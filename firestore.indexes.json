@@ -1,0 +1,40 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "chamados",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "categoria", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "DESCENDING" },
+        { "fieldPath": "data_abertura", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "chamados",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "data_abertura", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "chamados",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "categoria", "order": "ASCENDING" },
+        { "fieldPath": "prioridade", "order": "ASCENDING" },
+        { "fieldPath": "data_abertura", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "chamados",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "gate", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "data_abertura", "order": "DESCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

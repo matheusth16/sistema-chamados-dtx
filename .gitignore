@@ -1,0 +1,31 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# --- Ambiente Virtual ---
+.venv/
+venv/
+env/
+
+# --- Segredos e Configurações ---
+.env
+credentials.json
+.firebaserc
+firebase.json
+
+# --- Banco de Dados ---
+# Ignoramos o arquivo do banco para que os dados de teste fiquem só no seu PC
+*.db
+instance/
+
+# --- Uploads (Dados do Usuário) ---
+# Muito importante: não queremos subir fotos/PDFs de teste para o código
+app/static/uploads/*
+# Mas queremos manter a pasta vazia no repositório (opcional)
+!app/static/uploads/.gitkeep
+
+# --- Sistema Operacional ---
+.DS_Store
+Thumbs.db

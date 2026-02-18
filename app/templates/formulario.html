@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto">
+    
+    <div class="bg-white shadow-xl rounded-lg overflow-hidden">
+        <div class="bg-gradient-to-r from-blue-600 to-blue-800 px-6 py-4">
+            <h2 class="text-2xl font-bold text-white">Abertura de Chamado</h2>
+            <p class="text-blue-100 text-sm">Preencha os detalhes abaixo. Projetos têm prioridade automática.</p>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="mb-4">
+            {% for category, message in messages %}
+            <div class="p-4 rounded-md shadow-sm text-sm font-medium 
+                {% if category == 'danger' %} bg-red-100 text-red-700 border border-red-200 
+                {% else %} bg-green-100 text-green-700 border border-green-200 {% endif %}">
+                {{ message }}
+            </div>
+            {% endfor %}
+            </div>
+        {% endif %}
+        {% endwith %}
+
+        <form action="/" method="POST" enctype="multipart/form-data" class="p-8 space-y-6">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Categoria da Solicitação</label>
+                <div class="flex space-x-6">
+                    <div class="flex items-center">
+                        <input type="radio" id="cat_nao_aplicavel" name="categoria" value="Nao Aplicavel" checked onclick="toggleRL(false)"
+                               class="focus:ring-blue-500 h-4 w-4 text-blue-600 border-gray-300">
+                        <label for="cat_nao_aplicavel" class="ml-2 block text-sm text-gray-900">Não Aplicável (Rotina)</label>
+                    </div>
+                    <div class="flex items-center">
+                        <input type="radio" id="cat_projetos" name="categoria" value="Projetos" onclick="toggleRL(true)"
+                               class="focus:ring-blue-500 h-4 w-4 text-red-600 border-gray-300">
+                        <label for="cat_projetos" class="ml-2 block text-sm font-bold text-red-700">Projetos (Prioridade Máxima)</label>
+                    </div>
+                </div>
+            </div>
+
+            <div id="div_rl" class="hidden transition-all duration-300 ease-in-out bg-red-50 p-4 rounded-md border border-red-200">
+                <label for="rl_codigo" class="block text-sm font-bold text-red-800">Código RL (3 Dígitos) *</label>
+                <input type="text" name="rl_codigo" id="rl_codigo" maxlength="3" placeholder="Ex: 045"
+                       class="mt-1 block w-32 border-gray-300 rounded-md shadow-sm focus:ring-red-500 focus:border-red-500 sm:text-sm p-2 border">
+                <p class="text-xs text-red-500 mt-1">Obrigatório para priorização na fila.</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <label for="tipo" class="block text-sm font-medium text-gray-700">Tipo / Setor</label>
+                    <select name="tipo" id="tipo" required onchange="filtrarResponsaveis()"
+                            class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md border">
+                        <option value="" disabled selected>Selecione...</option>
+                        <option value="Manutencao">Manutenção</option>
+                        <option value="Engenharia">Engenharia</option>
+                        <option value="Qualidade">Qualidade</option>
+                        <option value="Comercial">Comercial</option>
+                        <option value="Planejamento">Planejamento</option>
+                        <option value="Material">Material Indireto / Compras</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label for="gate" class="block text-sm font-medium text-gray-700">Gate</label>
+                    <select name="gate" id="gate"
+                            class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md border">
+                        <option value="N/A">Não se aplica</option>
+                        <option value="Gate 1">Gate 1</option>
+                        <option value="Gate 2">Gate 2</option>
+                        <option value="Gate 3">Gate 3</option>
+                        <option value="Gate 4">Gate 4</option>
+                    </select>
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Impacto Principal</label>
+                <div class="grid grid-cols-3 gap-4">
+                    <label class="border rounded-md p-3 flex items-center hover:bg-gray-50 cursor-pointer">
+                        <input type="radio" name="impacto" value="Prazo" class="h-4 w-4 text-blue-600">
+                        <span class="ml-2 text-sm text-gray-700">Prazo / Cliente</span>
+                    </label>
+                    <label class="border rounded-md p-3 flex items-center hover:bg-gray-50 cursor-pointer">
+                        <input type="radio" name="impacto" value="Qualidade" class="h-4 w-4 text-blue-600">
+                        <span class="ml-2 text-sm text-gray-700">Qualidade</span>
+                    </label>
+                    <label class="border rounded-md p-3 flex items-center hover:bg-gray-50 cursor-pointer">
+                        <input type="radio" name="impacto" value="Seguranca" class="h-4 w-4 text-blue-600">
+                        <span class="ml-2 text-sm text-gray-700">Segurança</span>
+                    </label>
+                </div>
+            </div>
+
+            <div>
+                <label for="descricao" class="block text-sm font-medium text-gray-700">Descrição Detalhada</label>
+                <textarea name="descricao" id="descricao" rows="4" required placeholder="Descreva o problema ou solicitação..."
+                          class="mt-1 block w-full shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm border-gray-300 rounded-md border p-2"></textarea>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Anexar Arquivo (PDF, Imagem, Excel)</label>
+                <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md hover:bg-gray-50 transition relative group">
+                    <div class="space-y-1 text-center">
+                        <svg class="mx-auto h-12 w-12 text-gray-400 group-hover:text-blue-500 transition" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
+                            <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
+                        <div class="flex text-sm text-gray-600 justify-center">
+                            <label for="anexo_arquivo" class="relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500">
+                                <span>Carregar um arquivo</span>
+                                <input id="anexo_arquivo" name="anexo" type="file" class="sr-only">
+                            </label>
+                            <p class="pl-1">ou arraste e solte</p>
+                        </div>
+                        <p class="text-xs text-gray-500">PNG, JPG, PDF ou XLSX até 10MB</p>
+                        <p id="nome_arquivo" class="text-sm text-green-600 font-bold mt-2 hidden bg-green-50 py-1 px-2 rounded-md border border-green-200"></p>
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <label for="responsavel_visual" class="block text-sm font-medium text-gray-700">Responsável Sugerido</label>
+                <input type="text" id="responsavel_visual" value="Selecione um setor acima..." disabled
+                       class="mt-1 block w-full bg-gray-100 border-gray-300 rounded-md text-gray-500 sm:text-sm p-2 border cursor-not-allowed">
+                <p class="text-xs text-gray-500 mt-1">*Definido automaticamente pelo sistema.</p>
+            </div>
+
+            <div class="pt-4">
+                <button type="submit"
+                        class="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-900 hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition">
+                    Enviar Solicitação
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    // Função para mostrar/esconder o campo RL
+    function toggleRL(isProject) {
+        const divRL = document.getElementById('div_rl');
+        const inputRL = document.getElementById('rl_codigo');
+        
+        if (isProject) {
+            divRL.classList.remove('hidden');
+            inputRL.setAttribute('required', 'true');
+        } else {
+            divRL.classList.add('hidden');
+            inputRL.removeAttribute('required');
+            inputRL.value = ''; // Limpa se esconder
+        }
+    }
+
+    // Função Simulada de Filtro de Responsáveis
+    function filtrarResponsaveis() {
+        const setor = document.getElementById('tipo').value;
+        const campoResponsavel = document.getElementById('responsavel_visual');
+        
+        // No futuro, aqui teremos a lista real. Hoje é tudo Matheus!
+        if (setor) {
+            campoResponsavel.value = "Matheus Costa (Lead " + setor + ")";
+        } else {
+            campoResponsavel.value = "Selecione um setor...";
+        }
+    }
+
+    // Função para mostrar o nome do arquivo selecionado
+    document.getElementById('anexo_arquivo').addEventListener('change', function(e) {
+        var fileName = e.target.files[0].name;
+        var display = document.getElementById('nome_arquivo');
+        if(fileName) {
+            display.textContent = '📎 Arquivo pronto para envio: ' + fileName;
+            display.classList.remove('hidden');
+        }
+    });
+</script>
+{% endblock %}

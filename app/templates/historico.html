@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="space-y-6">
+    
+    <!-- Header -->
+    <div class="flex flex-col md:flex-row justify-between items-start bg-white p-6 rounded-lg shadow-sm border border-gray-100">
+        <div>
+            <h2 class="text-2xl font-bold text-gray-800">Histórico de Alterações</h2>
+            <p class="text-sm text-gray-600 mt-1">
+                <span class="font-semibold">{{ chamado.numero_chamado }}</span> - {{ chamado.descricao[:50] }}...
+            </p>
+        </div>
+        <a href="{{ url_for('main.admin') }}" class="mt-4 md:mt-0 inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-md shadow transition">
+            ← Voltar ao Painel
+        </a>
+    </div>
+
+    <!-- Informações do Chamado -->
+    <div class="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-lg border border-blue-200">
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <div>
+                <p class="text-xs text-gray-600 font-semibold uppercase">ID</p>
+                <p class="text-lg font-bold text-gray-900">{{ chamado.numero_chamado }}</p>
+            </div>
+            <div>
+                <p class="text-xs text-gray-600 font-semibold uppercase">Categoria</p>
+                <p class="text-lg font-bold text-gray-900">{{ chamado.categoria }}</p>
+            </div>
+            <div>
+                <p class="text-xs text-gray-600 font-semibold uppercase">Status</p>
+                <p class="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold
+                    {% if chamado.status == 'Concluído' %}bg-green-100 text-green-800{% elif chamado.status == 'Em Atendimento' %}bg-yellow-100 text-yellow-800{% else %}bg-gray-100 text-gray-800{% endif %}">
+                    {{ chamado.status }}
+                </p>
+            </div>
+            <div>
+                <p class="text-xs text-gray-600 font-semibold uppercase">Responsável</p>
+                <p class="text-lg font-bold text-gray-900">{{ chamado.responsavel }}</p>
+            </div>
+            <div>
+                <p class="text-xs text-gray-600 font-semibold uppercase">Abertura</p>
+                <p class="text-lg font-bold text-gray-900">{{ chamado.data_abertura_formatada() }}</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Timeline de Histórico -->
+    <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200">
+        <h3 class="text-lg font-bold text-gray-900 mb-6">Timeline de Alterações</h3>
+        
+        {% if historico %}
+            <div class="space-y-6">
+                {% for evento in historico %}
+                    <div class="flex gap-4">
+                        <!-- Ponto da Timeline -->
+                        <div class="flex flex-col items-center">
+                            <div class="h-12 w-12 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold shadow">
+                                {% if evento.acao == 'criacao' %}
+                                    ✓
+                                {% elif evento.acao == 'alteracao_status' %}
+                                    ↻
+                                {% elif evento.acao == 'alteracao_dados' %}
+                                    ⚙
+                                {% endif %}
+                            </div>
+                            {% if not loop.last %}<div class="h-12 w-1 bg-gray-300 mt-2"></div>{% endif %}
+                        </div>
+
+                        <!-- Descrição do Evento -->
+                        <div class="flex-1 bg-gray-50 p-4 rounded-lg border border-gray-200">
+                            <div class="flex justify-between items-start mb-2">
+                                <div>
+                                    <h4 class="text-sm font-bold text-gray-900">
+                                        {% if evento.acao == 'criacao' %}
+                                            Chamado criado
+                                        {% elif evento.acao == 'alteracao_status' %}
+                                            Status alterado
+                                        {% elif evento.acao == 'alteracao_dados' %}
+                                            Dados alterados
+                                        {% endif %}
+                                    </h4>
+                                    <p class="text-xs text-gray-600">Por: <span class="font-semibold">{{ evento.usuario_nome }}</span></p>
+                                </div>
+                                <time class="text-xs font-medium text-gray-500">{{ evento.data_acao_formatada() }}</time>
+                            </div>
+
+                            <!-- Detalhes da Alteração -->
+                            {% if evento.acao == 'alteracao_status' %}
+                                <div class="mt-3 p-3 bg-white rounded border-l-4 border-blue-500 text-sm">
+                                    <p class="text-gray-700">
+                                        <span class="font-semibold">{{ evento.campo_alterado }}</span> alterado de 
+                                        <span class="inline-block px-2 py-0.5 bg-red-100 text-red-800 rounded text-xs font-bold">{{ evento.valor_anterior }}</span> 
+                                        para 
+                                        <span class="inline-block px-2 py-0.5 bg-green-100 text-green-800 rounded text-xs font-bold">{{ evento.valor_novo }}</span>
+                                    </p>
+                                </div>
+                            {% elif evento.acao == 'alteracao_dados' %}
+                                <div class="mt-3 p-3 bg-white rounded border-l-4 border-purple-500 text-sm">
+                                    <p class="text-gray-700">
+                                        Campo <span class="font-semibold">{{ evento.campo_alterado }}</span> alterado
+                                    </p>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="text-center py-12">
+                <svg class="w-16 h-16 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                </svg>
+                <p class="text-gray-500 font-medium">Nenhuma alteração registrada ainda</p>
+                <p class="text-sm text-gray-400">Este chamado acabou de ser criado</p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+{% endblock %}
