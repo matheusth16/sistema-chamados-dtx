@@ -1,0 +1,17 @@
+.git
+.gitignore
+.venv/
+venv/
+env/
+__pycache__/
+*.pyc
+*.pyo
+*.db
+.DS_Store
+.vscode/
+.env
+credentials.json
+.firebaserc
+firebase.json
+instance/
+logs/
