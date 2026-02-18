@@ -9,7 +9,7 @@ load_dotenv(os.path.join(basedir, '.env'))
 
 class Config:
     """Configuração base da aplicação"""
-    SECRET_KEY = os.getenv('SECRET_KEY')
+    SECRET_KEY = os.getenv('SECRET_KEY') or 'dev-secret-key-change-in-production'
     
     # 2. Caminho ABSOLUTO para a pasta de uploads (Evita erros no Windows/OneDrive)
     UPLOAD_FOLDER = os.path.join(basedir, 'app', 'static', 'uploads')
@@ -32,7 +32,7 @@ class Config:
     
     # 7. Session Security
     PERMANENT_SESSION_LIFETIME = 86400  # 24 horas em segundos
-    SESSION_COOKIE_SECURE = True  # Apenas HTTPS em produção
+    SESSION_COOKIE_SECURE = os.getenv('SESSION_COOKIE_SECURE', 'True') == 'True'  # HTTPS em produção
     SESSION_COOKIE_HTTPONLY = True  # Não acessível via JavaScript
     SESSION_COOKIE_SAMESITE = 'Lax'  # Proteção contra CSRF
     
