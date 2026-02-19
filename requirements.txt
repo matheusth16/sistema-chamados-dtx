@@ -1,17 +1,35 @@
-Flask
-Flask-Login
-Flask-WTF
-Flask-Limiter
-python-dotenv
-firebase-admin
-pandas
-openpyxl
-werkzeug
-python-json-logger
-gunicorn
-pywebpush
-py-vapid
-pytest
-pytest-cov
-# Opcional: cache Redis (reduz queries ao Firestore). Use REDIS_URL no .env
-redis>=4.0
+# Framework
+Flask==3.1.2
+Werkzeug==3.1.5
+python-dotenv==1.0.1
+
+# Autenticação e CSRF
+Flask-Login==0.6.3
+Flask-WTF==1.2.2
+
+# Rate Limiting (com fallback em memória)
+Flask-Limiter==4.1.1
+
+# Google Firebase
+firebase-admin==7.1.0
+
+# Dados e Análise
+pandas==3.0.1
+openpyxl==3.1.5
+
+# Logging
+python-json-logger==3.2.1
+
+# Servidor WSGI
+gunicorn==25.1.0
+
+# Web Push (Notificações)
+pywebpush==2.0.0
+py-vapid==1.7.1
+
+# Opcional: Cache Redis (reduz queries ao Firestore, com fallback em memória)
+redis==7.2.0
+
+# Testes
+pytest==8.4.2
+pytest-cov==6.0.0
