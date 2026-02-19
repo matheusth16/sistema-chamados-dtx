@@ -14,6 +14,7 @@ function abrirModal(botao) {
         gate: botao.dataset.gate,
         data_abertura: botao.dataset.data,
         responsavel: botao.dataset.responsavel,
+        solicitante_nome: botao.dataset.solicitanteNome,
         descricao: botao.dataset.descricao,
         rl_codigo: botao.dataset.rl,
         anexo: botao.dataset.anexo,
@@ -25,10 +26,13 @@ function abrirModal(botao) {
 
     // 2. Preenche os Dados Básicos (Cabeçalho)
     document.getElementById('modal-titulo').innerText = `Visualizando Chamado ${dados.numero}`;
-    document.getElementById('modal-categoria').innerText = dados.categoria;
-    document.getElementById('modal-setor').innerText = dados.tipo;
+    document.getElementById('modal-categoria').innerText = translateCategory(dados.categoria);
+    document.getElementById('modal-setor').innerText = translateSector(dados.tipo);
     document.getElementById('modal-data').innerText = dados.data_abertura;
-    document.getElementById('modal-autor').innerText = dados.responsavel;
+    
+    // Mostra o solicitante (quem abriu o chamado)
+    const solicitanteText = dados.solicitante_nome ? dados.solicitante_nome : dados.responsavel;
+    document.getElementById('modal-autor').innerText = solicitanteText;
 
     // 3. Preenche a Descrição Completa
     document.getElementById('modal-descricao').innerText = dados.descricao;

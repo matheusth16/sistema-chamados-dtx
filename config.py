@@ -43,3 +43,17 @@ class Config:
     
     # Firebase: Será inicializado em app/database.py
     # As credenciais vão em credentials.json na raiz do projeto
+
+    # Notificações (URL base para links em e-mail/Teams/Web Push)
+    APP_BASE_URL = os.getenv('APP_BASE_URL', '')
+    MAIL_SERVER = os.getenv('MAIL_SERVER', '')
+    MAIL_PORT = int(os.getenv('MAIL_PORT', '587'))
+    MAIL_USE_TLS = os.getenv('MAIL_USE_TLS', 'true').lower() in ('true', '1', 'yes')
+    MAIL_USERNAME = os.getenv('MAIL_USERNAME', '')
+    MAIL_PASSWORD = os.getenv('MAIL_PASSWORD', '')
+    MAIL_DEFAULT_SENDER = os.getenv('MAIL_DEFAULT_SENDER', '')
+    TEAMS_WEBHOOK_URL = os.getenv('TEAMS_WEBHOOK_URL', '')
+
+    # Web Push (notificações no navegador). Gere chaves com: python gerar_vapid_keys.py
+    VAPID_PUBLIC_KEY = os.getenv('VAPID_PUBLIC_KEY', '')
+    VAPID_PRIVATE_KEY = os.getenv('VAPID_PRIVATE_KEY', '')

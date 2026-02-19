@@ -9,3 +9,7 @@ openpyxl
 werkzeug
 python-json-logger
 gunicorn
+pywebpush
+py-vapid
+pytest
+pytest-cov

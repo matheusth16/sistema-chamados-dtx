@@ -12,8 +12,10 @@ env/
 # --- Segredos e Configurações ---
 .env
 credentials.json
-.firebaserc
-firebase.json
+
+# --- Logs ---
+logs/
+*.log
 
 # --- Banco de Dados ---
 # Ignoramos o arquivo do banco para que os dados de teste fiquem só no seu PC

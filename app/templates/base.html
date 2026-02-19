@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() if csrf_token() else '' }}">
     <title>Sistema de Chamados - DTX Aerospace</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
@@ -21,14 +22,65 @@
                     </div>
                     <div class="hidden md:block">
                         <div class="ml-10 flex items-baseline space-x-4">
-                            <a href="/" class="hover:bg-blue-700 px-3 py-2 rounded-md text-sm font-medium transition">Novo Chamado</a>
-                            <a href="/admin" class="hover:bg-blue-700 px-3 py-2 rounded-md text-sm font-medium transition">Gestão (Admin)</a>
+                            {% if current_user.is_authenticated %}
+                                <!-- Aba "Novo Chamado" (visível para solicitantes) -->
+                                {% if current_user.perfil == 'solicitante' %}
+                                <a href="/" class="hover:bg-blue-700 px-3 py-2 rounded-md text-sm font-medium transition">{{ t('search') if current_user.perfil == 'solicitante' else 'Novo Chamado' }}</a>
+                                {% endif %}
+                                
+                                <!-- Aba "Gestão (Admin)" (visível apenas para supervisores e admins) -->
+                                {% if current_user.perfil in ['supervisor', 'admin'] %}
+                                <a href="/admin" class="hover:bg-blue-700 px-3 py-2 rounded-md text-sm font-medium transition">Gestão{% if current_user.perfil == 'admin' %} (Admin){% endif %}</a>
+                                {% endif %}
+                            {% else %}
+                                <!-- Sem autenticação: sem abas -->
+                            {% endif %}
                         </div>
                     </div>
                 </div>
-                <div>
+                <div class="flex items-center space-x-6">
+                    <!-- Sino de notificações (apenas supervisor/admin) -->
+                    {% if current_user.is_authenticated and current_user.perfil in ['supervisor', 'admin'] %}
+                    <div class="relative group" id="nav-notificacoes">
+                        <button type="button" id="btn-sino" class="relative p-2 rounded-md hover:bg-blue-700 transition" aria-label="Notificações">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+                            </svg>
+                            <span id="sino-badge" class="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 flex items-center justify-center text-xs font-bold bg-red-500 text-white rounded-full hidden">0</span>
+                        </button>
+                        <div id="sino-dropdown" class="absolute right-0 mt-2 w-80 max-h-96 overflow-auto bg-white text-gray-800 rounded-lg shadow-xl border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                            <div class="p-2 border-b border-gray-100 font-semibold text-sm text-gray-700">Notificações</div>
+                            <div id="sino-lista" class="divide-y divide-gray-100">
+                                <div class="p-3 text-sm text-gray-500 text-center">Carregando...</div>
+                            </div>
+                            <div class="p-2 border-t border-gray-100 text-center">
+                                <a href="{{ url_for('main.admin') }}" class="text-sm text-blue-600 hover:underline">Ver painel</a>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    <!-- Seletor de Idioma -->
+                    <div class="relative group">
+                        <button class="flex items-center space-x-1 hover:bg-blue-700 px-3 py-2 rounded-md text-sm font-medium transition">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 00.948-.684l1.498-4.493a1 1 0 011.502-.684l1.498 4.493a1 1 0 00.948.684H19a2 2 0 012 2v2M3 5a2 2 0 002 2h3.28a1 1 0 00.948.684l1.498 4.493a1 1 0 001.502.684l1.498-4.493a1 1 0 00.948-.684H19a2 2 0 002-2v2" />
+                            </svg>
+                            <span>{{ current_language[:5] }}</span>
+                        </button>
+                        <div class="absolute right-0 mt-2 w-48 bg-white text-gray-800 rounded-md shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                            <a href="?lang=pt_BR" class="block px-4 py-2 hover:bg-blue-50{% if current_language == 'pt_BR' %} bg-blue-100 font-semibold{% endif %}">🇧🇷 Português (Brasil)</a>
+                            <a href="?lang=en" class="block px-4 py-2 hover:bg-blue-50{% if current_language == 'en' %} bg-blue-100 font-semibold{% endif %}">🇺🇸 English</a>
+                            <a href="?lang=es" class="block px-4 py-2 hover:bg-blue-50{% if current_language == 'es' %} bg-blue-100 font-semibold{% endif %}">🇪🇸 Español</a>
+                        </div>
+                    </div>
+
                     {% if current_user.is_authenticated %}
-                    <span class="text-xs text-blue-200">Logado como: {{ current_user.nome }}</span>
+                    <div class="flex items-center">
+                        <span class="text-xs text-blue-200">
+                            👤 {{ current_user.nome }}
+                            {% if current_user.area %}<br><span class="text-xs text-blue-300">{{ current_user.area }}</span>{% endif %}
+                        </span>
+                    </div>
                     {% endif %}
                 </div>
             </div>
@@ -64,6 +116,97 @@
             </p>
         </div>
     </footer>
+
+    {% if current_user.is_authenticated and current_user.perfil in ['supervisor', 'admin'] %}
+    <script>
+    (function() {
+        var btn = document.getElementById('btn-sino');
+        var badge = document.getElementById('sino-badge');
+        var lista = document.getElementById('sino-lista');
+        if (!btn || !lista) return;
+        function carregarNotificacoes() {
+            fetch('{{ url_for("main.api_notificacoes_listar") }}', { credentials: 'same-origin' })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data.total_nao_lidas !== undefined) {
+                        if (badge) {
+                            badge.textContent = data.total_nao_lidas > 99 ? '99+' : data.total_nao_lidas;
+                            badge.classList.toggle('hidden', data.total_nao_lidas === 0);
+                        }
+                    }
+                    var notifs = data.notificacoes || [];
+                    if (notifs.length === 0) {
+                        lista.innerHTML = '<div class="p-3 text-sm text-gray-500 text-center">Nenhuma notificação</div>';
+                        return;
+                    }
+                    lista.innerHTML = notifs.map(function(n) {
+                        var urlChamado = '/chamado/' + (n.chamado_id || '') + '/historico';
+                        var lidaClass = n.lida ? 'bg-gray-50' : 'bg-blue-50';
+                        return '<a href="' + urlChamado + '" class="block p-3 text-left hover:bg-gray-100 ' + lidaClass + ' notif-item" data-id="' + (n.id || '') + '">' +
+                            '<div class="font-semibold text-gray-800 text-sm">' + (n.titulo || '') + '</div>' +
+                            '<div class="text-xs text-gray-600 mt-0.5">' + (n.mensagem || '') + '</div>' +
+                            '</a>';
+                    }).join('');
+                    lista.querySelectorAll('.notif-item').forEach(function(el) {
+                        el.addEventListener('click', function(e) {
+                            var id = el.getAttribute('data-id');
+                            if (id) {
+                                fetch('{{ url_for("main.api_notificacoes_marcar_lida", notificacao_id="__ID__") }}'.replace('__ID__', id), {
+                                    method: 'POST',
+                                    credentials: 'same-origin',
+                                    headers: { 'X-CSRFToken': document.querySelector('meta[name="csrf-token"]') && document.querySelector('meta[name="csrf-token"]').content || '', 'Content-Type': 'application/json' }
+                                }).then(function() {});
+                            }
+                        });
+                    });
+                })
+                .catch(function() {
+                    lista.innerHTML = '<div class="p-3 text-sm text-gray-500 text-center">Erro ao carregar</div>';
+                });
+        }
+        carregarNotificacoes();
+        btn.addEventListener('click', function() { carregarNotificacoes(); });
+    })();
+    </script>
+    <!-- Web Push: registrar SW e inscrever (apenas supervisor/admin) -->
+    <script>
+    (function() {
+        if (!('Notification' in window) || !('serviceWorker' in navigator)) return;
+        var vapidPublicKey = null;
+        function urlBase() { return window.location.origin; }
+        function csrfHeader() {
+            var m = document.querySelector('meta[name="csrf-token"]');
+            return m && m.content ? { 'X-CSRFToken': m.content } : {};
+        }
+        navigator.serviceWorker.register('{{ url_for("main.service_worker_js") }}').then(function(reg) {
+            return fetch('{{ url_for("main.api_push_vapid_public") }}', { credentials: 'same-origin' });
+        }).then(function(r) { return r.json(); }).then(function(data) {
+            vapidPublicKey = data.vapid_public_key;
+            if (!vapidPublicKey) return;
+            return Notification.requestPermission();
+        }).then(function(permission) {
+            if (permission !== 'granted' || !vapidPublicKey) return;
+            return navigator.serviceWorker.ready;
+        }).then(function(reg) {
+            if (!reg || !vapidPublicKey) return;
+            return reg.pushManager.subscribe({
+                userVisibleOnly: true,
+                applicationServerKey: vapidPublicKey
+            });
+        }).then(function(sub) {
+            if (!sub) return;
+            var subJson = sub.toJSON ? sub.toJSON() : { endpoint: sub.endpoint, keys: sub.getKey && { p256dh: sub.getKey('p256dh'), auth: sub.getKey('auth') } };
+            if (!subJson || !subJson.endpoint) return;
+            return fetch('{{ url_for("main.api_push_subscribe") }}', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: Object.assign({ 'Content-Type': 'application/json' }, csrfHeader()),
+                body: JSON.stringify({ subscription: subJson })
+            });
+        }).catch(function() {});
+    })();
+    </script>
+    {% endif %}
 
 </body>
 </html>

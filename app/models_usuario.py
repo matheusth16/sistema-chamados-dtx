@@ -5,11 +5,12 @@ from app.database import db
 class Usuario(UserMixin):
     """Representação de um usuário do sistema"""
     
-    def __init__(self, id: str, email: str, nome: str, perfil: str = 'gestor'):
+    def __init__(self, id: str, email: str, nome: str, perfil: str = 'solicitante', area: str = None):
         self.id = id
         self.email = email
         self.nome = nome
-        self.perfil = perfil  # 'admin' ou 'gestor'
+        self.perfil = perfil  # 'solicitante', 'supervisor' ou 'admin'
+        self.area = area  # Setor/departamento (ex: Manutencao, Engenharia, etc)
         self.senha_hash = None
     
     def set_password(self, senha: str):
@@ -26,6 +27,7 @@ class Usuario(UserMixin):
             'email': self.email,
             'nome': self.nome,
             'perfil': self.perfil,
+            'area': self.area,
             'senha_hash': self.senha_hash
         }
     
@@ -36,7 +38,8 @@ class Usuario(UserMixin):
             id=id,
             email=data.get('email'),
             nome=data.get('nome'),
-            perfil=data.get('perfil', 'gestor')
+            perfil=data.get('perfil', 'solicitante'),
+            area=data.get('area')
         )
         usuario.senha_hash = data.get('senha_hash')
         return usuario
@@ -73,6 +76,100 @@ class Usuario(UserMixin):
         except Exception as e:
             print(f'Erro ao salvar usuário: {e}')
             return False
+    
+    def update(self, **kwargs):
+        """Atualiza campos específicos do usuário no Firestore
+        
+        Args:
+            **kwargs: Campos a atualizar (email, nome, perfil, area, senha)
+        """
+        try:
+            update_data = {}
+            
+            # Aceita atualizações de campos específicos
+            if 'email' in kwargs:
+                self.email = kwargs['email']
+                update_data['email'] = kwargs['email']
+            
+            if 'nome' in kwargs:
+                self.nome = kwargs['nome']
+                update_data['nome'] = kwargs['nome']
+            
+            if 'perfil' in kwargs:
+                self.perfil = kwargs['perfil']
+                update_data['perfil'] = kwargs['perfil']
+            
+            if 'area' in kwargs:
+                self.area = kwargs['area']
+                update_data['area'] = kwargs['area']
+            
+            if 'senha' in kwargs and kwargs['senha']:
+                self.set_password(kwargs['senha'])
+                update_data['senha_hash'] = self.senha_hash
+            
+            if update_data:
+                db.collection('usuarios').document(self.id).update(update_data)
+                return True
+            
+            return False
+        except Exception as e:
+            print(f'Erro ao atualizar usuário: {e}')
+            return False
+    
+    def delete(self):
+        """Deleta o usuário do Firestore"""
+        try:
+            db.collection('usuarios').document(self.id).delete()
+            return True
+        except Exception as e:
+            print(f'Erro ao deletar usuário: {e}')
+            return False
+    
+    @classmethod
+    def get_all(cls):
+        """Retorna lista de todos os usuários"""
+        try:
+            docs = db.collection('usuarios').order_by('nome').stream()
+            usuarios = []
+            for doc in docs:
+                data = doc.to_dict()
+                usuario = cls.from_dict(data, doc.id)
+                usuarios.append(usuario)
+            return usuarios
+        except Exception as e:
+            print(f'Erro ao buscar usuários: {e}')
+            return []
+    
+    @classmethod
+    def email_existe(cls, email: str, id_atual: str = None) -> bool:
+        """Verifica se um email já existe (excluindo é um ID específico)
+        
+        Args:
+            email: Email a verificar
+            id_atual: ID do usuário atual (para validação de atualização)
+        """
+        try:
+            docs = db.collection('usuarios').where('email', '==', email).stream()
+            for doc in docs:
+                if id_atual is None or doc.id != id_atual:
+                    return True
+            return False
+        except Exception as e:
+            print(f'Erro ao verificar email: {e}')
+            return False
+    
+    @classmethod
+    def get_supervisores_por_area(cls, area: str):
+        """Retorna supervisores de uma área específica"""
+        try:
+            docs = db.collection('usuarios')\
+                .where('perfil', '==', 'supervisor')\
+                .where('area', '==', area)\
+                .stream()
+            return [cls.from_dict(doc.to_dict(), doc.id) for doc in docs]
+        except Exception as e:
+            print(f'Erro ao buscar supervisores: {e}')
+            return []
     
     def __repr__(self):
         return f'<Usuario {self.email} - {self.perfil}>'

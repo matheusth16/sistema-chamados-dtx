@@ -5,8 +5,8 @@
     
     <div class="bg-white shadow-xl rounded-lg overflow-hidden">
         <div class="bg-gradient-to-r from-blue-600 to-blue-800 px-6 py-4">
-            <h2 class="text-2xl font-bold text-white">Abertura de Chamado</h2>
-            <p class="text-blue-100 text-sm">Preencha os detalhes abaixo. Projetos têm prioridade automática.</p>
+            <h2 class="text-2xl font-bold text-white">{{ t('ticket_opening') }}</h2>
+            <p class="text-blue-100 text-sm">{{ t('fill_details') }}</p>
         </div>
 
         {% with messages = get_flashed_messages(with_categories=true) %}
@@ -23,86 +23,120 @@
         {% endif %}
         {% endwith %}
 
+        <!-- Card de Identificação do Solicitante -->
+        {% if current_user.is_authenticated %}
+        <div class="bg-blue-50 border border-blue-200 p-4 rounded-lg mb-6">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-4">
+                    <div class="flex-shrink-0">
+                        <svg class="h-6 w-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="text-sm font-bold text-blue-900">{{ t('identified_requester') }}</h3>
+                        <p class="text-sm text-blue-800 mt-1">
+                            <span class="font-semibold">{{ current_user.nome }}</span>
+                            {% if current_user.area %}<br><span class="text-xs text-blue-700">{{ t('area_sector') }}: <span class="font-semibold">{{ current_user.area }}</span></span>{% endif %}
+                        </p>
+                    </div>
+                </div>
+                <!-- Botão de Sair -->
+                <a href="{{ url_for('main.logout') }}" class="inline-flex items-center px-3 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-md shadow transition text-sm">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+                    </svg>
+                    {{ t('logout') }}
+                </a>
+            </div>
+        </div>
+        {% else %}
+        <!-- Mensagem se não autenticado (não deve acontecer, mas por segurança) -->
+        <div class="bg-red-50 border border-red-200 p-4 rounded-lg mb-6">
+            <p class="text-sm text-red-800"><span class="font-bold">⚠️ Atenção:</span> {{ t('must_be_logged') }}</p>
+        </div>
+        {% endif %}
+
         <form action="/" method="POST" enctype="multipart/form-data" class="p-8 space-y-6">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
 
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Categoria da Solicitação</label>
+                <label class="block text-sm font-medium text-gray-700 mb-2">{{ t('request_category') }}</label>
                 <div class="flex space-x-6">
                     <div class="flex items-center">
                         <input type="radio" id="cat_nao_aplicavel" name="categoria" value="Nao Aplicavel" checked onclick="toggleRL(false)"
                                class="focus:ring-blue-500 h-4 w-4 text-blue-600 border-gray-300">
-                        <label for="cat_nao_aplicavel" class="ml-2 block text-sm text-gray-900">Não Aplicável (Rotina)</label>
+                        <label for="cat_nao_aplicavel" class="ml-2 block text-sm text-gray-900">{{ t('not_applicable_routine') }}</label>
                     </div>
                     <div class="flex items-center">
                         <input type="radio" id="cat_projetos" name="categoria" value="Projetos" onclick="toggleRL(true)"
                                class="focus:ring-blue-500 h-4 w-4 text-red-600 border-gray-300">
-                        <label for="cat_projetos" class="ml-2 block text-sm font-bold text-red-700">Projetos (Prioridade Máxima)</label>
+                        <label for="cat_projetos" class="ml-2 block text-sm font-bold text-red-700">{{ t('projects_max_priority') }}</label>
                     </div>
                 </div>
             </div>
 
             <div id="div_rl" class="hidden transition-all duration-300 ease-in-out bg-red-50 p-4 rounded-md border border-red-200">
-                <label for="rl_codigo" class="block text-sm font-bold text-red-800">Código RL (3 Dígitos) *</label>
-                <input type="text" name="rl_codigo" id="rl_codigo" maxlength="3" placeholder="Ex: 045"
+                <label for="rl_codigo" class="block text-sm font-bold text-red-800">{{ t('rl_code_label') }} *</label>
+                <input type="text" name="rl_codigo" id="rl_codigo" maxlength="3" placeholder="{{ t('rl_code_example') }}"
                        class="mt-1 block w-32 border-gray-300 rounded-md shadow-sm focus:ring-red-500 focus:border-red-500 sm:text-sm p-2 border">
-                <p class="text-xs text-red-500 mt-1">Obrigatório para priorização na fila.</p>
+                <p class="text-xs text-red-500 mt-1">{{ t('rl_required') }}</p>
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                    <label for="tipo" class="block text-sm font-medium text-gray-700">Tipo / Setor</label>
+                    <label for="tipo" class="block text-sm font-medium text-gray-700">{{ t('type_sector') }}</label>
                     <select name="tipo" id="tipo" required onchange="filtrarResponsaveis()"
                             class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md border">
-                        <option value="" disabled selected>Selecione...</option>
-                        <option value="Manutencao">Manutenção</option>
-                        <option value="Engenharia">Engenharia</option>
-                        <option value="Qualidade">Qualidade</option>
-                        <option value="Comercial">Comercial</option>
-                        <option value="Planejamento">Planejamento</option>
-                        <option value="Material">Material Indireto / Compras</option>
+                        <option value="" disabled selected>{{ t('select') }}</option>
+                        <option value="Manutencao">{{ t('maintenance') }}</option>
+                        <option value="Engenharia">{{ t('engineering') }}</option>
+                        <option value="Qualidade">{{ t('quality') }}</option>
+                        <option value="Comercial">{{ t('commercial') }}</option>
+                        <option value="Planejamento">{{ t('planning') }}</option>
+                        <option value="Material">{{ t('indirect_material') }}</option>
                     </select>
                 </div>
 
                 <div>
-                    <label for="gate" class="block text-sm font-medium text-gray-700">Gate</label>
+                    <label for="gate" class="block text-sm font-medium text-gray-700">{{ t('gate') }}</label>
                     <select name="gate" id="gate"
                             class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md border">
-                        <option value="N/A">Não se aplica</option>
-                        <option value="Gate 1">Gate 1</option>
-                        <option value="Gate 2">Gate 2</option>
-                        <option value="Gate 3">Gate 3</option>
-                        <option value="Gate 4">Gate 4</option>
+                        <option value="N/A">{{ t('not_applicable_short') }}</option>
+                        <option value="Gate 1">{{ t('gate_1') }}</option>
+                        <option value="Gate 2">{{ t('gate_2') }}</option>
+                        <option value="Gate 3">{{ t('gate_3') }}</option>
+                        <option value="Gate 4">{{ t('gate_4') }}</option>
                     </select>
                 </div>
             </div>
 
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Impacto Principal</label>
+                <label class="block text-sm font-medium text-gray-700 mb-2">{{ t('main_impact') }}</label>
                 <div class="grid grid-cols-3 gap-4">
                     <label class="border rounded-md p-3 flex items-center hover:bg-gray-50 cursor-pointer">
                         <input type="radio" name="impacto" value="Prazo" class="h-4 w-4 text-blue-600">
-                        <span class="ml-2 text-sm text-gray-700">Prazo / Cliente</span>
+                        <span class="ml-2 text-sm text-gray-700">{{ t('timeline_client') }}</span>
                     </label>
                     <label class="border rounded-md p-3 flex items-center hover:bg-gray-50 cursor-pointer">
                         <input type="radio" name="impacto" value="Qualidade" class="h-4 w-4 text-blue-600">
-                        <span class="ml-2 text-sm text-gray-700">Qualidade</span>
+                        <span class="ml-2 text-sm text-gray-700">{{ t('quality') }}</span>
                     </label>
                     <label class="border rounded-md p-3 flex items-center hover:bg-gray-50 cursor-pointer">
                         <input type="radio" name="impacto" value="Seguranca" class="h-4 w-4 text-blue-600">
-                        <span class="ml-2 text-sm text-gray-700">Segurança</span>
+                        <span class="ml-2 text-sm text-gray-700">{{ t('security') }}</span>
                     </label>
                 </div>
             </div>
 
             <div>
-                <label for="descricao" class="block text-sm font-medium text-gray-700">Descrição Detalhada</label>
-                <textarea name="descricao" id="descricao" rows="4" required placeholder="Descreva o problema ou solicitação..."
+                <label for="descricao" class="block text-sm font-medium text-gray-700">{{ t('detailed_description') }}</label>
+                <textarea name="descricao" id="descricao" rows="4" required placeholder="{{ t('describe_problem') }}"
                           class="mt-1 block w-full shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm border-gray-300 rounded-md border p-2"></textarea>
             </div>
 
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Anexar Arquivo (PDF, Imagem, Excel)</label>
+                <label class="block text-sm font-medium text-gray-700 mb-2">{{ t('attach_file') }}</label>
                 <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md hover:bg-gray-50 transition relative group">
                     <div class="space-y-1 text-center">
                         <svg class="mx-auto h-12 w-12 text-gray-400 group-hover:text-blue-500 transition" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
@@ -110,28 +144,29 @@
                         </svg>
                         <div class="flex text-sm text-gray-600 justify-center">
                             <label for="anexo_arquivo" class="relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500">
-                                <span>Carregar um arquivo</span>
+                                <span>{{ t('upload_file') }}</span>
                                 <input id="anexo_arquivo" name="anexo" type="file" class="sr-only">
                             </label>
-                            <p class="pl-1">ou arraste e solte</p>
+                            <p class="pl-1">{{ t('or_drag_drop') }}</p>
                         </div>
-                        <p class="text-xs text-gray-500">PNG, JPG, PDF ou XLSX até 10MB</p>
+                        <p class="text-xs text-gray-500">{{ t('file_types') }}</p>
                         <p id="nome_arquivo" class="text-sm text-green-600 font-bold mt-2 hidden bg-green-50 py-1 px-2 rounded-md border border-green-200"></p>
                     </div>
                 </div>
             </div>
+            </div>
 
             <div>
-                <label for="responsavel_visual" class="block text-sm font-medium text-gray-700">Responsável Sugerido</label>
-                <input type="text" id="responsavel_visual" value="Selecione um setor acima..." disabled
+                <label for="responsavel_visual" class="block text-sm font-medium text-gray-700">{{ t('suggested_responsible') }}</label>
+                <input type="text" id="responsavel_visual" value="{{ t('select_sector_above') }}" disabled
                        class="mt-1 block w-full bg-gray-100 border-gray-300 rounded-md text-gray-500 sm:text-sm p-2 border cursor-not-allowed">
-                <p class="text-xs text-gray-500 mt-1">*Definido automaticamente pelo sistema.</p>
+                <p class="text-xs text-gray-500 mt-1">*{{ t('defined_automatically') }}</p>
             </div>
 
             <div class="pt-4">
                 <button type="submit"
                         class="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-900 hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition">
-                    Enviar Solicitação
+                    {{ t('submit_request') }}
                 </button>
             </div>
         </form>
@@ -154,17 +189,45 @@
         }
     }
 
-    // Função Simulada de Filtro de Responsáveis
+    // Função para carregar responsável automaticamente baseado na área/setor
     function filtrarResponsaveis() {
         const setor = document.getElementById('tipo').value;
         const campoResponsavel = document.getElementById('responsavel_visual');
         
-        // No futuro, aqui teremos a lista real. Hoje é tudo Matheus!
-        if (setor) {
-            campoResponsavel.value = "Matheus Costa (Lead " + setor + ")";
-        } else {
-            campoResponsavel.value = "Selecione um setor...";
+        if (!setor) {
+            campoResponsavel.value = "{{ t('select_sector') }}";
+            return;
         }
+        
+        // Mostra que está carregando
+        campoResponsavel.value = "{{ t('loading_supervisors') }}";
+        campoResponsavel.classList.add('opacity-50');
+        
+        // Consulta a API de disponibilidade
+        fetch(`/api/supervisores/disponibilidade?area=${encodeURIComponent(setor)}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.sucesso && data.supervisores.length > 0) {
+                    // Encontra o supervisor disponível com menos carga
+                    const supervArquivo = data.supervisores.reduce((anterior, atual) => 
+                        atual.chamados_abertos < anterior.chamados_abertos ? atual : anterior
+                    );
+                    
+                    // Renderiza a sugestão
+                    const disponivel = supervArquivo.disponivel ? '✓' : '⚠️';
+                    campoResponsavel.value = `${disponivel} ${supervArquivo.nome} (${supervArquivo.chamados_abertos} abertos)`;
+                    campoResponsavel.classList.remove('opacity-50');
+                } else {
+                    // Nenhum supervisor disponível
+                    campoResponsavel.value = "{{ t('no_supervisors') }}";
+                    campoResponsavel.classList.add('bg-yellow-100', 'border-yellow-300');
+                }
+            }
+            .catch(error => {
+                console.error('Erro ao carregar supervisores:', error);
+                campoResponsavel.value = "{{ t('error_loading') }}";
+                campoResponsavel.classList.add('bg-red-100', 'border-red-300');
+            });
     }
 
     // Função para mostrar o nome do arquivo selecionado
@@ -172,7 +235,7 @@
         var fileName = e.target.files[0].name;
         var display = document.getElementById('nome_arquivo');
         if(fileName) {
-            display.textContent = '📎 Arquivo pronto para envio: ' + fileName;
+            display.textContent = '📎 {{ t('file_ready') }} ' + fileName;
             display.classList.remove('hidden');
         }
     });

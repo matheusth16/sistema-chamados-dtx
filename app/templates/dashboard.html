@@ -6,9 +6,9 @@
     <!-- Header com Info do Usuário -->
     <div class="flex flex-col md:flex-row justify-between items-center bg-white p-6 rounded-lg shadow-sm border border-gray-100 gap-4">
         <div>
-            <h2 class="text-2xl font-bold text-gray-800">Painel de Gestão de Chamados</h2>
+            <h2 class="text-2xl font-bold text-gray-800">{{ t('dashboard_title') }}</h2>
             <p class="text-sm text-gray-500">
-                <span class="font-semibold text-blue-600">{{ total_chamados }}</span> chamados encontrados (Página {{ pagina_atual }} de {{ total_paginas }}).
+                <span class="font-semibold text-blue-600">{{ total_chamados }}</span> {{ t('found_tickets') }} ({{ t('page') }} {{ pagina_atual }} {{ t('of') }} {{ total_paginas }}).
                 {% if current_user.is_authenticated %}
                 <span class="inline-block ml-4 text-blue-600 font-semibold">👤 {{ current_user.nome }}</span>
                 {% endif %}
@@ -19,57 +19,101 @@
                 <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
                 </svg>
-                Exportar
+                {{ t('export') }}
             </a>
+            {% if current_user.is_authenticated and current_user.perfil in ['admin', 'supervisor'] %}
+            <a href="{{ url_for('main.relatorios') }}" class="inline-flex items-center px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white font-semibold rounded-md shadow transition justify-center" title="Ver relatórios e análises">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                </svg>
+                {{ t('reports') }}
+            </a>
+            {% endif %}
+            {% if current_user.is_authenticated and current_user.perfil == 'admin' %}
+            <a href="{{ url_for('main.gerenciar_usuarios') }}" class="inline-flex items-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-md shadow transition justify-center" title="{{ t('manage_users') }}">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3.914a.5.5 0 01-.5-.5V5.414a.5.5 0 01.5-.5h10.172a2 2 0 012 2v13.172a.5.5 0 01-.5.5z"/>
+                </svg>
+                {{ t('users') }}
+            </a>
+            {% endif %}
             {% if current_user.is_authenticated %}
             <a href="{{ url_for('main.logout') }}" class="inline-flex items-center px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-md shadow transition justify-center">
                 <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
                 </svg>
-                Sair
+                {{ t('logout') }}
             </a>
             {% endif %}
         </div>
     </div>
+
+    <!-- Dicionário de Tradução para JavaScript -->
+    <script>
+        // Mapeamento de setores para chaves de tradução
+        const sectorMap = {
+            'Manutencao': '{{ t("maintenance") }}',
+            'Engenharia': '{{ t("engineering") }}',
+            'Qualidade': '{{ t("quality") }}',
+            'Comercial': '{{ t("commercial") }}',
+            'Planejamento': '{{ t("planning") }}',
+            'Material': '{{ t("indirect_material") }}'
+        };
+
+        // Mapeamento de categorias para chaves de tradução
+        const categoryMap = {
+            'Projetos': '{{ t("projects") }}',
+            'Nao Aplicavel': '{{ t("not_applicable") }}'
+        };
+
+        // Função auxiliar para  traduzir setores e categorias
+        function translateSector(sectorName) {
+            return sectorMap[sectorName] || sectorName;
+        }
+
+        function translateCategory(categoryName) {
+            return categoryMap[categoryName] || categoryName;
+        }
+    </script>
 
     <form method="GET" action="{{ url_for('main.admin') }}" class="space-y-4">
         <div class="bg-gray-50 p-4 rounded-lg border border-gray-200 shadow-inner">
             <div class="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
                 
                 <div class="md:col-span-4">
-                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Buscar (ID, RL, Descrição)</label>
+                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">{{ t('search') }}</label>
                     <div class="relative">
                         <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                             <svg class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
                         </span>
-                        <input type="text" name="search" value="{{ request.args.get('search', '') }}" placeholder="Ex: Turbina, 111..." 
+                        <input type="text" name="search" value="{{ request.args.get('search', '') }}" placeholder="{{ t('search_placeholder') }}" 
                             class="pl-10 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm h-10 border px-3">
                     </div>
                 </div>
 
                 <div class="md:col-span-2">
-                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Categoria</label>
+                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">{{ t('category') }}</label>
                     <select name="categoria" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm h-10 border px-2">
-                        <option value="">Todas</option>
-                        <option value="Projetos" {% if request.args.get('categoria') == 'Projetos' %}selected{% endif %}>Projetos</option>
-                        <option value="Nao Aplicavel" {% if request.args.get('categoria') == 'Nao Aplicavel' %}selected{% endif %}>Não Aplicável</option>
+                        <option value="">{{ t('all') }}</option>
+                        <option value="Projetos" {% if request.args.get('categoria') == 'Projetos' %}selected{% endif %}>{{ t('projects') }}</option>
+                        <option value="Nao Aplicavel" {% if request.args.get('categoria') == 'Nao Aplicavel' %}selected{% endif %}>{{ t('not_applicable') }}</option>
                     </select>
                 </div>
 
                 <div class="md:col-span-2">
-                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Status</label>
+                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">{{ t('status') }}</label>
                     <select name="status" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm h-10 border px-2">
-                        <option value="">Todos</option>
-                        <option value="Aberto" {% if request.args.get('status') == 'Aberto' %}selected{% endif %}>Abertos</option>
-                        <option value="Em Atendimento" {% if request.args.get('status') == 'Em Atendimento' %}selected{% endif %}>Em Atendimento</option>
-                        <option value="Concluído" {% if request.args.get('status') == 'Concluído' %}selected{% endif %}>Concluídos</option>
+                        <option value="">{{ t('all') }}</option>
+                        <option value="Aberto" {% if request.args.get('status') == 'Aberto' %}selected{% endif %}>{{ t('open') }}</option>
+                        <option value="Em Atendimento" {% if request.args.get('status') == 'Em Atendimento' %}selected{% endif %}>{{ t('in_progress') }}</option>
+                        <option value="Concluído" {% if request.args.get('status') == 'Concluído' %}selected{% endif %}>{{ t('completed') }}</option>
                     </select>
                 </div>
 
                 <div class="md:col-span-2">
-                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Gate</label>
+                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">{{ t('gate') }}</label>
                     <select name="gate" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm h-10 border px-2">
-                        <option value="">Todos</option>
+                        <option value="">{{ t('all') }}</option>
                         <option value="Gate 1" {% if request.args.get('gate') == 'Gate 1' %}selected{% endif %}>Gate 1</option>
                         <option value="Gate 2" {% if request.args.get('gate') == 'Gate 2' %}selected{% endif %}>Gate 2</option>
                         <option value="Gate 3" {% if request.args.get('gate') == 'Gate 3' %}selected{% endif %}>Gate 3</option>
@@ -79,9 +123,9 @@
 
                 <div class="md:col-span-2 flex space-x-2">
                     <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md shadow h-10 transition">
-                        Filtrar
+                        {{ t('filter') }}
                     </button>
-                    <a href="{{ url_for('main.admin') }}" class="bg-white hover:bg-gray-100 text-gray-700 font-bold py-2 px-3 rounded-md border border-gray-300 h-10 flex items-center justify-center transition" title="Limpar Filtros">
+                    <a href="{{ url_for('main.admin') }}" class="bg-white hover:bg-gray-100 text-gray-700 font-bold py-2 px-3 rounded-md border border-gray-300 h-10 flex items-center justify-center transition" title="{{ t('clear_filters') }}">
                         ✕
                     </a>
                 </div>
@@ -95,12 +139,12 @@
         <table class="min-w-full divide-y divide-gray-200">
             <thead class="bg-gray-50">
                 <tr>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID / Ref</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Categoria</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Setor / Gate</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Descrição</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ t('id_ref') }}</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ t('category') }}</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ t('sector_gate') }}</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ t('description') }}</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ t('status') }}</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ t('actions') }}</th>
                 </tr>
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
@@ -112,7 +156,7 @@
                             <div class="text-sm font-bold text-gray-900">{{ chamado.numero_chamado }}</div>
                             {% if chamado.rl_codigo %}
                             <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">
-                                RL: {{ chamado.rl_codigo }}
+                                {{ t('rl_short') }} {{ chamado.rl_codigo }}
                             </span>
                             {% endif %}
                         </td>
@@ -120,17 +164,17 @@
                         <td class="px-6 py-4 whitespace-nowrap">
                             <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
                                 {% if chamado.categoria == 'Projetos' %}bg-red-100 text-red-800{% else %}bg-blue-100 text-blue-800{% endif %}">
-                                {{ chamado.categoria }}
+                                {{ translate_category(chamado.categoria) }}
                             </span>
                         </td>
 
                         <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="text-sm text-gray-900">{{ chamado.tipo_solicitacao }}</div>
+                            <div class="text-sm text-gray-900">{{ translate_sector(chamado.tipo_solicitacao) }}</div>
                             <div class="text-xs text-gray-500">{{ chamado.gate }}</div>
                         </td>
 
                         <td class="px-6 py-4">
-                            <div class="text-sm text-gray-900 truncate max-w-xs cursor-pointer hover:text-blue-600" title="Clique no olho para ver completo">
+                            <div class="text-sm text-gray-900 truncate max-w-xs cursor-pointer hover:text-blue-600" title="{{ t('click_eye_full') }}">
                                 {{ chamado.descricao }}
                             </div>
                             <div class="text-xs text-gray-400 italic">
@@ -154,12 +198,13 @@
                                 data-gate="{{ chamado.gate }}"
                                 data-data="{{ chamado.data_abertura_formatada() }}"
                                 data-responsavel="{{ chamado.responsavel }}"
+                                data-solicitante-nome="{{ chamado.solicitante_nome }}"
                                 data-descricao="{{ chamado.descricao }}"
                                 data-rl="{{ chamado.rl_codigo or '' }}"
                                 data-anexo="{{ chamado.anexo or '' }}"
                                 data-status="{{ chamado.status }}"
                                 class="text-blue-600 hover:text-blue-900 transition transform hover:scale-110" 
-                                title="Visualizar Detalhes">
+                                title="{{ t('view_details') }}">
                                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
@@ -168,7 +213,7 @@
 
                             <a href="{{ url_for('main.visualizar_historico', chamado_id=chamado.id) }}"
                                 class="text-purple-600 hover:text-purple-900 transition transform hover:scale-110" 
-                                title="Visualizar Histórico">
+                                title="{{ t('view_history') }}">
                                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
                                 </svg>
@@ -177,10 +222,10 @@
                             <form action="{{ url_for('main.admin') }}" method="POST" class="flex items-center">
                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                                 <input type="hidden" name="chamado_id" value="{{ chamado.id }}">
-                                <select name="novo_status" class="text-xs border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 p-1 border cursor-pointer hover:border-blue-500 transition" title="Clique para alterar status">
-                                    <option value="Aberto" {% if chamado.status == 'Aberto' %}selected{% endif %}>Aberto</option>
-                                    <option value="Em Atendimento" {% if chamado.status == 'Em Atendimento' %}selected{% endif %}>Atender</option>
-                                    <option value="Concluído" {% if chamado.status == 'Concluído' %}selected{% endif %}>Concluir</option>
+                                <select name="novo_status" class="text-xs border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 p-1 border cursor-pointer hover:border-blue-500 transition" title="{{ t('change_status') }}">
+                                    <option value="Aberto" {% if chamado.status == 'Aberto' %}selected{% endif %}>{{ t('option_open') }}</option>
+                                    <option value="Em Atendimento" {% if chamado.status == 'Em Atendimento' %}selected{% endif %}>{{ t('option_attend') }}</option>
+                                    <option value="Concluído" {% if chamado.status == 'Concluído' %}selected{% endif %}>{{ t('option_finish') }}</option>
                                 </select>
                             </form>
                         </td>
@@ -191,8 +236,8 @@
                         <td colspan="6" class="px-6 py-10 text-center text-gray-500">
                             <div class="flex flex-col items-center justify-center">
                                 <svg class="w-12 h-12 text-gray-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                                <p class="text-lg font-medium">Nenhum chamado encontrado.</p>
-                                <p class="text-sm">Tente limpar os filtros ou buscar por outro termo.</p>
+                                <p class="text-lg font-medium">{{ t('no_tickets') }}</p>
+                                <p class="text-sm">{{ t('no_tickets_hint') }}</p>
                             </div>
                         </td>
                     </tr>
@@ -205,20 +250,20 @@
     {% if total_paginas > 1 %}
     <div class="flex flex-col md:flex-row justify-between items-center bg-white p-4 rounded-lg shadow-sm border border-gray-100">
         <div class="text-sm text-gray-600 mb-4 md:mb-0">
-            Mostrando <span class="font-semibold">{{ (pagina_atual - 1) * itens_por_pagina + 1 }}</span> a 
+            {{ t('showing') }} <span class="font-semibold">{{ (pagina_atual - 1) * itens_por_pagina + 1 }}</span> {{ t('to') }} 
             <span class="font-semibold">{{ [pagina_atual * itens_por_pagina, total_chamados]|min }}</span> 
-            de <span class="font-semibold">{{ total_chamados }}</span> chamados
+            {{ t('of') }} <span class="font-semibold">{{ total_chamados }}</span> {{ t('found_tickets') }}
         </div>
         
         <div class="flex gap-2">
             {% if pagina_atual > 1 %}
                 <a href="{{ url_for('main.admin', pagina=1, search=request.args.get('search', ''), categoria=request.args.get('categoria', ''), status=request.args.get('status', ''), gate=request.args.get('gate', '')) }}" 
                    class="px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">
-                    ⟨⟨ Primeira
+                    ⟨⟨ {{ t('first') }}
                 </a>
                 <a href="{{ url_for('main.admin', pagina=pagina_atual-1, search=request.args.get('search', ''), categoria=request.args.get('categoria', ''), status=request.args.get('status', ''), gate=request.args.get('gate', '')) }}"
                    class="px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">
-                    ⟨ Anterior
+                    ⟨ {{ t('previous') }}
                 </a>
             {% endif %}
             
@@ -239,11 +284,11 @@
             {% if pagina_atual < total_paginas %}
                 <a href="{{ url_for('main.admin', pagina=pagina_atual+1, search=request.args.get('search', ''), categoria=request.args.get('categoria', ''), status=request.args.get('status', ''), gate=request.args.get('gate', '')) }}"
                    class="px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">
-                    Próxima ⟩
+                    {{ t('next') }} ⟩
                 </a>
                 <a href="{{ url_for('main.admin', pagina=total_paginas, search=request.args.get('search', ''), categoria=request.args.get('categoria', ''), status=request.args.get('status', ''), gate=request.args.get('gate', '')) }}"
                    class="px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">
-                    Última ⟩⟩
+                    {{ t('last') }} ⟩⟩
                 </a>
             {% endif %}
         </div>
@@ -255,8 +300,8 @@
         
         <div class="bg-gradient-to-r from-blue-800 to-blue-900 px-6 py-4 flex justify-between items-center">
             <div>
-                <h3 id="modal-titulo" class="text-xl font-bold text-white">Visualizando Chamado</h3>
-                <p class="text-blue-200 text-sm">Detalhes completos da solicitação</p>
+                <h3 id="modal-titulo" class="text-xl font-bold text-white">{{ t('viewing_chamado') }}</h3>
+                <p class="text-blue-200 text-sm">{{ t('complete_details') }}</p>
             </div>
             <button onclick="fecharModal()" class="text-white hover:text-gray-300 focus:outline-none">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
@@ -273,39 +318,39 @@
                     </div>
                 </div>
                 <div>
-                    <label class="block text-xs font-bold text-gray-500 uppercase tracking-wide">Descrição do Problema</label>
+                    <label class="block text-xs font-bold text-gray-500 uppercase tracking-wide">{{ t('problem_description') }}</label>
                     <div id="modal-descricao" class="mt-1 text-gray-800 bg-gray-50 p-4 rounded-md border border-gray-200 text-sm leading-relaxed whitespace-pre-wrap h-64 overflow-y-auto"></div>
                 </div>
                 <div id="modal-area-anexo" class="hidden">
-                    <label class="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">Arquivo Anexado</label>
+                    <label class="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">{{ t('attached_file') }}</label>
                     <a id="modal-link-anexo" href="#" target="_blank" class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
-                        📎 Baixar Anexo
+                        📈 {{ t('download_attachment') }}
                     </a>
                 </div>
             </div>
 
             <div class="space-y-6">
                 <div class="bg-blue-50 p-4 rounded-md border border-blue-100">
-                    <h4 class="font-bold text-blue-900 text-sm mb-3">Informações de Abertura</h4>
+                    <h4 class="font-bold text-blue-900 text-sm mb-3">{{ t('opening_info') }}</h4>
                     <div class="space-y-2 text-sm">
-                        <p><span class="text-gray-500">Data:</span> <span id="modal-data" class="font-medium"></span></p>
-                        <p><span class="text-gray-500">Solicitante:</span> <span id="modal-autor" class="font-medium"></span></p>
+                        <p><span class="text-gray-500">{{ t('date') }}:</span> <span id="modal-data" class="font-medium"></span></p>
+                        <p><span class="text-gray-500">{{ t('requester') }}:</span> <span id="modal-autor" class="font-medium"></span></p>
                     </div>
                 </div>
 
                 <div class="bg-gray-50 p-4 rounded-md border border-gray-200">
-                    <h4 class="font-bold text-gray-900 text-sm mb-3">Ação do Gestor</h4>
+                    <h4 class="font-bold text-gray-900 text-sm mb-3">{{ t('manager_action') }}</h4>
                     <form action="{{ url_for('main.admin') }}" method="POST">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         <input type="hidden" id="input-chamado-id" name="chamado_id">
-                        <label class="block text-xs text-gray-500 mb-1">Alterar Status para:</label>
+                        <label class="block text-xs text-gray-500 mb-1">{{ t('change_status_to') }}</label>
                         <select id="select-status-modal" name="novo_status" class="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md border mb-4">
-                            <option value="Aberto">Aberto</option>
-                            <option value="Em Atendimento">Em Atendimento</option>
-                            <option value="Concluído">Concluído</option>
+                            <option value="Aberto">{{ t('option_open') }}</option>
+                            <option value="Em Atendimento">{{ t('option_in_progress') }}</option>
+                            <option value="Concluído">{{ t('option_completed') }}</option>
                         </select>
                         <button type="submit" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-900 hover:bg-blue-800 focus:outline-none transition">
-                            Salvar Alteração
+                            {{ t('save_change') }}
                         </button>
                     </form>
                 </div>

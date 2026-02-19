@@ -4,35 +4,67 @@
       "collectionGroup": "chamados",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "categoria", "order": "ASCENDING" },
-        { "fieldPath": "status", "order": "DESCENDING" },
-        { "fieldPath": "data_abertura", "order": "DESCENDING" }
+        {"fieldPath": "categoria", "order": "ASCENDING"},
+        {"fieldPath": "status", "order": "DESCENDING"},
+        {"fieldPath": "data_abertura", "order": "DESCENDING"}
       ]
     },
     {
       "collectionGroup": "chamados",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "status", "order": "ASCENDING" },
-        { "fieldPath": "data_abertura", "order": "DESCENDING" }
+        {"fieldPath": "status", "order": "ASCENDING"},
+        {"fieldPath": "data_abertura", "order": "DESCENDING"}
       ]
     },
     {
       "collectionGroup": "chamados",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "categoria", "order": "ASCENDING" },
-        { "fieldPath": "prioridade", "order": "ASCENDING" },
-        { "fieldPath": "data_abertura", "order": "DESCENDING" }
+        {"fieldPath": "categoria", "order": "ASCENDING"},
+        {"fieldPath": "prioridade", "order": "ASCENDING"},
+        {"fieldPath": "data_abertura", "order": "DESCENDING"}
       ]
     },
     {
       "collectionGroup": "chamados",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "gate", "order": "ASCENDING" },
-        { "fieldPath": "status", "order": "ASCENDING" },
-        { "fieldPath": "data_abertura", "order": "DESCENDING" }
+        {"fieldPath": "gate", "order": "ASCENDING"},
+        {"fieldPath": "status", "order": "ASCENDING"},
+        {"fieldPath": "data_abertura", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "chamados",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "responsavel", "order": "ASCENDING"},
+        {"fieldPath": "status", "order": "ASCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "notificacoes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "usuario_id", "order": "ASCENDING"},
+        {"fieldPath": "lida", "order": "ASCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "historico",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "chamado_id", "order": "ASCENDING"},
+        {"fieldPath": "data_acao", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "usuarios",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "perfil", "order": "ASCENDING"},
+        {"fieldPath": "area", "order": "ASCENDING"}
       ]
     }
   ],

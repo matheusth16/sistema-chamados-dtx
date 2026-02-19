@@ -1,0 +1,596 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    /* Otimizações de performance */
+    canvas {
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+    }
+    .chart-container {
+        contain: layout style paint;
+    }
+</style>
+
+<div class="container mx-auto px-4 py-4">
+    
+    <!-- Indicador de carregamento -->
+    <div id="loading-charts" class="fixed inset-0 bg-white bg-opacity-90 flex items-center justify-center z-50" style="display: none;">
+        <div class="text-center">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-2"></div>
+            <p class="text-gray-600">Carregando gráficos...</p>
+        </div>
+    </div>
+
+    <!-- Cabeçalho -->
+    <div class="mb-4">
+        <h1 class="text-2xl font-bold text-gray-900 mb-1">📊 Relatórios e Análises</h1>
+        <p class="text-sm text-gray-600">Dashboard de performance e insights dos chamados</p>
+    </div>
+
+    <!-- INSIGHTS E ALERTAS -->
+    {% if insights %}
+    <div class="mb-6">
+        <h2 class="text-lg font-bold text-gray-800 mb-3">⚡ Insights e Alertas</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {% for insight in insights %}
+            <div class="p-3 rounded-lg border-l-4 
+                {% if insight.tipo == 'aviso' %}
+                    bg-yellow-50 border-yellow-400
+                {% elif insight.tipo == 'sucesso' %}
+                    bg-green-50 border-green-400
+                {% else %}
+                    bg-blue-50 border-blue-400
+                {% endif %}">
+                <h3 class="font-bold {% if insight.tipo == 'aviso' %}text-yellow-900{% elif insight.tipo == 'sucesso' %}text-green-900{% else %}text-blue-900{% endif %}">
+                    {{ insight.titulo }}
+                </h3>
+                <p class="text-sm {% if insight.tipo == 'aviso' %}text-yellow-800{% elif insight.tipo == 'sucesso' %}text-green-800{% else %}text-blue-800{% endif %} mt-2">
+                    {{ insight.mensagem }}
+                </p>
+                {% if insight.metrica %}
+                <p class="text-xs font-mono {% if insight.tipo == 'aviso' %}text-yellow-700{% elif insight.tipo == 'sucesso' %}text-green-700{% else %}text-blue-700{% endif %} mt-2">
+                    {{ insight.metrica }}
+                </p>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- MÉTRICAS GERAIS -->
+    {% if metricas_gerais %}
+    <div class="mb-6">
+        <h2 class="text-lg font-bold text-gray-800 mb-3">📈 Métricas Gerais (últimos {{ metricas_gerais.periodo_dias }} dias)</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
+            
+            <!-- Card Total -->
+            <div class="bg-white p-4 rounded-lg shadow border-t-4 border-blue-500">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="text-gray-600 text-xs font-medium">Total de Chamados</p>
+                        <p class="text-2xl font-bold text-blue-600 mt-1">{{ metricas_gerais.total_chamados }}</p>
+                    </div>
+                    <svg class="w-6 h-6 text-blue-200" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4z"></path>
+                        <path fill-rule="evenodd" d="M3 7h14v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7zm0 9v2h14v-2H3z" clip-rule="evenodd"></path>
+                    </svg>
+                </div>
+            </div>
+
+            <!-- Card Abertos -->
+            <div class="bg-white p-4 rounded-lg shadow border-t-4 border-orange-500">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="text-gray-600 text-xs font-medium">Abertos</p>
+                        <p class="text-2xl font-bold text-orange-600 mt-1">{{ metricas_gerais.abertos }}</p>
+                    </div>
+                    <svg class="w-6 h-6 text-orange-200" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M11 3a1 1 0 10-2 0v1a1 1 0 102 0V3zM15.657 5.757a1 1 0 00-1.414-1.414l-.707.707a1 1 0 001.414 1.414l.707-.707zM18 10a1 1 0 01-1 1h-1a1 1 0 110-2h1a1 1 0 011 1zm-1.657 4.243a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414l.707.707zM9 19a1 1 0 01-1-1v-1a1 1 0 112 0v1a1 1 0 01-1 1zM5.757 15.657a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414l-.707.707z"></path>
+                    </svg>
+                </div>
+            </div>
+
+            <!-- Card Em Andamento -->
+            <div class="bg-white p-4 rounded-lg shadow border-t-4 border-yellow-500">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="text-gray-600 text-xs font-medium">Em Andamento</p>
+                        <p class="text-2xl font-bold text-yellow-600 mt-1">{{ metricas_gerais.em_andamento }}</p>
+                    </div>
+                    <svg class="w-6 h-6 text-yellow-200" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z"></path>
+                    </svg>
+                </div>
+            </div>
+
+            <!-- Card Concluídos -->
+            <div class="bg-white p-4 rounded-lg shadow border-t-4 border-green-500">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="text-gray-600 text-xs font-medium">Concluídos</p>
+                        <p class="text-2xl font-bold text-green-600 mt-1">{{ metricas_gerais.concluidos }}</p>
+                    </div>
+                    <svg class="w-6 h-6 text-green-200" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                    </svg>
+                </div>
+            </div>
+
+            <!-- Card Taxa de Resolução -->
+            <div class="bg-white p-4 rounded-lg shadow border-t-4 border-purple-500">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="text-gray-600 text-xs font-medium">Taxa de Resolução</p>
+                        <p class="text-2xl font-bold text-purple-600 mt-1">{{ metricas_gerais.taxa_resolucao_percentual }}%</p>
+                    </div>
+                    <svg class="w-6 h-6 text-purple-200" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"></path>
+                    </svg>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Gráficos em linha -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+        
+        <!-- Gráfico: Distribuição de Chamados por Status -->
+        <div class="bg-white p-4 rounded-lg shadow">
+            <h3 class="text-base font-bold text-gray-800 mb-3">Distribuição por Status</h3>
+            <div class="chart-container" style="position: relative; height: 200px; width: 100%;">
+                <canvas id="chartStatus"></canvas>
+            </div>
+        </div>
+
+        <!-- Gráfico: Prioridade -->
+        <div class="bg-white p-4 rounded-lg shadow">
+            <h3 class="text-base font-bold text-gray-800 mb-3">Distribuição por Prioridade</h3>
+            <div class="chart-container" style="position: relative; height: 200px; width: 100%;">
+                <canvas id="chartPrioridade"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- ANÁLISE DE ATRIBUIÇÃO AUTOMÁTICA -->
+    {% if analise_atribuicao %}
+    <div class="mb-6">
+        <h2 class="text-lg font-bold text-gray-800 mb-3">🤖 Análise da Atribuição Automática</h2>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            
+            <!-- Estatísticas Comparativas -->
+            <div class="bg-white p-4 rounded-lg shadow">
+                <h3 class="text-base font-bold text-gray-800 mb-3">Comparação: Automática vs Manual</h3>
+                
+                <div class="space-y-3">
+                    <!-- Taxa de Resolução -->
+                    <div class="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                        <div class="flex justify-between mb-2">
+                            <span class="font-semibold text-blue-900">Taxa de Resolução</span>
+                        </div>
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-sm">Automática: <span class="font-bold">{{ analise_atribuicao.atribuicao_automatica.taxa_resolucao }}%</span></span>
+                            <span class="text-sm">Manual: <span class="font-bold">{{ analise_atribuicao.atribuicao_manual.taxa_resolucao }}%</span></span>
+                        </div>
+                        {% if analise_atribuicao.melhoria_taxa_percentual > 0 %}
+                        <div class="text-green-600 text-sm font-bold">
+                            ✓ Melhoria: +{{ analise_atribuicao.melhoria_taxa_percentual }}%
+                        </div>
+                        {% elif analise_atribuicao.melhoria_taxa_percentual < 0 %}
+                        <div class="text-red-600 text-sm font-bold">
+                            ✗ Redução: {{ analise_atribuicao.melhoria_taxa_percentual }}%
+                        </div>
+                        {% else %}
+                        <div class="text-gray-600 text-sm">
+                            = Sem diferença
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Tempo de Resolução -->
+                    <div class="p-3 bg-purple-50 rounded-lg border border-purple-200">
+                        <div class="flex justify-between mb-2">
+                            <span class="font-semibold text-purple-900">Tempo Médio de Resolução</span>
+                        </div>
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-sm">Automática: <span class="font-bold">{{ analise_atribuicao.atribuicao_automatica.tempo_medio_resolucao_horas }}h</span></span>
+                            <span class="text-sm">Manual: <span class="font-bold">{{ analise_atribuicao.atribuicao_manual.tempo_medio_resolucao_horas }}h</span></span>
+                        </div>
+                        {% if analise_atribuicao.melhoria_tempo_horas > 0 %}
+                        <div class="text-green-600 text-sm font-bold">
+                            ✓ Mais rápida em: {{ analise_atribuicao.melhoria_tempo_horas }}h
+                        </div>
+                        {% elif analise_atribuicao.melhoria_tempo_horas < 0 %}
+                        <div class="text-red-600 text-sm font-bold">
+                            ✗ Mais lenta em: {{ analise_atribuicao.melhoria_tempo_horas|abs }}h
+                        </div>
+                        {% else %}
+                        <div class="text-gray-600 text-sm">
+                            = Sem diferença
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Uso -->
+                    <div class="p-3 bg-green-50 rounded-lg border border-green-200">
+                        <div class="flex justify-between mb-2">
+                            <span class="font-semibold text-green-900">Utilização</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm">Automática: <span class="font-bold">{{ analise_atribuicao.percentual_automatico }}%</span></span>
+                            <span class="text-sm">({{ analise_atribuicao.atribuicao_automatica.total }} chamados)</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Gráfico Comparativo -->
+            <div class="bg-white p-4 rounded-lg shadow">
+                <h3 class="text-base font-bold text-gray-800 mb-3">Comparação Visual</h3>
+                <div class="chart-container" style="position: relative; height: 200px; width: 100%;">
+                    <canvas id="chartAtribuicao"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- DESEMPENHO POR SUPERVISOR -->
+    {% if metricas_supervisores %}
+    <div class="mb-6">
+        <h2 class="text-lg font-bold text-gray-800 mb-3">👥 Performance por Supervisor</h2>
+        
+        <!-- Tabela de Supervisores -->
+        <div class="bg-white rounded-lg shadow overflow-hidden">
+            <table class="w-full">
+                <thead class="bg-gray-100 border-b">
+                    <tr>
+                        <th class="px-4 py-2 text-left text-xs font-semibold text-gray-700">Supervisor</th>
+                        <th class="px-4 py-2 text-left text-xs font-semibold text-gray-700">Área</th>
+                        <th class="px-4 py-2 text-center text-xs font-semibold text-gray-700">Total</th>
+                        <th class="px-4 py-2 text-center text-xs font-semibold text-gray-700">Carga Atual</th>
+                        <th class="px-4 py-2 text-center text-xs font-semibold text-gray-700">Concluídos</th>
+                        <th class="px-4 py-2 text-center text-xs font-semibold text-gray-700">Taxa %</th>
+                        <th class="px-4 py-2 text-center text-xs font-semibold text-gray-700">Tempo Médio</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y">
+                    {% for sup in metricas_supervisores %}
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-4 py-2">
+                            <div class="text-sm font-semibold text-gray-900">{{ sup.supervisor_nome }}</div>
+                            <div class="text-xs text-gray-500">{{ sup.supervisor_email }}</div>
+                        </td>
+                        <td class="px-4 py-2 text-xs text-gray-600">{{ sup.area }}</td>
+                        <td class="px-4 py-2 text-center">
+                            <span class="inline-block bg-blue-100 text-blue-800 text-xs font-semibold px-2 py-1 rounded-full">
+                                {{ sup.total_chamados }}
+                            </span>
+                        </td>
+                        <td class="px-4 py-2 text-center">
+                            <span class="inline-block font-semibold 
+                                {% if sup.carga_atual > 10 %}
+                                    bg-red-100 text-red-800
+                                {% elif sup.carga_atual > 5 %}
+                                    bg-yellow-100 text-yellow-800
+                                {% else %}
+                                    bg-green-100 text-green-800
+                                {% endif %}
+                                text-xs px-2 py-1 rounded-full">
+                                {{ sup.carga_atual }}
+                            </span>
+                        </td>
+                        <td class="px-4 py-2 text-center text-xs font-semibold text-green-600">{{ sup.concluidos }}</td>
+                        <td class="px-4 py-2 text-center">
+                            <div class="w-full bg-gray-200 rounded-full h-2">
+                                <div class="bg-green-600 h-2 rounded-full" data-width="{{ sup.taxa_resolucao_percentual }}"></div>
+                            </div>
+                            <span class="text-xs font-semibold text-gray-700 mt-1">{{ sup.taxa_resolucao_percentual }}%</span>
+                        </td>
+                        <td class="px-4 py-2 text-center text-xs text-gray-600">{{ sup.tempo_medio_resolucao_horas }}h</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Gráfico de Carga -->
+        <div class="mt-4 bg-white p-4 rounded-lg shadow">
+            <h3 class="text-base font-bold text-gray-800 mb-3">Carga de Trabalho Distribuída</h3>
+            <div class="chart-container" style="position: relative; height: 120px; width: 100%;">
+                <canvas id="chartCarga"></canvas>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- DESEMPENHO POR ÁREA -->
+    {% if metricas_areas %}
+    <div class="mb-6">
+        <h2 class="text-lg font-bold text-gray-800 mb-3">🏢 Performance por Área</h2>
+        
+        <!-- Tabela de Áreas -->
+        <div class="bg-white rounded-lg shadow overflow-hidden">
+            <table class="w-full">
+                <thead class="bg-gray-100 border-b">
+                    <tr>
+                        <th class="px-4 py-2 text-left text-xs font-semibold text-gray-700">Área</th>
+                        <th class="px-4 py-2 text-center text-xs font-semibold text-gray-700">Total</th>
+                        <th class="px-4 py-2 text-center text-xs font-semibold text-gray-700">Abertos</th>
+                        <th class="px-4 py-2 text-center text-xs font-semibold text-gray-700">Concluídos</th>
+                        <th class="px-4 py-2 text-center text-xs font-semibold text-gray-700">Taxa %</th>
+                        <th class="px-4 py-2 text-center text-xs font-semibold text-gray-700">Supervisores</th>
+                        <th class="px-4 py-2 text-center text-xs font-semibold text-gray-700">Automação %</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y">
+                    {% for area in metricas_areas %}
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-4 py-2 font-semibold text-sm text-gray-900">{{ area.area }}</td>
+                        <td class="px-4 py-2 text-center">
+                            <span class="inline-block bg-blue-100 text-blue-800 text-xs font-semibold px-2 py-1 rounded-full">
+                                {{ area.total_chamados }}
+                            </span>
+                        </td>
+                        <td class="px-4 py-2 text-center text-xs text-orange-600 font-semibold">{{ area.abertos }}</td>
+                        <td class="px-4 py-2 text-center text-xs text-green-600 font-semibold">{{ area.concluidos }}</td>
+                        <td class="px-4 py-2 text-center">
+                            <div class="inline-block w-24 bg-gray-200 rounded-full h-2">
+                                <div class="bg-green-600 h-2 rounded-full" data-width="{{ area.taxa_resolucao_percentual }}"></div>
+                            </div>
+                            <span class="text-xs font-semibold text-gray-700">{{ area.taxa_resolucao_percentual }}%</span>
+                        </td>
+                        <td class="px-4 py-2 text-center text-xs font-semibold text-gray-600">{{ area.supervisores_alocados }}</td>
+                        <td class="px-4 py-2 text-center">
+                            <span class="inline-block bg-purple-100 text-purple-800 text-xs font-semibold px-2 py-1 rounded-full">
+                                {{ area.taxa_automacao_percentual }}%
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Gráfico de Taxa por Área -->
+        <div class="mt-4 bg-white p-4 rounded-lg shadow">
+            <h3 class="text-base font-bold text-gray-800 mb-3">Taxa de Resolução por Área</h3>
+            <div class="chart-container" style="position: relative; height: 120px; width: 100%;">
+                <canvas id="chartAreas"></canvas>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+
+<!-- Chart.js Library -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<!-- Dados JSON para os gráficos -->
+<script type="application/json" id="dados-gerais">{{ metricas_gerais|tojson|safe }}</script>
+<script type="application/json" id="dados-supervisores">{{ metricas_supervisores|tojson|safe }}</script>
+<script type="application/json" id="dados-areas">{{ metricas_areas|tojson|safe }}</script>
+<script type="application/json" id="dados-atribuicao">{{ analise_atribuicao|tojson|safe }}</script>
+
+<script>
+// Aguardar carregar completo da página
+document.addEventListener('DOMContentLoaded', function() {
+    // Mostrar loading
+    const loadingEl = document.getElementById('loading-charts');
+    if (loadingEl) loadingEl.style.display = 'flex';
+
+    // Carregar dados dos gráficos (com fallback para dados vazios/ausentes)
+    function parseJson(id, fallback) {
+        var el = document.getElementById(id);
+        if (!el || !el.textContent || el.textContent.trim() === '') return fallback;
+        try {
+            var v = JSON.parse(el.textContent);
+            return v != null ? v : fallback;
+        } catch (e) { return fallback; }
+    }
+    const dadosGerais = parseJson('dados-gerais', {});
+    const dadosSupervisores = Array.isArray(parseJson('dados-supervisores', null)) ? parseJson('dados-supervisores', []) : [];
+    const dadosAreas = Array.isArray(parseJson('dados-areas', null)) ? parseJson('dados-areas', []) : [];
+    const dadosAtribuicao = parseJson('dados-atribuicao', {});
+
+    // Configuração padrão para todos os gráficos - melhor performance
+    Chart.defaults.responsive = true;
+    Chart.defaults.maintainAspectRatio = false;
+    Chart.defaults.animation = false;
+    Chart.defaults.interaction = {
+        mode: 'nearest',
+        intersect: true
+    };
+    Chart.defaults.plugins.tooltip = {
+        enabled: true,
+        mode: 'nearest'
+    };
+
+    // Gráfico: Distribuição por Status
+    if (document.getElementById('chartStatus')) {
+        const ctxStatus = document.getElementById('chartStatus').getContext('2d');
+        new Chart(ctxStatus, {
+            type: 'doughnut',
+            data: {
+                labels: ['Abertos', 'Em Andamento', 'Concluídos'],
+                datasets: [{
+                    data: [
+                        dadosGerais.abertos || 0,
+                        dadosGerais.em_andamento || 0,
+                        dadosGerais.concluidos || 0
+                    ],
+                    backgroundColor: [
+                        '#FFA500',
+                        '#FFD700',
+                        '#4CAF50'
+                    ],
+                    borderColor: '#fff',
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: false,
+                plugins: {
+                    legend: { position: 'bottom' }
+                }
+            }
+        });
+    }
+
+    // Gráfico: Prioridade
+    if (document.getElementById('chartPrioridade') && dadosGerais.distribuicao_prioridade) {
+        const ctxPrio = document.getElementById('chartPrioridade').getContext('2d');
+        const labels = Object.keys(dadosGerais.distribuicao_prioridade);
+        const data = Object.values(dadosGerais.distribuicao_prioridade);
+        
+        new Chart(ctxPrio, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Chamados',
+                    data: data,
+                    backgroundColor: '#3B82F6',
+                    borderColor: '#1F2937',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: false,
+                scales: {
+                    y: { beginAtZero: true }
+                },
+                plugins: {
+                    legend: { display: false }
+                }
+            }
+        });
+    }
+
+    // Gráfico: Comparação Atribuição
+    if (document.getElementById('chartAtribuicao') && dadosAtribuicao.atribuicao_automatica) {
+        const ctxAttr = document.getElementById('chartAtribuicao').getContext('2d');
+        new Chart(ctxAttr, {
+            type: 'bar',
+            data: {
+                labels: ['Taxa de Resolução (%)', 'Tempo Médio (horas)'],
+                datasets: [
+                    {
+                        label: 'Automática',
+                        data: [
+                            dadosAtribuicao.atribuicao_automatica.taxa_resolucao,
+                            dadosAtribuicao.atribuicao_automatica.tempo_medio_resolucao_horas
+                        ],
+                        backgroundColor: '#10B981'
+                    },
+                    {
+                        label: 'Manual',
+                        data: [
+                            dadosAtribuicao.atribuicao_manual.taxa_resolucao,
+                            dadosAtribuicao.atribuicao_manual.tempo_medio_resolucao_horas
+                        ],
+                        backgroundColor: '#8B5CF6'
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: false,
+                scales: {
+                    y: { beginAtZero: true }
+                },
+                plugins: {
+                    legend: { position: 'bottom' }
+                }
+            }
+        });
+    }
+
+    // Gráfico: Carga de Trabalho
+    if (document.getElementById('chartCarga') && dadosSupervisores.length > 0) {
+        const ctxCarga = document.getElementById('chartCarga').getContext('2d');
+        const nomes = dadosSupervisores.map(s => s.supervisor_nome.split(' ')[0]);
+        const cargas = dadosSupervisores.map(s => s.carga_atual);
+        
+        new Chart(ctxCarga, {
+            type: 'bar',
+            data: {
+                labels: nomes,
+                datasets: [{
+                    label: 'Chamados Abertos + Em Andamento',
+                    data: cargas,
+                    backgroundColor: cargas.map(c => c > 10 ? '#EF4444' : c > 5 ? '#FBBF24' : '#10B981'),
+                    borderColor: '#1F2937',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: false,
+                scales: {
+                    y: { beginAtZero: true }
+                },
+                plugins: {
+                    legend: { display: false }
+                }
+            }
+        });
+    }
+
+    // Gráfico: Taxa por Área
+    if (document.getElementById('chartAreas') && dadosAreas.length > 0) {
+        const ctxArea = document.getElementById('chartAreas').getContext('2d');
+        const areasNomes = dadosAreas.map(a => a.area);
+        const taxas = dadosAreas.map(a => a.taxa_resolucao_percentual);
+        
+        new Chart(ctxArea, {
+            type: 'bar',
+            data: {
+                labels: areasNomes,
+                datasets: [{
+                    label: 'Taxa de Resolução (%)',
+                    data: taxas,
+                    backgroundColor: taxas.map(t => t > 60 ? '#10B981' : t > 40 ? '#FBBF24' : '#EF4444'),
+                    borderColor: '#1F2937',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: false,
+                scales: {
+                    y: { 
+                        beginAtZero: true,
+                        max: 100
+                    }
+                },
+                plugins: {
+                    legend: { display: false }
+                }
+            }
+        });
+    }
+
+    // Aplicar larguras das barras de progresso
+    document.querySelectorAll('[data-width]').forEach(function(el) {
+        el.style.width = el.getAttribute('data-width') + '%';
+    });
+
+    // Esconder loading após renderizar
+    setTimeout(function() {
+        if (loadingEl) loadingEl.style.display = 'none';
+    }, 100);
+});
+</script>
+
+{% endblock %}

@@ -9,6 +9,9 @@ class Chamado:
                  tipo_solicitacao: str,
                  descricao: str,
                  responsavel: str,
+                 solicitante_id: str = None,
+                 solicitante_nome: str = None,
+                 area: str = None,
                  rl_codigo: str = None,
                  gate: str = None,
                  impacto: str = None,
@@ -18,6 +21,8 @@ class Chamado:
                  status: str = 'Aberto',
                  data_abertura = None,
                  data_conclusao = None,
+                 responsavel_id: str = None,
+                 motivo_atribuicao: str = None,
                  id: str = None):
         
         self.id = id
@@ -32,6 +37,11 @@ class Chamado:
         self.descricao = descricao
         self.anexo = anexo
         self.responsavel = responsavel
+        self.responsavel_id = responsavel_id  # ID do responsável (supervisor ou solicitante)
+        self.motivo_atribuicao = motivo_atribuicao  # Como foi atribuído (automático/manual)
+        self.solicitante_id = solicitante_id  # ID do usuário que criou o chamado
+        self.solicitante_nome = solicitante_nome  # Nome do solicitante para rastreamento
+        self.area = area  # Área/setor para filtragem de supervisores
         self.status = status
         self.data_abertura = data_abertura or firestore.SERVER_TIMESTAMP
         self.data_conclusao = data_conclusao
@@ -75,6 +85,11 @@ class Chamado:
             'descricao': self.descricao,
             'anexo': self.anexo,
             'responsavel': self.responsavel,
+            'responsavel_id': self.responsavel_id,
+            'motivo_atribuicao': self.motivo_atribuicao,
+            'solicitante_id': self.solicitante_id,
+            'solicitante_nome': self.solicitante_nome,
+            'area': self.area,
             'status': self.status,
             'data_abertura': self.data_abertura,
             'data_conclusao': self.data_conclusao
@@ -95,6 +110,11 @@ class Chamado:
             descricao=data.get('descricao'),
             anexo=data.get('anexo'),
             responsavel=data.get('responsavel'),
+            responsavel_id=data.get('responsavel_id'),
+            motivo_atribuicao=data.get('motivo_atribuicao'),
+            solicitante_id=data.get('solicitante_id'),
+            solicitante_nome=data.get('solicitante_nome'),
+            area=data.get('area'),
             status=data.get('status', 'Aberto'),
             data_abertura=data.get('data_abertura'),
             data_conclusao=data.get('data_conclusao')

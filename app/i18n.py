@@ -1,0 +1,419 @@
+"""
+Sistema de Internacionalização (i18n) para múltiplos idiomas.
+Suporta: Português-BR, Inglês e Espanhol.
+"""
+
+# Dicionário de traduções
+TRANSLATIONS = {
+    'pt_BR': {
+        'dashboard_title': 'Painel de Gestão de Chamados',
+        'search_placeholder': 'Ex: Turbina, 111...',
+        'found_tickets': 'chamados encontrados',
+        'page': 'Página',
+        'of': 'de',
+        'category': 'Categoria',
+        'all': 'Todos',
+        'projects': 'Projetos',
+        'not_applicable': 'Não Aplicável',
+        'status': 'Status',
+        'open': 'Abertos',
+        'in_progress': 'Em Atendimento',
+        'completed': 'Concluídos',
+        'gate': 'Gate',
+        'filter': 'Filtrar',
+        'clear_filters': 'Limpar Filtros',
+        'export': 'Exportar',
+        'reports': 'Relatórios',
+        'users': 'Usuários',
+        'logout': 'Sair',
+        'search': 'Buscar (ID, RL, Descrição)',
+        'login_title': 'Sistema de Chamados',
+        'login_subtitle': 'DTX Aerospace',
+        'email': 'Email',
+        'password': 'Senha',
+        'sign_in': 'Entrar',
+        'manage_users': 'Gerenciar usuários do sistema',
+        'language': 'Idioma',
+        'portuguese': 'Português (Brasil)',
+        'english': 'English',
+        'spanish': 'Español',
+        'id_ref': 'ID / Ref',
+        'sector_gate': 'Setor / Gate',
+        'description': 'Descrição',
+        'actions': 'Ações',
+        'no_tickets': 'Nenhum chamado encontrado.',
+        'no_tickets_hint': 'Tente limpar os filtros ou buscar por outro termo.',
+        'showing': 'Mostrando',
+        'to': 'a',
+        'first': 'Primeira',
+        'previous': 'Anterior',
+        'next': 'Próxima',
+        'last': 'Última',
+        'view_details': 'Visualizar Detalhes',
+        'view_history': 'Visualizar Histórico',
+        'change_status': 'Clique para alterar status',
+        'opening_info': 'Informações de Abertura',
+        'date': 'Data',
+        'requester': 'Solicitante',
+        'manager_action': 'Ação do Gestor',
+        'change_status_to': 'Alterar Status para:',
+        'save_change': 'Salvar Alteração',
+        'problem_description': 'Descrição do Problema',
+        'attached_file': 'Arquivo Anexado',
+        'download_attachment': 'Baixar Anexo',
+        'new_ticket': 'Novo Chamado',
+        'ticket_opening': 'Abertura de Chamado',
+        'fill_details': 'Preencha os detalhes abaixo. Projetos têm prioridade automática.',
+        'identified_requester': 'Solicitante Identificado',
+        'area_sector': 'Área/Setor',
+        'logout': 'Sair',
+        'must_be_logged': 'Você precisa estar logado para criar um chamado.',
+        'request_category': 'Categoria da Solicitação',
+        'not_applicable_routine': 'Não Aplicável (Rotina)',
+        'projects_max_priority': 'Projetos (Prioridade Máxima)',
+        'rl_code_label': 'Código RL (3 Dígitos)',
+        'rl_code_example': 'Ex: 045',
+        'rl_required': 'Obrigatório para priorização na fila.',
+        'type_sector': 'Tipo / Setor',
+        'select': 'Selecione...',
+        'maintenance': 'Manutenção',
+        'engineering': 'Engenharia',
+        'quality': 'Qualidade',
+        'commercial': 'Comercial',
+        'planning': 'Planejamento',
+        'indirect_material': 'Material Indireto / Compras',
+        'not_applicable_short': 'Não se aplica',
+        'main_impact': 'Impacto Principal',
+        'timeline_client': 'Prazo / Cliente',
+        'detailed_description': 'Descrição Detalhada',
+        'describe_problem': 'Descreva o problema ou solicitação...',
+        'attach_file': 'Anexar Arquivo (PDF, Imagem, Excel)',
+        'upload_file': 'Carregar um arquivo',
+        'or_drag_drop': 'ou arraste e solte',
+        'file_types': 'PNG, JPG, PDF ou XLSX até 10MB',
+        'suggested_responsible': 'Responsável Sugerido',
+        'defined_automatically': 'Definido automaticamente pelo sistema.',
+        'submit_request': 'Enviar Solicitação',
+        'select_sector_above': 'Selecione um setor acima...',
+        'loading_supervisors': 'Carregando supervisores...',
+        'select_sector': 'Selecione um setor...',
+        'no_supervisors': 'Sem supervisores na área - Atribuição Manual',
+        'error_loading': 'Erro ao carregar - Será atribuído manualmente',
+        'file_ready': 'Arquivo pronto para envio:',
+        'gate_1': 'Gate 1',
+        'gate_2': 'Gate 2',
+        'gate_3': 'Gate 3',
+        'gate_4': 'Gate 4',
+        'security': 'Segurança',
+        'viewing_chamado': 'Visualizando Chamado',
+        'complete_details': 'Detalhes completos da solicitação',
+        'click_eye_full': 'Clique no olho para ver completo',
+        'rl_short': 'RL:',
+        'option_open': 'Aberto',
+        'option_in_progress': 'Em Atendimento',
+        'option_completed': 'Concluído',
+        'option_attend': 'Atender',
+        'option_finish': 'Concluir',
+    },
+    'en': {
+        'dashboard_title': 'Ticket Management Panel',
+        'search_placeholder': 'Ex: Turbine, 111...',
+        'found_tickets': 'tickets found',
+        'page': 'Page',
+        'of': 'of',
+        'category': 'Category',
+        'all': 'All',
+        'projects': 'Projects',
+        'not_applicable': 'Not Applicable',
+        'status': 'Status',
+        'open': 'Open',
+        'in_progress': 'In Progress',
+        'completed': 'Completed',
+        'gate': 'Gate',
+        'filter': 'Filter',
+        'clear_filters': 'Clear Filters',
+        'export': 'Export',
+        'reports': 'Reports',
+        'users': 'Users',
+        'logout': 'Sign Out',
+        'search': 'Search (ID, RL, Description)',
+        'login_title': 'Ticket System',
+        'login_subtitle': 'DTX Aerospace',
+        'email': 'Email',
+        'password': 'Password',
+        'sign_in': 'Sign In',
+        'manage_users': 'Manage system users',
+        'language': 'Language',
+        'portuguese': 'Português (Brasil)',
+        'english': 'English',
+        'spanish': 'Español',
+        'id_ref': 'ID / Ref',
+        'sector_gate': 'Sector / Gate',
+        'description': 'Description',
+        'actions': 'Actions',
+        'no_tickets': 'No tickets found.',
+        'no_tickets_hint': 'Try clearing the filters or searching for another term.',
+        'showing': 'Showing',
+        'to': 'to',
+        'first': 'First',
+        'previous': 'Previous',
+        'next': 'Next',
+        'last': 'Last',
+        'view_details': 'View Details',
+        'view_history': 'View History',
+        'change_status': 'Click to change status',
+        'opening_info': 'Opening Information',
+        'date': 'Date',
+        'requester': 'Requester',
+        'manager_action': 'Manager Action',
+        'change_status_to': 'Change Status to:',
+        'save_change': 'Save Change',
+        'problem_description': 'Problem Description',
+        'attached_file': 'Attached File',
+        'download_attachment': 'Download Attachment',
+        'new_ticket': 'New Ticket',
+        'ticket_opening': 'Ticket Opening',
+        'fill_details': 'Fill in the details below. Projects have automatic priority.',
+        'identified_requester': 'Identified Requester',
+        'area_sector': 'Area/Sector',
+        'logout': 'Sign Out',
+        'must_be_logged': 'You must be logged in to create a ticket.',
+        'request_category': 'Request Category',
+        'not_applicable_routine': 'Not Applicable (Routine)',
+        'projects_max_priority': 'Projects (Maximum Priority)',
+        'rl_code_label': 'RL Code (3 Digits)',
+        'rl_code_example': 'Ex: 045',
+        'rl_required': 'Required for queue prioritization.',
+        'type_sector': 'Type / Sector',
+        'select': 'Select...',
+        'maintenance': 'Maintenance',
+        'engineering': 'Engineering',
+        'quality': 'Quality',
+        'commercial': 'Commercial',
+        'planning': 'Planning',
+        'indirect_material': 'Indirect Material / Purchases',
+        'not_applicable_short': 'Not applicable',
+        'main_impact': 'Main Impact',
+        'timeline_client': 'Timeline / Client',
+        'detailed_description': 'Detailed Description',
+        'describe_problem': 'Describe the problem or request...',
+        'attach_file': 'Attach File (PDF, Image, Excel)',
+        'upload_file': 'Upload a file',
+        'or_drag_drop': 'or drag and drop',
+        'file_types': 'PNG, JPG, PDF or XLSX up to 10MB',
+        'suggested_responsible': 'Suggested Responsible',
+        'defined_automatically': 'Defined automatically by the system.',
+        'submit_request': 'Submit Request',
+        'select_sector_above': 'Select a sector above...',
+        'loading_supervisors': 'Loading supervisors...',
+        'select_sector': 'Select a sector...',
+        'no_supervisors': 'No supervisors in the area - Manual Assignment',
+        'error_loading': 'Error loading - Will be assigned manually',
+        'file_ready': 'File ready for submission:',
+        'gate_1': 'Gate 1',
+        'gate_2': 'Gate 2',
+        'gate_3': 'Gate 3',
+        'gate_4': 'Gate 4',
+        'security': 'Security',
+        'viewing_chamado': 'Viewing Ticket',
+        'complete_details': 'Complete details of the request',
+        'click_eye_full': 'Click the eye icon to see the full text',
+        'rl_short': 'RL:',
+        'option_open': 'Open',
+        'option_in_progress': 'In Progress',
+        'option_completed': 'Completed',
+        'option_attend': 'Attend',
+        'option_finish': 'Complete',
+    },
+    'es': {
+        'dashboard_title': 'Panel de Gestión de Tickets',
+        'search_placeholder': 'Ej: Turbina, 111...',
+        'found_tickets': 'tickets encontrados',
+        'page': 'Página',
+        'of': 'de',
+        'category': 'Categoría',
+        'all': 'Todos',
+        'projects': 'Proyectos',
+        'not_applicable': 'No Aplicable',
+        'status': 'Estado',
+        'open': 'Abiertos',
+        'in_progress': 'En Progreso',
+        'completed': 'Completados',
+        'gate': 'Gate',
+        'filter': 'Filtrar',
+        'clear_filters': 'Limpiar Filtros',
+        'export': 'Exportar',
+        'reports': 'Informes',
+        'users': 'Usuarios',
+        'logout': 'Cerrar Sesión',
+        'search': 'Buscar (ID, RL, Descripción)',
+        'login_title': 'Sistema de Tickets',
+        'login_subtitle': 'DTX Aerospace',
+        'email': 'Correo Electrónico',
+        'password': 'Contraseña',
+        'sign_in': 'Iniciar Sesión',
+        'manage_users': 'Gestionar usuarios del sistema',
+        'language': 'Idioma',
+        'portuguese': 'Português (Brasil)',
+        'english': 'English',
+        'spanish': 'Español',
+        'id_ref': 'ID / Referencia',
+        'sector_gate': 'Sector / Gate',
+        'description': 'Descripción',
+        'actions': 'Acciones',
+        'no_tickets': 'No se encontraron tickets.',
+        'no_tickets_hint': 'Intente limpiar los filtros o busque otro término.',
+        'showing': 'Mostrando',
+        'to': 'a',
+        'first': 'Primero',
+        'previous': 'Anterior',
+        'next': 'Siguiente',
+        'last': 'Último',
+        'view_details': 'Ver Detalles',
+        'view_history': 'Ver Historial',
+        'change_status': 'Haga clic para cambiar el estado',
+        'opening_info': 'Información de Apertura',
+        'date': 'Fecha',
+        'requester': 'Solicitante',
+        'manager_action': 'Acción del Gestor',
+        'change_status_to': 'Cambiar Estado a:',
+        'save_change': 'Guardar Cambio',
+        'problem_description': 'Descripción del Problema',
+        'attached_file': 'Archivo Adjunto',
+        'download_attachment': 'Descargar Adjunto',
+        'new_ticket': 'Nuevo Ticket',
+        'ticket_opening': 'Apertura de Ticket',
+        'fill_details': 'Rellene los detalles a continuación. Los proyectos tienen prioridad automática.',
+        'identified_requester': 'Solicitante Identificado',
+        'area_sector': 'Área/Sector',
+        'logout': 'Cerrar Sesión',
+        'must_be_logged': 'Debe estar conectado para crear un ticket.',
+        'request_category': 'Categoría de la Solicitud',
+        'not_applicable_routine': 'No Aplicable (Rutina)',
+        'projects_max_priority': 'Proyectos (Prioridad Máxima)',
+        'rl_code_label': 'Código RL (3 Dígitos)',
+        'rl_code_example': 'Ej: 045',
+        'rl_required': 'Requerido para priorización en la cola.',
+        'type_sector': 'Tipo / Sector',
+        'select': 'Seleccionar...',
+        'maintenance': 'Mantenimiento',
+        'engineering': 'Ingeniería',
+        'quality': 'Calidad',
+        'commercial': 'Comercial',
+        'planning': 'Planificación',
+        'indirect_material': 'Material Indirecto / Compras',
+        'not_applicable_short': 'No aplica',
+        'main_impact': 'Impacto Principal',
+        'timeline_client': 'Plazo / Cliente',
+        'detailed_description': 'Descripción Detallada',
+        'describe_problem': 'Describa el problema o solicitud...',
+        'attach_file': 'Adjuntar Archivo (PDF, Imagen, Excel)',
+        'upload_file': 'Cargar un archivo',
+        'or_drag_drop': 'o arrastra y suelta',
+        'file_types': 'PNG, JPG, PDF o XLSX hasta 10MB',
+        'suggested_responsible': 'Responsable Sugerido',
+        'defined_automatically': 'Definido automáticamente por el sistema.',
+        'submit_request': 'Enviar Solicitud',
+        'select_sector_above': 'Seleccione un sector anterior...',
+        'loading_supervisors': 'Cargando supervisores...',
+        'select_sector': 'Seleccione un sector...',
+        'no_supervisors': 'Sin supervisores en el área - Asignación Manual',
+        'error_loading': 'Error al cargar - Se asignará manualmente',
+        'file_ready': 'Archivo listo para envío:',
+        'gate_1': 'Gate 1',
+        'gate_2': 'Gate 2',
+        'gate_3': 'Gate 3',
+        'gate_4': 'Gate 4',
+        'security': 'Seguridad',
+        'viewing_chamado': 'Viendo Ticket',
+        'complete_details': 'Detalles completos de la solicitud',
+        'click_eye_full': 'Haz clic en el ícono de ojo para ver el texto completo',
+        'rl_short': 'RL:',
+        'option_open': 'Abierto',
+        'option_in_progress': 'En Progreso',
+        'option_completed': 'Completado',
+        'option_attend': 'Atender',
+        'option_finish': 'Completar',
+    }
+}
+
+# Idiomas suportados
+SUPPORTED_LANGUAGES = {
+    'pt_BR': 'Português (Brasil)',
+    'en': 'English',
+    'es': 'Español',
+}
+
+# Mapa de Setores para Chaves de Tradução
+SECTOR_KEYS_MAP = {
+    'Manutencao': 'maintenance',     # Sem acento no banco de dados
+    'Engenharia': 'engineering',
+    'Qualidade': 'quality',
+    'Comercial': 'commercial',
+    'Planejamento': 'planning',
+    'Material': 'indirect_material',  # Abreviado no banco de dados
+}
+
+# Mapa de Categorias para Chaves de Tradução
+CATEGORY_KEYS_MAP = {
+    'Projetos': 'projects',
+    'Nao Aplicavel': 'not_applicable',  # Sem acento no banco de dados
+}
+
+def get_language_code(lang_param):
+    """
+    Valida e retorna o código de idioma.
+    Se inválido, retorna o padrão: pt_BR
+    """
+    if lang_param in SUPPORTED_LANGUAGES:
+        return lang_param
+    return 'pt_BR'
+
+def get_translated_sector(sector_name, language='pt_BR'):
+    """
+    Traduz o nome de um setor usando seu mapeamento de chave.
+    
+    Args:
+        sector_name (str): Nome do setor em português (ex: 'Engenharia')
+        language (str): Código do idioma (pt_BR, en, es)
+    
+    Returns:
+        str: Texto traduzido ou o nome original se não encontrado
+    """
+    translation_key = SECTOR_KEYS_MAP.get(sector_name)
+    if translation_key:
+        return get_translation(translation_key, language)
+    return sector_name
+
+def get_translated_category(category_name, language='pt_BR'):
+    """
+    Traduz o nome de uma categoria usando seu mapeamento de chave.
+    
+    Args:
+        category_name (str): Nome da categoria em português (ex: 'Projetos')
+        language (str): Código do idioma (pt_BR, en, es)
+    
+    Returns:
+        str: Texto traduzido ou o nome original se não encontrado
+    """
+    translation_key = CATEGORY_KEYS_MAP.get(category_name)
+    if translation_key:
+        return get_translation(translation_key, language)
+    return category_name
+
+def get_translation(key, language='pt_BR'):
+    """
+    Obtém a tradução de uma chave para um idioma específico.
+    
+    Args:
+        key (str): Chave da tradução
+        language (str): Código do idioma (pt_BR, en, es)
+    
+    Returns:
+        str: Texto traduzido ou a chave se não encontrada
+    """
+    language = get_language_code(language)
+    if language in TRANSLATIONS and key in TRANSLATIONS[language]:
+        return TRANSLATIONS[language][key]
+    # Retorna a chave como fallback
+    return key

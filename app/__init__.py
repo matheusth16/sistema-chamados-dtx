@@ -1,8 +1,6 @@
-from flask import Flask
+from flask import Flask, session, request
 from flask_login import LoginManager
 from flask_wtf.csrf import CSRFProtect
-from flask_limiter import Limiter
-from flask_limiter.util import get_remote_address
 from config import Config
 import logging
 from pythonjsonlogger import jsonlogger
@@ -15,14 +13,9 @@ def create_app():
     # Inicializa CSRF Protection
     csrf = CSRFProtect(app)
 
-    # Inicializa Rate Limiting
-    limiter = Limiter(
-        app=app,
-        key_func=get_remote_address,
-        default_limits=["200 per day", "50 per hour"],
-        storage_uri="memory://",
-        storage_options={}
-    )
+    # Rate Limiting (limiter definido em app.limiter, usado pelos blueprints)
+    from app.limiter import limiter
+    limiter.init_app(app)
 
     # Configura Logging Estruturado
     _configurar_logging(app)
@@ -40,6 +33,9 @@ def create_app():
         from app.models_usuario import Usuario
         return Usuario.get_by_id(user_id)
 
+    # Configuração de i18n (Internacionalização)
+    _configurar_i18n(app)
+
     # Importa e registra as rotas
     from app.routes import main
     app.register_blueprint(main)
@@ -52,6 +48,47 @@ def create_app():
     # Não há tabelas para criar (Firestore é NoSQL)
     
     return app
+
+def _configurar_i18n(app: Flask) -> None:
+    """Configura sistema de internacionalização (i18n)"""
+    from app.i18n import get_translation, get_translated_sector, get_translated_category
+    
+    @app.before_request
+    def antes_da_requisicao():
+        """Define o idioma para a requisição atual"""
+        # Obtém idioma do parâmetro URL ou da sessão
+        lang = request.args.get('lang') or session.get('language', 'pt_BR')
+        session['language'] = lang
+    
+    @app.context_processor
+    def inject_i18n():
+        """Injeta função de tradução e idioma no contexto Jinja"""
+        def t(key):
+            """Função para traduzir uma chave no template"""
+            lang = session.get('language', 'pt_BR')
+            return get_translation(key, lang)
+        
+        def translate_sector(sector_name):
+            """Traduz o nome de um setor no template"""
+            lang = session.get('language', 'pt_BR')
+            return get_translated_sector(sector_name, lang)
+        
+        def translate_category(category_name):
+            """Traduz o nome de uma categoria no template"""
+            lang = session.get('language', 'pt_BR')
+            return get_translated_category(category_name, lang)
+        
+        return dict(
+            t=t,
+            translate_sector=translate_sector,
+            translate_category=translate_category,
+            current_language=session.get('language', 'pt_BR'),
+            get_supported_languages=lambda: {
+                'pt_BR': 'Português (Brasil)',
+                'en': 'English',
+                'es': 'Español'
+            }
+        )
 
 
 def _configurar_logging(app: Flask) -> None:
