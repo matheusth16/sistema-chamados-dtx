@@ -12,7 +12,7 @@ from statistics import mean, stdev
 
 logger = logging.getLogger(__name__)
 
-# Cache em memória para o relatório completo (evita queries pesadas a cada acesso)
+# Cache em memória (fallback quando Redis não está configurado)
 _RELATORIO_CACHE: Dict[str, Any] = {}
 _RELATORIO_CACHE_TTL_SEC = 300  # 5 minutos
 
@@ -111,7 +111,8 @@ class AnalisadorChamados:
             from app.services.assignment import atribuidor
             
             supervisores = Usuario.get_all()
-            supervisores_ativos = [u for u in supervisores if u.perfil in ['supervisor', 'admin']]
+            # Apenas supervisores (admin do sistema não entra nas métricas de atendimento)
+            supervisores_ativos = [u for u in supervisores if u.perfil == 'supervisor']
             
             metricas = []
             
@@ -189,15 +190,13 @@ class AnalisadorChamados:
         - Performance média da área
         """
         try:
-            # Buscar todas as áreas
+            # Apenas áreas que têm pelo menos um supervisor (exclui área só do admin, ex: TI)
             usuarios_ref = self.get_db().collection('usuarios').stream()
             areas_uniques = set()
-            
             for doc in usuarios_ref:
                 usuario = doc.to_dict()
-                if usuario.get('area'):
+                if usuario.get('area') and usuario.get('perfil') == 'supervisor':
                     areas_uniques.add(usuario['area'])
-            
             metricas = []
             
             for area in sorted(areas_uniques):
@@ -403,15 +402,25 @@ class AnalisadorChamados:
     def obter_relatorio_completo(self, usar_cache: bool = True) -> Dict[str, Any]:
         """Retorna um relatório completo consolidado.
         
-        Com usar_cache=True (padrão), reutiliza resultado por 5 minutos,
-        evitando várias queries pesadas ao Firestore a cada acesso à página.
+        Com usar_cache=True (padrão), reutiliza resultado por 5 minutos (Redis ou memória),
+        evitando várias queries pesadas ao Firestore.
         """
         try:
-            now = time.time()
-            if usar_cache and _RELATORIO_CACHE and (now < _RELATORIO_CACHE.get('expires', 0)):
-                logger.debug("Relatório servido do cache")
-                return _RELATORIO_CACHE['data']
-            
+            if usar_cache:
+                try:
+                    from app.cache import cache_get, cache_set
+                    cached = cache_get('relatorio_completo')
+                    if cached is not None:
+                        logger.debug("Relatório servido do cache (Redis/memória)")
+                        return cached
+                except Exception as e:
+                    logger.debug("Cache get ignorado: %s", e)
+                # Fallback: cache em memória local
+                now = time.time()
+                if _RELATORIO_CACHE and (now < _RELATORIO_CACHE.get('expires', 0)):
+                    logger.debug("Relatório servido do cache em memória")
+                    return _RELATORIO_CACHE['data']
+
             metricas_gerais = self.obter_metricas_gerais(dias=30)
             metricas_supervisores = self.obter_metricas_supervisores()
             metricas_areas = self.obter_metricas_areas()
@@ -421,7 +430,6 @@ class AnalisadorChamados:
                 analise_atribuicao=analise_atribuicao,
                 metricas_areas=metricas_areas,
             )
-            
             relatorio = {
                 'data_geracao': datetime.now().isoformat(),
                 'metricas_gerais': metricas_gerais,
@@ -430,11 +438,14 @@ class AnalisadorChamados:
                 'analise_atribuicao': analise_atribuicao,
                 'insights': insights,
             }
-            
             if usar_cache:
+                try:
+                    from app.cache import cache_set
+                    cache_set('relatorio_completo', relatorio, _RELATORIO_CACHE_TTL_SEC)
+                except Exception as e:
+                    logger.debug("Cache set ignorado: %s", e)
                 _RELATORIO_CACHE['data'] = relatorio
-                _RELATORIO_CACHE['expires'] = now + _RELATORIO_CACHE_TTL_SEC
-            
+                _RELATORIO_CACHE['expires'] = time.time() + _RELATORIO_CACHE_TTL_SEC
             return relatorio
         except Exception as e:
             logger.exception(f"Erro ao gerar relatório completo: {str(e)}")

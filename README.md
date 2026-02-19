@@ -54,12 +54,14 @@ pip install -r requirements.txt
 
 ### 5. Configure variáveis de ambiente
 
-Crie um arquivo `.env` na raiz:
+Copie o exemplo e preencha (veja **ENV.md** para a lista completa):
 
+```bash
+cp .env.example .env
+# Edite .env e defina ao menos SECRET_KEY e FLASK_ENV
 ```
-SECRET_KEY=sua-chave-secreta-aqui
-FLASK_ENV=development
-```
+
+Documentação das variáveis: **[ENV.md](ENV.md)**
 
 ### 6. Inicie a aplicação
 

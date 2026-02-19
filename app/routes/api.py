@@ -77,6 +77,69 @@ def atualizar_status_ajax():
         return jsonify({'sucesso': False, 'erro': str(e)}), 500
 
 
+@main.route('/api/bulk-status', methods=['POST'])
+@login_required
+@limiter.limit("20 per minute")
+def bulk_atualizar_status():
+    """Atualiza status de múltiplos chamados em lote. Apenas supervisor/admin."""
+    if current_user.perfil not in ('supervisor', 'admin'):
+        return jsonify({'sucesso': False, 'erro': 'Acesso negado'}), 403
+    try:
+        dados = request.get_json()
+        if not dados:
+            return jsonify({'sucesso': False, 'erro': 'JSON inválido ou vazio'}), 400
+        ids = dados.get('chamado_ids')
+        if not isinstance(ids, list):
+            return jsonify({'sucesso': False, 'erro': 'chamado_ids deve ser uma lista'}), 400
+        novo_status = (dados.get('novo_status') or '').strip()
+        if novo_status not in ('Aberto', 'Em Atendimento', 'Concluído'):
+            return jsonify({'sucesso': False, 'erro': 'novo_status inválido'}), 400
+        ids = [str(i).strip() for i in ids if i][:50]
+        if not ids:
+            return jsonify({'sucesso': False, 'erro': 'Nenhum chamado informado'}), 400
+
+        atualizados = 0
+        erros = []
+        update_data = {'status': novo_status}
+        if novo_status == 'Concluído':
+            update_data['data_conclusao'] = firestore.SERVER_TIMESTAMP
+        for chamado_id in ids:
+            try:
+                doc = db.collection('chamados').document(chamado_id).get()
+                if not doc.exists:
+                    erros.append({'id': chamado_id, 'erro': 'Não encontrado'})
+                    continue
+                data = doc.to_dict()
+                if current_user.perfil == 'supervisor':
+                    if data.get('area') != current_user.area and data.get('responsavel_id') != current_user.id:
+                        erros.append({'id': chamado_id, 'erro': 'Sem permissão para este chamado'})
+                        continue
+                db.collection('chamados').document(chamado_id).update(update_data)
+                if data.get('status') != novo_status:
+                    Historico(
+                        chamado_id=chamado_id,
+                        usuario_id=current_user.id,
+                        usuario_nome=current_user.nome,
+                        acao='alteracao_status',
+                        campo_alterado='status',
+                        valor_anterior=data.get('status'),
+                        valor_novo=novo_status,
+                    ).save()
+                atualizados += 1
+            except Exception as e:
+                logger.warning("Bulk status: falha em %s: %s", chamado_id, e)
+                erros.append({'id': chamado_id, 'erro': str(e)})
+        return jsonify({
+            'sucesso': True,
+            'atualizados': atualizados,
+            'total_solicitados': len(ids),
+            'erros': erros,
+        }), 200
+    except Exception as e:
+        logger.exception("Erro em bulk_atualizar_status: %s", e)
+        return jsonify({'sucesso': False, 'erro': str(e)}), 500
+
+
 @main.route('/api/notificacoes', methods=['GET'])
 @login_required
 def api_notificacoes_listar():

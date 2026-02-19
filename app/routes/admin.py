@@ -1,6 +1,7 @@
 """Rotas do painel administrativo: dashboard, exportar, histórico, usuários, relatórios, índices."""
 import logging
 import io
+from datetime import datetime
 from typing import List, Dict, Any
 from flask import render_template, request, redirect, url_for, send_file, flash, Response
 from flask_login import login_required, current_user
@@ -77,14 +78,28 @@ def admin() -> Response:
             flash(f'Erro ao atualizar: {str(e)}', 'danger')
             return redirect(url_for('main.admin', **request.args))
 
+    # Lista de responsáveis (apenas supervisores; admin do sistema não aparece no filtro)
+    usuarios_gestao = Usuario.get_all()
+    lista_responsaveis = sorted(
+        [u.nome for u in usuarios_gestao if u.perfil == 'supervisor' and u.nome],
+        key=lambda x: x.upper()
+    )
+
     chamados_ref = db.collection('chamados')
     docs = aplicar_filtros_dashboard(chamados_ref, request.args)
     chamados = []
     for doc in docs:
         data = doc.to_dict()
         c = Chamado.from_dict(data, doc.id)
-        if current_user.perfil == 'supervisor' and c.area != current_user.area:
-            continue
+        # Supervisor vê chamados da sua área OU chamados atribuídos a ele OU responsável está no seu setor
+        if current_user.perfil == 'supervisor':
+            # Busca area do responsavel para comparacao
+            responsavel_obj = Usuario.get_by_id(c.responsavel_id) if c.responsavel_id else None
+            responsavel_area = responsavel_obj.area if responsavel_obj else None
+            
+            # Mostrar se: (area == sua area) OR (você é responsável) OR (responsável é do seu setor)
+            if not (c.area == current_user.area or c.responsavel_id == current_user.id or responsavel_area == current_user.area):
+                continue
         chamados.append(c)
 
     def _chave(c):
@@ -112,7 +127,8 @@ def admin() -> Response:
         pagina_atual=pagina,
         total_paginas=total_paginas,
         total_chamados=total_chamados,
-        itens_por_pagina=itens_por_pagina
+        itens_por_pagina=itens_por_pagina,
+        lista_responsaveis=lista_responsaveis,
     )
 
 
@@ -126,9 +142,15 @@ def visualizar_historico(chamado_id: str) -> Response:
             flash('Chamado não encontrado', 'danger')
             return redirect(url_for('main.admin'))
         chamado = Chamado.from_dict(doc_chamado.to_dict(), chamado_id)
-        if current_user.perfil == 'supervisor' and chamado.area != current_user.area:
-            flash('Você só pode visualizar histórico de chamados da sua área', 'danger')
-            return redirect(url_for('main.admin'))
+        if current_user.perfil == 'supervisor':
+            # Busca area do responsavel
+            responsavel_obj = Usuario.get_by_id(chamado.responsavel_id) if chamado.responsavel_id else None
+            responsavel_area = responsavel_obj.area if responsavel_obj else None
+            
+            # Permite acesso se: você está na mesma area do chamado OU é responsável OU responsável é do seu setor
+            if not (chamado.area == current_user.area or chamado.responsavel_id == current_user.id or responsavel_area == current_user.area):
+                flash('Você só pode visualizar histórico de chamados da sua área', 'danger')
+                return redirect(url_for('main.admin'))
         historico = Historico.get_by_chamado_id(chamado_id)
         return render_template('historico.html', chamado=chamado, historico=historico)
     except Exception as e:
@@ -148,8 +170,13 @@ def exportar() -> Response:
         dados: List[Dict[str, Any]] = []
         for doc in docs:
             c = Chamado.from_dict(doc.to_dict(), doc.id)
-            if current_user.perfil == 'supervisor' and c.area != current_user.area:
-                continue
+            if current_user.perfil == 'supervisor':
+                # Mesma lógica de permissão do dashboard: área do chamado OU responsável do setor
+                responsavel_obj = Usuario.get_by_id(c.responsavel_id) if c.responsavel_id else None
+                responsavel_area = responsavel_obj.area if responsavel_obj else None
+                
+                if not (c.area == current_user.area or c.responsavel_id == current_user.id or responsavel_area == current_user.area):
+                    continue
             dados.append({
                 'Chamado': c.numero_chamado,
                 'Categoria': c.categoria,
@@ -328,13 +355,75 @@ def indices_firestore() -> Response:
         return redirect(url_for('main.admin'))
 
 
+@main.route('/exportar-avancado')
+@requer_supervisor_area
+@limiter.limit("3 per hour")
+def exportar_avancado() -> Response:
+    """Exporta relatório completo e profissional em Excel com múltiplas abas."""
+    try:
+        from app.services.excel_export_service import exportador_excel
+        
+        # Busca chamados com filtros
+        chamados_ref = db.collection('chamados')
+        docs = aplicar_filtros_dashboard(chamados_ref, request.args)
+        chamados = []
+        
+        for doc in docs:
+            c = Chamado.from_dict(doc.to_dict(), doc.id)
+            if current_user.perfil == 'supervisor':
+                # Mesma lógica de permissão: área do chamado OU responsável do setor
+                responsavel_obj = Usuario.get_by_id(c.responsavel_id) if c.responsavel_id else None
+                responsavel_area = responsavel_obj.area if responsavel_obj else None
+                
+                if not (c.area == current_user.area or c.responsavel_id == current_user.id or responsavel_area == current_user.area):
+                    continue
+            chamados.append(c)
+        
+        # Obtém métricas
+        analisador_local = analisador
+        metricas_gerais = analisador_local.obter_metricas_gerais(dias=30)
+        metricas_supervisores = analisador_local.obter_metricas_supervisores()
+        
+        # Filtros aplicados (para documenti no Excel)
+        filtros_aplicados = {}
+        if request.args.get('search'):
+            filtros_aplicados['Busca'] = request.args.get('search')
+        if request.args.get('categoria'):
+            filtros_aplicados['Categoria'] = request.args.get('categoria')
+        if request.args.get('status'):
+            filtros_aplicados['Status'] = request.args.get('status')
+        if request.args.get('responsavel'):
+            filtros_aplicados['Responsável'] = request.args.get('responsavel')
+        
+        # Exporta relatório
+        output = exportador_excel.exportar_relatorio_completo(
+            chamados=chamados,
+            metricas_gerais=metricas_gerais,
+            metricas_supervisores=metricas_supervisores,
+            filtros_aplicados=filtros_aplicados
+        )
+        
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        return send_file(
+            output,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            as_attachment=True,
+            download_name=f'relatorio_completo_{ts}.xlsx'
+        )
+    except Exception as e:
+        logger.exception(f"Erro ao exportar relatório avançado: {str(e)}")
+        flash('Erro ao exportar relatório. Tente novamente.', 'danger')
+        return redirect(url_for('main.admin'))
+
+
 @main.route('/admin/relatorios')
 @requer_supervisor_area
 @limiter.limit("30 per minute")
 def relatorios() -> Response:
-    """Dashboard de relatórios e análises."""
+    """Dashboard de relatórios e análises. Use ?atualizar=1 para forçar dados frescos."""
     try:
-        relatorio = analisador.obter_relatorio_completo()
+        atualizar = request.args.get('atualizar') == '1'
+        relatorio = analisador.obter_relatorio_completo(usar_cache=not atualizar)
         return render_template(
             'relatorios.html',
             relatorio=relatorio,

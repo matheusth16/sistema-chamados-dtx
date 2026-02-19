@@ -13,3 +13,5 @@ pywebpush
 py-vapid
 pytest
 pytest-cov
+# Opcional: cache Redis (reduz queries ao Firestore). Use REDIS_URL no .env
+redis>=4.0

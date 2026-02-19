@@ -118,6 +118,7 @@
         </div>
         
         <form method="POST" action="{{ url_for('main.gerenciar_usuarios') }}" class="p-6 space-y-4">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
             <input type="hidden" name="acao" value="criar">
             
             <!-- Email -->
@@ -194,6 +195,7 @@
         </div>
         
         <form method="POST" id="formEditar" class="p-6 space-y-4">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
             <input type="hidden" id="usuarioIdEditar">
             
             <!-- Email -->
@@ -278,6 +280,7 @@
             
             <!-- Form para deletar -->
             <form method="POST" id="formDeletar" class="flex gap-2 justify-end pt-4 border-t border-gray-200">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 <button type="button" onclick="fecharModalDeletar()"
                     class="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium rounded-md transition">
                     Cancelar
@@ -316,6 +319,7 @@ function toggleAreaNovo() {
 }
 
 // ===== MODAL EDITAR USUÁRIO =====
+var urlEditarComPlaceholder = "{{ url_for('main.editar_usuario', usuario_id='__ID__') }}";
 function abrirModalEditar(id, email, nome, perfil, area) {
     document.getElementById('usuarioIdEditar').value = id;
     document.getElementById('emailEditar').value = email;
@@ -326,10 +330,7 @@ function abrirModalEditar(id, email, nome, perfil, area) {
         document.getElementById('areaEditar').value = area;
     }
     
-    // Atualiza a URL do form
-    const baseUrl = "{{ url_for('main.editar_usuario', usuario_id='') }}";
-    document.getElementById('formEditar').action = baseUrl + id;
-    
+    document.getElementById('formEditar').action = urlEditarComPlaceholder.replace('__ID__', encodeURIComponent(id));
     toggleAreaEditar();
     document.getElementById('modalEditar').classList.remove('hidden');
 }
@@ -353,13 +354,10 @@ function toggleAreaEditar() {
 }
 
 // ===== MODAL DELETAR USUÁRIO =====
+var urlDeletarComPlaceholder = "{{ url_for('main.deletar_usuario', usuario_id='__ID__') }}";
 function abrirModalDeletar(id, nome) {
     document.getElementById('nomeDeletar').textContent = nome;
-    
-    // Atualiza a URL do form
-    const baseUrl = "{{ url_for('main.deletar_usuario', usuario_id='') }}";
-    document.getElementById('formDeletar').action = baseUrl + id;
-    
+    document.getElementById('formDeletar').action = urlDeletarComPlaceholder.replace('__ID__', encodeURIComponent(id));
     document.getElementById('modalDeletar').classList.remove('hidden');
 }
 

@@ -46,22 +46,40 @@ def index() -> Response:
     solicitante_id = current_user.id
     area_solicitante = current_user.area
 
-    resultado_atribuicao = atribuidor.atribuir(
-        area=area_solicitante or 'Geral',
-        categoria=categoria,
-        prioridade=0 if categoria == 'Projetos' else 1
-    )
+    # Se o solicitante escolheu um responsável no formulário (lista de supervisores), usa esse
+    responsavel_id_form = request.form.get('responsavel_id', '').strip()
+    responsavel_nome_form = request.form.get('responsavel_nome', '').strip()
+    if responsavel_id_form and responsavel_nome_form:
+        usuario_escolhido = Usuario.get_by_id(responsavel_id_form)
+        if usuario_escolhido and usuario_escolhido.perfil in ('supervisor', 'admin'):
+            responsavel = responsavel_nome_form
+            responsavel_id = responsavel_id_form
+            motivo_atribuicao = f"Escolhido pelo solicitante: {responsavel}"
+            logger.info(f"Responsável escolhido no formulário: {responsavel}")
+        else:
+            responsavel_id_form = None
+            responsavel_nome_form = None
 
-    if resultado_atribuicao['sucesso']:
-        responsavel = resultado_atribuicao['supervisor']['nome']
-        responsavel_id = resultado_atribuicao['supervisor']['id']
-        motivo_atribuicao = f"Atribuído automaticamente a {responsavel}"
-        logger.info(f"Atribuição automática bem-sucedida: {responsavel}")
-    else:
-        responsavel = solicitante_nome
-        responsavel_id = solicitante_id
-        motivo_atribuicao = f"Aguardando atribuição manual: {resultado_atribuicao['motivo']}"
-        flash(f"⚠️ {resultado_atribuicao['motivo']}", 'warning')
+    if not responsavel_id_form or not responsavel_nome_form:
+        resultado_atribuicao = atribuidor.atribuir(
+            area=tipo or area_solicitante or 'Geral',
+            categoria=categoria,
+            prioridade=0 if categoria == 'Projetos' else 1
+        )
+        if resultado_atribuicao['sucesso']:
+            responsavel = resultado_atribuicao['supervisor']['nome']
+            responsavel_id = resultado_atribuicao['supervisor']['id']
+            motivo_atribuicao = f"Atribuído automaticamente a {responsavel}"
+            logger.info(f"Atribuição automática bem-sucedida: {responsavel}")
+        else:
+            responsavel = solicitante_nome
+            responsavel_id = solicitante_id
+            motivo_atribuicao = f"Aguardando atribuição manual: {resultado_atribuicao['motivo']}"
+            flash(f"⚠️ {resultado_atribuicao['motivo']}", 'warning')
+
+    # Usa area do responsavel para o chamado (supervisores do mesmo setor conseguem visualizar)
+    responsavel_usuario = Usuario.get_by_id(responsavel_id) if responsavel_id else None
+    area_chamado = responsavel_usuario.area if responsavel_usuario and responsavel_usuario.area else area_solicitante
 
     novo_chamado = Chamado(
         numero_chamado=numero_chamado,
@@ -77,7 +95,7 @@ def index() -> Response:
         motivo_atribuicao=motivo_atribuicao,
         solicitante_id=solicitante_id,
         solicitante_nome=solicitante_nome,
-        area=area_solicitante,
+        area=area_chamado,
         status='Aberto'
     )
 

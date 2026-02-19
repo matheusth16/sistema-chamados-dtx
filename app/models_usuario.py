@@ -160,13 +160,22 @@ class Usuario(UserMixin):
     
     @classmethod
     def get_supervisores_por_area(cls, area: str):
-        """Retorna supervisores de uma área específica"""
+        """Retorna supervisores de uma área específica (e admins da mesma área, para sugestão de responsável)."""
         try:
-            docs = db.collection('usuarios')\
+            # Supervisores da área
+            docs_sup = db.collection('usuarios')\
                 .where('perfil', '==', 'supervisor')\
                 .where('area', '==', area)\
                 .stream()
-            return [cls.from_dict(doc.to_dict(), doc.id) for doc in docs]
+            usuarios = [cls.from_dict(doc.to_dict(), doc.id) for doc in docs_sup]
+            # Admins da área também podem ser sugeridos como responsáveis
+            docs_admin = db.collection('usuarios')\
+                .where('perfil', '==', 'admin')\
+                .where('area', '==', area)\
+                .stream()
+            for doc in docs_admin:
+                usuarios.append(cls.from_dict(doc.to_dict(), doc.id))
+            return usuarios
         except Exception as e:
             print(f'Erro ao buscar supervisores: {e}')
             return []

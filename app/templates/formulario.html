@@ -156,10 +156,17 @@
             </div>
             </div>
 
-            <div>
+            <div id="container_responsavel">
                 <label for="responsavel_visual" class="block text-sm font-medium text-gray-700">{{ t('suggested_responsible') }}</label>
-                <input type="text" id="responsavel_visual" value="{{ t('select_sector_above') }}" disabled
-                       class="mt-1 block w-full bg-gray-100 border-gray-300 rounded-md text-gray-500 sm:text-sm p-2 border cursor-not-allowed">
+                <div id="responsavel_visual_wrapper" class="mt-1">
+                    <input type="text" id="responsavel_visual" value="{{ t('select_sector_above') }}" disabled
+                           class="block w-full bg-gray-100 border-gray-300 rounded-md text-gray-500 sm:text-sm p-2 border cursor-not-allowed">
+                    <select id="responsavel_select" class="hidden mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md border bg-white">
+                        <!-- Preenchido via JS quando há mais de um supervisor -->
+                    </select>
+                </div>
+                <input type="hidden" name="responsavel_id" id="responsavel_id" value="">
+                <input type="hidden" name="responsavel_nome" id="responsavel_nome" value="">
                 <p class="text-xs text-gray-500 mt-1">*{{ t('defined_automatically') }}</p>
             </div>
 
@@ -193,42 +200,84 @@
     function filtrarResponsaveis() {
         const setor = document.getElementById('tipo').value;
         const campoResponsavel = document.getElementById('responsavel_visual');
+        const selectResponsavel = document.getElementById('responsavel_select');
+        const hiddenId = document.getElementById('responsavel_id');
+        const hiddenNome = document.getElementById('responsavel_nome');
+        
+        hiddenId.value = '';
+        hiddenNome.value = '';
+        selectResponsavel.innerHTML = '';
+        selectResponsavel.classList.add('hidden');
+        campoResponsavel.classList.remove('hidden');
+        campoResponsavel.classList.remove('bg-yellow-100', 'border-yellow-300', 'bg-red-100', 'border-red-300');
         
         if (!setor) {
             campoResponsavel.value = "{{ t('select_sector') }}";
             return;
         }
         
-        // Mostra que está carregando
         campoResponsavel.value = "{{ t('loading_supervisors') }}";
         campoResponsavel.classList.add('opacity-50');
         
-        // Consulta a API de disponibilidade
         fetch(`/api/supervisores/disponibilidade?area=${encodeURIComponent(setor)}`)
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) throw new Error('Erro na rede: ' + response.status);
+                return response.json();
+            })
             .then(data => {
-                if (data.sucesso && data.supervisores.length > 0) {
-                    // Encontra o supervisor disponível com menos carga
-                    const supervArquivo = data.supervisores.reduce((anterior, atual) => 
-                        atual.chamados_abertos < anterior.chamados_abertos ? atual : anterior
-                    );
-                    
-                    // Renderiza a sugestão
-                    const disponivel = supervArquivo.disponivel ? '✓' : '⚠️';
-                    campoResponsavel.value = `${disponivel} ${supervArquivo.nome} (${supervArquivo.chamados_abertos} abertos)`;
-                    campoResponsavel.classList.remove('opacity-50');
+                campoResponsavel.classList.remove('opacity-50');
+                if (data.sucesso && data.supervisores && data.supervisores.length > 0) {
+                    const lista = data.supervisores;
+                    if (lista.length === 1) {
+                        // Um só: mostra texto fixo e envia esse responsável
+                        const s = lista[0];
+                        const disp = s.disponivel ? '✓' : '⚠️';
+                        campoResponsavel.value = disp + ' ' + s.nome;
+                        campoResponsavel.classList.remove('hidden');
+                        hiddenId.value = s.id || '';
+                        hiddenNome.value = s.nome || '';
+                    } else {
+                        // Vários: mostra select com placeholder e opções
+                        campoResponsavel.classList.add('hidden');
+                        selectResponsavel.classList.remove('hidden');
+                        const placeholderText = "{{ t('select_responsible') }}";
+                        const optPlaceholder = document.createElement('option');
+                        optPlaceholder.value = '';
+                        optPlaceholder.textContent = placeholderText;
+                        optPlaceholder.disabled = true;
+                        optPlaceholder.selected = true;
+                        selectResponsavel.appendChild(optPlaceholder);
+                        lista.forEach(function(s) {
+                            const opt = document.createElement('option');
+                            opt.value = s.id || '';
+                            opt.setAttribute('data-nome', s.nome || '');
+                            const disp = s.disponivel ? '✓' : '⚠️';
+                            opt.textContent = disp + ' ' + s.nome;
+                            selectResponsavel.appendChild(opt);
+                        });
+                        hiddenId.value = '';
+                        hiddenNome.value = '';
+                    }
                 } else {
-                    // Nenhum supervisor disponível
                     campoResponsavel.value = "{{ t('no_supervisors') }}";
                     campoResponsavel.classList.add('bg-yellow-100', 'border-yellow-300');
                 }
-            }
+            })
             .catch(error => {
                 console.error('Erro ao carregar supervisores:', error);
-                campoResponsavel.value = "{{ t('error_loading') }}";
+                campoResponsavel.classList.remove('opacity-50');
                 campoResponsavel.classList.add('bg-red-100', 'border-red-300');
+                campoResponsavel.value = "{{ t('error_loading') }}";
             });
     }
+
+    // Atualiza os campos ocultos quando o usuário escolhe outro responsável no select
+    document.getElementById('responsavel_select').addEventListener('change', function() {
+        var sel = document.getElementById('responsavel_select');
+        var opt = sel.options[sel.selectedIndex];
+        document.getElementById('responsavel_id').value = sel.value || '';
+        document.getElementById('responsavel_nome').value = opt ? (opt.getAttribute('data-nome') || '') : '';
+    });
 
     // Função para mostrar o nome do arquivo selecionado
     document.getElementById('anexo_arquivo').addEventListener('change', function(e) {

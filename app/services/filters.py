@@ -2,25 +2,26 @@ def _construir_query_base(query_ref, args):
     """
     OTIMIZAÇÃO 1: Aplica filtros baseados em índices Firestore
     
-    Retorna: (query_filtrada, categoria_filtrada, status, gate)
-    
-    Esses filtros são implementados no banco de dados para máxima eficiência.
+    Retorna: (query_filtrada, categoria_filtrada, categoria, status, gate)
     """
     status = args.get('status')
     gate = args.get('gate')
     categoria = args.get('categoria')
+    responsavel = args.get('responsavel', '').strip()
 
     query_filtrada = query_ref
-    
-    # Filtros que podem ir para a query (usando índices)
+
     if status and status not in ['', 'Todos']:
         query_filtrada = query_filtrada.where('status', '==', status)
-    
+
     if gate and gate not in ['', 'Todos']:
         query_filtrada = query_filtrada.where('gate', '==', gate)
-    
+
+    if responsavel:
+        query_filtrada = query_filtrada.where('responsavel', '==', responsavel)
+
     categoria_filtrada = categoria and categoria not in ['', 'Todas']
-    
+
     return query_filtrada, categoria_filtrada, categoria, status, gate
 
 

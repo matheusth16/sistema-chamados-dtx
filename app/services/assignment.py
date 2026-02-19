@@ -212,6 +212,7 @@ class AtribuidorAutomatico:
                 'total_supervisores': len(supervisores_com_carga),
                 'supervisores': [
                     {
+                        'id': sup['usuario'].id,
                         'nome': sup['usuario'].nome,
                         'email': sup['usuario'].email,
                         'chamados_abertos': sup['chamados_abertos'],
