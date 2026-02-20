@@ -1,3 +1,4 @@
+# Dependências do projeto. Verifique vulnerabilidades com: pip audit
 # Framework
 Flask==3.1.2
 Werkzeug==3.1.5

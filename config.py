@@ -7,9 +7,20 @@ basedir = os.path.abspath(os.path.dirname(__file__))
 # Carrega as variáveis do arquivo .env
 load_dotenv(os.path.join(basedir, '.env'))
 
+# Em produção, exige SECRET_KEY forte (não usar o valor de desenvolvimento)
+_dev_secret = 'dev-secret-key-change-in-production'
+_secret = os.getenv('SECRET_KEY') or _dev_secret
+_env = (os.getenv('FLASK_ENV') or os.getenv('ENV') or 'development').lower()
+if _env == 'production' and (not os.getenv('SECRET_KEY') or _secret == _dev_secret):
+    raise ValueError(
+        "Em produção, defina SECRET_KEY no ambiente com um valor forte e único. "
+        "Não use o valor padrão de desenvolvimento."
+    )
+
+
 class Config:
     """Configuração base da aplicação"""
-    SECRET_KEY = os.getenv('SECRET_KEY') or 'dev-secret-key-change-in-production'
+    SECRET_KEY = _secret
     
     # 2. Caminho ABSOLUTO para a pasta de uploads (Evita erros no Windows/OneDrive)
     UPLOAD_FOLDER = os.path.join(basedir, 'app', 'static', 'uploads')
@@ -24,7 +35,8 @@ class Config:
     # 5. Rate Limiting (limite de requisições por janela de tempo)
     RATELIMIT_ENABLED = True
     RATELIMIT_DEFAULT = "200 per day, 50 per hour"  # Limite global padrão
-    RATELIMIT_STORAGE_URL = "memory://"  # Storage em memória (simples)
+    # Em produção, defina REDIS_URL para compartilhar limite entre workers (Gunicorn/Cloud Run)
+    RATELIMIT_STORAGE_URL = os.getenv('REDIS_URL', '').strip() or 'memory://'
     
     # 6. Segurança CSRF
     WTF_CSRF_ENABLED = True
@@ -57,3 +69,9 @@ class Config:
     # Web Push (notificações no navegador). Gere chaves com: python gerar_vapid_keys.py
     VAPID_PUBLIC_KEY = os.getenv('VAPID_PUBLIC_KEY', '')
     VAPID_PRIVATE_KEY = os.getenv('VAPID_PRIVATE_KEY', '')
+
+    # Logging: nível (DEBUG, INFO, WARNING, ERROR). Em produção use INFO ou WARNING.
+    LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO').upper()
+    # Rotação do arquivo de log: tamanho máximo por arquivo (bytes) e número de backups
+    LOG_MAX_BYTES = int(os.getenv('LOG_MAX_BYTES', 2 * 1024 * 1024))  # 2 MB
+    LOG_BACKUP_COUNT = int(os.getenv('LOG_BACKUP_COUNT', 5))

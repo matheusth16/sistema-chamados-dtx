@@ -425,12 +425,13 @@
                 btnSubmit.innerText = 'Salvando...';
             }
             
-            // Envia via AJAX para a API
+            // Envia via AJAX para a API (CSRF no header)
+            var csrfMeta = document.querySelector('meta[name="csrf-token"]');
+            var headers = { 'Content-Type': 'application/json' };
+            if (csrfMeta && csrfMeta.content) headers['X-CSRFToken'] = csrfMeta.content;
             fetch('/api/atualizar-status', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers: headers,
                 body: JSON.stringify({
                     chamado_id: chamadoId,
                     novo_status: novoStatus
@@ -487,8 +488,10 @@
             var status = bulkStatus ? bulkStatus.value : 'Concluído';
             bulkApply.disabled = true;
             var csrfInput = document.querySelector('input[name="csrf_token"]');
+            var csrfMeta = document.querySelector('meta[name="csrf-token"]');
             var headers = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
             if (csrfInput) headers['X-CSRFToken'] = csrfInput.value;
+            else if (csrfMeta && csrfMeta.content) headers['X-CSRFToken'] = csrfMeta.content;
             fetch('{{ url_for("main.bulk_atualizar_status") }}', {
                 method: 'POST',
                 headers: headers,

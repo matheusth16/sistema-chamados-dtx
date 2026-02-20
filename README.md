@@ -59,6 +59,7 @@ Copie o exemplo e preencha (veja **ENV.md** para a lista completa):
 ```bash
 cp .env.example .env
 # Edite .env e defina ao menos SECRET_KEY e FLASK_ENV
+# Em produção: defina FLASK_ENV=production e use SECRET_KEY forte (ex: openssl rand -hex 32)
 ```
 
 Documentação das variáveis: **[ENV.md](ENV.md)**
@@ -72,6 +73,9 @@ python run.py
 Acesse: `http://localhost:5000`
 
 ## 📚 APIs Disponíveis
+
+### GET `/health`
+Health check para load balancer e monitoramento. Retorna `200` e `{"status": "ok"}` quando a aplicação está no ar.
 
 ### GET `/api/chamados/paginar`
 Paginação inteligente de chamados com cursor
@@ -187,6 +191,9 @@ firebase deploy --only firestore:indexes --project seu-projeto-id
 - ✅ Passwords hasheados com werkzeug
 - ✅ Logs de auditoria completos
 - ✅ Credenciais Firebase não são versionadas
+- ✅ Em produção, `SECRET_KEY` é obrigatória (valor forte e único)
+- ✅ Headers de segurança: `X-Content-Type-Options: nosniff`, `X-Frame-Options: SAMEORIGIN`, HSTS em HTTPS
+- ✅ Validação de Origin/Referer em POST sensíveis quando `APP_BASE_URL` está definido
 
 ## 📖 Documentação
 
@@ -210,6 +217,22 @@ firebase deploy --only firestore:indexes --project seu-projeto-id
 
 **Causa:** `credentials.json` não encontrado  
 **Solução:** Adicionar arquivo de credenciais na raiz do projeto
+
+### Erro ao subir em produção: "SECRET_KEY must be set"
+
+**Causa:** Em `FLASK_ENV=production` a aplicação exige `SECRET_KEY` no ambiente.  
+**Solução:** Defina `SECRET_KEY` com um valor forte (ex: `openssl rand -hex 32`) nas variáveis de ambiente.
+
+### Dependências e vulnerabilidades
+
+Execute periodicamente para checar dependências:
+
+```bash
+pip install -U pip
+pip audit
+```
+
+Atualize pacotes quando necessário: `pip install -r requirements.txt --upgrade` (teste após atualizar).
 
 ## 📝 Commit Config
 

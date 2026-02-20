@@ -1,10 +1,21 @@
-from flask import Flask, session, request
+from flask import Flask, session, request, jsonify
 from flask_login import LoginManager
 from flask_wtf.csrf import CSRFProtect
 from config import Config
 import logging
+from logging.handlers import RotatingFileHandler
 from pythonjsonlogger import jsonlogger
+from urllib.parse import urlparse
 import os
+
+# Rotas POST sensíveis que devem validar Origin/Referer quando APP_BASE_URL estiver definido
+_POST_ORIGIN_CHECK_PATHS = frozenset({
+    '/api/atualizar-status',
+    '/api/bulk-status',
+    '/api/push-subscribe',
+    '/api/carregar-mais',
+})
+
 
 def create_app():
     app = Flask(__name__)
@@ -17,7 +28,7 @@ def create_app():
     from app.limiter import limiter
     limiter.init_app(app)
 
-    # Configura Logging Estruturado
+    # Configura Logging Estruturado (com rotação e nível configurável)
     _configurar_logging(app)
 
     # Inicializa Flask-Login
@@ -40,14 +51,58 @@ def create_app():
     from app.routes import main
     app.register_blueprint(main)
 
-    # API AJAX já é protegida por @login_required; isenta de CSRF para fetch com JSON
-    from app.routes import atualizar_status_ajax
-    csrf.exempt(atualizar_status_ajax)
+    # Segurança: headers e validação Origin/Referer em POST sensíveis
+    _configurar_seguranca(app)
+
+    # API de status exige CSRF; o frontend envia o token no header X-CSRFToken (meta csrf-token)
 
     # Firebase é inicializado em app/database.py
     # Não há tabelas para criar (Firestore é NoSQL)
     
     return app
+
+
+def _configurar_seguranca(app: Flask) -> None:
+    """Configura headers de segurança e validação Origin/Referer em POST sensíveis."""
+    from flask import current_app
+
+    @app.after_request
+    def _adicionar_headers_seguranca(response):
+        response.headers['X-Content-Type-Options'] = 'nosniff'
+        response.headers['X-Frame-Options'] = 'SAMEORIGIN'
+        if request.is_secure and current_app.env == 'production':
+            response.headers['Strict-Transport-Security'] = (
+                'max-age=31536000; includeSubDomains'
+            )
+        return response
+
+    @app.before_request
+    def _validar_origin_referer():
+        """Rejeita POST sensíveis de origens não autorizadas quando APP_BASE_URL está definido."""
+        base_url = (current_app.config.get('APP_BASE_URL') or '').strip()
+        if not base_url or request.method != 'POST':
+            return None
+        path = request.path
+        if path not in _POST_ORIGIN_CHECK_PATHS and not (
+            path.startswith('/api/notificacoes/') and path.endswith('/ler')
+        ):
+            return None
+        try:
+            base_parsed = urlparse(base_url)
+            base_origin = f"{base_parsed.scheme or 'https'}://{base_parsed.netloc}".lower()
+        except Exception:
+            return None
+        origin = request.headers.get('Origin') or request.headers.get('Referer') or ''
+        if not origin:
+            return None
+        try:
+            req_parsed = urlparse(origin)
+            req_origin = f"{req_parsed.scheme}://{req_parsed.netloc}".lower()
+        except Exception:
+            req_origin = ''
+        if req_origin and req_origin != base_origin:
+            return jsonify({'sucesso': False, 'erro': 'Origem não autorizada'}), 403
+        return None
 
 def _configurar_i18n(app: Flask) -> None:
     """Configura sistema de internacionalização (i18n)"""
@@ -92,33 +147,34 @@ def _configurar_i18n(app: Flask) -> None:
 
 
 def _configurar_logging(app: Flask) -> None:
-    """Configura logging estruturado em formato JSON"""
-    # Remove handlers padrão
+    """Configura logging estruturado em JSON com rotação e nível configurável (LOG_LEVEL)."""
     app.logger.handlers.clear()
-    
-    # Cria pasta de logs se não existir
-    log_dir = 'logs'
+
+    basedir = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
+    log_dir = os.path.join(basedir, 'logs')
     if not os.path.exists(log_dir):
         os.makedirs(log_dir)
-    
-    # Handler para arquivo com formato JSON
-    file_handler = logging.FileHandler(os.path.join(log_dir, 'sistema_chamados.log'))
-    file_handler.setLevel(logging.INFO)
-    
-    # Formatter JSON estruturado
-    json_formatter = jsonlogger.JsonFormatter()
-    file_handler.setFormatter(json_formatter)
-    
-    # Handler para console em desenvolvimento
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.DEBUG)
-    console_formatter = logging.Formatter(
-        '[%(asctime)s] %(levelname)s in %(module)s: %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
+
+    log_level_name = app.config.get('LOG_LEVEL', 'INFO').upper()
+    log_level = getattr(logging, log_level_name, logging.INFO)
+    app.logger.setLevel(log_level)
+
+    max_bytes = app.config.get('LOG_MAX_BYTES', 2 * 1024 * 1024)
+    backup_count = app.config.get('LOG_BACKUP_COUNT', 5)
+    file_handler = RotatingFileHandler(
+        os.path.join(log_dir, 'sistema_chamados.log'),
+        maxBytes=max_bytes,
+        backupCount=backup_count,
+        encoding='utf-8',
     )
-    console_handler.setFormatter(console_formatter)
-    
-    # Adiciona handlers ao logger da aplicação
+    file_handler.setLevel(log_level)
+    file_handler.setFormatter(jsonlogger.JsonFormatter())
     app.logger.addHandler(file_handler)
+
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(log_level)
+    console_handler.setFormatter(logging.Formatter(
+        '[%(asctime)s] %(levelname)s in %(module)s: %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S',
+    ))
     app.logger.addHandler(console_handler)
-    app.logger.setLevel(logging.DEBUG)

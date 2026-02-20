@@ -87,13 +87,16 @@ async function atualizarStatusAjax(selectElement) {
         };
         console.log('📤 Payload enviado:', JSON.stringify(payload, null, 2));
 
-        // Faz o request AJAX
+        // Faz o request AJAX (CSRF no header para proteção)
+        const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+        const headers = {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+        };
+        if (csrfMeta && csrfMeta.content) headers['X-CSRFToken'] = csrfMeta.content;
         const response = await fetch('/api/atualizar-status', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest'
-            },
+            headers: headers,
             body: JSON.stringify(payload)
         });
 

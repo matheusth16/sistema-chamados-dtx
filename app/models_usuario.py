@@ -1,6 +1,10 @@
+import logging
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 from app.database import db
+
+logger = logging.getLogger(__name__)
+
 
 class Usuario(UserMixin):
     """Representação de um usuário do sistema"""
@@ -53,7 +57,7 @@ class Usuario(UserMixin):
                 data = doc.to_dict()
                 return cls.from_dict(data, doc.id)
         except Exception as e:
-            print(f'Erro ao buscar usuário: {e}')
+            logger.exception("Erro ao buscar usuário por email: %s", e)
         return None
     
     @classmethod
@@ -65,7 +69,7 @@ class Usuario(UserMixin):
                 data = doc.to_dict()
                 return cls.from_dict(data, doc.id)
         except Exception as e:
-            print(f'Erro ao buscar usuário por ID: {e}')
+            logger.exception("Erro ao buscar usuário por ID: %s", e)
         return None
     
     def save(self):
@@ -74,7 +78,7 @@ class Usuario(UserMixin):
             db.collection('usuarios').document(self.id).set(self.to_dict())
             return True
         except Exception as e:
-            print(f'Erro ao salvar usuário: {e}')
+            logger.exception("Erro ao salvar usuário: %s", e)
             return False
     
     def update(self, **kwargs):
@@ -113,7 +117,7 @@ class Usuario(UserMixin):
             
             return False
         except Exception as e:
-            print(f'Erro ao atualizar usuário: {e}')
+            logger.exception("Erro ao atualizar usuário: %s", e)
             return False
     
     def delete(self):
@@ -122,7 +126,7 @@ class Usuario(UserMixin):
             db.collection('usuarios').document(self.id).delete()
             return True
         except Exception as e:
-            print(f'Erro ao deletar usuário: {e}')
+            logger.exception("Erro ao deletar usuário: %s", e)
             return False
     
     @classmethod
@@ -137,7 +141,7 @@ class Usuario(UserMixin):
                 usuarios.append(usuario)
             return usuarios
         except Exception as e:
-            print(f'Erro ao buscar usuários: {e}')
+            logger.exception("Erro ao buscar usuários: %s", e)
             return []
     
     @classmethod
@@ -155,7 +159,7 @@ class Usuario(UserMixin):
                     return True
             return False
         except Exception as e:
-            print(f'Erro ao verificar email: {e}')
+            logger.exception("Erro ao verificar email: %s", e)
             return False
     
     @classmethod
@@ -177,7 +181,7 @@ class Usuario(UserMixin):
                 usuarios.append(cls.from_dict(doc.to_dict(), doc.id))
             return usuarios
         except Exception as e:
-            print(f'Erro ao buscar supervisores: {e}')
+            logger.exception("Erro ao buscar supervisores: %s", e)
             return []
     
     def __repr__(self):

@@ -52,7 +52,7 @@ def requer_perfil(*perfis_permitidos):
             # Verifica se o perfil do usuário está na lista
             if current_user.perfil not in perfis_lista:
                 logger.warning(f"Acesso negado: usuário {current_user.email} (perfil {current_user.perfil}) tentou acessar {f.__name__}")
-                flash(f'Acesso negado. Você precisa ter um dos suivintes perfis: {", ".join(perfis_lista)}', 'danger')
+                flash(f'Acesso negado. Você precisa ter um dos seguintes perfis: {", ".join(perfis_lista)}', 'danger')
                 
                 # Redireciona para a página apropriada conforme o perfil
                 if current_user.perfil == 'solicitante':

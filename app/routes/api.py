@@ -1,7 +1,6 @@
 """Rotas de API (JSON) e service worker: status, notificações, push, paginação, disponibilidade."""
 import os
 import logging
-import traceback
 from flask import request, redirect, url_for, send_from_directory, current_app, jsonify
 from flask_login import login_required, current_user
 from firebase_admin import firestore
@@ -18,6 +17,15 @@ from app.services.webpush_service import salvar_inscricao
 from app.services.assignment import atribuidor
 
 logger = logging.getLogger(__name__)
+
+# Mensagem genérica em respostas 500 para não expor detalhes internos em produção
+ERRO_INTERNO_MSG = "Erro interno. Tente novamente."
+
+
+@main.route('/health', methods=['GET'])
+def health():
+    """Health check para load balancer e monitoramento. Retorna 200 quando a aplicação está no ar."""
+    return jsonify({'status': 'ok'}), 200
 
 
 @main.route('/api/atualizar-status', methods=['POST'])
@@ -73,8 +81,8 @@ def atualizar_status_ajax():
 
         return jsonify({'sucesso': True, 'mensagem': f'Status alterado para {novo_status}', 'novo_status': novo_status}), 200
     except Exception as e:
-        logger.exception(f"Erro em atualizar_status_ajax: {str(e)}")
-        return jsonify({'sucesso': False, 'erro': str(e)}), 500
+        logger.exception("Erro em atualizar_status_ajax: %s", e)
+        return jsonify({'sucesso': False, 'erro': ERRO_INTERNO_MSG}), 500
 
 
 @main.route('/api/bulk-status', methods=['POST'])
@@ -137,7 +145,7 @@ def bulk_atualizar_status():
         }), 200
     except Exception as e:
         logger.exception("Erro em bulk_atualizar_status: %s", e)
-        return jsonify({'sucesso': False, 'erro': str(e)}), 500
+        return jsonify({'sucesso': False, 'erro': ERRO_INTERNO_MSG}), 500
 
 
 @main.route('/api/notificacoes', methods=['GET'])
@@ -150,7 +158,7 @@ def api_notificacoes_listar():
         total_nao_lidas = contar_nao_lidas(current_user.id)
         return jsonify({'notificacoes': lista, 'total_nao_lidas': total_nao_lidas}), 200
     except Exception as e:
-        logger.exception(f"Erro ao listar notificações: {e}")
+        logger.exception("Erro ao listar notificações: %s", e)
         return jsonify({'notificacoes': [], 'total_nao_lidas': 0}), 200
 
 
@@ -162,7 +170,7 @@ def api_notificacoes_marcar_lida(notificacao_id):
         ok = marcar_como_lida(notificacao_id, current_user.id)
         return jsonify({'sucesso': ok}), 200
     except Exception as e:
-        logger.exception(f"Erro ao marcar notificação: {e}")
+        logger.exception("Erro ao marcar notificação: %s", e)
         return jsonify({'sucesso': False}), 500
 
 
@@ -196,7 +204,7 @@ def api_push_subscribe():
         ok = salvar_inscricao(current_user.id, subscription)
         return jsonify({'sucesso': ok}), 200
     except Exception as e:
-        logger.exception(f"Erro ao salvar inscrição push: {e}")
+        logger.exception("Erro ao salvar inscrição push: %s", e)
         return jsonify({'sucesso': False}), 500
 
 
@@ -242,8 +250,8 @@ def api_chamados_paginar():
             }
         }), 200
     except Exception as e:
-        logger.exception(f"Erro em api_chamados_paginar: {str(e)}")
-        return jsonify({'sucesso': False, 'erro': str(e)}), 500
+        logger.exception("Erro em api_chamados_paginar: %s", e)
+        return jsonify({'sucesso': False, 'erro': ERRO_INTERNO_MSG}), 500
 
 
 @main.route('/api/carregar-mais', methods=['POST'])
@@ -278,8 +286,8 @@ def carregar_mais():
             'tem_proxima': resultado['tem_proxima']
         }), 200
     except Exception as e:
-        logger.exception(f"Erro em carregar_mais: {str(e)}")
-        return jsonify({'sucesso': False, 'erro': str(e)}), 500
+        logger.exception("Erro em carregar_mais: %s", e)
+        return jsonify({'sucesso': False, 'erro': ERRO_INTERNO_MSG}), 500
 
 
 @main.route('/api/supervisores/disponibilidade', methods=['GET'])
@@ -292,5 +300,5 @@ def api_disponibilidade_supervisores():
         disponibilidade = atribuidor.obter_disponibilidade(area)
         return jsonify({'sucesso': True, **disponibilidade}), 200
     except Exception as e:
-        logger.exception(f"Erro ao obter disponibilidade: {str(e)}")
-        return jsonify({'sucesso': False, 'erro': str(e)}), 500
+        logger.exception("Erro ao obter disponibilidade: %s", e)
+        return jsonify({'sucesso': False, 'erro': ERRO_INTERNO_MSG}), 500
