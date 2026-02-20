@@ -32,14 +32,23 @@ Se você já configurou um trigger de Cloud Run que dispara com push:
 
 ### Opção B: Deploy Manual (Se precisa fazer manualmente)
 
+**Se suas alterações não aparecem na URL publicada**, use deploy **sem cache** (rebuild completo):
+
+```powershell
+.\deploy_fresh.ps1
+```
+
+Ou manualmente com `--no-cache`:
+
 ```bash
 cd "c:\Users\MatheusCosta\OneDrive - DTX Aerospace\Área de Trabalho\Projetos\sistema_chamados"
 
-# Faça deploy
+# Deploy COM rebuild (suas mudanças serão aplicadas)
 gcloud run deploy sistema-chamados-dtx \
   --source . \
   --platform managed \
   --region us-central1 \
+  --no-cache \
   --allow-unauthenticated \
   --set-env-vars="SECRET_KEY=seu-secret-key-forte-aqui,FLASK_ENV=production" \
   --memory=512Mi \
