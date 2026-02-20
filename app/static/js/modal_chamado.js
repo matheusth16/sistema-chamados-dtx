@@ -60,15 +60,47 @@ function abrirModal(botao) {
         divAnexo.classList.add('hidden');
     }
 
-    // 6. Prepara o Formulário de Ação
-    document.getElementById('input-chamado-id').value = dados.id;
-    document.getElementById('select-status-modal').value = dados.status;
+    // 6. Preenche informações do status, responsável e formulário
+    const statusDisplayEl = document.getElementById('modal-status-display');
+    const statusSelectEl = document.getElementById('select-status-modal');
+    const responsavelEl = document.getElementById('modal-responsavel');
+    const inputIdEl = document.getElementById('input-chamado-id');
+    
+    // Define o ID do chamado no formulário
+    if (inputIdEl) {
+        inputIdEl.value = dados.id;
+    }
+    
+    // Define a cor do badge de status (visualização)
+    if (statusDisplayEl) {
+        statusDisplayEl.innerText = dados.status;
+        statusDisplayEl.className = 'inline-flex px-3 py-1 rounded-full text-sm font-bold';
+        
+        if (dados.status === 'Concluído') {
+            statusDisplayEl.classList.add('bg-green-100', 'text-green-800');
+        } else if (dados.status === 'Em Atendimento') {
+            statusDisplayEl.classList.add('bg-yellow-100', 'text-yellow-800');
+        } else {
+            statusDisplayEl.classList.add('bg-gray-100', 'text-gray-800');
+        }
+    }
+    
+    // Pré-seleciona o status atual no select
+    if (statusSelectEl) {
+        statusSelectEl.value = dados.status;
+    }
+    
+    // Exibe o responsável
+    if (responsavelEl) {
+        responsavelEl.innerText = dados.responsavel;
+    }
     
     // Debug: Validar que dados estão corretos
     console.log('📋 Modal aberto com dados:', {
         chamado_id: dados.id,
         status_atual: dados.status,
-        numero: dados.numero
+        numero: dados.numero,
+        responsavel: dados.responsavel
     });
 
     // 7. Exibe o Modal
@@ -79,8 +111,16 @@ function abrirModal(botao) {
 
 function fecharModal() {
     const modal = document.getElementById('modal-overlay');
-    const inputId = document.getElementById('input-chamado-id').value;
-    console.log('❌ Fechando modal (Chamado: ' + inputId + ')');
+    if (!modal) {
+        console.error('❌ Modal não encontrado!');
+        return;
+    }
+    
+    const inputId = document.getElementById('input-chamado-id');
+    const chamadoId = inputId ? inputId.value : 'N/A';
+    
+    console.log('❌ Fechando modal (Chamado: ' + chamadoId + ')');
+    
     modal.classList.add('hidden');
     modal.classList.remove('flex');
 }

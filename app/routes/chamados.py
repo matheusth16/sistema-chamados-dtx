@@ -9,6 +9,7 @@ from app.database import db
 from app.models import Chamado
 from app.models_usuario import Usuario
 from app.models_historico import Historico
+from app.models_categorias import CategoriaSetor, CategoriaImpacto
 from app.utils import gerar_numero_chamado
 from app.services.validators import validar_novo_chamado
 from app.services.upload import salvar_anexo
@@ -26,13 +27,25 @@ logger = logging.getLogger(__name__)
 def index() -> Response:
     """GET: formulário de novo chamado. POST: processa e salva no Firestore."""
     if request.method != 'POST':
-        return render_template('formulario.html')
+        setores = CategoriaSetor.get_all()
+        impactos = CategoriaImpacto.get_all()
+        return render_template(
+            'formulario.html',
+            setores=setores,
+            impactos=impactos,
+        )
 
     lista_erros = validar_novo_chamado(request.form, request.files.get('anexo'))
     if lista_erros:
         for erro in lista_erros:
             flash(erro, 'danger')
-        return render_template('formulario.html')
+        setores = CategoriaSetor.get_all()
+        impactos = CategoriaImpacto.get_all()
+        return render_template(
+            'formulario.html',
+            setores=setores,
+            impactos=impactos,
+        )
 
     categoria = request.form.get('categoria')
     rl_codigo = request.form.get('rl_codigo')
@@ -41,7 +54,6 @@ def index() -> Response:
     impacto = request.form.get('impacto')
     gate = request.form.get('gate')
     caminho_anexo = salvar_anexo(request.files.get('anexo'))
-    numero_chamado = gerar_numero_chamado()
     solicitante_nome = current_user.nome
     solicitante_id = current_user.id
     area_solicitante = current_user.area
@@ -81,25 +93,28 @@ def index() -> Response:
     responsavel_usuario = Usuario.get_by_id(responsavel_id) if responsavel_id else None
     area_chamado = responsavel_usuario.area if responsavel_usuario and responsavel_usuario.area else area_solicitante
 
-    novo_chamado = Chamado(
-        numero_chamado=numero_chamado,
-        categoria=categoria,
-        rl_codigo=rl_codigo if categoria == 'Projetos' else None,
-        tipo_solicitacao=tipo,
-        gate=gate,
-        impacto=impacto,
-        descricao=descricao,
-        anexo=caminho_anexo,
-        responsavel=responsavel,
-        responsavel_id=responsavel_id,
-        motivo_atribuicao=motivo_atribuicao,
-        solicitante_id=solicitante_id,
-        solicitante_nome=solicitante_nome,
-        area=area_chamado,
-        status='Aberto'
-    )
-
     try:
+        # ✅ Gera o número APENAS aqui, pouco antes de salvar, garantindo que se algo falhar antes, o número não é consumido
+        numero_chamado = gerar_numero_chamado()
+        
+        novo_chamado = Chamado(
+            numero_chamado=numero_chamado,
+            categoria=categoria,
+            rl_codigo=rl_codigo if categoria == 'Projetos' else None,
+            tipo_solicitacao=tipo,
+            gate=gate,
+            impacto=impacto,
+            descricao=descricao,
+            anexo=caminho_anexo,
+            responsavel=responsavel,
+            responsavel_id=responsavel_id,
+            motivo_atribuicao=motivo_atribuicao,
+            solicitante_id=solicitante_id,
+            solicitante_nome=solicitante_nome,
+            area=area_chamado,
+            status='Aberto'
+        )
+
         doc_ref = db.collection('chamados').add(novo_chamado.to_dict())
         chamado_id = doc_ref[1].id
         Historico(chamado_id=chamado_id, usuario_id=solicitante_id, usuario_nome=solicitante_nome, acao='criacao').save()
@@ -147,4 +162,65 @@ def index() -> Response:
     except Exception as e:
         logger.exception(f"Erro ao salvar chamado no Firestore: {str(e)}")
         flash('Não foi possível salvar o chamado. Tente novamente.', 'danger')
+        return redirect(url_for('main.index'))
+
+
+@main.route('/meus-chamados')
+@requer_solicitante
+@limiter.limit("30 per minute")
+def meus_chamados() -> Response:
+    """GET: lista de chamados criados pelo solicitante."""
+    try:
+        # Buscar todos os chamados do solicitante
+        chamados_ref = db.collection('chamados').where('solicitante_id', '==', current_user.id)
+        docs = chamados_ref.stream()
+        
+        chamados = []
+        for doc in docs:
+            data = doc.to_dict()
+            c = Chamado.from_dict(data, doc.id)
+            chamados.append(c)
+        
+        # Filtro por status (opcional)
+        status_filtro = request.args.get('status', '')
+        if status_filtro:
+            chamados = [c for c in chamados if c.status == status_filtro]
+        
+        # Ordenar por data de abertura (mais recente primeiro)
+        chamados_ordenados = sorted(chamados, key=lambda c: c.data_abertura or '', reverse=True)
+        
+        # Paginação
+        pagina = request.args.get('pagina', 1, type=int)
+        itens_por_pagina = 10
+        total_chamados = len(chamados_ordenados)
+        inicio = (pagina - 1) * itens_por_pagina
+        fim = inicio + itens_por_pagina
+        total_paginas = (total_chamados + itens_por_pagina - 1) // itens_por_pagina
+        
+        if pagina < 1 or pagina > total_paginas:
+            pagina = 1
+            chamados_pagina = chamados_ordenados[:itens_por_pagina]
+        else:
+            chamados_pagina = chamados_ordenados[inicio:fim]
+        
+        # Contar chamados por status
+        status_counts = {
+            'Aberto': len([c for c in chamados if c.status == 'Aberto']),
+            'Em Atendimento': len([c for c in chamados if c.status == 'Em Atendimento']),
+            'Concluído': len([c for c in chamados if c.status == 'Concluído'])
+        }
+        
+        return render_template(
+            'meus_chamados.html',
+            chamados=chamados_pagina,
+            pagina_atual=pagina,
+            total_paginas=total_paginas,
+            total_chamados=total_chamados,
+            itens_por_pagina=itens_por_pagina,
+            status_filtro=status_filtro,
+            status_counts=status_counts
+        )
+    except Exception as e:
+        logger.exception(f"Erro ao buscar chamados do solicitante: {str(e)}")
+        flash('Erro ao carregar seus chamados.', 'danger')
         return redirect(url_for('main.index'))

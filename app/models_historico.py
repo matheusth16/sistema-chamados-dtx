@@ -1,4 +1,5 @@
 from datetime import datetime
+import pytz
 from firebase_admin import firestore
 from app.database import db
 
@@ -57,9 +58,17 @@ class Historico:
     def save(self):
         """Salva o histórico no Firestore"""
         try:
-            db.collection('historico').add(self.to_dict())
+            import logging
+            logger = logging.getLogger(__name__)
+            hist_dict = self.to_dict()
+            logger.info(f"Salvando histórico: {hist_dict}")
+            doc_ref = db.collection('historico').add(hist_dict)
+            logger.info(f"Histórico salvo com ID: {doc_ref[1].id}")
             return True
         except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f'Erro ao salvar histórico: {e}', exc_info=True)
             print(f'Erro ao salvar histórico: {e}')
             return False
     
@@ -67,24 +76,60 @@ class Historico:
     def get_by_chamado_id(cls, chamado_id: str):
         """Busca histórico de um chamado específico"""
         try:
-            docs = db.collection('historico').where('chamado_id', '==', chamado_id).order_by('data_acao', direction=firestore.Query.DESCENDING).stream()
-            historico = []
-            for doc in docs:
-                data = doc.to_dict()
-                historico.append(cls.from_dict(data, doc.id))
-            return historico
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.info(f"Buscando histórico para chamado_id: {chamado_id}")
+            
+            # Tenta buscar com ordenação (requer índice)
+            try:
+                docs = db.collection('historico').where('chamado_id', '==', chamado_id).order_by('data_acao', direction=firestore.Query.DESCENDING).stream()
+                historico = []
+                for doc in docs:
+                    data = doc.to_dict()
+                    logger.debug(f"Histórico encontrado: {doc.id} - {data}")
+                    historico.append(cls.from_dict(data, doc.id))
+                logger.info(f"✅ Total de {len(historico)} registros encontrados (com ordenação)")
+                return historico
+            except Exception as index_error:
+                # Se falhar (índice em construção), busca sem ordenação e ordena manualmente
+                if "index" in str(index_error).lower() or "building" in str(index_error).lower():
+                    logger.warning(f"⚠️ Índice ainda em construção, buscando sem ordenação: {index_error}")
+                    docs = db.collection('historico').where('chamado_id', '==', chamado_id).stream()
+                    historico = []
+                    for doc in docs:
+                        data = doc.to_dict()
+                        logger.debug(f"Histórico encontrado (sem ordem): {doc.id} - {data}")
+                        historico.append(cls.from_dict(data, doc.id))
+                    
+                    # Ordena manualmente por data_acao (mais recente primeiro)
+                    historico.sort(key=lambda h: h.data_acao if h.data_acao else '', reverse=True)
+                    logger.info(f"✅ Total de {len(historico)} registros encontrados (ordenação manual)")
+                    return historico
+                else:
+                    raise index_error
+                    
         except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f'❌ Erro ao buscar histórico: {e}', exc_info=True)
             print(f'Erro ao buscar histórico: {e}')
             return []
     
     def _converter_timestamp(self, ts):
-        """Converte timestamp do Firestore para datetime ou string"""
+        """Converte timestamp do Firestore para datetime em horário de Brasília"""
         if ts is None or ts == firestore.SERVER_TIMESTAMP:
             return None
         if isinstance(ts, datetime):
-            return ts
+            # Se não tiver timezone, assume UTC e converte para Brasília
+            if ts.tzinfo is None:
+                ts = pytz.utc.localize(ts)
+            return ts.astimezone(pytz.timezone('America/Sao_Paulo'))
         if hasattr(ts, 'to_pydatetime'):
-            return ts.to_pydatetime()
+            dt = ts.to_pydatetime()
+            # Firestore timestamps são UTC, então convertemos para Brasília
+            if dt.tzinfo is None:
+                dt = pytz.utc.localize(dt)
+            return dt.astimezone(pytz.timezone('America/Sao_Paulo'))
         return ts
     
     def data_acao_formatada(self):

@@ -43,12 +43,13 @@ def gerar_numero_chamado() -> str:
 
         @firestore.transactional
         def atualizar_contador(transaction):
-            doc = transaction.get(contador_ref)
+            # Usar next() e iter() para obter o documento do generator
+            doc = next(iter(transaction.get([contador_ref])))
             if doc.exists:
                 proximo_numero = doc.get('proximo_numero') + 1
             else:
                 proximo_numero = 1
-            transaction.update(contador_ref, {'proximo_numero': proximo_numero})
+            transaction.set(contador_ref, {'proximo_numero': proximo_numero})
             return proximo_numero
 
         transaction = db.transaction()

@@ -1,4 +1,5 @@
 from datetime import datetime
+import pytz
 from firebase_admin import firestore
 
 class Chamado:
@@ -47,15 +48,22 @@ class Chamado:
         self.data_conclusao = data_conclusao
     
     def _converter_timestamp(self, ts):
-        """Converte timestamp do Firestore para datetime ou string"""
+        """Converte timestamp do Firestore para datetime em horário de Brasília"""
         if ts is None or ts == firestore.SERVER_TIMESTAMP:
             return None
         # Se já for datetime, retorna
         if isinstance(ts, datetime):
-            return ts
+            # Se não tiver timezone, assume UTC e converte para Brasília
+            if ts.tzinfo is None:
+                ts = pytz.utc.localize(ts)
+            return ts.astimezone(pytz.timezone('America/Sao_Paulo'))
         # Se for Timestamp do Firestore, converte para datetime
         if hasattr(ts, 'to_pydatetime'):
-            return ts.to_pydatetime()
+            dt = ts.to_pydatetime()
+            # Firestore timestamps são UTC, então convertemos para Brasília
+            if dt.tzinfo is None:
+                dt = pytz.utc.localize(dt)
+            return dt.astimezone(pytz.timezone('America/Sao_Paulo'))
         return ts
     
     def data_abertura_formatada(self):

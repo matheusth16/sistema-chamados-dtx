@@ -1,0 +1,377 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="space-y-6">
+    
+    <!-- Header com Informações -->
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-6 rounded-lg shadow-sm border border-gray-100 gap-4">
+        <div>
+            <h2 class="text-2xl font-bold text-gray-800">{{ t('my_tickets') }}</h2>
+            <p class="text-sm text-gray-600 mt-2">
+                {{ t('track_tickets') }}
+                <span class="font-semibold text-blue-600 ml-2">{{ t('total_tickets') }}: {{ total_chamados }}</span>
+            </p>
+        </div>
+        <div class="flex gap-2 w-full md:w-auto flex-col md:flex-row">
+            <a href="/" class="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-md shadow transition justify-center">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                </svg>
+                {{ t('new_ticket') }}
+            </a>
+            <a href="{{ url_for('main.logout') }}" class="inline-flex items-center px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-md shadow transition justify-center">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+                </svg>
+                {{ t('logout') }}
+            </a>
+        </div>
+    </div>
+
+    <!-- Cards de Resumo de Status -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <a href="?status=" class="block bg-white p-4 rounded-lg shadow-sm border {% if not status_filtro %}border-blue-500 bg-blue-50{% else %}border-gray-200 hover:border-gray-300{% endif %} transition">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-semibold text-gray-600 uppercase tracking-wide">{{ t('total_tickets') }}</p>
+                    <p class="text-2xl font-bold text-gray-900">{{ total_chamados }}</p>
+                </div>
+                <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                </svg>
+            </div>
+        </a>
+
+        <a href="?status=Aberto" class="block bg-white p-4 rounded-lg shadow-sm border {% if status_filtro == 'Aberto' %}border-orange-500 bg-orange-50{% else %}border-gray-200 hover:border-gray-300{% endif %} transition">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-semibold text-gray-600 uppercase tracking-wide">{{ t('open_tickets') }}</p>
+                    <p class="text-2xl font-bold text-orange-600">{{ status_counts['Aberto'] }}</p>
+                </div>
+                <svg class="w-8 h-8 text-orange-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+            </div>
+        </a>
+
+        <a href="?status=Em%20Atendimento" class="block bg-white p-4 rounded-lg shadow-sm border {% if status_filtro == 'Em Atendimento' %}border-yellow-500 bg-yellow-50{% else %}border-gray-200 hover:border-gray-300{% endif %} transition">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-semibold text-gray-600 uppercase tracking-wide">{{ t('in_progress_tickets') }}</p>
+                    <p class="text-2xl font-bold text-yellow-600">{{ status_counts['Em Atendimento'] }}</p>
+                </div>
+                <svg class="w-8 h-8 text-yellow-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+            </div>
+        </a>
+
+        <a href="?status=Concluído" class="block bg-white p-4 rounded-lg shadow-sm border {% if status_filtro == 'Concluído' %}border-green-500 bg-green-50{% else %}border-gray-200 hover:border-gray-300{% endif %} transition md:col-span-1">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-semibold text-gray-600 uppercase tracking-wide">{{ t('completed_tickets') }}</p>
+                    <p class="text-2xl font-bold text-green-600">{{ status_counts['Concluído'] }}</p>
+                </div>
+                <svg class="w-8 h-8 text-green-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+            </div>
+        </a>
+    </div>
+
+    <!-- Tabela de Chamados -->
+    <div class="bg-white shadow-xl rounded-lg overflow-hidden border border-gray-200">
+        {% if chamados %}
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">{{ t('id_ref') }}</th>
+                    <th class="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">{{ t('category') }}</th>
+                    <th class="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">{{ t('type_sector') }}</th>
+                    <th class="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">{{ t('description') }}</th>
+                    <th class="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">{{ t('assigned_to') }}</th>
+                    <th class="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">{{ t('status') }}</th>
+                    <th class="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">{{ t('date') }}</th>
+                    <th class="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">{{ t('actions') }}</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+                {% for chamado in chamados %}
+                <tr class="hover:bg-gray-50 transition {% if chamado.status == 'Concluído' %}bg-green-50/20{% elif chamado.status == 'Em Atendimento' %}bg-yellow-50/20{% endif %}">
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="text-sm font-bold text-gray-900">{{ chamado.numero_chamado }}</div>
+                        {% if chamado.rl_codigo %}
+                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 mt-1">
+                            {{ t('rl_short') }} {{ chamado.rl_codigo }}
+                        </span>
+                        {% endif %}
+                    </td>
+
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                            {% if chamado.categoria == 'Projetos' %}bg-red-100 text-red-800{% else %}bg-blue-100 text-blue-800{% endif %}">
+                            {{ translate_category(chamado.categoria) }}
+                        </span>
+                    </td>
+
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="text-sm text-gray-700">{{ translate_sector(chamado.tipo_solicitacao) or '—' }}</span>
+                    </td>
+
+                    <td class="px-6 py-4 max-w-xs">
+                        <div class="text-sm text-gray-900 truncate" title="{{ chamado.descricao }}">
+                            {{ chamado.descricao[:60] }}{% if chamado.descricao|length > 60 %}...{% endif %}
+                        </div>
+                    </td>
+
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="text-sm font-medium text-gray-900">{{ chamado.responsavel or '—' }}</span>
+                    </td>
+
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full 
+                            {% if chamado.status == 'Concluído' %}bg-green-100 text-green-800{% elif chamado.status == 'Em Atendimento' %}bg-yellow-100 text-yellow-800{% else %}bg-gray-100 text-gray-800{% endif %}">
+                            {{ chamado.status }}
+                        </span>
+                    </td>
+
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                        {{ chamado.data_abertura_formatada() }}
+                    </td>
+
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <button onclick="abrirDetalhes(this)"
+                            data-id="{{ chamado.id }}"
+                            data-numero="{{ chamado.numero_chamado }}"
+                            data-categoria="{{ chamado.categoria }}"
+                            data-tipo="{{ chamado.tipo_solicitacao }}"
+                            data-gate="{{ chamado.gate or '' }}"
+                            data-descricao="{{ chamado.descricao }}"
+                            data-responsavel="{{ chamado.responsavel or '' }}"
+                            data-status="{{ chamado.status }}"
+                            data-data-abertura="{{ chamado.data_abertura_formatada() }}"
+                            data-data-conclusao="{{ chamado.data_conclusao_formatada() }}"
+                            data-rl="{{ chamado.rl_codigo or '' }}"
+                            data-anexo="{{ chamado.anexo or '' }}"
+                            class="text-blue-600 hover:text-blue-900 transition">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                            </svg>
+                        </button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <!-- Paginação -->
+        {% if total_paginas > 1 %}
+        <div class="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
+            <div class="flex-1 flex justify-between sm:hidden">
+                {% if pagina_atual > 1 %}
+                <a href="{{ url_for('main.meus_chamados', pagina=pagina_atual-1, status=status_filtro) }}" class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                    {{ t('previous') }}
+                </a>
+                {% endif %}
+                {% if pagina_atual < total_paginas %}
+                <a href="{{ url_for('main.meus_chamados', pagina=pagina_atual+1, status=status_filtro) }}" class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                    {{ t('next') }}
+                </a>
+                {% endif %}
+            </div>
+            <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                <div>
+                    <p class="text-sm text-gray-700">
+                        {{ t('showing') }} <span class="font-medium">{{ (pagina_atual - 1) * itens_por_pagina + 1 }}</span> {{ t('to') }} <span class="font-medium">{{ [pagina_atual * itens_por_pagina, total_chamados]|min }}</span> {{ t('of') }} <span class="font-medium">{{ total_chamados }}</span>
+                    </p>
+                </div>
+                <div>
+                    <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                        {% if pagina_atual > 1 %}
+                        <a href="{{ url_for('main.meus_chamados', pagina=1, status=status_filtro) }}" class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                            {{ t('first') }}
+                        </a>
+                        <a href="{{ url_for('main.meus_chamados', pagina=pagina_atual-1, status=status_filtro) }}" class="relative inline-flex items-center px-2 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                            ‹
+                        </a>
+                        {% endif %}
+
+                        {% for p in range(1, total_paginas + 1) %}
+                            {% if (p >= pagina_atual - 1) and (p <= pagina_atual + 1) %}
+                            <a href="{{ url_for('main.meus_chamados', pagina=p, status=status_filtro) }}" 
+                               class="relative inline-flex items-center px-3 py-2 border {% if p == pagina_atual %}z-10 bg-blue-50 border-blue-500 text-blue-600{% else %}border-gray-300 bg-white text-gray-500 hover:bg-gray-50{% endif %} text-sm font-medium">
+                                {{ p }}
+                            </a>
+                            {% endif %}
+                        {% endfor %}
+
+                        {% if pagina_atual < total_paginas %}
+                        <a href="{{ url_for('main.meus_chamados', pagina=pagina_atual+1, status=status_filtro) }}" class="relative inline-flex items-center px-2 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                            ›
+                        </a>
+                        <a href="{{ url_for('main.meus_chamados', pagina=total_paginas, status=status_filtro) }}" class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                            {{ t('last') }}
+                        </a>
+                        {% endif %}
+                    </nav>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        {% else %}
+        <!-- Estado Vazio -->
+        <div class="text-center py-12">
+            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+            </svg>
+            <h3 class="mt-2 text-sm font-medium text-gray-900">{{ t('no_tickets_message') }}</h3>
+            <p class="mt-1 text-sm text-gray-500">
+                {% if status_filtro %}
+                    {{ t('no_tickets_hint_with_filter') }} <a href="?status=" class="text-blue-600 hover:text-blue-700 font-medium">{{ t('view_all') }}</a>
+                {% else %}
+                    {{ t('no_tickets_hint_default') }}
+                {% endif %}
+            </p>
+            <div class="mt-6">
+                <a href="/" class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                    </svg>
+                    {{ t('new_ticket') }}
+                </a>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+</div>
+
+<!-- Modal de Detalhes do Chamado -->
+<div id="modal-detalhes" class="hidden fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-96 overflow-y-auto">
+        <div class="sticky top-0 bg-gradient-to-r from-blue-600 to-blue-800 px-6 py-4 flex items-center justify-between">
+            <h3 class="text-xl font-bold text-white" id="modal-titulo">{{ t('viewing_chamado') }}</h3>
+            <button onclick="fecharDetalhes()" class="text-white hover:bg-blue-700 p-1 rounded transition">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+            </button>
+        </div>
+
+        <div class="px-6 py-4 space-y-4">
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <p class="text-xs font-bold text-gray-600 uppercase">{{ t('category') }}</p>
+                    <p class="text-sm font-semibold text-gray-900" id="modal-categoria">—</p>
+                </div>
+                <div>
+                    <p class="text-xs font-bold text-gray-600 uppercase">{{ t('status') }}</p>
+                    <p class="text-sm font-semibold" id="modal-status">—</p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <p class="text-xs font-bold text-gray-600 uppercase">{{ t('type_sector') }}</p>
+                    <p class="text-sm text-gray-900" id="modal-tipo">—</p>
+                </div>
+                <div>
+                    <p class="text-xs font-bold text-gray-600 uppercase">{{ t('assigned_to') }}</p>
+                    <p class="text-sm text-gray-900" id="modal-responsavel">—</p>
+                </div>
+            </div>
+
+            <div>
+                <p class="text-xs font-bold text-gray-600 uppercase">{{ t('description') }}</p>
+                <p class="text-sm text-gray-900 mt-1" id="modal-descricao">—</p>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <p class="text-xs font-bold text-gray-600 uppercase">{{ t('date') }}</p>
+                    <p class="text-sm text-gray-900" id="modal-data-abertura">—</p>
+                </div>
+                <div>
+                    <p class="text-xs font-bold text-gray-600 uppercase">{{ t('completion_date') }}</p>
+                    <p class="text-sm text-gray-900" id="modal-data-conclusao">—</p>
+                </div>
+            </div>
+
+            <!-- Seção de Anexo -->
+            <div id="modal-area-anexo" class="hidden">
+                <label class="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">📎 {{ t('attached_file') }}</label>
+                <a id="modal-link-anexo" href="#" target="_blank" class="inline-flex items-center px-4 py-2 border border-blue-300 shadow-sm text-sm font-medium rounded-md text-blue-700 bg-blue-50 hover:bg-blue-100 transition">
+                    📥 {{ t('download_attachment') }}
+                </a>
+            </div>
+
+            {% if current_user.is_authenticated %}
+            <div class="bg-blue-50 border border-blue-200 rounded p-3 text-center">
+                <p class="text-xs text-blue-700 font-medium">{{ t('problem_description') }}<br>
+                <span class="text-blue-600 font-semibold" id="modal-responsavel-contato">—</span></p>
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="bg-gray-50 px-6 py-4 flex justify-end border-t border-gray-200">
+            <button onclick="fecharDetalhes()" class="px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold rounded-md transition">
+                {{ t('close') }}
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+function abrirDetalhes(btn) {
+    const modal = document.getElementById('modal-detalhes');
+    document.getElementById('modal-titulo').textContent = 'Chamado #' + btn.dataset.numero;
+    document.getElementById('modal-categoria').textContent = btn.dataset.categoria;
+    document.getElementById('modal-tipo').textContent = btn.dataset.tipo || '—';
+    document.getElementById('modal-descricao').textContent = btn.dataset.descricao;
+    document.getElementById('modal-responsavel').textContent = btn.dataset.responsavel || '—';
+    document.getElementById('modal-status').textContent = btn.dataset.status;
+    document.getElementById('modal-responsavel-contato').textContent = btn.dataset.responsavel || 'Não atribuído';
+    document.getElementById('modal-data-abertura').textContent = btn.dataset.dataAbertura;
+    document.getElementById('modal-data-conclusao').textContent = btn.dataset.dataConclusao || '—';
+    
+    // Processar Anexo
+    const divAnexo = document.getElementById('modal-area-anexo');
+    const linkAnexo = document.getElementById('modal-link-anexo');
+    
+    if (btn.dataset.anexo && btn.dataset.anexo !== 'None' && btn.dataset.anexo !== '') {
+        linkAnexo.href = `/static/uploads/${btn.dataset.anexo}`;
+        linkAnexo.innerText = `📥 Baixar Anexo (${btn.dataset.anexo})`;
+        divAnexo.classList.remove('hidden');
+    } else {
+        divAnexo.classList.add('hidden');
+    }
+    
+    // Colorir status
+    const statusEl = document.getElementById('modal-status');
+    statusEl.className = 'text-sm font-semibold px-2 py-1 rounded-full inline-block ';
+    if (btn.dataset.status === 'Concluído') {
+        statusEl.className += 'bg-green-100 text-green-800';
+    } else if (btn.dataset.status === 'Em Atendimento') {
+        statusEl.className += 'bg-yellow-100 text-yellow-800';
+    } else {
+        statusEl.className += 'bg-gray-100 text-gray-800';
+    }
+    
+    modal.classList.remove('hidden');
+}
+
+function fecharDetalhes() {
+    document.getElementById('modal-detalhes').classList.add('hidden');
+}
+
+// Fechar modal ao clicar fora
+document.getElementById('modal-detalhes').addEventListener('click', (e) => {
+    if (e.target.id === 'modal-detalhes') {
+        fecharDetalhes();
+    }
+});
+</script>
+
+{% endblock %}

@@ -224,7 +224,7 @@
                         <td class="px-6 py-4 whitespace-nowrap">
                             <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
                                 {% if chamado.status == 'Concluído' %}bg-green-100 text-green-800{% elif chamado.status == 'Em Atendimento' %}bg-yellow-100 text-yellow-800{% else %}bg-gray-100 text-gray-800{% endif %}">
-                                {{ chamado.status }}
+                                {{ chamado.status or 'Aberto' }}
                             </span>
                         </td>
 
@@ -257,16 +257,6 @@
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
                                 </svg>
                             </a>
-
-                            <form action="{{ url_for('main.admin') }}" method="POST" class="flex items-center">
-                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                                <input type="hidden" name="chamado_id" value="{{ chamado.id }}">
-                                <select name="novo_status" class="text-xs border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 p-1 border cursor-pointer hover:border-blue-500 transition" title="{{ t('change_status') }}">
-                                    <option value="Aberto" {% if chamado.status == 'Aberto' %}selected{% endif %}>{{ t('option_open') }}</option>
-                                    <option value="Em Atendimento" {% if chamado.status == 'Em Atendimento' %}selected{% endif %}>{{ t('option_attend') }}</option>
-                                    <option value="Concluído" {% if chamado.status == 'Concluído' %}selected{% endif %}>{{ t('option_finish') }}</option>
-                                </select>
-                            </form>
                         </td>
                     </tr>
                     {% endfor %}
@@ -378,19 +368,32 @@
                 </div>
 
                 <div class="bg-gray-50 p-4 rounded-md border border-gray-200">
-                    <h4 class="font-bold text-gray-900 text-sm mb-3">{{ t('manager_action') }}</h4>
-                    <form action="{{ url_for('main.admin') }}" method="POST">
+                    <h4 class="font-bold text-gray-900 text-sm mb-3">{{ t('ticket_details') }}</h4>
+                    <form id="form-status-modal" action="{{ url_for('main.admin') }}" method="POST">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         <input type="hidden" id="input-chamado-id" name="chamado_id">
-                        <label class="block text-xs text-gray-500 mb-1">{{ t('change_status_to') }}</label>
-                        <select id="select-status-modal" name="novo_status" class="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md border mb-4">
-                            <option value="Aberto">{{ t('option_open') }}</option>
-                            <option value="Em Atendimento">{{ t('option_in_progress') }}</option>
-                            <option value="Concluído">{{ t('option_completed') }}</option>
-                        </select>
-                        <button type="submit" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-900 hover:bg-blue-800 focus:outline-none transition">
-                            {{ t('save_change') }}
-                        </button>
+                        
+                        <div class="mb-3">
+                            <label class="block text-xs text-gray-500 mb-1">{{ t('current_status') }}</label>
+                            <span id="modal-status-display" class="inline-flex px-3 py-1 rounded-full text-sm font-bold"></span>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="block text-xs text-gray-500 mb-1">{{ t('responsible') }}</label>
+                            <span id="modal-responsavel" class="text-sm font-medium text-gray-900"></span>
+                        </div>
+                        
+                        <div class="border-t border-gray-300 pt-3 mt-3">
+                            <label class="block text-xs text-gray-500 mb-2">{{ t('change_status_to') }}</label>
+                            <select id="select-status-modal" name="novo_status" class="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md border mb-4">
+                                <option value="Aberto">{{ t('option_open') }}</option>
+                                <option value="Em Atendimento">{{ t('option_in_progress') }}</option>
+                                <option value="Concluído">{{ t('option_completed') }}</option>
+                            </select>
+                            <button type="submit" id="btn-submit-status" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-900 hover:bg-blue-800 focus:outline-none transition">
+                                {{ t('save_change') }}
+                            </button>
+                        </div>
                     </form>
                 </div>
             </div>
@@ -402,6 +405,54 @@
 <script src="{{ url_for('static', filename='js/modal_chamado.js') }}"></script>
 
 <script>
+// Interceptar submit do formulário de status no modal para enviar via AJAX
+(function() {
+    var formStatus = document.getElementById('form-status-modal');
+    if (formStatus) {
+        formStatus.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            // Coleta os dados do formulário
+            var chamadoId = document.getElementById('input-chamado-id').value;
+            var novoStatus = document.getElementById('select-status-modal').value;
+            var btnSubmit = document.getElementById('btn-submit-status');
+            
+            console.log('📤 Enviando alteração de status:', { chamado_id: chamadoId, novo_status: novoStatus });
+            
+            // Desabilita botão
+            if (btnSubmit) {
+                btnSubmit.disabled = true;
+                btnSubmit.innerText = 'Salvando...';
+            }
+            
+            // Envia via AJAX para a API
+            fetch('/api/atualizar-status', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    chamado_id: chamadoId,
+                    novo_status: novoStatus
+                })
+            })
+            .then(function(response) {
+                return response.json();
+            })
+            .then(function(data) {
+                console.log('✅ Resposta da API:', data);
+                // Recarrega a página após sucesso
+                window.location.reload();
+            })
+            .catch(function(error) {
+                console.error('❌ Erro ao alterar status:', error);
+                // Recarrega mesmo em caso de erro
+                window.location.reload();
+            });
+        });
+    }
+})();
+
 (function() {
     var bulkBar = document.getElementById('bulk-bar');
     var bulkSelectAll = document.getElementById('bulk-select-all');

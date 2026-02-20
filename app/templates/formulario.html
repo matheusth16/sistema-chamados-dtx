@@ -89,12 +89,9 @@
                     <select name="tipo" id="tipo" required onchange="filtrarResponsaveis()"
                             class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md border">
                         <option value="" disabled selected>{{ t('select') }}</option>
-                        <option value="Manutencao">{{ t('maintenance') }}</option>
-                        <option value="Engenharia">{{ t('engineering') }}</option>
-                        <option value="Qualidade">{{ t('quality') }}</option>
-                        <option value="Comercial">{{ t('commercial') }}</option>
-                        <option value="Planejamento">{{ t('planning') }}</option>
-                        <option value="Material">{{ t('indirect_material') }}</option>
+                        {% for setor in setores %}
+                        <option value="{{ setor.nome_pt }}">{{ setor.nome_pt }}</option>
+                        {% endfor %}
                     </select>
                 </div>
 
@@ -114,18 +111,12 @@
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">{{ t('main_impact') }}</label>
                 <div class="grid grid-cols-3 gap-4">
+                    {% for impacto in impactos %}
                     <label class="border rounded-md p-3 flex items-center hover:bg-gray-50 cursor-pointer">
-                        <input type="radio" name="impacto" value="Prazo" class="h-4 w-4 text-blue-600">
-                        <span class="ml-2 text-sm text-gray-700">{{ t('timeline_client') }}</span>
+                        <input type="radio" name="impacto" value="{{ impacto.nome_pt }}" class="h-4 w-4 text-blue-600">
+                        <span class="ml-2 text-sm text-gray-700">{{ impacto.nome_pt }}</span>
                     </label>
-                    <label class="border rounded-md p-3 flex items-center hover:bg-gray-50 cursor-pointer">
-                        <input type="radio" name="impacto" value="Qualidade" class="h-4 w-4 text-blue-600">
-                        <span class="ml-2 text-sm text-gray-700">{{ t('quality') }}</span>
-                    </label>
-                    <label class="border rounded-md p-3 flex items-center hover:bg-gray-50 cursor-pointer">
-                        <input type="radio" name="impacto" value="Seguranca" class="h-4 w-4 text-blue-600">
-                        <span class="ml-2 text-sm text-gray-700">{{ t('security') }}</span>
-                    </label>
+                    {% endfor %}
                 </div>
             </div>
 

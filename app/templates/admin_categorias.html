@@ -1,0 +1,246 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="min-h-screen bg-gray-50 py-8">
+    <div class="max-w-7xl mx-auto px-4">
+        <!-- Cabeçalho -->
+        <div class="mb-8">
+            <h1 class="text-3xl font-bold text-gray-900">Administração de Categorias</h1>
+            <p class="text-gray-600 mt-2">Gerencie setores, gates e impactos do sistema. Todas as categorias são traduzidas automaticamente para Inglês e Espanhol.</p>
+        </div>
+
+        <!-- Abas de navegação -->
+        <div class="mb-6 border-b border-gray-200">
+            <div class="flex space-x-8">
+                <button onclick="mostrarAba('setores')" id="btn-setores" class="px-4 py-2 border-b-2 border-blue-600 text-blue-600 font-medium">
+                    🏢 Setores
+                </button>
+                <button onclick="mostrarAba('gates')" id="btn-gates" class="px-4 py-2 border-b-2 border-gray-200 text-gray-600 font-medium hover:text-gray-900">
+                    🚪 Gates
+                </button>
+                <button onclick="mostrarAba('impactos')" id="btn-impactos" class="px-4 py-2 border-b-2 border-gray-200 text-gray-600 font-medium hover:text-gray-900">
+                    ⚡ Impactos
+                </button>
+            </div>
+        </div>
+
+        <!-- ABA: SETORES -->
+        <div id="aba-setores" class="tab-content">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Formulário de criação -->
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h2 class="text-xl font-bold text-gray-900 mb-4">Novo Setor</h2>
+                    <form method="POST" action="{{ url_for('main.criar_setor') }}" class="space-y-4">
+                        <div>
+                            <label for="setor-nome" class="block text-sm font-medium text-gray-700">Nome (Português)</label>
+                            <input type="text" id="setor-nome" name="nome_pt" required placeholder="ex: Manutenção"
+                                   class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                            <p class="text-xs text-gray-500 mt-1">⭐ Será traduzido automaticamente para Inglês e Espanhol</p>
+                        </div>
+                        <div>
+                            <label for="setor-descricao" class="block text-sm font-medium text-gray-700">Descrição (opcional)</label>
+                            <textarea id="setor-descricao" name="descricao_pt" placeholder="ex: Departamento de manutenção preventiva"
+                                      rows="3" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"></textarea>
+                        </div>
+                        <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded-md font-medium hover:bg-blue-700 transition">
+                            ➕ Adicionar Setor
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Lista de setores -->
+                <div class="lg:col-span-2">
+                    <div class="bg-white rounded-lg shadow">
+                        <div class="px-6 py-4 border-b border-gray-200">
+                            <h2 class="text-xl font-bold text-gray-900">Setores Cadastrados</h2>
+                        </div>
+                        <div class="divide-y divide-gray-200">
+                            {% if setores %}
+                                {% for setor in setores %}
+                                <div class="p-6 hover:bg-gray-50 transition">
+                                    <div class="flex justify-between items-start mb-2">
+                                        <div>
+                                            <h3 class="font-bold text-gray-900">{{ setor.nome_pt }}</h3>
+                                            <p class="text-sm text-gray-600">🇬🇧 {{ setor.nome_en }} | 🇪🇸 {{ setor.nome_es }}</p>
+                                            {% if setor.descricao_pt %}
+                                            <p class="text-sm text-gray-500 mt-2">{{ setor.descricao_pt }}</p>
+                                            {% endif %}
+                                        </div>
+                                        <span class="inline-block px-3 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">{{ t('active') if setor.ativo else 'Inativo' }}</span>
+                                    </div>
+                                    <button onclick="editarSetor('{{ setor.id }}')" class="mt-3 text-sm text-blue-600 hover:text-blue-800 font-medium">
+                                        ✏️ Editar
+                                    </button>
+                                </div>
+                                {% endfor %}
+                            {% else %}
+                            <div class="p-6 text-center text-gray-500">
+                                <p>Nenhum setor cadastrado ainda.</p>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ABA: GATES -->
+        <div id="aba-gates" class="tab-content hidden">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Formulário de criação -->
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h2 class="text-xl font-bold text-gray-900 mb-4">Novo Gate</h2>
+                    <form method="POST" action="{{ url_for('main.criar_gate') }}" class="space-y-4">
+                        <div>
+                            <label for="gate-nome" class="block text-sm font-medium text-gray-700">Nome (Português)</label>
+                            <input type="text" id="gate-nome" name="nome_pt" required placeholder="ex: Gate 5"
+                                   class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                            <p class="text-xs text-gray-500 mt-1">⭐ Será traduzido automaticamente para Inglês e Espanhol</p>
+                        </div>
+                        <div>
+                            <label for="gate-descricao" class="block text-sm font-medium text-gray-700">Descrição (opcional)</label>
+                            <textarea id="gate-descricao" name="descricao_pt" placeholder="ex: Validação de requisitos"
+                                      rows="3" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"></textarea>
+                        </div>
+                        <p class="text-xs text-gray-600 bg-blue-50 p-2 rounded">
+                            📌 A ordem será atribuída automaticamente (próximo número sequencial)
+                        </p>
+                        <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded-md font-medium hover:bg-blue-700 transition">
+                            ➕ Adicionar Gate
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Lista de gates -->
+                <div class="lg:col-span-2">
+                    <div class="bg-white rounded-lg shadow">
+                        <div class="px-6 py-4 border-b border-gray-200">
+                            <h2 class="text-xl font-bold text-gray-900">Gates Cadastrados</h2>
+                        </div>
+                        <div class="divide-y divide-gray-200">
+                            {% if gates %}
+                                {% for gate in gates %}
+                                <div class="p-6 hover:bg-gray-50 transition">
+                                    <div class="flex justify-between items-start mb-2">
+                                        <div>
+                                            <h3 class="font-bold text-gray-900">#{{ gate.ordem }} - {{ gate.nome_pt }}</h3>
+                                            <p class="text-sm text-gray-600">🇬🇧 {{ gate.nome_en }} | 🇪🇸 {{ gate.nome_es }}</p>
+                                            {% if gate.descricao_pt %}
+                                            <p class="text-sm text-gray-500 mt-2">{{ gate.descricao_pt }}</p>
+                                            {% endif %}
+                                        </div>
+                                        <span class="inline-block px-3 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">{{ t('active') if gate.ativo else 'Inativo' }}</span>
+                                    </div>
+                                    <button onclick="editarGate('{{ gate.id }}')" class="mt-3 text-sm text-blue-600 hover:text-blue-800 font-medium">
+                                        ✏️ Editar
+                                    </button>
+                                </div>
+                                {% endfor %}
+                            {% else %}
+                            <div class="p-6 text-center text-gray-500">
+                                <p>Nenhum gate cadastrado ainda.</p>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ABA: IMPACTOS -->
+        <div id="aba-impactos" class="tab-content hidden">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Formulário de criação -->
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h2 class="text-xl font-bold text-gray-900 mb-4">Novo Impacto</h2>
+                    <form method="POST" action="{{ url_for('main.criar_impacto') }}" class="space-y-4">
+                        <div>
+                            <label for="impacto-nome" class="block text-sm font-medium text-gray-700">Nome (Português)</label>
+                            <input type="text" id="impacto-nome" name="nome_pt" required placeholder="ex: Crítico"
+                                   class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                            <p class="text-xs text-gray-500 mt-1">⭐ Será traduzido automaticamente para Inglês e Espanhol</p>
+                        </div>
+                        <div>
+                            <label for="impacto-descricao" class="block text-sm font-medium text-gray-700">Descrição (opcional)</label>
+                            <textarea id="impacto-descricao" name="descricao_pt" placeholder="ex: Impacto crítico na operação"
+                                      rows="3" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"></textarea>
+                        </div>
+                        <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded-md font-medium hover:bg-blue-700 transition">
+                            ➕ Adicionar Impacto
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Lista de impactos -->
+                <div class="lg:col-span-2">
+                    <div class="bg-white rounded-lg shadow">
+                        <div class="px-6 py-4 border-b border-gray-200">
+                            <h2 class="text-xl font-bold text-gray-900">Impactos Cadastrados</h2>
+                        </div>
+                        <div class="divide-y divide-gray-200">
+                            {% if impactos %}
+                                {% for impacto in impactos %}
+                                <div class="p-6 hover:bg-gray-50 transition">
+                                    <div class="flex justify-between items-start mb-2">
+                                        <div>
+                                            <h3 class="font-bold text-gray-900">{{ impacto.nome_pt }}</h3>
+                                            <p class="text-sm text-gray-600">🇬🇧 {{ impacto.nome_en }} | 🇪🇸 {{ impacto.nome_es }}</p>
+                                            {% if impacto.descricao_pt %}
+                                            <p class="text-sm text-gray-500 mt-2">{{ impacto.descricao_pt }}</p>
+                                            {% endif %}
+                                        </div>
+                                        <span class="inline-block px-3 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">{{ t('active') if impacto.ativo else 'Inativo' }}</span>
+                                    </div>
+                                    <button onclick="editarImpacto('{{ impacto.id }}')" class="mt-3 text-sm text-blue-600 hover:text-blue-800 font-medium">
+                                        ✏️ Editar
+                                    </button>
+                                </div>
+                                {% endfor %}
+                            {% else %}
+                            <div class="p-6 text-center text-gray-500">
+                                <p>Nenhum impacto cadastrado ainda.</p>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modais de edição serão adicionados -->
+<script>
+function mostrarAba(abaName) {
+    // Esconde todas as abas
+    document.querySelectorAll('.tab-content').forEach(el => {
+        el.classList.add('hidden');
+    });
+    
+    // Remove destaque de todos os botões
+    document.querySelectorAll('[id^="btn-"]').forEach(btn => {
+        btn.classList.remove('border-blue-600', 'text-blue-600');
+        btn.classList.add('border-gray-200', 'text-gray-600');
+    });
+    
+    // Mostra a aba selecionada
+    document.getElementById(`aba-${abaName}`).classList.remove('hidden');
+    
+    // Destaca o botão selecionado
+    document.getElementById(`btn-${abaName}`).classList.remove('border-gray-200', 'text-gray-600');
+    document.getElementById(`btn-${abaName}`).classList.add('border-blue-600', 'text-blue-600');
+}
+
+function editarSetor(setorId) {
+    alert('Edição de setor será implementada em breve');
+}
+
+function editarGate(gateId) {
+    alert('Edição de gate será implementada em breve');
+}
+
+function editarImpacto(impactoId) {
+    alert('Edição de impacto será implementada em breve');
+}
+</script>
+{% endblock %}
