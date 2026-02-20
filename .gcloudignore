@@ -1,0 +1,41 @@
+# Evita enviar arquivos desnecessários ao Cloud Build (build mais rápido e previsível)
+# Baseado no .gitignore + itens extras para deploy
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Ambiente virtual
+.venv/
+venv/
+env/
+
+# Segredos e config local (NUNCA enviar ao build)
+.env
+.env.*
+!.env.example
+credentials.json
+
+# Logs e DB local
+logs/
+*.log
+*.db
+instance/
+
+# Uploads (dados de usuário, não código)
+app/static/uploads/*
+!app/static/uploads/.gitkeep
+
+# SO
+.DS_Store
+Thumbs.db
+
+# Scripts de diagnóstico/teste locais (opcional: descomente se quiser build menor)
+# check_deployment.py
+# full_diagnostic.py
+# diagnose_build.py
+# test_cloud_run.py
+# verify_cloud_build.py
+# teste_*.py

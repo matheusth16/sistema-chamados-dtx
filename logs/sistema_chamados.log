@@ -216,3 +216,4 @@
 {"message": "Login bem-sucedido: julia.salgado@dtx.aero (Julia Salgado, Perfil: supervisor)"}
 {"message": "Logout: julia.salgado@dtx.aero"}
 {"message": "Login bem-sucedido: matheus.costa@dtx.aero (Matheus Costa, Perfil: supervisor)"}
+{"message": "Acesso negado: usu\u00e1rio n\u00e3o autenticado tentou acessar index"}
