@@ -1,11 +1,20 @@
 """
 Script para inicializar categorias padrão no Firestore.
 Use este script para popular dados de exemplo se o banco estiver vazio.
+
+Uso (a partir da raiz do projeto): python scripts/init_categorias.py
 """
 import sys
-sys.path.insert(0, '/Users/MatheusCosta/OneDrive - DTX Aerospace/Área de Trabalho/Projetos/sistema_chamados')
+import os
+
+# Adiciona a raiz do projeto ao path (funciona em qualquer SO)
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if ROOT not in sys.path:
+    sys.path.insert(0, ROOT)
+os.chdir(ROOT)
 
 from app.models_categorias import CategoriaSetor, CategoriaGate, CategoriaImpacto
+
 
 def criar_setores_padrao():
     """Cria setores padrão se não existirem"""
@@ -16,7 +25,7 @@ def criar_setores_padrao():
         ("TI", "Departamento de tecnologia da informação"),
         ("Administrativo", "Departamento administrativo"),
     ]
-    
+
     setores_existentes = CategoriaSetor.get_all()
     if len(setores_existentes) == 0:
         print("Criando setores padrão...")
@@ -36,7 +45,7 @@ def criar_gates_padrao():
         ("Gate 3", "Prototipagem e testes", 3),
         ("Gate 4", "Implementação em produção", 4),
     ]
-    
+
     gates_existentes = CategoriaGate.get_all()
     if len(gates_existentes) == 0:
         print("\nCriando gates padrão...")
@@ -56,7 +65,7 @@ def criar_impactos_padrao():
         ("Médio", "Impacto médio - degradação parcial"),
         ("Baixo", "Impacto baixo - afeta funcionalidade secundária"),
     ]
-    
+
     impactos_existentes = CategoriaImpacto.get_all()
     if len(impactos_existentes) == 0:
         print("\nCriando impactos padrão...")
@@ -72,11 +81,11 @@ if __name__ == '__main__':
     print("=" * 60)
     print("INICIALIZAÇÃO DE CATEGORIAS PADRÃO")
     print("=" * 60)
-    
+
     criar_setores_padrao()
     criar_gates_padrao()
     criar_impactos_padrao()
-    
+
     print("\n" + "=" * 60)
     print("✅ Inicialização concluída!")
     print("=" * 60)

@@ -62,7 +62,7 @@ gcloud run deploy sistema-chamados-dtx \
 
 Após deploy completar:
 
-1. **Acesse a URL gerada:** 
+1. **Acesse a URL gerada:**
    ```
    https://sistema-chamados-dtx-xxxxxx.run.app
    ```

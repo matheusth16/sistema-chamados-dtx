@@ -5,12 +5,17 @@ import firebase_admin
 from firebase_admin import credentials
 from firebase_admin import firestore
 from datetime import datetime
+import os
+
+# Garante que credentials.json seja encontrado na raiz do projeto
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+os.chdir(ROOT)
 
 # Inicializa Firebase
 try:
     firebase_admin.get_app()
 except ValueError:
-    cred = credentials.Certificate('credentials.json')
+    cred = credentials.Certificate(os.path.join(ROOT, 'credentials.json'))
     firebase_admin.initialize_app(cred)
 
 db = firestore.client()

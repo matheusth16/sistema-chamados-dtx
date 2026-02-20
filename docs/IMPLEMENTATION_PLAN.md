@@ -240,7 +240,7 @@ def traduzir_texto(texto: str, idioma_destino: str = 'en') -> str:
     # Tenta mapa local primeiro
     if resultado_local:
         return resultado_local
-    
+
     # Fallback para API
     api_result = chamar_google_translate_api(texto, idioma_destino)
     return api_result
