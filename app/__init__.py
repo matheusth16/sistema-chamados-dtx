@@ -1,4 +1,4 @@
-from flask import Flask, session, request, jsonify
+from flask import Flask, session, request, jsonify, render_template
 from flask_login import LoginManager
 from flask_wtf.csrf import CSRFProtect
 from config import Config
@@ -61,12 +61,24 @@ def create_app():
     # Timeout de inatividade (15 minutos)
     _configurar_timeout_sessao(app)
 
+    # 404 amigável: anexos em /static/uploads/ (ex.: Cloud Run disco efêmero) e páginas não encontradas
+    _configurar_erro_404(app)
+
     # API de status exige CSRF; o frontend envia o token no header X-CSRFToken (meta csrf-token)
 
     # Firebase é inicializado em app/database.py
     # Não há tabelas para criar (Firestore é NoSQL)
     
     return app
+
+
+def _configurar_erro_404(app: Flask) -> None:
+    """Resposta amigável para 404. Anexos em /static/uploads/ mostram mensagem sobre indisponibilidade (ex.: Cloud Run)."""
+    @app.errorhandler(404)
+    def pagina_nao_encontrada(e):
+        if request.path.startswith('/static/uploads/'):
+            return render_template('erro_anexo_nao_encontrado.html'), 404
+        return render_template('erro_404.html'), 404
 
 
 def _configurar_seguranca(app: Flask) -> None:

@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto mt-12 px-4">
+    <div class="bg-white rounded-lg shadow-md border border-gray-200 p-8 text-center">
+        <h1 class="text-xl font-semibold text-gray-800 mb-2">Página não encontrada</h1>
+        <p class="text-gray-600 mb-6">A URL solicitada não existe neste servidor.</p>
+        <a href="{{ url_for('main.index') }}" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">Ir para o início</a>
+    </div>
+</div>
+{% endblock %}

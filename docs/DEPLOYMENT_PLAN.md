@@ -79,6 +79,8 @@ Após deploy completar:
    - Acesse: Cloud Run → sistema-chamados-dtx → Logs
    - Procure por mensagem de erro
 
+**Limitação – Anexos:** No Cloud Run o disco é efêmero. Arquivos enviados em "Anexo" ficam só na instância que recebeu e podem sumir após reinício ou em outra instância. Ao abrir um anexo indisponível, o usuário vê a mensagem "Anexo não disponível" em vez do 404 genérico. Os dados do chamado (texto, status) continuam no Firestore; apenas o arquivo pode não estar acessível.
+
 ---
 
 ## PASSO 4: Configurar Domínio (Bônus)
