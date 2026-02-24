@@ -4,14 +4,15 @@
 
 ## 🚀 Características
 
-- **Paginação Otimizada**: Cursor-based pagination para performance com grandes volumes
+- **Paginação Otimizada**: Cursor-based pagination para performance com grandes volumes (sem OOM)
 - **Índices Firestore**: Índices compostos para máxima velocidade de queries
 - **Atualização em Tempo Real**: Status atualiza sem recarregar a página
-- **Dashboard Completo**: Visualização, filtros e histórico de alterações
-- **Autenticação Segura**: Login com Firebase Authentication
-- **Upload de Anexos**: Suporte a arquivos (PDFs, imagens, etc)
+- **Dashboard Completo**: Visualização, filtros, histórico de alterações e bulk status
+- **Autenticação Segura**: Login com Firebase Authentication e perfis (solicitante, supervisor, admin)
+- **Upload de Anexos**: Suporte a arquivos (PDFs, imagens, etc.)
+- **Internacionalização (i18n)**: Traduções PT/EN e painel de administração de textos
 - **Logs Estruturados**: Rastreamento completo de ações
-- **Rate Limiting**: Proteção contra abuso de requisições
+- **Rate Limiting**: Proteção contra abuso de requisições (Redis em produção)
 
 ## 📋 Requisitos
 
@@ -72,88 +73,46 @@ python run.py
 
 Acesse: `http://localhost:5000`
 
-## 📚 APIs Disponíveis
+### 7. Scripts úteis (opcional)
 
-### GET `/health`
-Health check para load balancer e monitoramento. Retorna `200` e `{"status": "ok"}` quando a aplicação está no ar.
+Na raiz do projeto você pode rodar scripts de manutenção (criação de usuário, chaves VAPID, deploy, etc.). Documentação: **[scripts/README.md](scripts/README.md)**.
 
-### GET `/api/chamados/paginar`
-Paginação inteligente de chamados com cursor
-
-**Query Params:**
-- `limite`: 1-100 documentos por página (padrão: 50)
-- `cursor`: ID do último documento (para próxima página)
-- `status`: Filtrar por status (Aberto, Em Atendimento, Concluído)
-- `categoria`: Filtrar por categoria
-- `gate`: Filtrar por gate
-- `search`: Busca full-text
-
-**Response:**
-```json
-{
-  "sucesso": true,
-  "chamados": [...],
-  "paginacao": {
-    "cursor_proximo": "doc123",
-    "tem_proxima": true,
-    "total_pagina": 50,
-    "limite": 50
-  }
-}
+```bash
+python scripts/gerar_vapid_keys.py   # Chaves Web Push
+python scripts/criar_usuario.py      # Criar usuário no sistema
 ```
 
-### POST `/api/carregar-mais`
-Carregar mais registros (infinite scroll)
+## 📚 API
 
-**Body:**
-```json
-{
-  "cursor": "doc123",
-  "limite": 20
-}
-```
+Referência completa dos endpoints: **[docs/API.md](docs/API.md)**.
 
-### POST `/api/atualizar-status`
-Atualizar status de um chamado sem recarregar a página
-
-**Body:**
-```json
-{
-  "chamado_id": "doc123",
-  "novo_status": "Concluído"
-}
-```
+Resumo rápido:
+- **GET** `/health` — Health check (retorna `{"status": "ok"}`).
+- **GET** `/api/chamados/paginar` — Paginação com cursor; query params: `limite`, `cursor`, `status`, `categoria`, `gate`, `search`.
+- **POST** `/api/carregar-mais` — Carregar mais registros (infinite scroll).
+- **POST** `/api/atualizar-status` — Atualizar status de um chamado.
+- **POST** `/api/bulk-status` — Atualizar status em lote (supervisor/admin).
 
 ## 🏗️ Estrutura do Projeto
 
 ```
 sistema-chamados-dtx/
 ├── app/
-│   ├── services/
-│   │   ├── filters.py           # Filtros Firestore otimizados
-│   │   ├── pagination.py        # Serviço de paginação
-│   │   ├── validators.py        # Validações
-│   │   ├── upload.py            # Upload de arquivos
-│   │   └── ...
-│   ├── templates/
-│   │   ├── dashboard.html       # Painel administrativo
-│   │   ├── formulario.html      # Formulário de novo chamado
-│   │   ├── historico.html       # Histórico de alterações
-│   │   ├── indices_firestore.html
-│   │   └── ...
-│   ├── static/
-│   │   ├── js/                  # Scripts JavaScript
-│   │   ├── css/                 # Estilos
-│   │   └── uploads/             # Uploads de usuários
-│   ├── models.py                # Modelos de dados
-│   ├── routes.py                # Rotas e endpoints
-│   ├── database.py              # Configuração Firebase
-│   └── ...
-├── config.py                     # Configurações da app
-├── run.py                        # Ponto de entrada
-├── requirements.txt             # Dependências
-├── firestore.indexes.json       # Índices Firestore
-├── firestore.rules              # Regras de segurança
+│   ├── routes/                  # Rotas (chamados, auth, api, dashboard, usuários, categorias, traduções)
+│   ├── services/                # Lógica de negócio (filters, pagination, validators, analytics, permissions, etc.)
+│   ├── templates/               # Jinja2 (dashboard, formulario, historico, usuarios, admin_traducoes, etc.)
+│   ├── static/                  # JS, CSS, uploads
+│   ├── models.py, models_categorias.py, models_usuario.py
+│   ├── database.py, i18n.py, limiter.py, cache.py
+│   └── translations.json        # Textos i18n (PT/EN)
+├── docs/                        # Documentação (ENV.md, API.md, DEPLOYMENT_PLAN.md, etc.)
+├── scripts/                     # Scripts de manutenção (criar_usuario, gerar_vapid_keys, deploy, etc.)
+├── tests/                       # Testes (routes, services, utils)
+├── config.py                    # Configurações
+├── run.py                       # Ponto de entrada
+├── requirements.txt
+├── firestore.indexes.json
+├── firestore.rules
 └── README.md
 ```
 
@@ -197,9 +156,15 @@ firebase deploy --only firestore:indexes --project seu-projeto-id
 
 ## 📖 Documentação
 
-- **Firestore Rules:** Ver `firestore.rules`
-- **Índices:** Ver `firestore.indexes.json`
-- **Configuração:** Ver `config.py`
+| Documento | Descrição |
+|-----------|-----------|
+| [docs/ENV.md](docs/ENV.md) | Variáveis de ambiente (.env) |
+| [docs/API.md](docs/API.md) | Referência completa da API |
+| [docs/DEPLOYMENT_PLAN.md](docs/DEPLOYMENT_PLAN.md) | Deploy (Cloud Run, Firebase) |
+| [scripts/README.md](scripts/README.md) | Scripts de manutenção |
+| `firestore.rules` | Regras de segurança Firestore |
+| `firestore.indexes.json` | Índices Firestore |
+| `config.py` | Configurações da aplicação |
 
 ## 🐛 Troubleshooting
 
@@ -234,11 +199,6 @@ pip audit
 
 Atualize pacotes quando necessário: `pip install -r requirements.txt --upgrade` (teste após atualizar).
 
-## 📝 Commit Config
-
-User: Matheus Costa  
-Email: matheus@dtx-aerospace.com
-
 ## 🤝 Contribuindo
 
 1. Faça um Fork do projeto
@@ -259,12 +219,11 @@ Este projeto é propriedade da DTX Aerospace.
 
 ## 🎯 Roadmap
 
-- [ ] Frontend com "Carregar Mais" visual
-- [ ] Infinite scroll automático
-- [ ] Cache local com IndexedDB
-- [ ] Caching na API (Redis)
-- [ ] Export em múltiplos formatos
-- [ ] Relatórios avançados
+- [x] Paginação com "Carregar Mais" / infinite scroll
+- [x] Caching e rate limit com Redis (configurável)
+- [x] Export (Excel) e relatórios
+- [x] i18n (PT/EN) e painel de traduções
+- [ ] Cache local com IndexedDB (opcional)
 - [ ] Mobile app
 - [ ] Notificações em tempo real (WebSocket)
 
