@@ -279,3 +279,285 @@
 {"message": "Logout: admin@dtx.com"}
 {"message": "Login bem-sucedido: danillo.cunha@dtx.aero (Danillo Cunha, Perfil: solicitante)"}
 {"message": "Logout: danillo.cunha@dtx.aero"}
+{"message": "Acesso negado: usu\u00e1rio n\u00e3o autenticado tentou acessar index"}
+{"message": "Acesso negado: usu\u00e1rio n\u00e3o autenticado tentou acessar index"}
+{"message": "Login bem-sucedido: danillo.cunha@dtx.aero (Danillo Cunha, Perfil: solicitante)"}
+{"message": "Respons\u00e1vel escolhido no formul\u00e1rio: Matheus Costa"}
+{"message": "Erro ao gerar n\u00famero de chamado via transa\u00e7\u00e3o", "exc_info": "Traceback (most recent call last):\n  File \"C:\\Users\\MatheusCosta\\OneDrive - DTX Aerospace\\\u00c1rea de Trabalho\\Projetos\\sistema_chamados\\app\\utils.py\", line 56, in gerar_numero_chamado\n    novo_numero = atualizar_contador(transaction)\n  File \"C:\\Users\\MatheusCosta\\OneDrive - DTX Aerospace\\\u00c1rea de Trabalho\\Projetos\\sistema_chamados\\.venv\\Lib\\site-packages\\google\\cloud\\firestore_v1\\transaction.py\", line 311, in __call__\n    result = self._pre_commit(transaction, *args, **kwargs)\n  File \"C:\\Users\\MatheusCosta\\OneDrive - DTX Aerospace\\\u00c1rea de Trabalho\\Projetos\\sistema_chamados\\.venv\\Lib\\site-packages\\google\\cloud\\firestore_v1\\transaction.py\", line 282, in _pre_commit\n    return self.to_wrap(transaction, *args, **kwargs)\n           ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\MatheusCosta\\OneDrive - DTX Aerospace\\\u00c1rea de Trabalho\\Projetos\\sistema_chamados\\app\\utils.py\", line 47, in atualizar_contador\n    doc = next(iter(transaction.get([contador_ref])))\n                    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\MatheusCosta\\OneDrive - DTX Aerospace\\\u00c1rea de Trabalho\\Projetos\\sistema_chamados\\.venv\\Lib\\site-packages\\google\\cloud\\firestore_v1\\transaction.py\", line 237, in get\n    raise ValueError(\n        'Value for argument \"ref_or_query\" must be a DocumentReference or a Query.'\n    )\nValueError: Value for argument \"ref_or_query\" must be a DocumentReference or a Query."}
+{"message": "Salvando hist\u00f3rico: {'chamado_id': 'L570cWX2oKCc8t4lx8SP', 'usuario_id': 'user_danillo.cunha_23512', 'usuario_nome': 'Danillo Cunha', 'acao': 'criacao', 'campo_alterado': None, 'valor_anterior': None, 'valor_novo': None, 'data_acao': Sentinel: Value used to set a document field to the server timestamp.}"}
+{"message": "Hist\u00f3rico salvo com ID: SBcUqF4HyJxxo1i7iiwh"}
+{"message": "Chamado criado: CHM-3082 (ID: L570cWX2oKCc8t4lx8SP)"}
+{"message": "Logout: danillo.cunha@dtx.aero"}
+{"message": "Login bem-sucedido: matheus.costa@dtx.aero (Matheus Costa, Perfil: supervisor)"}
+{"message": "Salvando hist\u00f3rico: {'chamado_id': 'L570cWX2oKCc8t4lx8SP', 'usuario_id': 'user_matheus.costa_93253', 'usuario_nome': 'Matheus Costa', 'acao': 'alteracao_status', 'campo_alterado': 'status', 'valor_anterior': 'Aberto', 'valor_novo': 'Conclu\u00eddo', 'data_acao': Sentinel: Value used to set a document field to the server timestamp.}"}
+{"message": "Hist\u00f3rico salvo com ID: QIPa6b2CXCJfFwlANetA"}
+{"message": "Salvando hist\u00f3rico: {'chamado_id': 'L570cWX2oKCc8t4lx8SP', 'usuario_id': 'user_matheus.costa_93253', 'usuario_nome': 'Matheus Costa', 'acao': 'alteracao_status', 'campo_alterado': 'status', 'valor_anterior': 'Conclu\u00eddo', 'valor_novo': 'Em Atendimento', 'data_acao': Sentinel: Value used to set a document field to the server timestamp.}"}
+{"message": "Hist\u00f3rico salvo com ID: srRY6tiiDmC4AYY3fIPr"}
+{"message": "Buscando hist\u00f3rico para chamado_id: L570cWX2oKCc8t4lx8SP"}
+{"message": "\u2705 Total de 3 registros encontrados (com ordena\u00e7\u00e3o)"}
+{"message": "Logout: matheus.costa@dtx.aero"}
+{"message": "Login bem-sucedido: admin@dtx.com (Administrador Sistema, Perfil: admin)"}
+{"message": "Logout: admin@dtx.com"}
+{"message": "Login bem-sucedido: danillo.cunha@dtx.aero (Danillo Cunha, Perfil: solicitante)"}
+{"message": "Logout: danillo.cunha@dtx.aero"}
+{"message": "Login bem-sucedido: matheus.costa@dtx.aero (Matheus Costa, Perfil: supervisor)"}
+{"message": "Logout: matheus.costa@dtx.aero"}
+{"message": "Login bem-sucedido: matheus.costa@dtx.aero (Matheus Costa, Perfil: supervisor)"}
+{"message": "Acesso negado: supervisor matheus.costa@dtx.aero tentou acessar rota de solicitante index"}
+{"message": "Salvando hist\u00f3rico: {'chamado_id': 'u7uLvGXC9eWhSX0zEqOv', 'usuario_id': 'user_matheus.costa_93253', 'usuario_nome': 'Matheus Costa', 'acao': 'alteracao_dados', 'campo_alterado': 'respons\u00e1vel', 'valor_anterior': 'Matheus Costa', 'valor_novo': 'Julia Salgado', 'data_acao': Sentinel: Value used to set a document field to the server timestamp.}"}
+{"message": "Hist\u00f3rico salvo com ID: CJyLb22E58xcFiVwTvjv"}
+{"message": "Salvando hist\u00f3rico: {'chamado_id': 'u7uLvGXC9eWhSX0zEqOv', 'usuario_id': 'user_matheus.costa_93253', 'usuario_nome': 'Matheus Costa', 'acao': 'alteracao_dados', 'campo_alterado': 'descri\u00e7\u00e3o', 'valor_anterior': '(Texto anterior)', 'valor_novo': '(Novo texto)', 'data_acao': Sentinel: Value used to set a document field to the server timestamp.}"}
+{"message": "Hist\u00f3rico salvo com ID: r6gQiwwgvCRFDyhXUOwM"}
+{"message": "Salvando hist\u00f3rico: {'chamado_id': 'u7uLvGXC9eWhSX0zEqOv', 'usuario_id': 'user_matheus.costa_93253', 'usuario_nome': 'Matheus Costa', 'acao': 'alteracao_dados', 'campo_alterado': 'anexo (upload de supervisor)', 'valor_anterior': '20260223_103331_relatorio_completo_20260223_102448.xlsx', 'valor_novo': '20260223_092154_Captura_de_tela_2026-02-19_092236.png', 'data_acao': Sentinel: Value used to set a document field to the server timestamp.}"}
+{"message": "Hist\u00f3rico salvo com ID: 63pHxT4TBvZWpglz5aYg"}
+{"message": "Logout: matheus.costa@dtx.aero"}
+{"message": "Login bem-sucedido: julia.salgado@dtx.aero (Julia Salgado, Perfil: supervisor)"}
+{"message": "Logout: julia.salgado@dtx.aero"}
+{"message": "Login bem-sucedido: julia.salgado@dtx.aero (Julia Salgado, Perfil: supervisor)"}
+{"message": "Buscando hist\u00f3rico para chamado_id: u7uLvGXC9eWhSX0zEqOv"}
+{"message": "\u2705 Total de 4 registros encontrados (com ordena\u00e7\u00e3o)"}
+{"message": "Salvando hist\u00f3rico: {'chamado_id': 'u7uLvGXC9eWhSX0zEqOv', 'usuario_id': 'user_julia.salgado_11704', 'usuario_nome': 'Julia Salgado', 'acao': 'alteracao_dados', 'campo_alterado': 'descri\u00e7\u00e3o', 'valor_anterior': '(Texto anterior)', 'valor_novo': '(Novo texto)', 'data_acao': Sentinel: Value used to set a document field to the server timestamp.}"}
+{"message": "Hist\u00f3rico salvo com ID: iUTbKK4x50kpdxYFSY28"}
+{"message": "Buscando hist\u00f3rico para chamado_id: u7uLvGXC9eWhSX0zEqOv"}
+{"message": "\u2705 Total de 5 registros encontrados (com ordena\u00e7\u00e3o)"}
+{"message": "Salvando hist\u00f3rico: {'chamado_id': 'u7uLvGXC9eWhSX0zEqOv', 'usuario_id': 'user_julia.salgado_11704', 'usuario_nome': 'Julia Salgado', 'acao': 'alteracao_dados', 'campo_alterado': 'novo anexo', 'valor_anterior': '-', 'valor_novo': '20260223_093311_Captura_de_tela_2026-02-19_093607.png', 'data_acao': Sentinel: Value used to set a document field to the server timestamp.}"}
+{"message": "Hist\u00f3rico salvo com ID: U2iXpKWgfQUdoMJHhV3S"}
+{"message": "Logout: julia.salgado@dtx.aero"}
+{"message": "Login bem-sucedido: julia.salgado@dtx.aero (Julia Salgado, Perfil: supervisor)"}
+{"message": "Logout: julia.salgado@dtx.aero"}
+{"message": "Login bem-sucedido: admin@dtx.com (Administrador Sistema, Perfil: admin)"}
+{"message": "Logout: admin@dtx.com"}
+{"message": "Login bem-sucedido: julia.salgado@dtx.aero (Julia Salgado, Perfil: supervisor)"}
+{"message": "Logout: julia.salgado@dtx.aero"}
+{"message": "Falha de autentica\u00e7\u00e3o: email admin@dtx.com ou senha incorretos"}
+{"message": "Login bem-sucedido: admin@dtx.com (Administrador Sistema, Perfil: admin)"}
+{"message": "Logout: admin@dtx.com"}
+{"message": "Login bem-sucedido: danillo.cunha@dtx.aero (Danillo Cunha, Perfil: solicitante)"}
+{"message": "Logout: danillo.cunha@dtx.aero"}
+{"message": "Login bem-sucedido: matheus.costa@dtx.aero (Matheus Costa, Perfil: supervisor)"}
+{"message": "Logout: matheus.costa@dtx.aero"}
+{"message": "Login bem-sucedido: matheus.costa@dtx.aero (Matheus Costa, Perfil: supervisor)"}
+{"message": "Login bem-sucedido: danillo.cunha@dtx.aero (Danillo Cunha, Perfil: solicitante)"}
+{"message": "Logout: danillo.cunha@dtx.aero"}
+{"message": "Login bem-sucedido: matheus.costa@dtx.aero (Matheus Costa, Perfil: supervisor)"}
+{"message": "Logout: matheus.costa@dtx.aero"}
+{"message": "Login bem-sucedido: admin@dtx.com (Administrador Sistema, Perfil: admin)"}
+{"message": "Login bem-sucedido: danillo.cunha@dtx.aero (Danillo Cunha, Perfil: solicitante)"}
+{"message": "Respons\u00e1vel escolhido no formul\u00e1rio: Paulo Lima"}
+{"message": "Erro ao gerar n\u00famero de chamado via transa\u00e7\u00e3o", "exc_info": "Traceback (most recent call last):\n  File \"C:\\Users\\MatheusCosta\\OneDrive - DTX Aerospace\\\u00c1rea de Trabalho\\Projetos\\sistema_chamados\\app\\utils.py\", line 56, in gerar_numero_chamado\n    novo_numero = atualizar_contador(transaction)\n  File \"C:\\Users\\MatheusCosta\\OneDrive - DTX Aerospace\\\u00c1rea de Trabalho\\Projetos\\sistema_chamados\\.venv\\Lib\\site-packages\\google\\cloud\\firestore_v1\\transaction.py\", line 311, in __call__\n    result = self._pre_commit(transaction, *args, **kwargs)\n  File \"C:\\Users\\MatheusCosta\\OneDrive - DTX Aerospace\\\u00c1rea de Trabalho\\Projetos\\sistema_chamados\\.venv\\Lib\\site-packages\\google\\cloud\\firestore_v1\\transaction.py\", line 282, in _pre_commit\n    return self.to_wrap(transaction, *args, **kwargs)\n           ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\MatheusCosta\\OneDrive - DTX Aerospace\\\u00c1rea de Trabalho\\Projetos\\sistema_chamados\\app\\utils.py\", line 48, in atualizar_contador\n    if doc.exists:\n       ^^^^^^^^^^\nAttributeError: 'generator' object has no attribute 'exists'"}
+{"message": "Salvando hist\u00f3rico: {'chamado_id': 'EKzAlcF4x6K3rlnvKcUh', 'usuario_id': 'user_danillo.cunha_23512', 'usuario_nome': 'Danillo Cunha', 'acao': 'criacao', 'campo_alterado': None, 'valor_anterior': None, 'valor_novo': None, 'data_acao': Sentinel: Value used to set a document field to the server timestamp.}"}
+{"message": "Hist\u00f3rico salvo com ID: 6xAmjYQW17cTNIPRxr7d"}
+{"message": "Chamado criado: CHM-3572 (ID: EKzAlcF4x6K3rlnvKcUh)"}
+{"message": "Logout: danillo.cunha@dtx.aero"}
+{"message": "Login bem-sucedido: danillo.cunha@dtx.aero (Danillo Cunha, Perfil: solicitante)"}
+{"message": "Respons\u00e1vel escolhido no formul\u00e1rio: Paulo Lima"}
+{"message": "Salvando hist\u00f3rico: {'chamado_id': 'U04drYr5YwYado6acgu7', 'usuario_id': 'user_danillo.cunha_23512', 'usuario_nome': 'Danillo Cunha', 'acao': 'criacao', 'campo_alterado': None, 'valor_anterior': None, 'valor_novo': None, 'data_acao': Sentinel: Value used to set a document field to the server timestamp.}"}
+{"message": "Hist\u00f3rico salvo com ID: FurDV3NvZ7uVFpO6SYCD"}
+{"message": "Chamado criado: CHM-0001 (ID: U04drYr5YwYado6acgu7)"}
+{"message": "Logout: danillo.cunha@dtx.aero"}
+{"message": "Login bem-sucedido: paulo.lima@dtx.aero (Paulo Lima, Perfil: supervisor)"}
+{"message": "Logout: paulo.lima@dtx.aero"}
+{"message": "Login bem-sucedido: danillo.cunha@dtx.aero (Danillo Cunha, Perfil: solicitante)"}
+{"message": "Respons\u00e1vel escolhido no formul\u00e1rio: Paulo Lima"}
+{"message": "Salvando hist\u00f3rico: {'chamado_id': 'gn0Rm6qSXRgs27YgPE8e', 'usuario_id': 'user_danillo.cunha_23512', 'usuario_nome': 'Danillo Cunha', 'acao': 'criacao', 'campo_alterado': None, 'valor_anterior': None, 'valor_novo': None, 'data_acao': Sentinel: Value used to set a document field to the server timestamp.}"}
+{"message": "Hist\u00f3rico salvo com ID: 1GZ9E32BxDKmVrUthK0P"}
+{"message": "Chamado criado: CHM-0002 (ID: gn0Rm6qSXRgs27YgPE8e)"}
+{"message": "Logout: danillo.cunha@dtx.aero"}
+{"message": "Login bem-sucedido: paulo.lima@dtx.aero (Paulo Lima, Perfil: supervisor)"}
+{"message": "Logout: paulo.lima@dtx.aero"}
+{"message": "Login bem-sucedido: julia.salgado@dtx.aero (Julia Salgado, Perfil: supervisor)"}
+{"message": "Logout: julia.salgado@dtx.aero"}
+{"message": "Login bem-sucedido: admin@dtx.com (Administrador Sistema, Perfil: admin)"}
+{"message": "Logout: admin@dtx.com"}
+{"message": "Usu\u00e1rio admin@dtx.com (admin) j\u00e1 autenticado, redirecionando..."}
+{"message": "Logout: admin@dtx.com"}
+{"message": "Login bem-sucedido: danillo.cunha@dtx.aero (Danillo Cunha, Perfil: solicitante)"}
+{"message": "Logout: danillo.cunha@dtx.aero"}
+{"message": "Login bem-sucedido: paulo.lima@dtx.aero (Paulo Lima, Perfil: supervisor)"}
+{"message": "Buscando hist\u00f3rico para chamado_id: U04drYr5YwYado6acgu7"}
+{"message": "\u2705 Total de 1 registros encontrados (com ordena\u00e7\u00e3o)"}
+{"message": "Buscando hist\u00f3rico para chamado_id: U04drYr5YwYado6acgu7"}
+{"message": "\u2705 Total de 1 registros encontrados (com ordena\u00e7\u00e3o)"}
+{"message": "Buscando hist\u00f3rico para chamado_id: U04drYr5YwYado6acgu7"}
+{"message": "\u2705 Total de 1 registros encontrados (com ordena\u00e7\u00e3o)"}
+{"message": "Buscando hist\u00f3rico para chamado_id: U04drYr5YwYado6acgu7"}
+{"message": "\u2705 Total de 1 registros encontrados (com ordena\u00e7\u00e3o)"}
+{"message": "Salvando hist\u00f3rico: {'chamado_id': 'U04drYr5YwYado6acgu7', 'usuario_id': 'user_paulo.lima_88469', 'usuario_nome': 'Paulo Lima', 'acao': 'alteracao_dados', 'campo_alterado': 'respons\u00e1vel', 'valor_anterior': 'Paulo Lima', 'valor_novo': 'Matheus Costa', 'data_acao': Sentinel: Value used to set a document field to the server timestamp.}"}
+{"message": "Hist\u00f3rico salvo com ID: UPyCMMYgmTOAIZPo8NEa"}
+{"message": "Logout: paulo.lima@dtx.aero"}
+{"message": "Login bem-sucedido: danillo.cunha@dtx.aero (Danillo Cunha, Perfil: solicitante)"}
+{"message": "Logout: danillo.cunha@dtx.aero"}
+{"message": "Login bem-sucedido: admin@dtx.com (Administrador Sistema, Perfil: admin)"}
+{"message": "Logout: admin@dtx.com"}
+{"message": "Login bem-sucedido: danillo.cunha@dtx.aero (Danillo Cunha, Perfil: solicitante)"}
+{"message": "Logout: danillo.cunha@dtx.aero"}
+{"message": "Login bem-sucedido: matheus.costa@dtx.aero (Matheus Costa, Perfil: supervisor)"}
+{"message": "Logout: matheus.costa@dtx.aero"}
+{"message": "Login bem-sucedido: admin@dtx.com (Administrador Sistema, Perfil: admin)"}
+{"message": "Buscando hist\u00f3rico para chamado_id: U04drYr5YwYado6acgu7"}
+{"message": "\u2705 Total de 2 registros encontrados (com ordena\u00e7\u00e3o)"}
+{"message": "Logout: admin@dtx.com"}
+{"message": "Login bem-sucedido: danillo.cunha@dtx.aero (Danillo Cunha, Perfil: solicitante)"}
+{"message": "Logout: danillo.cunha@dtx.aero"}
+{"message": "Login bem-sucedido: julia.salgado@dtx.aero (J\u00falia Salgado, Perfil: supervisor)"}
+{"message": "Logout: julia.salgado@dtx.aero"}
+{"message": "Login bem-sucedido: admin@dtx.com (Administrador Sistema, Perfil: admin)"}
+{"message": "Login bem-sucedido: admin@dtx.com (Administrador Sistema, Perfil: admin)"}
+{"message": "Buscando hist\u00f3rico para chamado_id: U04drYr5YwYado6acgu7"}
+{"message": "\u2705 Total de 2 registros encontrados (com ordena\u00e7\u00e3o)"}
+{"message": "Logout: admin@dtx.com"}
+{"message": "Login bem-sucedido: matheus.costa@dtx.aero (Matheus Costa, Perfil: supervisor)"}
+{"message": "Buscando hist\u00f3rico para chamado_id: U04drYr5YwYado6acgu7"}
+{"message": "\u2705 Total de 2 registros encontrados (com ordena\u00e7\u00e3o)"}
+{"message": "Tentativa 1/3 para inicializar Firebase..."}
+{"message": "Carregando credentials.json de: C:\\Users\\MatheusCosta\\OneDrive - DTX Aerospace\\\u00c1rea de Trabalho\\Projetos\\sistema_chamados\\credentials.json"}
+{"message": "Tentativa 1/3 para inicializar Firebase..."}
+{"message": "Carregando credentials.json de: C:\\Users\\MatheusCosta\\OneDrive - DTX Aerospace\\\u00c1rea de Trabalho\\Projetos\\sistema_chamados\\credentials.json"}
+{"message": "\u2713 Firebase inicializado com credentials.json (arquivo local)"}
+{"message": "\u2713 Cliente Firestore obtido com sucesso. Aplica\u00e7\u00e3o pronta."}
+{"message": "\u2713 Cliente Firestore obtido com sucesso. Aplica\u00e7\u00e3o pronta."}
+{"message": "Tentativa 1/3 para inicializar Firebase..."}
+{"message": "Carregando credentials.json de: C:\\Users\\MatheusCosta\\OneDrive - DTX Aerospace\\\u00c1rea de Trabalho\\Projetos\\sistema_chamados\\credentials.json"}
+{"message": "Tentativa 1/3 para inicializar Firebase..."}
+{"message": "Carregando credentials.json de: C:\\Users\\MatheusCosta\\OneDrive - DTX Aerospace\\\u00c1rea de Trabalho\\Projetos\\sistema_chamados\\credentials.json"}
+{"message": "\u2713 Firebase inicializado com credentials.json (arquivo local)"}
+{"message": "\u2713 Cliente Firestore obtido com sucesso. Aplica\u00e7\u00e3o pronta."}
+{"message": "\u2713 Firebase inicializado com credentials.json (arquivo local)"}
+{"message": "\u2713 Cliente Firestore obtido com sucesso. Aplica\u00e7\u00e3o pronta."}
+{"message": "Tentativa 1/3 para inicializar Firebase..."}
+{"message": "Carregando credentials.json de: C:\\Users\\MatheusCosta\\OneDrive - DTX Aerospace\\\u00c1rea de Trabalho\\Projetos\\sistema_chamados\\credentials.json"}
+{"message": "\u2713 Firebase inicializado com credentials.json (arquivo local)"}
+{"message": "\u2713 Cliente Firestore obtido com sucesso. Aplica\u00e7\u00e3o pronta."}
+{"message": "Tentativa 1/3 para inicializar Firebase..."}
+{"message": "Carregando credentials.json de: C:\\Users\\MatheusCosta\\OneDrive - DTX Aerospace\\\u00c1rea de Trabalho\\Projetos\\sistema_chamados\\credentials.json"}
+{"message": "\u2713 Firebase inicializado com credentials.json (arquivo local)"}
+{"message": "\u2713 Cliente Firestore obtido com sucesso. Aplica\u00e7\u00e3o pronta."}
+{"message": "Login bem-sucedido: danillo.cunha@dtx.aero (Danillo Cunha, Perfil: solicitante)"}
+{"message": "Logout: danillo.cunha@dtx.aero"}
+{"message": "Login bem-sucedido: matheus.costa@dtx.aero (Matheus Costa, Perfil: supervisor)"}
+{"message": "Logout: matheus.costa@dtx.aero"}
+{"message": "Login bem-sucedido: admin@dtx.com (Administrador Sistema, Perfil: admin)"}
+{"message": "Logout: admin@dtx.com"}
+{"message": "Tentativa 1/3 para inicializar Firebase..."}
+{"message": "Carregando credentials.json de: C:\\Users\\MatheusCosta\\OneDrive - DTX Aerospace\\\u00c1rea de Trabalho\\Projetos\\sistema_chamados\\credentials.json"}
+{"message": "\u2713 Firebase inicializado com credentials.json (arquivo local)"}
+{"message": "\u2713 Cliente Firestore obtido com sucesso. Aplica\u00e7\u00e3o pronta."}
+{"message": "Tentativa 1/3 para inicializar Firebase..."}
+{"message": "Carregando credentials.json de: C:\\Users\\MatheusCosta\\OneDrive - DTX Aerospace\\\u00c1rea de Trabalho\\Projetos\\sistema_chamados\\credentials.json"}
+{"message": "\u2713 Firebase inicializado com credentials.json (arquivo local)"}
+{"message": "\u2713 Cliente Firestore obtido com sucesso. Aplica\u00e7\u00e3o pronta."}
+{"message": "Acesso negado: usu\u00e1rio n\u00e3o autenticado tentou acessar index"}
+{"message": "Acesso negado: usu\u00e1rio n\u00e3o autenticado tentou acessar index"}
+{"message": "Falha de autentica\u00e7\u00e3o: email invalido@test.com ou senha incorretos"}
+{"message": "Login bem-sucedido: sol@test.com (Solicitante, Perfil: solicitante)"}
+{"message": "Acesso negado: usu\u00e1rio n\u00e3o autenticado tentou acessar admin"}
+{"message": "Login bem-sucedido: sol@test.com (Solicitante Teste, Perfil: solicitante)"}
+{"message": "Login bem-sucedido: sup@test.com (Supervisor Teste, Perfil: supervisor)"}
+{"message": "Login bem-sucedido: sup@test.com (Supervisor Teste, Perfil: supervisor)"}
+{"message": "Login bem-sucedido: sup@test.com (Supervisor Teste, Perfil: supervisor)"}
+{"message": "Login bem-sucedido: sol@test.com (Solicitante Teste, Perfil: solicitante)"}
+{"message": "Login bem-sucedido: sol@test.com (Solicitante Teste, Perfil: solicitante)"}
+{"message": "Login bem-sucedido: sol@test.com (Solicitante Teste, Perfil: solicitante)"}
+{"message": "Acesso negado: usu\u00e1rio n\u00e3o autenticado tentou acessar index"}
+{"message": "Acesso negado: usu\u00e1rio n\u00e3o autenticado tentou acessar index"}
+{"message": "Nenhum supervisor encontrado para \u00e1rea: AreaVazia"}
+{"message": "Nenhum supervisor encontrado para \u00e1rea: X"}
+{"message": "Notifica\u00e7\u00e3o por e-mail ignorada: destinat\u00e1rio vazio"}
+{"message": "Tentativa 1/3 para inicializar Firebase..."}
+{"message": "Carregando credentials.json de: C:\\Users\\MatheusCosta\\OneDrive - DTX Aerospace\\\u00c1rea de Trabalho\\Projetos\\sistema_chamados\\credentials.json"}
+{"message": "\u2713 Firebase inicializado com credentials.json (arquivo local)"}
+{"message": "\u2713 Cliente Firestore obtido com sucesso. Aplica\u00e7\u00e3o pronta."}
+{"message": "Login bem-sucedido: danillo.cunha@dtx.aero (Danillo Cunha, Perfil: solicitante)"}
+{"message": "Respons\u00e1vel escolhido no formul\u00e1rio: Matheus Costa"}
+{"message": "Salvando hist\u00f3rico: {'chamado_id': 'AgGUvgNVWrnC7Vy1M1MY', 'usuario_id': 'user_danillo.cunha_23512', 'usuario_nome': 'Danillo Cunha', 'acao': 'criacao', 'campo_alterado': None, 'valor_anterior': None, 'valor_novo': None, 'data_acao': Sentinel: Value used to set a document field to the server timestamp.}"}
+{"message": "Hist\u00f3rico salvo com ID: 2Dcb5TZAeAH3n2uzvPhA"}
+{"message": "Chamado criado: CHM-0003 (ID: AgGUvgNVWrnC7Vy1M1MY)"}
+{"message": "Tentativa 1/3 para inicializar Firebase..."}
+{"message": "Carregando credentials.json de: C:\\Users\\MatheusCosta\\OneDrive - DTX Aerospace\\\u00c1rea de Trabalho\\Projetos\\sistema_chamados\\credentials.json"}
+{"message": "\u2713 Firebase inicializado com credentials.json (arquivo local)"}
+{"message": "\u2713 Cliente Firestore obtido com sucesso. Aplica\u00e7\u00e3o pronta."}
+{"message": "Tentativa 1/3 para inicializar Firebase..."}
+{"message": "Carregando credentials.json de: C:\\Users\\MatheusCosta\\OneDrive - DTX Aerospace\\\u00c1rea de Trabalho\\Projetos\\sistema_chamados\\credentials.json"}
+{"message": "\u2713 Firebase inicializado com credentials.json (arquivo local)"}
+{"message": "\u2713 Cliente Firestore obtido com sucesso. Aplica\u00e7\u00e3o pronta."}
+{"message": "Acesso negado: usu\u00e1rio n\u00e3o autenticado tentou acessar index"}
+{"message": "Login bem-sucedido: danillo.cunha@dtx.aero (Danillo Cunha, Perfil: solicitante)"}
+{"message": "Tentativa 1/3 para inicializar Firebase..."}
+{"message": "Carregando credentials.json de: C:\\Users\\MatheusCosta\\OneDrive - DTX Aerospace\\\u00c1rea de Trabalho\\Projetos\\sistema_chamados\\credentials.json"}
+{"message": "\u2713 Firebase inicializado com credentials.json (arquivo local)"}
+{"message": "\u2713 Cliente Firestore obtido com sucesso. Aplica\u00e7\u00e3o pronta."}
+{"message": "Tentativa 1/3 para inicializar Firebase..."}
+{"message": "Carregando credentials.json de: C:\\Users\\MatheusCosta\\OneDrive - DTX Aerospace\\\u00c1rea de Trabalho\\Projetos\\sistema_chamados\\credentials.json"}
+{"message": "\u2713 Firebase inicializado com credentials.json (arquivo local)"}
+{"message": "\u2713 Cliente Firestore obtido com sucesso. Aplica\u00e7\u00e3o pronta."}
+{"message": "Tentativa 1/3 para inicializar Firebase..."}
+{"message": "Carregando credentials.json de: C:\\Users\\MatheusCosta\\OneDrive - DTX Aerospace\\\u00c1rea de Trabalho\\Projetos\\sistema_chamados\\credentials.json"}
+{"message": "\u2713 Firebase inicializado com credentials.json (arquivo local)"}
+{"message": "\u2713 Cliente Firestore obtido com sucesso. Aplica\u00e7\u00e3o pronta."}
+{"message": "Tentativa 1/3 para inicializar Firebase..."}
+{"message": "Carregando credentials.json de: C:\\Users\\MatheusCosta\\OneDrive - DTX Aerospace\\\u00c1rea de Trabalho\\Projetos\\sistema_chamados\\credentials.json"}
+{"message": "\u2713 Firebase inicializado com credentials.json (arquivo local)"}
+{"message": "\u2713 Cliente Firestore obtido com sucesso. Aplica\u00e7\u00e3o pronta."}
+{"message": "Tentativa 1/3 para inicializar Firebase..."}
+{"message": "Carregando credentials.json de: C:\\Users\\MatheusCosta\\OneDrive - DTX Aerospace\\\u00c1rea de Trabalho\\Projetos\\sistema_chamados\\credentials.json"}
+{"message": "\u2713 Firebase inicializado com credentials.json (arquivo local)"}
+{"message": "\u2713 Cliente Firestore obtido com sucesso. Aplica\u00e7\u00e3o pronta."}
+{"message": "Tentativa 1/3 para inicializar Firebase..."}
+{"message": "Carregando credentials.json de: C:\\Users\\MatheusCosta\\OneDrive - DTX Aerospace\\\u00c1rea de Trabalho\\Projetos\\sistema_chamados\\credentials.json"}
+{"message": "\u2713 Firebase inicializado com credentials.json (arquivo local)"}
+{"message": "\u2713 Cliente Firestore obtido com sucesso. Aplica\u00e7\u00e3o pronta."}
+{"message": "Tentativa 1/3 para inicializar Firebase..."}
+{"message": "Carregando credentials.json de: C:\\Users\\MatheusCosta\\OneDrive - DTX Aerospace\\\u00c1rea de Trabalho\\Projetos\\sistema_chamados\\credentials.json"}
+{"message": "\u2713 Firebase inicializado com credentials.json (arquivo local)"}
+{"message": "\u2713 Cliente Firestore obtido com sucesso. Aplica\u00e7\u00e3o pronta."}
+{"message": "Tentativa 1/3 para inicializar Firebase..."}
+{"message": "Carregando credentials.json de: C:\\Users\\MatheusCosta\\OneDrive - DTX Aerospace\\\u00c1rea de Trabalho\\Projetos\\sistema_chamados\\credentials.json"}
+{"message": "\u2713 Firebase inicializado com credentials.json (arquivo local)"}
+{"message": "\u2713 Cliente Firestore obtido com sucesso. Aplica\u00e7\u00e3o pronta."}
+{"message": "Tentativa 1/3 para inicializar Firebase..."}
+{"message": "Carregando credentials.json de: C:\\Users\\MatheusCosta\\OneDrive - DTX Aerospace\\\u00c1rea de Trabalho\\Projetos\\sistema_chamados\\credentials.json"}
+{"message": "\u2713 Firebase inicializado com credentials.json (arquivo local)"}
+{"message": "\u2713 Cliente Firestore obtido com sucesso. Aplica\u00e7\u00e3o pronta."}
+{"message": "Tentativa 1/3 para inicializar Firebase..."}
+{"message": "Carregando credentials.json de: C:\\Users\\MatheusCosta\\OneDrive - DTX Aerospace\\\u00c1rea de Trabalho\\Projetos\\sistema_chamados\\credentials.json"}
+{"message": "\u2713 Firebase inicializado com credentials.json (arquivo local)"}
+{"message": "\u2713 Cliente Firestore obtido com sucesso. Aplica\u00e7\u00e3o pronta."}
+{"message": "Tentativa 1/3 para inicializar Firebase..."}
+{"message": "Carregando credentials.json de: C:\\Users\\MatheusCosta\\OneDrive - DTX Aerospace\\\u00c1rea de Trabalho\\Projetos\\sistema_chamados\\credentials.json"}
+{"message": "\u2713 Firebase inicializado com credentials.json (arquivo local)"}
+{"message": "\u2713 Cliente Firestore obtido com sucesso. Aplica\u00e7\u00e3o pronta."}
+{"message": "Tentativa 1/3 para inicializar Firebase..."}
+{"message": "Carregando credentials.json de: C:\\Users\\MatheusCosta\\OneDrive - DTX Aerospace\\\u00c1rea de Trabalho\\Projetos\\sistema_chamados\\credentials.json"}
+{"message": "\u2713 Firebase inicializado com credentials.json (arquivo local)"}
+{"message": "\u2713 Cliente Firestore obtido com sucesso. Aplica\u00e7\u00e3o pronta."}
+{"message": "Tentativa 1/3 para inicializar Firebase..."}
+{"message": "Carregando credentials.json de: C:\\Users\\MatheusCosta\\OneDrive - DTX Aerospace\\\u00c1rea de Trabalho\\Projetos\\sistema_chamados\\credentials.json"}
+{"message": "\u2713 Firebase inicializado com credentials.json (arquivo local)"}
+{"message": "\u2713 Cliente Firestore obtido com sucesso. Aplica\u00e7\u00e3o pronta."}
+{"message": "Tentativa 1/3 para inicializar Firebase..."}
+{"message": "Carregando credentials.json de: C:\\Users\\MatheusCosta\\OneDrive - DTX Aerospace\\\u00c1rea de Trabalho\\Projetos\\sistema_chamados\\credentials.json"}
+{"message": "\u2713 Firebase inicializado com credentials.json (arquivo local)"}
+{"message": "\u2713 Cliente Firestore obtido com sucesso. Aplica\u00e7\u00e3o pronta."}
+{"message": "Tentativa 1/3 para inicializar Firebase..."}
+{"message": "Carregando credentials.json de: C:\\Users\\MatheusCosta\\OneDrive - DTX Aerospace\\\u00c1rea de Trabalho\\Projetos\\sistema_chamados\\credentials.json"}
+{"message": "\u2713 Firebase inicializado com credentials.json (arquivo local)"}
+{"message": "\u2713 Cliente Firestore obtido com sucesso. Aplica\u00e7\u00e3o pronta."}
+{"message": "Login bem-sucedido: danillo.cunha@dtx.aero (Danillo Cunha, Perfil: solicitante)"}
+{"message": "Logout: danillo.cunha@dtx.aero"}
+{"message": "Login bem-sucedido: admin@dtx.com (Administrador Sistema, Perfil: admin)"}
+{"message": "Tentativa 1/3 para inicializar Firebase..."}
+{"message": "Carregando credentials.json de: C:\\Users\\MatheusCosta\\OneDrive - DTX Aerospace\\\u00c1rea de Trabalho\\Projetos\\sistema_chamados\\credentials.json"}
+{"message": "\u2713 Firebase inicializado com credentials.json (arquivo local)"}
+{"message": "\u2713 Cliente Firestore obtido com sucesso. Aplica\u00e7\u00e3o pronta."}
+{"message": "Tentativa 1/3 para inicializar Firebase..."}
+{"message": "Carregando credentials.json de: C:\\Users\\MatheusCosta\\OneDrive - DTX Aerospace\\\u00c1rea de Trabalho\\Projetos\\sistema_chamados\\credentials.json"}
+{"message": "\u2713 Firebase inicializado com credentials.json (arquivo local)"}
+{"message": "\u2713 Cliente Firestore obtido com sucesso. Aplica\u00e7\u00e3o pronta."}
+{"message": "Tentativa 1/3 para inicializar Firebase..."}
+{"message": "Carregando credentials.json de: C:\\Users\\MatheusCosta\\OneDrive - DTX Aerospace\\\u00c1rea de Trabalho\\Projetos\\sistema_chamados\\credentials.json"}
+{"message": "\u2713 Firebase inicializado com credentials.json (arquivo local)"}
+{"message": "\u2713 Cliente Firestore obtido com sucesso. Aplica\u00e7\u00e3o pronta."}
+{"message": "Tentativa 1/3 para inicializar Firebase..."}
+{"message": "Carregando credentials.json de: C:\\Users\\MatheusCosta\\OneDrive - DTX Aerospace\\\u00c1rea de Trabalho\\Projetos\\sistema_chamados\\credentials.json"}
+{"message": "\u2713 Firebase inicializado com credentials.json (arquivo local)"}
+{"message": "\u2713 Cliente Firestore obtido com sucesso. Aplica\u00e7\u00e3o pronta."}
