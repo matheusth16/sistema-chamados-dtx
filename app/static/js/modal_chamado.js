@@ -3,7 +3,16 @@
  * Agora lê os dados diretamente dos atributos 'data-' do botão HTML.
  */
 
-function abrirModal(botao) {
+const DEBUG = Boolean(window.DTX_DEBUG) || (
+    window.location && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+);
+
+function debugLog() {
+    if (!DEBUG || !window.console) return;
+    console.log.apply(console, arguments);
+}
+
+window.abrirModal = function abrirModal(botao) {
     // 1. Coleta os dados dos atributos do botão
     // O 'dataset' pega tudo que começa com 'data-' no HTML
     const dados = {
@@ -18,29 +27,33 @@ function abrirModal(botao) {
         descricao: botao.dataset.descricao,
         rl_codigo: botao.dataset.rl,
         anexo: botao.dataset.anexo,
+        anexos: botao.dataset.anexos,
         status: botao.dataset.status
     };
 
     // Debug: Validar que dados foram lidos
-    console.log('🔍 Abrindo modal, dados coletados:', dados);
+    debugLog('🔍 Abrindo modal, dados coletados:', dados);
 
     // 2. Preenche os Dados Básicos (Cabeçalho)
     document.getElementById('modal-titulo').innerText = `Visualizando Chamado ${dados.numero}`;
     document.getElementById('modal-categoria').innerText = translateCategory(dados.categoria);
     document.getElementById('modal-setor').innerText = translateSector(dados.tipo);
     document.getElementById('modal-data').innerText = dados.data_abertura;
-    
+
     // Mostra o solicitante (quem abriu o chamado)
     const solicitanteText = dados.solicitante_nome ? dados.solicitante_nome : dados.responsavel;
     document.getElementById('modal-autor').innerText = solicitanteText;
 
-    // 3. Preenche a Descrição Completa
-    document.getElementById('modal-descricao').innerText = dados.descricao;
+    // 3. Preenche a Descrição Completa (agora é um textarea editável)
+    const descTextarea = document.getElementById('modal-descricao');
+    if (descTextarea) {
+        descTextarea.value = dados.descricao;
+    }
 
     // 4. Tratamento Inteligente do Código RL
     const elRl = document.getElementById('modal-rl-container');
     const txtRl = document.getElementById('modal-rl-texto');
-    
+
     if (dados.rl_codigo && dados.rl_codigo !== 'None' && dados.rl_codigo !== '') {
         txtRl.innerText = `Código RL: ${dados.rl_codigo}`;
         elRl.classList.remove('hidden');
@@ -48,34 +61,52 @@ function abrirModal(botao) {
         elRl.classList.add('hidden');
     }
 
-    // 5. Tratamento do Anexo
-    const divAnexo = document.getElementById('modal-area-anexo');
-    const linkAnexo = document.getElementById('modal-link-anexo');
-    
-    if (dados.anexo && dados.anexo !== 'None' && dados.anexo !== '') {
-        linkAnexo.href = `/static/uploads/${dados.anexo}`;
-        linkAnexo.innerText = `📎 Baixar Anexo (${dados.anexo})`;
-        divAnexo.classList.remove('hidden');
-    } else {
-        divAnexo.classList.add('hidden');
+    // 5. Tratamento dos Anexos
+    const divAnexos = document.getElementById('modal-area-anexos');
+    const listaAnexos = document.getElementById('modal-lista-anexos');
+
+    if (listaAnexos) listaAnexos.innerHTML = '';
+
+    // Ler a lista de anexos (pode vir como 'file1.txt,file2.txt')
+    let listaAnexosArray = [];
+    if (dados.anexos && dados.anexos !== 'None' && dados.anexos !== '') {
+        listaAnexosArray = dados.anexos.split(',');
+    } else if (dados.anexo && dados.anexo !== 'None' && dados.anexo !== '') {
+        // Fallback pro caso de não ter 'anexos' populado (chamados antigos)
+        listaAnexosArray = [dados.anexo];
     }
 
-    // 6. Preenche informações do status, responsável e formulário
+    if (listaAnexosArray.length > 0 && divAnexos && listaAnexos) {
+        listaAnexosArray.forEach(anx => {
+            const link = document.createElement('a');
+            link.href = `/static/uploads/${anx}`;
+            link.target = '_blank';
+            link.className = 'inline-flex flex-wrap items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-blue-700 bg-white hover:bg-gray-50 mr-2 mb-2 max-w-full truncate';
+            link.innerText = `📎 Baixar Anexo (${anx})`;
+            link.title = anx;
+            listaAnexos.appendChild(link);
+        });
+        divAnexos.classList.remove('hidden');
+    } else if (divAnexos) {
+        divAnexos.classList.add('hidden');
+    }
+
     const statusDisplayEl = document.getElementById('modal-status-display');
     const statusSelectEl = document.getElementById('select-status-modal');
-    const responsavelEl = document.getElementById('modal-responsavel');
+    const responsavelDisplayEl = document.getElementById('modal-responsavel-display');
+    const responsavelSelectEl = document.getElementById('select-responsavel-modal');
     const inputIdEl = document.getElementById('input-chamado-id');
-    
+
     // Define o ID do chamado no formulário
     if (inputIdEl) {
         inputIdEl.value = dados.id;
     }
-    
+
     // Define a cor do badge de status (visualização)
     if (statusDisplayEl) {
         statusDisplayEl.innerText = dados.status;
         statusDisplayEl.className = 'inline-flex px-3 py-1 rounded-full text-sm font-bold';
-        
+
         if (dados.status === 'Concluído') {
             statusDisplayEl.classList.add('bg-green-100', 'text-green-800');
         } else if (dados.status === 'Em Atendimento') {
@@ -84,19 +115,24 @@ function abrirModal(botao) {
             statusDisplayEl.classList.add('bg-gray-100', 'text-gray-800');
         }
     }
-    
+
     // Pré-seleciona o status atual no select
     if (statusSelectEl) {
         statusSelectEl.value = dados.status;
     }
-    
-    // Exibe o responsável
-    if (responsavelEl) {
-        responsavelEl.innerText = dados.responsavel;
+
+    // Exibe o responsável atual em modo texto
+    if (responsavelDisplayEl) {
+        responsavelDisplayEl.innerText = dados.responsavel ? dados.responsavel : 'Nenhum';
     }
-    
+
+    // Reseta o select de responsável para "Sem alteração"
+    if (responsavelSelectEl) {
+        responsavelSelectEl.value = '';
+    }
+
     // Debug: Validar que dados estão corretos
-    console.log('📋 Modal aberto com dados:', {
+    debugLog('📋 Modal aberto com dados:', {
         chamado_id: dados.id,
         status_atual: dados.status,
         numero: dados.numero,
@@ -109,25 +145,37 @@ function abrirModal(botao) {
     modal.classList.add('flex');
 }
 
-function fecharModal() {
+window.fecharModal = function fecharModal() {
     const modal = document.getElementById('modal-overlay');
     if (!modal) {
-        console.error('❌ Modal não encontrado!');
+        debugLog('❌ Modal não encontrado!');
         return;
     }
-    
+
     const inputId = document.getElementById('input-chamado-id');
     const chamadoId = inputId ? inputId.value : 'N/A';
-    
-    console.log('❌ Fechando modal (Chamado: ' + chamadoId + ')');
-    
+
+    debugLog('❌ Fechando modal (Chamado: ' + chamadoId + ')');
+
     modal.classList.add('hidden');
     modal.classList.remove('flex');
 }
 
-window.onclick = function(event) {
+window.onclick = function (event) {
     const modal = document.getElementById('modal-overlay');
     if (event.target === modal) {
         fecharModal();
     }
+}
+
+// Log de confirmação de carregamento (apenas em DEBUG mode)
+debugLog('✅ modal_chamado.js carregado com sucesso');
+debugLog('Funções disponíveis:', { 
+    abrirModal: typeof window.abrirModal, 
+    fecharModal: typeof window.fecharModal 
+});
+
+// Debug adicional
+if (DEBUG) {
+    debugLog('🔧 DEBUG MODE ativado');
 }

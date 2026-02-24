@@ -43,8 +43,10 @@ def gerar_numero_chamado() -> str:
 
         @firestore.transactional
         def atualizar_contador(transaction):
-            # Usar next() e iter() para obter o documento do generator
-            doc = next(iter(transaction.get([contador_ref])))
+            # transaction.get() aceita um DocumentReference, não uma lista
+            result = transaction.get(contador_ref)
+            # Em versões mais recentes da API, pode retornar um generator
+            doc = next(result) if hasattr(result, '__next__') else result
             if doc.exists:
                 proximo_numero = doc.get('proximo_numero') + 1
             else:

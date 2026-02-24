@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
 """
 Script para criar usuários no sistema de chamados
-Uso: python criar_usuario.py
+Uso: python scripts/criar_usuario.py (a partir da raiz do projeto)
 """
 
 import os
 import sys
 from getpass import getpass
 
-# Adiciona o diretório do projeto ao path
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# Adiciona a raiz do projeto ao path (script está em scripts/)
+_raiz = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, _raiz)
 
 from app.models_usuario import Usuario
 from app.database import db

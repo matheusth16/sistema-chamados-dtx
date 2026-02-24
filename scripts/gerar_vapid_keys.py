@@ -1,5 +1,5 @@
 """
-Gera chaves VAPID para Web Push. Execute: python gerar_vapid_keys.py
+Gera chaves VAPID para Web Push. Execute: python scripts/gerar_vapid_keys.py
 Copie as linhas geradas para o seu arquivo .env
 """
 import base64

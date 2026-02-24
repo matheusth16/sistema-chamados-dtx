@@ -12,56 +12,79 @@
     }
 </style>
 
-<div class="container mx-auto px-4 py-4">
+<div class="space-y-6">
     
     <!-- Indicador de carregamento -->
-    <div id="loading-charts" class="fixed inset-0 bg-white bg-opacity-90 flex items-center justify-center z-50" style="display: none;">
+    <div id="loading-charts" class="fixed inset-0 bg-white bg-opacity-90 flex items-center justify-center z-50 rounded-xl" style="display: none;">
         <div class="text-center">
             <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-2"></div>
-            <p class="text-gray-600">Carregando gráficos...</p>
+            <p class="text-gray-600 font-medium tracking-wide">Gerando relatórios...</p>
         </div>
     </div>
 
     <!-- Cabeçalho -->
-    <div class="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-            <h1 class="text-2xl font-bold text-gray-900 mb-1">📊 Relatórios e Análises</h1>
-            <p class="text-sm text-gray-600">Dashboard de performance e insights dos chamados</p>
+    <div class="gsap-animate bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col md:flex-row justify-between items-center gap-4">
+        <div class="flex items-center gap-3">
+            <div class="bg-blue-50 p-3 rounded-xl text-blue-600">
+                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+            </div>
+            <div>
+                <h1 class="text-2xl font-black text-gray-800 tracking-tight">{{ t('reports_analysis') }}</h1>
+                <p class="text-sm text-gray-500 font-medium">{{ t('reports_subtitle') }}</p>
+            </div>
         </div>
         <a href="{{ url_for('main.relatorios', atualizar=1) }}"
            class="inline-flex items-center px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white font-medium rounded-lg shadow transition text-sm whitespace-nowrap">
             <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
             </svg>
-            Atualizar dados
+            {{ t('refresh_data') }}
         </a>
     </div>
 
     <!-- INSIGHTS E ALERTAS -->
     {% if insights %}
-    <div class="mb-6">
-        <h2 class="text-lg font-bold text-gray-800 mb-3">⚡ Insights e Alertas</h2>
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+    <div class="mb-8">
+        <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
+            <span class="bg-blue-100 text-blue-600 p-1.5 rounded-lg mr-2">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+            </span>
+            Insights e Alertas
+        </h2>
+        <div class="gsap-scroll-reveal-stagger grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {% for insight in insights %}
-            <div class="p-3 rounded-lg border-l-4 
-                {% if insight.tipo == 'aviso' %}
-                    bg-yellow-50 border-yellow-400
-                {% elif insight.tipo == 'sucesso' %}
-                    bg-green-50 border-green-400
-                {% else %}
-                    bg-blue-50 border-blue-400
-                {% endif %}">
-                <h3 class="font-bold {% if insight.tipo == 'aviso' %}text-yellow-900{% elif insight.tipo == 'sucesso' %}text-green-900{% else %}text-blue-900{% endif %}">
-                    {{ insight.titulo }}
-                </h3>
-                <p class="text-sm {% if insight.tipo == 'aviso' %}text-yellow-800{% elif insight.tipo == 'sucesso' %}text-green-800{% else %}text-blue-800{% endif %} mt-2">
-                    {{ insight.mensagem }}
-                </p>
-                {% if insight.metrica %}
-                <p class="text-xs font-mono {% if insight.tipo == 'aviso' %}text-yellow-700{% elif insight.tipo == 'sucesso' %}text-green-700{% else %}text-blue-700{% endif %} mt-2">
-                    {{ insight.metrica }}
-                </p>
-                {% endif %}
+            <div class="gsap-scroll-reveal-item p-4 rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition bg-white 
+                relative overflow-hidden group">
+                
+                <!-- Borda lateral colorida -->
+                <div class="absolute left-0 top-0 bottom-0 w-1.5 
+                    {% if insight.tipo == 'aviso' %}bg-yellow-400{% elif insight.tipo == 'sucesso' %}bg-green-400{% else %}bg-blue-400{% endif %}">
+                </div>
+
+                <div class="pl-3">
+                    <h3 class="font-bold text-gray-800 flex items-center gap-2">
+                        {% if insight.tipo == 'aviso' %}
+                            <svg class="w-4 h-4 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                        {% elif insight.tipo == 'sucesso' %}
+                            <svg class="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                        {% else %}
+                            <svg class="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        {% endif %}
+                        {{ insight.titulo }}
+                    </h3>
+                    <p class="text-sm text-gray-600 mt-2 leading-relaxed">
+                        {{ insight.mensagem }}
+                    </p>
+                    {% if insight.metrica %}
+                    <div class="mt-3 pt-3 border-t border-gray-50 flex items-center justify-between">
+                        <span class="text-xs font-semibold text-gray-400 uppercase tracking-wide">Métrica de Impacto</span>
+                        <span class="text-xs font-bold px-2 py-1 rounded bg-gray-50 
+                            {% if insight.tipo == 'aviso' %}text-yellow-700{% elif insight.tipo == 'sucesso' %}text-green-700{% else %}text-blue-700{% endif %}">
+                            {{ insight.metrica }}
+                        </span>
+                    </div>
+                    {% endif %}
+                </div>
             </div>
             {% endfor %}
         </div>
@@ -70,175 +93,178 @@
 
     <!-- MÉTRICAS GERAIS -->
     {% if metricas_gerais %}
-    <div class="mb-6">
-        <h2 class="text-lg font-bold text-gray-800 mb-3">📈 Métricas Gerais (últimos {{ metricas_gerais.periodo_dias }} dias)</h2>
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
+    <div class="mb-8">
+        <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
+            <span class="bg-purple-100 text-purple-600 p-1.5 rounded-lg mr-2">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+            </span>
+            Visão Geral <span class="text-sm font-normal text-gray-500 ml-2">(últimos {{ metricas_gerais.periodo_dias }} dias)</span>
+        </h2>
+        <div class="gsap-scroll-reveal-stagger grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
             
             <!-- Card Total -->
-            <div class="bg-white p-4 rounded-lg shadow border-t-4 border-blue-500">
-                <div class="flex justify-between items-start">
-                    <div>
-                        <p class="text-gray-600 text-xs font-medium">Total de Chamados</p>
-                        <p class="text-2xl font-bold text-blue-600 mt-1">{{ metricas_gerais.total_chamados }}</p>
+            <div class="gsap-scroll-reveal-item bg-white p-5 rounded-2xl shadow-sm hover:shadow border border-gray-100 transition group">
+                <div class="flex justify-between items-start mb-2">
+                    <p class="text-gray-500 text-sm font-semibold truncate">Total de Chamados</p>
+                    <div class="p-2 bg-blue-50 text-blue-500 rounded-lg group-hover:bg-blue-500 group-hover:text-white transition">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
                     </div>
-                    <svg class="w-6 h-6 text-blue-200" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4z"></path>
-                        <path fill-rule="evenodd" d="M3 7h14v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7zm0 9v2h14v-2H3z" clip-rule="evenodd"></path>
-                    </svg>
                 </div>
+                <p class="text-3xl font-black text-gray-800">{{ metricas_gerais.total_chamados }}</p>
             </div>
 
             <!-- Card Abertos -->
-            <div class="bg-white p-4 rounded-lg shadow border-t-4 border-orange-500">
-                <div class="flex justify-between items-start">
-                    <div>
-                        <p class="text-gray-600 text-xs font-medium">Abertos</p>
-                        <p class="text-2xl font-bold text-orange-600 mt-1">{{ metricas_gerais.abertos }}</p>
+            <div class="gsap-scroll-reveal-item bg-white p-5 rounded-2xl shadow-sm hover:shadow border border-gray-100 transition group">
+                <div class="flex justify-between items-start mb-2">
+                    <p class="text-gray-500 text-sm font-semibold truncate">{{ t('open') }}</p>
+                    <div class="p-2 bg-blue-50 text-blue-500 rounded-lg group-hover:bg-blue-500 group-hover:text-white transition">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
                     </div>
-                    <svg class="w-6 h-6 text-orange-200" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M11 3a1 1 0 10-2 0v1a1 1 0 102 0V3zM15.657 5.757a1 1 0 00-1.414-1.414l-.707.707a1 1 0 001.414 1.414l.707-.707zM18 10a1 1 0 01-1 1h-1a1 1 0 110-2h1a1 1 0 011 1zm-1.657 4.243a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414l.707.707zM9 19a1 1 0 01-1-1v-1a1 1 0 112 0v1a1 1 0 01-1 1zM5.757 15.657a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414l-.707.707z"></path>
-                    </svg>
                 </div>
+                <p class="text-3xl font-black text-blue-600">{{ metricas_gerais.abertos }}</p>
             </div>
 
             <!-- Card Em Andamento -->
-            <div class="bg-white p-4 rounded-lg shadow border-t-4 border-yellow-500">
-                <div class="flex justify-between items-start">
-                    <div>
-                        <p class="text-gray-600 text-xs font-medium">Em Andamento</p>
-                        <p class="text-2xl font-bold text-yellow-600 mt-1">{{ metricas_gerais.em_andamento }}</p>
+            <div class="gsap-scroll-reveal-item bg-white p-5 rounded-2xl shadow-sm hover:shadow border border-gray-100 transition group">
+                <div class="flex justify-between items-start mb-2">
+                    <p class="text-gray-500 text-sm font-semibold truncate">{{ t('in_progress_tickets') }}</p>
+                    <div class="p-2 bg-yellow-50 text-yellow-500 rounded-lg group-hover:bg-yellow-400 group-hover:text-white transition">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                     </div>
-                    <svg class="w-6 h-6 text-yellow-200" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z"></path>
-                    </svg>
                 </div>
+                <p class="text-3xl font-black text-yellow-500">{{ metricas_gerais.em_andamento }}</p>
             </div>
 
             <!-- Card Concluídos -->
-            <div class="bg-white p-4 rounded-lg shadow border-t-4 border-green-500">
-                <div class="flex justify-between items-start">
-                    <div>
-                        <p class="text-gray-600 text-xs font-medium">Concluídos</p>
-                        <p class="text-2xl font-bold text-green-600 mt-1">{{ metricas_gerais.concluidos }}</p>
+            <div class="gsap-scroll-reveal-item bg-white p-5 rounded-2xl shadow-sm hover:shadow border border-gray-100 transition group">
+                <div class="flex justify-between items-start mb-2">
+                    <p class="text-gray-500 text-sm font-semibold truncate">{{ t('completed_tickets') }}</p>
+                    <div class="p-2 bg-green-50 text-green-500 rounded-lg group-hover:bg-green-500 group-hover:text-white transition">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
                     </div>
-                    <svg class="w-6 h-6 text-green-200" fill="currentColor" viewBox="0 0 20 20">
-                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
-                    </svg>
                 </div>
+                <p class="text-3xl font-black text-green-500">{{ metricas_gerais.concluidos }}</p>
             </div>
 
             <!-- Card Taxa de Resolução -->
-            <div class="bg-white p-4 rounded-lg shadow border-t-4 border-purple-500">
-                <div class="flex justify-between items-start">
-                    <div>
-                        <p class="text-gray-600 text-xs font-medium">Taxa de Resolução</p>
-                        <p class="text-2xl font-bold text-purple-600 mt-1">{{ metricas_gerais.taxa_resolucao_percentual }}%</p>
+            <div class="gsap-scroll-reveal-item p-5 rounded-2xl shadow-sm hover:shadow transition group bg-gradient-to-br from-indigo-500 to-purple-600 text-white col-span-2 md:col-span-1 border border-transparent">
+                <div class="flex justify-between items-start mb-2">
+                    <p class="text-indigo-100 text-sm font-semibold truncate">Taxa de Resolução</p>
+                    <div class="p-2 bg-white/20 rounded-lg backdrop-blur-sm">
+                        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
                     </div>
-                    <svg class="w-6 h-6 text-purple-200" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"></path>
-                    </svg>
                 </div>
+                <p class="text-3xl font-black">{{ metricas_gerais.taxa_resolucao_percentual }}%</p>
             </div>
         </div>
     </div>
     {% endif %}
 
     <!-- Gráficos em linha -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+    <div class="gsap-scroll-reveal grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         
         <!-- Gráfico: Distribuição de Chamados por Status -->
-        <div class="bg-white p-4 rounded-lg shadow">
-            <h3 class="text-base font-bold text-gray-800 mb-3">Distribuição por Status</h3>
-            <div class="chart-container" style="position: relative; height: 200px; width: 100%;">
+        <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col">
+            <h3 class="text-base font-bold text-gray-800 mb-4">Distribuição por Status</h3>
+            <div class="chart-container flex-1" style="position: relative; min-height: 250px; width: 100%;">
                 <canvas id="chartStatus"></canvas>
             </div>
         </div>
 
         <!-- Gráfico: Prioridade -->
-        <div class="bg-white p-4 rounded-lg shadow">
-            <h3 class="text-base font-bold text-gray-800 mb-3">Distribuição por Prioridade</h3>
-            <div class="chart-container" style="position: relative; height: 200px; width: 100%;">
+        <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col">
+            <h3 class="text-base font-bold text-gray-800 mb-4">Distribuição por Prioridade</h3>
+            <div class="chart-container flex-1" style="position: relative; min-height: 250px; width: 100%;">
                 <canvas id="chartPrioridade"></canvas>
             </div>
         </div>
     </div>
 
-    <!-- ANÁLISE DE ATRIBUIÇÃO AUTOMÁTICA -->
+    <!-- ANÁLISE DE BALANCEAMENTO DE CARGA -->
     {% if analise_atribuicao %}
-    <div class="mb-6">
-        <h2 class="text-lg font-bold text-gray-800 mb-3">🤖 Análise da Atribuição Automática</h2>
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    <div class="gsap-scroll-reveal mb-8">
+        <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
+            <span class="bg-teal-100 text-teal-600 p-1.5 rounded-lg mr-2">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/></svg>
+            </span>
+            Impacto do Balanceamento de Carga
+        </h2>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
             
             <!-- Estatísticas Comparativas -->
-            <div class="bg-white p-4 rounded-lg shadow">
-                <h3 class="text-base font-bold text-gray-800 mb-3">Comparação: Automática vs Manual</h3>
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
+                <h3 class="text-base font-bold text-gray-800 mb-4">Balanceamento Automático vs Atribuição Manual</h3>
                 
-                <div class="space-y-3">
+                <div class="space-y-4">
                     <!-- Taxa de Resolução -->
-                    <div class="p-3 bg-blue-50 rounded-lg border border-blue-200">
-                        <div class="flex justify-between mb-2">
-                            <span class="font-semibold text-blue-900">Taxa de Resolução</span>
+                    <div class="p-4 bg-gray-50 rounded-xl border border-gray-100 flex flex-col justify-center">
+                        <span class="font-bold text-gray-700 mb-3 block">Eficiência de Resolução</span>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <p class="text-xs text-gray-500 uppercase tracking-wider mb-1">Balanceado</p>
+                                <p class="text-2xl font-black text-teal-600">{{ analise_atribuicao.atribuicao_automatica.taxa_resolucao }}%</p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-gray-500 uppercase tracking-wider mb-1">Manual</p>
+                                <p class="text-2xl font-black text-gray-600">{{ analise_atribuicao.atribuicao_manual.taxa_resolucao }}%</p>
+                            </div>
                         </div>
-                        <div class="flex justify-between items-center mb-2">
-                            <span class="text-sm">Automática: <span class="font-bold">{{ analise_atribuicao.atribuicao_automatica.taxa_resolucao }}%</span></span>
-                            <span class="text-sm">Manual: <span class="font-bold">{{ analise_atribuicao.atribuicao_manual.taxa_resolucao }}%</span></span>
+                        <div class="mt-3 pt-3 border-t border-gray-200">
+                            {% if analise_atribuicao.melhoria_taxa_percentual > 0 %}
+                            <span class="inline-flex items-center text-sm font-bold text-green-600 bg-green-50 px-2 py-1 rounded">
+                                <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
+                                +{{ analise_atribuicao.melhoria_taxa_percentual }}% de ganho
+                            </span>
+                            {% elif analise_atribuicao.melhoria_taxa_percentual < 0 %}
+                            <span class="inline-flex items-center text-sm font-bold text-red-600 bg-red-50 px-2 py-1 rounded">
+                                <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"></path></svg>
+                                {{ analise_atribuicao.melhoria_taxa_percentual }}% redução
+                            </span>
+                            {% else %}
+                            <span class="text-sm text-gray-500 font-medium">Equivalente</span>
+                            {% endif %}
                         </div>
-                        {% if analise_atribuicao.melhoria_taxa_percentual > 0 %}
-                        <div class="text-green-600 text-sm font-bold">
-                            ✓ Melhoria: +{{ analise_atribuicao.melhoria_taxa_percentual }}%
-                        </div>
-                        {% elif analise_atribuicao.melhoria_taxa_percentual < 0 %}
-                        <div class="text-red-600 text-sm font-bold">
-                            ✗ Redução: {{ analise_atribuicao.melhoria_taxa_percentual }}%
-                        </div>
-                        {% else %}
-                        <div class="text-gray-600 text-sm">
-                            = Sem diferença
-                        </div>
-                        {% endif %}
                     </div>
 
                     <!-- Tempo de Resolução -->
-                    <div class="p-3 bg-purple-50 rounded-lg border border-purple-200">
-                        <div class="flex justify-between mb-2">
-                            <span class="font-semibold text-purple-900">Tempo Médio de Resolução</span>
+                    <div class="p-4 bg-gray-50 rounded-xl border border-gray-100 flex flex-col justify-center">
+                        <span class="font-bold text-gray-700 mb-3 block">Velocidade de Resolução</span>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <p class="text-xs text-gray-500 uppercase tracking-wider mb-1">Balanceado</p>
+                                <p class="text-2xl font-black text-purple-600">{{ analise_atribuicao.atribuicao_automatica.tempo_medio_resolucao_horas }}<span class="text-base font-semibold">h</span></p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-gray-500 uppercase tracking-wider mb-1">Manual</p>
+                                <p class="text-2xl font-black text-gray-600">{{ analise_atribuicao.atribuicao_manual.tempo_medio_resolucao_horas }}<span class="text-base font-semibold">h</span></p>
+                            </div>
                         </div>
-                        <div class="flex justify-between items-center mb-2">
-                            <span class="text-sm">Automática: <span class="font-bold">{{ analise_atribuicao.atribuicao_automatica.tempo_medio_resolucao_horas }}h</span></span>
-                            <span class="text-sm">Manual: <span class="font-bold">{{ analise_atribuicao.atribuicao_manual.tempo_medio_resolucao_horas }}h</span></span>
-                        </div>
-                        {% if analise_atribuicao.melhoria_tempo_horas > 0 %}
-                        <div class="text-green-600 text-sm font-bold">
-                            ✓ Mais rápida em: {{ analise_atribuicao.melhoria_tempo_horas }}h
-                        </div>
-                        {% elif analise_atribuicao.melhoria_tempo_horas < 0 %}
-                        <div class="text-red-600 text-sm font-bold">
-                            ✗ Mais lenta em: {{ analise_atribuicao.melhoria_tempo_horas|abs }}h
-                        </div>
-                        {% else %}
-                        <div class="text-gray-600 text-sm">
-                            = Sem diferença
-                        </div>
-                        {% endif %}
-                    </div>
-
-                    <!-- Uso -->
-                    <div class="p-3 bg-green-50 rounded-lg border border-green-200">
-                        <div class="flex justify-between mb-2">
-                            <span class="font-semibold text-green-900">Utilização</span>
-                        </div>
-                        <div class="flex justify-between items-center">
-                            <span class="text-sm">Automática: <span class="font-bold">{{ analise_atribuicao.percentual_automatico }}%</span></span>
-                            <span class="text-sm">({{ analise_atribuicao.atribuicao_automatica.total }} chamados)</span>
+                        <div class="mt-3 pt-3 border-t border-gray-200">
+                            {% if analise_atribuicao.melhoria_tempo_horas > 0 %}
+                            <span class="inline-flex items-center text-sm font-bold text-green-600 bg-green-50 px-2 py-1 rounded">
+                                <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                {{ analise_atribuicao.melhoria_tempo_horas }}h mais veloz
+                            </span>
+                            {% elif analise_atribuicao.melhoria_tempo_horas < 0 %}
+                            <span class="inline-flex items-center text-sm font-bold text-red-600 bg-red-50 px-2 py-1 rounded">
+                                <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                {{ analise_atribuicao.melhoria_tempo_horas|abs }}h mais lenta
+                            </span>
+                            {% else %}
+                            <span class="text-sm text-gray-500 font-medium">Equivalente</span>
+                            {% endif %}
                         </div>
                     </div>
                 </div>
             </div>
 
             <!-- Gráfico Comparativo -->
-            <div class="bg-white p-4 rounded-lg shadow">
-                <h3 class="text-base font-bold text-gray-800 mb-3">Comparação Visual</h3>
-                <div class="chart-container" style="position: relative; height: 200px; width: 100%;">
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between">
+                <div>
+                    <h3 class="text-base font-bold text-gray-800 mb-1">Adoção do Balanceamento Automatizado</h3>
+                    <p class="text-sm text-gray-500 mb-4">Adoção atual: <span class="font-bold text-teal-600">{{ analise_atribuicao.percentual_automatico }}%</span> ({{ analise_atribuicao.atribuicao_automatica.total }} chamados balanceados)</p>
+                </div>
+                <div class="chart-container flex-1" style="position: relative; min-height: 250px; width: 100%;">
                     <canvas id="chartAtribuicao"></canvas>
                 </div>
             </div>
@@ -248,68 +274,86 @@
 
     <!-- DESEMPENHO POR SUPERVISOR -->
     {% if metricas_supervisores %}
-    <div class="mb-6">
-        <h2 class="text-lg font-bold text-gray-800 mb-3">👥 Performance por Supervisor</h2>
+    <div class="gsap-scroll-reveal mb-8">
+        <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
+            <span class="bg-indigo-100 text-indigo-600 p-1.5 rounded-lg mr-2">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+            </span>
+            Performance da Equipe (Supervisores)
+        </h2>
         
-        <!-- Tabela de Supervisores -->
-        <div class="bg-white rounded-lg shadow overflow-hidden">
-            <table class="w-full">
-                <thead class="bg-gray-100 border-b">
-                    <tr>
-                        <th class="px-4 py-2 text-left text-xs font-semibold text-gray-700">Supervisor</th>
-                        <th class="px-4 py-2 text-left text-xs font-semibold text-gray-700">Área</th>
-                        <th class="px-4 py-2 text-center text-xs font-semibold text-gray-700">Total</th>
-                        <th class="px-4 py-2 text-center text-xs font-semibold text-gray-700">Carga Atual</th>
-                        <th class="px-4 py-2 text-center text-xs font-semibold text-gray-700">Concluídos</th>
-                        <th class="px-4 py-2 text-center text-xs font-semibold text-gray-700">Taxa %</th>
-                        <th class="px-4 py-2 text-center text-xs font-semibold text-gray-700">Tempo Médio</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y">
-                    {% for sup in metricas_supervisores %}
-                    <tr class="hover:bg-gray-50">
-                        <td class="px-4 py-2">
-                            <div class="text-sm font-semibold text-gray-900">{{ sup.supervisor_nome }}</div>
-                            <div class="text-xs text-gray-500">{{ sup.supervisor_email }}</div>
-                        </td>
-                        <td class="px-4 py-2 text-xs text-gray-600">{{ sup.area }}</td>
-                        <td class="px-4 py-2 text-center">
-                            <span class="inline-block bg-blue-100 text-blue-800 text-xs font-semibold px-2 py-1 rounded-full">
-                                {{ sup.total_chamados }}
-                            </span>
-                        </td>
-                        <td class="px-4 py-2 text-center">
-                            <span class="inline-block font-semibold 
-                                {% if sup.carga_atual > 10 %}
-                                    bg-red-100 text-red-800
-                                {% elif sup.carga_atual > 5 %}
-                                    bg-yellow-100 text-yellow-800
-                                {% else %}
-                                    bg-green-100 text-green-800
-                                {% endif %}
-                                text-xs px-2 py-1 rounded-full">
-                                {{ sup.carga_atual }}
-                            </span>
-                        </td>
-                        <td class="px-4 py-2 text-center text-xs font-semibold text-green-600">{{ sup.concluidos }}</td>
-                        <td class="px-4 py-2 text-center">
-                            <div class="w-full bg-gray-200 rounded-full h-2">
-                                <div class="bg-green-600 h-2 rounded-full" data-width="{{ sup.taxa_resolucao_percentual }}"></div>
-                            </div>
-                            <span class="text-xs font-semibold text-gray-700 mt-1">{{ sup.taxa_resolucao_percentual }}%</span>
-                        </td>
-                        <td class="px-4 py-2 text-center text-xs text-gray-600">{{ sup.tempo_medio_resolucao_horas }}h</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+        <!-- Tabelas e Gráficos de Perf -->
+        <div class="grid grid-cols-1 xl:grid-cols-4 gap-6">
+            
+            <!-- Tabela de Supervisores -->
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden xl:col-span-3">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left">
+                        <thead class="bg-gray-50/50 border-b border-gray-100 uppercase text-xs font-bold tracking-wider text-gray-500">
+                            <tr>
+                                <th class="px-5 py-4">Supervisor</th>
+                                <th class="px-5 py-4">Área</th>
+                                <th class="px-5 py-4 text-center">Total</th>
+                                <th class="px-5 py-4 text-center">Carga (Abertos)</th>
+                                <th class="px-5 py-4 text-center">Concluídos</th>
+                                <th class="px-5 py-4 w-40">Taxa</th>
+                                <th class="px-5 py-4 text-right">Tempo Med.</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            {% for sup in metricas_supervisores %}
+                            <tr class="hover:bg-blue-50/30 transition group">
+                                <td class="px-5 py-4">
+                                    <div class="flex items-center">
+                                        <div class="w-8 h-8 rounded-full bg-blue-100 text-blue-600 font-bold flex items-center justify-center mr-3 text-sm">
+                                            {{ sup.supervisor_nome[0] }}
+                                        </div>
+                                        <div>
+                                            <div class="text-sm font-bold text-gray-800">{{ sup.supervisor_nome }}</div>
+                                            <div class="text-xs text-gray-400">{{ sup.supervisor_email }}</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-5 py-4 text-sm text-gray-600">{{ sup.area }}</td>
+                                <td class="px-5 py-4 text-center">
+                                    <span class="inline-flex justify-center min-w-[32px] font-bold text-gray-700 bg-gray-100 px-2 py-1 rounded-md">{{ sup.total_chamados }}</span>
+                                </td>
+                                <td class="px-5 py-4 text-center">
+                                    <span class="inline-flex justify-center min-w-[32px] font-bold shadow-sm 
+                                        {% if sup.carga_atual > 10 %}
+                                            bg-red-500 text-white
+                                        {% elif sup.carga_atual > 5 %}
+                                            bg-yellow-400 text-yellow-900
+                                        {% else %}
+                                            bg-emerald-100 text-emerald-800
+                                        {% endif %}
+                                        px-2 py-1 rounded-md">
+                                        {{ sup.carga_atual }}
+                                    </span>
+                                </td>
+                                <td class="px-5 py-4 text-center font-bold text-emerald-600">{{ sup.concluidos }}</td>
+                                <td class="px-5 py-4">
+                                    <div class="flex items-center gap-2">
+                                        <div class="w-full bg-gray-100 rounded-full h-2">
+                                            <div class="bg-indigo-500 h-2 rounded-full" data-width="{{ sup.taxa_resolucao_percentual }}"></div>
+                                        </div>
+                                        <span class="text-xs font-bold text-gray-700 w-10 text-right">{{ sup.taxa_resolucao_percentual }}%</span>
+                                    </div>
+                                </td>
+                                <td class="px-5 py-4 text-right text-sm font-mono text-gray-500">{{ sup.tempo_medio_resolucao_horas }}h</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
 
-        <!-- Gráfico de Carga -->
-        <div class="mt-4 bg-white p-4 rounded-lg shadow">
-            <h3 class="text-base font-bold text-gray-800 mb-3">Carga de Trabalho Distribuída</h3>
-            <div class="chart-container" style="position: relative; height: 120px; width: 100%;">
-                <canvas id="chartCarga"></canvas>
+            <!-- Gráfico de Carga -->
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col xl:col-span-1">
+                <h3 class="text-sm font-bold text-gray-800 mb-4 whitespace-nowrap">Carga de Trabalho Distribuída</h3>
+                <div class="chart-container flex-1" style="position: relative; min-height: 200px; width: 100%;">
+                    <canvas id="chartCarga"></canvas>
+                </div>
             </div>
         </div>
     </div>
@@ -317,57 +361,67 @@
 
     <!-- DESEMPENHO POR ÁREA -->
     {% if metricas_areas %}
-    <div class="mb-6">
-        <h2 class="text-lg font-bold text-gray-800 mb-3">🏢 Performance por Área</h2>
+    <div class="gsap-scroll-reveal mb-8">
+        <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
+            <span class="bg-pink-100 text-pink-600 p-1.5 rounded-lg mr-2">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+            </span>
+            Performance por Área
+        </h2>
         
-        <!-- Tabela de Áreas -->
-        <div class="bg-white rounded-lg shadow overflow-hidden">
-            <table class="w-full">
-                <thead class="bg-gray-100 border-b">
-                    <tr>
-                        <th class="px-4 py-2 text-left text-xs font-semibold text-gray-700">Área</th>
-                        <th class="px-4 py-2 text-center text-xs font-semibold text-gray-700">Total</th>
-                        <th class="px-4 py-2 text-center text-xs font-semibold text-gray-700">Abertos</th>
-                        <th class="px-4 py-2 text-center text-xs font-semibold text-gray-700">Concluídos</th>
-                        <th class="px-4 py-2 text-center text-xs font-semibold text-gray-700">Taxa %</th>
-                        <th class="px-4 py-2 text-center text-xs font-semibold text-gray-700">Supervisores</th>
-                        <th class="px-4 py-2 text-center text-xs font-semibold text-gray-700">Automação %</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y">
-                    {% for area in metricas_areas %}
-                    <tr class="hover:bg-gray-50">
-                        <td class="px-4 py-2 font-semibold text-sm text-gray-900">{{ area.area }}</td>
-                        <td class="px-4 py-2 text-center">
-                            <span class="inline-block bg-blue-100 text-blue-800 text-xs font-semibold px-2 py-1 rounded-full">
-                                {{ area.total_chamados }}
-                            </span>
-                        </td>
-                        <td class="px-4 py-2 text-center text-xs text-orange-600 font-semibold">{{ area.abertos }}</td>
-                        <td class="px-4 py-2 text-center text-xs text-green-600 font-semibold">{{ area.concluidos }}</td>
-                        <td class="px-4 py-2 text-center">
-                            <div class="inline-block w-24 bg-gray-200 rounded-full h-2">
-                                <div class="bg-green-600 h-2 rounded-full" data-width="{{ area.taxa_resolucao_percentual }}"></div>
-                            </div>
-                            <span class="text-xs font-semibold text-gray-700">{{ area.taxa_resolucao_percentual }}%</span>
-                        </td>
-                        <td class="px-4 py-2 text-center text-xs font-semibold text-gray-600">{{ area.supervisores_alocados }}</td>
-                        <td class="px-4 py-2 text-center">
-                            <span class="inline-block bg-purple-100 text-purple-800 text-xs font-semibold px-2 py-1 rounded-full">
-                                {{ area.taxa_automacao_percentual }}%
-                            </span>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+        <div class="grid grid-cols-1 xl:grid-cols-4 gap-6">
+            <!-- Tabela de Áreas -->
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden xl:col-span-3">
+                <table class="w-full text-left">
+                    <thead class="bg-gray-50/50 border-b border-gray-100 uppercase text-xs font-bold tracking-wider text-gray-500">
+                        <tr>
+                            <th class="px-5 py-4">Área</th>
+                            <th class="px-5 py-4 text-center">Total</th>
+                            <th class="px-5 py-4 text-center">Abertos</th>
+                            <th class="px-5 py-4 text-center">Concluídos</th>
+                            <th class="px-5 py-4 w-40 text-center">Taxa</th>
+                            <th class="px-5 py-4 text-center">Sups. Aloc.</th>
+                            <th class="px-5 py-4 text-right">Taxa (Balanceado)</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100">
+                        {% for area in metricas_areas %}
+                        <tr class="hover:bg-pink-50/20 transition group">
+                            <td class="px-5 py-4 font-bold text-sm text-gray-800 flex items-center">
+                                <div class="w-2 h-2 rounded-full bg-pink-400 mr-2"></div>
+                                {{ area.area }}
+                            </td>
+                            <td class="px-5 py-4 text-center">
+                                <span class="inline-flex justify-center min-w-[32px] font-bold text-gray-700 bg-gray-100 px-2 py-1 rounded-md">{{ area.total_chamados }}</span>
+                            </td>
+                            <td class="px-5 py-4 text-center text-sm text-orange-600 font-bold">{{ area.abertos }}</td>
+                            <td class="px-5 py-4 text-center text-sm text-emerald-600 font-bold">{{ area.concluidos }}</td>
+                            <td class="px-5 py-4">
+                                <div class="flex items-center gap-2">
+                                    <div class="w-full bg-gray-100 rounded-full h-2">
+                                        <div class="bg-pink-500 h-2 rounded-full" data-width="{{ area.taxa_resolucao_percentual }}"></div>
+                                    </div>
+                                    <span class="text-xs font-bold text-gray-700 w-10 text-right">{{ area.taxa_resolucao_percentual }}%</span>
+                                </div>
+                            </td>
+                            <td class="px-5 py-4 text-center text-sm font-semibold text-gray-500">{{ area.supervisores_alocados }}</td>
+                            <td class="px-5 py-4 text-right">
+                                <span class="inline-flex justify-center min-w-[40px] font-bold text-teal-800 bg-teal-100 px-2 py-1 rounded border border-teal-200 text-xs">
+                                    {{ area.taxa_automacao_percentual }}%
+                                </span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
 
-        <!-- Gráfico de Taxa por Área -->
-        <div class="mt-4 bg-white p-4 rounded-lg shadow">
-            <h3 class="text-base font-bold text-gray-800 mb-3">Taxa de Resolução por Área</h3>
-            <div class="chart-container" style="position: relative; height: 120px; width: 100%;">
-                <canvas id="chartAreas"></canvas>
+            <!-- Gráfico de Taxa por Área -->
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col xl:col-span-1">
+                <h3 class="text-sm font-bold text-gray-800 mb-4 whitespace-nowrap">Taxa de Resolução (%)</h3>
+                <div class="chart-container flex-1" style="position: relative; min-height: 200px; width: 100%;">
+                    <canvas id="chartAreas"></canvas>
+                </div>
             </div>
         </div>
     </div>
@@ -404,19 +458,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const dadosSupervisores = Array.isArray(parseJson('dados-supervisores', null)) ? parseJson('dados-supervisores', []) : [];
     const dadosAreas = Array.isArray(parseJson('dados-areas', null)) ? parseJson('dados-areas', []) : [];
     const dadosAtribuicao = parseJson('dados-atribuicao', {});
-
-    // Configuração padrão para todos os gráficos - melhor performance
-    Chart.defaults.responsive = true;
-    Chart.defaults.maintainAspectRatio = false;
-    Chart.defaults.animation = false;
-    Chart.defaults.interaction = {
-        mode: 'nearest',
-        intersect: true
-    };
-    Chart.defaults.plugins.tooltip = {
-        enabled: true,
-        mode: 'nearest'
-    };
 
     // Gráfico: Distribuição por Status
     if (document.getElementById('chartStatus')) {
@@ -492,7 +533,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 labels: ['Taxa de Resolução (%)', 'Tempo Médio (horas)'],
                 datasets: [
                     {
-                        label: 'Automática',
+                        label: 'Balanceado',
                         data: [
                             dadosAtribuicao.atribuicao_automatica.taxa_resolucao,
                             dadosAtribuicao.atribuicao_automatica.tempo_medio_resolucao_horas

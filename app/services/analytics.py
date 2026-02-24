@@ -1,6 +1,11 @@
 """
-Serviço de Análise e Relatórios
-Fornece métricas de performance, insights e análises dos chamados
+Serviço de Análise e Relatórios.
+
+Fornece métricas de performance, insights e análises dos chamados:
+- Métricas gerais (total, abertos, concluídos, taxa de resolução, tempo médio)
+- Métricas por supervisor e por área
+- Relatório completo com cache (Redis ou memória)
+- Análise de atribuição e insights sugeridos
 """
 
 import logging
@@ -24,7 +29,7 @@ class AnalisadorChamados:
         self.db = None
     
     def get_db(self):
-        """Lazy initialization do Firestore"""
+        """Retorna o cliente Firestore (lazy initialization)."""
         if self.db is None:
             self.db = firestore.client()
         return self.db
@@ -52,7 +57,7 @@ class AnalisadorChamados:
             total = len(chamados)
             abertos = sum(1 for doc in chamados if doc.to_dict().get('status') == 'Aberto')
             concluidos = sum(1 for doc in chamados if doc.to_dict().get('status') == 'Concluído')
-            em_andamento = sum(1 for doc in chamados if doc.to_dict().get('status') == 'Em Andamento')
+            em_andamento = sum(1 for doc in chamados if doc.to_dict().get('status') == 'Em Atendimento')
             
             # Taxa de resolução
             taxa_resolucao = (concluidos / total * 100) if total > 0 else 0
@@ -125,7 +130,7 @@ class AnalisadorChamados:
                 total = len(chamados)
                 abertos = sum(1 for doc in chamados if doc.to_dict().get('status') == 'Aberto')
                 concluidos = sum(1 for doc in chamados if doc.to_dict().get('status') == 'Concluído')
-                em_andamento = sum(1 for doc in chamados if doc.to_dict().get('status') == 'Em Andamento')
+                em_andamento = sum(1 for doc in chamados if doc.to_dict().get('status') == 'Em Atendimento')
                 
                 # Taxa de resolução
                 taxa_resolucao = (concluidos / total * 100) if total > 0 else 0
@@ -190,13 +195,14 @@ class AnalisadorChamados:
         - Performance média da área
         """
         try:
-            # Apenas áreas que têm pelo menos um supervisor (exclui área só do admin, ex: TI)
+            # Coleta todas as áreas únicas dos supervisores (usando campo 'areas' array)
             usuarios_ref = self.get_db().collection('usuarios').stream()
             areas_uniques = set()
             for doc in usuarios_ref:
                 usuario = doc.to_dict()
-                if usuario.get('area') and usuario.get('perfil') == 'supervisor':
-                    areas_uniques.add(usuario['area'])
+                if usuario.get('perfil') == 'supervisor':
+                    for area in (usuario.get('areas') or []):
+                        areas_uniques.add(area)
             metricas = []
             
             for area in sorted(areas_uniques):
@@ -212,9 +218,9 @@ class AnalisadorChamados:
                 # Taxa de resolução
                 taxa_resolucao = (concluidos / total * 100) if total > 0 else 0
                 
-                # Supervisores da área
+                # Supervisores da área (usando array_contains para o campo 'areas')
                 supervs_area = self.get_db().collection('usuarios')\
-                    .where('area', '==', area)\
+                    .where('areas', 'array_contains', area)\
                     .where('perfil', '==', 'supervisor').stream()
                 
                 num_supervisores = len(list(supervs_area))

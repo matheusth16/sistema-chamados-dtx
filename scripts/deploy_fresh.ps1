@@ -1,6 +1,6 @@
 # Deploy para Cloud Run FORÇANDO rebuild sem cache
 # Use quando fizer mudanças no código e elas nao aparecerem na URL publicada
-# Uso: .\deploy_fresh.ps1
+# Uso (a partir da raiz do projeto): .\scripts\deploy_fresh.ps1
 
 $ErrorActionPreference = "Stop"
 $project = "sistema-de-chamados-dtx-aero"
@@ -26,6 +26,6 @@ if ($LASTEXITCODE -eq 0) {
     Write-Host ""
     Write-Host "Deploy concluido. Aguarde 1-2 min e teste a URL (ou use Ctrl+Shift+R no navegador)." -ForegroundColor Green
 } else {
-    Write-Host "Deploy falhou. Veja a mensagem acima ou rode: .\ver_logs_build.ps1" -ForegroundColor Red
+    Write-Host "Deploy falhou. Veja a mensagem acima ou rode: .\scripts\ver_logs_build.ps1" -ForegroundColor Red
     exit 1
 }

@@ -29,7 +29,8 @@ def login() -> Response:
 
         usuario = Usuario.get_by_email(email)
         if usuario and usuario.check_password(senha):
-            login_user(usuario, remember=True)
+            # remember=False ensures it's a session cookie that expires on browser close
+            login_user(usuario, remember=False)
             logger.info(f"Login bem-sucedido: {usuario.email} ({usuario.nome}, Perfil: {usuario.perfil})")
             flash(f'Bem-vindo, {usuario.nome}!', 'success')
             if usuario.perfil == 'solicitante':

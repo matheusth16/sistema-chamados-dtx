@@ -2,6 +2,7 @@ import logging
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 from app.database import db
+from app.firebase_retry import firebase_retry
 
 logger = logging.getLogger(__name__)
 
@@ -9,13 +10,18 @@ logger = logging.getLogger(__name__)
 class Usuario(UserMixin):
     """Representação de um usuário do sistema"""
     
-    def __init__(self, id: str, email: str, nome: str, perfil: str = 'solicitante', area: str = None):
+    def __init__(self, id: str, email: str, nome: str, perfil: str = 'solicitante', areas: list = None):
         self.id = id
         self.email = email
         self.nome = nome
         self.perfil = perfil  # 'solicitante', 'supervisor' ou 'admin'
-        self.area = area  # Setor/departamento (ex: Manutencao, Engenharia, etc)
+        self.areas = areas or []  # Lista de setores/departamentos
         self.senha_hash = None
+    
+    @property
+    def area(self):
+        """Property de compatibilidade: retorna áreas separadas por vírgula"""
+        return ", ".join(self.areas) if self.areas else None
     
     def set_password(self, senha: str):
         """Define a senha com hash"""
@@ -31,19 +37,24 @@ class Usuario(UserMixin):
             'email': self.email,
             'nome': self.nome,
             'perfil': self.perfil,
-            'area': self.area,
+            'areas': self.areas,
             'senha_hash': self.senha_hash
         }
     
     @classmethod
     def from_dict(cls, data: dict, id: str = None):
         """Cria um objeto Usuario a partir de um dicionário do Firestore"""
+        areas = data.get('areas', [])
+        # Migração: se tem area string mas não tem areas array
+        if not areas and data.get('area'):
+            areas = [data.get('area')]
+            
         usuario = cls(
             id=id,
             email=data.get('email'),
             nome=data.get('nome'),
             perfil=data.get('perfil', 'solicitante'),
-            area=data.get('area')
+            areas=areas
         )
         usuario.senha_hash = data.get('senha_hash')
         return usuario
@@ -72,8 +83,9 @@ class Usuario(UserMixin):
             logger.exception("Erro ao buscar usuário por ID: %s", e)
         return None
     
+    @firebase_retry(max_retries=3)
     def save(self):
-        """Salva o usuário no Firestore"""
+        """Salva o usuário no Firestore com retry automático"""
         try:
             db.collection('usuarios').document(self.id).set(self.to_dict())
             return True
@@ -81,8 +93,9 @@ class Usuario(UserMixin):
             logger.exception("Erro ao salvar usuário: %s", e)
             return False
     
+    @firebase_retry(max_retries=3)
     def update(self, **kwargs):
-        """Atualiza campos específicos do usuário no Firestore
+        """Atualiza campos específicos do usuário no Firestore com retry automático
         
         Args:
             **kwargs: Campos a atualizar (email, nome, perfil, area, senha)
@@ -103,9 +116,9 @@ class Usuario(UserMixin):
                 self.perfil = kwargs['perfil']
                 update_data['perfil'] = kwargs['perfil']
             
-            if 'area' in kwargs:
-                self.area = kwargs['area']
-                update_data['area'] = kwargs['area']
+            if 'areas' in kwargs:
+                self.areas = kwargs['areas']
+                update_data['areas'] = kwargs['areas']
             
             if 'senha' in kwargs and kwargs['senha']:
                 self.set_password(kwargs['senha'])
@@ -120,8 +133,9 @@ class Usuario(UserMixin):
             logger.exception("Erro ao atualizar usuário: %s", e)
             return False
     
+    @firebase_retry(max_retries=3)
     def delete(self):
-        """Deleta o usuário do Firestore"""
+        """Deleta o usuário do Firestore com retry automático"""
         try:
             db.collection('usuarios').document(self.id).delete()
             return True
@@ -166,19 +180,28 @@ class Usuario(UserMixin):
     def get_supervisores_por_area(cls, area: str):
         """Retorna supervisores de uma área específica (e admins da mesma área, para sugestão de responsável)."""
         try:
-            # Supervisores da área
-            docs_sup = db.collection('usuarios')\
-                .where('perfil', '==', 'supervisor')\
-                .where('area', '==', area)\
-                .stream()
-            usuarios = [cls.from_dict(doc.to_dict(), doc.id) for doc in docs_sup]
-            # Admins da área também podem ser sugeridos como responsáveis
-            docs_admin = db.collection('usuarios')\
-                .where('perfil', '==', 'admin')\
-                .where('area', '==', area)\
-                .stream()
+            usuarios = []
+            
+            # Buscar todos os supervisores e filtrar por área em Python
+            # (Firestore tem limitações em queries compostas com array_contains)
+            docs_sup = db.collection('usuarios').where('perfil', '==', 'supervisor').stream()
+            for doc in docs_sup:
+                user_dict = doc.to_dict()
+                # Precisamos criar o objeto Usuario primeiro para que from_dict
+                # faça a conversão de 'area' (string) para 'areas' (array)
+                usuario = cls.from_dict(user_dict, doc.id)
+                # Agora verificar se a área desejada está nas áreas do usuário
+                if area in usuario.areas:
+                    usuarios.append(usuario)
+            
+            # Buscar todos os admins e filtrar por área
+            docs_admin = db.collection('usuarios').where('perfil', '==', 'admin').stream()
             for doc in docs_admin:
-                usuarios.append(cls.from_dict(doc.to_dict(), doc.id))
+                user_dict = doc.to_dict()
+                usuario = cls.from_dict(user_dict, doc.id)
+                if area in usuario.areas:
+                    usuarios.append(usuario)
+            
             return usuarios
         except Exception as e:
             logger.exception("Erro ao buscar supervisores: %s", e)

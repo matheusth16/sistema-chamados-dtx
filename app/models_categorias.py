@@ -7,6 +7,7 @@ import pytz
 from firebase_admin import firestore
 from app.database import db
 from app.services.translation_service import traduzir_categoria
+from app.firebase_retry import firebase_retry
 import logging
 
 logger = logging.getLogger(__name__)
@@ -61,8 +62,9 @@ class CategoriaSetor:
             id=id,
         )
     
+    @firebase_retry(max_retries=3)
     def save(self):
-        """Salva o setor no Firestore"""
+        """Salva o setor no Firestore com retry automático"""
         try:
             if self.id:
                 db.collection('categorias_setores').document(self.id).update(self.to_dict())
@@ -150,8 +152,9 @@ class CategoriaGate:
             id=id,
         )
     
+    @firebase_retry(max_retries=3)
     def save(self):
-        """Salva o gate no Firestore"""
+        """Salva o gate no Firestore com retry automático"""
         try:
             if self.id:
                 db.collection('categorias_gates').document(self.id).update(self.to_dict())

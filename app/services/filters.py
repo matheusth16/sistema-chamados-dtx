@@ -1,3 +1,59 @@
+"""
+Serviço de Filtros para Dashboard de Chamados
+
+Aplicar múltiplos filtros a queries do Firestore para buscar chamados específicos.
+Usa indexação Firestore para performance, com fallback para filtros em memória.
+
+**Filtros Disponíveis:**
+
+| Parâmetro | Exemplos | Comportamento |
+|-----------|----------|---------------|
+| `status` | 'Aberto', 'Em Atendimento', 'Concluído' | Filtra por status exato |
+| `categoria` | 'Projetos', 'Manutenção' | Filtra por categoria |
+| `gate` | 'Gate 1', 'Gate 2' | Filtra por gate (produção) |
+| `responsavel` | User ID | Chamados atribuídos a supervisor |
+| `search` | Qualquer texto | Busca em descrição, código RL, etc (case-insensitive) |
+| Valor 'Todos'/'Todas' | Qualquer filtro | Ignora o filtro (retorna tudo) |
+
+**Estratégia de Performance:**
+
+1. **Índices Firestore:** Status, gate, responsavel usam índices compostos (rápido)
+2. **Filtros em Memória:** Categoria, search aplicados após buscar do Firestore (mais flexível)
+3. **Cursor-Based Pagination:** Uso de snapshots para paginação eficiente (sem offset)
+
+**Exemplos de Uso:**
+
+```python
+# Chamados abertos da última semana
+filtros = {'status': 'Aberto', 'data_inicio': datetime.now() - timedelta(days=7)}
+docs = aplicar_filtros_dashboard_com_paginacao(
+    chamados_query, 
+    filtros=filtros,
+    pagina=1
+)
+
+# Chamados de um supervisor específico com busca
+filtros = {'responsavel': 'userId123', 'search': 'falha'}
+docs = aplicar_filtros_dashboard(chamados_query, filtros)
+
+# Paginação com cursor
+resultado = aplicar_filtros_dashboard_com_paginacao(
+    query_ref=chamados_query,
+    args={'status': 'Concluído'},
+    limite=50,
+    cursor='ultimo_doc_id_da_pagina_anterior'
+)
+if resultado['tem_proxima']:
+    # Buscar próxima página usando resultado['proximo_cursor']
+```
+
+**Notas Importantes:**
+- Filtros são case-sensitive para status/categoria
+- Search é substring match (parcial)
+- Valor vazio em status/gate ignora o filtro
+- Cursor vazio ou inválido reinicia do início
+"""
+
 def _construir_query_base(query_ref, args):
     """
     OTIMIZAÇÃO 1: Aplica filtros baseados em índices Firestore
@@ -25,6 +81,19 @@ def _construir_query_base(query_ref, args):
     return query_filtrada, categoria_filtrada, categoria, status, gate
 
 
+def construir_query_para_contagem(query_ref, args):
+    """
+    Retorna a query com os mesmos filtros por índice usados no dashboard.
+
+    Use com obter_total_por_contagem() para obter o total de documentos sem
+    carregar todos em memória (agregação no Firestore). Quando há filtros
+    em memória (categoria, search), o total retornado pode ser maior que o
+    número real de resultados exibidos.
+    """
+    query_filtrada, _, _, _, _ = _construir_query_base(query_ref, args)
+    return query_filtrada
+
+
 def _aplicar_filtros_em_memoria(docs, status, gate, categoria, search):
     """
     OTIMIZAÇÃO 2: Filtros que não podem usar índices compostos
@@ -36,14 +105,7 @@ def _aplicar_filtros_em_memoria(docs, status, gate, categoria, search):
     
     # Filtro de categoria (inclui Projetos no topo se necessário)
     if categoria and categoria not in ['', 'Todas']:
-        if categoria != 'Projetos':
-            # Separa Projetos dos outros
-            projetos = [d for d in resultado if d.to_dict().get('categoria') == 'Projetos']
-            outros = [d for d in resultado if d.to_dict().get('categoria') == categoria]
-            resultado = outros + projetos
-        else:
-            # Filtra apenas Projetos
-            resultado = [d for d in resultado if d.to_dict().get('categoria') == 'Projetos']
+        resultado = [d for d in resultado if d.to_dict().get('categoria') == categoria]
     
     # Busca por texto (case-insensitive)
     if search:

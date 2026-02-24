@@ -33,10 +33,15 @@ class Config:
     ITENS_POR_PAGINA = 10
     
     # 5. Rate Limiting (limite de requisições por janela de tempo)
-    RATELIMIT_ENABLED = True
-    RATELIMIT_DEFAULT = "200 per day, 50 per hour"  # Limite global padrão
-    # Em produção, defina REDIS_URL para compartilhar limite entre workers (Gunicorn/Cloud Run)
-    RATELIMIT_STORAGE_URL = os.getenv('REDIS_URL', '').strip() or 'memory://'
+    # Em desenvolvimento: desativado para melhor UX
+    # Em produção: 200 requisições/hora (~3-4 por minuto), 2000 por dia
+    RATELIMIT_ENABLED = os.getenv('FLASK_ENV', 'development') == 'production'
+    RATELIMIT_DEFAULT = "200 per hour, 2000 per day"
+    # Redis em produção: defina REDIS_URL para rate limit compartilhado entre workers (Gunicorn/Cloud Run)
+    # e para cache (app/cache.py). Sem Redis, usa memória local por processo (limites não compartilhados).
+    _redis_url = os.getenv('REDIS_URL', '').strip()
+    RATELIMIT_STORAGE_URL = _redis_url or 'memory://'
+    RATELIMIT_STORAGE_URI = _redis_url or 'memory://'  # Flask-Limiter aceita ambos os nomes
     
     # 6. Segurança CSRF
     WTF_CSRF_ENABLED = True
@@ -66,7 +71,7 @@ class Config:
     MAIL_DEFAULT_SENDER = os.getenv('MAIL_DEFAULT_SENDER', '')
     TEAMS_WEBHOOK_URL = os.getenv('TEAMS_WEBHOOK_URL', '')
 
-    # Web Push (notificações no navegador). Gere chaves com: python gerar_vapid_keys.py
+    # Web Push (notificações no navegador). Gere chaves com: python scripts/gerar_vapid_keys.py
     VAPID_PUBLIC_KEY = os.getenv('VAPID_PUBLIC_KEY', '')
     VAPID_PRIVATE_KEY = os.getenv('VAPID_PRIVATE_KEY', '')
 

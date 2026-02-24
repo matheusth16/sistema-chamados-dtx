@@ -4,142 +4,169 @@
 <div class="space-y-6">
     
     <!-- Header com Informações -->
-    <div class="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-6 rounded-lg shadow-sm border border-gray-100 gap-4">
-        <div>
-            <h2 class="text-2xl font-bold text-gray-800">{{ t('my_tickets') }}</h2>
-            <p class="text-sm text-gray-600 mt-2">
-                {{ t('track_tickets') }}
-                <span class="font-semibold text-blue-600 ml-2">{{ t('total_tickets') }}: {{ total_chamados }}</span>
-            </p>
+    <div
+        class="flex flex-col md:flex-row justify-between items-center bg-gray-50/50 p-6 rounded-2xl border border-gray-100 gap-4 mb-2">
+        <div class="flex items-center gap-4">
+            <div class="bg-indigo-100 text-indigo-600 p-3 rounded-xl hidden sm:block">
+                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+            </div>
+            <div>
+                <h2 class="text-2xl font-black text-gray-800 tracking-tight">{{ t('my_tickets') }}</h2>
+                <div class="text-sm text-gray-500 flex items-center gap-2 mt-1">
+                    <span class="font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">{{ total_chamados }}</span> 
+                    <span>{{ t('track_tickets') }}</span>
+                </div>
+            </div>
         </div>
-        <div class="flex gap-2 w-full md:w-auto flex-col md:flex-row">
-            <a href="/" class="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-md shadow transition justify-center">
+        <div class="flex gap-2 w-full md:w-auto flex-col md:flex-row justify-end">
+            <a href="/"
+                class="inline-flex items-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl shadow-sm transition-colors justify-center text-sm">
                 <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
                 </svg>
                 {{ t('new_ticket') }}
             </a>
-            <a href="{{ url_for('main.logout') }}" class="inline-flex items-center px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-md shadow transition justify-center">
-                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+            <a href="{{ url_for('main.logout') }}"
+                class="inline-flex items-center px-3 py-2 text-gray-400 hover:text-red-600 hover:bg-red-50 font-medium rounded-xl transition justify-center text-sm ml-1" title="{{ t('logout') }}">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                 </svg>
-                {{ t('logout') }}
             </a>
         </div>
     </div>
 
     <!-- Cards de Resumo de Status -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <a href="?status=" class="block bg-white p-4 rounded-lg shadow-sm border {% if not status_filtro %}border-blue-500 bg-blue-50{% else %}border-gray-200 hover:border-gray-300{% endif %} transition">
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <a href="?status=" class="block bg-white p-5 rounded-2xl shadow-sm border {% if not status_filtro %}border-indigo-500 bg-indigo-50/30 ring-1 ring-indigo-500{% else %}border-gray-100 hover:border-indigo-200 hover:shadow-md{% endif %} transition-all relative overflow-hidden group">
+            <div class="absolute right-0 top-0 bottom-0 w-1 {% if not status_filtro %}bg-indigo-500{% else %}bg-gray-100 group-hover:bg-indigo-300{% endif %} transition-colors"></div>
             <div class="flex items-center justify-between">
                 <div>
-                    <p class="text-xs font-semibold text-gray-600 uppercase tracking-wide">{{ t('total_tickets') }}</p>
-                    <p class="text-2xl font-bold text-gray-900">{{ total_chamados }}</p>
+                    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{{ t('total_tickets') }}</p>
+                    <p class="text-3xl font-black text-gray-800 mt-1">{{ total_chamados }}</p>
                 </div>
-                <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                </svg>
+                <div class="p-2 {% if not status_filtro %}bg-indigo-100/50 text-indigo-600{% else %}bg-gray-50 text-gray-400 group-hover:bg-indigo-50 group-hover:text-indigo-400{% endif %} rounded-xl transition-colors">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                    </svg>
+                </div>
             </div>
         </a>
 
-        <a href="?status=Aberto" class="block bg-white p-4 rounded-lg shadow-sm border {% if status_filtro == 'Aberto' %}border-orange-500 bg-orange-50{% else %}border-gray-200 hover:border-gray-300{% endif %} transition">
+        <a href="?status=Aberto" class="block bg-white p-5 rounded-2xl shadow-sm border {% if status_filtro == 'Aberto' %}border-blue-400 bg-blue-50/50 ring-1 ring-blue-400{% else %}border-gray-100 hover:border-blue-200 hover:shadow-md{% endif %} transition-all relative overflow-hidden group">
+            <div class="absolute right-0 top-0 bottom-0 w-1 {% if status_filtro == 'Aberto' %}bg-blue-400{% else %}bg-gray-100 group-hover:bg-blue-300{% endif %} transition-colors"></div>
             <div class="flex items-center justify-between">
                 <div>
-                    <p class="text-xs font-semibold text-gray-600 uppercase tracking-wide">{{ t('open_tickets') }}</p>
-                    <p class="text-2xl font-bold text-orange-600">{{ status_counts['Aberto'] }}</p>
+                    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{{ t('open_tickets') }}</p>
+                    <p class="text-3xl font-black text-blue-600 mt-1">{{ status_counts['Aberto'] }}</p>
                 </div>
-                <svg class="w-8 h-8 text-orange-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+                <div class="p-2 {% if status_filtro == 'Aberto' %}bg-blue-100 text-blue-600{% else %}bg-gray-50 text-gray-400 group-hover:bg-blue-50 group-hover:text-blue-500{% endif %} rounded-xl transition-colors">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </div>
             </div>
         </a>
 
-        <a href="?status=Em%20Atendimento" class="block bg-white p-4 rounded-lg shadow-sm border {% if status_filtro == 'Em Atendimento' %}border-yellow-500 bg-yellow-50{% else %}border-gray-200 hover:border-gray-300{% endif %} transition">
+        <a href="?status=Em%20Atendimento" class="block bg-white p-5 rounded-2xl shadow-sm border {% if status_filtro == 'Em Atendimento' %}border-amber-400 bg-amber-50/50 ring-1 ring-amber-400{% else %}border-gray-100 hover:border-amber-200 hover:shadow-md{% endif %} transition-all relative overflow-hidden group">
+            <div class="absolute right-0 top-0 bottom-0 w-1 {% if status_filtro == 'Em Atendimento' %}bg-amber-400{% else %}bg-gray-100 group-hover:bg-amber-300{% endif %} transition-colors"></div>
             <div class="flex items-center justify-between">
                 <div>
-                    <p class="text-xs font-semibold text-gray-600 uppercase tracking-wide">{{ t('in_progress_tickets') }}</p>
-                    <p class="text-2xl font-bold text-yellow-600">{{ status_counts['Em Atendimento'] }}</p>
+                    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{{ t('in_progress_tickets') }}</p>
+                    <p class="text-3xl font-black text-amber-500 mt-1">{{ status_counts['Em Atendimento'] }}</p>
                 </div>
-                <svg class="w-8 h-8 text-yellow-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
+                <div class="p-2 {% if status_filtro == 'Em Atendimento' %}bg-amber-100 text-amber-600{% else %}bg-gray-50 text-gray-400 group-hover:bg-amber-50 group-hover:text-amber-500{% endif %} rounded-xl transition-colors">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                </div>
             </div>
         </a>
 
-        <a href="?status=Concluído" class="block bg-white p-4 rounded-lg shadow-sm border {% if status_filtro == 'Concluído' %}border-green-500 bg-green-50{% else %}border-gray-200 hover:border-gray-300{% endif %} transition md:col-span-1">
+        <a href="?status=Concluído" class="block bg-white p-5 rounded-2xl shadow-sm border {% if status_filtro == 'Concluído' %}border-emerald-500 bg-emerald-50/50 ring-1 ring-emerald-500{% else %}border-gray-100 hover:border-emerald-200 hover:shadow-md{% endif %} transition-all relative overflow-hidden group md:col-span-1">
+            <div class="absolute right-0 top-0 bottom-0 w-1 {% if status_filtro == 'Concluído' %}bg-emerald-500{% else %}bg-gray-100 group-hover:bg-emerald-300{% endif %} transition-colors"></div>
             <div class="flex items-center justify-between">
                 <div>
-                    <p class="text-xs font-semibold text-gray-600 uppercase tracking-wide">{{ t('completed_tickets') }}</p>
-                    <p class="text-2xl font-bold text-green-600">{{ status_counts['Concluído'] }}</p>
+                    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{{ t('completed_tickets') }}</p>
+                    <p class="text-3xl font-black text-emerald-600 mt-1">{{ status_counts['Concluído'] }}</p>
                 </div>
-                <svg class="w-8 h-8 text-green-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+                <div class="p-2 {% if status_filtro == 'Concluído' %}bg-emerald-100 text-emerald-600{% else %}bg-gray-50 text-gray-400 group-hover:bg-emerald-50 group-hover:text-emerald-500{% endif %} rounded-xl transition-colors">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </div>
             </div>
         </a>
     </div>
 
     <!-- Tabela de Chamados -->
-    <div class="bg-white shadow-xl rounded-lg overflow-hidden border border-gray-200">
+    <div class="bg-white shadow-sm rounded-2xl overflow-hidden border border-gray-100 p-1">
         {% if chamados %}
-        <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
+        <table class="min-w-full divide-y divide-gray-100">
+            <thead class="bg-gray-50/50">
                 <tr>
-                    <th class="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">{{ t('id_ref') }}</th>
-                    <th class="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">{{ t('category') }}</th>
-                    <th class="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">{{ t('type_sector') }}</th>
-                    <th class="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">{{ t('description') }}</th>
-                    <th class="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">{{ t('assigned_to') }}</th>
-                    <th class="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">{{ t('status') }}</th>
-                    <th class="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">{{ t('date') }}</th>
-                    <th class="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">{{ t('actions') }}</th>
+                    <th class="px-5 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-widest">{{ t('id_ref') }}</th>
+                    <th class="px-5 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-widest">{{ t('category') }}</th>
+                    <th class="px-5 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-widest">{{ t('type_sector') }}</th>
+                    <th class="px-5 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-widest">{{ t('description') }}</th>
+                    <th class="px-5 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-widest">{{ t('assigned_to') }}</th>
+                    <th class="px-5 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-widest">{{ t('status') }}</th>
+                    <th class="px-5 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-widest">{{ t('date') }}</th>
+                    <th class="px-5 py-4 text-center text-xs font-bold text-gray-400 uppercase tracking-widest">{{ t('actions') }}</th>
                 </tr>
             </thead>
-            <tbody class="bg-white divide-y divide-gray-200">
+            <tbody class="bg-white divide-y divide-gray-50/80">
                 {% for chamado in chamados %}
-                <tr class="hover:bg-gray-50 transition {% if chamado.status == 'Concluído' %}bg-green-50/20{% elif chamado.status == 'Em Atendimento' %}bg-yellow-50/20{% endif %}">
-                    <td class="px-6 py-4 whitespace-nowrap">
-                        <div class="text-sm font-bold text-gray-900">{{ chamado.numero_chamado }}</div>
+                <tr class="hover:bg-indigo-50/50 transition duration-150 group cursor-default {% if chamado.status == 'Concluído' %}bg-emerald-50/20{% elif chamado.status == 'Em Atendimento' %}bg-amber-50/20{% endif %}">
+                    <td class="px-5 py-4 whitespace-nowrap">
+                        <div class="text-sm font-black text-gray-800">{{ chamado.numero_chamado }}</div>
                         {% if chamado.rl_codigo %}
-                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 mt-1">
+                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-pink-100 text-pink-700 mt-1 uppercase tracking-wider">
                             {{ t('rl_short') }} {{ chamado.rl_codigo }}
                         </span>
                         {% endif %}
                     </td>
 
-                    <td class="px-6 py-4 whitespace-nowrap">
-                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-                            {% if chamado.categoria == 'Projetos' %}bg-red-100 text-red-800{% else %}bg-blue-100 text-blue-800{% endif %}">
+                    <td class="px-5 py-4 whitespace-nowrap">
+                        <span class="px-2.5 py-1 inline-flex text-xs leading-5 font-bold rounded-lg 
+                            {% if chamado.categoria == 'Projetos' %}bg-pink-100 text-pink-700{% else %}bg-indigo-100 text-indigo-700{% endif %}">
                             {{ translate_category(chamado.categoria) }}
                         </span>
                     </td>
 
-                    <td class="px-6 py-4 whitespace-nowrap">
-                        <span class="text-sm text-gray-700">{{ translate_sector(chamado.tipo_solicitacao) or '—' }}</span>
+                    <td class="px-5 py-4 whitespace-nowrap">
+                        <span class="text-sm font-semibold text-gray-800">{{ translate_sector(chamado.tipo_solicitacao) or '—' }}</span>
                     </td>
 
-                    <td class="px-6 py-4 max-w-xs">
-                        <div class="text-sm text-gray-900 truncate" title="{{ chamado.descricao }}">
-                            {{ chamado.descricao[:60] }}{% if chamado.descricao|length > 60 %}...{% endif %}
+                    <td class="px-5 py-4 max-w-[200px]">
+                        <div class="text-sm text-gray-700 truncate group-hover:text-indigo-600 font-medium cursor-pointer" title="{{ chamado.descricao }}">
+                            {{ chamado.descricao[:30] }}{% if chamado.descricao|length > 30 %}...{% endif %}
                         </div>
                     </td>
 
-                    <td class="px-6 py-4 whitespace-nowrap">
-                        <span class="text-sm font-medium text-gray-900">{{ chamado.responsavel or '—' }}</span>
+                    <td class="px-5 py-4 whitespace-nowrap">
+                        <div class="flex items-center">
+                            {% if chamado.responsavel %}
+                            <div class="h-6 w-6 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-xs font-bold mr-2">
+                                {{ chamado.responsavel[0] }}
+                            </div>
+                            {% endif %}
+                            <span class="text-sm font-medium text-gray-700">{{ chamado.responsavel or '—' }}</span>
+                        </div>
                     </td>
 
-                    <td class="px-6 py-4 whitespace-nowrap">
-                        <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full 
-                            {% if chamado.status == 'Concluído' %}bg-green-100 text-green-800{% elif chamado.status == 'Em Atendimento' %}bg-yellow-100 text-yellow-800{% else %}bg-gray-100 text-gray-800{% endif %}">
-                            {{ chamado.status }}
+                    <td class="px-5 py-4 whitespace-nowrap">
+                        <span class="px-2.5 py-1 inline-flex items-center text-xs leading-5 font-bold rounded-lg 
+                            {% if chamado.status == 'Concluído' %}bg-emerald-100 text-emerald-700{% elif chamado.status == 'Em Atendimento' %}bg-amber-100 text-amber-700{% else %}bg-blue-100 text-blue-700{% endif %}">
+                            <span class="w-1.5 h-1.5 rounded-full mr-1.5 {% if chamado.status == 'Concluído' %}bg-emerald-500{% elif chamado.status == 'Em Atendimento' %}bg-amber-500{% else %}bg-blue-500{% endif %}"></span>
+                            {{ translate_status(chamado.status) }}
                         </span>
                     </td>
 
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                    <td class="px-5 py-4 whitespace-nowrap text-xs text-gray-400 font-medium">
                         {{ chamado.data_abertura_formatada() }}
                     </td>
 
-                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                    <td class="px-5 py-4 whitespace-nowrap text-sm font-medium flex justify-center">
                         <button onclick="abrirDetalhes(this)"
                             data-id="{{ chamado.id }}"
                             data-numero="{{ chamado.numero_chamado }}"
@@ -153,7 +180,7 @@
                             data-data-conclusao="{{ chamado.data_conclusao_formatada() }}"
                             data-rl="{{ chamado.rl_codigo or '' }}"
                             data-anexo="{{ chamado.anexo or '' }}"
-                            class="text-blue-600 hover:text-blue-900 transition">
+                            class="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors" title="{{ t('view_details') }}">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
@@ -167,55 +194,43 @@
 
         <!-- Paginação -->
         {% if total_paginas > 1 %}
-        <div class="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
-            <div class="flex-1 flex justify-between sm:hidden">
-                {% if pagina_atual > 1 %}
-                <a href="{{ url_for('main.meus_chamados', pagina=pagina_atual-1, status=status_filtro) }}" class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
-                    {{ t('previous') }}
-                </a>
-                {% endif %}
-                {% if pagina_atual < total_paginas %}
-                <a href="{{ url_for('main.meus_chamados', pagina=pagina_atual+1, status=status_filtro) }}" class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
-                    {{ t('next') }}
-                </a>
-                {% endif %}
+        <div class="flex flex-col md:flex-row justify-between items-center bg-gray-50/50 p-4 rounded-b-2xl border-t border-gray-100 gap-4">
+            <div class="text-sm text-gray-500 font-medium">
+                {{ t('showing') }} <span class="font-bold text-gray-800">{{ (pagina_atual - 1) * itens_por_pagina + 1 }}</span> {{ t('to') }} <span class="font-bold text-gray-800">{{ [pagina_atual * itens_por_pagina, total_chamados]|min }}</span> {{ t('of') }} <span class="font-bold text-gray-800">{{ total_chamados }}</span>
             </div>
-            <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-                <div>
-                    <p class="text-sm text-gray-700">
-                        {{ t('showing') }} <span class="font-medium">{{ (pagina_atual - 1) * itens_por_pagina + 1 }}</span> {{ t('to') }} <span class="font-medium">{{ [pagina_atual * itens_por_pagina, total_chamados]|min }}</span> {{ t('of') }} <span class="font-medium">{{ total_chamados }}</span>
-                    </p>
-                </div>
-                <div>
-                    <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
-                        {% if pagina_atual > 1 %}
-                        <a href="{{ url_for('main.meus_chamados', pagina=1, status=status_filtro) }}" class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
-                            {{ t('first') }}
-                        </a>
-                        <a href="{{ url_for('main.meus_chamados', pagina=pagina_atual-1, status=status_filtro) }}" class="relative inline-flex items-center px-2 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
-                            ‹
+            
+            <div class="flex items-center gap-1 bg-white border border-gray-200 rounded-xl p-1 shadow-sm">
+                {% if pagina_atual > 1 %}
+                <a href="{{ url_for('main.meus_chamados', pagina=1, status=status_filtro) }}" class="w-8 h-8 flex items-center justify-center rounded-lg text-sm font-medium text-gray-500 hover:bg-gray-50 hover:text-gray-900 transition-colors" title="{{ t('first') }}">
+                    «
+                </a>
+                <a href="{{ url_for('main.meus_chamados', pagina=pagina_atual-1, status=status_filtro) }}" class="w-8 h-8 flex items-center justify-center rounded-lg text-sm font-medium text-gray-500 hover:bg-gray-50 hover:text-gray-900 transition-colors" title="{{ t('previous') }}">
+                    ‹
+                </a>
+                {% endif %}
+
+                {% for p in range(1, total_paginas + 1) %}
+                    {% if (p >= pagina_atual - 1) and (p <= pagina_atual + 1) %}
+                        {% if p == pagina_atual %}
+                        <button disabled class="w-8 h-8 flex items-center justify-center rounded-lg text-sm font-bold text-white bg-indigo-600 shadow-sm">
+                            {{ p }}
+                        </button>
+                        {% else %}
+                        <a href="{{ url_for('main.meus_chamados', pagina=p, status=status_filtro) }}" class="w-8 h-8 flex items-center justify-center rounded-lg text-sm font-medium text-gray-500 hover:bg-gray-50 hover:text-gray-900 transition-colors">
+                            {{ p }}
                         </a>
                         {% endif %}
+                    {% endif %}
+                {% endfor %}
 
-                        {% for p in range(1, total_paginas + 1) %}
-                            {% if (p >= pagina_atual - 1) and (p <= pagina_atual + 1) %}
-                            <a href="{{ url_for('main.meus_chamados', pagina=p, status=status_filtro) }}" 
-                               class="relative inline-flex items-center px-3 py-2 border {% if p == pagina_atual %}z-10 bg-blue-50 border-blue-500 text-blue-600{% else %}border-gray-300 bg-white text-gray-500 hover:bg-gray-50{% endif %} text-sm font-medium">
-                                {{ p }}
-                            </a>
-                            {% endif %}
-                        {% endfor %}
-
-                        {% if pagina_atual < total_paginas %}
-                        <a href="{{ url_for('main.meus_chamados', pagina=pagina_atual+1, status=status_filtro) }}" class="relative inline-flex items-center px-2 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
-                            ›
-                        </a>
-                        <a href="{{ url_for('main.meus_chamados', pagina=total_paginas, status=status_filtro) }}" class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
-                            {{ t('last') }}
-                        </a>
-                        {% endif %}
-                    </nav>
-                </div>
+                {% if pagina_atual < total_paginas %}
+                <a href="{{ url_for('main.meus_chamados', pagina=pagina_atual+1, status=status_filtro) }}" class="w-8 h-8 flex items-center justify-center rounded-lg text-sm font-medium text-gray-500 hover:bg-gray-50 hover:text-gray-900 transition-colors" title="{{ t('next') }}">
+                    ›
+                </a>
+                <a href="{{ url_for('main.meus_chamados', pagina=total_paginas, status=status_filtro) }}" class="w-8 h-8 flex items-center justify-center rounded-lg text-sm font-medium text-gray-500 hover:bg-gray-50 hover:text-gray-900 transition-colors" title="{{ t('last') }}">
+                    »
+                </a>
+                {% endif %}
             </div>
         </div>
         {% endif %}
@@ -250,7 +265,7 @@
 
 <!-- Modal de Detalhes do Chamado -->
 <div id="modal-detalhes" class="hidden fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50 p-4">
-    <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-96 overflow-y-auto">
+    <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[80vh] overflow-y-auto">
         <div class="sticky top-0 bg-gradient-to-r from-blue-600 to-blue-800 px-6 py-4 flex items-center justify-between">
             <h3 class="text-xl font-bold text-white" id="modal-titulo">{{ t('viewing_chamado') }}</h3>
             <button onclick="fecharDetalhes()" class="text-white hover:bg-blue-700 p-1 rounded transition">
@@ -309,7 +324,7 @@
 
             {% if current_user.is_authenticated %}
             <div class="bg-blue-50 border border-blue-200 rounded p-3 text-center">
-                <p class="text-xs text-blue-700 font-medium">{{ t('problem_description') }}<br>
+                <p class="text-xs text-blue-700 font-medium">{{ t('responsible_for_ticket') }}<br>
                 <span class="text-blue-600 font-semibold" id="modal-responsavel-contato">—</span></p>
             </div>
             {% endif %}
@@ -324,14 +339,27 @@
 </div>
 
 <script>
+const categoryTranslations = {
+    'Nao Aplicavel': '{{ t("not_applicable") }}',
+    'Projetos': '{{ t("projects") }}'
+};
+
+const statusTranslations = {
+    'Aberto': '{{ t("option_open") }}',
+    'Em Atendimento': '{{ t("option_in_progress") }}',
+    'Concluído': '{{ t("option_completed") }}'
+};
+
 function abrirDetalhes(btn) {
     const modal = document.getElementById('modal-detalhes');
     document.getElementById('modal-titulo').textContent = 'Chamado #' + btn.dataset.numero;
-    document.getElementById('modal-categoria').textContent = btn.dataset.categoria;
+    const catRaw = btn.dataset.categoria;
+    document.getElementById('modal-categoria').textContent = categoryTranslations[catRaw] || catRaw;
     document.getElementById('modal-tipo').textContent = btn.dataset.tipo || '—';
     document.getElementById('modal-descricao').textContent = btn.dataset.descricao;
     document.getElementById('modal-responsavel').textContent = btn.dataset.responsavel || '—';
-    document.getElementById('modal-status').textContent = btn.dataset.status;
+    const statusRaw = btn.dataset.status;
+    document.getElementById('modal-status').textContent = statusTranslations[statusRaw] || statusRaw;
     document.getElementById('modal-responsavel-contato').textContent = btn.dataset.responsavel || 'Não atribuído';
     document.getElementById('modal-data-abertura').textContent = btn.dataset.dataAbertura;
     document.getElementById('modal-data-conclusao').textContent = btn.dataset.dataConclusao || '—';
@@ -350,13 +378,13 @@ function abrirDetalhes(btn) {
     
     // Colorir status
     const statusEl = document.getElementById('modal-status');
-    statusEl.className = 'text-sm font-semibold px-2 py-1 rounded-full inline-block ';
+    statusEl.className = 'text-sm font-bold px-3 py-1 rounded-full inline-block ';
     if (btn.dataset.status === 'Concluído') {
         statusEl.className += 'bg-green-100 text-green-800';
     } else if (btn.dataset.status === 'Em Atendimento') {
         statusEl.className += 'bg-yellow-100 text-yellow-800';
     } else {
-        statusEl.className += 'bg-gray-100 text-gray-800';
+        statusEl.className += 'bg-blue-100 text-blue-800';
     }
     
     modal.classList.remove('hidden');

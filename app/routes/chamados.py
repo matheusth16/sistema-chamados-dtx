@@ -17,6 +17,7 @@ from app.services.assignment import atribuidor
 from app.services.notifications import notificar_aprovador_novo_chamado, notificar_solicitante_status
 from app.services.notifications_inapp import criar_notificacao
 from app.services.webpush_service import enviar_webpush_usuario
+from app.firebase_retry import execute_with_retry
 
 logger = logging.getLogger(__name__)
 
@@ -29,10 +30,25 @@ def index() -> Response:
     if request.method != 'POST':
         setores = CategoriaSetor.get_all()
         impactos = CategoriaImpacto.get_all()
+
+        # Contagem de chamados do solicitante para o mini resumo
+        status_counts = {'Aberto': 0, 'Em Atendimento': 0, 'Concluído': 0}
+        try:
+            docs = db.collection('chamados').where(
+                'solicitante_id', '==', current_user.id
+            ).stream()
+            for doc in docs:
+                st = doc.to_dict().get('status', 'Aberto')
+                if st in status_counts:
+                    status_counts[st] += 1
+        except Exception as e:
+            logger.warning(f"Erro ao contar chamados do solicitante: {e}")
+
         return render_template(
             'formulario.html',
             setores=setores,
             impactos=impactos,
+            status_counts=status_counts,
         )
 
     lista_erros = validar_novo_chamado(request.form, request.files.get('anexo'))
@@ -89,9 +105,8 @@ def index() -> Response:
             motivo_atribuicao = f"Aguardando atribuição manual: {resultado_atribuicao['motivo']}"
             flash(f"⚠️ {resultado_atribuicao['motivo']}", 'warning')
 
-    # Usa area do responsavel para o chamado (supervisores do mesmo setor conseguem visualizar)
-    responsavel_usuario = Usuario.get_by_id(responsavel_id) if responsavel_id else None
-    area_chamado = responsavel_usuario.area if responsavel_usuario and responsavel_usuario.area else area_solicitante
+    # Área do chamado: setor solicitado (tipo) ou área do solicitante (uma única string)
+    area_chamado = tipo or (area_solicitante if area_solicitante else 'Geral')
 
     try:
         # ✅ Gera o número APENAS aqui, pouco antes de salvar, garantindo que se algo falhar antes, o número não é consumido
@@ -115,7 +130,12 @@ def index() -> Response:
             status='Aberto'
         )
 
-        doc_ref = db.collection('chamados').add(novo_chamado.to_dict())
+        # Adiciona novo chamado com retry automático em caso de falha de conexão
+        doc_ref = execute_with_retry(
+            db.collection('chamados').add,
+            novo_chamado.to_dict(),
+            max_retries=3
+        )
         chamado_id = doc_ref[1].id
         Historico(chamado_id=chamado_id, usuario_id=solicitante_id, usuario_nome=solicitante_nome, acao='criacao').save()
 

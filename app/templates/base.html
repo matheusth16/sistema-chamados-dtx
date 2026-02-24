@@ -1,57 +1,109 @@
 <!DOCTYPE html>
 <html lang="pt-br">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() if csrf_token() else '' }}">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
     <title>Sistema de Chamados - DTX Aerospace</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js?t=1" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js?t=1"
+        crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollToPlugin.min.js?t=1"
+        crossorigin="anonymous"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Inter', sans-serif; }
+        body {
+            font-family: 'Inter', sans-serif;
+        }
     </style>
 </head>
-<body class="bg-gray-50 text-gray-800">
 
-    <nav class="bg-blue-900 text-white shadow-lg">
+<body class="bg-gray-50 text-gray-800" data-debug="{% if config.DEBUG %}true{% endif %}">
+    <script>
+        // Define flag de debug para JS: apenas em desenvolvimento (evita console.log em produção)
+        window.DTX_DEBUG = document.body.getAttribute('data-debug') === 'true';
+    </script>
+
+    <nav class="bg-blue-900 text-white shadow-lg sticky top-0 z-[200]">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex items-center justify-between h-16">
                 <div class="flex items-center">
                     <div class="flex-shrink-0">
-                        <span class="font-bold text-xl tracking-tight">DTX <span class="text-blue-300">Internal</span></span>
+                        <span class="font-bold text-xl tracking-tight">DTX <span
+                                class="text-blue-300">Internal</span></span>
                     </div>
                     <div class="hidden md:block">
                         <div class="ml-10 flex items-baseline space-x-4">
                             {% if current_user.is_authenticated %}
-                                <!-- Abas para Solicitantes -->
-                                {% if current_user.perfil == 'solicitante' %}
-                                <a href="/" class="hover:bg-blue-700 px-3 py-2 rounded-md text-sm font-medium transition">
-                                    <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-                                    </svg>
-                                    Novo Chamado
-                                </a>
-                                <a href="/meus-chamados" class="hover:bg-blue-700 px-3 py-2 rounded-md text-sm font-medium transition">
-                                    <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
-                                    </svg>
-                                    Meus Chamados
-                                </a>
-                                {% endif %}
-                                
-                                <!-- Aba "Gestão (Admin)" (visível apenas para supervisores e admins) -->
-                                {% if current_user.perfil in ['supervisor', 'admin'] %}
-                                <a href="/admin" class="hover:bg-blue-700 px-3 py-2 rounded-md text-sm font-medium transition">Gestão{% if current_user.perfil == 'admin' %} (Admin){% endif %}</a>
-                                {% endif %}
-                                
-                                <!-- Link para Administração de Categorias (apenas admin) -->
-                                {% if current_user.perfil == 'admin' %}
-                                <a href="{{ url_for('main.admin_categorias') }}" class="hover:bg-blue-700 px-3 py-2 rounded-md text-sm font-medium transition">
-                                    ⚙️ Categorias
-                                </a>
-                                {% endif %}
+                            <!-- Abas para Solicitantes -->
+                            {% if current_user.perfil == 'solicitante' %}
+                            <a href="/" class="hover:bg-blue-700 px-3 py-2 rounded-md text-sm font-medium transition">
+                                <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M12 4v16m8-8H4" />
+                                </svg>
+                                Novo Chamado
+                            </a>
+                            <a href="/meus-chamados"
+                                class="hover:bg-blue-700 px-3 py-2 rounded-md text-sm font-medium transition">
+                                <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                                </svg>
+                                Meus Chamados
+                            </a>
+                            {% endif %}
+
+                            <!-- Aba "Gestão (Admin)" (visível apenas para supervisores e admins) -->
+                            {% if current_user.perfil in ['supervisor', 'admin'] %}
+                            <a href="/admin"
+                                class="hover:bg-blue-700 px-3 py-2 rounded-md text-sm font-medium transition flex items-center">
+                                <svg class="w-4 h-4 mr-1.5 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                                </svg>
+                                Gestão
+                            </a>
+                            
+                            <a href="{{ url_for('main.relatorios') }}"
+                                class="hover:bg-blue-700 px-3 py-2 rounded-md text-sm font-medium transition flex items-center">
+                                <svg class="w-4 h-4 mr-1.5 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                                </svg>
+                                Meus Relatórios
+                            </a>
+                            {% endif %}
+
+                            <!-- Link para Administração de Categorias (apenas admin) -->
+                            {% if current_user.perfil == 'admin' %}
+                            <a href="{{ url_for('main.admin_categorias') }}"
+                                class="hover:bg-blue-700 px-3 py-2 rounded-md text-sm font-medium transition flex items-center">
+                                <svg class="w-4 h-4 mr-1.5 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                                </svg>
+                                Categorias
+                            </a>
+                            <a href="{{ url_for('main.gerenciar_usuarios') }}"
+                                class="hover:bg-blue-700 px-3 py-2 rounded-md text-sm font-medium transition flex items-center">
+                                <svg class="w-4 h-4 mr-1.5 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                                </svg>
+                                Usuários
+                            </a>
+                            <a href="{{ url_for('main.admin_traducoes') }}"
+                                class="hover:bg-blue-700 px-3 py-2 rounded-md text-sm font-medium transition flex items-center">
+                                <svg class="w-4 h-4 mr-1.5 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 15h2.498" />
+                                </svg>
+                                Traduções
+                            </a>
+                            {% endif %}
                             {% else %}
-                                <!-- Sem autenticação: sem abas -->
+                            <!-- Sem autenticação: sem abas -->
                             {% endif %}
                         </div>
                     </div>
@@ -60,35 +112,62 @@
                     <!-- Sino de notificações (apenas supervisor/admin) -->
                     {% if current_user.is_authenticated and current_user.perfil in ['supervisor', 'admin'] %}
                     <div class="relative group" id="nav-notificacoes">
-                        <button type="button" id="btn-sino" class="relative p-2 rounded-md hover:bg-blue-700 transition" aria-label="Notificações">
+                        <button type="button" id="btn-sino" class="relative p-2 rounded-md hover:bg-blue-700 transition"
+                            aria-label="Notificações">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
                             </svg>
-                            <span id="sino-badge" class="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 flex items-center justify-center text-xs font-bold bg-red-500 text-white rounded-full hidden">0</span>
+                            <span id="sino-badge"
+                                class="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 flex items-center justify-center text-xs font-bold bg-red-500 text-white rounded-full hidden">0</span>
                         </button>
-                        <div id="sino-dropdown" class="absolute right-0 mt-2 w-80 max-h-96 overflow-auto bg-white text-gray-800 rounded-lg shadow-xl border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-                            <div class="p-2 border-b border-gray-100 font-semibold text-sm text-gray-700">Notificações</div>
+                        <div id="sino-dropdown"
+                            class="absolute right-0 mt-2 w-80 max-h-96 overflow-auto bg-white text-gray-800 rounded-lg shadow-xl border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                            <div class="p-2 border-b border-gray-100 font-semibold text-sm text-gray-700">Notificações
+                            </div>
                             <div id="sino-lista" class="divide-y divide-gray-100">
                                 <div class="p-3 text-sm text-gray-500 text-center">Carregando...</div>
                             </div>
                             <div class="p-2 border-t border-gray-100 text-center">
-                                <a href="{{ url_for('main.admin') }}" class="text-sm text-blue-600 hover:underline">Ver painel</a>
+                                <a href="{{ url_for('main.admin') }}" class="text-sm text-blue-600 hover:underline">Ver
+                                    painel</a>
                             </div>
                         </div>
                     </div>
                     {% endif %}
-                    <!-- Seletor de Idioma -->
+                    <!-- Seletor de Idioma Minimalista -->
                     <div class="relative group">
-                        <button class="flex items-center space-x-1 hover:bg-blue-700 px-3 py-2 rounded-md text-sm font-medium transition">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 00.948-.684l1.498-4.493a1 1 0 011.502-.684l1.498 4.493a1 1 0 00.948.684H19a2 2 0 012 2v2M3 5a2 2 0 002 2h3.28a1 1 0 00.948.684l1.498 4.493a1 1 0 001.502.684l1.498-4.493a1 1 0 00.948-.684H19a2 2 0 002-2v2" />
+                        <button
+                            class="flex items-center space-x-1.5 px-3 py-2 rounded-lg text-sm font-semibold text-blue-100 hover:text-white hover:bg-white/10 transition-colors">
+                            <svg class="w-4 h-4 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
-                            <span>{{ current_language[:5] }}</span>
+                            <span class="tracking-wide uppercase">
+                                {% if current_language == 'en' %}EN
+                                {% elif current_language == 'es' %}ES
+                                {% else %}PT{% endif %}
+                            </span>
+                            <svg class="w-3.5 h-3.5 opacity-50 ml-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7" />
+                            </svg>
                         </button>
-                        <div class="absolute right-0 mt-2 w-48 bg-white text-gray-800 rounded-md shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-                            <a href="?lang=pt_BR" class="block px-4 py-2 hover:bg-blue-50{% if current_language == 'pt_BR' %} bg-blue-100 font-semibold{% endif %}">🇧🇷 Português (Brasil)</a>
-                            <a href="?lang=en" class="block px-4 py-2 hover:bg-blue-50{% if current_language == 'en' %} bg-blue-100 font-semibold{% endif %}">🇺🇸 English</a>
-                            <a href="?lang=es" class="block px-4 py-2 hover:bg-blue-50{% if current_language == 'es' %} bg-blue-100 font-semibold{% endif %}">🇪🇸 Español</a>
+                        
+                        <!-- Dropdown Menu -->
+                        <div class="absolute right-0 mt-2 w-40 bg-white text-gray-700 rounded-xl shadow-xl shadow-blue-900/10 border border-gray-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 transform origin-top-right group-hover:scale-100 scale-95">
+                            <div class="p-1.5 space-y-0.5">
+                                <a href="?lang=pt_BR" class="flex items-center justify-between px-3 py-2 text-sm rounded-lg hover:bg-gray-50 transition-colors {% if current_language == 'pt_BR' %}bg-blue-50 text-blue-700 font-bold{% else %}font-medium{% endif %}">
+                                    <span>Português</span>
+                                    <span class="text-[10px] font-bold px-1.5 py-0.5 rounded {% if current_language == 'pt_BR' %}bg-blue-200 text-blue-800{% else %}bg-gray-100 text-gray-500{% endif %} uppercase tracking-wider">PT</span>
+                                </a>
+                                <a href="?lang=en" class="flex items-center justify-between px-3 py-2 text-sm rounded-lg hover:bg-gray-50 transition-colors {% if current_language == 'en' %}bg-blue-50 text-blue-700 font-bold{% else %}font-medium{% endif %}">
+                                    <span>English</span>
+                                    <span class="text-[10px] font-bold px-1.5 py-0.5 rounded {% if current_language == 'en' %}bg-blue-200 text-blue-800{% else %}bg-gray-100 text-gray-500{% endif %} uppercase tracking-wider">EN</span>
+                                </a>
+                                <a href="?lang=es" class="flex items-center justify-between px-3 py-2 text-sm rounded-lg hover:bg-gray-50 transition-colors {% if current_language == 'es' %}bg-blue-50 text-blue-700 font-bold{% else %}font-medium{% endif %}">
+                                    <span>Español</span>
+                                    <span class="text-[10px] font-bold px-1.5 py-0.5 rounded {% if current_language == 'es' %}bg-blue-200 text-blue-800{% else %}bg-gray-100 text-gray-500{% endif %} uppercase tracking-wider">ES</span>
+                                </a>
+                            </div>
                         </div>
                     </div>
 
@@ -96,7 +175,8 @@
                     <div class="flex items-center">
                         <span class="text-xs text-blue-200">
                             👤 {{ current_user.nome }}
-                            {% if current_user.area %}<br><span class="text-xs text-blue-300">{{ current_user.area }}</span>{% endif %}
+                            {% if current_user.area %}<br><span class="text-xs text-blue-300">{{ current_user.area
+                                }}</span>{% endif %}
                         </span>
                     </div>
                     {% endif %}
@@ -107,22 +187,23 @@
 
     <main class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-            <div id="flash-messages" class="space-y-2 mb-6">
-                {% for category, message in messages %}
-                <div class="px-4 py-3 rounded-md border text-sm font-medium
+        {% if messages %}
+        <div id="flash-messages" class="space-y-2 mb-6">
+            {% for category, message in messages %}
+            <div
+                class="px-4 py-3 rounded-md border text-sm font-medium
                     {% if category == 'danger' %}bg-red-50 text-red-800 border-red-200{% elif category == 'success' %}bg-green-50 text-green-800 border-green-200{% elif category == 'info' %}bg-blue-50 text-blue-800 border-blue-200{% else %}bg-gray-50 text-gray-800 border-gray-200{% endif %}">
-                    {{ message }}
-                </div>
-                {% endfor %}
+                {{ message }}
             </div>
-            <script>
-                setTimeout(function () {
-                    var el = document.getElementById('flash-messages');
-                    if (el) { el.remove(); }
-                }, 5000);
-            </script>
-            {% endif %}
+            {% endfor %}
+        </div>
+        <script>
+            setTimeout(function () {
+                var el = document.getElementById('flash-messages');
+                if (el) { el.remove(); }
+            }, 5000);
+        </script>
+        {% endif %}
         {% endwith %}
         {% block content %}{% endblock %}
     </main>
@@ -135,96 +216,103 @@
         </div>
     </footer>
 
+    <!-- GSAP Motion: animações de entrada (conteúdo, flash, elementos com .gsap-animate) -->
+    <script src="{{ url_for('static', filename='js/gsap-motion.js') }}"></script>
+
     {% if current_user.is_authenticated and current_user.perfil in ['supervisor', 'admin'] %}
     <script>
-    (function() {
-        var btn = document.getElementById('btn-sino');
-        var badge = document.getElementById('sino-badge');
-        var lista = document.getElementById('sino-lista');
-        if (!btn || !lista) return;
-        function carregarNotificacoes() {
-            fetch('{{ url_for("main.api_notificacoes_listar") }}', { credentials: 'same-origin' })
-                .then(function(r) { return r.json(); })
-                .then(function(data) {
-                    if (data.total_nao_lidas !== undefined) {
-                        if (badge) {
-                            badge.textContent = data.total_nao_lidas > 99 ? '99+' : data.total_nao_lidas;
-                            badge.classList.toggle('hidden', data.total_nao_lidas === 0);
-                        }
-                    }
-                    var notifs = data.notificacoes || [];
-                    if (notifs.length === 0) {
-                        lista.innerHTML = '<div class="p-3 text-sm text-gray-500 text-center">Nenhuma notificação</div>';
-                        return;
-                    }
-                    lista.innerHTML = notifs.map(function(n) {
-                        var urlChamado = '/chamado/' + (n.chamado_id || '') + '/historico';
-                        var lidaClass = n.lida ? 'bg-gray-50' : 'bg-blue-50';
-                        return '<a href="' + urlChamado + '" class="block p-3 text-left hover:bg-gray-100 ' + lidaClass + ' notif-item" data-id="' + (n.id || '') + '">' +
-                            '<div class="font-semibold text-gray-800 text-sm">' + (n.titulo || '') + '</div>' +
-                            '<div class="text-xs text-gray-600 mt-0.5">' + (n.mensagem || '') + '</div>' +
-                            '</a>';
-                    }).join('');
-                    lista.querySelectorAll('.notif-item').forEach(function(el) {
-                        el.addEventListener('click', function(e) {
-                            var id = el.getAttribute('data-id');
-                            if (id) {
-                                fetch('{{ url_for("main.api_notificacoes_marcar_lida", notificacao_id="__ID__") }}'.replace('__ID__', id), {
-                                    method: 'POST',
-                                    credentials: 'same-origin',
-                                    headers: { 'X-CSRFToken': document.querySelector('meta[name="csrf-token"]') && document.querySelector('meta[name="csrf-token"]').content || '', 'Content-Type': 'application/json' }
-                                }).then(function() {});
+        (function () {
+            var btn = document.getElementById('btn-sino');
+            var badge = document.getElementById('sino-badge');
+            var lista = document.getElementById('sino-lista');
+            if (!btn || !lista) return;
+            function carregarNotificacoes() {
+                fetch('{{ url_for("main.api_notificacoes_listar") }}', { credentials: 'same-origin' })
+                    .then(function (r) { return r.json(); })
+                    .then(function (data) {
+                        if (data.total_nao_lidas !== undefined) {
+                            if (badge) {
+                                badge.textContent = data.total_nao_lidas > 99 ? '99+' : data.total_nao_lidas;
+                                badge.classList.toggle('hidden', data.total_nao_lidas === 0);
                             }
+                        }
+                        var notifs = data.notificacoes || [];
+                        if (notifs.length === 0) {
+                            lista.innerHTML = '<div class="p-3 text-sm text-gray-500 text-center">Nenhuma notificação</div>';
+                            return;
+                        }
+                        lista.innerHTML = notifs.map(function (n) {
+                            var urlChamado = '/chamado/' + (n.chamado_id || '') + '/historico';
+                            var lidaClass = n.lida ? 'bg-gray-50' : 'bg-blue-50';
+                            return '<a href="' + urlChamado + '" class="block p-3 text-left hover:bg-gray-100 ' + lidaClass + ' notif-item" data-id="' + (n.id || '') + '">' +
+                                '<div class="font-semibold text-gray-800 text-sm">' + (n.titulo || '') + '</div>' +
+                                '<div class="text-xs text-gray-600 mt-0.5">' + (n.mensagem || '') + '</div>' +
+                                '</a>';
+                        }).join('');
+                        lista.querySelectorAll('.notif-item').forEach(function (el) {
+                            el.addEventListener('click', function (e) {
+                                var id = el.getAttribute('data-id');
+                                if (id) {
+                                    fetch('{{ url_for("main.api_notificacoes_marcar_lida", notificacao_id="__ID__") }}'.replace('__ID__', id), {
+                                        method: 'POST',
+                                        credentials: 'same-origin',
+                                        headers: { 'X-CSRFToken': document.querySelector('meta[name="csrf-token"]') && document.querySelector('meta[name="csrf-token"]').content || '', 'Content-Type': 'application/json' }
+                                    }).then(function () { });
+                                }
+                            });
                         });
+                    })
+                    .catch(function () {
+                        lista.innerHTML = '<div class="p-3 text-sm text-gray-500 text-center">Erro ao carregar</div>';
                     });
-                })
-                .catch(function() {
-                    lista.innerHTML = '<div class="p-3 text-sm text-gray-500 text-center">Erro ao carregar</div>';
-                });
-        }
-        carregarNotificacoes();
-        btn.addEventListener('click', function() { carregarNotificacoes(); });
-    })();
+            }
+            carregarNotificacoes();
+            btn.addEventListener('click', function () { carregarNotificacoes(); });
+        })();
     </script>
     <!-- Web Push: registrar SW e inscrever (apenas supervisor/admin) -->
     <script>
-    (function() {
-        if (!('Notification' in window) || !('serviceWorker' in navigator)) return;
-        var vapidPublicKey = null;
-        function urlBase() { return window.location.origin; }
-        function csrfHeader() {
-            var m = document.querySelector('meta[name="csrf-token"]');
-            return m && m.content ? { 'X-CSRFToken': m.content } : {};
-        }
-        navigator.serviceWorker.register('{{ url_for("main.service_worker_js") }}').then(function(reg) {
-            return fetch('{{ url_for("main.api_push_vapid_public") }}', { credentials: 'same-origin' });
-        }).then(function(r) { return r.json(); }).then(function(data) {
-            vapidPublicKey = data.vapid_public_key;
-            if (!vapidPublicKey) return;
-            return Notification.requestPermission();
-        }).then(function(permission) {
-            if (permission !== 'granted' || !vapidPublicKey) return;
-            return navigator.serviceWorker.ready;
-        }).then(function(reg) {
-            if (!reg || !vapidPublicKey) return;
-            return reg.pushManager.subscribe({
-                userVisibleOnly: true,
-                applicationServerKey: vapidPublicKey
-            });
-        }).then(function(sub) {
-            if (!sub) return;
-            var subJson = sub.toJSON ? sub.toJSON() : { endpoint: sub.endpoint, keys: sub.getKey && { p256dh: sub.getKey('p256dh'), auth: sub.getKey('auth') } };
-            if (!subJson || !subJson.endpoint) return;
-            return fetch('{{ url_for("main.api_push_subscribe") }}', {
-                method: 'POST',
-                credentials: 'same-origin',
-                headers: Object.assign({ 'Content-Type': 'application/json' }, csrfHeader()),
-                body: JSON.stringify({ subscription: subJson })
-            });
-        }).catch(function() {});
-    })();
+        (function () {
+            if (!('Notification' in window) || !('serviceWorker' in navigator)) return;
+            var vapidPublicKey = null;
+            function urlBase() { return window.location.origin; }
+            function csrfHeader() {
+                var m = document.querySelector('meta[name="csrf-token"]');
+                return m && m.content ? { 'X-CSRFToken': m.content } : {};
+            }
+            navigator.serviceWorker.register('{{ url_for("main.service_worker_js") }}').then(function (reg) {
+                return fetch('{{ url_for("main.api_push_vapid_public") }}', { credentials: 'same-origin' });
+            }).then(function (r) { return r.json(); }).then(function (data) {
+                vapidPublicKey = data.vapid_public_key;
+                if (!vapidPublicKey) return;
+                return Notification.requestPermission();
+            }).then(function (permission) {
+                if (permission !== 'granted' || !vapidPublicKey) return;
+                return navigator.serviceWorker.ready;
+            }).then(function (reg) {
+                if (!reg || !vapidPublicKey) return;
+                return reg.pushManager.subscribe({
+                    userVisibleOnly: true,
+                    applicationServerKey: vapidPublicKey
+                });
+            }).then(function (sub) {
+                if (!sub) return;
+                var subJson = sub.toJSON ? sub.toJSON() : { endpoint: sub.endpoint, keys: sub.getKey && { p256dh: sub.getKey('p256dh'), auth: sub.getKey('auth') } };
+                if (!subJson || !subJson.endpoint) return;
+                return fetch('{{ url_for("main.api_push_subscribe") }}', {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: Object.assign({ 'Content-Type': 'application/json' }, csrfHeader()),
+                    body: JSON.stringify({ subscription: subJson })
+                });
+            }).catch(function () { });
+        })();
     </script>
     {% endif %}
 
+    <!-- Bloco para scripts adicionais de páginas específicas -->
+    {% block page_scripts %}{% endblock %}
+
 </body>
+
 </html>

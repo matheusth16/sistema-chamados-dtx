@@ -54,7 +54,7 @@ pip install -r requirements.txt
 
 ### 5. Configure variáveis de ambiente
 
-Copie o exemplo e preencha (veja **ENV.md** para a lista completa):
+Copie o exemplo e preencha (veja **docs/ENV.md** para a lista completa):
 
 ```bash
 cp .env.example .env
@@ -62,7 +62,7 @@ cp .env.example .env
 # Em produção: defina FLASK_ENV=production e use SECRET_KEY forte (ex: openssl rand -hex 32)
 ```
 
-Documentação das variáveis: **[ENV.md](ENV.md)**
+Documentação das variáveis: **[docs/ENV.md](docs/ENV.md)**
 
 ### 6. Inicie a aplicação
 

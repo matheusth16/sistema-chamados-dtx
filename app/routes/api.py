@@ -15,6 +15,10 @@ from app.services.notifications import notificar_solicitante_status
 from app.services.notifications_inapp import listar_para_usuario, contar_nao_lidas, marcar_como_lida
 from app.services.webpush_service import salvar_inscricao
 from app.services.assignment import atribuidor
+from app.services.upload import salvar_anexo
+from app.services.status_service import atualizar_status_chamado
+from app.services.permissions import usuario_pode_ver_chamado
+from app.firebase_retry import execute_with_retry
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +35,7 @@ def health():
 @main.route('/api/atualizar-status', methods=['POST'])
 @login_required
 def atualizar_status_ajax():
-    """Atualiza status do chamado via JSON. Isento de CSRF para fetch."""
+    """Atualiza status do chamado via JSON. Requer CSRF; o frontend deve enviar o token no header X-CSRFToken (ex.: valor da meta tag csrf-token)."""
     try:
         dados = request.get_json()
         if not dados:
@@ -45,45 +49,142 @@ def atualizar_status_ajax():
         if novo_status not in ['Aberto', 'Em Atendimento', 'Concluído']:
             return jsonify({'sucesso': False, 'erro': f'Status inválido "{novo_status}"'}), 400
 
-        doc_anterior = db.collection('chamados').document(chamado_id).get()
-        if not doc_anterior.exists:
-            return jsonify({'sucesso': False, 'erro': 'Chamado não encontrado'}), 404
-        status_anterior = doc_anterior.to_dict().get('status')
-        update_data = {'status': novo_status}
-        if novo_status == 'Concluído':
-            update_data['data_conclusao'] = firestore.SERVER_TIMESTAMP
-        db.collection('chamados').document(chamado_id).update(update_data)
-
-        if status_anterior != novo_status:
-            Historico(
-                chamado_id=chamado_id,
-                usuario_id=current_user.id,
-                usuario_nome=current_user.nome,
-                acao='alteracao_status',
-                campo_alterado='status',
-                valor_anterior=status_anterior,
-                valor_novo=novo_status
-            ).save()
-            if novo_status in ('Em Atendimento', 'Concluído'):
-                try:
-                    data_anterior = doc_anterior.to_dict()
-                    sid = data_anterior.get('solicitante_id')
-                    sup = Usuario.get_by_id(sid) if sid else None
-                    notificar_solicitante_status(
-                        chamado_id=chamado_id,
-                        numero_chamado=data_anterior.get('numero_chamado') or 'N/A',
-                        novo_status=novo_status,
-                        categoria=data_anterior.get('categoria') or 'Chamado',
-                        solicitante_usuario=sup,
-                    )
-                except Exception as e:
-                    logger.warning(f"Notificação ao solicitante não enviada: {e}")
-
-        return jsonify({'sucesso': True, 'mensagem': f'Status alterado para {novo_status}', 'novo_status': novo_status}), 200
+        resultado = atualizar_status_chamado(
+            chamado_id=chamado_id,
+            novo_status=novo_status,
+            usuario_id=current_user.id,
+            usuario_nome=current_user.nome,
+        )
+        if resultado['sucesso']:
+            return jsonify({'sucesso': True, 'mensagem': resultado['mensagem'], 'novo_status': novo_status}), 200
+        else:
+            return jsonify({'sucesso': False, 'erro': resultado.get('erro', 'Erro desconhecido')}), 404 if resultado.get('erro') == 'Chamado não encontrado' else 500
     except Exception as e:
         logger.exception("Erro em atualizar_status_ajax: %s", e)
         return jsonify({'sucesso': False, 'erro': ERRO_INTERNO_MSG}), 500
 
+
+@main.route('/api/editar-chamado', methods=['POST'])
+@login_required
+def api_editar_chamado():
+    """Edita chamado de forma completa via FormData (incluindo arquivo, status, responsavel, descricao). Apenas supervisor/admin."""
+    if current_user.perfil not in ('supervisor', 'admin'):
+        return jsonify({'sucesso': False, 'erro': 'Acesso negado'}), 403
+
+    try:
+        chamado_id = request.form.get('chamado_id')
+        novo_status = request.form.get('novo_status')
+        nova_descricao = request.form.get('nova_descricao')
+        novo_responsavel_id = request.form.get('novo_responsavel_id')
+        arquivo_anexo = request.files.get('anexo')
+
+        if not chamado_id:
+            return jsonify({'sucesso': False, 'erro': 'ID do chamado é obrigatório'}), 400
+
+        doc_chamado = db.collection('chamados').document(chamado_id).get()
+        if not doc_chamado.exists:
+            return jsonify({'sucesso': False, 'erro': 'Chamado não encontrado'}), 404
+
+        data_chamado = doc_chamado.to_dict()
+        
+        # Validar permissão da área (Supervisor só edita chamados de sua área, a menos que seja admin)
+        if current_user.perfil == 'supervisor':
+            responsavel_atual_obj = Usuario.get_by_id(data_chamado.get('responsavel_id')) if data_chamado.get('responsavel_id') else None
+            tem_area_comum = bool(set(responsavel_atual_obj.areas) & set(current_user.areas)) if responsavel_atual_obj else False
+            if not (data_chamado.get('area') in current_user.areas or data_chamado.get('responsavel_id') == current_user.id or tem_area_comum):
+                return jsonify({'sucesso': False, 'erro': 'Você só pode editar chamados da sua área'}), 403
+
+        update_data = {}
+
+        # Status (atualização via serviço centralizado — já faz o update no Firestore)
+        if novo_status and novo_status in ['Aberto', 'Em Atendimento', 'Concluído'] and novo_status != data_chamado.get('status'):
+            resultado_status = atualizar_status_chamado(
+                chamado_id=chamado_id,
+                novo_status=novo_status,
+                usuario_id=current_user.id,
+                usuario_nome=current_user.nome,
+                data_chamado=data_chamado,
+            )
+            if not resultado_status['sucesso']:
+                return jsonify({'sucesso': False, 'erro': resultado_status.get('erro', 'Erro ao atualizar status')}), 500
+
+        # Responsável (reatribuição)
+        novo_responsavel_nome = None
+        if novo_responsavel_id and novo_responsavel_id != data_chamado.get('responsavel_id'):
+            novo_resp_obj = Usuario.get_by_id(novo_responsavel_id)
+            if novo_resp_obj:
+                novo_responsavel_nome = novo_resp_obj.nome
+                update_data['responsavel_id'] = novo_responsavel_id
+                update_data['responsavel'] = novo_responsavel_nome
+                # Chamado guarda uma única área; usa a primeira do responsável se houver várias
+                update_data['area'] = (novo_resp_obj.areas[0] if getattr(novo_resp_obj, 'areas', None) else novo_resp_obj.area)
+
+                Historico(
+                    chamado_id=chamado_id,
+                    usuario_id=current_user.id,
+                    usuario_nome=current_user.nome,
+                    acao='alteracao_dados',
+                    campo_alterado='responsável',
+                    valor_anterior=data_chamado.get('responsavel'),
+                    valor_novo=novo_responsavel_nome
+                ).save()
+
+        # Descrição
+        if nova_descricao and nova_descricao.strip() != data_chamado.get('descricao', '').strip():
+            update_data['descricao'] = nova_descricao.strip()
+            Historico(
+                chamado_id=chamado_id,
+                usuario_id=current_user.id,
+                usuario_nome=current_user.nome,
+                acao='alteracao_dados',
+                campo_alterado='descrição',
+                valor_anterior='(Texto anterior)',
+                valor_novo='(Novo texto)'
+            ).save()
+
+        # Anexo (Adicionando múltiplos anexos)
+        if arquivo_anexo and arquivo_anexo.filename:
+            caminho_anexo = salvar_anexo(arquivo_anexo)
+            if caminho_anexo:
+                # Recarrega anexos existentes e adiciona o novo
+                anexos_existentes = data_chamado.get('anexos', [])
+                anexo_principal = data_chamado.get('anexo')
+                
+                # Garante que o anexo principal original também está na lista
+                if anexo_principal and anexo_principal not in anexos_existentes:
+                    anexos_existentes.insert(0, anexo_principal)
+                
+                anexos_existentes.append(caminho_anexo)
+                update_data['anexos'] = anexos_existentes
+                
+                # Se ainda não tinha anexo principal, define este como tal
+                if not anexo_principal:
+                    update_data['anexo'] = caminho_anexo
+                
+                Historico(
+                    chamado_id=chamado_id,
+                    usuario_id=current_user.id,
+                    usuario_nome=current_user.nome,
+                    acao='alteracao_dados',
+                    campo_alterado='novo anexo',
+                    valor_anterior='-',
+                    valor_novo=caminho_anexo
+                ).save()
+
+        if update_data:
+            # Atualiza documento com retry automático
+            execute_with_retry(
+                db.collection('chamados').document(chamado_id).update,
+                update_data,
+                max_retries=3
+            )
+            return jsonify({'sucesso': True, 'mensagem': 'Chamado atualizado com sucesso', 'dados': update_data}), 200
+        else:
+            return jsonify({'sucesso': True, 'mensagem': 'Nenhuma alteração foi feita'}), 200
+
+    except Exception as e:
+        logger.exception("Erro em api_editar_chamado: %s", e)
+        return jsonify({'sucesso': False, 'erro': ERRO_INTERNO_MSG}), 500
 
 @main.route('/api/bulk-status', methods=['POST'])
 @login_required
@@ -119,10 +220,16 @@ def bulk_atualizar_status():
                     continue
                 data = doc.to_dict()
                 if current_user.perfil == 'supervisor':
-                    if data.get('area') != current_user.area and data.get('responsavel_id') != current_user.id:
+                    chamado_area = data.get('area')
+                    if (chamado_area not in current_user.areas) and data.get('responsavel_id') != current_user.id:
                         erros.append({'id': chamado_id, 'erro': 'Sem permissão para este chamado'})
                         continue
-                db.collection('chamados').document(chamado_id).update(update_data)
+                # Atualiza status com retry automático
+                execute_with_retry(
+                    db.collection('chamados').document(chamado_id).update,
+                    update_data,
+                    max_retries=3
+                )
                 if data.get('status') != novo_status:
                     Historico(
                         chamado_id=chamado_id,

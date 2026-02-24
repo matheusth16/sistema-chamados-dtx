@@ -1,7 +1,55 @@
 """
-Serviço avançado de exportação para Excel.
-Fornece múltiplas abas, formatação profissional, gráficos e insights.
+Serviço Avançado de Exportação para Excel
+
+Fornece exportação de chamados em formato XLSX com múltiplas abas,
+formatação profissional, estilos, e análises.
+
+**Funcionalidades:**
+
+1. **Export Completo:**
+   - Múltiplas abas: Resumo, Detalhes, Histórico
+   - Formatação: cabeçalhos em cores, alinhamento, bordas
+   - Styles: Cores indicando status/prioridade
+
+2. **Configurações de Estilo:**
+   - Cores padronizadas por tipo de dado (sucesso, alerta, info)
+   - Fonte Calibri com tamanhos apropriados
+   - Bordas e preenchimentos profissionais
+   - Freeze panes para cabeçalhos
+
+3. **Análise Histórica:**
+   - Tempo de resolução (data abertura → conclusão)
+   - Estatísticas por categoria/supervisor
+   - Gráficos de tendência (pode ser adicionado com openpyxl)
+
+**Uso Básico:**
+
+```python
+from app.services.excel_export_service import gerar_relatorio_excel
+
+# Obter lista de chamados
+chamados = db.collection('chamados').limit(100).stream()
+
+# Gerar Excel
+excel_bytes = gerar_relatorio_excel(
+    chamados=list(chamados),
+    tipo='completo',  # ou 'basico', 'analise'
+    titulo='Relatório de Chamados - Fevereiro 2026'
+)
+
+# Enviar como download
+response.data = excel_bytes
+response.headers['Content-Type'] = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+response.headers['Content-Disposition'] = 'attachment; filename=chamados.xlsx'
+return response
+```
+
+**Formatos Disponíveis:**
+- `completo`: Todas as colunas e análises
+- `basico`: Colunas essenciais apenas
+- `analise`: Foco em histórico e duração
 """
+
 
 import logging
 import io

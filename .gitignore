@@ -28,6 +28,9 @@ app/static/uploads/*
 # Mas queremos manter a pasta vazia no repositório (opcional)
 !app/static/uploads/.gitkeep
 
+# --- Firebase (emulador/debug) ---
+firebase-debug.log
+
 # --- Sistema Operacional ---
 .DS_Store
 Thumbs.db

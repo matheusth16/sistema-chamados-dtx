@@ -35,7 +35,7 @@ Se você já configurou um trigger de Cloud Run que dispara com push:
 **Se suas alterações não aparecem na URL publicada**, use deploy **sem cache** (rebuild completo):
 
 ```powershell
-.\deploy_fresh.ps1
+.\scripts\deploy_fresh.ps1
 ```
 
 Ou manualmente com `--no-cache`:

@@ -1,0 +1,662 @@
+{
+    "no_supervisors": {
+        "pt_BR": "Sem supervisores na área - Atribuição Manual",
+        "en": "No supervisors in the area - Manual Assignment",
+        "es": "Sin supervisores en el área - Asignación Manual"
+    },
+    "no_tickets_message": {
+        "pt_BR": "Nenhum chamado encontrado",
+        "en": "No tickets found",
+        "es": "No se encontraron tickets"
+    },
+    "previous": {
+        "pt_BR": "Anterior",
+        "en": "Previous",
+        "es": "Anterior"
+    },
+    "save_change": {
+        "pt_BR": "Salvar Alteração",
+        "en": "Save Change",
+        "es": "Guardar Cambio"
+    },
+    "no_tickets": {
+        "pt_BR": "Nenhum chamado encontrado.",
+        "en": "No tickets found.",
+        "es": "No se encontraron tickets."
+    },
+    "gate_1": {
+        "pt_BR": "Gate 1",
+        "en": "Gate 1",
+        "es": "Gate 1"
+    },
+    "attached_file": {
+        "pt_BR": "Arquivo Anexado",
+        "en": "Attached File",
+        "es": "Archivo Adjunto"
+    },
+    "manager_action": {
+        "pt_BR": "Ação do Gestor",
+        "en": "Manager Action",
+        "es": "Acción del Gestor"
+    },
+    "select": {
+        "pt_BR": "Selecione...",
+        "en": "Select...",
+        "es": "Seleccionar..."
+    },
+    "gate_4": {
+        "pt_BR": "Gate 4",
+        "en": "Gate 4",
+        "es": "Gate 4"
+    },
+    "indirect_material": {
+        "pt_BR": "Material Indireto / Compras",
+        "en": "Indirect Material / Purchases",
+        "es": "Material Indirecto / Compras"
+    },
+    "loading_supervisors": {
+        "pt_BR": "Carregando supervisores...",
+        "en": "Loading supervisors...",
+        "es": "Cargando supervisores..."
+    },
+    "not_applicable_short": {
+        "pt_BR": "Não se aplica",
+        "en": "Not applicable",
+        "es": "No aplica"
+    },
+    "status": {
+        "pt_BR": "Status",
+        "en": "Status",
+        "es": "Estado"
+    },
+    "current_status": {
+        "pt_BR": "Status Atual",
+        "en": "Current Status",
+        "es": "Estado Actual"
+    },
+    "security": {
+        "pt_BR": "Segurança",
+        "en": "Security",
+        "es": "Seguridad"
+    },
+    "sector_gate": {
+        "pt_BR": "Setor / Gate",
+        "en": "Sector / Gate",
+        "es": "Sector / Gate"
+    },
+    "all": {
+        "pt_BR": "Todos",
+        "en": "All",
+        "es": "Todos"
+    },
+    "ticket_opening": {
+        "pt_BR": "Abertura de Chamado",
+        "en": "Ticket Opening",
+        "es": "Apertura de Ticket"
+    },
+    "not_applicable_routine": {
+        "pt_BR": "Não Aplicável (Rotina)",
+        "en": "Not Applicable (Routine)",
+        "es": "No Aplicable (Rutina)"
+    },
+    "error_loading": {
+        "pt_BR": "Erro ao carregar - Será atribuído manualmente",
+        "en": "Error loading - Will be assigned manually",
+        "es": "Error al cargar - Se asignará manualmente"
+    },
+    "click_eye_full": {
+        "pt_BR": "Clique no olho para ver completo",
+        "en": "Click the eye icon to see the full text",
+        "es": "Haz clic en el ícono de ojo para ver el texto completo"
+    },
+    "view_history": {
+        "pt_BR": "Visualizar Histórico",
+        "en": "View History",
+        "es": "Ver Historial"
+    },
+    "date": {
+        "pt_BR": "Data",
+        "en": "Date",
+        "es": "Fecha"
+    },
+    "password": {
+        "pt_BR": "Senha",
+        "en": "Password",
+        "es": "Contraseña"
+    },
+    "option_attend": {
+        "pt_BR": "Atender",
+        "en": "Attend",
+        "es": "Atender"
+    },
+    "fill_details": {
+        "pt_BR": "Preencha os detalhes abaixo. Projetos têm prioridade automática.",
+        "en": "Fill in the details below. Projects have automatic priority.",
+        "es": "Rellene los detalles a continuación. Los proyectos tienen prioridad automática."
+    },
+    "rl_code_example": {
+        "pt_BR": "Ex: 045, ABC-01, 123/2026",
+        "en": "Ex: 045, ABC-01, 123/2026",
+        "es": "Ej: 045, ABC-01, 123/2026"
+    },
+    "completed": {
+        "pt_BR": "Concluídos",
+        "en": "Completed",
+        "es": "Completados"
+    },
+    "search_placeholder": {
+        "pt_BR": "Ex: Turbina, 111...",
+        "en": "Ex: Turbine, 111...",
+        "es": "Ej: Turbina, 111..."
+    },
+    "your_tickets_summary": {
+        "pt_BR": "Resumo dos Seus Chamados",
+        "en": "Your Tickets Summary",
+        "es": "Resumen de Sus Tickets"
+    },
+    "sign_in": {
+        "pt_BR": "Entrar",
+        "en": "Sign In",
+        "es": "Iniciar Sesión"
+    },
+    "change_status": {
+        "pt_BR": "Clique para alterar status",
+        "en": "Click to change status",
+        "es": "Haga clic para cambiar el estado"
+    },
+    "open_tickets": {
+        "pt_BR": "Abertos",
+        "en": "Open",
+        "es": "Abiertos"
+    },
+    "responsible": {
+        "pt_BR": "Responsável",
+        "en": "Responsible",
+        "es": "Responsable"
+    },
+    "complete_details": {
+        "pt_BR": "Detalhes completos da solicitação",
+        "en": "Complete details of the request",
+        "es": "Detalles completos de la solicitud"
+    },
+    "projects_max_priority": {
+        "pt_BR": "Projetos (Prioridade Máxima)",
+        "en": "Projects (Maximum Priority)",
+        "es": "Proyectos (Prioridad Máxima)"
+    },
+    "gate": {
+        "pt_BR": "Gate",
+        "en": "Gate",
+        "es": "Gate"
+    },
+    "suggested_responsible": {
+        "pt_BR": "Responsável Sugerido",
+        "en": "Suggested Responsible",
+        "es": "Responsable Sugerido"
+    },
+    "export": {
+        "pt_BR": "Exportar",
+        "en": "Export",
+        "es": "Exportar"
+    },
+    "download_attachment": {
+        "pt_BR": "Baixar Anexo",
+        "en": "Download Attachment",
+        "es": "Descargar Adjunto"
+    },
+    "completion_date": {
+        "pt_BR": "Data de Conclusão",
+        "en": "Completion Date",
+        "es": "Fecha de Finalización"
+    },
+    "search": {
+        "pt_BR": "Buscar (ID, RL, Descrição)",
+        "en": "Search (ID, RL, Description)",
+        "es": "Buscar (ID, RL, Descripción)"
+    },
+    "file_types": {
+        "pt_BR": "PNG, JPG, PDF ou XLSX até 10MB",
+        "en": "PNG, JPG, PDF or XLSX up to 10MB",
+        "es": "PNG, JPG, PDF o XLSX hasta 10MB"
+    },
+    "request_category": {
+        "pt_BR": "Categoria da Solicitação",
+        "en": "Request Category",
+        "es": "Categoría de la Solicitud"
+    },
+    "found_tickets": {
+        "pt_BR": "chamados encontrados",
+        "en": "tickets found",
+        "es": "tickets encontrados"
+    },
+    "file_ready": {
+        "pt_BR": "Arquivo pronto para envio:",
+        "en": "File ready for submission:",
+        "es": "Archivo listo para envío:"
+    },
+    "no_tickets_hint_default": {
+        "pt_BR": "Comece criando seu primeiro chamado para acompanhar o andamento.",
+        "en": "Start by creating your first ticket to track progress.",
+        "es": "Comience creando su primer ticket para rastrear el progreso."
+    },
+    "track_tickets": {
+        "pt_BR": "Acompanhe o andamento de todos os seus chamados solicitados.",
+        "en": "Track the progress of all your submitted tickets.",
+        "es": "Siga el progreso de todos sus tickets enviados."
+    },
+    "close": {
+        "pt_BR": "Fechar",
+        "en": "Close",
+        "es": "Cerrar"
+    },
+    "problem_description": {
+        "pt_BR": "Descrição do Problema",
+        "en": "Problem Description",
+        "es": "Descripción del Problema"
+    },
+    "type_sector": {
+        "pt_BR": "Tipo / Setor",
+        "en": "Type / Sector",
+        "es": "Tipo / Sector"
+    },
+    "option_open": {
+        "pt_BR": "Aberto",
+        "en": "Open",
+        "es": "Abierto"
+    },
+    "detailed_description": {
+        "pt_BR": "Descrição Detalhada",
+        "en": "Detailed Description",
+        "es": "Descripción Detallada"
+    },
+    "upload_file": {
+        "pt_BR": "Carregar um arquivo",
+        "en": "Upload a file",
+        "es": "Cargar un archivo"
+    },
+    "commercial": {
+        "pt_BR": "Comercial",
+        "en": "Commercial",
+        "es": "Comercial"
+    },
+    "no_tickets_hint": {
+        "pt_BR": "Tente limpar os filtros ou buscar por outro termo.",
+        "en": "Try clearing the filters or searching for another term.",
+        "es": "Intente limpiar los filtros o busque otro término."
+    },
+    "dashboard_title": {
+        "pt_BR": "Painel de Gestão de Chamados",
+        "en": "Ticket Management Panel",
+        "es": "Panel de Gestión de Tickets"
+    },
+    "language": {
+        "pt_BR": "Idioma",
+        "en": "Language",
+        "es": "Idioma"
+    },
+    "actions": {
+        "pt_BR": "Ações",
+        "en": "Actions",
+        "es": "Acciones"
+    },
+    "requester": {
+        "pt_BR": "Solicitante",
+        "en": "Requester",
+        "es": "Solicitante"
+    },
+    "timeline_client": {
+        "pt_BR": "Prazo / Cliente",
+        "en": "Timeline / Client",
+        "es": "Plazo / Cliente"
+    },
+    "option_finish": {
+        "pt_BR": "Concluir",
+        "en": "Complete",
+        "es": "Completar"
+    },
+    "logout": {
+        "pt_BR": "Sair",
+        "en": "Sign Out",
+        "es": "Cerrar Sesión"
+    },
+    "spanish": {
+        "pt_BR": "Español",
+        "en": "Español",
+        "es": "Español"
+    },
+    "planning": {
+        "pt_BR": "Planejamento",
+        "en": "Planning",
+        "es": "Planificación"
+    },
+    "rl_short": {
+        "pt_BR": "RL:",
+        "en": "RL:",
+        "es": "RL:"
+    },
+    "rl_code_label": {
+        "pt_BR": "Código RL",
+        "en": "RL Code",
+        "es": "Código RL"
+    },
+    "id_ref": {
+        "pt_BR": "ID / Ref",
+        "en": "ID / Ref",
+        "es": "ID / Referencia"
+    },
+    "select_sector": {
+        "pt_BR": "Selecione um setor...",
+        "en": "Select a sector...",
+        "es": "Seleccione un sector..."
+    },
+    "english": {
+        "pt_BR": "English",
+        "en": "English",
+        "es": "English"
+    },
+    "my_tickets": {
+        "pt_BR": "Meus Chamados",
+        "en": "My Tickets",
+        "es": "Mis Tickets"
+    },
+    "manage_users": {
+        "pt_BR": "Gerenciar usuários do sistema",
+        "en": "Manage system users",
+        "es": "Gestionar usuarios del sistema"
+    },
+    "assigned_to": {
+        "pt_BR": "Atribuído a",
+        "en": "Assigned to",
+        "es": "Asignado a"
+    },
+    "to": {
+        "pt_BR": "a",
+        "en": "to",
+        "es": "a"
+    },
+    "change_status_to": {
+        "pt_BR": "Alterar Status para:",
+        "en": "Change Status to:",
+        "es": "Cambiar Estado a:"
+    },
+    "identified_requester": {
+        "pt_BR": "Solicitante Identificado",
+        "en": "Identified Requester",
+        "es": "Solicitante Identificado"
+    },
+    "showing": {
+        "pt_BR": "Mostrando",
+        "en": "Showing",
+        "es": "Mostrando"
+    },
+    "no_tickets_hint_with_filter": {
+        "pt_BR": "Você não tem chamados com este status.",
+        "en": "You have no tickets with this status.",
+        "es": "No tiene tickets con este estado."
+    },
+    "total_tickets": {
+        "pt_BR": "Total de Chamados",
+        "en": "Total Tickets",
+        "es": "Total de Tickets"
+    },
+    "new_ticket": {
+        "pt_BR": "Novo Chamado",
+        "en": "New Ticket",
+        "es": "Nuevo Ticket"
+    },
+    "main_impact": {
+        "pt_BR": "Impacto Principal",
+        "en": "Main Impact",
+        "es": "Impacto Principal"
+    },
+    "select_sector_above": {
+        "pt_BR": "Selecione um setor acima...",
+        "en": "Select a sector above...",
+        "es": "Seleccione un sector anterior..."
+    },
+    "ticket_details": {
+        "pt_BR": "Detalhes do Chamado",
+        "en": "Ticket Details",
+        "es": "Detalles del Ticket"
+    },
+    "apply": {
+        "pt_BR": "Aplicar",
+        "en": "Apply",
+        "es": "Aplicar"
+    },
+    "attach_file": {
+        "pt_BR": "Anexar Arquivo (PDF, Imagem, Excel)",
+        "en": "Attach File (PDF, Image, Excel)",
+        "es": "Adjuntar Archivo (PDF, Imagen, Excel)"
+    },
+    "must_be_logged": {
+        "pt_BR": "Você precisa estar logado para criar um chamado.",
+        "en": "You must be logged in to create a ticket.",
+        "es": "Debe estar conectado para crear un ticket."
+    },
+    "login_subtitle": {
+        "pt_BR": "DTX Aerospace",
+        "en": "DTX Aerospace",
+        "es": "DTX Aerospace"
+    },
+    "gate_2": {
+        "pt_BR": "Gate 2",
+        "en": "Gate 2",
+        "es": "Gate 2"
+    },
+    "select_all": {
+        "pt_BR": "Selecionar todos",
+        "en": "Select all",
+        "es": "Seleccionar todo"
+    },
+    "opening_info": {
+        "pt_BR": "Informações de Abertura",
+        "en": "Opening Information",
+        "es": "Información de Apertura"
+    },
+    "submit_request": {
+        "pt_BR": "Enviar Solicitação",
+        "en": "Submit Request",
+        "es": "Enviar Solicitud"
+    },
+    "defined_automatically": {
+        "pt_BR": "Definido automaticamente pelo sistema.",
+        "en": "Defined automatically by the system.",
+        "es": "Definido automáticamente por el sistema."
+    },
+    "login_title": {
+        "pt_BR": "Sistema de Chamados",
+        "en": "Ticket System",
+        "es": "Sistema de Tickets"
+    },
+    "quality": {
+        "pt_BR": "Qualidade",
+        "en": "Quality",
+        "es": "Calidad"
+    },
+    "first": {
+        "pt_BR": "Primeira",
+        "en": "First",
+        "es": "Primero"
+    },
+    "users": {
+        "pt_BR": "Usuários",
+        "en": "Users",
+        "es": "Usuarios"
+    },
+    "option_in_progress": {
+        "pt_BR": "Em Atendimento",
+        "en": "In Progress",
+        "es": "En Progreso"
+    },
+    "select_responsible": {
+        "pt_BR": "Selecione um responsável...",
+        "en": "Select a responsible person...",
+        "es": "Seleccione un responsable..."
+    },
+    "engineering": {
+        "pt_BR": "Engenharia",
+        "en": "Engineering",
+        "es": "Ingeniería"
+    },
+    "describe_problem": {
+        "pt_BR": "Descreva o problema ou solicitação...",
+        "en": "Describe the problem or request...",
+        "es": "Describa el problema o solicitud..."
+    },
+    "view_details": {
+        "pt_BR": "Visualizar Detalhes",
+        "en": "View Details",
+        "es": "Ver Detalles"
+    },
+    "projects": {
+        "pt_BR": "Projetos",
+        "en": "Projects",
+        "es": "Proyectos"
+    },
+    "reports": {
+        "pt_BR": "Relatórios",
+        "en": "Reports",
+        "es": "Informes"
+    },
+    "portuguese": {
+        "pt_BR": "Português (Brasil)",
+        "en": "Português (Brasil)",
+        "es": "Português (Brasil)"
+    },
+    "viewing_chamado": {
+        "pt_BR": "Visualizando Chamado",
+        "en": "Viewing Ticket",
+        "es": "Viendo Ticket"
+    },
+    "email": {
+        "pt_BR": "Email",
+        "en": "Email",
+        "es": "Correo Electrónico"
+    },
+    "maintenance": {
+        "pt_BR": "Manutenção",
+        "en": "Maintenance",
+        "es": "Mantenimiento"
+    },
+    "in_progress": {
+        "pt_BR": "Em Atendimento",
+        "en": "In Progress",
+        "es": "En Progreso"
+    },
+    "description": {
+        "pt_BR": "Descrição",
+        "en": "Description",
+        "es": "Descripción"
+    },
+    "view_all": {
+        "pt_BR": "Ver todos",
+        "en": "View all",
+        "es": "Ver todos"
+    },
+    "responsible_for_ticket": {
+        "pt_BR": "Responsável pelo Chamado",
+        "en": "Responsible for Ticket",
+        "es": "Responsable del Ticket"
+    },
+    "clear_filters": {
+        "pt_BR": "Limpar Filtros",
+        "en": "Clear Filters",
+        "es": "Limpiar Filtros"
+    },
+    "next": {
+        "pt_BR": "Próxima",
+        "en": "Next",
+        "es": "Siguiente"
+    },
+    "last": {
+        "pt_BR": "Última",
+        "en": "Last",
+        "es": "Último"
+    },
+    "rl_required": {
+        "pt_BR": "Letras, números e caracteres (- _ . / , ( ) ) permitidos. Obrigatório para priorização na fila.",
+        "en": "Letters, numbers and characters (- _ . / , ( ) ) allowed. Required for queue prioritization.",
+        "es": "Letras, números y caracteres (- _ . / , ( ) ) permitidos. Requerido para priorización en la cola."
+    },
+    "gate_3": {
+        "pt_BR": "Gate 3",
+        "en": "Gate 3",
+        "es": "Gate 3"
+    },
+    "in_progress_tickets": {
+        "pt_BR": "Em Atendimento",
+        "en": "In Progress",
+        "es": "En Progreso"
+    },
+    "of": {
+        "pt_BR": "de",
+        "en": "of",
+        "es": "de"
+    },
+    "category": {
+        "pt_BR": "Categoria",
+        "en": "Category",
+        "es": "Categoría"
+    },
+    "bulk_change_status": {
+        "pt_BR": "Alterar status em lote",
+        "en": "Change status in bulk",
+        "es": "Cambiar estado en lote"
+    },
+    "area_sector": {
+        "pt_BR": "Área/Setor",
+        "en": "Area/Sector",
+        "es": "Área/Sector"
+    },
+    "not_applicable": {
+        "pt_BR": "Não Aplicável",
+        "en": "Not Applicable",
+        "es": "No Aplicable"
+    },
+    "page": {
+        "pt_BR": "Página",
+        "en": "Page",
+        "es": "Página"
+    },
+    "completed_tickets": {
+        "pt_BR": "Concluídos",
+        "en": "Completed",
+        "es": "Completados"
+    },
+    "filter": {
+        "pt_BR": "Filtrar",
+        "en": "Filter",
+        "es": "Filtrar"
+    },
+    "open": {
+        "pt_BR": "Abertos",
+        "en": "Open",
+        "es": "Abiertos"
+    },
+    "option_completed": {
+        "pt_BR": "Concluído",
+        "en": "Completed",
+        "es": "Completado"
+    },
+    "or_drag_drop": {
+        "pt_BR": "ou arraste e solte",
+        "en": "or drag and drop",
+        "es": "o arrastra y suelta"
+    },
+    "reports_analysis": {
+        "pt_BR": "Relatórios e Análises",
+        "en": "Reports and Analysis",
+        "es": "Informes y Análisis"
+    },
+    "reports_subtitle": {
+        "pt_BR": "Dashboard de performance e insights da operação",
+        "en": "Performance dashboard and operation insights",
+        "es": "Panel de rendimiento e información de la operación"
+    },
+    "refresh_data": {
+        "pt_BR": "Atualizar dados",
+        "en": "Refresh data",
+        "es": "Actualizar datos"
+    }
+}

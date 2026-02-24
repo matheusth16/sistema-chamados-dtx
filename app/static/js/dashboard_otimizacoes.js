@@ -5,6 +5,15 @@
  * 3. Virtualização de linhas (renderizar apenas o visível)
  */
 
+const DEBUG = Boolean(window.DTX_DEBUG) || (
+    window.location && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+);
+
+function debugLog() {
+    if (!DEBUG || !window.console) return;
+    console.log.apply(console, arguments);
+}
+
 // ============================================================================
 // 1. ATUALIZAÇÃO DE STATUS VIA AJAX
 // ============================================================================
@@ -18,7 +27,7 @@ async function atualizarStatusAjax(selectElement) {
     const form = selectElement.closest('form');
     
     if (!form) {
-        console.error('❌ Erro: formulário não encontrado');
+        debugLog('❌ Erro: formulário não encontrado');
         mostrarNotificacao('Erro: Formulário não encontrado', 'danger');
         return;
     }
@@ -30,7 +39,7 @@ async function atualizarStatusAjax(selectElement) {
     const statusAnterior = selectElement.dataset.statusAnterior || selectElement.value;
 
     // Log detalhado para debug
-    console.log('🔍 DEBUG - Dados coletados:', {
+    debugLog('🔍 DEBUG - Dados coletados:', {
         form_encontrado: !!form,
         input_encontrado: !!chamadoIdInput,
         chamado_id: chamadoId || '[VAZIO]',
@@ -41,13 +50,13 @@ async function atualizarStatusAjax(selectElement) {
 
     // Validações rigorosas
     if (!form.querySelector('input[name="chamado_id"]')) {
-        console.error('❌ Campo input[name="chamado_id"] não encontrado no formulário');
+        debugLog('❌ Campo input[name="chamado_id"] não encontrado no formulário');
         mostrarNotificacao('Erro: Campo ID não encontrado', 'danger');
         return;
     }
 
     if (!chamadoId) {
-        console.error('❌ chamado_id está vazio!', {
+        debugLog('❌ chamado_id está vazio!', {
             input_value: chamadoIdInput?.value,
             input_html: chamadoIdInput?.outerHTML
         });
@@ -56,7 +65,7 @@ async function atualizarStatusAjax(selectElement) {
     }
 
     if (!novoStatus) {
-        console.error('❌ novo_status está vazio');
+        debugLog('❌ novo_status está vazio');
         mostrarNotificacao('Erro: Status não selecionado', 'danger');
         return;
     }
@@ -64,28 +73,28 @@ async function atualizarStatusAjax(selectElement) {
     // Valida o status
     const statusValidos = ['Aberto', 'Em Atendimento', 'Concluído'];
     if (!statusValidos.includes(novoStatus)) {
-        console.error('❌ Status inválido:', novoStatus);
+        debugLog('❌ Status inválido:', novoStatus);
         mostrarNotificacao(`Erro: Status inválido "${novoStatus}"`, 'danger');
         selectElement.value = statusAnterior;
         return;
     }
 
     if (novoStatus === statusAnterior) {
-        console.log('ℹ️ Status não mudou (mesmo valor)');
+        debugLog('ℹ️ Status não mudou (mesmo valor)');
         return;
     }
 
     try {
         // Desabilita o select durante o request
         selectElement.disabled = true;
-        console.log(`🔄 Enviando atualização: ${chamadoId} → ${novoStatus}`);
+        debugLog(`🔄 Enviando atualização: ${chamadoId} → ${novoStatus}`);
 
         // Log do payload
         const payload = {
             chamado_id: chamadoId,
             novo_status: novoStatus
         };
-        console.log('📤 Payload enviado:', JSON.stringify(payload, null, 2));
+        debugLog('📤 Payload enviado:', JSON.stringify(payload, null, 2));
 
         // Faz o request AJAX (CSRF no header para proteção)
         const csrfMeta = document.querySelector('meta[name="csrf-token"]');
@@ -100,22 +109,22 @@ async function atualizarStatusAjax(selectElement) {
             body: JSON.stringify(payload)
         });
 
-        console.log('📊 HTTP Status:', response.status, response.statusText);
-        console.log('📊 Content-Type:', response.headers.get('content-type'));
+        debugLog('📊 HTTP Status:', response.status, response.statusText);
+        debugLog('📊 Content-Type:', response.headers.get('content-type'));
 
         const text = await response.text();
         let resultado;
         try {
             resultado = text ? JSON.parse(text) : {};
         } catch (parseError) {
-            console.error('❌ Erro ao parsear JSON:', parseError);
-            console.error('Resposta raw:', text);
+            debugLog('❌ Erro ao parsear JSON:', parseError);
+            debugLog('Resposta raw:', text);
             selectElement.value = statusAnterior;
             mostrarNotificacao('Erro do servidor. Contate o administrador.', 'danger');
             return false;
         }
 
-        console.log('✅ Resposta do servidor:', resultado);
+        debugLog('✅ Resposta do servidor:', resultado);
 
         if (response.ok && resultado.sucesso) {
             // ✅ Sucesso: atualiza visualmente
@@ -129,14 +138,14 @@ async function atualizarStatusAjax(selectElement) {
             return false;
         } else {
             // ❌ Erro: reverte o status
-            console.error('❌ Erro na resposta:', resultado);
+            debugLog('❌ Erro na resposta:', resultado);
             selectElement.value = statusAnterior;
             mostrarNotificacao(resultado.erro || 'Erro ao atualizar', 'danger');
             return false;
         }
     } catch (erro) {
-        console.error('❌ Erro de conexão:', erro);
-        console.error('Stack trace:', erro.stack);
+        debugLog('❌ Erro de conexão:', erro);
+        debugLog('Stack trace:', erro.stack);
         selectElement.value = statusAnterior;
         mostrarNotificacao('Erro de conexão. Tente novamente.', 'danger');
         return false;
@@ -325,11 +334,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 const chamadoIdInput = form.querySelector('input[name="chamado_id"]');
                 const chamadoId = chamadoIdInput?.value;
                 if (chamadoId) {
-                    console.log(`🔄 Mudança detectada: Chamado ${chamadoId} → ${select.value}`);
+                    debugLog(`🔄 Mudança detectada: Chamado ${chamadoId} → ${select.value}`);
                     select.dataset.chamadoId = chamadoId;
                     atualizarStatusAjax(select);
                 } else {
-                    console.error('❌ Erro: chamado_id não encontrado no formulário');
+                    debugLog('❌ Erro: chamado_id não encontrado no formulário');
                 }
             }
         });
@@ -340,13 +349,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const formularioModal = document.querySelector('#modal-overlay form');
     if (formularioModal) {
         formularioModal.addEventListener('submit', (e) => {
-            console.log('🛑 Bloqueando submit do modal (usar AJAX)');
+            debugLog('🛑 Bloqueando submit do modal (usar AJAX)');
             e.preventDefault();
             return false;
         });
     }
 
-    console.log('✓ Dashboard otimizado: AJAX status (tabela + modal), Debounce busca, Virtualização ativados');
+    debugLog('✓ Dashboard otimizado: AJAX status (tabela + modal), Debounce busca, Virtualização ativados');
 });
 
 // ============================================================================

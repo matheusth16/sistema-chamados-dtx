@@ -31,7 +31,7 @@
                 <p class="text-xs text-gray-600 font-semibold uppercase">Status</p>
                 <p class="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold
                     {% if chamado.status == 'Concluído' %}bg-green-100 text-green-800{% elif chamado.status == 'Em Atendimento' %}bg-yellow-100 text-yellow-800{% else %}bg-gray-100 text-gray-800{% endif %}">
-                    {{ chamado.status }}
+                    {{ translate_status(chamado.status) }}
                 </p>
             </div>
             <div>
@@ -122,13 +122,13 @@
                                             <span class="text-sm text-gray-600 font-medium">{{ evento.campo_alterado }}:</span>
                                             <div class="flex items-center gap-2">
                                                 <span class="px-3 py-1 bg-red-100 text-red-800 rounded-md text-sm font-bold shadow-sm">
-                                                    {{ evento.valor_anterior }}
+                                                    {% if evento.campo_alterado == 'Status' %}{{ translate_status(evento.valor_anterior) }}{% elif evento.campo_alterado == 'Setor/Gate' %}{{ translate_sector(evento.valor_anterior) }}{% elif evento.campo_alterado == 'Categoria' %}{{ translate_category(evento.valor_anterior) }}{% else %}{{ evento.valor_anterior }}{% endif %}
                                                 </span>
                                                 <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
                                                 </svg>
                                                 <span class="px-3 py-1 bg-green-100 text-green-800 rounded-md text-sm font-bold shadow-sm">
-                                                    {{ evento.valor_novo }}
+                                                    {% if evento.campo_alterado == 'Status' %}{{ translate_status(evento.valor_novo) }}{% elif evento.campo_alterado == 'Setor/Gate' %}{{ translate_sector(evento.valor_novo) }}{% elif evento.campo_alterado == 'Categoria' %}{{ translate_category(evento.valor_novo) }}{% else %}{{ evento.valor_novo }}{% endif %}
                                                 </span>
                                             </div>
                                         </div>

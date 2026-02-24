@@ -1,6 +1,6 @@
 # Mostra os logs do último build do Cloud Build (para debugar deploy que falhou)
-# Uso: .\ver_logs_build.ps1
-# Ou com ID específico: .\ver_logs_build.ps1 -BuildId "c3596f94-9d0d-4452-8ad8-bc9e1b1d89eb"
+# Uso (a partir da raiz do projeto): .\scripts\ver_logs_build.ps1
+# Ou com ID específico: .\scripts\ver_logs_build.ps1 -BuildId "c3596f94-9d0d-4452-8ad8-bc9e1b1d89eb"
 
 param([string]$BuildId = "")
 

@@ -4,6 +4,11 @@ SERVIÇO DE PAGINAÇÃO OTIMIZADO PARA FIRESTORE
 Implementa cursor-based pagination para melhor performance com grandes volumes.
 Evita o problema do offset com documentos eliminados.
 
+IMPORTANTE - total_global:
+Não retornamos total_global no resultado da paginação para evitar carregar todos
+os documentos em memória (risco de OOM em produção). Para contagem total use
+obter_total_por_contagem() com a query do Firestore (agregação no servidor).
+
 Referência:
 https://firebase.google.com/docs/firestore/query-data/query-cursors
 """
@@ -44,15 +49,9 @@ class PaginadorFirestore:
             cursor_anterior: ID do último documento da página anterior
         
         Returns:
-            {
-                'docs': [docs da página atual],
-                'cursor_atual': ID do primeiro documento,
-                'cursor_proximo': ID do último documento,
-                'tem_anterior': bool,
-                'tem_proximo': bool,
-                'total_pagina': int,
-                'limite': int
-            }
+            Dict com: docs, cursor_atual, cursor_proximo, tem_anterior, tem_proximo,
+            total_pagina, limite, indice_inicio, indice_fim.
+            Não inclui total_global (evita OOM); use obter_total_por_contagem() se precisar.
         """
         if not docs:
             return self._pagina_vazia()
@@ -91,8 +90,7 @@ class PaginadorFirestore:
             'total_pagina': len(docs_pagina),
             'limite': self.limite,
             'indice_inicio': indice_inicio,
-            'indice_fim': indice_fim,
-            'total_global': len(docs)  # CUIDADO: Isso carrega todos os docs em memória!
+            'indice_fim': indice_fim
         }
     
     def _encontrar_indice_cursor(self, docs: List[Any], cursor_id: str) -> int:
@@ -111,8 +109,7 @@ class PaginadorFirestore:
             'tem_anterior': False,
             'tem_proximo': False,
             'total_pagina': 0,
-            'limite': self.limite,
-            'total_global': 0
+            'limite': self.limite
         }
     
     def resposta_json(self, resultado_paginacao: Dict[str, Any], chamados_dict: List[Dict]) -> Dict[str, Any]:
@@ -135,8 +132,7 @@ class PaginadorFirestore:
                 'tem_anterior': resultado_paginacao['tem_anterior'],
                 'tem_proximo': resultado_paginacao['tem_proximo'],
                 'limite': resultado_paginacao['limite'],
-                'total_pagina_atual': resultado_paginacao['total_pagina'],
-                'total_global': resultado_paginacao['total_global']
+                'total_pagina_atual': resultado_paginacao['total_pagina']
             }
         }
 
@@ -236,3 +232,47 @@ class OptimizadorQuery:
             return True, "✓ Usando índice: gate + status"
         
         return True, "✓ Filtros válidos"
+
+
+def obter_total_por_contagem(query_ref: Any) -> Optional[int]:
+    """
+    Obtém o total de documentos que batem com a query sem carregar os documentos
+    (agregação no Firestore). Evita OOM quando só se precisa do número total.
+
+    Usa count() do Firestore: apenas o total é retornado pelo servidor, sem
+    transferir documentos. Use esta função em vez de len(list(query.stream())).
+
+    Args:
+        query_ref: Referência da coleção ou query do Firestore (ex.:
+                   db.collection('chamados') ou query com .where() aplicados).
+                   Deve ser a mesma query usada para listar (filtros por índice).
+
+    Returns:
+        Número total de documentos ou None se a agregação falhar (SDK antigo,
+        query sem suporte a count, ou erro de rede).
+    """
+    import logging
+    _log = logging.getLogger(__name__)
+    try:
+        if not hasattr(query_ref, 'count'):
+            _log.debug("obter_total_por_contagem: query sem método count()")
+            return None
+        agg = query_ref.count()
+        result = agg.get()
+        if result is None:
+            return None
+        # Firestore Python SDK: get() retorna estrutura onde o count está em result[0][0].value
+        if hasattr(result, '__getitem__') and len(result) > 0:
+            row = result[0]
+            if hasattr(row, '__getitem__') and len(row) > 0:
+                cell = row[0]
+                if hasattr(cell, 'value'):
+                    return int(cell.value)
+            if hasattr(row, 'value'):
+                return int(row.value)
+        if hasattr(result, 'value'):
+            return int(result.value)
+        return None
+    except Exception as e:
+        _log.debug("obter_total_por_contagem: %s", e)
+        return None

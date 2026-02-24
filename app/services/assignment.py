@@ -13,6 +13,7 @@ Uso:
 
 import logging
 from typing import Optional, Dict, List
+from google.cloud.firestore_v1.base_query import FieldFilter, BaseCompositeFilter
 from app.database import db
 from app.models_usuario import Usuario
 
@@ -44,26 +45,43 @@ class AtribuidorAutomatico:
     
     def atribuir(self, area: str, categoria: str = None, prioridade: int = 1) -> Dict:
         """
-        Atribui um chamado a um supervisor automaticamente
+        Atribui um chamado a um supervisor automaticamente.
+        
+        Distribui novo chamado usando a estratégia configurada:
+        - **Balanceamento de Carga:** Atribui ao supervisor com menos chamados abertos (padrão)
+        - **Round-Robin:** Alterna sequencialmente entre supervisores
+        - **Aleatório:** Seleciona supervisor aleatório
         
         Args:
-            area: Área/departamento (ex: 'Manutencao', 'Engenharia')
-            categoria: Categoria do chamado (ex: 'Projetos') - opcional
-            prioridade: Prioridade do chamado (0=alta, 1=média, 2=baixa)
+            area (str): Área/departamento do chamado (ex: 'Manutencao', 'Engenharia').
+                        Deve corresponder à área de um supervisor.
+            categoria (str, optional): Categoria do chamado (ex: 'Projetos'). 
+                        Padrão: None. Pode ser usado para priorização futura.
+            prioridade (int, optional): Nível de prioridade (0=crítica, 1=alta, 2=média, 3=baixa).
+                        Padrão: 1. Pode influenciar em atribuição por prioridade.
         
         Returns:
-            {
-                'sucesso': bool,
-                'supervisor': {
-                    'id': str,
-                    'email': str,
-                    'nome': str,
-                    'area': str,
-                    'chamados_abertos': int
-                },
-                'motivo': str,
-                'estrategia_usada': str
-            }
+            dict: Resultado da atribuição com chaves:
+                - **sucesso** (bool): True se supervisor foi encontrado e atribuído
+                - **supervisor** (dict): Dados do supervisor atribuído:
+                    - id (str): ID único do supervisor
+                    - nome (str): Nome completo
+                    - email (str): Email para notificação
+                    - area (str): Área de atuação
+                    - chamados_abertos (int): Contagem atual de chamados abertos
+                - **motivo** (str): Razão da atribuição ou mensagem de erro
+                - **estrategia_usada** (str): Nome da estratégia aplicada
+                
+        Raises:
+            ValueError: Se area for inválida ou vazia
+            
+        Examples:
+            >>> resultado = atribuidor.atribuir('Suporte', 'Manutenção', prioridade=0)
+            >>> if resultado['sucesso']:
+            ...     print(f"Atribuído para {resultado['supervisor']['nome']}")
+            ...     # Enviar e-mail de notificação
+            ... else:
+            ...     print(f"Erro: {resultado['motivo']}")
         """
         try:
             logger.debug(f"Atribuindo chamado: area={area}, categoria={categoria}, prioridade={prioridade}")
@@ -136,10 +154,11 @@ class AtribuidorAutomatico:
         for sup in supervisores:
             try:
                 # Conta chamados não concluídos atribuídos ao supervisor
-                docs = db.collection('chamados')\
-                    .where('responsavel', '==', sup.nome)\
-                    .where('status', '!=', 'Concluído')\
-                    .stream()
+                filtro = BaseCompositeFilter('AND', [
+                    FieldFilter('responsavel', '==', sup.nome),
+                    FieldFilter('status', '!=', 'Concluído'),
+                ])
+                docs = db.collection('chamados').where(filter=filtro).stream()
                 
                 count = sum(1 for _ in docs)
                 

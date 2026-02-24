@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 def _config(key: str, default=None):
-    """Lê configuração da app (config ou env)."""
+    """Lê valor da configuração Flask (ex.: MAIL_SERVER, TEAMS_WEBHOOK_URL). Retorna default se fora de app context."""
     return getattr(current_app.config, key, None) if current_app else default
 
 

@@ -1,6 +1,7 @@
 from datetime import datetime
 import pytz
 from firebase_admin import firestore
+from app.exceptions import ChamadoNaoEncontradoError, ValidacaoChamadoError
 
 class Chamado:
     """Representação de um documento Chamado no Firestore"""
@@ -17,6 +18,7 @@ class Chamado:
                  gate: str = None,
                  impacto: str = None,
                  anexo: str = None,
+                 anexos: list = None,
                  numero_chamado: str = None,
                  prioridade: int = 1,
                  status: str = 'Aberto',
@@ -37,6 +39,7 @@ class Chamado:
         self.impacto = impacto
         self.descricao = descricao
         self.anexo = anexo
+        self.anexos = anexos or []
         self.responsavel = responsavel
         self.responsavel_id = responsavel_id  # ID do responsável (supervisor ou solicitante)
         self.motivo_atribuicao = motivo_atribuicao  # Como foi atribuído (automático/manual)
@@ -92,6 +95,7 @@ class Chamado:
             'impacto': self.impacto,
             'descricao': self.descricao,
             'anexo': self.anexo,
+            'anexos': self.anexos,
             'responsavel': self.responsavel,
             'responsavel_id': self.responsavel_id,
             'motivo_atribuicao': self.motivo_atribuicao,
@@ -105,7 +109,14 @@ class Chamado:
     
     @classmethod
     def from_dict(cls, data: dict, id: str = None):
-        """Cria um objeto Chamado a partir de um dicionário do Firestore"""
+        """Cria um objeto Chamado a partir de um dicionário do Firestore.
+        
+        Raises:
+            ValidacaoChamadoError: Se campos obrigatórios estiverem ausentes.
+        """
+        if not data:
+            raise ValidacaoChamadoError('Dados do chamado estão vazios')
+        
         return cls(
             id=id,
             numero_chamado=data.get('numero_chamado'),
@@ -117,6 +128,7 @@ class Chamado:
             impacto=data.get('impacto'),
             descricao=data.get('descricao'),
             anexo=data.get('anexo'),
+            anexos=data.get('anexos', []),
             responsavel=data.get('responsavel'),
             responsavel_id=data.get('responsavel_id'),
             motivo_atribuicao=data.get('motivo_atribuicao'),
