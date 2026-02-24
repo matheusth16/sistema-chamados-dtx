@@ -1,6 +1,9 @@
 """
 Serviço de upload de anexos.
-Hoje salva em disco local; preparado para trocar por Firebase Storage quando necessário.
+
+Em produção (e quando o Firebase Storage está disponível): envia o arquivo para
+Firebase Storage (pasta chamados/) e retorna a URL pública.
+Caso contrário: salva em disco local (app/static/uploads) e retorna o nome do arquivo.
 """
 import os
 from datetime import datetime
@@ -8,16 +11,42 @@ from werkzeug.utils import secure_filename
 from flask import current_app
 
 
+def _upload_firebase_storage(arquivo, nome_final: str):
+    """
+    Envia o arquivo para Firebase Storage em chamados/nome_final.
+    Retorna a URL pública ou None em caso de falha.
+    """
+    try:
+        from firebase_admin import storage
+        bucket = storage.bucket()
+    except Exception:
+        return None
+
+    try:
+        blob = bucket.blob(f"chamados/{nome_final}")
+        if hasattr(arquivo.stream, 'seek'):
+            arquivo.stream.seek(0)
+        blob.upload_from_file(
+            arquivo.stream,
+            content_type=arquivo.content_type or 'application/octet-stream'
+        )
+        blob.make_public()
+        return blob.public_url
+    except Exception:
+        return None
+
+
 def salvar_anexo(arquivo):
     """
-    Salva o anexo e retorna o identificador para guardar no chamado
-    (nome do arquivo local ou, no futuro, URL do Firebase Storage).
+    Salva o anexo e retorna o identificador para guardar no chamado:
+    - URL do Firebase Storage (https://...) quando Storage está disponível;
+    - nome do arquivo quando salvo localmente (fallback).
 
     Args:
         arquivo: FileStorage do request.files
 
     Returns:
-        str: nome do arquivo salvo, ou None se não houver arquivo
+        str: URL pública ou nome do arquivo, ou None se não houver arquivo
     """
     if not arquivo or not arquivo.filename or arquivo.filename.strip() == '':
         return None
@@ -26,17 +55,19 @@ def salvar_anexo(arquivo):
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     nome_final = f"{timestamp}_{nome_seguro}"
 
-    # Armazenamento local (pasta app/static/uploads)
+    # 1) Tenta Firebase Storage primeiro
+    if hasattr(arquivo.stream, 'seek'):
+        arquivo.stream.seek(0)
+    url = _upload_firebase_storage(arquivo, nome_final)
+    if url:
+        return url
+
+    # 2) Fallback: armazenamento local (pasta app/static/uploads)
     pasta_upload = current_app.config['UPLOAD_FOLDER']
     if not os.path.exists(pasta_upload):
         os.makedirs(pasta_upload)
     caminho_completo = os.path.join(pasta_upload, nome_final)
+    if hasattr(arquivo.stream, 'seek'):
+        arquivo.stream.seek(0)
     arquivo.save(caminho_completo)
-
-    # Para usar Firebase Storage no futuro:
-    # from firebase_admin import storage
-    # bucket = storage.bucket()
-    # blob = bucket.blob(f"chamados/{nome_final}")
-    # blob.upload_from_file(arquivo.stream, content_type=arquivo.content_type)
-    # return blob.public_url  # ou blob.make_authenticated_url(...)
     return nome_final

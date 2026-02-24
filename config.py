@@ -25,9 +25,9 @@ class Config:
     # 2. Caminho ABSOLUTO para a pasta de uploads (Evita erros no Windows/OneDrive)
     UPLOAD_FOLDER = os.path.join(basedir, 'app', 'static', 'uploads')
     
-    # 3. Segurança: Limita o tamanho do arquivo a 16MB (Padrão Flask)
+    # 3. Segurança: Limita o tamanho do arquivo a 5 MB (anexos: imagens, PDF, Excel)
     # Se passar disso, o sistema rejeita automaticamente.
-    MAX_CONTENT_LENGTH = 16 * 1024 * 1024
+    MAX_CONTENT_LENGTH = 5 * 1024 * 1024
     
     # 4. Paginação
     ITENS_POR_PAGINA = 10

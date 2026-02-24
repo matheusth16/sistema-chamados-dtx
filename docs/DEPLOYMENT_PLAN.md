@@ -79,7 +79,7 @@ Após deploy completar:
    - Acesse: Cloud Run → sistema-chamados-dtx → Logs
    - Procure por mensagem de erro
 
-**Limitação – Anexos:** No Cloud Run o disco é efêmero. Arquivos enviados em "Anexo" ficam só na instância que recebeu e podem sumir após reinício ou em outra instância. Ao abrir um anexo indisponível, o usuário vê a mensagem "Anexo não disponível" em vez do 404 genérico. Os dados do chamado (texto, status) continuam no Firestore; apenas o arquivo pode não estar acessível.
+**Anexos:** Os arquivos enviados são armazenados no **Firebase Storage** (pasta `chamados/`), com leitura permitida por link. Tamanho máximo por arquivo: **5 MB**. Formatos: imagens (png, jpg, jpeg), PDF e Excel (xlsx). Em ambiente sem Storage configurado, o sistema faz fallback para disco local (`static/uploads/`); no Cloud Run o Storage é usado para persistir os anexos.
 
 ---
 

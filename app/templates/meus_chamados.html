@@ -369,8 +369,10 @@ function abrirDetalhes(btn) {
     const linkAnexo = document.getElementById('modal-link-anexo');
     
     if (btn.dataset.anexo && btn.dataset.anexo !== 'None' && btn.dataset.anexo !== '') {
-        linkAnexo.href = `/static/uploads/${btn.dataset.anexo}`;
-        linkAnexo.innerText = `📥 Baixar Anexo (${btn.dataset.anexo})`;
+        const anexoVal = btn.dataset.anexo;
+        const isUrl = anexoVal.indexOf('http://') === 0 || anexoVal.indexOf('https://') === 0;
+        linkAnexo.href = isUrl ? anexoVal : `/static/uploads/${anexoVal}`;
+        linkAnexo.innerText = isUrl ? '📥 Baixar Anexo' : `📥 Baixar Anexo (${anexoVal})`;
         divAnexo.classList.remove('hidden');
     } else {
         divAnexo.classList.add('hidden');

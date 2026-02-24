@@ -156,11 +156,12 @@
             if (listaAnexosArray.length > 0 && divAnexos && listaAnexos) {
                 listaAnexosArray.forEach(function(anx) {
                     var link = document.createElement('a');
-                    link.href = '/static/uploads/' + anx;
+                    var isUrl = anx && (anx.indexOf('http://') === 0 || anx.indexOf('https://') === 0);
+                    link.href = isUrl ? anx : '/static/uploads/' + anx;
                     link.target = '_blank';
                     link.className = 'inline-flex flex-wrap items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-blue-700 bg-white hover:bg-gray-50 mr-2 mb-2 max-w-full truncate';
-                    link.innerText = '📎 Baixar Anexo (' + anx + ')';
-                    link.title = anx;
+                    link.innerText = isUrl ? '📎 Baixar Anexo' : '📎 Baixar Anexo (' + anx + ')';
+                    link.title = isUrl ? 'Anexo' : anx;
                     listaAnexos.appendChild(link);
                 });
                 divAnexos.classList.remove('hidden');
