@@ -1,7 +1,8 @@
 """Rotas de autenticação: login e logout."""
 import logging
-from flask import render_template, request, redirect, url_for, Response, flash
+from flask import render_template, request, redirect, url_for, Response
 from flask_login import login_user, logout_user, current_user, login_required
+from app.i18n import flash_t
 from app.routes import main
 from app.limiter import limiter
 from app.models_usuario import Usuario
@@ -24,7 +25,7 @@ def login() -> Response:
         senha = request.form.get('senha', '')
 
         if not email or not senha:
-            flash('Email e senha são obrigatórios', 'danger')
+            flash_t('email_password_required', 'danger')
             return redirect(url_for('main.login'))
 
         usuario = Usuario.get_by_email(email)
@@ -32,13 +33,13 @@ def login() -> Response:
             # remember=False ensures it's a session cookie that expires on browser close
             login_user(usuario, remember=False)
             logger.info(f"Login bem-sucedido: {usuario.email} ({usuario.nome}, Perfil: {usuario.perfil})")
-            flash(f'Bem-vindo, {usuario.nome}!', 'success')
+            flash_t('welcome_user', 'success', nome=usuario.nome)
             if usuario.perfil == 'solicitante':
                 return redirect(url_for('main.index'))
             return redirect(url_for('main.admin'))
 
         logger.warning(f"Falha de autenticação: email {email} ou senha incorretos")
-        flash('Email ou senha incorretos', 'danger')
+        flash_t('invalid_email_password', 'danger')
         return redirect(url_for('main.login'))
 
     return render_template('login.html')
@@ -51,5 +52,5 @@ def logout() -> Response:
     email = current_user.email
     logout_user()
     logger.info(f"Logout: {email}")
-    flash('Você foi desconectado com sucesso!', 'info')
+    flash_t('logout_success', 'info')
     return redirect(url_for('main.login'))

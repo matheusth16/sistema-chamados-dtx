@@ -19,11 +19,6 @@
         "en": "Save Change",
         "es": "Guardar Cambio"
     },
-    "no_tickets": {
-        "pt_BR": "Nenhum chamado encontrado.",
-        "en": "No tickets found.",
-        "es": "No se encontraron tickets."
-    },
     "gate_1": {
         "pt_BR": "Gate 1",
         "en": "Gate 1",
@@ -658,5 +653,1179 @@
         "pt_BR": "Atualizar dados",
         "en": "Refresh data",
         "es": "Actualizar datos"
+    },
+    "lang_portuguese": {
+        "pt_BR": "Português",
+        "en": "Portuguese",
+        "es": "Portugués"
+    },
+    "lang_english": {
+        "pt_BR": "Inglês",
+        "en": "English",
+        "es": "Inglés"
+    },
+    "lang_spanish": {
+        "pt_BR": "Espanhol",
+        "en": "Spanish",
+        "es": "Español"
+    },
+    "nav_management": {
+        "pt_BR": "Gestão",
+        "en": "Management",
+        "es": "Gestión"
+    },
+    "nav_my_reports": {
+        "pt_BR": "Meus Relatórios",
+        "en": "My Reports",
+        "es": "Mis Informes"
+    },
+    "nav_new_ticket": {
+        "pt_BR": "Novo Chamado",
+        "en": "New Ticket",
+        "es": "Nuevo Ticket"
+    },
+    "nav_my_tickets": {
+        "pt_BR": "Meus Chamados",
+        "en": "My Tickets",
+        "es": "Mis Tickets"
+    },
+    "nav_users": {
+        "pt_BR": "Usuários",
+        "en": "Users",
+        "es": "Usuarios"
+    },
+    "nav_categories": {
+        "pt_BR": "Categorias",
+        "en": "Categories",
+        "es": "Categorías"
+    },
+    "nav_translations": {
+        "pt_BR": "Traduções",
+        "en": "Translations",
+        "es": "Traducciones"
+    },
+    "nav_logout": {
+        "pt_BR": "Sair",
+        "en": "Logout",
+        "es": "Cerrar sesión"
+    },
+    "footer_text": {
+        "pt_BR": "DTX Aerospace. Todos os direitos reservados.",
+        "en": "DTX Aerospace. All rights reserved.",
+        "es": "DTX Aerospace. Todos los derechos reservados."
+    },
+    "opening_date": {
+        "pt_BR": "Data de Abertura",
+        "en": "Opening Date",
+        "es": "Fecha de Apertura"
+    },
+    "rate_service": {
+        "pt_BR": "Avalie o Atendimento",
+        "en": "Rate the Service",
+        "es": "Califique el Servicio"
+    },
+    "rating": {
+        "pt_BR": "Nota",
+        "en": "Rating",
+        "es": "Calificación"
+    },
+    "comment": {
+        "pt_BR": "Comentário",
+        "en": "Comment",
+        "es": "Comentario"
+    },
+    "submit_rating": {
+        "pt_BR": "Avaliar",
+        "en": "Submit Rating",
+        "es": "Enviar Calificación"
+    },
+
+    "sla_tooltip": {
+        "pt_BR": "Projetos: 2 dias. Demais: 3 dias.",
+        "en": "Projects: 2 days. Others: 3 days.",
+        "es": "Proyectos: 2 días. Otros: 3 días."
+    },
+    "edit_description_placeholder": {
+        "pt_BR": "Edite ou adicione texto à descrição existente...",
+        "en": "Edit or add text to the existing description...",
+        "es": "Edite o agregue texto a la descripción existente..."
+    },
+    "current_attachments": {
+        "pt_BR": "Anexos Atuais",
+        "en": "Current Attachments",
+        "es": "Archivos Adjuntos Actuales"
+    },
+    "new_attachment": {
+        "pt_BR": "Novo Anexo (Adicionar)",
+        "en": "New Attachment (Add)",
+        "es": "Nuevo Archivo Adjunto (Agregar)"
+    },
+    "no_change": {
+        "pt_BR": "Sem alteração",
+        "en": "No change",
+        "es": "Sin cambios"
+    },
+    "saving": {
+        "pt_BR": "Salvando...",
+        "en": "Saving...",
+        "es": "Guardando..."
+    },
+    "save_error": {
+        "pt_BR": "Erro de rede ao salvar!",
+        "en": "Network error while saving!",
+        "es": "¡Error de red al guardar!"
+    },
+
+    "viewing_ticket_num": {
+        "pt_BR": "Visualizando Chamado ",
+        "en": "Viewing Ticket ",
+        "es": "Viendo Ticket "
+    },
+    "ticket_num": {
+        "pt_BR": "Chamado #",
+        "en": "Ticket #",
+        "es": "Ticket #"
+    },
+    "generating_reports": {
+        "pt_BR": "Gerando relatórios...",
+        "en": "Generating reports...",
+        "es": "Generando informes..."
+    },
+    "insights_alerts": {
+        "pt_BR": "Insights e Alertas",
+        "en": "Insights and Alerts",
+        "es": "Información y Alertas"
+    },
+    "impact_metric": {
+        "pt_BR": "Métrica de Impacto",
+        "en": "Impact Metric",
+        "es": "Métrica de Impacto"
+    },
+    "no_insights": {
+        "pt_BR": "Nenhum insight ou alerta no momento para o período analisado.",
+        "en": "No insights or alerts at the moment for the analyzed period.",
+        "es": "No hay información ni alertas en este momento para el período analizado."
+    },
+    "overview": {
+        "pt_BR": "Visão Geral",
+        "en": "Overview",
+        "es": "Visión General"
+    },
+    "last_plural": {
+        "pt_BR": "últimos",
+        "en": "last",
+        "es": "últimos"
+    },
+    "days": {
+        "pt_BR": "dias",
+        "en": "days",
+        "es": "días"
+    },
+
+    "resolution_rate": {
+        "pt_BR": "Taxa de Resolução",
+        "en": "Resolution Rate",
+        "es": "Tasa de Resolución"
+    },
+    "within_sla": {
+        "pt_BR": "Dentro do SLA",
+        "en": "Within SLA",
+        "es": "Dentro del SLA"
+    },
+    "none_completed_period": {
+        "pt_BR": "Sem concluídos no período",
+        "en": "None completed in the period",
+        "es": "Ninguno completado en el período"
+    },
+    "no_data_available": {
+        "pt_BR": "Nenhum dado disponível para o período.",
+        "en": "No data available for the period.",
+        "es": "No hay datos disponibles para el período."
+    },
+    "distribution_by_status": {
+        "pt_BR": "Distribuição por Status",
+        "en": "Distribution by Status",
+        "es": "Distribución por Estado"
+    },
+    "distribution_by_priority": {
+        "pt_BR": "Distribuição por Prioridade",
+        "en": "Distribution by Priority",
+        "es": "Distribución por Prioridad"
+    },
+    "sla_summary": {
+        "pt_BR": "Resumo SLA",
+        "en": "SLA Summary",
+        "es": "Resumen de SLA"
+    },
+    "on_time": {
+        "pt_BR": "No prazo",
+        "en": "On time",
+        "es": "A tiempo"
+    },
+    "completed_on_time": {
+        "pt_BR": "Concluídos no prazo",
+        "en": "Completed on time",
+        "es": "Completados a tiempo"
+    },
+    "delayed": {
+        "pt_BR": "Atrasado",
+        "en": "Delayed",
+        "es": "Retrasado"
+    },
+    "overdue": {
+        "pt_BR": "Fora do prazo ou vencidos",
+        "en": "Overdue or expired",
+        "es": "Fuera de plazo o vencidos"
+    },
+    "at_risk": {
+        "pt_BR": "Em risco",
+        "en": "At risk",
+        "es": "En riesgo"
+    },
+    "due_in_1_day": {
+        "pt_BR": "Vencem em até 1 dia",
+        "en": "Due in up to 1 day",
+        "es": "Vencen en hasta 1 día"
+    },
+    "team_performance": {
+        "pt_BR": "Performance da Equipe (Supervisores)",
+        "en": "Team Performance (Supervisors)",
+        "es": "Rendimiento del Equipo (Supervisores)"
+    },
+    "supervisor": {
+        "pt_BR": "Supervisor",
+        "en": "Supervisor",
+        "es": "Supervisor"
+    },
+    "area_th": {
+        "pt_BR": "Área",
+        "en": "Area",
+        "es": "Área"
+    },
+    "total": {
+        "pt_BR": "Total",
+        "en": "Total",
+        "es": "Total"
+    },
+    "workload": {
+        "pt_BR": "Carga",
+        "en": "Workload",
+        "es": "Carga"
+    },
+    "completed_short": {
+        "pt_BR": "Concl.",
+        "en": "Comp.",
+        "es": "Comp."
+    },
+    "rate": {
+        "pt_BR": "Taxa",
+        "en": "Rate",
+        "es": "Tasa"
+    },
+    "time": {
+        "pt_BR": "Tempo",
+        "en": "Time",
+        "es": "Tiempo"
+    },
+    "sla_percent": {
+        "pt_BR": "SLA %",
+        "en": "SLA %",
+        "es": "SLA %"
+    },
+    "workload_distributed": {
+        "pt_BR": "Carga de Trabalho Distribuída",
+        "en": "Distributed Workload",
+        "es": "Carga de Trabajo Distribuida"
+    },
+    "area_performance": {
+        "pt_BR": "Performance por Área",
+        "en": "Performance by Area",
+        "es": "Rendimiento por Área"
+    },
+    "sups_short": {
+        "pt_BR": "Sups.",
+        "en": "Sups.",
+        "es": "Sups."
+    },
+    "balanced": {
+        "pt_BR": "Balanceado",
+        "en": "Balanced",
+        "es": "Equilibrado"
+    },
+    "history_of_changes": {
+        "pt_BR": "Histórico de Alterações",
+        "en": "History of Changes",
+        "es": "Historial de Cambios"
+    },
+    "back_to_dashboard": {
+        "pt_BR": "Voltar ao Painel",
+        "en": "Back to Dashboard",
+        "es": "Volver al Panel"
+    },
+    "opening": {
+        "pt_BR": "Abertura",
+        "en": "Opening",
+        "es": "Apertura"
+    },
+    "changes_timeline": {
+        "pt_BR": "Timeline de Alterações",
+        "en": "Changes Timeline",
+        "es": "Línea de Tiempo de Cambios"
+    },
+    "ticket_created": {
+        "pt_BR": "Chamado Criado",
+        "en": "Ticket Created",
+        "es": "Ticket Creado"
+    },
+    "status_updated_event": {
+        "pt_BR": "Status Atualizado",
+        "en": "Status Updated",
+        "es": "Estado Actualizado"
+    },
+    "data_modified": {
+        "pt_BR": "Dados Modificados",
+        "en": "Data Modified",
+        "es": "Datos Modificados"
+    },
+    "brasilia_time": {
+        "pt_BR": "Horário de Brasília",
+        "en": "Brasilia Time",
+        "es": "Hora de Brasilia"
+    },
+    "changed_field": {
+        "pt_BR": "Campo alterado:",
+        "en": "Changed field:",
+        "es": "Campo cambiado:"
+    },
+    "ticket_started_successfully": {
+        "pt_BR": "Chamado iniciado com sucesso",
+        "en": "Ticket started successfully",
+        "es": "Ticket iniciado correctamente"
+    },
+    "no_changes_recorded": {
+        "pt_BR": "Nenhuma alteração registrada ainda",
+        "en": "No changes recorded yet",
+        "es": "Aún no hay cambios registrados"
+    },
+    "ticket_just_created": {
+        "pt_BR": "Este chamado acabou de ser criado",
+        "en": "This ticket was just created",
+        "es": "Este ticket acaba de ser creado"
+    },
+    "category_administration": {
+        "pt_BR": "Administração de Categorias",
+        "en": "Category Administration",
+        "es": "Administración de Categorías"
+    },
+    "manage_categories_desc": {
+        "pt_BR": "Gerencie setores, gates e impactos do sistema. Todas as categorias são traduzidas automaticamente para Inglês e Espanhol.",
+        "en": "Manage system sectors, gates, and impacts. All categories are automatically translated to English and Spanish.",
+        "es": "Gestione sectores, gates e impactos del sistema. Todas las categorías se traducen automáticamente al Inglés y Español."
+    },
+    "sectors": {
+        "pt_BR": "Setores",
+        "en": "Sectors",
+        "es": "Sectores"
+    },
+    "gates": {
+        "pt_BR": "Gates",
+        "en": "Gates",
+        "es": "Gates"
+    },
+    "impacts": {
+        "pt_BR": "Impactos",
+        "en": "Impacts",
+        "es": "Impactos"
+    },
+    "new_sector": {
+        "pt_BR": "Novo Setor",
+        "en": "New Sector",
+        "es": "Nuevo Sector"
+    },
+    "name_portuguese": {
+        "pt_BR": "Nome (Português)",
+        "en": "Name (Portuguese)",
+        "es": "Nombre (Portugués)"
+    },
+    "ex_maintenance": {
+        "pt_BR": "ex: Manutenção",
+        "en": "e.g.: Maintenance",
+        "es": "ej.: Mantenimiento"
+    },
+    "auto_translated_note": {
+        "pt_BR": "⭐ Será traduzido automaticamente para Inglês e Espanhol",
+        "en": "⭐ Will be automatically translated to English and Spanish",
+        "es": "⭐ Será traducido automáticamente al Inglés y Español"
+    },
+    "description_optional": {
+        "pt_BR": "Descrição (opcional)",
+        "en": "Description (optional)",
+        "es": "Descripción (opcional)"
+    },
+    "ex_maintenance_desc": {
+        "pt_BR": "ex: Departamento de manutenção preventiva",
+        "en": "e.g.: Preventive maintenance department",
+        "es": "ej.: Departamento de mantenimiento preventivo"
+    },
+    "add_sector": {
+        "pt_BR": "Adicionar Setor",
+        "en": "Add Sector",
+        "es": "Añadir Sector"
+    },
+    "registered_sectors": {
+        "pt_BR": "Setores Cadastrados",
+        "en": "Registered Sectors",
+        "es": "Sectores Registrados"
+    },
+    "inactive": {
+        "pt_BR": "Inativo",
+        "en": "Inactive",
+        "es": "Inactivo"
+    },
+    "edit": {
+        "pt_BR": "Editar",
+        "en": "Edit",
+        "es": "Editar"
+    },
+    "delete": {
+        "pt_BR": "Excluir",
+        "en": "Delete",
+        "es": "Eliminar"
+    },
+    "no_sectors_registered": {
+        "pt_BR": "Nenhum setor cadastrado ainda.",
+        "en": "No sectors registered yet.",
+        "es": "Ningún sector registrado aún."
+    },
+    "new_gate": {
+        "pt_BR": "Novo Gate",
+        "en": "New Gate",
+        "es": "Nuevo Gate"
+    },
+    "ex_gate_5": {
+        "pt_BR": "ex: Gate 5",
+        "en": "e.g.: Gate 5",
+        "es": "ej.: Gate 5"
+    },
+    "ex_validation_req": {
+        "pt_BR": "ex: Validação de requisitos",
+        "en": "e.g.: Requirements validation",
+        "es": "ej.: Validación de requisitos"
+    },
+    "order_auto_assigned_note": {
+        "pt_BR": "📌 A ordem será atribuída automaticamente (próximo número sequencial)",
+        "en": "📌 Order will be automatically assigned (next sequential number)",
+        "es": "📌 El orden será asignado automáticamente (siguiente número secuencial)"
+    },
+    "add_gate": {
+        "pt_BR": "Adicionar Gate",
+        "en": "Add Gate",
+        "es": "Añadir Gate"
+    },
+    "registered_gates": {
+        "pt_BR": "Gates Cadastrados",
+        "en": "Registered Gates",
+        "es": "Gates Registrados"
+    },
+    "no_gates_registered": {
+        "pt_BR": "Nenhum gate cadastrado ainda.",
+        "en": "No gates registered yet.",
+        "es": "Ningún gate registrado aún."
+    },
+    "new_impact": {
+        "pt_BR": "Novo Impacto",
+        "en": "New Impact",
+        "es": "Nuevo Impacto"
+    },
+    "ex_critical": {
+        "pt_BR": "ex: Crítico",
+        "en": "e.g.: Critical",
+        "es": "ej.: Crítico"
+    },
+    "ex_critical_desc": {
+        "pt_BR": "ex: Impacto crítico na operação",
+        "en": "e.g.: Critical impact on operation",
+        "es": "ej.: Impacto crítico en la operación"
+    },
+    "add_impact": {
+        "pt_BR": "Adicionar Impacto",
+        "en": "Add Impact",
+        "es": "Añadir Impacto"
+    },
+    "registered_impacts": {
+        "pt_BR": "Impactos Cadastrados",
+        "en": "Registered Impacts",
+        "es": "Impactos Registrados"
+    },
+    "no_impacts_registered": {
+        "pt_BR": "Nenhum impacto cadastrado ainda.",
+        "en": "No impacts registered yet.",
+        "es": "Ningún impacto registrado aún."
+    },
+    "confirm_delete_sector": {
+        "pt_BR": "Tem certeza que deseja excluir este setor?",
+        "en": "Are you sure you want to delete this sector?",
+        "es": "¿Está seguro de que desea eliminar este sector?"
+    },
+    "confirm_delete_gate": {
+        "pt_BR": "Tem certeza que deseja excluir este gate?",
+        "en": "Are you sure you want to delete this gate?",
+        "es": "¿Está seguro de que desea eliminar este gate?"
+    },
+    "confirm_delete_impact": {
+        "pt_BR": "Tem certeza que deseja excluir este impacto?",
+        "en": "Are you sure you want to delete this impact?",
+        "es": "¿Está seguro de que desea eliminar este impacto?"
+    },
+    "edit_sector_soon": {
+        "pt_BR": "Edição de setor será implementada em breve",
+        "en": "Sector editing will be implemented soon",
+        "es": "La edición de sector se implementará pronto"
+    },
+    "edit_gate_soon": {
+        "pt_BR": "Edição de gate será implementada em breve",
+        "en": "Gate editing will be implemented soon",
+        "es": "La edición de gate se implementará pronto"
+    },
+    "edit_impact_soon": {
+        "pt_BR": "Edição de impacto será implementada em breve",
+        "en": "Impact editing will be implemented soon",
+        "es": "La edición de impacto se implementará pronto"
+    },
+    "translation_management": {
+        "pt_BR": "Gerenciamento de Traduções",
+        "en": "Translation Management",
+        "es": "Gestión de Traducciones"
+    },
+    "edit_system_terms": {
+        "pt_BR": "Edite os termos do sistema em múltiplos idiomas",
+        "en": "Edit system terms in multiple languages",
+        "es": "Edite los términos del sistema en múltiples idiomas"
+    },
+    "search_key_or_text": {
+        "pt_BR": "Buscar por chave ou texto...",
+        "en": "Search by key or text...",
+        "es": "Buscar por clave o texto..."
+    },
+    "system_key": {
+        "pt_BR": "Chave do Sistema",
+        "en": "System Key",
+        "es": "Clave del Sistema"
+    },
+    "portuguese_pt_br": {
+        "pt_BR": "Português (pt_BR)",
+        "en": "Portuguese (pt_BR)",
+        "es": "Portugués (pt_BR)"
+    },
+    "english_en": {
+        "pt_BR": "Inglês (en)",
+        "en": "English (en)",
+        "es": "Inglés (en)"
+    },
+    "spanish_es": {
+        "pt_BR": "Espanhol (es)",
+        "en": "Spanish (es)",
+        "es": "Español (es)"
+    },
+
+    "save": {
+        "pt_BR": "Salvar",
+        "en": "Save",
+        "es": "Guardar"
+    },
+
+    "saved": {
+        "pt_BR": "Salvo",
+        "en": "Saved",
+        "es": "Guardado"
+    },
+    "error_saving": {
+        "pt_BR": "Erro ao salvar",
+        "en": "Error saving",
+        "es": "Error al guardar"
+    },
+    "unknown": {
+        "pt_BR": "Desconhecido",
+        "en": "Unknown",
+        "es": "Desconocido"
+    },
+    "error": {
+        "pt_BR": "Erro",
+        "en": "Error",
+        "es": "Error"
+    },
+    "error_in_request_console": {
+        "pt_BR": "Erro na requisição. Verifique o console.",
+        "en": "Request error. Check the console.",
+        "es": "Error en la solicitud. Verifique la consola."
+    },
+
+    "users_registered_in_system": {
+        "pt_BR": "usuários cadastrados no sistema.",
+        "en": "users registered in the system.",
+        "es": "usuarios registrados en el sistema."
+    },
+    "new_user": {
+        "pt_BR": "Novo Usuário",
+        "en": "New User",
+        "es": "Nuevo Usuario"
+    },
+    "back": {
+        "pt_BR": "Voltar",
+        "en": "Back",
+        "es": "Volver"
+    },
+
+    "profile": {
+        "pt_BR": "Perfil",
+        "en": "Profile",
+        "es": "Perfil"
+    },
+
+    "admin": {
+        "pt_BR": "Admin",
+        "en": "Admin",
+        "es": "Admin"
+    },
+
+    "confirm_delete_user": {
+        "pt_BR": "Tem certeza que deseja remover o usuário {nome}? Esta ação não pode ser desfeita!",
+        "en": "Are you sure you want to remove user {nome}? This action cannot be undone!",
+        "es": "¿Está seguro de que desea eliminar al usuario {nome}? ¡Esta acción no se puede deshacer!"
+    },
+    "cannot_delete_yourself": {
+        "pt_BR": "Não é possível deletar você mesmo",
+        "en": "Cannot delete yourself",
+        "es": "No puede eliminarse a sí mismo"
+    },
+    "no_users_registered": {
+        "pt_BR": "Nenhum usuário cadastrado.",
+        "en": "No users registered.",
+        "es": "Ningún usuario registrado."
+    },
+    "create_now": {
+        "pt_BR": "Criar agora",
+        "en": "Create now",
+        "es": "Crear ahora"
+    },
+    "back_to_user_list": {
+        "pt_BR": "← Voltar para lista de usuários",
+        "en": "← Back to user list",
+        "es": "← Volver a la lista de usuarios"
+    },
+    "edit_user": {
+        "pt_BR": "Editar Usuário",
+        "en": "Edit User",
+        "es": "Editar Usuario"
+    },
+    "change_user_data": {
+        "pt_BR": "Altere os dados do usuário",
+        "en": "Change user data",
+        "es": "Cambiar datos del usuario"
+    },
+    "fill_new_user_data": {
+        "pt_BR": "Preencha os dados do novo usuário",
+        "en": "Fill out new user data",
+        "es": "Complete los datos del nuevo usuario"
+    },
+    "email_required": {
+        "pt_BR": "📧 Email *",
+        "en": "📧 Email *",
+        "es": "📧 Correo electrónico *"
+    },
+    "ex_email": {
+        "pt_BR": "usuario@dtx.com",
+        "en": "user@dtx.com",
+        "es": "usuario@dtx.com"
+    },
+    "full_name_required": {
+        "pt_BR": "👤 Nome Completo *",
+        "en": "👤 Full Name *",
+        "es": "👤 Nombre Completo *"
+    },
+    "ex_name": {
+        "pt_BR": "João da Silva",
+        "en": "John Doe",
+        "es": "Juan Pérez"
+    },
+    "profile_required": {
+        "pt_BR": "👥 Perfil *",
+        "en": "👥 Profile *",
+        "es": "👥 Perfil *"
+    },
+    "requester_creates_tickets": {
+        "pt_BR": "Solicitante (Cria chamados)",
+        "en": "Requester (Creates tickets)",
+        "es": "Solicitante (Crea tickets)"
+    },
+    "supervisor_manages_area": {
+        "pt_BR": "Supervisor (Gerencia área)",
+        "en": "Supervisor (Manages area)",
+        "es": "Supervisor (Gestiona área)"
+    },
+    "admin_full_access": {
+        "pt_BR": "Admin (Acesso total)",
+        "en": "Admin (Full access)",
+        "es": "Admin (Acceso total)"
+    },
+    "areas_sectors_select_one_or_more": {
+        "pt_BR": "🏢 Áreas/Setores (Selecione um ou mais) *",
+        "en": "🏢 Areas/Sectors (Select one or more) *",
+        "es": "🏢 Áreas/Sectores (Seleccione uno o más) *"
+    },
+    "area_maintenance": {
+        "pt_BR": "Manutenção",
+        "en": "Maintenance",
+        "es": "Mantenimiento"
+    },
+    "area_engineering": {
+        "pt_BR": "Engenharia",
+        "en": "Engineering",
+        "es": "Ingeniería"
+    },
+    "area_quality": {
+        "pt_BR": "Qualidade",
+        "en": "Quality",
+        "es": "Calidad"
+    },
+    "area_commercial": {
+        "pt_BR": "Comercial",
+        "en": "Commercial",
+        "es": "Comercial"
+    },
+    "area_planning": {
+        "pt_BR": "Planejamento",
+        "en": "Planning",
+        "es": "Planificación"
+    },
+    "area_material": {
+        "pt_BR": "Material",
+        "en": "Material",
+        "es": "Material"
+    },
+    "new_password_leave_blank": {
+        "pt_BR": "🔑 Nova Senha (deixe em branco para manter)",
+        "en": "🔑 New Password (leave blank to keep)",
+        "es": "🔑 Nueva Contraseña (dejar en blanco para mantener)"
+    },
+    "leave_blank_to_keep_current": {
+        "pt_BR": "Deixe vazio para manter a senha atual",
+        "en": "Leave empty to keep the current password",
+        "es": "Dejar vacío para mantener la contraseña actual"
+    },
+    "password_required": {
+        "pt_BR": "🔑 Senha *",
+        "en": "🔑 Password *",
+        "es": "🔑 Contraseña *"
+    },
+    "minimum_6_chars": {
+        "pt_BR": "Mínimo 6 caracteres",
+        "en": "Minimum 6 characters",
+        "es": "Mínimo 6 caracteres"
+    },
+    "cancel": {
+        "pt_BR": "Cancelar",
+        "en": "Cancel",
+        "es": "Cancelar"
+    },
+    "save_changes": {
+        "pt_BR": "Salvar Alterações",
+        "en": "Save Changes",
+        "es": "Guardar Cambios"
+    },
+    "create_user_btn": {
+        "pt_BR": "Criar Usuário",
+        "en": "Create User",
+        "es": "Crear Usuario"
+    },
+    "email_password_required": {
+        "pt_BR": "Email e senha são obrigatórios",
+        "en": "Email and password are required",
+        "es": "Correo y contraseña son obligatorios"
+    },
+    "welcome_user": {
+        "pt_BR": "Bem-vindo, {nome}!",
+        "en": "Welcome, {nome}!",
+        "es": "¡Bienvenido, {nome}!"
+    },
+    "invalid_email_password": {
+        "pt_BR": "Email ou senha incorretos",
+        "en": "Invalid email or password",
+        "es": "Correo o contraseña incorrectos"
+    },
+    "logout_success": {
+        "pt_BR": "Você foi desconectado com sucesso!",
+        "en": "You have been successfully logged out!",
+        "es": "¡Ha cerrado sesión con éxito!"
+    },
+    "error_loading_categories": {
+        "pt_BR": "Erro ao carregar categorias. Tente novamente.",
+        "en": "Error loading categories. Please try again.",
+        "es": "Error al cargar categorías. Por favor inténtelo de nuevo."
+    },
+    "sector_name_required": {
+        "pt_BR": "Nome do setor é obrigatório",
+        "en": "Sector name is required",
+        "es": "El nombre del sector es obligatorio"
+    },
+    "sector_created_success": {
+        "pt_BR": "Setor \"{nome}\" criado com sucesso (traduzido automaticamente)",
+        "en": "Sector \"{nome}\" successfully created (automatically translated)",
+        "es": "Sector \"{nome}\" creado con éxito (traducido automáticamente)"
+    },
+    "error_creating_sector": {
+        "pt_BR": "Erro ao criar setor: {error}",
+        "en": "Error creating sector: {error}",
+        "es": "Error al crear el sector: {error}"
+    },
+    "gate_name_required": {
+        "pt_BR": "Nome do gate é obrigatório",
+        "en": "Gate name is required",
+        "es": "El nombre de la puerta (gate) es obligatorio"
+    },
+    "gate_created_success": {
+        "pt_BR": "Gate \"{nome}\" criado com sucesso (ordem: {ordem}, traduzido automaticamente)",
+        "en": "Gate \"{nome}\" successfully created (order: {ordem}, automatically translated)",
+        "es": "Puerta \"{nome}\" creada con éxito (orden: {ordem}, traducido automáticamente)"
+    },
+    "error_creating_gate": {
+        "pt_BR": "Erro ao criar gate: {error}",
+        "en": "Error creating gate: {error}",
+        "es": "Error al crear la puerta (gate): {error}"
+    },
+    "impact_name_required": {
+        "pt_BR": "Nome do impacto é obrigatório",
+        "en": "Impact name is required",
+        "es": "El nombre del impacto es obligatorio"
+    },
+    "impact_created_success": {
+        "pt_BR": "Impacto \"{nome}\" criado com sucesso (traduzido automaticamente)",
+        "en": "Impact \"{nome}\" successfully created (automatically translated)",
+        "es": "Impacto \"{nome}\" creado con éxito (traducido automáticamente)"
+    },
+    "error_creating_impact": {
+        "pt_BR": "Erro ao criar impacto: {error}",
+        "en": "Error creating impact: {error}",
+        "es": "Error al crear el impacto: {error}"
+    },
+    "sector_not_found": {
+        "pt_BR": "Setor não encontrado",
+        "en": "Sector not found",
+        "es": "Sector no encontrado"
+    },
+    "sector_updated_success": {
+        "pt_BR": "Setor \"{nome}\" atualizado com sucesso",
+        "en": "Sector \"{nome}\" successfully updated",
+        "es": "Sector \"{nome}\" actualizado con éxito"
+    },
+    "error_editing_sector": {
+        "pt_BR": "Erro ao editar setor: {error}",
+        "en": "Error editing sector: {error}",
+        "es": "Error al editar el sector: {error}"
+    },
+    "sector_deleted_success": {
+        "pt_BR": "Setor \"{nome}\" excluído com sucesso",
+        "en": "Sector \"{nome}\" successfully deleted",
+        "es": "Sector \"{nome}\" eliminado con éxito"
+    },
+    "error_deleting_sector": {
+        "pt_BR": "Erro ao excluir setor: {error}",
+        "en": "Error deleting sector: {error}",
+        "es": "Error al eliminar el sector: {error}"
+    },
+    "gate_not_found": {
+        "pt_BR": "Gate não encontrado",
+        "en": "Gate not found",
+        "es": "Puerta (gate) no encontrada"
+    },
+    "gate_updated_success": {
+        "pt_BR": "Gate \"{nome}\" atualizado com sucesso",
+        "en": "Gate \"{nome}\" successfully updated",
+        "es": "Puerta \"{nome}\" actualizada con éxito"
+    },
+    "error_editing_gate": {
+        "pt_BR": "Erro ao editar gate: {error}",
+        "en": "Error editing gate: {error}",
+        "es": "Error al editar la puerta (gate): {error}"
+    },
+    "gate_deleted_success": {
+        "pt_BR": "Gate \"{nome}\" excluído com sucesso",
+        "en": "Gate \"{nome}\" successfully deleted",
+        "es": "Puerta \"{nome}\" eliminada con éxito"
+    },
+    "error_deleting_gate": {
+        "pt_BR": "Erro ao excluir gate: {error}",
+        "en": "Error deleting gate: {error}",
+        "es": "Error al eliminar la puerta (gate): {error}"
+    },
+    "impact_not_found": {
+        "pt_BR": "Impacto não encontrado",
+        "en": "Impact not found",
+        "es": "Impacto no encontrado"
+    },
+    "impact_updated_success": {
+        "pt_BR": "Impacto \"{nome}\" atualizado com sucesso",
+        "en": "Impact \"{nome}\" successfully updated",
+        "es": "Impacto \"{nome}\" actualizado con éxito"
+    },
+    "error_editing_impact": {
+        "pt_BR": "Erro ao editar impacto: {error}",
+        "en": "Error editing impact: {error}",
+        "es": "Error al editar el impacto: {error}"
+    },
+    "impact_deleted_success": {
+        "pt_BR": "Impacto \"{nome}\" excluído com sucesso",
+        "en": "Impact \"{nome}\" successfully deleted",
+        "es": "Impacto \"{nome}\" eliminado con éxito"
+    },
+    "error_deleting_impact": {
+        "pt_BR": "Erro ao excluir impacto: {error}",
+        "en": "Error deleting impact: {error}",
+        "es": "Error al eliminar el impacto: {error}"
+    },
+    "ticket_not_found": {
+        "pt_BR": "Chamado não encontrado",
+        "en": "Ticket not found",
+        "es": "Ticket no encontrado"
+    },
+    "only_update_tickets_your_area": {
+        "pt_BR": "Você só pode atualizar chamados da sua área",
+        "en": "You can only update tickets in your area",
+        "es": "Solo puedes actualizar tickets de tu área"
+    },
+    "error_updating": {
+        "pt_BR": "Erro ao atualizar",
+        "en": "Error updating",
+        "es": "Error al actualizar"
+    },
+    "error_updating_with_msg": {
+        "pt_BR": "Erro ao atualizar: {error}",
+        "en": "Error updating: {error}",
+        "es": "Error al actualizar: {error}"
+    },
+    "only_view_history_your_area": {
+        "pt_BR": "Você só pode visualizar histórico de chamados da sua área",
+        "en": "You can only view history for tickets in your area",
+        "es": "Solo puedes ver el historial de tickets de tu área"
+    },
+    "error_loading_history": {
+        "pt_BR": "Erro ao buscar histórico",
+        "en": "Error locating history",
+        "es": "Error al localizar el historial"
+    },
+    "error_exporting_data": {
+        "pt_BR": "Erro ao exportar dados. Tente novamente.",
+        "en": "Error exporting data. Please try again.",
+        "es": "Error al exportar datos. Por favor inténtalo de nuevo."
+    },
+    "error_exporting_report": {
+        "pt_BR": "Erro ao exportar relatório. Tente novamente.",
+        "en": "Error exporting report. Please try again.",
+        "es": "Error al exportar informe. Por favor inténtalo de nuevo."
+    },
+    "error_generating_reports": {
+        "pt_BR": "Erro ao gerar relatórios. Tente novamente.",
+        "en": "Error generating reports. Please try again.",
+        "es": "Error al generar informes. Por favor inténtalo de nuevo."
+    },
+    "error_loading_index_info": {
+        "pt_BR": "Erro ao carregar informações de índices",
+        "en": "Error loading index information",
+        "es": "Error al cargar la información de los índices"
+    },
+    "ticket_created_success": {
+        "pt_BR": "Chamado criado com sucesso!",
+        "en": "Ticket successfully created!",
+        "es": "¡Ticket creado con éxito!"
+    },
+    "error_saving_ticket": {
+        "pt_BR": "Não foi possível salvar o chamado. Tente novamente.",
+        "en": "Unable to save the ticket. Please try again.",
+        "es": "No se pudo guardar el ticket. Por favor inténtalo de nuevo."
+    },
+    "error_loading_your_tickets": {
+        "pt_BR": "Erro ao carregar seus chamados.",
+        "en": "Error loading your tickets.",
+        "es": "Error al cargar tus tickets."
+    },
+    "trans_key_not_provided": {
+        "pt_BR": "Chave de tradução não informada.",
+        "en": "Translation key not provided.",
+        "es": "Clave de traducción no proporcionada."
+    },
+    "translation_saved_success": {
+        "pt_BR": "Tradução para \"{chave}\" salva com sucesso.",
+        "en": "Translation for \"{chave}\" saved successfully.",
+        "es": "Traducción para \"{chave}\" guardada con éxito."
+    },
+    "error_saving_json": {
+        "pt_BR": "Erro ao salvar o arquivo json.",
+        "en": "Error saving JSON file.",
+        "es": "Error al guardar el archivo JSON."
+    },
+    "error_saving_with_msg": {
+        "pt_BR": "Erro ao salvar: {error}",
+        "en": "Error saving: {error}",
+        "es": "Error al guardar: {error}"
+    },
+    "error_loading_translations": {
+        "pt_BR": "Erro ao carregar lista de traduções.",
+        "en": "Error loading translations list.",
+        "es": "Error al cargar la lista de traducciones."
+    },
+    "invalid_email": {
+        "pt_BR": "Email inválido",
+        "en": "Invalid email",
+        "es": "Correo inválido"
+    },
+    "email_exists": {
+        "pt_BR": "Email já existe no sistema",
+        "en": "Email already exists in the system",
+        "es": "El correo ya existe en el sistema"
+    },
+    "name_min_chars": {
+        "pt_BR": "Nome deve ter pelo menos 3 caracteres",
+        "en": "Name must have at least 3 characters",
+        "es": "El nombre debe tener al menos 3 caracteres"
+    },
+    "invalid_profile": {
+        "pt_BR": "Perfil inválido",
+        "en": "Invalid profile",
+        "es": "Perfil inválido"
+    },
+    "area_required_for_supervisor": {
+        "pt_BR": "Pelo menos uma Área é obrigatória para supervisores e admins",
+        "en": "At least one Area is required for supervisors and admins",
+        "es": "Se requiere al menos un Área para supervisores y admins"
+    },
+    "password_min_chars": {
+        "pt_BR": "Senha deve ter pelo menos 6 caracteres",
+        "en": "Password must have at least 6 characters",
+        "es": "La contraseña debe tener al menos 6 caracteres"
+    },
+    "user_created_success": {
+        "pt_BR": "Usuário {nome} criado com sucesso!",
+        "en": "User {nome} successfully created!",
+        "es": "¡Usuario {nome} creado con éxito!"
+    },
+    "error_creating_user": {
+        "pt_BR": "Erro ao criar usuário: {error}",
+        "en": "Error creating user: {error}",
+        "es": "Error al crear usuario: {error}"
+    },
+    "error_loading_users": {
+        "pt_BR": "Erro ao carregar usuários",
+        "en": "Error loading users",
+        "es": "Error al cargar usuarios"
+    },
+    "user_not_found": {
+        "pt_BR": "Usuário não encontrado",
+        "en": "User not found",
+        "es": "Usuario no encontrado"
+    },
+    "user_updated_success": {
+        "pt_BR": "Usuário {nome} atualizado com sucesso!",
+        "en": "User {nome} successfully updated!",
+        "es": "¡Usuario {nome} actualizado con éxito!"
+    },
+    "error_editing_user": {
+        "pt_BR": "Erro ao editar usuário: {error}",
+        "en": "Error editing user: {error}",
+        "es": "Error al editar usuario: {error}"
+    },
+    "cannot_delete_own_account": {
+        "pt_BR": "Você não pode deletar sua própria conta!",
+        "en": "You cannot delete your own account!",
+        "es": "¡No puedes eliminar tu propia cuenta!"
+    },
+    "user_deleted_success": {
+        "pt_BR": "Usuário {nome} foi removido do sistema",
+        "en": "User {nome} was removed from the system",
+        "es": "El usuario {nome} fue eliminado del sistema"
+    },
+    "error_deleting_user": {
+        "pt_BR": "Erro ao deletar usuário: {error}",
+        "en": "Error deleting user: {error}",
+        "es": "Error al eliminar usuario: {error}"
+    },
+    "session_expired": {
+        "pt_BR": "Sua sessão expirou por inatividade. Faça login novamente.",
+        "en": "Your session has expired due to inactivity. Please log in again.",
+        "es": "Su sesión ha expirado por inactividad. Por favor inicie sesión de nuevo."
+    },
+    "login_restricted": {
+        "pt_BR": "Sistema restrito a usuários autorizados",
+        "en": "System restricted to authorized users",
+        "es": "Sistema restringido a usuarios autorizados"
+    },
+    "login_contact_admin": {
+        "pt_BR": "Para solicitar acesso, contate o administrador",
+        "en": "To request access, contact the administrator",
+        "es": "Para solicitar acceso, contacte al administrador"
+    },
+    "resolution_rate_by_area": {
+        "pt_BR": "Taxa de Resolução por Área (%)",
+        "en": "Resolution Rate by Area (%)",
+        "es": "Tasa de Resolución por Área (%)"
+    },
+    "insight_sla_ok_title": {
+        "pt_BR": "SLA em dia",
+        "en": "SLA On Track",
+        "es": "SLA al día"
+    },
+    "insight_sla_ok_msg": {
+        "pt_BR": "{pct}% dos chamados concluídos foram resolvidos dentro do SLA (Projetos 2 dias, demais 3 dias).",
+        "en": "{pct}% of completed tickets were resolved within the SLA (Projects 2 days, others 3 days).",
+        "es": "{pct}% de los tickets completados fueron resueltos dentro del SLA (Proyectos 2 días, otros 3 días)."
+    },
+    "insight_sla_low_title": {
+        "pt_BR": "SLA abaixo do esperado",
+        "en": "SLA Below Expected",
+        "es": "SLA por debajo de lo esperado"
+    },
+    "insight_sla_low_msg": {
+        "pt_BR": "Apenas {pct}% dos chamados concluídos estão dentro do SLA. Meta: Projetos 2 dias, demais 3 dias.",
+        "en": "Only {pct}% of completed tickets are within the SLA. Target: Projects 2 days, others 3 days.",
+        "es": "Solo {pct}% de los tickets completados están dentro del SLA. Meta: Proyectos 2 días, otros 3 días."
+    },
+    "insight_sla_metric": {
+        "pt_BR": "{pct}% no prazo",
+        "en": "{pct}% on time",
+        "es": "{pct}% a tiempo"
+    },
+    "insight_overloaded_title": {
+        "pt_BR": "Supervisor Sobrecarregado",
+        "en": "Overloaded Supervisor",
+        "es": "Supervisor Sobrecargado"
+    },
+    "insight_overloaded_msg": {
+        "pt_BR": "{nome} tem {carga} chamados abertos. Considere redistribuição.",
+        "en": "{nome} has {carga} open tickets. Consider redistribution.",
+        "es": "{nome} tiene {carga} tickets abiertos. Considere redistribución."
+    },
+    "insight_best_perf_title": {
+        "pt_BR": "Melhor Performance",
+        "en": "Best Performance",
+        "es": "Mejor Rendimiento"
+    },
+    "insight_best_perf_msg": {
+        "pt_BR": "{nome} tem a melhor taxa de resolução ({taxa}%)",
+        "en": "{nome} has the best resolution rate ({taxa}%)",
+        "es": "{nome} tiene la mejor tasa de resolución ({taxa}%)"
+    },
+    "insight_low_area_title": {
+        "pt_BR": "Área com Baixa Performance",
+        "en": "Low Performance Area",
+        "es": "Área con Bajo Rendimiento"
+    },
+    "insight_low_area_msg": {
+        "pt_BR": "A área {area} tem taxa de resolução de {taxa}%. Investigação recomendada.",
+        "en": "Area {area} has a resolution rate of {taxa}%. Investigation recommended.",
+        "es": "El área {area} tiene una tasa de resolución de {taxa}%. Se recomienda investigación."
+    },
+    "avg_time_by_area": {
+        "pt_BR": "Tempo Médio por Área (h)",
+        "en": "Avg. Time by Area (h)",
+        "es": "Tiempo Medio por Área (h)"
     }
 }

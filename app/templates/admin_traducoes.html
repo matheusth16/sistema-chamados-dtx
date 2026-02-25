@@ -3,25 +3,25 @@
 {% block content %}
 <div class="mb-6 flex justify-between items-center">
     <div>
-        <h1 class="text-2xl font-bold text-gray-900">Gerenciamento de Traduções</h1>
-        <p class="text-gray-500 mt-1">Edite os termos do sistema em múltiplos idiomas</p>
+        <h1 class="text-2xl font-bold text-gray-900">{{ t('translation_management') }}</h1>
+        <p class="text-gray-500 mt-1">{{ t('edit_system_terms') }}</p>
     </div>
 </div>
 
 <div class="bg-white shadow-sm rounded-lg overflow-hidden border border-gray-200">
     <div class="p-4 border-b border-gray-200 bg-gray-50 mb-2">
-        <input type="text" id="searchInput" placeholder="Buscar por chave ou texto..." class="w-full md:w-1/3 px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+        <input type="text" id="searchInput" placeholder="{{ t('search_key_or_text') }}" class="w-full md:w-1/3 px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
     </div>
 
     <div class="overflow-x-auto">
         <table class="min-w-full divide-y divide-gray-200">
             <thead class="bg-gray-50">
                 <tr>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Chave do Sistema</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Português (pt_BR)</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Inglês (en)</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Espanhol (es)</th>
-                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ t('system_key') }}</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ t('portuguese_pt_br') }}</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ t('english_en') }}</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ t('spanish_es') }}</th>
+                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">{{ t('actions') }}</th>
                 </tr>
             </thead>
             <tbody class="bg-white divide-y divide-gray-200" id="translationsTable">
@@ -39,7 +39,7 @@
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <button class="save-btn inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                            Salvar
+                            {{ t('save') }}
                         </button>
                     </td>
                 </tr>
@@ -80,7 +80,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const es = row.querySelector('input[data-lang="es"]').value;
             
             const originalText = this.innerHTML;
-            this.innerHTML = 'Salvando...';
+            this.innerHTML = `{{ t('saving') }}`;
             this.disabled = true;
             this.classList.replace('bg-blue-600', 'bg-blue-400');
             
@@ -102,19 +102,19 @@ document.addEventListener('DOMContentLoaded', function() {
             .then(response => response.json())
             .then(data => {
                 if (data.sucesso) {
-                    this.innerHTML = '✓ Salvo';
+                    this.innerHTML = `✓ {{ t('saved') }}`;
                     this.classList.replace('bg-blue-400', 'bg-green-600');
                     setTimeout(() => {
-                        this.innerHTML = 'Salvar';
+                        this.innerHTML = `{{ t('save') }}`;
                         this.classList.replace('bg-green-600', 'bg-blue-600');
                         this.disabled = false;
                     }, 2000);
                 } else {
-                    alert('Erro ao salvar: ' + (data.erro || 'Desconhecido'));
-                    this.innerHTML = 'Erro';
+                    alert(`{{ t('error_saving') }}: ` + (data.erro || `{{ t('unknown') }}`));
+                    this.innerHTML = `{{ t('error') }}`;
                     this.classList.replace('bg-blue-400', 'bg-red-600');
                     setTimeout(() => {
-                        this.innerHTML = 'Salvar';
+                        this.innerHTML = `{{ t('save') }}`;
                         this.classList.replace('bg-red-600', 'bg-blue-600');
                         this.disabled = false;
                     }, 2000);
@@ -122,8 +122,8 @@ document.addEventListener('DOMContentLoaded', function() {
             })
             .catch(err => {
                 console.error(err);
-                alert('Erro na requisição. Verifique o console.');
-                this.innerHTML = 'Salvar';
+                alert(`{{ t('error_in_request_console') }}`);
+                this.innerHTML = `{{ t('save') }}`;
                 this.classList.replace('bg-blue-400', 'bg-blue-600');
                 this.disabled = false;
             });

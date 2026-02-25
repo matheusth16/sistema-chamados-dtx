@@ -56,3 +56,41 @@ def test_criar_chamado_com_login_e_dados_validos_redireciona(client, app, usuari
                                     }, follow_redirects=False)
     assert r.status_code == 302
     assert r.location and ('/' in r.location or 'admin' in r.location or 'chamado' in r.location)
+
+
+def test_criar_chamado_com_supervisor_redireciona_e_salva_com_solicitante_id_do_supervisor(
+    client_logado_supervisor, app
+):
+    """POST / com supervisor logado cria chamado com solicitante_id igual ao id do supervisor."""
+    # client_logado_supervisor usa usuário com id='sup_1', nome='Supervisor Teste'
+    with patch('app.routes.chamados.db') as mock_db:
+        mock_add = mock_db.collection.return_value.add
+        mock_add.return_value = (None, 'doc_id_456')
+        with patch('app.routes.chamados.gerar_numero_chamado', return_value='CHM-8888'):
+            with patch('app.routes.chamados.atribuidor') as mock_atr:
+                mock_atr.atribuir.return_value = {
+                    'sucesso': True,
+                    'supervisor': {'id': 'sup_2', 'nome': 'Outro Supervisor'},
+                    'motivo': 'Ok',
+                }
+            with patch('app.routes.chamados.salvar_anexo', return_value=None):
+                with patch('app.routes.chamados.Historico'):
+                    with patch('app.routes.chamados.notificar_aprovador_novo_chamado'):
+                        with patch('app.routes.chamados.criar_notificacao'):
+                            with patch('app.routes.chamados.enviar_webpush_usuario'):
+                                r = client_logado_supervisor.post('/', data={
+                                    'csrf_token': 'ignored',
+                                    'categoria': 'Nao Aplicavel',
+                                    'tipo': 'Planejamento',
+                                    'gate': 'N/A',
+                                    'impacto': 'Prazo',
+                                    'descricao': 'Chamado criado por supervisor',
+                                }, follow_redirects=False)
+    assert r.status_code == 302
+    assert r.location
+    # Chamado foi salvo com solicitante_id = id do supervisor (sup_1 do conftest)
+    call_args = mock_add.call_args
+    assert call_args is not None
+    dados_chamado = call_args[0][0]
+    assert dados_chamado.get('solicitante_id') == 'sup_1'
+    assert dados_chamado.get('solicitante_nome') == 'Supervisor Teste'

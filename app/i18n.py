@@ -5,6 +5,7 @@ Suporta: Português-BR, Inglês e Espanhol.
 
 import os
 import json
+from flask import session, flash
 
 # Cache do dicionário de traduções e caminho do arquivo
 _TRANSLATIONS_CACHE = None
@@ -121,13 +122,14 @@ def get_translated_status(status_name, language='pt_BR'):
         return get_translation(translation_key, language)
     return status_name
 
-def get_translation(key, language='pt_BR'):
+def get_translation(key, language='pt_BR', **kwargs):
     """
     Obtém a tradução de uma chave para um idioma específico.
     
     Args:
         key (str): Chave da tradução
         language (str): Código do idioma (pt_BR, en, es)
+        **kwargs: Argumentos para formatação da string traduzida
     
     Returns:
         str: Texto traduzido ou a chave se não encontrada
@@ -136,6 +138,29 @@ def get_translation(key, language='pt_BR'):
     translations = get_translations_dict()
     
     if key in translations and language in translations[key] and translations[key][language]:
-        return translations[key][language]
+        texto = translations[key][language]
+        if kwargs:
+            try:
+                return texto.format(**kwargs)
+            except KeyError:
+                pass
+        return texto
     # Retorna a chave como fallback
     return key
+
+def flash_t(key, category='message', **kwargs):
+    """
+    Exibe uma mensagem flash traduzida.
+    
+    Args:
+        key (str): Chave da tradução
+        category (str): Categoria da mensagem (ex: 'success', 'danger')
+        **kwargs: Argumentos para formatação
+    """
+    try:
+        lang = session.get('language', 'pt_BR')
+    except RuntimeError:
+        # Fora do contexto da requisição
+        lang = 'pt_BR'
+    msg = get_translation(key, lang, **kwargs)
+    flash(msg, category)

@@ -21,7 +21,10 @@ def test_obter_metricas_gerais_retorna_dict_com_chaves_esperadas():
     assert 'abertos' in r
     assert 'concluidos' in r
     assert 'taxa_resolucao_percentual' in r
+    assert 'resumo_sla' in r
+    assert 'distribuicao_categoria' in r
     assert r['periodo_dias'] == 30
+    assert set(r['resumo_sla'].keys()) == {'no_prazo', 'atrasado', 'em_risco'}
 
 
 def test_obter_relatorio_completo_retorna_dict_com_secoes():
@@ -30,13 +33,11 @@ def test_obter_relatorio_completo_retorna_dict_com_secoes():
     with patch.object(AnalisadorChamados, 'obter_metricas_gerais', return_value={}):
         with patch.object(AnalisadorChamados, 'obter_metricas_supervisores', return_value=[]):
             with patch.object(AnalisadorChamados, 'obter_metricas_areas', return_value=[]):
-                with patch.object(AnalisadorChamados, 'obter_analise_atribuicao', return_value={}):
-                    with patch.object(AnalisadorChamados, 'obter_insights', return_value=[]):
-                        a = AnalisadorChamados()
-                        r = a.obter_relatorio_completo(usar_cache=False)
+                with patch.object(AnalisadorChamados, 'obter_insights', return_value=[]):
+                    a = AnalisadorChamados()
+                    r = a.obter_relatorio_completo(usar_cache=False)
     assert 'metricas_gerais' in r
     assert 'metricas_supervisores' in r
     assert 'metricas_areas' in r
-    assert 'analise_atribuicao' in r
     assert 'insights' in r
     assert 'data_geracao' in r

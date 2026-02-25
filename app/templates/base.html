@@ -8,6 +8,7 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <title>Sistema de Chamados - DTX Aerospace</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js?t=1" crossorigin="anonymous"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js?t=1"
@@ -28,92 +29,130 @@
         window.DTX_DEBUG = document.body.getAttribute('data-debug') === 'true';
     </script>
 
-    <nav class="bg-blue-900 text-white shadow-lg sticky top-0 z-[200]">
+    {% block body_overlay %}{% endblock %}
+
+    <nav class="bg-[#1a305d] text-white shadow-lg sticky top-0 z-[200]">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex items-center justify-between h-16">
                 <div class="flex items-center">
                     <div class="flex-shrink-0">
-                        <span class="font-bold text-xl tracking-tight">DTX <span
-                                class="text-blue-300">Internal</span></span>
+                        <a href="/" class="flex items-center">
+                            <img src="{{ url_for('static', filename='img/logo-full.png') }}" alt="DTX Aerospace" class="h-11 brightness-0 invert">
+                        </a>
                     </div>
-                    <div class="hidden md:block">
-                        <div class="ml-10 flex items-baseline space-x-4">
-                            {% if current_user.is_authenticated %}
-                            <!-- Abas para Solicitantes -->
-                            {% if current_user.perfil == 'solicitante' %}
-                            <a href="/" class="hover:bg-blue-700 px-3 py-2 rounded-md text-sm font-medium transition">
-                                <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M12 4v16m8-8H4" />
-                                </svg>
-                                Novo Chamado
-                            </a>
-                            <a href="/meus-chamados"
-                                class="hover:bg-blue-700 px-3 py-2 rounded-md text-sm font-medium transition">
-                                <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                                </svg>
-                                Meus Chamados
-                            </a>
-                            {% endif %}
+                    <div class="hidden md:flex md:items-center md:gap-1 md:ml-10">
+                        {% if current_user.is_authenticated %}
+                        <!-- Solicitante: Novo Chamado e Meus Chamados na barra -->
+                        {% if current_user.perfil == 'solicitante' %}
+                        <a href="{{ url_for('main.index') }}" class="hover:bg-blue-700 px-3 py-2 rounded-md text-sm font-medium transition inline-flex items-center whitespace-nowrap">
+                            <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                            </svg>
+                            {{ t('nav_new_ticket') }}
+                        </a>
+                        <a href="/meus-chamados" class="hover:bg-blue-700 px-3 py-2 rounded-md text-sm font-medium transition inline-flex items-center whitespace-nowrap">
+                            <svg class="w-4 h-4 mr-1.5 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
+                            </svg>
+                            {{ t('nav_my_tickets') }}
+                        </a>
+                        {% endif %}
 
-                            <!-- Aba "Gestão (Admin)" (visível apenas para supervisores e admins) -->
-                            {% if current_user.perfil in ['supervisor', 'admin'] %}
-                            <a href="/admin"
-                                class="hover:bg-blue-700 px-3 py-2 rounded-md text-sm font-medium transition flex items-center">
-                                <svg class="w-4 h-4 mr-1.5 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                                </svg>
-                                Gestão
-                            </a>
-                            
-                            <a href="{{ url_for('main.relatorios') }}"
-                                class="hover:bg-blue-700 px-3 py-2 rounded-md text-sm font-medium transition flex items-center">
-                                <svg class="w-4 h-4 mr-1.5 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                                </svg>
-                                Meus Relatórios
-                            </a>
-                            {% endif %}
+                        <!-- Supervisor: Gestão, Meus Relatórios, Novo Chamado, Meus Chamados (tudo na barra) -->
+                        {% if current_user.perfil == 'supervisor' %}
+                        <a href="{{ url_for('main.admin') }}" class="hover:bg-blue-700 px-3 py-2 rounded-md text-sm font-medium transition inline-flex items-center whitespace-nowrap">
+                            <svg class="w-4 h-4 mr-1.5 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                            </svg>
+                            {{ t('nav_management') }}
+                        </a>
+                        <a href="{{ url_for('main.relatorios') }}" class="hover:bg-blue-700 px-3 py-2 rounded-md text-sm font-medium transition inline-flex items-center whitespace-nowrap">
+                            <svg class="w-4 h-4 shrink-0 mr-1.5 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                            </svg>
+                            {{ t('nav_my_reports') }}
+                        </a>
+                        <a href="/" class="hover:bg-blue-700 px-3 py-2 rounded-md text-sm font-medium transition inline-flex items-center whitespace-nowrap">
+                            <svg class="w-4 h-4 shrink-0 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+                            {{ t('nav_new_ticket') }}
+                        </a>
+                        <a href="/meus-chamados" class="hover:bg-blue-700 px-3 py-2 rounded-md text-sm font-medium transition inline-flex items-center whitespace-nowrap">
+                            <svg class="w-4 h-4 shrink-0 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+                            {{ t('nav_my_tickets') }}
+                        </a>
+                        {% endif %}
 
-                            <!-- Link para Administração de Categorias (apenas admin) -->
-                            {% if current_user.perfil == 'admin' %}
-                            <a href="{{ url_for('main.admin_categorias') }}"
-                                class="hover:bg-blue-700 px-3 py-2 rounded-md text-sm font-medium transition flex items-center">
-                                <svg class="w-4 h-4 mr-1.5 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                                </svg>
-                                Categorias
-                            </a>
-                            <a href="{{ url_for('main.gerenciar_usuarios') }}"
-                                class="hover:bg-blue-700 px-3 py-2 rounded-md text-sm font-medium transition flex items-center">
-                                <svg class="w-4 h-4 mr-1.5 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-                                </svg>
-                                Usuários
-                            </a>
-                            <a href="{{ url_for('main.admin_traducoes') }}"
-                                class="hover:bg-blue-700 px-3 py-2 rounded-md text-sm font-medium transition flex items-center">
-                                <svg class="w-4 h-4 mr-1.5 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 15h2.498" />
-                                </svg>
-                                Traduções
-                            </a>
-                            {% endif %}
-                            {% else %}
-                            <!-- Sem autenticação: sem abas -->
-                            {% endif %}
-                        </div>
+                        <!-- Admin: apenas Gestão e Meus Relatórios na barra (resto no hamburger) -->
+                        {% if current_user.perfil == 'admin' %}
+                        <a href="/admin" class="hover:bg-blue-700 px-3 py-2 rounded-md text-sm font-medium transition inline-flex items-center whitespace-nowrap">
+                            <svg class="w-4 h-4 shrink-0 mr-1.5 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                            </svg>
+                            {{ t('nav_management') }}
+                        </a>
+                        <a href="{{ url_for('main.relatorios') }}" class="hover:bg-blue-700 px-3 py-2 rounded-md text-sm font-medium transition inline-flex items-center whitespace-nowrap">
+                            <svg class="w-4 h-4 shrink-0 mr-1.5 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                            </svg>
+                            {{ t('nav_my_reports') }}
+                        </a>
+                        {% endif %}
+                        {% endif %}
                     </div>
                 </div>
-                <div class="flex items-center space-x-6">
-                    <!-- Sino de notificações (apenas supervisor/admin) -->
+                <div class="flex items-center gap-2 md:gap-4">
+                    <!-- Menu hamburger (apenas admin): Novo Chamado, Meus Chamados, Categorias, Usuários, Traduções -->
+                    {% if current_user.is_authenticated and current_user.perfil == 'admin' %}
+                    <div class="relative" id="nav-hamburger-wrap">
+                        <button type="button" id="btn-hamburger" aria-label="Abrir menu" aria-expanded="false"
+                            class="p-2 rounded-md hover:bg-blue-700 transition inline-flex items-center justify-center">
+                            <svg class="w-6 h-6 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                            </svg>
+                        </button>
+                        <div id="nav-menu-dropdown" class="absolute right-0 mt-2 w-64 py-2 bg-white text-gray-800 rounded-xl shadow-xl border border-gray-200 opacity-0 invisible transition-all duration-200 z-[210] max-h-[85vh] overflow-y-auto"
+                            role="menu" aria-label="Menu de navegação">
+                            <div class="md:hidden border-b border-gray-100 pb-2 mb-2">
+                                <a href="/admin" class="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition" role="menuitem">
+                                    <svg class="w-4 h-4 shrink-0 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+                                    {{ t('nav_management') }}
+                                </a>
+                                <a href="{{ url_for('main.relatorios') }}" class="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition" role="menuitem">
+                                    <svg class="w-4 h-4 shrink-0 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
+                                    {{ t('nav_my_reports') }}
+                                </a>
+                            </div>
+                            <a href="/" class="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition" role="menuitem">
+                                <svg class="w-4 h-4 shrink-0 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+                                {{ t('nav_new_ticket') }}
+                            </a>
+                            <a href="/meus-chamados" class="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition" role="menuitem">
+                                <svg class="w-4 h-4 shrink-0 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+                                {{ t('nav_my_tickets') }}
+                            </a>
+                            <div class="border-t border-gray-100 my-1"></div>
+                            <a href="{{ url_for('main.admin_categorias') }}" class="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition" role="menuitem">
+                                <svg class="w-4 h-4 shrink-0 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg>
+                                {{ t('nav_categories') }}
+                            </a>
+                            <a href="{{ url_for('main.gerenciar_usuarios') }}" class="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition" role="menuitem">
+                                <svg class="w-4 h-4 shrink-0 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+                                {{ t('nav_users') }}
+                            </a>
+                            <a href="{{ url_for('main.admin_traducoes') }}" class="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition" role="menuitem">
+                                <svg class="w-4 h-4 shrink-0 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 15h2.498" /></svg>
+                                {{ t('nav_translations') }}
+                            </a>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Sino de notificações na navbar (supervisor e admin) -->
                     {% if current_user.is_authenticated and current_user.perfil in ['supervisor', 'admin'] %}
-                    <div class="relative group" id="nav-notificacoes">
+                    <div class="relative" id="nav-notificacoes">
                         <button type="button" id="btn-sino" class="relative p-2 rounded-md hover:bg-blue-700 transition"
-                            aria-label="Notificações">
+                            aria-label="Notificações" aria-expanded="false" aria-haspopup="true">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                     d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
@@ -122,15 +161,14 @@
                                 class="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 flex items-center justify-center text-xs font-bold bg-red-500 text-white rounded-full hidden">0</span>
                         </button>
                         <div id="sino-dropdown"
-                            class="absolute right-0 mt-2 w-80 max-h-96 overflow-auto bg-white text-gray-800 rounded-lg shadow-xl border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-                            <div class="p-2 border-b border-gray-100 font-semibold text-sm text-gray-700">Notificações
-                            </div>
+                            class="absolute right-0 mt-2 w-80 max-h-96 overflow-auto bg-white text-gray-800 rounded-lg shadow-xl border border-gray-200 opacity-0 invisible transition-all duration-200 z-50">
+                            <div class="p-2 border-b border-gray-100 font-semibold text-sm text-gray-700">Notificações</div>
                             <div id="sino-lista" class="divide-y divide-gray-100">
                                 <div class="p-3 text-sm text-gray-500 text-center">Carregando...</div>
                             </div>
-                            <div class="p-2 border-t border-gray-100 text-center">
-                                <a href="{{ url_for('main.admin') }}" class="text-sm text-blue-600 hover:underline">Ver
-                                    painel</a>
+                            <div id="sino-footer" class="p-2 border-t border-gray-100 text-center space-y-1">
+                                <button type="button" id="btn-sino-marcar-todas" class="text-sm text-blue-600 hover:underline hidden">Marcar todas como lidas</button>
+                                <a href="{{ url_for('main.admin') }}" class="block text-sm text-blue-600 hover:underline">Ver painel</a>
                             </div>
                         </div>
                     </div>
@@ -156,11 +194,11 @@
                         <div class="absolute right-0 mt-2 w-40 bg-white text-gray-700 rounded-xl shadow-xl shadow-blue-900/10 border border-gray-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 transform origin-top-right group-hover:scale-100 scale-95">
                             <div class="p-1.5 space-y-0.5">
                                 <a href="?lang=pt_BR" class="flex items-center justify-between px-3 py-2 text-sm rounded-lg hover:bg-gray-50 transition-colors {% if current_language == 'pt_BR' %}bg-blue-50 text-blue-700 font-bold{% else %}font-medium{% endif %}">
-                                    <span>Português</span>
+                                    <span>{{ t('lang_portuguese') }}</span>
                                     <span class="text-[10px] font-bold px-1.5 py-0.5 rounded {% if current_language == 'pt_BR' %}bg-blue-200 text-blue-800{% else %}bg-gray-100 text-gray-500{% endif %} uppercase tracking-wider">PT</span>
                                 </a>
                                 <a href="?lang=en" class="flex items-center justify-between px-3 py-2 text-sm rounded-lg hover:bg-gray-50 transition-colors {% if current_language == 'en' %}bg-blue-50 text-blue-700 font-bold{% else %}font-medium{% endif %}">
-                                    <span>English</span>
+                                    <span>{{ t('lang_english') }}</span>
                                     <span class="text-[10px] font-bold px-1.5 py-0.5 rounded {% if current_language == 'en' %}bg-blue-200 text-blue-800{% else %}bg-gray-100 text-gray-500{% endif %} uppercase tracking-wider">EN</span>
                                 </a>
                                 <a href="?lang=es" class="flex items-center justify-between px-3 py-2 text-sm rounded-lg hover:bg-gray-50 transition-colors {% if current_language == 'es' %}bg-blue-50 text-blue-700 font-bold{% else %}font-medium{% endif %}">
@@ -175,7 +213,7 @@
                     <div class="flex items-center">
                         <span class="text-xs text-blue-200">
                             👤 {{ current_user.nome }}
-                            {% if current_user.area %}<br><span class="text-xs text-blue-300">{{ current_user.area
+                            {% if current_user.area %}<br><span class="text-xs text-blue-300">{{ translate_sector(current_user.area)
                                 }}</span>{% endif %}
                         </span>
                     </div>
@@ -225,38 +263,82 @@
             var btn = document.getElementById('btn-sino');
             var badge = document.getElementById('sino-badge');
             var lista = document.getElementById('sino-lista');
+            var dropdown = document.getElementById('sino-dropdown');
+            var btnMarcarTodas = document.getElementById('btn-sino-marcar-todas');
             if (!btn || !lista) return;
+
+            function dataRelativa(isoStr) {
+                if (!isoStr) return '';
+                var d = new Date(isoStr);
+                if (isNaN(d.getTime())) return '';
+                var now = new Date();
+                var diffMs = now - d;
+                var diffMin = Math.floor(diffMs / 60000);
+                var diffH = Math.floor(diffMs / 3600000);
+                var diffD = Math.floor(diffMs / 86400000);
+                if (diffMin < 1) return 'Agora';
+                if (diffMin < 60) return 'Há ' + diffMin + ' min';
+                if (diffH < 24) return 'Há ' + diffH + ' h';
+                if (diffD === 1) return 'Ontem';
+                if (diffD < 7) return 'Há ' + diffD + ' dias';
+                return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: d.getFullYear() !== now.getFullYear() ? 'numeric' : undefined });
+            }
+
+            function atualizarBadge(total) {
+                if (!badge) return;
+                badge.textContent = total > 99 ? '99+' : total;
+                badge.classList.toggle('hidden', total === 0);
+                if (btnMarcarTodas) btnMarcarTodas.classList.toggle('hidden', total === 0);
+            }
+
+            function abrirDropdown() {
+                if (dropdown) {
+                    dropdown.classList.remove('opacity-0', 'invisible');
+                    dropdown.classList.add('opacity-100', 'visible');
+                    btn.setAttribute('aria-expanded', 'true');
+                }
+            }
+            function fecharDropdown() {
+                if (dropdown) {
+                    dropdown.classList.add('opacity-0', 'invisible');
+                    dropdown.classList.remove('opacity-100', 'visible');
+                    btn.setAttribute('aria-expanded', 'false');
+                }
+            }
+            function dropdownAberto() {
+                return dropdown && !dropdown.classList.contains('invisible');
+            }
+
             function carregarNotificacoes() {
                 fetch('{{ url_for("main.api_notificacoes_listar") }}', { credentials: 'same-origin' })
                     .then(function (r) { return r.json(); })
                     .then(function (data) {
-                        if (data.total_nao_lidas !== undefined) {
-                            if (badge) {
-                                badge.textContent = data.total_nao_lidas > 99 ? '99+' : data.total_nao_lidas;
-                                badge.classList.toggle('hidden', data.total_nao_lidas === 0);
-                            }
-                        }
+                        var total = data.total_nao_lidas !== undefined ? data.total_nao_lidas : 0;
+                        atualizarBadge(total);
                         var notifs = data.notificacoes || [];
                         if (notifs.length === 0) {
                             lista.innerHTML = '<div class="p-3 text-sm text-gray-500 text-center">Nenhuma notificação</div>';
                             return;
                         }
+                        var csrf = document.querySelector('meta[name="csrf-token"]') && document.querySelector('meta[name="csrf-token"]').content || '';
                         lista.innerHTML = notifs.map(function (n) {
                             var urlChamado = '/chamado/' + (n.chamado_id || '') + '/historico';
                             var lidaClass = n.lida ? 'bg-gray-50' : 'bg-blue-50';
+                            var relativa = dataRelativa(n.data_criacao);
                             return '<a href="' + urlChamado + '" class="block p-3 text-left hover:bg-gray-100 ' + lidaClass + ' notif-item" data-id="' + (n.id || '') + '">' +
                                 '<div class="font-semibold text-gray-800 text-sm">' + (n.titulo || '') + '</div>' +
                                 '<div class="text-xs text-gray-600 mt-0.5">' + (n.mensagem || '') + '</div>' +
+                                (relativa ? '<div class="text-xs text-gray-400 mt-1">' + relativa + '</div>' : '') +
                                 '</a>';
                         }).join('');
                         lista.querySelectorAll('.notif-item').forEach(function (el) {
-                            el.addEventListener('click', function (e) {
+                            el.addEventListener('click', function () {
                                 var id = el.getAttribute('data-id');
                                 if (id) {
                                     fetch('{{ url_for("main.api_notificacoes_marcar_lida", notificacao_id="__ID__") }}'.replace('__ID__', id), {
                                         method: 'POST',
                                         credentials: 'same-origin',
-                                        headers: { 'X-CSRFToken': document.querySelector('meta[name="csrf-token"]') && document.querySelector('meta[name="csrf-token"]').content || '', 'Content-Type': 'application/json' }
+                                        headers: { 'X-CSRFToken': csrf, 'Content-Type': 'application/json' }
                                     }).then(function () { });
                                 }
                             });
@@ -266,49 +348,134 @@
                         lista.innerHTML = '<div class="p-3 text-sm text-gray-500 text-center">Erro ao carregar</div>';
                     });
             }
+
+            function atualizarSóBadge() {
+                fetch('{{ url_for("main.api_notificacoes_listar") }}', { credentials: 'same-origin' })
+                    .then(function (r) { return r.json(); })
+                    .then(function (data) {
+                        if (data.total_nao_lidas !== undefined) atualizarBadge(data.total_nao_lidas);
+                    }).catch(function () {});
+            }
+
+            var navNotificacoes = document.getElementById('nav-notificacoes');
+            btn.addEventListener('click', function (e) {
+                e.stopPropagation();
+                if (dropdownAberto()) {
+                    fecharDropdown();
+                } else {
+                    carregarNotificacoes();
+                    abrirDropdown();
+                }
+            });
+            document.addEventListener('click', function (e) {
+                if (dropdownAberto() && navNotificacoes && !navNotificacoes.contains(e.target)) fecharDropdown();
+            });
+            if (btnMarcarTodas) {
+                btnMarcarTodas.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    fetch('{{ url_for("main.api_notificacoes_ler_todas") }}', {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: { 'X-CSRFToken': (document.querySelector('meta[name="csrf-token"]') && document.querySelector('meta[name="csrf-token"]').content) || '', 'Content-Type': 'application/json' }
+                    }).then(function (r) { return r.json(); }).then(function () { carregarNotificacoes(); }).catch(function () {});
+                });
+            }
+
             carregarNotificacoes();
-            btn.addEventListener('click', function () { carregarNotificacoes(); });
+            var pollInterval = setInterval(function () {
+                if (document.visibilityState === 'visible') atualizarSóBadge();
+            }, 60000);
+            document.addEventListener('visibilitychange', function () {
+                if (document.visibilityState === 'visible') atualizarSóBadge();
+            });
         })();
     </script>
-    <!-- Web Push: registrar SW e inscrever (apenas supervisor/admin) -->
+    <!-- Web Push: registrar SW; banner para pedir permissão e inscrever no clique -->
+    <div id="webpush-banner" class="hidden fixed top-16 left-1/2 -translate-x-1/2 z-50 bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg text-sm flex items-center gap-3 max-w-md">
+        <span>Receber avisos de novos chamados no navegador?</span>
+        <button type="button" id="webpush-ativar" class="px-3 py-1 bg-white text-blue-600 font-semibold rounded hover:bg-blue-50">Ativar</button>
+        <button type="button" id="webpush-dispensar" class="px-2 py-1 text-blue-100 hover:text-white">Agora não</button>
+    </div>
     <script>
         (function () {
             if (!('Notification' in window) || !('serviceWorker' in navigator)) return;
             var vapidPublicKey = null;
-            function urlBase() { return window.location.origin; }
+            var BANNER_KEY = 'webpush_banner_dispensado';
             function csrfHeader() {
                 var m = document.querySelector('meta[name="csrf-token"]');
                 return m && m.content ? { 'X-CSRFToken': m.content } : {};
             }
-            navigator.serviceWorker.register('{{ url_for("main.service_worker_js") }}').then(function (reg) {
+            function inscrever() {
+                if (!vapidPublicKey) return Promise.resolve();
+                return navigator.serviceWorker.ready.then(function (reg) {
+                    if (!reg) return null;
+                    return reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: vapidPublicKey });
+                }).then(function (sub) {
+                    if (!sub) return;
+                    var subJson = sub.toJSON ? sub.toJSON() : { endpoint: sub.endpoint, keys: sub.getKey && { p256dh: sub.getKey('p256dh'), auth: sub.getKey('auth') } };
+                    if (!subJson || !subJson.endpoint) return;
+                    return fetch('{{ url_for("main.api_push_subscribe") }}', {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: Object.assign({ 'Content-Type': 'application/json' }, csrfHeader()),
+                        body: JSON.stringify({ subscription: subJson })
+                    });
+                });
+            }
+            navigator.serviceWorker.register('{{ url_for("main.service_worker_js") }}').then(function () {
                 return fetch('{{ url_for("main.api_push_vapid_public") }}', { credentials: 'same-origin' });
             }).then(function (r) { return r.json(); }).then(function (data) {
-                vapidPublicKey = data.vapid_public_key;
+                vapidPublicKey = data.vapid_public_key || null;
                 if (!vapidPublicKey) return;
-                return Notification.requestPermission();
-            }).then(function (permission) {
-                if (permission !== 'granted' || !vapidPublicKey) return;
-                return navigator.serviceWorker.ready;
-            }).then(function (reg) {
-                if (!reg || !vapidPublicKey) return;
-                return reg.pushManager.subscribe({
-                    userVisibleOnly: true,
-                    applicationServerKey: vapidPublicKey
+                if (Notification.permission === 'granted') {
+                    inscrever().catch(function () {});
+                    return;
+                }
+                if (Notification.permission === 'denied') return;
+                if (sessionStorage.getItem(BANNER_KEY)) return;
+                var banner = document.getElementById('webpush-banner');
+                var btnAtivar = document.getElementById('webpush-ativar');
+                var btnDispensar = document.getElementById('webpush-dispensar');
+                if (banner) banner.classList.remove('hidden');
+                if (btnAtivar) btnAtivar.addEventListener('click', function () {
+                    Notification.requestPermission().then(function (permission) {
+                        if (banner) banner.classList.add('hidden');
+                        if (permission === 'granted') inscrever().catch(function () {});
+                    });
                 });
-            }).then(function (sub) {
-                if (!sub) return;
-                var subJson = sub.toJSON ? sub.toJSON() : { endpoint: sub.endpoint, keys: sub.getKey && { p256dh: sub.getKey('p256dh'), auth: sub.getKey('auth') } };
-                if (!subJson || !subJson.endpoint) return;
-                return fetch('{{ url_for("main.api_push_subscribe") }}', {
-                    method: 'POST',
-                    credentials: 'same-origin',
-                    headers: Object.assign({ 'Content-Type': 'application/json' }, csrfHeader()),
-                    body: JSON.stringify({ subscription: subJson })
+                if (btnDispensar) btnDispensar.addEventListener('click', function () {
+                    if (banner) banner.classList.add('hidden');
+                    sessionStorage.setItem(BANNER_KEY, '1');
                 });
-            }).catch(function () { });
+            }).catch(function () {});
         })();
     </script>
     {% endif %}
+
+    <!-- Toggle menu hamburger (supervisor/admin) -->
+    <script>
+        (function () {
+            var btn = document.getElementById('btn-hamburger');
+            var menu = document.getElementById('nav-menu-dropdown');
+            if (!btn || !menu) return;
+            function open() {
+                menu.classList.remove('opacity-0', 'invisible');
+                menu.classList.add('opacity-100', 'visible');
+                btn.setAttribute('aria-expanded', 'true');
+            }
+            function close() {
+                menu.classList.add('opacity-0', 'invisible');
+                menu.classList.remove('opacity-100', 'visible');
+                btn.setAttribute('aria-expanded', 'false');
+            }
+            function toggle() {
+                if (menu.classList.contains('invisible')) open(); else close();
+            }
+            btn.addEventListener('click', function (e) { e.stopPropagation(); toggle(); });
+            document.addEventListener('click', function () { if (!menu.classList.contains('invisible')) close(); });
+            document.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(); });
+        })();
+    </script>
 
     <!-- Bloco para scripts adicionais de páginas específicas -->
     {% block page_scripts %}{% endblock %}

@@ -36,6 +36,48 @@
     }
 
     /**
+     * Splash Screen animation (login page only).
+     * Timeline: logo fade+scale → line grows → text fade → pause → overlay dissolves.
+     * Calls callback when complete (to trigger login card animations).
+     */
+    function splashScreen(callback) {
+        var splash = document.getElementById('splash-screen');
+        if (!splash) { if (callback) callback(); return; }
+
+        // Hide nav and footer during splash for full-page immersion
+        var nav = document.querySelector('nav');
+        var footer = document.querySelector('footer');
+        if (nav) gsap.set(nav, { opacity: 0, y: -30 });
+        if (footer) gsap.set(footer, { opacity: 0 });
+
+        var tl = gsap.timeline({
+            onComplete: function () {
+                splash.remove();
+                // Reveal nav and footer with smooth animation
+                if (nav) gsap.to(nav, { opacity: 1, y: 0, duration: 0.5, ease: 'power2.out' });
+                if (footer) gsap.to(footer, { opacity: 1, duration: 0.5, ease: 'power2.out', delay: 0.2 });
+                if (callback) callback();
+            }
+        });
+
+        tl.to('#splash-logo', {
+            opacity: 1, scale: 1, duration: 0.5, ease: 'back.out(1.7)'
+        })
+        .fromTo('#splash-line', 
+            { width: 0 }, 
+            { width: 220, duration: 0.6, ease: 'power2.out' },
+            '+=0.15'
+        )
+        .to('#splash-text', {
+            opacity: 1, duration: 0.4, ease: 'power1.out'
+        }, '-=0.25')
+        .to({}, { duration: 0.7 })  // pausa para impacto visual
+        .to(splash, {
+            opacity: 0, y: -50, duration: 0.4, ease: 'power2.in'
+        });
+    }
+
+    /**
      * Inicializa animações na carga da página
      */
     function init() {
@@ -73,9 +115,21 @@
             }
         });
 
-        // Página de login: card com escala + fade bem visível
-        var loginCard = document.getElementById('login-card');
-        if (loginCard) {
+        // --- Splash Screen (login page) ---
+        var splash = document.getElementById('splash-screen');
+        if (splash) {
+            splashScreen(function () {
+                animateLoginCard();
+            });
+        } else {
+            // Página de login sem splash (ex: após redirect com erro)
+            animateLoginCard();
+        }
+
+        // Página de login: card com escala + fade
+        function animateLoginCard() {
+            var loginCard = document.getElementById('login-card');
+            if (!loginCard) return;
             gsap.fromTo(loginCard, { opacity: 0, scale: 0.88 }, { opacity: 1, scale: 1, duration: 0.6, ease: 'back.out(1.4)' });
             var loginHeader = loginCard.querySelector('.gsap-login-header');
             var loginForm = loginCard.querySelector('form');

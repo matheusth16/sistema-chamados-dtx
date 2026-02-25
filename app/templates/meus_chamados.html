@@ -352,7 +352,7 @@ const statusTranslations = {
 
 function abrirDetalhes(btn) {
     const modal = document.getElementById('modal-detalhes');
-    document.getElementById('modal-titulo').textContent = 'Chamado #' + btn.dataset.numero;
+    document.getElementById('modal-titulo').textContent = '{{ t("ticket_num") }}' + btn.dataset.numero;
     const catRaw = btn.dataset.categoria;
     document.getElementById('modal-categoria').textContent = categoryTranslations[catRaw] || catRaw;
     document.getElementById('modal-tipo').textContent = btn.dataset.tipo || '—';
@@ -360,7 +360,7 @@ function abrirDetalhes(btn) {
     document.getElementById('modal-responsavel').textContent = btn.dataset.responsavel || '—';
     const statusRaw = btn.dataset.status;
     document.getElementById('modal-status').textContent = statusTranslations[statusRaw] || statusRaw;
-    document.getElementById('modal-responsavel-contato').textContent = btn.dataset.responsavel || 'Não atribuído';
+    document.getElementById('modal-responsavel-contato').textContent = btn.dataset.responsavel || '{{ t("unassigned") }}';
     document.getElementById('modal-data-abertura').textContent = btn.dataset.dataAbertura;
     document.getElementById('modal-data-conclusao').textContent = btn.dataset.dataConclusao || '—';
     
@@ -372,7 +372,7 @@ function abrirDetalhes(btn) {
         const anexoVal = btn.dataset.anexo;
         const isUrl = anexoVal.indexOf('http://') === 0 || anexoVal.indexOf('https://') === 0;
         linkAnexo.href = isUrl ? anexoVal : `/static/uploads/${anexoVal}`;
-        linkAnexo.innerText = isUrl ? '📥 Baixar Anexo' : `📥 Baixar Anexo (${anexoVal})`;
+        linkAnexo.innerText = isUrl ? `📥 {{ t('download_attachment') }}` : `📥 {{ t('download_attachment') }} (${anexoVal})`;
         divAnexo.classList.remove('hidden');
     } else {
         divAnexo.classList.add('hidden');

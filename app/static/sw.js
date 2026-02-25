@@ -12,7 +12,8 @@ self.addEventListener('push', function(event) {
     var options = {
         body: data.body,
         data: { url: data.url },
-        tag: 'chamado-' + (data.url || Date.now())
+        tag: 'chamado-' + (data.url || Date.now()),
+        icon: self.location.origin + '/static/favicon.ico'
     };
     event.waitUntil(
         self.registration.showNotification(data.title, options)

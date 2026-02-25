@@ -30,16 +30,22 @@ def runner(app):
     return app.test_cli_runner()
 
 
-def _usuario_mock(uid, email, nome, perfil, area='Geral'):
-    """Cria um MagicMock de usuário para testes."""
+def _usuario_mock(uid, email, nome, perfil, area='Geral', areas=None):
+    """Cria um MagicMock de usuário para testes.
+    area: string única (usado como u.area e, se areas não for passado, como u.areas = [area]).
+    areas: lista de áreas (usado por permissions: supervisor vê só chamados cuja área está em user.areas).
+    """
     u = MagicMock()
     u.id = uid
     u.email = email
     u.nome = nome
     u.perfil = perfil
     u.area = area
+    u.areas = areas if areas is not None else ([area] if isinstance(area, str) else area)
     u.is_authenticated = True
     u.check_password = MagicMock(return_value=True)
+    # Flask-Login serializa user_id na sessão; get_id deve retornar string
+    u.get_id = lambda: str(uid)
     return u
 
 

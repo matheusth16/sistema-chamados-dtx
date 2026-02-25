@@ -10,7 +10,8 @@ Fornece métricas de performance, insights e análises dos chamados:
 
 import logging
 import time
-from datetime import datetime, timedelta
+from collections import defaultdict
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Any, Optional
 from firebase_admin import firestore
 from statistics import mean, stdev
@@ -20,6 +21,74 @@ logger = logging.getLogger(__name__)
 # Cache em memória (fallback quando Redis não está configurado)
 _RELATORIO_CACHE: Dict[str, Any] = {}
 _RELATORIO_CACHE_TTL_SEC = 300  # 5 minutos
+
+# SLA por categoria (dias para conclusão): Projetos 2 dias, demais 3 dias
+SLA_DIAS_PROJETOS = 2
+SLA_DIAS_PADRAO = 3
+
+
+def _sla_dias_por_categoria(categoria: str) -> int:
+    """Retorna o prazo em dias do SLA para a categoria."""
+    return SLA_DIAS_PROJETOS if (categoria or '').strip() == 'Projetos' else SLA_DIAS_PADRAO
+
+
+def _to_datetime(ts: Any) -> Optional[datetime]:
+    """Converte valor do Firestore (Timestamp/datetime) para datetime. Evita queries extras."""
+    if ts is None:
+        return None
+    if isinstance(ts, datetime):
+        return ts
+    if hasattr(ts, 'to_pydatetime'):
+        return ts.to_pydatetime()
+    return None
+
+
+def _dentro_sla(data_abertura, data_conclusao, categoria: str) -> Optional[bool]:
+    """True se concluído dentro do SLA, False se fora. None se não for possível calcular."""
+    dt_abertura = _to_datetime(data_abertura)
+    dt_conclusao = _to_datetime(data_conclusao)
+    if not dt_abertura or not dt_conclusao:
+        return None
+    dias = _sla_dias_por_categoria(categoria or '')
+    limite = dt_abertura + timedelta(days=dias)
+    return dt_conclusao <= limite
+
+
+def obter_sla_para_exibicao(chamado: Any) -> Optional[Dict[str, Any]]:
+    """Retorna dict para exibir SLA na Gestão (dashboard). Sem leituras ao Firestore.
+    chamado: objeto com .data_abertura, .data_conclusao, .categoria, .status
+    Retorno: {'label': 'No prazo'|'Atrasado'|'Em risco', 'dentro_prazo': bool|None, 'em_risco': bool} ou None."""
+    data_abertura = getattr(chamado, 'data_abertura', None)
+    data_conclusao = getattr(chamado, 'data_conclusao', None)
+    categoria = getattr(chamado, 'categoria', None) or ''
+    status = getattr(chamado, 'status', None) or 'Aberto'
+    dt_abertura = _to_datetime(data_abertura)
+    if not dt_abertura:
+        return None
+    dias = _sla_dias_por_categoria(categoria)
+    limite = dt_abertura + timedelta(days=dias)
+    # Comparação consistente: ambos naive ou ambos aware (evita TypeError)
+    if limite.tzinfo is not None:
+        now = datetime.now(timezone.utc)
+    else:
+        now = datetime.utcnow()
+    if status == 'Concluído':
+        dt_conclusao = _to_datetime(data_conclusao)
+        if not dt_conclusao:
+            return None
+        dentro = dt_conclusao <= limite
+        return {
+            'label': 'No prazo' if dentro else 'Atrasado',
+            'dentro_prazo': dentro,
+            'em_risco': False,
+        }
+    # Aberto ou Em Atendimento
+    if now > limite:
+        return {'label': 'Atrasado', 'dentro_prazo': False, 'em_risco': False}
+    um_dia = timedelta(days=1)
+    if (limite - now) <= um_dia:
+        return {'label': 'Em risco', 'dentro_prazo': None, 'em_risco': True}
+    return {'label': 'No prazo', 'dentro_prazo': True, 'em_risco': False}
 
 
 class AnalisadorChamados:
@@ -62,27 +131,72 @@ class AnalisadorChamados:
             # Taxa de resolução
             taxa_resolucao = (concluidos / total * 100) if total > 0 else 0
             
-            # Tempo médio de resolução (apenas concluídos)
+            # Tempo médio de resolução e SLA (apenas concluídos; mesma iteração, zero query extra)
             tempos_resolucao = []
+            concluidos_dentro_sla = 0
+            concluidos_fora_sla = 0
             for doc in chamados:
                 chamado = doc.to_dict()
                 if chamado.get('status') == 'Concluído' and chamado.get('data_conclusao'):
-                    data_abertura = chamado.get('data_abertura', datetime.now())
-                    data_conclusao = chamado.get('data_conclusao', datetime.now())
-                    
-                    if isinstance(data_abertura, datetime) and isinstance(data_conclusao, datetime):
-                        tempo = (data_conclusao - data_abertura).total_seconds() / 3600  # em horas
+                    data_abertura = chamado.get('data_abertura')
+                    data_conclusao = chamado.get('data_conclusao')
+                    categoria = chamado.get('categoria') or ''
+                    # Tempo em horas
+                    dt_ab = _to_datetime(data_abertura)
+                    dt_con = _to_datetime(data_conclusao)
+                    if dt_ab and dt_con:
+                        tempo = (dt_con - dt_ab).total_seconds() / 3600
                         tempos_resolucao.append(tempo)
+                    # SLA (Projetos 2d, demais 3d)
+                    dentro = _dentro_sla(data_abertura, data_conclusao, categoria)
+                    if dentro is True:
+                        concluidos_dentro_sla += 1
+                    elif dentro is False:
+                        concluidos_fora_sla += 1
             
             tempo_medio_resolucao = mean(tempos_resolucao) if tempos_resolucao else 0
+            total_concluidos_sla = concluidos_dentro_sla + concluidos_fora_sla
+            percentual_dentro_sla = round(
+                (concluidos_dentro_sla / total_concluidos_sla * 100), 2
+            ) if total_concluidos_sla > 0 else None
             
-            # Contagem por prioridade
+            # Contagem por prioridade e por categoria
             prioridades = {}
+            categorias = {}
+            em_risco_count = 0
+            atrasado_abertos = 0
+            um_dia = timedelta(days=1)
+
             for doc in chamados:
                 chamado = doc.to_dict()
                 prio = chamado.get('prioridade', 'Indefinido')
                 prioridades[prio] = prioridades.get(prio, 0) + 1
-            
+                cat = chamado.get('categoria') or 'Indefinido'
+                categorias[cat] = categorias.get(cat, 0) + 1
+
+                # SLA para abertos/em atendimento: em risco (vence em <= 1 dia) ou atrasado
+                if chamado.get('status') not in ('Concluído',):
+                    data_abertura = chamado.get('data_abertura')
+                    categoria = chamado.get('categoria') or ''
+                    dt_ab = _to_datetime(data_abertura)
+                    if dt_ab is not None:
+                        dias_sla = _sla_dias_por_categoria(categoria)
+                        limite = dt_ab + timedelta(days=dias_sla)
+                        if limite.tzinfo is not None:
+                            now = datetime.now(timezone.utc)
+                        else:
+                            now = datetime.utcnow()
+                        if now > limite:
+                            atrasado_abertos += 1
+                        elif (limite - now) <= um_dia:
+                            em_risco_count += 1
+
+            resumo_sla = {
+                'no_prazo': concluidos_dentro_sla,
+                'atrasado': concluidos_fora_sla + atrasado_abertos,
+                'em_risco': em_risco_count,
+            }
+
             return {
                 'periodo_dias': dias,
                 'total_chamados': total,
@@ -91,7 +205,12 @@ class AnalisadorChamados:
                 'concluidos': concluidos,
                 'taxa_resolucao_percentual': round(taxa_resolucao, 2),
                 'tempo_medio_resolucao_horas': round(tempo_medio_resolucao, 2),
-                'distribuicao_prioridade': prioridades
+                'concluidos_dentro_sla': concluidos_dentro_sla,
+                'concluidos_fora_sla': concluidos_fora_sla,
+                'percentual_dentro_sla': percentual_dentro_sla,
+                'distribuicao_prioridade': prioridades,
+                'distribuicao_categoria': categorias,
+                'resumo_sla': resumo_sla,
             }
         
         except Exception as e:
@@ -135,19 +254,32 @@ class AnalisadorChamados:
                 # Taxa de resolução
                 taxa_resolucao = (concluidos / total * 100) if total > 0 else 0
                 
-                # Tempo médio de resolução
+                # Tempo médio de resolução e SLA (mesma iteração, zero query extra)
                 tempos_resolucao = []
+                dentro_sla = 0
+                fora_sla = 0
                 for doc in chamados:
                     chamado = doc.to_dict()
                     if chamado.get('status') == 'Concluído' and chamado.get('data_conclusao'):
-                        data_abertura = chamado.get('data_abertura', datetime.now())
-                        data_conclusao = chamado.get('data_conclusao', datetime.now())
-                        
-                        if isinstance(data_abertura, datetime) and isinstance(data_conclusao, datetime):
-                            tempo = (data_conclusao - data_abertura).total_seconds() / 3600
+                        data_abertura = chamado.get('data_abertura')
+                        data_conclusao = chamado.get('data_conclusao')
+                        categoria = chamado.get('categoria') or ''
+                        dt_ab = _to_datetime(data_abertura)
+                        dt_con = _to_datetime(data_conclusao)
+                        if dt_ab and dt_con:
+                            tempo = (dt_con - dt_ab).total_seconds() / 3600
                             tempos_resolucao.append(tempo)
+                        d = _dentro_sla(data_abertura, data_conclusao, categoria)
+                        if d is True:
+                            dentro_sla += 1
+                        elif d is False:
+                            fora_sla += 1
                 
                 tempo_medio = mean(tempos_resolucao) if tempos_resolucao else 0
+                total_sla = dentro_sla + fora_sla
+                percentual_dentro_sla = round(
+                    (dentro_sla / total_sla * 100), 2
+                ) if total_sla > 0 else None
                 
                 # Distribuição por categoria
                 categorias = {}
@@ -171,6 +303,7 @@ class AnalisadorChamados:
                     'carga_atual': carga_atual,
                     'taxa_resolucao_percentual': round(taxa_resolucao, 2),
                     'tempo_medio_resolucao_horas': round(tempo_medio, 2),
+                    'percentual_dentro_sla': percentual_dentro_sla,
                     'distribuicao_categoria': categorias
                 })
             
@@ -195,16 +328,23 @@ class AnalisadorChamados:
         - Performance média da área
         """
         try:
-            # Coleta todas as áreas únicas dos supervisores (usando campo 'areas' array)
+            # Um único passe nos usuários: áreas únicas + contagem de supervisores por área
+            # (considera 'areas' array e legado 'area' string, igual ao modelo Usuario)
             usuarios_ref = self.get_db().collection('usuarios').stream()
             areas_uniques = set()
+            area_to_supervisor_ids = defaultdict(set)
             for doc in usuarios_ref:
                 usuario = doc.to_dict()
-                if usuario.get('perfil') == 'supervisor':
-                    for area in (usuario.get('areas') or []):
-                        areas_uniques.add(area)
+                if usuario.get('perfil') != 'supervisor':
+                    continue
+                areas_list = usuario.get('areas') or []
+                if not areas_list and usuario.get('area'):
+                    areas_list = [usuario.get('area')]
+                for a in areas_list:
+                    areas_uniques.add(a)
+                    area_to_supervisor_ids[a].add(doc.id)
             metricas = []
-            
+
             for area in sorted(areas_uniques):
                 # Chamados criados por solicitantes dessa área
                 chamados_ref = self.get_db().collection('chamados')\
@@ -218,17 +358,24 @@ class AnalisadorChamados:
                 # Taxa de resolução
                 taxa_resolucao = (concluidos / total * 100) if total > 0 else 0
                 
-                # Supervisores da área (usando array_contains para o campo 'areas')
-                supervs_area = self.get_db().collection('usuarios')\
-                    .where('areas', 'array_contains', area)\
-                    .where('perfil', '==', 'supervisor').stream()
-                
-                num_supervisores = len(list(supervs_area))
+                # Supervisores alocados à área (já contados no passe único, suporta 'areas' e 'area')
+                num_supervisores = len(area_to_supervisor_ids.get(area, set()))
                 
                 # Análise de atribuição automática vs manual
                 atribuidos_auto = sum(1 for doc in chamados 
                     if 'Atribuído automaticamente' in doc.to_dict().get('motivo_atribuicao', ''))
                 atribuidos_manual = total - atribuidos_auto
+
+                # Tempo médio de resolução (horas) para concluídos da área
+                tempos_resolucao = []
+                for doc in chamados:
+                    c = doc.to_dict()
+                    if c.get('status') == 'Concluído' and c.get('data_conclusao') and c.get('data_abertura'):
+                        dt_ab = _to_datetime(c.get('data_abertura'))
+                        dt_con = _to_datetime(c.get('data_conclusao'))
+                        if dt_ab and dt_con:
+                            tempos_resolucao.append((dt_con - dt_ab).total_seconds() / 3600)
+                tempo_medio = round(mean(tempos_resolucao), 2) if tempos_resolucao else 0
                 
                 metricas.append({
                     'area': area,
@@ -236,6 +383,7 @@ class AnalisadorChamados:
                     'abertos': abertos,
                     'concluidos': concluidos,
                     'taxa_resolucao_percentual': round(taxa_resolucao, 2),
+                    'tempo_medio_resolucao_horas': tempo_medio,
                     'supervisores_alocados': num_supervisores,
                     'chamados_por_supervisor': round(total / num_supervisores, 2) if num_supervisores > 0 else 0,
                     'atribuidos_automaticamente': atribuidos_auto,
@@ -332,12 +480,12 @@ class AnalisadorChamados:
     def obter_insights(
         self,
         metricas_supervisores: Optional[List[Dict[str, Any]]] = None,
-        analise_atribuicao: Optional[Dict[str, Any]] = None,
         metricas_areas: Optional[List[Dict[str, Any]]] = None,
+        metricas_gerais: Optional[Dict[str, Any]] = None,
     ) -> List[Dict[str, str]]:
         """Gera insights e recomendações baseado nos dados.
         
-        Se forem passados metricas_supervisores, analise_atribuicao ou metricas_areas,
+        Se forem passados metricas_supervisores, metricas_areas ou metricas_gerais,
         usa esses dados em vez de recalcular (recomendado ao chamar de obter_relatorio_completo).
         
         Exemplos:
@@ -351,6 +499,29 @@ class AnalisadorChamados:
             if metricas_supervisores is None:
                 metricas_supervisores = self.obter_metricas_supervisores()
             
+            # Insight SLA (usa metricas_gerais já calculadas no relatório; sem query extra)
+            if metricas_gerais is not None:
+                pct = metricas_gerais.get('percentual_dentro_sla')
+                if pct is not None:
+                    if pct >= 80:
+                        insights.append({
+                            'tipo': 'sucesso',
+                            'titulo_key': 'insight_sla_ok_title',
+                            'mensagem_key': 'insight_sla_ok_msg',
+                            'mensagem_params': {'pct': pct},
+                            'metrica_key': 'insight_sla_metric',
+                            'metrica_params': {'pct': pct},
+                        })
+                    elif pct < 60:
+                        insights.append({
+                            'tipo': 'aviso',
+                            'titulo_key': 'insight_sla_low_title',
+                            'mensagem_key': 'insight_sla_low_msg',
+                            'mensagem_params': {'pct': pct},
+                            'metrica_key': 'insight_sla_metric',
+                            'metrica_params': {'pct': pct},
+                        })
+            
             # Insight 1: Supervisor sobrecarregado
             metricas_sups = metricas_supervisores
             if metricas_sups:
@@ -358,8 +529,9 @@ class AnalisadorChamados:
                 if sup_maior_carga['carga_atual'] > 10:
                     insights.append({
                         'tipo': 'aviso',
-                        'titulo': 'Supervisor Sobrecarregado',
-                        'mensagem': f"{sup_maior_carga['supervisor_nome']} tem {sup_maior_carga['carga_atual']} chamados abertos. Considere redistribuição.",
+                        'titulo_key': 'insight_overloaded_title',
+                        'mensagem_key': 'insight_overloaded_msg',
+                        'mensagem_params': {'nome': sup_maior_carga['supervisor_nome'], 'carga': sup_maior_carga['carga_atual']},
                         'supervisor': sup_maior_carga['supervisor_nome']
                     })
                 
@@ -367,24 +539,13 @@ class AnalisadorChamados:
                 sup_melhor = max(metricas_sups, key=lambda x: x['taxa_resolucao_percentual'])
                 insights.append({
                     'tipo': 'sucesso',
-                    'titulo': 'Melhor Performance',
-                    'mensagem': f"{sup_melhor['supervisor_nome']} tem a melhor taxa de resolução ({sup_melhor['taxa_resolucao_percentual']}%)",
+                    'titulo_key': 'insight_best_perf_title',
+                    'mensagem_key': 'insight_best_perf_msg',
+                    'mensagem_params': {'nome': sup_melhor['supervisor_nome'], 'taxa': sup_melhor['taxa_resolucao_percentual']},
                     'supervisor': sup_melhor['supervisor_nome']
                 })
             
-            # Insight 3: Análise de atribuição automática
-            if analise_atribuicao is None:
-                analise_atribuicao = self.obter_analise_atribuicao()
-            analise_attr = analise_atribuicao
-            if analise_attr.get('melhoria_taxa_percentual', 0) > 0:
-                insights.append({
-                    'tipo': 'info',
-                    'titulo': 'Atribuição Automática Eficaz',
-                    'mensagem': f"A atribuição automática tem +{analise_attr['melhoria_taxa_percentual']}% de taxa de resolução comparado ao manual.",
-                    'metrica': f"{analise_attr['percentual_automatico']}% dos chamados são automáticos"
-                })
-            
-            # Insight 4: Área com menor performance
+            # Insight 3: Área com menor performance
             if metricas_areas is None:
                 metricas_areas = self.obter_metricas_areas()
             if metricas_areas:
@@ -392,8 +553,9 @@ class AnalisadorChamados:
                 if area_menor['taxa_resolucao_percentual'] < 40:
                     insights.append({
                         'tipo': 'aviso',
-                        'titulo': 'Área com Baixa Performance',
-                        'mensagem': f"A área {area_menor['area']} tem taxa de resolução de {area_menor['taxa_resolucao_percentual']}%. Investigação recomendada.",
+                        'titulo_key': 'insight_low_area_title',
+                        'mensagem_key': 'insight_low_area_msg',
+                        'mensagem_params': {'area': area_menor['area'], 'taxa': area_menor['taxa_resolucao_percentual']},
                         'area': area_menor['area']
                     })
             
@@ -430,18 +592,16 @@ class AnalisadorChamados:
             metricas_gerais = self.obter_metricas_gerais(dias=30)
             metricas_supervisores = self.obter_metricas_supervisores()
             metricas_areas = self.obter_metricas_areas()
-            analise_atribuicao = self.obter_analise_atribuicao(dias=180)
             insights = self.obter_insights(
                 metricas_supervisores=metricas_supervisores,
-                analise_atribuicao=analise_atribuicao,
                 metricas_areas=metricas_areas,
+                metricas_gerais=metricas_gerais,
             )
             relatorio = {
                 'data_geracao': datetime.now().isoformat(),
                 'metricas_gerais': metricas_gerais,
                 'metricas_supervisores': metricas_supervisores,
                 'metricas_areas': metricas_areas,
-                'analise_atribuicao': analise_atribuicao,
                 'insights': insights,
             }
             if usar_cache:

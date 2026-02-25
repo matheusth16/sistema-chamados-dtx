@@ -37,7 +37,7 @@
                         <h3 class="text-sm font-bold text-blue-900">{{ t('identified_requester') }}</h3>
                         <p class="text-sm text-blue-800 mt-1">
                             <span class="font-semibold">{{ current_user.nome }}</span>
-                            {% if current_user.area %}<br><span class="text-xs text-blue-700">{{ t('area_sector') }}: <span class="font-semibold">{{ current_user.area }}</span></span>{% endif %}
+                            {% if current_user.area %}<br><span class="text-xs text-blue-700">{{ t('area_sector') }}: <span class="font-semibold">{{ translate_sector(current_user.area) }}</span></span>{% endif %}
                         </p>
                     </div>
                 </div>
@@ -122,7 +122,8 @@
                             class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md border">
                         <option value="" disabled selected>{{ t('select') }}</option>
                         {% for setor in setores %}
-                        <option value="{{ setor.nome_pt }}">{{ setor.nome_pt }}</option>
+                        {% if current_language == 'en' %}{% set nome_display = setor.nome_en|default(setor.nome_pt) %}{% elif current_language == 'es' %}{% set nome_display = setor.nome_es|default(setor.nome_pt) %}{% else %}{% set nome_display = setor.nome_pt %}{% endif %}
+                        <option value="{{ setor.nome_pt }}">{{ nome_display }}</option>
                         {% endfor %}
                     </select>
                 </div>
@@ -146,7 +147,8 @@
                     {% for impacto in impactos %}
                     <label class="border rounded-md p-3 flex items-center hover:bg-gray-50 cursor-pointer">
                         <input type="radio" name="impacto" value="{{ impacto.nome_pt }}" class="h-4 w-4 text-blue-600">
-                        <span class="ml-2 text-sm text-gray-700">{{ impacto.nome_pt }}</span>
+                        {% if current_language == 'en' %}{% set imp_display = impacto.nome_en|default(impacto.nome_pt) %}{% elif current_language == 'es' %}{% set imp_display = impacto.nome_es|default(impacto.nome_pt) %}{% else %}{% set imp_display = impacto.nome_pt %}{% endif %}
+                        <span class="ml-2 text-sm text-gray-700">{{ imp_display }}</span>
                     </label>
                     {% endfor %}
                 </div>
@@ -302,11 +304,12 @@
     });
 
     // Função para mostrar o nome do arquivo selecionado
+    var fileReadyText = "{{ t('file_ready') }}";
     document.getElementById('anexo_arquivo').addEventListener('change', function(e) {
         var fileName = e.target.files[0].name;
         var display = document.getElementById('nome_arquivo');
         if(fileName) {
-            display.textContent = '📎 {{ t('file_ready') }} ' + fileName;
+            display.textContent = '📎 ' + fileReadyText + ' ' + fileName;
             display.classList.remove('hidden');
         }
     });

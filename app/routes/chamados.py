@@ -2,9 +2,10 @@
 import logging
 from flask import render_template, request, redirect, url_for, Response, flash, current_app
 from flask_login import current_user
+from app.i18n import flash_t
 from app.routes import main
 from app.limiter import limiter
-from app.decoradores import requer_solicitante
+from app.decoradores import requer_perfil
 from app.database import db
 from app.models import Chamado
 from app.models_usuario import Usuario
@@ -23,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 
 @main.route('/', methods=['GET', 'POST'])
-@requer_solicitante
+@requer_perfil('solicitante', 'supervisor', 'admin')
 @limiter.limit("10 per hour")
 def index() -> Response:
     """GET: formulário de novo chamado. POST: processa e salva no Firestore."""
@@ -151,6 +152,7 @@ def index() -> Response:
                 area=area_solicitante or 'Geral',
                 solicitante_nome=solicitante_nome,
                 responsavel_usuario=responsavel_usuario,
+                solicitante_email=getattr(current_user, 'email', None),
             )
             if responsavel_id:
                 criar_notificacao(
@@ -177,16 +179,16 @@ def index() -> Response:
             logger.warning(f"Notificação ao aprovador não enviada: {e}")
 
         logger.info(f"Chamado criado: {numero_chamado} (ID: {chamado_id})")
-        flash('Chamado criado com sucesso!', 'success')
+        flash_t('ticket_created_success', 'success')
         return redirect(url_for('main.index'))
     except Exception as e:
         logger.exception(f"Erro ao salvar chamado no Firestore: {str(e)}")
-        flash('Não foi possível salvar o chamado. Tente novamente.', 'danger')
+        flash_t('error_saving_ticket', 'danger')
         return redirect(url_for('main.index'))
 
 
 @main.route('/meus-chamados')
-@requer_solicitante
+@requer_perfil('solicitante', 'supervisor', 'admin')
 @limiter.limit("30 per minute")
 def meus_chamados() -> Response:
     """GET: lista de chamados criados pelo solicitante."""
@@ -242,5 +244,5 @@ def meus_chamados() -> Response:
         )
     except Exception as e:
         logger.exception(f"Erro ao buscar chamados do solicitante: {str(e)}")
-        flash('Erro ao carregar seus chamados.', 'danger')
+        flash_t('error_loading_your_tickets', 'danger')
         return redirect(url_for('main.index'))

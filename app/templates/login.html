@@ -1,5 +1,19 @@
 {% extends "base.html" %}
 
+{% block body_overlay %}
+<!-- Splash Screen Overlay — rendered at body level to cover the entire page -->
+<div id="splash-screen" class="fixed inset-0 z-[9999] flex items-center justify-center bg-[#0d182e]">
+    <div class="text-center">
+        <img id="splash-logo" src="{{ url_for('static', filename='img/logo-full.png') }}" 
+             alt="DTX Aerospace" class="h-16 sm:h-20 mx-auto brightness-0 invert opacity-0 scale-75">
+        <div id="splash-line" class="h-0.5 bg-gradient-to-r from-transparent via-blue-400 to-transparent mx-auto mt-6 rounded-full" style="width: 0;"></div>
+        <p id="splash-text" class="text-blue-300/80 text-sm mt-4 tracking-[0.25em] uppercase opacity-0 font-light">
+            {{ t('login_title') }}
+        </p>
+    </div>
+</div>
+{% endblock %}
+
 {% block content %}
 <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 py-12 px-4 sm:px-6 lg:px-8">
     <div id="login-card" class="w-full max-w-md bg-white rounded-lg shadow-xl p-8">
@@ -62,8 +76,8 @@
 
         <!-- Rodapé com Info -->
         <div class="gsap-login-footer mt-8 pt-6 border-t border-gray-200 text-center text-xs text-gray-500">
-            <p>Sistema restrito a usuários autorizados</p>
-            <p class="mt-2">Para solicitar acesso, contate o administrador</p>
+            <p>{{ t('login_restricted') }}</p>
+            <p class="mt-2">{{ t('login_contact_admin') }}</p>
         </div>
     </div>
 </div>

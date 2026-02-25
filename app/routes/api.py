@@ -12,7 +12,7 @@ from app.models_usuario import Usuario
 from app.models_historico import Historico
 from app.services.filters import aplicar_filtros_dashboard_com_paginacao
 from app.services.notifications import notificar_solicitante_status
-from app.services.notifications_inapp import listar_para_usuario, contar_nao_lidas, marcar_como_lida
+from app.services.notifications_inapp import listar_para_usuario, contar_nao_lidas, marcar_como_lida, marcar_todas_como_lidas
 from app.services.webpush_service import salvar_inscricao
 from app.services.assignment import atribuidor
 from app.services.upload import salvar_anexo
@@ -87,11 +87,9 @@ def api_editar_chamado():
 
         data_chamado = doc_chamado.to_dict()
         
-        # Validar permissão da área (Supervisor só edita chamados de sua área, a menos que seja admin)
+        # Validar permissão: supervisor só edita chamados cujo setor está nas suas áreas
         if current_user.perfil == 'supervisor':
-            responsavel_atual_obj = Usuario.get_by_id(data_chamado.get('responsavel_id')) if data_chamado.get('responsavel_id') else None
-            tem_area_comum = bool(set(responsavel_atual_obj.areas) & set(current_user.areas)) if responsavel_atual_obj else False
-            if not (data_chamado.get('area') in current_user.areas or data_chamado.get('responsavel_id') == current_user.id or tem_area_comum):
+            if data_chamado.get('area') not in current_user.areas:
                 return jsonify({'sucesso': False, 'erro': 'Você só pode editar chamados da sua área'}), 403
 
         update_data = {}
@@ -220,8 +218,7 @@ def bulk_atualizar_status():
                     continue
                 data = doc.to_dict()
                 if current_user.perfil == 'supervisor':
-                    chamado_area = data.get('area')
-                    if (chamado_area not in current_user.areas) and data.get('responsavel_id') != current_user.id:
+                    if data.get('area') not in current_user.areas:
                         erros.append({'id': chamado_id, 'erro': 'Sem permissão para este chamado'})
                         continue
                 # Atualiza status com retry automático
@@ -279,6 +276,18 @@ def api_notificacoes_marcar_lida(notificacao_id):
     except Exception as e:
         logger.exception("Erro ao marcar notificação: %s", e)
         return jsonify({'sucesso': False}), 500
+
+
+@main.route('/api/notificacoes/ler-todas', methods=['POST'])
+@login_required
+def api_notificacoes_ler_todas():
+    """Marca todas as notificações do usuário como lidas."""
+    try:
+        count = marcar_todas_como_lidas(current_user.id)
+        return jsonify({'sucesso': True, 'atualizadas': count}), 200
+    except Exception as e:
+        logger.exception("Erro ao marcar todas notificações: %s", e)
+        return jsonify({'sucesso': False, 'atualizadas': 0}), 500
 
 
 @main.route('/sw.js')

@@ -1,6 +1,7 @@
 """Rotas de administração de traduções globais JSON. Apenas para admins."""
 import logging
 from flask import render_template, request, redirect, url_for, flash, jsonify, Response
+from app.i18n import flash_t
 from app.routes import main
 from app.limiter import limiter
 from app.decoradores import requer_perfil
@@ -24,7 +25,7 @@ def admin_traducoes() -> Response:
             es = request.form.get('es')
             
             if not chave:
-                flash('Chave de tradução não informada.', 'danger')
+                flash_t('trans_key_not_provided', 'danger')
                 return redirect(url_for('main.admin_traducoes'))
                 
             translations = get_translations_dict()
@@ -40,17 +41,17 @@ def admin_traducoes() -> Response:
                 # Se for requisição AJAX/Fetch
                 if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.accept_mimetypes.accept_json:
                     return jsonify({'sucesso': True, 'mensagem': f'Tradução "{chave}" salva.'})
-                flash(f'Tradução para "{chave}" salva com sucesso.', 'success')
+                flash_t('translation_saved_success', 'success', chave=chave)
             else:
                 if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.accept_mimetypes.accept_json:
                     return jsonify({'sucesso': False, 'erro': 'Erro ao escrever no arquivo.'}), 500
-                flash('Erro ao salvar o arquivo json.', 'danger')
+                flash_t('error_saving_json', 'danger')
                 
         except Exception as e:
             logger.exception(f"Erro ao salvar tradução: {str(e)}")
             if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.accept_mimetypes.accept_json:
                 return jsonify({'sucesso': False, 'erro': str(e)}), 500
-            flash(f'Erro ao salvar: {str(e)}', 'danger')
+            flash_t('error_saving_with_msg', 'danger', error=str(e))
             
         return redirect(url_for('main.admin_traducoes'))
         
@@ -59,5 +60,5 @@ def admin_traducoes() -> Response:
         return render_template('admin_traducoes.html', translations=translations)
     except Exception as e:
         logger.exception(f"Erro ao carregar traduções: {str(e)}")
-        flash('Erro ao carregar lista de traduções.', 'danger')
+        flash_t('error_loading_translations', 'danger')
         return redirect(url_for('main.admin'))

@@ -27,8 +27,8 @@ formatação profissional, estilos, e análises.
 ```python
 from app.services.excel_export_service import gerar_relatorio_excel
 
-# Obter lista de chamados
-chamados = db.collection('chamados').limit(100).stream()
+# Obter lista de chamados (usar MAX_EXPORT_CHAMADOS para não estourar cota Firestore)
+chamados = db.collection('chamados').limit(MAX_EXPORT_CHAMADOS).stream()
 
 # Gerar Excel
 excel_bytes = gerar_relatorio_excel(
@@ -52,6 +52,12 @@ return response
 
 
 import logging
+
+# Limite de chamados na exportação. Aumentar esse valor aumenta as leituras no
+# Firestore e pode aproximar do limite do plano Spark (50k leituras/dia).
+# Manter controle para não estourar cota sem necessidade.
+MAX_EXPORT_CHAMADOS = 100
+
 import io
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional

@@ -11,10 +11,9 @@ def usuario_pode_ver_chamado(user, chamado) -> bool:
     """Verifica se o usuário tem permissão para ver/editar o chamado.
     
     Admin: pode ver tudo.
-    Supervisor: pode ver se:
-        - A área do chamado está nas suas áreas, OU
-        - O chamado está atribuído a ele, OU
-        - O responsável atual do chamado tem área em comum com o supervisor.
+    Supervisor: pode ver apenas se a ÁREA DO CHAMADO está nas suas áreas.
+    (Não basta o responsável ser de outro setor que o supervisor também atende;
+     cada supervisor vê só os chamados dos setores que ele gerencia.)
     
     Args:
         user: Objeto Usuario (current_user)
@@ -29,35 +28,15 @@ def usuario_pode_ver_chamado(user, chamado) -> bool:
     if user.perfil != 'supervisor':
         return False
     
-    # 1. Área do chamado está nas áreas do supervisor
-    if chamado.area in user.areas:
-        return True
-    
-    # 2. Chamado está atribuído diretamente ao supervisor
-    if chamado.responsavel_id == user.id:
-        return True
-    
-    # 3. Responsável atual tem área em comum com o supervisor
-    if chamado.responsavel_id:
-        responsavel_obj = Usuario.get_by_id(chamado.responsavel_id)
-        if responsavel_obj and bool(set(responsavel_obj.areas) & set(user.areas)):
-            return True
-    
-    return False
+    # Supervisor vê apenas chamados cujo setor está nas suas áreas
+    return chamado.area in user.areas
 
 
 def usuario_pode_ver_chamado_otimizado(user, chamado, cache_usuarios: dict = None) -> bool:
-    """Versão otimizada que aceita um cache de usuários pré-carregados.
+    """Versão otimizada: mesma regra de usuario_pode_ver_chamado (por área do chamado).
     
-    Evita queries N+1 ao Firestore quando chamada em loop.
-    
-    Args:
-        user: Objeto Usuario (current_user)
-        chamado: Objeto Chamado
-        cache_usuarios: Dict {user_id: Usuario} pré-carregado
-    
-    Returns:
-        True se pode ver, False caso contrário.
+    Supervisor vê apenas chamados cujo setor está nas suas áreas.
+    cache_usuarios é ignorado nesta regra (mantido por compatibilidade de assinatura).
     """
     if user.perfil == 'admin':
         return True
@@ -65,15 +44,4 @@ def usuario_pode_ver_chamado_otimizado(user, chamado, cache_usuarios: dict = Non
     if user.perfil != 'supervisor':
         return False
     
-    if chamado.area in user.areas:
-        return True
-    
-    if chamado.responsavel_id == user.id:
-        return True
-    
-    if chamado.responsavel_id and cache_usuarios:
-        responsavel_obj = cache_usuarios.get(chamado.responsavel_id)
-        if responsavel_obj and bool(set(responsavel_obj.areas) & set(user.areas)):
-            return True
-    
-    return False
+    return chamado.area in user.areas

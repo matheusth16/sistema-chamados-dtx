@@ -4,6 +4,7 @@ import io
 from datetime import datetime
 from typing import List, Dict, Any
 from flask import render_template, request, redirect, url_for, send_file, flash, Response
+from app.i18n import flash_t
 from flask_login import login_required, current_user
 from firebase_admin import firestore
 import pandas as pd
@@ -16,8 +17,9 @@ from app.models import Chamado
 from app.models_usuario import Usuario
 from app.models_historico import Historico
 from app.utils import formatar_data_para_excel, extrair_numero_chamado
-from app.services.filters import aplicar_filtros_dashboard
-from app.services.analytics import analisador
+from app.services.filters import aplicar_filtros_dashboard, aplicar_filtros_dashboard_com_paginacao
+from app.services.excel_export_service import MAX_EXPORT_CHAMADOS
+from app.services.analytics import analisador, obter_sla_para_exibicao
 from app.services.pagination import OptimizadorQuery
 from app.services.status_service import atualizar_status_chamado
 from app.services.permissions import usuario_pode_ver_chamado, usuario_pode_ver_chamado_otimizado
@@ -75,11 +77,11 @@ def admin() -> Response:
             if current_user.perfil == 'supervisor':
                 doc_anterior = db.collection('chamados').document(chamado_id).get()
                 if not doc_anterior.exists:
-                    flash('Chamado não encontrado', 'danger')
+                    flash_t('ticket_not_found', 'danger')
                     return redirect(url_for('main.admin', **request.args))
                 data_anterior = doc_anterior.to_dict()
                 if data_anterior.get('area') not in current_user.areas:
-                    flash('Você só pode atualizar chamados da sua área', 'danger')
+                    flash_t('only_update_tickets_your_area', 'danger')
                     return redirect(url_for('main.admin', **request.args))
 
             # Delega ao serviço centralizado de status
@@ -92,11 +94,14 @@ def admin() -> Response:
             if resultado['sucesso']:
                 flash(resultado['mensagem'], 'success')
             else:
-                flash(resultado.get('erro', 'Erro ao atualizar'), 'danger')
+                if 'erro' in resultado:
+                    flash(resultado['erro'], 'danger')
+                else:
+                    flash_t('error_updating', 'danger')
             return redirect(url_for('main.admin', **request.args))
         except Exception as e:
             logger.exception(f"Erro ao atualizar chamado {chamado_id}: {str(e)}")
-            flash(f'Erro ao atualizar: {str(e)}', 'danger')
+            flash_t('error_updating_with_msg', 'danger', error=str(e))
             return redirect(url_for('main.admin', **request.args))
 
     # Lista de responsáveis (apenas supervisores; admin do sistema não aparece no filtro)
@@ -135,6 +140,9 @@ def admin() -> Response:
         chamados_pagina = chamados_ordenados[:itens_por_pagina]
     else:
         chamados_pagina = chamados_ordenados[inicio:fim]
+    # SLA por chamado para exibição na Gestão (sem query extra)
+    for c in chamados_pagina:
+        c.sla_info = obter_sla_para_exibicao(c)
     # Gates disponíveis (para dropdown dinâmico)
     lista_gates = sorted([g.nome_pt for g in CategoriaGate.get_all()])
     
@@ -160,28 +168,31 @@ def visualizar_historico(chamado_id: str) -> Response:
     try:
         doc_chamado = db.collection('chamados').document(chamado_id).get()
         if not doc_chamado.exists:
-            flash('Chamado não encontrado', 'danger')
+            flash_t('ticket_not_found', 'danger')
             return redirect(url_for('main.admin'))
         chamado = Chamado.from_dict(doc_chamado.to_dict(), chamado_id)
         if not usuario_pode_ver_chamado(current_user, chamado):
-            flash('Você só pode visualizar histórico de chamados da sua área', 'danger')
+            flash_t('only_view_history_your_area', 'danger')
             return redirect(url_for('main.admin'))
         historico = Historico.get_by_chamado_id(chamado_id)
         return render_template('historico.html', chamado=chamado, historico=historico)
     except Exception as e:
         logger.exception(f"Erro ao buscar histórico de {chamado_id}: {str(e)}")
-        flash('Erro ao buscar histórico', 'danger')
+        flash_t('error_loading_history', 'danger')
         return redirect(url_for('main.admin'))
 
 
 @main.route('/exportar')
 @requer_supervisor_area
-@limiter.limit("5 per hour")
+@limiter.limit("3 per hour")  # Evita abuso; cada exportação gera muitas leituras no Firestore
 def exportar() -> Response:
-    """Exporta chamados filtrados para Excel."""
+    """Exporta chamados filtrados para Excel (até MAX_EXPORT_CHAMADOS)."""
     try:
         chamados_ref = db.collection('chamados')
-        docs = aplicar_filtros_dashboard(chamados_ref, request.args)
+        resultado = aplicar_filtros_dashboard_com_paginacao(
+            chamados_ref, request.args, limite=MAX_EXPORT_CHAMADOS, cursor=None
+        )
+        docs = resultado['docs']
         chamados = _filtrar_chamados_por_permissao(docs, current_user)
 
         dados: List[Dict[str, Any]] = []
@@ -215,21 +226,24 @@ def exportar() -> Response:
         )
     except Exception as e:
         logger.exception(f"Erro ao exportar: {str(e)}")
-        flash('Erro ao exportar dados. Tente novamente.', 'danger')
+        flash_t('error_exporting_data', 'danger')
         return redirect(url_for('main.admin'))
 
 
 @main.route('/exportar-avancado')
 @requer_supervisor_area
-@limiter.limit("3 per hour")
+@limiter.limit("3 per hour")  # Evita abuso; cada exportação gera muitas leituras no Firestore
 def exportar_avancado() -> Response:
-    """Exporta relatório completo e profissional em Excel com múltiplas abas."""
+    """Exporta relatório completo em Excel com múltiplas abas (até MAX_EXPORT_CHAMADOS)."""
     try:
         from app.services.excel_export_service import exportador_excel
         
-        # Busca chamados com filtros e permissão
+        # Busca chamados com filtros e permissão (limitado para não estourar cota Firestore)
         chamados_ref = db.collection('chamados')
-        docs = aplicar_filtros_dashboard(chamados_ref, request.args)
+        resultado = aplicar_filtros_dashboard_com_paginacao(
+            chamados_ref, request.args, limite=MAX_EXPORT_CHAMADOS, cursor=None
+        )
+        docs = resultado['docs']
         chamados = _filtrar_chamados_por_permissao(docs, current_user)
         
         # Obtém métricas
@@ -264,7 +278,7 @@ def exportar_avancado() -> Response:
         )
     except Exception as e:
         logger.exception(f"Erro ao exportar relatório avançado: {str(e)}")
-        flash('Erro ao exportar relatório. Tente novamente.', 'danger')
+        flash_t('error_exporting_report', 'danger')
         return redirect(url_for('main.admin'))
 
 
@@ -276,18 +290,21 @@ def relatorios() -> Response:
     try:
         atualizar = request.args.get('atualizar') == '1'
         relatorio = analisador.obter_relatorio_completo(usar_cache=not atualizar)
+        insights = relatorio.get('insights', [])
+        # Ordenar por prioridade: aviso primeiro, depois sucesso, depois info
+        ordem_tipo = {'aviso': 0, 'sucesso': 1, 'info': 2}
+        insights = sorted(insights, key=lambda x: ordem_tipo.get(x.get('tipo'), 3))
         return render_template(
             'relatorios.html',
             relatorio=relatorio,
             metricas_gerais=relatorio.get('metricas_gerais', {}),
             metricas_supervisores=relatorio.get('metricas_supervisores', []),
             metricas_areas=relatorio.get('metricas_areas', []),
-            analise_atribuicao=relatorio.get('analise_atribuicao', {}),
-            insights=relatorio.get('insights', [])
+            insights=insights
         )
     except Exception as e:
         logger.exception(f"Erro ao gerar relatórios: {str(e)}")
-        flash('Erro ao gerar relatórios. Tente novamente.', 'danger')
+        flash_t('error_generating_reports', 'danger')
         return redirect(url_for('main.admin'))
 
 
@@ -301,5 +318,5 @@ def indices_firestore() -> Response:
         return render_template('indices_firestore.html', indices=indices, script=script)
     except Exception as e:
         logger.exception(f"Erro ao exibir índices: {str(e)}")
-        flash('Erro ao carregar informações de índices', 'danger')
+        flash_t('error_loading_index_info', 'danger')
         return redirect(url_for('main.admin'))

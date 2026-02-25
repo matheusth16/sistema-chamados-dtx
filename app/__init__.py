@@ -216,10 +216,10 @@ def _configurar_i18n(app: Flask) -> None:
     @app.context_processor
     def inject_i18n():
         """Injeta função de tradução e idioma no contexto Jinja"""
-        def t(key):
+        def t(key, **kwargs):
             """Função para traduzir uma chave no template"""
             lang = session.get('language', 'pt_BR')
-            return get_translation(key, lang)
+            return get_translation(key, lang, **kwargs)
         
         def translate_sector(sector_name):
             """Traduz o nome de um setor no template"""
@@ -236,11 +236,21 @@ def _configurar_i18n(app: Flask) -> None:
             lang = session.get('language', 'pt_BR')
             return get_translated_status(status_name, lang)
         
+        def nome_curto(nome):
+            """Exibe primeiro nome + inicial do sobrenome, ex: 'Matheus Costa' -> 'Matheus C.'"""
+            if not nome or not str(nome).strip():
+                return nome or ''
+            parts = str(nome).strip().split()
+            if len(parts) >= 2:
+                return parts[0] + ' ' + parts[-1][0].upper() + '.'
+            return parts[0]
+        
         return dict(
             t=t,
             translate_sector=translate_sector,
             translate_category=translate_category,
             translate_status=translate_status,
+            nome_curto=nome_curto,
             current_language=session.get('language', 'pt_BR'),
             get_supported_languages=lambda: {
                 'pt_BR': 'Português (Brasil)',
@@ -248,6 +258,10 @@ def _configurar_i18n(app: Flask) -> None:
                 'es': 'Español'
             }
         )
+
+    # Register as Jinja filters for use with |map() in templates
+    app.jinja_env.filters['translate_sector'] = lambda name: get_translated_sector(name, session.get('language', 'pt_BR'))
+    app.jinja_env.filters['translate_category'] = lambda name: get_translated_category(name, session.get('language', 'pt_BR'))
 
 def _configurar_timeout_sessao(app: Flask) -> None:
     """Configura logout automático por inatividade de sessão (15 minutos)"""
@@ -272,7 +286,8 @@ def _configurar_timeout_sessao(app: Flask) -> None:
             if ultima_atividade is not None and (agora - ultima_atividade > limite_segundos):
                 logout_user()
                 session.clear() # Limpa a sessão
-                flash('Sua sessão expirou por inatividade. Faça login novamente.', 'info')
+                from app.i18n import flash_t
+                flash_t('session_expired', 'info')
                 # Redireciona para login e impede a requisição atual de continuar
                 return redirect(url_for('main.login'))
                 

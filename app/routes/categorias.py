@@ -1,11 +1,20 @@
 """Rotas de administração de categorias: setores, gates, impactos. Apenas para admins."""
 import logging
-from flask import render_template, request, redirect, url_for, flash, Response
+from flask import render_template, request, redirect, url_for, Response
+from app.i18n import flash_t
 from app.routes import main
 from app.limiter import limiter
 from app.decoradores import requer_perfil
-from app.models_categorias import CategoriaSetor, CategoriaGate, CategoriaImpacto
+from app.models_categorias import (
+    CategoriaSetor,
+    CategoriaGate,
+    CategoriaImpacto,
+    CACHE_KEY_SETORES,
+    CACHE_KEY_GATES,
+    CACHE_KEY_IMPACTOS,
+)
 from app.services.translation_service import adicionar_traducao_customizada
+from app.cache import cache_delete
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +37,7 @@ def admin_categorias() -> Response:
         )
     except Exception as e:
         logger.exception(f"Erro ao carregar categorias: {str(e)}")
-        flash('Erro ao carregar categorias. Tente novamente.', 'danger')
+        flash_t('error_loading_categories', 'danger')
         return redirect(url_for('main.admin'))
 
 
@@ -42,7 +51,7 @@ def criar_setor() -> Response:
         descricao_pt = request.form.get('descricao_pt', '').strip()
         
         if not nome_pt:
-            flash('Nome do setor é obrigatório', 'danger')
+            flash_t('sector_name_required', 'danger')
             return redirect(url_for('main.admin_categorias'))
         
         # Cria o setor (tradução automática)
@@ -51,15 +60,14 @@ def criar_setor() -> Response:
             descricao_pt=descricao_pt,
         )
         setor.save()
-        
+        cache_delete(CACHE_KEY_SETORES)
         # Adiciona a tradução customizada para futuras referências
         adicionar_traducao_customizada(nome_pt, setor.nome_en, setor.nome_es)
-        
-        flash(f'Setor "{nome_pt}" criado com sucesso (traduzido automaticamente)', 'success')
+        flash_t('sector_created_success', 'success', nome=nome_pt)
         return redirect(url_for('main.admin_categorias'))
     except Exception as e:
         logger.exception(f"Erro ao criar setor: {str(e)}")
-        flash(f'Erro ao criar setor: {str(e)}', 'danger')
+        flash_t('error_creating_sector', 'danger', error=str(e))
         return redirect(url_for('main.admin_categorias'))
 
 
@@ -73,7 +81,7 @@ def criar_gate() -> Response:
         descricao_pt = request.form.get('descricao_pt', '').strip()
         
         if not nome_pt:
-            flash('Nome do gate é obrigatório', 'danger')
+            flash_t('gate_name_required', 'danger')
             return redirect(url_for('main.admin_categorias'))
         
         # Calcula próxima ordem: pega o maior valor existente + 1
@@ -90,15 +98,14 @@ def criar_gate() -> Response:
             ordem=proxima_ordem,
         )
         gate.save()
-        
+        cache_delete(CACHE_KEY_GATES)
         # Adiciona a tradução customizada
         adicionar_traducao_customizada(nome_pt, gate.nome_en, gate.nome_es)
-        
-        flash(f'Gate "{nome_pt}" criado com sucesso (ordem: {proxima_ordem}, traduzido automaticamente)', 'success')
+        flash_t('gate_created_success', 'success', nome=nome_pt, ordem=proxima_ordem)
         return redirect(url_for('main.admin_categorias'))
     except Exception as e:
         logger.exception(f"Erro ao criar gate: {str(e)}")
-        flash(f'Erro ao criar gate: {str(e)}', 'danger')
+        flash_t('error_creating_gate', 'danger', error=str(e))
         return redirect(url_for('main.admin_categorias'))
 
 
@@ -112,7 +119,7 @@ def criar_impacto() -> Response:
         descricao_pt = request.form.get('descricao_pt', '').strip()
         
         if not nome_pt:
-            flash('Nome do impacto é obrigatório', 'danger')
+            flash_t('impact_name_required', 'danger')
             return redirect(url_for('main.admin_categorias'))
         
         # Cria o impacto (tradução automática)
@@ -121,15 +128,14 @@ def criar_impacto() -> Response:
             descricao_pt=descricao_pt,
         )
         impacto.save()
-        
+        cache_delete(CACHE_KEY_IMPACTOS)
         # Adiciona a tradução customizada
         adicionar_traducao_customizada(nome_pt, impacto.nome_en, impacto.nome_es)
-        
-        flash(f'Impacto "{nome_pt}" criado com sucesso (traduzido automaticamente)', 'success')
+        flash_t('impact_created_success', 'success', nome=nome_pt)
         return redirect(url_for('main.admin_categorias'))
     except Exception as e:
         logger.exception(f"Erro ao criar impacto: {str(e)}")
-        flash(f'Erro ao criar impacto: {str(e)}', 'danger')
+        flash_t('error_creating_impact', 'danger', error=str(e))
         return redirect(url_for('main.admin_categorias'))
 
 
@@ -141,7 +147,7 @@ def editar_setor(setor_id: str) -> Response:
     try:
         setor = CategoriaSetor.get_by_id(setor_id)
         if not setor:
-            flash('Setor não encontrado', 'danger')
+            flash_t('sector_not_found', 'danger')
             return redirect(url_for('main.admin_categorias'))
         
         setor.nome_pt = request.form.get('nome_pt', setor.nome_pt).strip()
@@ -149,11 +155,33 @@ def editar_setor(setor_id: str) -> Response:
         setor.ativo = request.form.get('ativo') == 'on'
         
         setor.save()
-        flash(f'Setor "{setor.nome_pt}" atualizado com sucesso', 'success')
+        cache_delete(CACHE_KEY_SETORES)
+        flash_t('sector_updated_success', 'success', nome=setor.nome_pt)
         return redirect(url_for('main.admin_categorias'))
     except Exception as e:
         logger.exception(f"Erro ao editar setor: {str(e)}")
-        flash(f'Erro ao editar setor: {str(e)}', 'danger')
+        flash_t('error_editing_sector', 'danger', error=str(e))
+        return redirect(url_for('main.admin_categorias'))
+
+
+@main.route('/admin/categorias/setor/<setor_id>/excluir', methods=['POST'])
+@requer_perfil('admin')
+@limiter.limit("30 per minute")
+def excluir_setor(setor_id: str) -> Response:
+    """Exclui um setor."""
+    try:
+        setor = CategoriaSetor.get_by_id(setor_id)
+        if not setor:
+            flash_t('sector_not_found', 'danger')
+            return redirect(url_for('main.admin_categorias'))
+        nome = setor.nome_pt
+        setor.delete()
+        cache_delete(CACHE_KEY_SETORES)
+        flash_t('sector_deleted_success', 'success', nome=nome)
+        return redirect(url_for('main.admin_categorias'))
+    except Exception as e:
+        logger.exception(f"Erro ao excluir setor: {str(e)}")
+        flash_t('error_deleting_sector', 'danger', error=str(e))
         return redirect(url_for('main.admin_categorias'))
 
 
@@ -165,7 +193,7 @@ def editar_gate(gate_id: str) -> Response:
     try:
         gate = CategoriaGate.get_by_id(gate_id)
         if not gate:
-            flash('Gate não encontrado', 'danger')
+            flash_t('gate_not_found', 'danger')
             return redirect(url_for('main.admin_categorias'))
         
         gate.nome_pt = request.form.get('nome_pt', gate.nome_pt).strip()
@@ -173,11 +201,33 @@ def editar_gate(gate_id: str) -> Response:
         gate.ativo = request.form.get('ativo') == 'on'
         
         gate.save()
-        flash(f'Gate "{gate.nome_pt}" atualizado com sucesso', 'success')
+        cache_delete(CACHE_KEY_GATES)
+        flash_t('gate_updated_success', 'success', nome=gate.nome_pt)
         return redirect(url_for('main.admin_categorias'))
     except Exception as e:
         logger.exception(f"Erro ao editar gate: {str(e)}")
-        flash(f'Erro ao editar gate: {str(e)}', 'danger')
+        flash_t('error_editing_gate', 'danger', error=str(e))
+        return redirect(url_for('main.admin_categorias'))
+
+
+@main.route('/admin/categorias/gate/<gate_id>/excluir', methods=['POST'])
+@requer_perfil('admin')
+@limiter.limit("30 per minute")
+def excluir_gate(gate_id: str) -> Response:
+    """Exclui um gate."""
+    try:
+        gate = CategoriaGate.get_by_id(gate_id)
+        if not gate:
+            flash_t('gate_not_found', 'danger')
+            return redirect(url_for('main.admin_categorias'))
+        nome = gate.nome_pt
+        gate.delete()
+        cache_delete(CACHE_KEY_GATES)
+        flash_t('gate_deleted_success', 'success', nome=nome)
+        return redirect(url_for('main.admin_categorias'))
+    except Exception as e:
+        logger.exception(f"Erro ao excluir gate: {str(e)}")
+        flash_t('error_deleting_gate', 'danger', error=str(e))
         return redirect(url_for('main.admin_categorias'))
 
 
@@ -189,7 +239,7 @@ def editar_impacto(impacto_id: str) -> Response:
     try:
         impacto = CategoriaImpacto.get_by_id(impacto_id)
         if not impacto:
-            flash('Impacto não encontrado', 'danger')
+            flash_t('impact_not_found', 'danger')
             return redirect(url_for('main.admin_categorias'))
         
         impacto.nome_pt = request.form.get('nome_pt', impacto.nome_pt).strip()
@@ -197,9 +247,31 @@ def editar_impacto(impacto_id: str) -> Response:
         impacto.ativo = request.form.get('ativo') == 'on'
         
         impacto.save()
-        flash(f'Impacto "{impacto.nome_pt}" atualizado com sucesso', 'success')
+        cache_delete(CACHE_KEY_IMPACTOS)
+        flash_t('impact_updated_success', 'success', nome=impacto.nome_pt)
         return redirect(url_for('main.admin_categorias'))
     except Exception as e:
         logger.exception(f"Erro ao editar impacto: {str(e)}")
-        flash(f'Erro ao editar impacto: {str(e)}', 'danger')
+        flash_t('error_editing_impact', 'danger', error=str(e))
+        return redirect(url_for('main.admin_categorias'))
+
+
+@main.route('/admin/categorias/impacto/<impacto_id>/excluir', methods=['POST'])
+@requer_perfil('admin')
+@limiter.limit("30 per minute")
+def excluir_impacto(impacto_id: str) -> Response:
+    """Exclui um impacto."""
+    try:
+        impacto = CategoriaImpacto.get_by_id(impacto_id)
+        if not impacto:
+            flash_t('impact_not_found', 'danger')
+            return redirect(url_for('main.admin_categorias'))
+        nome = impacto.nome_pt
+        impacto.delete()
+        cache_delete(CACHE_KEY_IMPACTOS)
+        flash_t('impact_deleted_success', 'success', nome=nome)
+        return redirect(url_for('main.admin_categorias'))
+    except Exception as e:
+        logger.exception(f"Erro ao excluir impacto: {str(e)}")
+        flash_t('error_deleting_impact', 'danger', error=str(e))
         return redirect(url_for('main.admin_categorias'))

@@ -6,13 +6,13 @@
     <!-- Header -->
     <div class="flex flex-col md:flex-row justify-between items-start bg-white p-6 rounded-lg shadow-sm border border-gray-100">
         <div>
-            <h2 class="text-2xl font-bold text-gray-800">Histórico de Alterações</h2>
+            <h2 class="text-2xl font-bold text-gray-800">{{ t('history_of_changes') }}</h2>
             <p class="text-sm text-gray-600 mt-1">
                 <span class="font-semibold">{{ chamado.numero_chamado }}</span> - {{ chamado.descricao[:50] }}...
             </p>
         </div>
         <a href="{{ url_for('main.admin') }}" class="mt-4 md:mt-0 inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-md shadow transition">
-            ← Voltar ao Painel
+            ← {{ t('back_to_dashboard') }}
         </a>
     </div>
 
@@ -24,22 +24,22 @@
                 <p class="text-lg font-bold text-gray-900">{{ chamado.numero_chamado }}</p>
             </div>
             <div>
-                <p class="text-xs text-gray-600 font-semibold uppercase">Categoria</p>
+                <p class="text-xs text-gray-600 font-semibold uppercase">{{ t('category') }}</p>
                 <p class="text-lg font-bold text-gray-900">{{ translate_category(chamado.categoria) }}</p>
             </div>
             <div>
-                <p class="text-xs text-gray-600 font-semibold uppercase">Status</p>
+                <p class="text-xs text-gray-600 font-semibold uppercase">{{ t('status') }}</p>
                 <p class="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold
                     {% if chamado.status == 'Concluído' %}bg-green-100 text-green-800{% elif chamado.status == 'Em Atendimento' %}bg-yellow-100 text-yellow-800{% else %}bg-gray-100 text-gray-800{% endif %}">
                     {{ translate_status(chamado.status) }}
                 </p>
             </div>
             <div>
-                <p class="text-xs text-gray-600 font-semibold uppercase">Responsável</p>
+                <p class="text-xs text-gray-600 font-semibold uppercase">{{ t('responsible') }}</p>
                 <p class="text-lg font-bold text-gray-900">{{ chamado.responsavel }}</p>
             </div>
             <div>
-                <p class="text-xs text-gray-600 font-semibold uppercase">Abertura</p>
+                <p class="text-xs text-gray-600 font-semibold uppercase">{{ t('opening') }}</p>
                 <p class="text-lg font-bold text-gray-900">{{ chamado.data_abertura_formatada() }}</p>
             </div>
         </div>
@@ -51,7 +51,7 @@
             <svg class="w-6 h-6 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
             </svg>
-            Timeline de Alterações
+            {{ t('changes_timeline') }}
         </h3>
         
         {% if historico %}
@@ -90,11 +90,11 @@
                                         <div class="flex items-center gap-2 mb-1">
                                             <h4 class="text-base font-bold text-gray-900">
                                                 {% if evento.acao == 'criacao' %}
-                                                    🎫 Chamado Criado
+                                                    🎫 {{ t('ticket_created') }}
                                                 {% elif evento.acao == 'alteracao_status' %}
-                                                    🔄 Status Atualizado
+                                                    🔄 {{ t('status_updated_event') }}
                                                 {% elif evento.acao == 'alteracao_dados' %}
-                                                    ⚙️ Dados Modificados
+                                                    ⚙️ {{ t('data_modified') }}
                                                 {% endif %}
                                             </h4>
                                             <span class="px-2 py-0.5 bg-blue-100 text-blue-800 text-xs font-semibold rounded-full">
@@ -111,7 +111,7 @@
                                     <time class="flex flex-col items-end text-xs font-medium bg-blue-50 px-3 py-2 rounded-md border border-blue-200">
                                         <span class="text-blue-900 font-bold">{{ evento.data_acao_formatada().split(' ')[0] }}</span>
                                         <span class="text-blue-700">{{ evento.data_acao_formatada().split(' ')[1] if ' ' in evento.data_acao_formatada() else '' }}</span>
-                                        <span class="text-blue-600 text-[10px] mt-1">Horário de Brasília</span>
+                                        <span class="text-blue-600 text-[10px] mt-1">{{ t('brasilia_time') }}</span>
                                     </time>
                                 </div>
 
@@ -136,7 +136,7 @@
                                 {% elif evento.acao == 'alteracao_dados' %}
                                     <div class="mt-3 p-4 bg-white rounded-lg border-l-4 border-purple-500 shadow-sm">
                                         <p class="text-sm text-gray-700 flex items-center gap-2">
-                                            <span class="font-semibold text-purple-700">Campo alterado:</span>
+                                            <span class="font-semibold text-purple-700">{{ t('changed_field') }}</span>
                                             <span class="px-2 py-1 bg-purple-100 text-purple-800 rounded text-xs font-medium">{{ evento.campo_alterado }}</span>
                                         </p>
                                     </div>
@@ -146,7 +146,7 @@
                                             <svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                                             </svg>
-                                            <span class="font-medium text-green-800">Chamado iniciado com sucesso</span>
+                                            <span class="font-medium text-green-800">{{ t('ticket_started_successfully') }}</span>
                                         </p>
                                     </div>
                                 {% endif %}
@@ -160,8 +160,8 @@
                 <svg class="w-16 h-16 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                 </svg>
-                <p class="text-gray-500 font-medium">Nenhuma alteração registrada ainda</p>
-                <p class="text-sm text-gray-400">Este chamado acabou de ser criado</p>
+                <p class="text-gray-500 font-medium">{{ t('no_changes_recorded') }}</p>
+                <p class="text-sm text-gray-400">{{ t('ticket_just_created') }}</p>
             </div>
         {% endif %}
     </div>

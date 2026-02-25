@@ -116,6 +116,10 @@ sistema-chamados-dtx/
 └── README.md
 ```
 
+### Caminhos de arquivos (Windows)
+
+No repositório **não há arquivos duplicados**. O Git sempre usa barras normais (`/`) nos caminhos. No Windows, `app\routes\api.py` e `app/routes/api.py` referem-se ao **mesmo arquivo**; o `.gitattributes` garante normalização. Em imports e referências no código, use sempre `app/routes/api.py` e `app/services/notifications_inapp.py`.
+
 ## ⚡ Performance
 
 ### Impacto das Otimizações
@@ -188,16 +192,24 @@ firebase deploy --only firestore:indexes --project seu-projeto-id
 **Causa:** Em `FLASK_ENV=production` a aplicação exige `SECRET_KEY` no ambiente.  
 **Solução:** Defina `SECRET_KEY` com um valor forte (ex: `openssl rand -hex 32`) nas variáveis de ambiente.
 
-### Dependências e vulnerabilidades
+### Dependências
 
-Execute periodicamente para checar dependências:
+O `requirements.txt` usa **versões fixas** (ex.: Flask 3.1.2, firebase-admin 7.1.0) para reprodutibilidade entre ambientes.
 
-```bash
-pip install -U pip
-pip audit
-```
+É importante manter dependências seguras e atualizadas:
 
-Atualize pacotes quando necessário: `pip install -r requirements.txt --upgrade` (teste após atualizar).
+1. **Auditar vulnerabilidades** (recomendado de forma periódica):
+   ```bash
+   pip install -U pip
+   pip audit
+   ```
+
+2. **Atualizar pacotes** quando necessário (testar a aplicação após atualizar):
+   ```bash
+   pip install -r requirements.txt --upgrade
+   ```
+
+Após alterar versões, atualize o `requirements.txt` com `pip freeze` ou ajuste manualmente as versões pinadas.
 
 ## 🤝 Contribuindo
 
@@ -223,9 +235,10 @@ Este projeto é propriedade da DTX Aerospace.
 - [x] Caching e rate limit com Redis (configurável)
 - [x] Export (Excel) e relatórios
 - [x] i18n (PT/EN) e painel de traduções
-- [ ] Cache local com IndexedDB (opcional)
+- [x] **PWA / notificações**: Service Worker e Web Push (notificações push no navegador) — base para uso offline e alertas
+- [ ] Cache local com IndexedDB (opcional; melhora uso offline)
+- [ ] Notificações em tempo real (WebSocket; complementa Web Push)
 - [ ] Mobile app
-- [ ] Notificações em tempo real (WebSocket)
 
 ---
 

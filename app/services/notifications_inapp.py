@@ -99,3 +99,21 @@ def marcar_como_lida(notificacao_id: str, usuario_id: str) -> bool:
     except Exception as e:
         logger.exception(f"Erro ao marcar notificação como lida: {e}")
         return False
+
+
+def marcar_todas_como_lidas(usuario_id: str) -> int:
+    """Marca todas as notificações não lidas do usuário como lidas. Retorna quantidade atualizada."""
+    if not usuario_id:
+        return 0
+    try:
+        docs = db.collection('notificacoes').where('usuario_id', '==', usuario_id).where('lida', '==', False).stream()
+        count = 0
+        for doc in docs:
+            doc.reference.update({'lida': True})
+            count += 1
+        if count:
+            logger.debug(f"Notificações marcadas como lidas: usuario={usuario_id}, count={count}")
+        return count
+    except Exception as e:
+        logger.exception(f"Erro ao marcar todas notificações como lidas: {e}")
+        return 0

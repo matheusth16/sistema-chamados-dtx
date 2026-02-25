@@ -42,6 +42,30 @@ def test_api_editar_chamado_chamado_inexistente_retorna_404(client_logado_superv
     assert 'não encontrado' in r.get_json().get('erro', '').lower()
 
 
+def test_api_editar_chamado_supervisor_outra_area_retorna_403(client_logado_supervisor):
+    """Edge case: supervisor só pode editar chamados da sua área; chamado de outra área retorna 403."""
+    mock_doc = MagicMock()
+    mock_doc.exists = True
+    # Chamado da área TI; supervisor do conftest tem areas=['Manutencao']
+    mock_doc.to_dict.return_value = {
+        'area': 'TI',
+        'status': 'Aberto',
+        'descricao': 'Desc',
+        'responsavel': 'Alguém',
+        'responsavel_id': 'outro_id',
+    }
+    with patch('app.routes.api.db') as mock_db:
+        mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
+        r = client_logado_supervisor.post(
+            '/api/editar-chamado',
+            data={'chamado_id': 'ch_ti_123'},
+            content_type='multipart/form-data',
+        )
+    assert r.status_code == 403
+    data = r.get_json()
+    assert data is not None and ('sua área' in data.get('erro', '').lower() or 'área' in data.get('erro', '').lower())
+
+
 def test_carregar_mais_sem_login_redireciona(client):
     """POST /api/carregar-mais sem login retorna 302."""
     r = client.post('/api/carregar-mais', json={}, content_type='application/json')
@@ -119,3 +143,35 @@ def test_api_supervisores_disponibilidade_sem_login_redireciona(client):
     """GET /api/supervisores/disponibilidade sem login redireciona."""
     r = client.get('/api/supervisores/disponibilidade')
     assert r.status_code == 302
+
+
+def test_bulk_status_supervisor_outra_area_retorna_erro_por_chamado(client_logado_supervisor):
+    """Edge case: no bulk-status, chamados de outra área do supervisor retornam em erros (sem permissão)."""
+    # Supervisor do conftest tem areas=['Manutencao']. Doc 1 = mesma área, Doc 2 = outra área.
+    doc_manutencao = MagicMock()
+    doc_manutencao.exists = True
+    doc_manutencao.to_dict.return_value = {'area': 'Manutencao', 'status': 'Aberto'}
+    doc_ti = MagicMock()
+    doc_ti.exists = True
+    doc_ti.to_dict.return_value = {'area': 'TI', 'status': 'Aberto'}
+    with patch('app.routes.api.db') as mock_db:
+        col = mock_db.collection.return_value
+        def doc_side_effect(doc_id):
+            m = MagicMock()
+            m.get.return_value = doc_manutencao if doc_id == 'ch_manutencao' else doc_ti
+            m.update = MagicMock()
+            return m
+        col.document.side_effect = doc_side_effect
+        with patch('app.routes.api.execute_with_retry'):
+            r = client_logado_supervisor.post(
+                '/api/bulk-status',
+                json={'chamado_ids': ['ch_manutencao', 'ch_ti'], 'novo_status': 'Em Atendimento'},
+                content_type='application/json',
+            )
+    assert r.status_code == 200
+    data = r.get_json()
+    assert data.get('sucesso') is True
+    assert 'erros' in data
+    erros_ids = [e.get('id') for e in data['erros']]
+    assert 'ch_ti' in erros_ids
+    assert data.get('atualizados', 0) >= 0

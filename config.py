@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 basedir = os.path.abspath(os.path.dirname(__file__))
 
 # Carrega as variáveis do arquivo .env
-load_dotenv(os.path.join(basedir, '.env'))
+load_dotenv(os.path.join(basedir, '.env'), override=True)
 
 # Em produção, exige SECRET_KEY forte (não usar o valor de desenvolvimento)
 _dev_secret = 'dev-secret-key-change-in-production'
@@ -70,6 +70,11 @@ class Config:
     MAIL_PASSWORD = os.getenv('MAIL_PASSWORD', '')
     MAIL_DEFAULT_SENDER = os.getenv('MAIL_DEFAULT_SENDER', '')
     TEAMS_WEBHOOK_URL = os.getenv('TEAMS_WEBHOOK_URL', '')
+
+    # Resend (e-mail transacional). Se definido, usa Resend em vez de SMTP para notificações.
+    RESEND_API_KEY = os.getenv('RESEND_API_KEY', '')
+    RESEND_FROM_EMAIL = os.getenv('RESEND_FROM_EMAIL', 'onboarding@resend.dev')
+    RESEND_FROM_NAME = os.getenv('RESEND_FROM_NAME', 'Sistema de Chamados')
 
     # Web Push (notificações no navegador). Gere chaves com: python scripts/gerar_vapid_keys.py
     VAPID_PUBLIC_KEY = os.getenv('VAPID_PUBLIC_KEY', '')
