@@ -211,13 +211,13 @@
             <tbody class="bg-white divide-y divide-gray-50/80 gsap-stagger-container">
                 {% if chamados %}
                 {% for chamado in chamados %}
-                <tr
+                <tr data-chamado-id="{{ chamado.id }}"
                     class="gsap-stagger hover:bg-indigo-50/50 transition duration-150 group cursor-default {% if chamado.categoria == 'Projetos' %}bg-red-50/20{% endif %}">
                     <td class="px-5 py-4 whitespace-nowrap">
                         <input type="checkbox" class="bulk-cb rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
                             value="{{ chamado.id }}" data-id="{{ chamado.id }}">
                     </td>
-                    <td class="px-5 py-4 whitespace-nowrap">
+                    <td class="px-5 py-4 whitespace-nowrap" data-cell="numero">
                         <div class="text-sm font-black text-gray-800">{{ chamado.numero_chamado }}</div>
                         {% if chamado.rl_codigo %}
                         <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-pink-100 text-pink-700 mt-1 uppercase tracking-wider">
@@ -226,19 +226,19 @@
                         {% endif %}
                     </td>
 
-                    <td class="px-5 py-4 whitespace-nowrap">
+                    <td class="px-5 py-4 whitespace-nowrap" data-cell="categoria">
                         <span class="px-2.5 py-1 inline-flex text-xs leading-5 font-bold rounded-lg 
                                 {% if chamado.categoria == 'Projetos' %}bg-pink-100 text-pink-700{% else %}bg-indigo-100 text-indigo-700{% endif %}">
                             {{ translate_category(chamado.categoria) }}
                         </span>
                     </td>
 
-                    <td class="px-5 py-4 whitespace-nowrap">
+                    <td class="px-5 py-4 whitespace-nowrap" data-cell="setor">
                         <div class="text-sm font-semibold text-gray-800">{{ translate_sector(chamado.tipo_solicitacao) }}</div>
                         <div class="text-xs font-medium text-gray-400">{{ chamado.gate }}</div>
                     </td>
 
-                    <td class="px-5 py-4 whitespace-nowrap">
+                    <td class="px-5 py-4 whitespace-nowrap" data-cell="responsavel">
                         <div class="flex items-center">
                             {% if chamado.responsavel %}
                             <div class="h-6 w-6 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-xs font-bold mr-2">
@@ -249,7 +249,7 @@
                         </div>
                     </td>
 
-                    <td class="px-5 py-4">
+                    <td class="px-5 py-4" data-cell="descricao">
                         <div class="text-sm text-gray-700 truncate max-w-[120px] cursor-pointer group-hover:text-indigo-600 font-medium"
                             title="{{ t('click_eye_full') }}">
                             {{ chamado.descricao[:15] }}{% if chamado.descricao|length > 15 %}...{% endif %}
@@ -259,7 +259,7 @@
                         </div>
                     </td>
 
-                    <td class="px-5 py-4 whitespace-nowrap">
+                    <td class="px-5 py-4 whitespace-nowrap" data-cell="status">
                         <span class="px-2.5 py-1 inline-flex text-xs leading-5 font-bold rounded-lg 
                                 {% if chamado.status == 'Concluído' %}bg-emerald-100 text-emerald-700{% elif chamado.status == 'Em Atendimento' %}bg-amber-100 text-amber-700{% else %}bg-blue-100 text-blue-700{% endif %}">
                             <span class="w-1.5 h-1.5 rounded-full mr-1.5 mt-1.5 {% if chamado.status == 'Concluído' %}bg-emerald-500{% elif chamado.status == 'Em Atendimento' %}bg-amber-500{% else %}bg-blue-500{% endif %}"></span>
@@ -267,7 +267,7 @@
                         </span>
                     </td>
 
-                    <td class="px-5 py-4 whitespace-nowrap text-center">
+                    <td class="px-5 py-4 whitespace-nowrap text-center" data-cell="sla">
                         {% if chamado.sla_info %}
                         <span class="px-2 py-1 inline-flex text-xs font-bold rounded-lg
                                 {% if chamado.sla_info.dentro_prazo %}bg-emerald-100 text-emerald-700
@@ -282,7 +282,7 @@
                     </td>
 
                     <td class="px-5 py-4 text-sm font-medium flex items-center justify-center space-x-2 min-w-[7rem] shrink-0">
-                        <a href="{{ url_for('main.visualizar_detalhe_chamado', chamado_id=chamado.id) }}" target="_blank"
+                        <a href="{{ url_for('main.visualizar_detalhe_chamado', chamado_id=chamado.id) }}" target="_blank" rel="opener"
                             class="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors" title="{{ t('view_details') }}">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -491,6 +491,51 @@
                     });
                 });
             }
+        })();
+
+        // Atualizar apenas a linha do chamado quando a aba de detalhes for fechada (postMessage da aba filha)
+        (function () {
+            function nomeCurto(nome) {
+                if (!nome || !nome.trim()) return '—';
+                var p = nome.trim().split(/\s+/);
+                if (p.length >= 2) return p[0] + ' ' + p[p.length - 1].charAt(0) + '.';
+                return nome.length > 25 ? nome.slice(0, 25) + '...' : nome;
+            }
+            function updateRowFromChamado(chamadoId, c) {
+                var row = document.querySelector('tr[data-chamado-id="' + chamadoId + '"]');
+                if (!row) return;
+                var cat = typeof translateCategory === 'function' ? translateCategory(c.categoria) : (categoryMap && categoryMap[c.categoria]) || c.categoria;
+                var set = function (cell, html) {
+                    var el = row.querySelector('[data-cell="' + cell + '"]');
+                    if (el) el.innerHTML = html;
+                };
+                set('numero', '<div class="text-sm font-black text-gray-800">' + (c.numero_chamado || '') + '</div>' +
+                    (c.rl_codigo ? '<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-pink-100 text-pink-700 mt-1 uppercase tracking-wider">{{ t("rl_short") }} ' + (c.rl_codigo || '') + '</span>' : ''));
+                set('categoria', '<span class="px-2.5 py-1 inline-flex text-xs leading-5 font-bold rounded-lg ' + (c.categoria === 'Projetos' ? 'bg-pink-100 text-pink-700' : 'bg-indigo-100 text-indigo-700') + '">' + cat + '</span>');
+                var setor = typeof translateSector === 'function' ? translateSector(c.tipo_solicitacao) : (sectorMap && sectorMap[c.tipo_solicitacao]) || c.tipo_solicitacao || '';
+                set('setor', '<div class="text-sm font-semibold text-gray-800">' + setor + '</div><div class="text-xs font-medium text-gray-400">' + (c.gate || '') + '</div>');
+                set('responsavel', '<div class="flex items-center">' + (c.responsavel ? '<div class="h-6 w-6 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-xs font-bold mr-2">' + (c.responsavel.charAt(0) || '') + '</div>' : '') + '<span class="text-sm font-medium text-gray-700">' + nomeCurto(c.responsavel) + '</span></div>');
+                var desc = (c.descricao || '').slice(0, 15) + ((c.descricao || '').length > 15 ? '...' : '');
+                set('descricao', '<div class="text-sm text-gray-700 truncate max-w-[120px] cursor-pointer group-hover:text-indigo-600 font-medium" title="{{ t("click_eye_full") }}">' + desc + '</div><div class="text-xs text-gray-400 font-medium mt-0.5">' + (c.data_abertura || '-') + '</div>');
+                var statusLabel = typeof translateStatus === 'function' ? translateStatus(c.status || 'Aberto') : (statusMap && statusMap[c.status]) || c.status || 'Aberto';
+                var statusCls = (c.status === 'Concluído') ? 'bg-emerald-100 text-emerald-700' : (c.status === 'Em Atendimento') ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700';
+                var statusDot = (c.status === 'Concluído') ? 'bg-emerald-500' : (c.status === 'Em Atendimento') ? 'bg-amber-500' : 'bg-blue-500';
+                set('status', '<span class="px-2.5 py-1 inline-flex text-xs leading-5 font-bold rounded-lg ' + statusCls + '"><span class="w-1.5 h-1.5 rounded-full mr-1.5 mt-1.5 ' + statusDot + '"></span>' + statusLabel + '</span>');
+                var sla = c.sla_info;
+                var slaHtml = !sla ? '<span class="text-gray-300 text-xs">—</span>' : '<span class="px-2 py-1 inline-flex text-xs font-bold rounded-lg ' + (sla.dentro_prazo ? 'bg-emerald-100 text-emerald-700' : sla.em_risco ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700') + '" title="{{ t("sla_tooltip") }}">' + (sla.label === 'No prazo' ? '{{ t("on_time") }}' : sla.label === 'Atrasado' ? '{{ t("delayed") }}' : sla.label === 'Em risco' ? '{{ t("at_risk") }}' : sla.label) + '</span>';
+                set('sla', slaHtml);
+            }
+            window.addEventListener('message', function (event) {
+                if (event.data && event.data.type === 'refreshChamado' && event.data.chamadoId) {
+                    var chamadoId = event.data.chamadoId;
+                    fetch('/api/chamado/' + encodeURIComponent(chamadoId))
+                        .then(function (r) { return r.json(); })
+                        .then(function (res) {
+                            if (res.sucesso && res.chamado) updateRowFromChamado(chamadoId, res.chamado);
+                        })
+                        .catch(function () {});
+                }
+            });
         })();
     </script>
 

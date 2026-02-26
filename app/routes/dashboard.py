@@ -4,6 +4,7 @@ import io
 from datetime import datetime
 from typing import List, Dict, Any
 from flask import render_template, request, redirect, url_for, send_file, flash, Response
+from urllib.parse import urlparse
 from app.i18n import flash_t
 from flask_login import login_required, current_user
 from firebase_admin import firestore
@@ -23,9 +24,23 @@ from app.services.analytics import analisador, obter_sla_para_exibicao
 from app.services.pagination import OptimizadorQuery
 from app.services.status_service import atualizar_status_chamado
 from app.services.permissions import usuario_pode_ver_chamado, usuario_pode_ver_chamado_otimizado
+from app.services.upload import salvar_anexo
+from app.firebase_retry import execute_with_retry
 from app.models_categorias import CategoriaGate
 
 logger = logging.getLogger(__name__)
+
+
+def _same_origin(referrer: str) -> bool:
+    """Retorna True se referrer tem a mesma origem (host) que a requisição atual."""
+    if not referrer:
+        return False
+    try:
+        ref = urlparse(referrer)
+        base = urlparse(request.url_root)
+        return ref.netloc == base.netloc and ref.scheme == base.scheme
+    except Exception:
+        return False
 
 
 def _filtrar_chamados_por_permissao(docs, user) -> list:
@@ -118,6 +133,11 @@ def admin() -> Response:
     )
 
     chamados_ref = db.collection('chamados')
+    # Supervisor vê apenas chamados das suas áreas (filtro no Firestore para não trazer outros setores)
+    if current_user.perfil == 'supervisor' and getattr(current_user, 'areas', None):
+        areas = current_user.areas[:10]  # Firestore 'in' aceita no máximo 10
+        if areas:
+            chamados_ref = chamados_ref.where('area', 'in', areas)
     docs = aplicar_filtros_dashboard(chamados_ref, request.args)
     chamados = _filtrar_chamados_por_permissao(docs, current_user)
 
@@ -159,6 +179,156 @@ def admin() -> Response:
         max=max,
         min=min,
     )
+
+
+@main.route('/chamado/<chamado_id>')
+@login_required
+@limiter.limit("60 per minute")
+def visualizar_detalhe_chamado(chamado_id: str) -> Response:
+    """Exibe detalhes do chamado. Solicitante vê só os próprios; supervisor/admin conforme permissão."""
+    try:
+        doc_chamado = db.collection('chamados').document(chamado_id).get()
+        if not doc_chamado.exists:
+            flash_t('ticket_not_found', 'danger')
+            return redirect(url_for('main.admin' if current_user.perfil in ('supervisor', 'admin') else 'main.meus_chamados'))
+        chamado = Chamado.from_dict(doc_chamado.to_dict(), chamado_id)
+        if current_user.perfil == 'solicitante':
+            if chamado.solicitante_id != current_user.id:
+                flash_t('ticket_not_found', 'danger')
+                return redirect(url_for('main.meus_chamados'))
+        else:
+            if not usuario_pode_ver_chamado(current_user, chamado):
+                flash_t('only_view_history_your_area', 'danger')
+                return redirect(url_for('main.admin'))
+        voltar_url = request.referrer if request.referrer and _same_origin(request.referrer) else (
+            url_for('main.admin') if current_user.perfil in ('supervisor', 'admin') else url_for('main.meus_chamados')
+        )
+        pode_editar = current_user.perfil in ('supervisor', 'admin')
+        usuarios_gestao = Usuario.get_all()
+        supervisores_detalhados = sorted(
+            [{'id': u.id, 'nome': u.nome, 'area': u.area} for u in usuarios_gestao if u.perfil in ('supervisor', 'admin') and u.nome],
+            key=lambda x: (x['nome'] or '').upper()
+        ) if pode_editar else []
+        return render_template(
+            'visualizar_chamado.html',
+            chamado=chamado,
+            voltar_url=voltar_url,
+            pode_editar=pode_editar,
+            supervisores_detalhados=supervisores_detalhados
+        )
+    except Exception as e:
+        logger.exception("Erro ao exibir chamado %s: %s", chamado_id, e)
+        flash_t('ticket_not_found', 'danger')
+        return redirect(url_for('main.admin' if current_user.perfil in ('supervisor', 'admin') else 'main.meus_chamados'))
+
+
+@main.route('/chamado/editar', methods=['POST'])
+@login_required
+@limiter.limit("30 per minute")
+def editar_chamado_pagina() -> Response:
+    """Processa o formulário de edição da página de detalhes do chamado (status, responsável, descrição, anexo)."""
+    if current_user.perfil not in ('supervisor', 'admin'):
+        flash_t('only_supervisor_can_edit', 'danger')
+        return redirect(url_for('main.index'))
+
+    chamado_id = request.form.get('chamado_id')
+    if not chamado_id:
+        flash_t('ticket_not_found', 'danger')
+        return redirect(url_for('main.admin'))
+
+    doc_chamado = db.collection('chamados').document(chamado_id).get()
+    if not doc_chamado.exists:
+        flash_t('ticket_not_found', 'danger')
+        return redirect(url_for('main.admin'))
+
+    chamado = Chamado.from_dict(doc_chamado.to_dict(), chamado_id)
+    if not usuario_pode_ver_chamado(current_user, chamado):
+        flash_t('only_view_history_your_area', 'danger')
+        return redirect(url_for('main.admin'))
+
+    data_chamado = doc_chamado.to_dict()
+    update_data = {}
+
+    try:
+        novo_status = request.form.get('novo_status')
+        if novo_status and novo_status in ('Aberto', 'Em Atendimento', 'Concluído') and novo_status != data_chamado.get('status'):
+            resultado = atualizar_status_chamado(
+                chamado_id=chamado_id,
+                novo_status=novo_status,
+                usuario_id=current_user.id,
+                usuario_nome=current_user.nome,
+                data_chamado=data_chamado,
+            )
+            if resultado.get('sucesso'):
+                flash(resultado.get('mensagem', 'Status atualizado.'), 'success')
+            else:
+                flash(resultado.get('erro', 'Erro ao atualizar status.'), 'danger')
+
+        novo_responsavel_id = request.form.get('novo_responsavel_id', '').strip()
+        if novo_responsavel_id and novo_responsavel_id != data_chamado.get('responsavel_id'):
+            novo_resp = Usuario.get_by_id(novo_responsavel_id)
+            if novo_resp:
+                update_data['responsavel_id'] = novo_resp.id
+                update_data['responsavel'] = novo_resp.nome
+                update_data['area'] = (novo_resp.areas[0] if getattr(novo_resp, 'areas', None) else novo_resp.area or data_chamado.get('area'))
+                Historico(
+                    chamado_id=chamado_id,
+                    usuario_id=current_user.id,
+                    usuario_nome=current_user.nome,
+                    acao='alteracao_dados',
+                    campo_alterado='responsável',
+                    valor_anterior=data_chamado.get('responsavel'),
+                    valor_novo=novo_resp.nome
+                ).save()
+
+        nova_descricao = request.form.get('nova_descricao', '').strip()
+        if nova_descricao and nova_descricao != (data_chamado.get('descricao') or '').strip():
+            update_data['descricao'] = nova_descricao
+            Historico(
+                chamado_id=chamado_id,
+                usuario_id=current_user.id,
+                usuario_nome=current_user.nome,
+                acao='alteracao_dados',
+                campo_alterado='descrição',
+                valor_anterior='(Texto anterior)',
+                valor_novo='(Novo texto)'
+            ).save()
+
+        arquivo_anexo = request.files.get('anexo')
+        if arquivo_anexo and arquivo_anexo.filename:
+            caminho_anexo = salvar_anexo(arquivo_anexo)
+            if caminho_anexo:
+                anexos_existentes = data_chamado.get('anexos', [])
+                anexo_principal = data_chamado.get('anexo')
+                if anexo_principal and anexo_principal not in anexos_existentes:
+                    anexos_existentes.insert(0, anexo_principal)
+                anexos_existentes.append(caminho_anexo)
+                update_data['anexos'] = anexos_existentes
+                if not anexo_principal:
+                    update_data['anexo'] = caminho_anexo
+                Historico(
+                    chamado_id=chamado_id,
+                    usuario_id=current_user.id,
+                    usuario_nome=current_user.nome,
+                    acao='alteracao_dados',
+                    campo_alterado='novo anexo',
+                    valor_anterior='-',
+                    valor_novo=caminho_anexo
+                ).save()
+
+        if update_data:
+            execute_with_retry(
+                db.collection('chamados').document(chamado_id).update,
+                update_data,
+                max_retries=3
+            )
+            if not (novo_status and novo_status != data_chamado.get('status')):
+                flash('Alterações salvas.', 'success')
+    except Exception as e:
+        logger.exception("Erro ao editar chamado na página: %s", e)
+        flash_t('error_updating_with_msg', 'danger', error=str(e))
+
+    return redirect(url_for('main.visualizar_detalhe_chamado', chamado_id=chamado_id))
 
 
 @main.route('/chamado/<chamado_id>/historico')

@@ -1,8 +1,12 @@
 # --- Python ---
 __pycache__/
 *.py[cod]
+*.pyc
 *$py.class
 .pytest_cache/
+.coverage
+htmlcov/
+.coverage.*
 
 # --- Ambiente Virtual ---
 .venv/

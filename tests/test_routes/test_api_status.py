@@ -13,14 +13,14 @@ def test_atualizar_status_sem_login_retorna_401_ou_redirect(client):
 
 
 def test_atualizar_status_json_vazio_retorna_400(client):
-    """POST com JSON vazio ou inválido retorna 400."""
+    """POST com JSON vazio ou inválido retorna 400 (ou 401 se não logado)."""
     # Sem JSON
     r = client.post('/api/atualizar-status', data={})
-    assert r.status_code in (400, 302, 415)  # 415 se não enviar Content-Type
-    # Com JSON vazio (precisa estar logado para chegar na validação; sem login = redirect)
+    assert r.status_code in (400, 302, 401, 415)  # 401 em rotas /api/ sem login
+    # Com JSON vazio: sem login = 401; logado = 400
     r2 = client.post(
         '/api/atualizar-status',
         json={},
         content_type='application/json'
     )
-    assert r2.status_code in (400, 302)
+    assert r2.status_code in (400, 302, 401)

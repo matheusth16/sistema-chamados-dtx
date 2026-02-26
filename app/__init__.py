@@ -1,4 +1,4 @@
-from flask import Flask, session, request, jsonify, render_template
+from flask import Flask, session, request, jsonify
 from flask_login import LoginManager
 from flask_wtf.csrf import CSRFProtect
 from config import Config
@@ -48,16 +48,14 @@ def create_app():
         from app.models_usuario import Usuario
         return Usuario.get_by_id(user_id)
 
-    # Para rotas /api/*, retornar 401 JSON em vez de redirecionar (evita "Unexpected token '<'" no frontend)
+    # Rotas /api/* sem login retornam 401 JSON em vez de redirect (para clientes AJAX/SPA)
     @login_manager.unauthorized_handler
     def unauthorized():
+        from flask import request, jsonify, redirect, url_for, flash
         if request.path.startswith('/api/'):
-            return jsonify({'sucesso': False, 'erro': 'Não autenticado.', 'requer_login': True}), 401
-        from flask import redirect, url_for, flash
-        from flask_login import current_user
-        if not current_user.is_authenticated:
-            flash(login_manager.login_message, login_manager.login_message_category or 'info')
-        return redirect(url_for(login_manager.login_view, next=request.url))
+            return jsonify({'sucesso': False, 'requer_login': True, 'erro': 'Login necessário'}), 401
+        flash(login_manager.login_message, login_manager.login_message_category or 'info')
+        return redirect(url_for(login_manager.login_view))
 
     # Configuração de i18n (Internacionalização)
     _configurar_i18n(app)
@@ -72,7 +70,7 @@ def create_app():
     # Timeout de inatividade (15 minutos)
     _configurar_timeout_sessao(app)
 
-    # 404 amigável: anexos em /static/uploads/ (ex.: Cloud Run disco efêmero) e páginas não encontradas
+    # 404 amigável para anexos em /static/uploads/ (arquivo não encontrado → página "Anexo não disponível")
     _configurar_erro_404(app)
 
     # API de status exige CSRF; o frontend envia o token no header X-CSRFToken (meta csrf-token)
@@ -84,7 +82,9 @@ def create_app():
 
 
 def _configurar_erro_404(app: Flask) -> None:
-    """Resposta amigável para 404. Anexos em /static/uploads/ mostram mensagem sobre indisponibilidade (ex.: Cloud Run)."""
+    """Resposta amigável para 404. Requisições a /static/uploads/ sem arquivo exibem 'Anexo não disponível'."""
+    from flask import render_template, request
+
     @app.errorhandler(404)
     def pagina_nao_encontrada(e):
         if request.path.startswith('/static/uploads/'):
@@ -215,8 +215,18 @@ def _configurar_seguranca(app: Flask) -> None:
 
 def _configurar_i18n(app: Flask) -> None:
     """Configura sistema de internacionalização (i18n)"""
+    from flask import session
     from app.i18n import get_translation, get_translated_sector, get_translated_category, get_translated_status
-    
+
+    def translate_sector_filter(sector_name):
+        """Traduz setor para o idioma da sessão. Usado como função no contexto e como filter (map) no Jinja."""
+        if not sector_name:
+            return sector_name
+        lang = session.get('language', 'pt_BR')
+        return get_translated_sector(sector_name, lang)
+
+    app.jinja_env.filters['translate_sector'] = translate_sector_filter
+
     @app.before_request
     def antes_da_requisicao():
         """Define o idioma para a requisição atual"""
@@ -228,15 +238,10 @@ def _configurar_i18n(app: Flask) -> None:
     def inject_i18n():
         """Injeta função de tradução e idioma no contexto Jinja"""
         def t(key, **kwargs):
-            """Função para traduzir uma chave no template"""
+            """Função para traduzir uma chave no template. Aceita kwargs para formatação (ex: area=..., nome=..., pct=...)."""
             lang = session.get('language', 'pt_BR')
             return get_translation(key, lang, **kwargs)
-        
-        def translate_sector(sector_name):
-            """Traduz o nome de um setor no template"""
-            lang = session.get('language', 'pt_BR')
-            return get_translated_sector(sector_name, lang)
-        
+
         def translate_category(category_name):
             """Traduz o nome de uma categoria no template"""
             lang = session.get('language', 'pt_BR')
@@ -246,19 +251,22 @@ def _configurar_i18n(app: Flask) -> None:
             """Traduz o status de um chamado no template"""
             lang = session.get('language', 'pt_BR')
             return get_translated_status(status_name, lang)
-        
+
         def nome_curto(nome):
-            """Exibe primeiro nome + inicial do sobrenome, ex: 'Matheus Costa' -> 'Matheus C.'"""
-            if not nome or not str(nome).strip():
-                return nome or ''
-            parts = str(nome).strip().split()
-            if len(parts) >= 2:
-                return parts[0] + ' ' + parts[-1][0].upper() + '.'
-            return parts[0]
-        
+            """Retorna versão curta do nome para exibição (ex.: 'Maria Santos' -> 'Maria S.')."""
+            if not nome or not isinstance(nome, str):
+                return None
+            nome = nome.strip()
+            if not nome:
+                return None
+            partes = nome.split()
+            if len(partes) >= 2:
+                return f"{partes[0]} {partes[-1][0]}."
+            return nome[:25] + ('...' if len(nome) > 25 else '')
+
         return dict(
             t=t,
-            translate_sector=translate_sector,
+            translate_sector=translate_sector_filter,
             translate_category=translate_category,
             translate_status=translate_status,
             nome_curto=nome_curto,
@@ -269,10 +277,6 @@ def _configurar_i18n(app: Flask) -> None:
                 'es': 'Español'
             }
         )
-
-    # Register as Jinja filters for use with |map() in templates
-    app.jinja_env.filters['translate_sector'] = lambda name: get_translated_sector(name, session.get('language', 'pt_BR'))
-    app.jinja_env.filters['translate_category'] = lambda name: get_translated_category(name, session.get('language', 'pt_BR'))
 
 def _configurar_timeout_sessao(app: Flask) -> None:
     """Configura logout automático por inatividade de sessão (15 minutos)"""
@@ -297,8 +301,7 @@ def _configurar_timeout_sessao(app: Flask) -> None:
             if ultima_atividade is not None and (agora - ultima_atividade > limite_segundos):
                 logout_user()
                 session.clear() # Limpa a sessão
-                from app.i18n import flash_t
-                flash_t('session_expired', 'info')
+                flash('Sua sessão expirou por inatividade. Faça login novamente.', 'info')
                 # Redireciona para login e impede a requisição atual de continuar
                 return redirect(url_for('main.login'))
                 

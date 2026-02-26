@@ -37,19 +37,22 @@ def test_extrair_numero_chamado_invalido_retorna_inf():
     assert extrair_numero_chamado('CHM-abc') == float('inf')
 
 
-def test_gerar_numero_chamado_formato():
+def test_gerar_numero_chamado_formato(app):
     """gerar_numero_chamado retorna string no formato CHM-XXXX (transação mockada)."""
+    class DocContador:
+        exists = True
+        def get(self, k):
+            return 1 if k == 'proximo_numero' else None
+    doc_contador = DocContador()
     with patch('app.utils.db') as mock_db:
-        mock_doc = MagicMock()
-        mock_doc.exists = True
-        mock_doc.get.side_effect = lambda k: 1 if k == 'proximo_numero' else None
         mock_transaction = MagicMock()
-        mock_transaction.get.return_value = mock_doc
+        mock_transaction.get.return_value = doc_contador
         mock_db.transaction.return_value = mock_transaction
         mock_db.collection.return_value.document.return_value = MagicMock()
 
-        result = gerar_numero_chamado()
+        with app.app_context():
+            result = gerar_numero_chamado()
     assert result.startswith('CHM-')
-    assert len(result) == 8  # CHM-0002
+    assert len(result) == 8
     assert result[4:].isdigit()
     assert result == 'CHM-0002'

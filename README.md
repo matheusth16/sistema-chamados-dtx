@@ -78,8 +78,9 @@ Acesse: `http://localhost:5000`
 Na raiz do projeto você pode rodar scripts de manutenção (criação de usuário, chaves VAPID, deploy, etc.). Documentação: **[scripts/README.md](scripts/README.md)**.
 
 ```bash
-python scripts/gerar_vapid_keys.py   # Chaves Web Push
-python scripts/criar_usuario.py      # Criar usuário no sistema
+python scripts/verificar_dependencias.py  # Audit + testes (recomendado antes de commit)
+python scripts/gerar_vapid_keys.py        # Chaves Web Push
+python scripts/criar_usuario.py            # Criar usuário no sistema
 ```
 
 ## 📚 API
@@ -210,6 +211,11 @@ O `requirements.txt` usa **versões fixas** (ex.: Flask 3.1.2, firebase-admin 7.
    ```
 
 Após alterar versões, atualize o `requirements.txt` com `pip freeze` ou ajuste manualmente as versões pinadas.
+
+### Antes de commitar / checklist rápido
+
+- **Não commitar:** `__pycache__/`, `*.pyc`, `.coverage`, `logs/`, `.env`, `credentials.json` — o `.gitignore` já os ignora; use sempre caminhos com `/` (ex.: `app/routes/api.py`).
+- **Verificar dependências e testes:** rode `python scripts/verificar_dependencias.py` (executa `pip audit` e `pytest`). Em alterações importantes ou antes de deploy, use `--cov` para conferir cobertura.
 
 ## 🤝 Contribuindo
 

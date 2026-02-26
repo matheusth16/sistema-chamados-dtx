@@ -18,6 +18,7 @@ from app.services.assignment import atribuidor
 from app.services.upload import salvar_anexo
 from app.services.status_service import atualizar_status_chamado
 from app.services.permissions import usuario_pode_ver_chamado
+from app.services.analytics import obter_sla_para_exibicao
 from app.firebase_retry import execute_with_retry
 
 logger = logging.getLogger(__name__)
@@ -87,9 +88,11 @@ def api_editar_chamado():
 
         data_chamado = doc_chamado.to_dict()
         
-        # Validar permissão: supervisor só edita chamados cujo setor está nas suas áreas
+        # Validar permissão da área (Supervisor só edita chamados de sua área, a menos que seja admin)
         if current_user.perfil == 'supervisor':
-            if data_chamado.get('area') not in current_user.areas:
+            responsavel_atual_obj = Usuario.get_by_id(data_chamado.get('responsavel_id')) if data_chamado.get('responsavel_id') else None
+            tem_area_comum = bool(set(responsavel_atual_obj.areas) & set(current_user.areas)) if responsavel_atual_obj else False
+            if not (data_chamado.get('area') in current_user.areas or data_chamado.get('responsavel_id') == current_user.id or tem_area_comum):
                 return jsonify({'sucesso': False, 'erro': 'Você só pode editar chamados da sua área'}), 403
 
         update_data = {}
@@ -218,7 +221,8 @@ def bulk_atualizar_status():
                     continue
                 data = doc.to_dict()
                 if current_user.perfil == 'supervisor':
-                    if data.get('area') not in current_user.areas:
+                    chamado_area = data.get('area')
+                    if (chamado_area not in current_user.areas) and data.get('responsavel_id') != current_user.id:
                         erros.append({'id': chamado_id, 'erro': 'Sem permissão para este chamado'})
                         continue
                 # Atualiza status com retry automático
@@ -283,11 +287,11 @@ def api_notificacoes_marcar_lida(notificacao_id):
 def api_notificacoes_ler_todas():
     """Marca todas as notificações do usuário como lidas."""
     try:
-        count = marcar_todas_como_lidas(current_user.id)
-        return jsonify({'sucesso': True, 'atualizadas': count}), 200
+        qtd = marcar_todas_como_lidas(current_user.id)
+        return jsonify({'sucesso': True, 'marcadas': qtd}), 200
     except Exception as e:
         logger.exception("Erro ao marcar todas notificações: %s", e)
-        return jsonify({'sucesso': False, 'atualizadas': 0}), 500
+        return jsonify({'sucesso': False}), 500
 
 
 @main.route('/sw.js')
@@ -322,6 +326,45 @@ def api_push_subscribe():
     except Exception as e:
         logger.exception("Erro ao salvar inscrição push: %s", e)
         return jsonify({'sucesso': False}), 500
+
+
+@main.route('/api/chamado/<chamado_id>', methods=['GET'])
+@login_required
+@limiter.limit("60 per minute")
+def api_chamado_por_id(chamado_id: str):
+    """Retorna um chamado por ID para atualização da linha na Gestão (após fechar aba de detalhes)."""
+    try:
+        doc = db.collection('chamados').document(chamado_id).get()
+        if not doc or not doc.exists:
+            return jsonify({'sucesso': False, 'erro': 'Chamado não encontrado'}), 404
+        data = doc.to_dict()
+        c = Chamado.from_dict(data, doc.id)
+        if current_user.perfil == 'solicitante':
+            if c.solicitante_id != current_user.id:
+                return jsonify({'sucesso': False, 'erro': 'Acesso negado'}), 403
+        else:
+            if not usuario_pode_ver_chamado(current_user, c):
+                return jsonify({'sucesso': False, 'erro': 'Acesso negado'}), 403
+        c.sla_info = obter_sla_para_exibicao(c)
+        return jsonify({
+            'sucesso': True,
+            'chamado': {
+                'id': c.id,
+                'numero_chamado': c.numero_chamado,
+                'rl_codigo': c.rl_codigo or None,
+                'categoria': c.categoria,
+                'tipo_solicitacao': c.tipo_solicitacao,
+                'gate': c.gate or '',
+                'responsavel': c.responsavel or '',
+                'descricao': c.descricao or '',
+                'data_abertura': c.data_abertura_formatada(),
+                'status': c.status or 'Aberto',
+                'sla_info': c.sla_info,
+            }
+        }), 200
+    except Exception as e:
+        logger.exception("Erro ao buscar chamado %s: %s", chamado_id, e)
+        return jsonify({'sucesso': False, 'erro': ERRO_INTERNO_MSG}), 500
 
 
 @main.route('/api/chamados/paginar', methods=['GET'])

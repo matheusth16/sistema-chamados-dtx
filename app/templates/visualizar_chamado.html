@@ -2,13 +2,30 @@
 
 {% block content %}
 <div class="max-w-5xl mx-auto space-y-3 -mt-2">
-    <!-- Back btn -->
+    <!-- Voltar: avisa a aba Gestão para atualizar o chamado, fecha a aba (ou redireciona se o navegador bloquear). -->
     <div>
-        <a href="javascript:history.back()" class="inline-flex items-center text-sm font-medium text-gray-500 hover:text-indigo-600 transition-colors bg-white px-3 py-1.5 rounded-lg shadow-sm border border-gray-100">
+        <a href="{{ voltar_url | default(url_for('main.admin')) }}" id="btn-voltar-detalhes" data-chamado-id="{{ chamado.id }}" class="inline-flex items-center text-sm font-medium text-gray-500 hover:text-indigo-600 transition-colors bg-white px-3 py-1.5 rounded-lg shadow-sm border border-gray-100">
             <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
             {{ t('back') if t else 'Voltar' }}
         </a>
     </div>
+    <script>
+        (function() {
+            var btn = document.getElementById('btn-voltar-detalhes');
+            var voltarFallback = btn.getAttribute('href');
+            var chamadoId = btn.getAttribute('data-chamado-id');
+            btn.addEventListener('click', function(e) {
+                e.preventDefault();
+                if (window.opener && !window.opener.closed && chamadoId) {
+                    try {
+                        window.opener.postMessage({ type: 'refreshChamado', chamadoId: chamadoId }, window.location.origin);
+                    } catch (err) {}
+                }
+                window.close();
+                setTimeout(function() { window.location.href = voltarFallback; }, 150);
+            });
+        })();
+    </script>
 
     <!-- Ticket Card -->
     <div class="bg-white rounded-2xl shadow-sm border border-gray-100 flex flex-col overflow-hidden">

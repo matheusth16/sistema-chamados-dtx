@@ -8,15 +8,14 @@ from firebase_admin import firestore
 from app.database import db
 from app.services.translation_service import traduzir_categoria
 from app.firebase_retry import firebase_retry
-from app.cache import cache_get, cache_set
 import logging
 
+logger = logging.getLogger(__name__)
+
+# Chaves de cache usadas em app/routes/categorias.py
 CACHE_KEY_SETORES = 'categorias_setores'
 CACHE_KEY_GATES = 'categorias_gates'
 CACHE_KEY_IMPACTOS = 'categorias_impactos'
-CACHE_TTL_CATEGORIAS = 600  # 10 minutos
-
-logger = logging.getLogger(__name__)
 
 
 class CategoriaSetor:
@@ -84,19 +83,14 @@ class CategoriaSetor:
     
     @classmethod
     def get_all(cls):
-        """Retorna todos os setores (com cache de 10 min)."""
+        """Retorna todos os setores"""
         try:
-            cached = cache_get(CACHE_KEY_SETORES)
-            if cached is not None:
-                return [cls.from_dict({k: v for k, v in d.items() if k != '_id'}, d['_id']) for d in cached]
-            docs = list(db.collection('categorias_setores').stream())
-            lista = [{"_id": doc.id, **doc.to_dict()} for doc in docs]
-            cache_set(CACHE_KEY_SETORES, lista, ttl_seconds=CACHE_TTL_CATEGORIAS)
+            docs = db.collection('categorias_setores').stream()
             return [cls.from_dict(doc.to_dict(), doc.id) for doc in docs]
         except Exception as e:
             logger.error(f"Erro ao buscar setores: {e}")
             return []
-
+    
     @classmethod
     def get_by_id(cls, setor_id: str):
         """Busca um setor pelo ID"""
@@ -108,12 +102,6 @@ class CategoriaSetor:
         except Exception as e:
             logger.error(f"Erro ao buscar setor: {e}")
             return None
-
-    def delete(self):
-        """Remove o setor do Firestore."""
-        if self.id:
-            db.collection('categorias_setores').document(self.id).delete()
-            logger.info(f"Setor {self.nome_pt} (id={self.id}) excluído")
 
 
 class CategoriaGate:
@@ -185,21 +173,16 @@ class CategoriaGate:
     
     @classmethod
     def get_all(cls):
-        """Retorna todos os gates ordenados por ordem (com cache de 10 min)."""
+        """Retorna todos os gates ordenados por ordem"""
         try:
-            cached = cache_get(CACHE_KEY_GATES)
-            if cached is not None:
-                gates = [cls.from_dict({k: v for k, v in d.items() if k != '_id'}, d['_id']) for d in cached]
-                return sorted(gates, key=lambda x: x.ordem)
-            docs = list(db.collection('categorias_gates').stream())
-            lista = [{"_id": doc.id, **doc.to_dict()} for doc in docs]
-            cache_set(CACHE_KEY_GATES, lista, ttl_seconds=CACHE_TTL_CATEGORIAS)
+            docs = db.collection('categorias_gates').stream()
             gates = [cls.from_dict(doc.to_dict(), doc.id) for doc in docs]
+            # Ordena por ordem no Python (evita problema de índice no Firestore)
             return sorted(gates, key=lambda x: x.ordem)
         except Exception as e:
             logger.error(f"Erro ao buscar gates: {e}")
             return []
-
+    
     @classmethod
     def get_by_id(cls, gate_id: str):
         """Busca um gate pelo ID"""
@@ -211,12 +194,6 @@ class CategoriaGate:
         except Exception as e:
             logger.error(f"Erro ao buscar gate: {e}")
             return None
-
-    def delete(self):
-        """Remove o gate do Firestore."""
-        if self.id:
-            db.collection('categorias_gates').document(self.id).delete()
-            logger.info(f"Gate {self.nome_pt} (id={self.id}) excluído")
 
 
 class CategoriaImpacto:
@@ -291,19 +268,14 @@ class CategoriaImpacto:
     
     @classmethod
     def get_all(cls):
-        """Retorna todos os impactos ativos (com cache de 10 min)."""
+        """Retorna todos os impactos ativos"""
         try:
-            cached = cache_get(CACHE_KEY_IMPACTOS)
-            if cached is not None:
-                return [cls.from_dict({k: v for k, v in d.items() if k != '_id'}, d['_id']) for d in cached]
-            docs = list(db.collection('categorias_impactos').where('ativo', '==', True).stream())
-            lista = [{"_id": doc.id, **doc.to_dict()} for doc in docs]
-            cache_set(CACHE_KEY_IMPACTOS, lista, ttl_seconds=CACHE_TTL_CATEGORIAS)
+            docs = db.collection('categorias_impactos').where('ativo', '==', True).stream()
             return [cls.from_dict(doc.to_dict(), doc.id) for doc in docs]
         except Exception as e:
             logger.error(f"Erro ao buscar impactos: {e}")
             return []
-
+    
     @classmethod
     def get_by_id(cls, impacto_id: str):
         """Busca um impacto pelo ID"""
@@ -315,9 +287,3 @@ class CategoriaImpacto:
         except Exception as e:
             logger.error(f"Erro ao buscar impacto: {e}")
             return None
-
-    def delete(self):
-        """Remove o impacto do Firestore."""
-        if self.id:
-            db.collection('categorias_impactos').document(self.id).delete()
-            logger.info(f"Impacto {self.nome_pt} (id={self.id}) excluído")

@@ -439,9 +439,23 @@
                 var btnDispensar = document.getElementById('webpush-dispensar');
                 if (banner) banner.classList.remove('hidden');
                 if (btnAtivar) btnAtivar.addEventListener('click', function () {
+                    var labelAtivar = btnAtivar.textContent;
+                    btnAtivar.disabled = true;
+                    btnAtivar.textContent = 'Ativando...';
                     Notification.requestPermission().then(function (permission) {
-                        if (banner) banner.classList.add('hidden');
-                        if (permission === 'granted') inscrever().catch(function () {});
+                        if (permission !== 'granted') {
+                            if (banner) banner.classList.add('hidden');
+                            return;
+                        }
+                        inscrever().then(function () {
+                            if (banner) banner.classList.add('hidden');
+                        }).catch(function () {
+                            btnAtivar.disabled = false;
+                            btnAtivar.textContent = 'Tente novamente';
+                        });
+                    }).catch(function () {
+                        btnAtivar.disabled = false;
+                        btnAtivar.textContent = labelAtivar;
                     });
                 });
                 if (btnDispensar) btnDispensar.addEventListener('click', function () {

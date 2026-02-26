@@ -3,16 +3,11 @@ from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 from app.database import db
 from app.firebase_retry import firebase_retry
-from app.cache import cache_get, cache_set
 
 logger = logging.getLogger(__name__)
 
-CACHE_KEY_USUARIOS = 'usuarios_lista'
-CACHE_TTL_USUARIOS = 300  # 5 minutos
-CACHE_KEY_SUPERVISORES_VERSION = 'usuarios_supervisores_version'
-CACHE_TTL_SUPERVISORES = 300  # 5 minutos
-CACHE_TTL_VERSION = 86400  # 1 dia (só para a chave de versão)
-CACHE_TTL_USUARIO_BY_ID = 120  # 2 minutos para get_by_id
+# Chave de cache para lista de usuários (usada em app/routes/usuarios.py)
+CACHE_KEY_USUARIOS = 'usuarios_list'
 
 
 class Usuario(UserMixin):
@@ -81,19 +76,12 @@ class Usuario(UserMixin):
     
     @classmethod
     def get_by_id(cls, user_id: str):
-        """Busca usuário por ID (com cache de 2 min)."""
+        """Busca usuário por ID"""
         try:
-            cache_key = f'usuario_{user_id}'
-            cached = cache_get(cache_key)
-            if cached is not None:
-                return cls.from_dict({k: v for k, v in cached.items() if k != '_id'}, cached['_id'])
             doc = db.collection('usuarios').document(user_id).get()
-            if not doc.exists:
-                return None
-            data = doc.to_dict()
-            usuario = cls.from_dict(data, doc.id)
-            cache_set(cache_key, {"_id": doc.id, **data}, ttl_seconds=CACHE_TTL_USUARIO_BY_ID)
-            return usuario
+            if doc.exists:
+                data = doc.to_dict()
+                return cls.from_dict(data, doc.id)
         except Exception as e:
             logger.exception("Erro ao buscar usuário por ID: %s", e)
         return None
@@ -160,15 +148,15 @@ class Usuario(UserMixin):
     
     @classmethod
     def get_all(cls):
-        """Retorna lista de todos os usuários (ordenada por nome, com cache de 5 min)."""
+        """Retorna lista de todos os usuários"""
         try:
-            cached = cache_get(CACHE_KEY_USUARIOS)
-            if cached is not None:
-                return [cls.from_dict({k: v for k, v in d.items() if k != '_id'}, d['_id']) for d in cached]
-            docs = list(db.collection('usuarios').order_by('nome').stream())
-            lista = [{"_id": doc.id, **doc.to_dict()} for doc in docs]
-            cache_set(CACHE_KEY_USUARIOS, lista, ttl_seconds=CACHE_TTL_USUARIOS)
-            return [cls.from_dict(doc.to_dict(), doc.id) for doc in docs]
+            docs = db.collection('usuarios').order_by('nome').stream()
+            usuarios = []
+            for doc in docs:
+                data = doc.to_dict()
+                usuario = cls.from_dict(data, doc.id)
+                usuarios.append(usuario)
+            return usuarios
         except Exception as e:
             logger.exception("Erro ao buscar usuários: %s", e)
             return []
@@ -193,28 +181,30 @@ class Usuario(UserMixin):
     
     @classmethod
     def get_supervisores_por_area(cls, area: str):
-        """Retorna supervisores de uma área específica (e admins da mesma área), com cache de 5 min."""
+        """Retorna supervisores de uma área específica (e admins da mesma área, para sugestão de responsável)."""
         try:
-            version = cache_get(CACHE_KEY_SUPERVISORES_VERSION) or 0
-            cache_key = f'usuarios_supervisores_area_{area}_{version}'
-            cached = cache_get(cache_key)
-            if cached is not None:
-                return [cls.from_dict({k: v for k, v in d.items() if k != '_id'}, d['_id']) for d in cached]
             usuarios = []
-            docs_sup = list(db.collection('usuarios').where('perfil', '==', 'supervisor').stream())
+            
+            # Buscar todos os supervisores e filtrar por área em Python
+            # (Firestore tem limitações em queries compostas com array_contains)
+            docs_sup = db.collection('usuarios').where('perfil', '==', 'supervisor').stream()
             for doc in docs_sup:
                 user_dict = doc.to_dict()
+                # Precisamos criar o objeto Usuario primeiro para que from_dict
+                # faça a conversão de 'area' (string) para 'areas' (array)
                 usuario = cls.from_dict(user_dict, doc.id)
+                # Agora verificar se a área desejada está nas áreas do usuário
                 if area in usuario.areas:
                     usuarios.append(usuario)
-            docs_admin = list(db.collection('usuarios').where('perfil', '==', 'admin').stream())
+            
+            # Buscar todos os admins e filtrar por área
+            docs_admin = db.collection('usuarios').where('perfil', '==', 'admin').stream()
             for doc in docs_admin:
                 user_dict = doc.to_dict()
                 usuario = cls.from_dict(user_dict, doc.id)
                 if area in usuario.areas:
                     usuarios.append(usuario)
-            lista = [{"_id": u.id, **u.to_dict()} for u in usuarios]
-            cache_set(cache_key, lista, ttl_seconds=CACHE_TTL_SUPERVISORES)
+            
             return usuarios
         except Exception as e:
             logger.exception("Erro ao buscar supervisores: %s", e)
@@ -222,12 +212,12 @@ class Usuario(UserMixin):
 
     @classmethod
     def invalidar_cache_supervisores_por_area(cls):
-        """Invalida o cache de supervisores por área (chamar após criar/editar/excluir usuário)."""
+        """Invalida cache de supervisores por área (se existir). No-op se não houver cache."""
         try:
-            version = (cache_get(CACHE_KEY_SUPERVISORES_VERSION) or 0) + 1
-            cache_set(CACHE_KEY_SUPERVISORES_VERSION, version, ttl_seconds=CACHE_TTL_VERSION)
-        except Exception as e:
-            logger.debug("Invalidação cache supervisores: %s", e)
-    
+            from app.cache import cache_delete
+            cache_delete('supervisores_por_area')
+        except Exception:
+            pass
+
     def __repr__(self):
         return f'<Usuario {self.email} - {self.perfil}>'

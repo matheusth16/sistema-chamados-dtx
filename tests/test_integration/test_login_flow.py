@@ -26,12 +26,14 @@ def test_login_post_sucesso_redireciona_conforme_perfil(client):
     usuario.perfil = 'solicitante'
     usuario.area = 'Planejamento'
     usuario.check_password = MagicMock(return_value=True)
+    usuario.get_id = lambda: 'user_1'  # Flask-Login serializa na sessão; precisa ser string
     with patch('app.routes.auth.Usuario.get_by_email', return_value=usuario):
         r = client.post('/login', data={'email': 'sol@test.com', 'senha': 'ok'}, follow_redirects=False)
     assert r.status_code == 302
     assert '/' in r.location and 'admin' not in r.location or r.location.endswith('/')
 
     usuario.perfil = 'supervisor'
+    usuario.get_id = lambda: 'sup_1'
     with patch('app.routes.auth.Usuario.get_by_email', return_value=usuario):
         r2 = client.post('/login', data={'email': 'sup@test.com', 'senha': 'ok'}, follow_redirects=False)
     assert r2.status_code == 302

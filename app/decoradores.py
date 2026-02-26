@@ -105,8 +105,8 @@ def requer_supervisor_area(f):
 
 def requer_solicitante(f):
     """
-    Decorador para rotas que só solicitantes podem acessar
-    (aqueles que criam chamados)
+    Decorador para rotas de criação e listagem de chamados.
+    Permite: solicitante, supervisor e admin (todos podem abrir e ver seus chamados).
     """
     @wraps(f)
     def funcao_decorada(*args, **kwargs):
@@ -116,11 +116,11 @@ def requer_solicitante(f):
             flash('Você precisa estar logado para acessar essa página.', 'danger')
             return redirect(url_for('main.login'))
         
-        # Apenas solicitantes podem acessar
-        if current_user.perfil != 'solicitante':
-            logger.warning(f"Acesso negado: {current_user.perfil} {current_user.email} tentou acessar rota de solicitante {f.__name__}")
-            flash('Acesso negado. Essa página é apenas para solicitantes.', 'danger')
-            return redirect(url_for('main.admin'))
+        # Solicitantes, supervisores e admins podem criar e ver seus chamados
+        if current_user.perfil not in ('solicitante', 'supervisor', 'admin'):
+            logger.warning(f"Acesso negado: {current_user.perfil} {current_user.email} tentou acessar rota {f.__name__}")
+            flash('Acesso negado. Essa página é para solicitantes, supervisores e administradores.', 'danger')
+            return redirect(url_for('main.login'))
         
         # Executa a função
         return f(*args, **kwargs)

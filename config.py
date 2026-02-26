@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 basedir = os.path.abspath(os.path.dirname(__file__))
 
 # Carrega as variáveis do arquivo .env
-load_dotenv(os.path.join(basedir, '.env'), override=True)
+load_dotenv(os.path.join(basedir, '.env'))
 
 # Em produção, exige SECRET_KEY forte (não usar o valor de desenvolvimento)
 _dev_secret = 'dev-secret-key-change-in-production'
@@ -25,9 +25,9 @@ class Config:
     # 2. Caminho ABSOLUTO para a pasta de uploads (Evita erros no Windows/OneDrive)
     UPLOAD_FOLDER = os.path.join(basedir, 'app', 'static', 'uploads')
     
-    # 3. Segurança: Limita o tamanho do arquivo a 5 MB (anexos: imagens, PDF, Excel)
+    # 3. Segurança: Limita o tamanho do arquivo a 16MB (Padrão Flask)
     # Se passar disso, o sistema rejeita automaticamente.
-    MAX_CONTENT_LENGTH = 5 * 1024 * 1024
+    MAX_CONTENT_LENGTH = 16 * 1024 * 1024
     
     # 4. Paginação
     ITENS_POR_PAGINA = 10
@@ -71,12 +71,7 @@ class Config:
     MAIL_DEFAULT_SENDER = os.getenv('MAIL_DEFAULT_SENDER', '')
     TEAMS_WEBHOOK_URL = os.getenv('TEAMS_WEBHOOK_URL', '')
 
-    # Resend (e-mail transacional). Se definido, usa Resend em vez de SMTP para notificações.
-    RESEND_API_KEY = os.getenv('RESEND_API_KEY', '')
-    RESEND_FROM_EMAIL = os.getenv('RESEND_FROM_EMAIL', 'onboarding@resend.dev')
-    RESEND_FROM_NAME = os.getenv('RESEND_FROM_NAME', 'Sistema de Chamados')
-
-    # Web Push (notificações no navegador). Gere chaves com: python scripts/gerar_vapid_keys.py
+    # Web Push (notificações no navegador). Gere chaves com: python gerar_vapid_keys.py
     VAPID_PUBLIC_KEY = os.getenv('VAPID_PUBLIC_KEY', '')
     VAPID_PRIVATE_KEY = os.getenv('VAPID_PRIVATE_KEY', '')
 

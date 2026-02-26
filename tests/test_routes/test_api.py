@@ -44,9 +44,10 @@ def test_api_editar_chamado_chamado_inexistente_retorna_404(client_logado_superv
 
 def test_api_editar_chamado_supervisor_outra_area_retorna_403(client_logado_supervisor):
     """Edge case: supervisor só pode editar chamados da sua área; chamado de outra área retorna 403."""
+    from tests.conftest import _usuario_mock
+    supervisor_user = _usuario_mock('sup_1', 'sup@test.com', 'Supervisor Teste', 'supervisor', 'Manutencao')
     mock_doc = MagicMock()
     mock_doc.exists = True
-    # Chamado da área TI; supervisor do conftest tem areas=['Manutencao']
     mock_doc.to_dict.return_value = {
         'area': 'TI',
         'status': 'Aberto',
@@ -54,22 +55,28 @@ def test_api_editar_chamado_supervisor_outra_area_retorna_403(client_logado_supe
         'responsavel': 'Alguém',
         'responsavel_id': 'outro_id',
     }
+    def get_by_id_side_effect(uid):
+        if uid == 'sup_1':
+            return supervisor_user
+        return None
     with patch('app.routes.api.db') as mock_db:
         mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
-        r = client_logado_supervisor.post(
-            '/api/editar-chamado',
-            data={'chamado_id': 'ch_ti_123'},
-            content_type='multipart/form-data',
-        )
+        with patch('app.routes.api.Usuario.get_by_id', side_effect=get_by_id_side_effect):
+            r = client_logado_supervisor.post(
+                '/api/editar-chamado',
+                data={'chamado_id': 'ch_ti_123'},
+                content_type='multipart/form-data',
+            )
     assert r.status_code == 403
     data = r.get_json()
     assert data is not None and ('sua área' in data.get('erro', '').lower() or 'área' in data.get('erro', '').lower())
 
 
 def test_carregar_mais_sem_login_redireciona(client):
-    """POST /api/carregar-mais sem login retorna 302."""
+    """POST /api/carregar-mais sem login retorna 401 JSON (rotas /api/ não redirecionam)."""
     r = client.post('/api/carregar-mais', json={}, content_type='application/json')
-    assert r.status_code == 302
+    assert r.status_code == 401
+    assert r.get_json() and r.get_json().get('requer_login') is True
 
 
 def test_carregar_mais_retorna_estrutura_esperada(client_logado_supervisor):
@@ -94,9 +101,10 @@ def test_carregar_mais_retorna_estrutura_esperada(client_logado_supervisor):
 
 
 def test_api_notificacoes_listar_sem_login_redireciona(client):
-    """GET /api/notificacoes sem login retorna 302."""
+    """GET /api/notificacoes sem login retorna 401 JSON."""
     r = client.get('/api/notificacoes')
-    assert r.status_code == 302
+    assert r.status_code == 401
+    assert r.get_json() and r.get_json().get('requer_login') is True
 
 
 def test_api_notificacoes_listar_retorna_estrutura(client_logado_solicitante):
@@ -134,9 +142,10 @@ def test_api_push_subscribe_subscription_sem_endpoint_retorna_400(client_logado_
 
 
 def test_api_push_vapid_public_requer_login(client):
-    """GET /api/push-vapid-public sem login redireciona."""
+    """GET /api/push-vapid-public sem login retorna 401 JSON."""
     r = client.get('/api/push-vapid-public')
-    assert r.status_code == 302
+    assert r.status_code == 401
+    assert r.get_json() and r.get_json().get('requer_login') is True
 
 
 def test_api_supervisores_disponibilidade_sem_login_retorna_401_json(client):

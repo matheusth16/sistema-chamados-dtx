@@ -2,6 +2,17 @@
 
 Execute sempre **a partir da raiz do projeto** (onde está o `run.py`).
 
+## verificar_dependencias.py
+
+Verifica vulnerabilidades (`pip audit`) e roda a suíte de testes (`pytest`). Recomendado antes de commit ou deploy.
+
+```bash
+python scripts/verificar_dependencias.py
+python scripts/verificar_dependencias.py --cov        # testes com cobertura
+python scripts/verificar_dependencias.py --no-audit   # só testes
+python scripts/verificar_dependencias.py --no-tests   # só pip audit
+```
+
 ## init_categorias.py
 
 Inicializa categorias padrão no Firestore (setores, gates, impactos) se o banco estiver vazio.
