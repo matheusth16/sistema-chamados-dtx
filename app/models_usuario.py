@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 from app.database import db
@@ -6,43 +7,32 @@ from app.firebase_retry import firebase_retry
 
 logger = logging.getLogger(__name__)
 
-
-def _encrypt_nome_if_enabled(nome: str):
-    """Criptografa o nome para armazenamento se ENCRYPT_PII_AT_REST estiver ativo."""
-    try:
-        from flask import current_app
-        if current_app.config.get('ENCRYPT_PII_AT_REST') and nome:
-            from app.services.crypto import encrypt_at_rest
-            return encrypt_at_rest(nome)
-    except RuntimeError:
-        pass  # fora do contexto de aplicação
-    return nome
-
-
-def _decrypt_nome_if_encrypted(valor):
-    """Descriptografa o nome ao ler do banco, se for payload criptografado."""
-    if not valor:
-        return valor
-    try:
-        from app.services.crypto import decrypt_at_rest
-        return decrypt_at_rest(valor)
-    except Exception:
-        return valor
-
-# Chave de cache para lista de usuários (usada em app/routes/usuarios.py)
+# Chave de cache para lista de usuários (usada em cache_delete nas rotas)
 CACHE_KEY_USUARIOS = 'usuarios_list'
 
 
 class Usuario(UserMixin):
     """Representação de um usuário do sistema"""
     
-    def __init__(self, id: str, email: str, nome: str, perfil: str = 'solicitante', areas: list = None):
+    def __init__(self, id: str, email: str, nome: str, perfil: str = 'solicitante', areas: list = None,
+                 exp_total: int = 0, exp_semanal: int = 0, level: int = 1, conquistas: list = None,
+                 must_change_password: bool = False, password_changed_at=None):
         self.id = id
         self.email = email
         self.nome = nome
         self.perfil = perfil  # 'solicitante', 'supervisor' ou 'admin'
         self.areas = areas or []  # Lista de setores/departamentos
         self.senha_hash = None
+        
+        # Controle de senha
+        self.must_change_password = must_change_password
+        self.password_changed_at = password_changed_at
+        
+        # Sistemas de Gamificação
+        self.exp_total = exp_total
+        self.exp_semanal = exp_semanal
+        self.level = level
+        self.conquistas = conquistas or []
     
     @property
     def area(self):
@@ -58,31 +48,49 @@ class Usuario(UserMixin):
         return check_password_hash(self.senha_hash, senha) if self.senha_hash else False
     
     def to_dict(self):
-        """Converte para dicionário para salvar no Firestore (nome pode ser criptografado se ENCRYPT_PII_AT_REST)."""
-        nome_armazenar = _encrypt_nome_if_enabled(self.nome) if self.nome else self.nome
+        """Converte para dicionário para salvar no Firestore"""
         return {
             'email': self.email,
-            'nome': nome_armazenar,
+            'nome': self.nome,
             'perfil': self.perfil,
             'areas': self.areas,
-            'senha_hash': self.senha_hash
+            'senha_hash': self.senha_hash,
+            'must_change_password': self.must_change_password,
+            'password_changed_at': self.password_changed_at.isoformat() if self.password_changed_at else None,
+            'exp_total': self.exp_total,
+            'exp_semanal': self.exp_semanal,
+            'level': self.level,
+            'conquistas': self.conquistas
         }
     
     @classmethod
     def from_dict(cls, data: dict, id: str = None):
-        """Cria um objeto Usuario a partir de um dicionário do Firestore (nome descriptografado se criptografado)."""
+        """Cria um objeto Usuario a partir de um dicionário do Firestore"""
         areas = data.get('areas', [])
         # Migração: se tem area string mas não tem areas array
         if not areas and data.get('area'):
             areas = [data.get('area')]
-        nome_raw = data.get('nome')
-        nome = _decrypt_nome_if_encrypted(nome_raw) if nome_raw else nome_raw
+            
+        # Processar password_changed_at
+        password_changed_at = data.get('password_changed_at')
+        if password_changed_at and isinstance(password_changed_at, str):
+            try:
+                password_changed_at = datetime.fromisoformat(password_changed_at)
+            except:
+                password_changed_at = None
+        
         usuario = cls(
             id=id,
             email=data.get('email'),
-            nome=nome,
+            nome=data.get('nome'),
             perfil=data.get('perfil', 'solicitante'),
-            areas=areas
+            areas=areas,
+            exp_total=data.get('exp_total', 0),
+            exp_semanal=data.get('exp_semanal', 0),
+            level=data.get('level', 1),
+            conquistas=data.get('conquistas', []),
+            must_change_password=data.get('must_change_password', False),
+            password_changed_at=password_changed_at
         )
         usuario.senha_hash = data.get('senha_hash')
         return usuario
@@ -152,6 +160,29 @@ class Usuario(UserMixin):
                 self.set_password(kwargs['senha'])
                 update_data['senha_hash'] = self.senha_hash
             
+            if 'must_change_password' in kwargs:
+                self.must_change_password = kwargs['must_change_password']
+                update_data['must_change_password'] = kwargs['must_change_password']
+            
+            if 'password_changed_at' in kwargs:
+                self.password_changed_at = kwargs['password_changed_at']
+                update_data['password_changed_at'] = kwargs['password_changed_at'].isoformat() if kwargs['password_changed_at'] else None
+            
+            if 'gamification' in kwargs:
+                g_data = kwargs['gamification']
+                if 'exp_total' in g_data:
+                    self.exp_total = g_data['exp_total']
+                    update_data['exp_total'] = g_data['exp_total']
+                if 'exp_semanal' in g_data:
+                    self.exp_semanal = g_data['exp_semanal']
+                    update_data['exp_semanal'] = g_data['exp_semanal']
+                if 'level' in g_data:
+                    self.level = g_data['level']
+                    update_data['level'] = g_data['level']
+                if 'conquistas' in g_data:
+                    self.conquistas = g_data['conquistas']
+                    update_data['conquistas'] = g_data['conquistas']
+            
             if update_data:
                 db.collection('usuarios').document(self.id).update(update_data)
                 return True
@@ -173,19 +204,8 @@ class Usuario(UserMixin):
     
     @classmethod
     def get_all(cls):
-        """Retorna lista de todos os usuários (ordenada por nome). Com criptografia PII, ordenação é em memória."""
+        """Retorna lista de todos os usuários"""
         try:
-            try:
-                from flask import current_app
-                use_encrypt = current_app.config.get('ENCRYPT_PII_AT_REST')
-            except RuntimeError:
-                use_encrypt = False
-            if use_encrypt:
-                # Nome criptografado: não ordenar no Firestore; ordenar após descriptografar
-                docs = db.collection('usuarios').stream()
-                usuarios = [cls.from_dict(doc.to_dict(), doc.id) for doc in docs]
-                usuarios.sort(key=lambda u: (u.nome or '').upper())
-                return usuarios
             docs = db.collection('usuarios').order_by('nome').stream()
             usuarios = []
             for doc in docs:
@@ -214,7 +234,12 @@ class Usuario(UserMixin):
         except Exception as e:
             logger.exception("Erro ao verificar email: %s", e)
             return False
-    
+
+    @classmethod
+    def invalidar_cache_supervisores_por_area(cls):
+        """Invalida cache de supervisores por área (no-op se não houver cache)."""
+        pass
+
     @classmethod
     def get_supervisores_por_area(cls, area: str):
         """Retorna supervisores de uma área específica (e admins da mesma área, para sugestão de responsável)."""
@@ -245,15 +270,6 @@ class Usuario(UserMixin):
         except Exception as e:
             logger.exception("Erro ao buscar supervisores: %s", e)
             return []
-
-    @classmethod
-    def invalidar_cache_supervisores_por_area(cls):
-        """Invalida cache de supervisores por área (se existir). No-op se não houver cache."""
-        try:
-            from app.cache import cache_delete
-            cache_delete('supervisores_por_area')
-        except Exception:
-            pass
-
+    
     def __repr__(self):
         return f'<Usuario {self.email} - {self.perfil}>'

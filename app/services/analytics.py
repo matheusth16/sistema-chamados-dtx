@@ -615,7 +615,13 @@ class AnalisadorChamados:
             return relatorio
         except Exception as e:
             logger.exception(f"Erro ao gerar relatório completo: {str(e)}")
-            return {}
+            return {
+                'data_geracao': None,
+                'metricas_gerais': {},
+                'metricas_supervisores': [],
+                'metricas_areas': [],
+                'insights': [],
+            }
 
 
 # Instância global

@@ -46,7 +46,9 @@ def gerenciar_usuarios() -> Response:
                 email=email,
                 nome=nome,
                 perfil=perfil,
-                areas=areas
+                areas=areas,
+                must_change_password=(perfil in ['solicitante', 'supervisor']),
+                password_changed_at=None
             )
             u.set_password(senha)
             u.save()
@@ -158,3 +160,38 @@ def deletar_usuario(usuario_id: str) -> Response:
         logger.exception(f"Erro ao deletar usuário: {str(e)}")
         flash_t('error_deleting_user', 'danger', error=str(e))
         return redirect(url_for('main.gerenciar_usuarios'))
+
+@main.route('/admin/usuarios/<usuario_id>/reset-exp', methods=['POST'])
+@requer_perfil('admin')
+@limiter.limit("10 per minute")
+def resetar_exp_usuario(usuario_id: str) -> Response:
+    """Zera a experiência e nível do usuário."""
+    try:
+        usuario = Usuario.get_by_id(usuario_id)
+        if not usuario:
+            flash_t('user_not_found', 'danger')
+            return redirect(url_for('main.gerenciar_usuarios'))
+        
+        nome_usuario = usuario.nome
+        usuario.update(gamification={
+            'exp_total': 0,
+            'exp_semanal': 0,
+            'level': 1,
+            'conquistas': []
+        })
+        
+        cache_delete(CACHE_KEY_USUARIOS)
+        cache_delete(f'usuario_{usuario_id}')
+        Usuario.invalidar_cache_supervisores_por_area()
+        
+        # Opcional: deletar cache do ranking
+        cache_delete('ranking_gamificacao_semanal')
+        
+        flash_t('user_exp_reset_success', 'success', nome=nome_usuario)
+        return redirect(url_for('main.gerenciar_usuarios'))
+        
+    except Exception as e:
+        logger.exception(f"Erro ao resetar EXP do usuário: {str(e)}")
+        flash_t('error_resetting_exp', 'danger', error=str(e))
+        return redirect(url_for('main.gerenciar_usuarios'))
+

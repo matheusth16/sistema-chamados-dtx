@@ -59,7 +59,14 @@
 </style>
 
 <div class="space-y-6">
-    
+    {% if erro_relatorio %}
+    <div class="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-xl flex items-center gap-3" role="alert">
+        <svg class="w-6 h-6 shrink-0 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <p class="font-medium">{{ t('error_generating_reports') }}</p>
+        <a href="{{ url_for('main.relatorios', atualizar=1) }}" class="ml-auto text-sm font-semibold text-red-700 hover:text-red-900 underline">{{ t('refresh_data') }}</a>
+    </div>
+    {% endif %}
+
     <!-- Indicador de carregamento -->
     <div id="loading-charts" class="fixed inset-0 bg-white bg-opacity-90 flex items-center justify-center z-50 rounded-xl" style="display: none;">
         <div class="text-center">

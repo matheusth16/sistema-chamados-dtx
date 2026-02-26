@@ -79,12 +79,11 @@ window.abrirModal = function abrirModal(botao) {
     if (listaAnexosArray.length > 0 && divAnexos && listaAnexos) {
         listaAnexosArray.forEach(anx => {
             const link = document.createElement('a');
-            const isUrl = anx && (anx.startsWith('http://') || anx.startsWith('https://'));
-            link.href = isUrl ? anx : `/static/uploads/${anx}`;
+            link.href = `/static/uploads/${anx}`;
             link.target = '_blank';
             link.className = 'inline-flex flex-wrap items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-blue-700 bg-white hover:bg-gray-50 mr-2 mb-2 max-w-full truncate';
-            link.innerText = isUrl ? '📎 Baixar Anexo' : `📎 Baixar Anexo (${anx})`;
-            link.title = isUrl ? 'Anexo' : anx;
+            link.innerText = `📎 Baixar Anexo (${anx})`;
+            link.title = anx;
             listaAnexos.appendChild(link);
         });
         divAnexos.classList.remove('hidden');

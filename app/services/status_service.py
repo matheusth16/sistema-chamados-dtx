@@ -13,6 +13,7 @@ from app.database import db
 from app.models_historico import Historico
 from app.models_usuario import Usuario
 from app.services.notifications import notificar_solicitante_status
+from app.services.gamification_service import GamificationService
 from app.firebase_retry import execute_with_retry
 
 logger = logging.getLogger(__name__)
@@ -77,6 +78,15 @@ def atualizar_status_chamado(
         # Envia notificação ao solicitante
         if novo_status in ('Em Atendimento', 'Concluído'):
             _notificar_solicitante(chamado_id, data_chamado, novo_status)
+            
+        # Gamificação: Conceder pontos ao responsável pela ação
+        # Evitar dar pontos se o status não mudou real ou se quem mudou foi o solicitante
+        # Geralmente quem altera status para Em Atendimento / Concluído é técnico/admin
+        if status_anterior != novo_status:
+            if novo_status == 'Concluído':
+                GamificationService.avaliar_resolucao_chamado(usuario_id, data_chamado)
+            elif novo_status == 'Em Atendimento':
+                GamificationService.avaliar_atendimento_inicial(usuario_id)
         
         return {
             'sucesso': True,

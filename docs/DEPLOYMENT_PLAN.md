@@ -32,25 +32,25 @@ Se você já configurou um trigger de Cloud Run que dispara com push:
 
 ### Opção B: Deploy Manual (Se precisa fazer manualmente)
 
-**Se suas alterações não aparecem na URL publicada**, use deploy **sem cache** (rebuild completo):
+**Deploy manual** (a partir da raiz do projeto):
 
 ```powershell
 .\scripts\deploy_fresh.ps1
 ```
 
-Ou manualmente com `--no-cache`:
+Ou manualmente:
 
 ```bash
 cd "c:\Users\MatheusCosta\OneDrive - DTX Aerospace\Área de Trabalho\Projetos\sistema_chamados"
 
-# Deploy COM rebuild (suas mudanças serão aplicadas)
 gcloud run deploy sistema-chamados-dtx \
   --source . \
   --platform managed \
   --region us-central1 \
-  --no-cache \
+  --project sistema-de-chamados-dtx-aero \
   --allow-unauthenticated \
-  --set-env-vars="SECRET_KEY=seu-secret-key-forte-aqui,FLASK_ENV=production" \
+  --set-env-vars="SECRET_KEY=seu-secret-key-forte-aqui,FLASK_ENV=production,FIREBASE_STORAGE_BUCKET=seu-bucket.firebasestorage.app" \
+  --set-build-env-vars="GOOGLE_ENTRYPOINT=gunicorn -b :8080 run:app" \
   --memory=512Mi \
   --timeout=60 \
   --max-instances=10
@@ -116,14 +116,13 @@ gcloud run logs read sistema-chamados-dtx --region us-central1 --limit 50 --foll
 
 ## SE FALHAR NO BUILD
 
-Erro 51 ainda aparecer? Use:
+Erro 51 ainda aparecer? Aumente o timeout do build:
 
 ```bash
-# Força rebuild sem cache
 gcloud run deploy sistema-chamados-dtx \
   --source . \
   --region us-central1 \
-  --no-cache \
+  --project sistema-de-chamados-dtx-aero \
   --build-timeout=1800
 ```
 

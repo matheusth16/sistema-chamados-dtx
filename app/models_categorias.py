@@ -12,10 +12,10 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# Chaves de cache usadas em app/routes/categorias.py
-CACHE_KEY_SETORES = 'categorias_setores'
-CACHE_KEY_GATES = 'categorias_gates'
-CACHE_KEY_IMPACTOS = 'categorias_impactos'
+# Chaves de cache para listas de categorias (usadas em cache_delete nas rotas)
+CACHE_KEY_SETORES = 'categorias_setores_list'
+CACHE_KEY_GATES = 'categorias_gates_list'
+CACHE_KEY_IMPACTOS = 'categorias_impactos_list'
 
 
 class CategoriaSetor:

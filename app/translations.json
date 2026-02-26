@@ -1873,11 +1873,6 @@
         "en": "Top areas by resolution rate",
         "es": "Top áreas por tasa de resolución"
     },
-    "view_all": {
-        "pt_BR": "Ver todas",
-        "en": "View all",
-        "es": "Ver todas"
-    },
     "search_supervisors_placeholder": {
         "pt_BR": "Buscar por nome ou e-mail...",
         "en": "Search by name or email...",
@@ -1917,5 +1912,130 @@
         "pt_BR": "Performance por área",
         "en": "Performance by area",
         "es": "Rendimiento por área"
+    },
+    "top_5_week": {
+        "pt_BR": "Top 5 da Semana",
+        "en": "Top 5 of the Week",
+        "es": "Top 5 de la Semana"
+    },
+    "top_5_desc": {
+        "pt_BR": "Os técnicos mais eficientes no fechamento de chamados.",
+        "en": "The most efficient technicians in closing tickets.",
+        "es": "Los técnicos más eficientes en el cierre de tickets."
+    },
+    "1st_place": {
+        "pt_BR": "1º Lugar",
+        "en": "1st Place",
+        "es": "1er Lugar"
+    },
+    "2nd_place": {
+        "pt_BR": "2º Lugar",
+        "en": "2nd Place",
+        "es": "2do Lugar"
+    },
+    "3rd_place": {
+        "pt_BR": "3º Lugar",
+        "en": "3rd Place",
+        "es": "3er Lugar"
+    },
+    "level_abbv": {
+        "pt_BR": "Nv.",
+        "en": "Lvl.",
+        "es": "Niv."
+    },
+    "confirm_reset_exp": {
+        "pt_BR": "Tem certeza que deseja ZERAR a Experiência (XP e Nível) de {nome}? Esta ação é irreversível.",
+        "en": "Are you sure you want to RESET the Experience (XP and Level) of {nome}? This action is irreversible.",
+        "es": "¿Está seguro de que desea RESTABLECER la Experiencia (XP y Nivel) de {nome}? Esta acción es irreversible."
+    },
+    "reset_exp_btn_title": {
+        "pt_BR": "Zerar EXP e Nível do Usuário",
+        "en": "Reset User EXP and Level",
+        "es": "Restablecer EXP y Nivel del Usuario"
+    },
+    "reset_exp_btn": {
+        "pt_BR": "Zerar XP",
+        "en": "Reset XP",
+        "es": "Restab. XP"
+    },
+    "user_exp_reset_success": {
+        "pt_BR": "A Experiência (XP e Nível) do usuário {nome} foi zerada com sucesso.",
+        "en": "The Experience (XP and Level) of user {nome} has been successfully reset.",
+        "es": "La Experiencia (XP y Nivel) del usuario {nome} se ha restablecido exitosamente."
+    },
+    "password_change_required": {
+        "pt_BR": "Alteração de Senha Obrigatória",
+        "en": "Password Change Required",
+        "es": "Cambio de Contraseña Obligatorio"
+    },
+    "password_change_explanation": {
+        "pt_BR": "Este é seu primeiro acesso. Por segurança, você deve cadastrar uma nova senha.",
+        "en": "This is your first login. For security, you must register a new password.",
+        "es": "Este es su primer acceso. Por seguridad, debe registrar una nueva contraseña."
+    },
+    "first_login_security_message": {
+        "pt_BR": "Por questões de segurança, você deve criar sua própria senha antes de acessar o sistema.",
+        "en": "For security reasons, you must create your own password before accessing the system.",
+        "es": "Por razones de seguridad, debe crear su propia contraseña antes de acceder al sistema."
+    },
+    "new_password": {
+        "pt_BR": "Nova Senha",
+        "en": "New Password",
+        "es": "Nueva Contraseña"
+    },
+    "confirm_new_password": {
+        "pt_BR": "Confirmar Nova Senha",
+        "en": "Confirm New Password",
+        "es": "Confirmar Nueva Contraseña"
+    },
+    "password_changed_success": {
+        "pt_BR": "Senha alterada com sucesso! Bem-vindo(a) ao sistema.",
+        "en": "Password changed successfully! Welcome to the system.",
+        "es": "¡Contraseña cambiada con éxito! Bienvenido al sistema."
+    },
+    "password_cannot_be_default": {
+        "pt_BR": "A nova senha não pode ser a senha padrão (123456)",
+        "en": "The new password cannot be the default password (123456)",
+        "es": "La nueva contraseña no puede ser la contraseña predeterminada (123456)"
+    },
+    "passwords_must_match": {
+        "pt_BR": "As senhas devem ser iguais",
+        "en": "Passwords must match",
+        "es": "Las contraseñas deben coincidir"
+    },
+    "password_min_6_chars": {
+        "pt_BR": "A senha deve ter no mínimo 6 caracteres",
+        "en": "Password must be at least 6 characters",
+        "es": "La contraseña debe tener al menos 6 caracteres"
+    },
+    "password_change_required_alert": {
+        "pt_BR": "Por segurança, você deve alterar sua senha antes de continuar.",
+        "en": "For security, you must change your password before continuing.",
+        "es": "Por seguridad, debe cambiar su contraseña antes de continuar."
+    },
+    "password_requirements": {
+        "pt_BR": "Mínimo 6 caracteres, diferente da senha padrão",
+        "en": "Minimum 6 characters, different from default password",
+        "es": "Mínimo 6 caracteres, diferente de la contraseña predeterminada"
+    },
+    "change_password": {
+        "pt_BR": "Alterar Senha",
+        "en": "Change Password",
+        "es": "Cambiar Contraseña"
+    },
+    "need_help": {
+        "pt_BR": "Precisa de ajuda? Entre em contato com o administrador.",
+        "en": "Need help? Contact the administrator.",
+        "es": "¿Necesita ayuda? Contacte al administrador."
+    },
+    "all_fields_required": {
+        "pt_BR": "Todos os campos são obrigatórios",
+        "en": "All fields are required",
+        "es": "Todos los campos son obligatorios"
+    },
+    "error_updating_password": {
+        "pt_BR": "Erro ao atualizar senha. Tente novamente.",
+        "en": "Error updating password. Please try again.",
+        "es": "Error al actualizar la contraseña. Inténtelo de nuevo."
     }
 }

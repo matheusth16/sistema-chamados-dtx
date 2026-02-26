@@ -174,6 +174,62 @@
 
     </form>
 
+    <!-- Gamificação: Ranking Top 5 da Semana -->
+    {% if current_user.perfil in ['supervisor', 'admin'] and ranking_gamificacao %}
+    <div class="bg-gradient-to-b from-slate-50 to-white rounded-3xl shadow-sm border border-slate-200/60 p-8 relative mb-8 gsap-fade-up z-10 overflow-visible">
+        
+        <div class="mb-8 text-center sm:text-left">
+            <h3 class="text-2xl font-black text-slate-800 tracking-tight">{{ t('top_5_week') }}</h3>
+            <p class="text-slate-500 text-sm mt-1 font-medium">{{ t('top_5_desc') }}</p>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6 relative gsap-stagger-container">
+            {% for usuario in ranking_gamificacao %}
+            <!-- Card -->
+            <div class="gsap-stagger bg-white rounded-2xl p-6 border border-slate-100 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] hover:shadow-[0_20px_40px_-12px_rgba(99,102,241,0.15)] hover:-translate-y-2 hover:scale-[1.02] transition-all duration-500 group flex flex-col items-center text-center relative mt-4 cursor-default">
+                
+                <!-- Medalha -->
+                {% if loop.index == 1 %}
+                <div class="absolute -top-3 left-1/2 -translate-x-1/2 bg-gradient-to-b from-yellow-300 to-yellow-500 text-yellow-900 rounded-full px-4 py-1 flex items-center gap-1 font-black text-xs shadow-md border border-yellow-200 z-10 whitespace-nowrap" title="{{ t('1st_place') }}">
+                    🥇 {{ t('1st_place') }}
+                </div>
+                {% elif loop.index == 2 %}
+                <div class="absolute -top-3 left-1/2 -translate-x-1/2 bg-gradient-to-b from-slate-200 to-slate-400 text-slate-800 rounded-full px-4 py-1 flex items-center gap-1 font-black text-xs shadow-md border border-slate-300 z-10 whitespace-nowrap" title="{{ t('2nd_place') }}">
+                    🥈 {{ t('2nd_place') }}
+                </div>
+                {% elif loop.index == 3 %}
+                <div class="absolute -top-3 left-1/2 -translate-x-1/2 bg-gradient-to-b from-orange-400 to-amber-600 text-white rounded-full px-4 py-1 flex items-center gap-1 font-black text-xs shadow-md border border-orange-500/50 z-10 whitespace-nowrap" title="{{ t('3rd_place') }}">
+                    🥉 {{ t('3rd_place') }}
+                </div>
+                {% else %}
+                <div class="absolute -top-3 left-1/2 -translate-x-1/2 bg-slate-100 text-slate-500 rounded-full w-6 h-6 flex items-center justify-center font-black text-xs shadow-sm border border-slate-200 z-10">
+                    {{ loop.index }}º
+                </div>
+                {% endif %}
+
+                <!-- Avatar -->
+                <div class="w-16 h-16 rounded-full bg-gradient-to-tr from-indigo-500 to-blue-600 flex items-center justify-center text-white font-bold text-2xl mb-4 shadow-md ring-4 ring-indigo-50 group-hover:ring-indigo-100 group-hover:scale-110 transition-all duration-500 mt-2">
+                    {{ usuario.nome[0] if usuario.nome else '?' }}
+                </div>
+                
+                <!-- Nome -->
+                <h4 class="text-slate-800 font-bold text-base truncate w-full group-hover:text-indigo-600 transition-colors" title="{{ usuario.nome }}">{{ nome_curto(usuario.nome) if usuario.nome else 'Usuário' }}</h4>
+                
+                <!-- Status -->
+                <div class="flex flex-col items-center gap-1.5 mt-4 w-full border-t border-slate-50 pt-4">
+                    <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                        {{ t('level_abbv') }} {{ usuario.level }}
+                    </span>
+                    <span class="text-sm font-black text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full whitespace-nowrap">
+                        {{ usuario.exp_semanal }} XP
+                    </span>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
     <div id="bulk-bar"
         class="hidden mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg flex flex-wrap items-center gap-3">
         <span class="text-sm font-medium text-blue-900">{{ t('bulk_change_status') }}:</span>

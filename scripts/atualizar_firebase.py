@@ -101,7 +101,7 @@ impactos_dados = [
         'criado_em': datetime.now()
     },
     {
-        'nome_pt': 'Seguranca',
+        'nome_pt': 'Segurança',
         'nome_en': 'Safety',
         'nome_es': 'Seguridad',
         'ativo': True,

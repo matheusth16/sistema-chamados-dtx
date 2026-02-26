@@ -148,7 +148,9 @@ def criar_usuario_interativo():
             email=email,
             nome=nome,
             perfil=perfil,
-            area=area
+            areas=[area] if area else [],
+            must_change_password=(perfil in ['solicitante', 'supervisor']),
+            password_changed_at=None
         )
         usuario.set_password(senha)
         usuario.save()
@@ -156,6 +158,8 @@ def criar_usuario_interativo():
         print("\n✅ SUCESSO!")
         print(f"   Usuário '{nome}' ({email}) criado com sucesso!")
         print(f"   ID do usuário: {usuario.id}")
+        if perfil in ['solicitante', 'supervisor']:
+            print(f"   ⚠️  Deverá trocar a senha no primeiro acesso")
         return True
         
     except Exception as e:
@@ -190,7 +194,9 @@ def criar_usuario_rapido():
             email=email,
             nome=nome,
             perfil=perfil,
-            area=area
+            areas=[area] if area else [],
+            must_change_password=(perfil in ['solicitante', 'supervisor']),
+            password_changed_at=None
         )
         usuario.set_password("123456")
         usuario.save()
@@ -201,6 +207,8 @@ def criar_usuario_rapido():
         print(f"   Tipo: {perfil}")
         if area:
             print(f"   Área: {area}")
+        if perfil in ['solicitante', 'supervisor']:
+            print(f"   ⚠️  Deverá trocar a senha no primeiro acesso")
         return True
         
     except Exception as e:

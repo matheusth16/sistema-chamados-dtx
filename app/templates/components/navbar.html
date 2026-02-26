@@ -1,0 +1,279 @@
+<nav class="bg-[#0b1b3d]/90 backdrop-blur-xl border-b border-white/10 shadow-2xl sticky top-0 z-[200] transition-all duration-300">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex items-center justify-between h-16 sm:h-20">
+            <!-- Logo area -->
+            <div class="flex items-center gap-6">
+                <!-- Logo -->
+                <a href="/" class="flex-shrink-0 group flex items-center relative outline-none focus-visible:ring-2 focus-visible:ring-blue-400 rounded-2xl">
+                    <div class="absolute inset-0 bg-blue-500/20 blur-xl rounded-full scale-0 group-hover:scale-150 transition-transform duration-500"></div>
+                    <div class="relative p-2 bg-white/5 rounded-2xl group-hover:bg-white/10 transition-all duration-300 backdrop-blur-md border border-white/5 shadow-[0_4px_30px_rgba(0,0,0,0.1)] group-hover:shadow-[0_4px_30px_rgba(0,0,0,0.3)] group-hover:-translate-y-0.5">
+                        <img src="{{ url_for('static', filename='img/logo-full.png') }}" alt="DTX Aerospace" class="h-8 sm:h-10 brightness-0 invert object-contain drop-shadow-lg transition-transform duration-500 group-hover:scale-105">
+                    </div>
+                </a>
+
+                <!-- Nav Links Desktop -->
+                <div class="hidden md:flex md:items-center md:gap-2">
+                    {% if current_user.is_authenticated %}
+                    
+                    {% macro nav_link(url, icon_path, label_code, is_highlight=False) %}
+                    <a href="{{ url }}" class="relative group px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-300 outline-none focus-visible:ring-2 focus-visible:ring-blue-400 flex items-center gap-2 {% if is_highlight %}bg-blue-600/20 text-blue-100 hover:bg-blue-600/40 hover:text-white border border-blue-500/20 hover:border-blue-500/40 hover:shadow-[0_0_15px_rgba(37,99,235,0.3)]{% else %}text-gray-200 hover:bg-white/10 hover:text-white{% endif %}">
+                        <svg class="w-4 h-4 shrink-0 transition-transform duration-300 group-hover:scale-110 {% if not is_highlight %}opacity-70 group-hover:opacity-100{% endif %}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{{ icon_path }}"></path>
+                        </svg>
+                        <span>{{ t(label_code) }}</span>
+                    </a>
+                    {% endmacro %}
+
+                    {% if current_user.perfil == 'solicitante' %}
+                        {{ nav_link(url_for('main.index'), 'M12 4v16m8-8H4', 'nav_new_ticket', True) }}
+                        {{ nav_link('/meus-chamados', 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01', 'nav_my_tickets') }}
+                    {% endif %}
+
+                    {% if current_user.perfil == 'supervisor' %}
+                        {{ nav_link(url_for('main.admin'), 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z', 'nav_management') }}
+                        {{ nav_link(url_for('main.relatorios'), 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z', 'nav_my_reports') }}
+                        {{ nav_link('/', 'M12 4v16m8-8H4', 'nav_new_ticket', True) }}
+                        {{ nav_link('/meus-chamados', 'M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10', 'nav_my_tickets') }}
+                    {% endif %}
+
+                    {% if current_user.perfil == 'admin' %}
+                        {{ nav_link('/admin', 'M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10', 'nav_management') }}
+                        {{ nav_link(url_for('main.relatorios'), 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z', 'nav_my_reports') }}
+                    {% endif %}
+                    
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="flex items-center gap-3 sm:gap-5">
+                <!-- Hamburger Menu for Admin/Mobile -->
+                {% if current_user.is_authenticated and current_user.perfil == 'admin' %}
+                <div class="relative group" id="nav-hamburger-wrap">
+                    <button type="button" id="btn-hamburger" aria-label="Abrir menu" aria-expanded="false"
+                        class="p-2.5 rounded-xl text-gray-200 hover:text-white hover:bg-white/10 transition-all duration-300 inline-flex items-center justify-center outline-none focus-visible:ring-2 focus-visible:ring-blue-400 border border-transparent hover:border-white/10 group-data-[open=true]:bg-white/10 group-data-[open=true]:text-white group-data-[open=true]:border-white/10 group-data-[open=true]:shadow-inner">
+                        <svg class="w-5 h-5 transition-transform duration-300 group-data-[open=true]:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                        </svg>
+                    </button>
+                    <!-- Enhanced Dropdown Menu -->
+                    <div id="nav-menu-dropdown" class="absolute right-0 mt-3 w-72 py-3 bg-white/95 backdrop-blur-2xl text-gray-800 rounded-2xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.3)] border border-gray-100/50 opacity-0 invisible scale-95 translate-y-2 origin-top-right transition-all duration-300 cubic-bezier(0.16, 1, 0.3, 1) z-[210] max-h-[85vh] overflow-y-auto" role="menu">
+                        <div class="absolute inset-0 bg-gradient-to-b from-blue-50/50 to-transparent pointer-events-none rounded-2xl"></div>
+                        <div class="relative">
+                            <div class="px-4 py-2 text-xs font-bold tracking-wider text-gray-400 uppercase mb-1">Navegação Rápida</div>
+                            
+                            <div class="md:hidden">
+                                <a href="/admin" class="flex items-center gap-3 px-5 py-2.5 text-sm font-medium text-gray-700 hover:text-blue-700 hover:bg-blue-50/80 transition-all group" role="menuitem">
+                                    <div class="p-1.5 rounded-lg bg-gray-100 text-gray-500 group-hover:bg-blue-100 group-hover:text-blue-600 transition-colors">
+                                        <svg class="w-4 h-4 shrink-0 text-current" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+                                    </div>
+                                    {{ t('nav_management') }}
+                                </a>
+                                <a href="{{ url_for('main.relatorios') }}" class="flex items-center gap-3 px-5 py-2.5 text-sm font-medium text-gray-700 hover:text-blue-700 hover:bg-blue-50/80 transition-all group" role="menuitem">
+                                    <div class="p-1.5 rounded-lg bg-gray-100 text-gray-500 group-hover:bg-blue-100 group-hover:text-blue-600 transition-colors">
+                                        <svg class="w-4 h-4 shrink-0 text-current" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
+                                    </div>
+                                    {{ t('nav_my_reports') }}
+                                </a>
+                                <div class="border-t border-gray-100/80 my-2 mx-4"></div>
+                            </div>
+                            
+                            <a href="/" class="flex items-center gap-3 px-5 py-2.5 text-sm font-medium text-gray-700 hover:text-blue-700 hover:bg-blue-50/80 transition-all group" role="menuitem">
+                                <div class="p-1.5 rounded-lg bg-gray-100 text-gray-500 group-hover:bg-blue-100 group-hover:text-blue-600 transition-colors">
+                                    <svg class="w-4 h-4 shrink-0 text-current" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+                                </div>
+                                {{ t('nav_new_ticket') }}
+                            </a>
+                            <a href="/meus-chamados" class="flex items-center gap-3 px-5 py-2.5 text-sm font-medium text-gray-700 hover:text-blue-700 hover:bg-blue-50/80 transition-all group" role="menuitem">
+                                <div class="p-1.5 rounded-lg bg-gray-100 text-gray-500 group-hover:bg-blue-100 group-hover:text-blue-600 transition-colors">
+                                    <svg class="w-4 h-4 shrink-0 text-current" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+                                </div>
+                                {{ t('nav_my_tickets') }}
+                            </a>
+                            
+                            <div class="border-t border-gray-100/80 my-2 mx-4"></div>
+                            <div class="px-4 py-2 text-xs font-bold tracking-wider text-gray-400 uppercase mb-1">Administração</div>
+                            
+                            <a href="{{ url_for('main.admin_categorias') }}" class="flex items-center gap-3 px-5 py-2.5 text-sm font-medium text-gray-700 hover:text-blue-700 hover:bg-blue-50/80 transition-all group" role="menuitem">
+                                <div class="p-1.5 rounded-lg bg-gray-100 text-gray-500 group-hover:bg-blue-100 group-hover:text-blue-600 transition-colors">
+                                    <svg class="w-4 h-4 shrink-0 text-current" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg>
+                                </div>
+                                {{ t('nav_categories') }}
+                            </a>
+                            <a href="{{ url_for('main.gerenciar_usuarios') }}" class="flex items-center gap-3 px-5 py-2.5 text-sm font-medium text-gray-700 hover:text-blue-700 hover:bg-blue-50/80 transition-all group" role="menuitem">
+                                <div class="p-1.5 rounded-lg bg-gray-100 text-gray-500 group-hover:bg-blue-100 group-hover:text-blue-600 transition-colors">
+                                    <svg class="w-4 h-4 shrink-0 text-current" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+                                </div>
+                                {{ t('nav_users') }}
+                            </a>
+                            <a href="{{ url_for('main.admin_traducoes') }}" class="flex items-center gap-3 px-5 py-2.5 text-sm font-medium text-gray-700 hover:text-blue-700 hover:bg-blue-50/80 transition-all group" role="menuitem">
+                                <div class="p-1.5 rounded-lg bg-gray-100 text-gray-500 group-hover:bg-blue-100 group-hover:text-blue-600 transition-colors">
+                                    <svg class="w-4 h-4 shrink-0 text-current" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 15h2.498" /></svg>
+                                </div>
+                                {{ t('nav_translations') }}
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Sino de Notificações -->
+                {% if current_user.is_authenticated and current_user.perfil in ['supervisor', 'admin'] %}
+                <div class="relative" id="nav-notificacoes">
+                    <button type="button" id="btn-sino" class="relative p-2.5 rounded-xl text-gray-200 hover:text-white hover:bg-white/10 transition-all duration-300 inline-flex items-center justify-center outline-none focus-visible:ring-2 focus-visible:ring-blue-400 border border-transparent hover:border-white/10 group group-data-[open=true]:bg-white/10 group-data-[open=true]:text-white group-data-[open=true]:shadow-inner"
+                        aria-label="Notificações" aria-expanded="false" aria-haspopup="true">
+                        <svg class="w-5 h-5 transition-transform duration-300 origin-top group-hover:animate-[wiggle_1s_ease-in-out_infinite]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                        </svg>
+                        <span id="sino-badge" class="absolute -top-1 -right-1 min-w-[20px] h-[20px] px-1.5 flex items-center justify-center text-[10px] sm:text-xs font-bold bg-gradient-to-br from-red-500 to-rose-600 text-white rounded-full shadow-md shadow-red-500/40 border border-[#0b1b3d] hidden transform scale-0 transition-transform duration-300">0</span>
+                    </button>
+                    <!-- Dropdown Notificações -->
+                    <div id="sino-dropdown"
+                        class="absolute right-0 mt-3 w-80 sm:w-96 max-h-[80vh] flex flex-col bg-white/95 backdrop-blur-2xl text-gray-800 rounded-2xl shadow-[0_15px_50px_-12px_rgba(0,0,0,0.4)] border border-gray-100/50 opacity-0 invisible scale-95 translate-y-2 origin-top-right transition-all duration-300 cubic-bezier(0.16, 1, 0.3, 1) z-50">
+                        <div class="px-5 py-4 border-b border-gray-100/80 flex items-center justify-between shrink-0 bg-gray-50/50 rounded-t-2xl">
+                            <div class="font-bold text-gray-800 flex items-center gap-2">
+                                <svg class="w-4 h-4 text-blue-500" fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z"/></svg>
+                                Notificações
+                            </div>
+                            <button type="button" id="btn-sino-marcar-todas" class="text-xs font-semibold text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-2.5 py-1 rounded-lg transition-colors hidden">Marcar todas como lidas</button>
+                        </div>
+                        <div id="sino-lista" class="flex-1 overflow-y-auto divide-y divide-gray-50 p-2 scrollbar-thin scrollbar-thumb-gray-200 hover:scrollbar-thumb-gray-300">
+                            <!-- Loading State -->
+                            <div class="flex flex-col items-center justify-center py-10 opacity-70">
+                                <div class="w-8 h-8 flex items-center justify-center mb-3">
+                                    <div class="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                                </div>
+                                <div class="text-sm font-medium text-gray-500">Buscando atualizações...</div>
+                            </div>
+                        </div>
+                        <div id="sino-footer" class="p-3 border-t border-gray-100/80 text-center shrink-0 bg-gray-50/50 rounded-b-2xl">
+                            <a href="{{ url_for('main.admin') }}" class="inline-flex items-center justify-center w-full px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 hover:text-blue-600 transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500">Ver painel completo</a>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <div class="w-px h-8 bg-white/10 hidden sm:block mx-1"></div>
+
+                <!-- Seletor de Idioma -->
+                <div class="relative group">
+                    <button class="relative p-2.5 rounded-xl text-gray-200 hover:text-white hover:bg-white/10 transition-all duration-300 inline-flex items-center justify-center outline-none focus-visible:ring-2 focus-visible:ring-blue-400 border border-transparent hover:border-white/10">
+                        <div class="flex items-center gap-1.5 font-bold text-sm tracking-wide">
+                            <svg class="w-4 h-4 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <span class="uppercase">
+                                {% if current_language == 'en' %}EN
+                                {% elif current_language == 'es' %}ES
+                                {% else %}PT{% endif %}
+                            </span>
+                            <svg class="w-3.5 h-3.5 opacity-50 transition-transform duration-300 group-hover:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </div>
+                    </button>
+                    <!-- Dropdown Idiomas -->
+                    <div class="absolute right-0 mt-3 w-48 bg-white/95 backdrop-blur-2xl text-gray-700 rounded-2xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.3)] border border-gray-100/50 opacity-0 invisible scale-95 translate-y-2 group-hover:opacity-100 group-hover:visible group-hover:scale-100 group-hover:translate-y-0 transform origin-top-right transition-all duration-300 cubic-bezier(0.16, 1, 0.3, 1) z-50">
+                        <div class="px-4 py-3 border-b border-gray-100/80">
+                            <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider">Selecione o Idioma</h3>
+                        </div>
+                        <div class="p-2 space-y-1">
+                            <a href="?lang=pt_BR" class="flex items-center justify-between px-3 py-2.5 text-sm rounded-xl transition-all duration-200 {% if current_language == 'pt_BR' %}bg-blue-50 text-blue-700 font-bold shadow-sm{% else %}font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900{% endif %}">
+                                <span>{{ t('lang_portuguese') }}</span>
+                                <span class="text-[10px] font-black px-2 py-0.5 rounded-lg {% if current_language == 'pt_BR' %}bg-blue-100 text-blue-800{% else %}bg-gray-100 text-gray-500{% endif %} uppercase tracking-wider">PT</span>
+                            </a>
+                            <a href="?lang=en" class="flex items-center justify-between px-3 py-2.5 text-sm rounded-xl transition-all duration-200 {% if current_language == 'en' %}bg-blue-50 text-blue-700 font-bold shadow-sm{% else %}font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900{% endif %}">
+                                <span>{{ t('lang_english') }}</span>
+                                <span class="text-[10px] font-black px-2 py-0.5 rounded-lg {% if current_language == 'en' %}bg-blue-100 text-blue-800{% else %}bg-gray-100 text-gray-500{% endif %} uppercase tracking-wider">EN</span>
+                            </a>
+                            <a href="?lang=es" class="flex items-center justify-between px-3 py-2.5 text-sm rounded-xl transition-all duration-200 {% if current_language == 'es' %}bg-blue-50 text-blue-700 font-bold shadow-sm{% else %}font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900{% endif %}">
+                                <span>Español</span>
+                                <span class="text-[10px] font-black px-2 py-0.5 rounded-lg {% if current_language == 'es' %}bg-blue-100 text-blue-800{% else %}bg-gray-100 text-gray-500{% endif %} uppercase tracking-wider">ES</span>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Perfil do Usuário -->
+                {% if current_user.is_authenticated %}
+                <div class="relative group ml-1 sm:ml-2">
+                    <button class="flex items-center gap-3 pl-3 pr-2 py-1.5 rounded-2xl transition-all duration-300 hover:bg-white/10 border border-transparent hover:border-white/10 outline-none focus-visible:ring-2 focus-visible:ring-blue-400">
+                        <div class="text-right hidden sm:block">
+                            <div class="text-sm font-bold text-white leading-tight">
+                                {{ current_user.nome }}
+                            </div>
+                            {% if current_user.area %}
+                            <div class="text-xs font-medium text-blue-300 leading-tight mt-0.5 opacity-80">{{ translate_sector(current_user.area) }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="relative">
+                            <div class="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 p-[2px] shadow-lg">
+                                <div class="w-full h-full rounded-full bg-[#0b1b3d] flex items-center justify-center overflow-hidden border border-[#0b1b3d]">
+                                    <svg class="w-6 h-6 text-blue-100" fill="currentColor" viewBox="0 0 24 24"><path d="M24 20.993V24H0v-2.996A14.977 14.977 0 0112.004 15c4.904 0 9.26 2.354 11.996 5.993zM16.002 8.999a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+                                </div>
+                            </div>
+                            <!-- Indicador Status -->
+                            <div class="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-[#0b1b3d] rounded-full"></div>
+                        </div>
+                    </button>
+                    
+                    <!-- Dropdown Meu Perfil -->
+                    <div class="absolute right-0 mt-3 w-64 bg-white/95 backdrop-blur-2xl text-gray-800 rounded-2xl shadow-[0_15px_50px_-12px_rgba(0,0,0,0.4)] border border-gray-100/50 opacity-0 invisible scale-95 translate-y-2 group-hover:opacity-100 group-hover:visible group-hover:scale-100 group-hover:translate-y-0 transform origin-top-right transition-all duration-300 cubic-bezier(0.16, 1, 0.3, 1) z-50">
+                        <div class="p-4 border-b border-gray-100/80 bg-gradient-to-br from-gray-50/50 to-white rounded-t-2xl">
+                            <div class="font-bold text-gray-900">{{ current_user.nome }}</div>
+                            <div class="text-xs text-gray-500 mt-1 flex items-center gap-1.5 font-medium">
+                                <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg> 
+                                {{ current_user.email }}
+                            </div>
+                            {% if current_user.perfil == 'admin' %}
+                                <div class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-purple-100 text-purple-700 text-[10px] font-black uppercase tracking-wider mt-3 shadow-sm border border-purple-200/50">
+                                    <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+                                    Administrador
+                                </div>
+                            {% elif current_user.perfil == 'supervisor' %}
+                                <div class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-blue-100 text-blue-700 text-[10px] font-black uppercase tracking-wider mt-3 shadow-sm border border-blue-200/50">Supervisor</div>
+                            {% else %}
+                                <div class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-gray-100 text-gray-700 text-[10px] font-black uppercase tracking-wider mt-3 shadow-sm border border-gray-200/50">Solicitante</div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Gamificação no Dropdown -->
+                        {% if current_user.level is defined and current_user.perfil in ['supervisor', 'admin'] %}
+                        <div class="px-4 py-3 bg-gradient-to-br from-yellow-50 to-orange-50/30 border-b border-gray-100/80">
+                            <div class="flex items-center justify-between mb-2">
+                                <div class="flex items-center gap-1.5">
+                                    <div class="w-6 h-6 rounded-lg bg-gradient-to-br from-yellow-400 to-orange-500 shadow-sm shadow-yellow-500/30 flex items-center justify-center text-white">
+                                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+                                    </div>
+                                    <span class="text-xs font-black text-yellow-800 tracking-wide uppercase">Nível {{ current_user.level }}</span>
+                                </div>
+                                <div class="text-[10px] font-black text-orange-600 bg-orange-100 px-2 py-0.5 rounded-full">{{ current_user.exp_semanal }} XP Semanal</div>
+                            </div>
+                            <div class="w-full bg-orange-100 rounded-full h-1.5 overflow-hidden shadow-inner">
+                                {% set exp_next_level = current_user.level * 100 %}
+                                {% set exp_progress = (current_user.exp_total % 100) %}
+                                <div class="bg-gradient-to-r from-yellow-400 to-orange-500 h-1.5 rounded-full" style="width: {{ exp_progress }}%"></div>
+                            </div>
+                            <div class="text-[10px] text-gray-500 font-medium text-right mt-1.5 flex justify-between">
+                                <span>Progresso global</span>
+                                <span>{{ current_user.exp_total }} XP Total</span>
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        <div class="p-2">
+                            <a href="{{ url_for('main.logout') }}" class="flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 rounded-xl transition-colors group">
+                                <div class="p-1.5 rounded-lg bg-red-100 text-red-600 group-hover:bg-red-200 transition-colors">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+                                </div>
+                                Sair da Conta
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+            </div>
+        </div>
+    </div>
+</nav>

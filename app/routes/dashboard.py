@@ -132,6 +132,16 @@ def admin() -> Response:
         key=lambda x: x['nome'].upper()
     )
 
+    # Ranking Gamificação (Top 5 da Semana)
+    # Pegamos os usuários logados/ativos (ideal buscar do banco filtrando por exp_semanal > 0, mas em memória resolve se a base não for tão monstruosa de técnicos)
+    # Como não temos uma query que retorna *todos* sempre ou dependemos de criptografia (já lidada em get_all),
+    # reaproveitamos usuarios_gestao que já possui supervisores/admins
+    ranking_gamificacao = sorted(
+        [u for u in usuarios_gestao if u.exp_semanal > 0],
+        key=lambda u: u.exp_semanal, 
+        reverse=True
+    )[:5]
+
     chamados_ref = db.collection('chamados')
     # Supervisor vê apenas chamados das suas áreas (filtro no Firestore para não trazer outros setores)
     if current_user.perfil == 'supervisor' and getattr(current_user, 'areas', None):
@@ -176,6 +186,7 @@ def admin() -> Response:
         lista_responsaveis=lista_responsaveis,
         supervisores_detalhados=supervisores_detalhados,
         lista_gates=lista_gates,
+        ranking_gamificacao=ranking_gamificacao,
         max=max,
         min=min,
     )
@@ -503,17 +514,29 @@ def _relatorios_ordenar_areas(lista: List[Dict], campo: str, asc: bool) -> List[
 def relatorios() -> Response:
     """Dashboard de relatórios e análises. Use ?atualizar=1 para forçar dados frescos.
     Query params: pagina_sup, pagina_area, ordenar_sup, ordenar_area, ordem_sup, ordem_area (asc|desc), busca_sup, busca_area."""
+    erro_relatorio = False
     try:
         atualizar = request.args.get('atualizar') == '1'
-        relatorio = analisador.obter_relatorio_completo(usar_cache=not atualizar)
-        insights = relatorio.get('insights', [])
+        try:
+            relatorio = analisador.obter_relatorio_completo(usar_cache=not atualizar) or {}
+        except Exception as e_analytics:
+            logger.exception("Erro ao obter relatório completo (analytics): %s", e_analytics)
+            relatorio = {
+                'data_geracao': None,
+                'metricas_gerais': {},
+                'metricas_supervisores': [],
+                'metricas_areas': [],
+                'insights': [],
+            }
+            erro_relatorio = True
+        insights = list(relatorio.get('insights') or [])
         ordem_tipo = {'aviso': 0, 'sucesso': 1, 'info': 2}
-        insights = sorted(insights, key=lambda x: ordem_tipo.get(x.get('tipo'), 3))
+        insights = sorted(insights, key=lambda x: ordem_tipo.get((x or {}).get('tipo'), 3))
 
-        itens_por_pagina = getattr(Config, 'ITENS_POR_PAGINA', 10)
+        itens_por_pagina = max(1, int(getattr(Config, 'ITENS_POR_PAGINA', 10)))
 
         # Supervisores: lista completa para gráficos e para filtrar/ordenar/paginar
-        metricas_supervisores_full = list(relatorio.get('metricas_supervisores', []))
+        metricas_supervisores_full = list(relatorio.get('metricas_supervisores') or [])
         busca_sup = (request.args.get('busca_sup') or '').strip().lower()
         if busca_sup:
             metricas_supervisores_full = [
@@ -540,7 +563,7 @@ def relatorios() -> Response:
         metricas_supervisores = metricas_supervisores_full[inicio_sup : inicio_sup + itens_por_pagina]
 
         # Áreas: lista completa para gráficos e para filtrar/ordenar/paginar
-        metricas_areas_full = list(relatorio.get('metricas_areas', []))
+        metricas_areas_full = list(relatorio.get('metricas_areas') or [])
         busca_area = (request.args.get('busca_area') or '').strip().lower()
         if busca_area:
             metricas_areas_full = [
@@ -567,7 +590,7 @@ def relatorios() -> Response:
         return render_template(
             'relatorios.html',
             relatorio=relatorio,
-            metricas_gerais=relatorio.get('metricas_gerais', {}),
+            metricas_gerais=relatorio.get('metricas_gerais') or {},
             metricas_supervisores=metricas_supervisores,
             metricas_supervisores_full=metricas_supervisores_full,
             metricas_areas=metricas_areas,
@@ -588,11 +611,42 @@ def relatorios() -> Response:
             ordenar_area=ordenar_area,
             ordem_area=ordem_area,
             busca_area=request.args.get('busca_area', ''),
+            erro_relatorio=erro_relatorio,
         )
     except Exception as e:
-        logger.exception(f"Erro ao gerar relatórios: {str(e)}")
-        flash_t('error_generating_reports', 'danger')
-        return redirect(url_for('main.admin'))
+        logger.exception(f"Erro ao gerar relatórios: %s", e)
+        try:
+            # Tenta exibir a página de relatórios com dados vazios e mensagem de erro
+            return render_template(
+                'relatorios.html',
+                relatorio={},
+                metricas_gerais={},
+                metricas_supervisores=[],
+                metricas_supervisores_full=[],
+                metricas_areas=[],
+                metricas_areas_full=[],
+                insights=[],
+                data_geracao=None,
+                pagina_sup=1,
+                total_paginas_sup=1,
+                total_supervisores=0,
+                itens_por_pagina_sup=max(1, int(getattr(Config, 'ITENS_POR_PAGINA', 10))),
+                ordenar_sup='desc',
+                ordem_sup='desc',
+                busca_sup=request.args.get('busca_sup', ''),
+                pagina_area=1,
+                total_paginas_area=1,
+                total_areas=0,
+                itens_por_pagina_area=max(1, int(getattr(Config, 'ITENS_POR_PAGINA', 10))),
+                ordenar_area='desc',
+                ordem_area='desc',
+                busca_area=request.args.get('busca_area', ''),
+                erro_relatorio=True,
+            )
+        except Exception as e2:
+            logger.exception("Erro ao renderizar página de relatórios (fallback): %s", e2)
+            flash_t('error_generating_reports', 'danger')
+            return redirect(url_for('main.admin'))
 
 
 @main.route('/admin/indices-firestore')

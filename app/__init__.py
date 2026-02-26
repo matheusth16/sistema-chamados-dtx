@@ -48,15 +48,6 @@ def create_app():
         from app.models_usuario import Usuario
         return Usuario.get_by_id(user_id)
 
-    # Rotas /api/* sem login retornam 401 JSON em vez de redirect (para clientes AJAX/SPA)
-    @login_manager.unauthorized_handler
-    def unauthorized():
-        from flask import request, jsonify, redirect, url_for, flash
-        if request.path.startswith('/api/'):
-            return jsonify({'sucesso': False, 'requer_login': True, 'erro': 'Login necessário'}), 401
-        flash(login_manager.login_message, login_manager.login_message_category or 'info')
-        return redirect(url_for(login_manager.login_view))
-
     # Configuração de i18n (Internacionalização)
     _configurar_i18n(app)
 
@@ -70,26 +61,12 @@ def create_app():
     # Timeout de inatividade (15 minutos)
     _configurar_timeout_sessao(app)
 
-    # 404 amigável para anexos em /static/uploads/ (arquivo não encontrado → página "Anexo não disponível")
-    _configurar_erro_404(app)
-
     # API de status exige CSRF; o frontend envia o token no header X-CSRFToken (meta csrf-token)
 
     # Firebase é inicializado em app/database.py
     # Não há tabelas para criar (Firestore é NoSQL)
     
     return app
-
-
-def _configurar_erro_404(app: Flask) -> None:
-    """Resposta amigável para 404. Requisições a /static/uploads/ sem arquivo exibem 'Anexo não disponível'."""
-    from flask import render_template, request
-
-    @app.errorhandler(404)
-    def pagina_nao_encontrada(e):
-        if request.path.startswith('/static/uploads/'):
-            return render_template('erro_anexo_nao_encontrado.html'), 404
-        return render_template('erro_404.html'), 404
 
 
 def _configurar_seguranca(app: Flask) -> None:
@@ -215,18 +192,8 @@ def _configurar_seguranca(app: Flask) -> None:
 
 def _configurar_i18n(app: Flask) -> None:
     """Configura sistema de internacionalização (i18n)"""
-    from flask import session
     from app.i18n import get_translation, get_translated_sector, get_translated_category, get_translated_status
-
-    def translate_sector_filter(sector_name):
-        """Traduz setor para o idioma da sessão. Usado como função no contexto e como filter (map) no Jinja."""
-        if not sector_name:
-            return sector_name
-        lang = session.get('language', 'pt_BR')
-        return get_translated_sector(sector_name, lang)
-
-    app.jinja_env.filters['translate_sector'] = translate_sector_filter
-
+    
     @app.before_request
     def antes_da_requisicao():
         """Define o idioma para a requisição atual"""
@@ -238,10 +205,15 @@ def _configurar_i18n(app: Flask) -> None:
     def inject_i18n():
         """Injeta função de tradução e idioma no contexto Jinja"""
         def t(key, **kwargs):
-            """Função para traduzir uma chave no template. Aceita kwargs para formatação (ex: area=..., nome=..., pct=...)."""
+            """Função para traduzir uma chave no template"""
             lang = session.get('language', 'pt_BR')
             return get_translation(key, lang, **kwargs)
-
+        
+        def translate_sector(sector_name):
+            """Traduz o nome de um setor no template"""
+            lang = session.get('language', 'pt_BR')
+            return get_translated_sector(sector_name, lang)
+        
         def translate_category(category_name):
             """Traduz o nome de uma categoria no template"""
             lang = session.get('language', 'pt_BR')
@@ -253,20 +225,19 @@ def _configurar_i18n(app: Flask) -> None:
             return get_translated_status(status_name, lang)
 
         def nome_curto(nome):
-            """Retorna versão curta do nome para exibição (ex.: 'Maria Santos' -> 'Maria S.')."""
+            """Retorna versão curta do nome para exibição (ex: 'João Silva' -> 'João S.')."""
             if not nome or not isinstance(nome, str):
-                return None
-            nome = nome.strip()
-            if not nome:
-                return None
-            partes = nome.split()
-            if len(partes) >= 2:
-                return f"{partes[0]} {partes[-1][0]}."
-            return nome[:25] + ('...' if len(nome) > 25 else '')
-
+                return ''
+            partes = nome.strip().split()
+            if not partes:
+                return ''
+            if len(partes) == 1:
+                return partes[0]
+            return f"{partes[0]} {partes[-1][0]}."
+        
         return dict(
             t=t,
-            translate_sector=translate_sector_filter,
+            translate_sector=translate_sector,
             translate_category=translate_category,
             translate_status=translate_status,
             nome_curto=nome_curto,
@@ -277,6 +248,22 @@ def _configurar_i18n(app: Flask) -> None:
                 'es': 'Español'
             }
         )
+        
+    # Registra funções as Jinja filters (para usar com o pipe |)
+    @app.template_filter('translate_sector')
+    def filter_translate_sector(sector_name):
+        lang = session.get('language', 'pt_BR')
+        return get_translated_sector(sector_name, lang)
+
+    @app.template_filter('translate_category')
+    def filter_translate_category(category_name):
+        lang = session.get('language', 'pt_BR')
+        return get_translated_category(category_name, lang)
+
+    @app.template_filter('translate_status')
+    def filter_translate_status(status_name):
+        lang = session.get('language', 'pt_BR')
+        return get_translated_status(status_name, lang)
 
 def _configurar_timeout_sessao(app: Flask) -> None:
     """Configura logout automático por inatividade de sessão (15 minutos)"""
@@ -307,6 +294,28 @@ def _configurar_timeout_sessao(app: Flask) -> None:
                 
             # Atualiza o timestamp da última atividade da sessão com a hora atual
             session['last_activity'] = agora
+    
+    @app.before_request
+    def verificar_troca_senha_obrigatoria():
+        """Intercepta requisições para forçar troca de senha no primeiro acesso"""
+        # Ignora rotas de arquivos estáticos
+        if request.endpoint and request.endpoint.startswith('static'):
+            return None
+        
+        # Lista de rotas isentas da verificação
+        rotas_isentas = [
+            'main.alterar_senha_obrigatoria',
+            'main.logout',
+            'main.login'
+        ]
+        
+        # Verifica se usuário está autenticado e precisa trocar senha
+        if current_user.is_authenticated:
+            # Admins estão isentos da troca obrigatória
+            if current_user.perfil != 'admin' and current_user.must_change_password:
+                # Se não está em uma rota isenta, redireciona
+                if request.endpoint not in rotas_isentas:
+                    return redirect(url_for('main.alterar_senha_obrigatoria'))
 
 
 def _configurar_logging(app: Flask) -> None:

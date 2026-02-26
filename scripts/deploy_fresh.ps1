@@ -1,5 +1,4 @@
-# Deploy para Cloud Run FORÇANDO rebuild sem cache
-# Use quando fizer mudanças no código e elas nao aparecerem na URL publicada
+# Deploy para Cloud Run a partir do código local
 # Uso (a partir da raiz do projeto): .\scripts\deploy_fresh.ps1
 
 $ErrorActionPreference = "Stop"
@@ -7,7 +6,7 @@ $project = "sistema-de-chamados-dtx-aero"
 $region = "us-central1"
 $service = "sistema-chamados-dtx"
 
-Write-Host "Deploy COM rebuild completo (--no-cache) - suas alteracoes serao aplicadas." -ForegroundColor Cyan
+Write-Host "Deploy para Cloud Run - codigo atual sera implantado." -ForegroundColor Cyan
 Write-Host "Servico: $service | Regiao: $region | Projeto: $project" -ForegroundColor Gray
 Write-Host ""
 
@@ -16,7 +15,6 @@ gcloud run deploy $service `
   --platform managed `
   --region $region `
   --project $project `
-  --no-cache `
   --allow-unauthenticated `
   --memory=512Mi `
   --timeout=60 `

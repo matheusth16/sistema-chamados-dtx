@@ -131,28 +131,22 @@ def api_editar_chamado():
                 ).save()
 
         # Descrição
-        descricao_anterior = (data_chamado.get('descricao') or '').strip()
-        nova_descricao_stripped = (nova_descricao or '').strip()
-        if nova_descricao_stripped and nova_descricao_stripped != descricao_anterior:
-            update_data['descricao'] = nova_descricao_stripped
-            max_len = 3000
+        if nova_descricao and nova_descricao.strip() != data_chamado.get('descricao', '').strip():
+            update_data['descricao'] = nova_descricao.strip()
             Historico(
                 chamado_id=chamado_id,
                 usuario_id=current_user.id,
                 usuario_nome=current_user.nome,
                 acao='alteracao_dados',
                 campo_alterado='descrição',
-                valor_anterior=(descricao_anterior[:max_len] + ('...' if len(descricao_anterior) > max_len else '')),
-                valor_novo=(nova_descricao_stripped[:max_len] + ('...' if len(nova_descricao_stripped) > max_len else ''))
+                valor_anterior='(Texto anterior)',
+                valor_novo='(Novo texto)'
             ).save()
 
         # Anexo (Adicionando múltiplos anexos)
-        aviso_anexo = None
         if arquivo_anexo and arquivo_anexo.filename:
             caminho_anexo = salvar_anexo(arquivo_anexo)
-            if caminho_anexo is None and current_app.config.get('ENV') == 'production':
-                aviso_anexo = 'O anexo não pôde ser salvo (Firebase Storage indisponível). Configure FIREBASE_STORAGE_BUCKET.'
-            elif caminho_anexo:
+            if caminho_anexo:
                 # Recarrega anexos existentes e adiciona o novo
                 anexos_existentes = data_chamado.get('anexos', [])
                 anexo_principal = data_chamado.get('anexo')
@@ -173,10 +167,9 @@ def api_editar_chamado():
                     usuario_id=current_user.id,
                     usuario_nome=current_user.nome,
                     acao='alteracao_dados',
-                    campo_alterado='anexo',
+                    campo_alterado='novo anexo',
                     valor_anterior='-',
-                    valor_novo=caminho_anexo,
-                    detalhe=arquivo_anexo.filename
+                    valor_novo=caminho_anexo
                 ).save()
 
         if update_data:
@@ -186,15 +179,9 @@ def api_editar_chamado():
                 update_data,
                 max_retries=3
             )
-            resp = {'sucesso': True, 'mensagem': 'Chamado atualizado com sucesso', 'dados': update_data}
-            if aviso_anexo:
-                resp['aviso_anexo'] = aviso_anexo
-            return jsonify(resp), 200
+            return jsonify({'sucesso': True, 'mensagem': 'Chamado atualizado com sucesso', 'dados': update_data}), 200
         else:
-            resp = {'sucesso': True, 'mensagem': 'Nenhuma alteração foi feita'}
-            if aviso_anexo:
-                resp['aviso_anexo'] = aviso_anexo
-            return jsonify(resp), 200
+            return jsonify({'sucesso': True, 'mensagem': 'Nenhuma alteração foi feita'}), 200
 
     except Exception as e:
         logger.exception("Erro em api_editar_chamado: %s", e)
@@ -300,8 +287,8 @@ def api_notificacoes_marcar_lida(notificacao_id):
 def api_notificacoes_ler_todas():
     """Marca todas as notificações do usuário como lidas."""
     try:
-        qtd = marcar_todas_como_lidas(current_user.id)
-        return jsonify({'sucesso': True, 'marcadas': qtd}), 200
+        count = marcar_todas_como_lidas(current_user.id)
+        return jsonify({'sucesso': True, 'atualizadas': count}), 200
     except Exception as e:
         logger.exception("Erro ao marcar todas notificações: %s", e)
         return jsonify({'sucesso': False}), 500
@@ -345,36 +332,33 @@ def api_push_subscribe():
 @login_required
 @limiter.limit("60 per minute")
 def api_chamado_por_id(chamado_id: str):
-    """Retorna um chamado por ID para atualização da linha na Gestão (após fechar aba de detalhes)."""
+    """Retorna um chamado por ID (JSON). Usado pelo dashboard para atualizar a linha após fechar o modal/aba de detalhes."""
     try:
-        doc = db.collection('chamados').document(chamado_id).get()
-        if not doc or not doc.exists:
+        doc_chamado = db.collection('chamados').document(chamado_id).get()
+        if not doc_chamado.exists:
             return jsonify({'sucesso': False, 'erro': 'Chamado não encontrado'}), 404
-        data = doc.to_dict()
-        c = Chamado.from_dict(data, doc.id)
+        chamado = Chamado.from_dict(doc_chamado.to_dict(), chamado_id)
         if current_user.perfil == 'solicitante':
-            if c.solicitante_id != current_user.id:
-                return jsonify({'sucesso': False, 'erro': 'Acesso negado'}), 403
+            if chamado.solicitante_id != current_user.id:
+                return jsonify({'sucesso': False, 'erro': 'Sem permissão'}), 403
         else:
-            if not usuario_pode_ver_chamado(current_user, c):
-                return jsonify({'sucesso': False, 'erro': 'Acesso negado'}), 403
-        c.sla_info = obter_sla_para_exibicao(c)
-        return jsonify({
-            'sucesso': True,
-            'chamado': {
-                'id': c.id,
-                'numero_chamado': c.numero_chamado,
-                'rl_codigo': c.rl_codigo or None,
-                'categoria': c.categoria,
-                'tipo_solicitacao': c.tipo_solicitacao,
-                'gate': c.gate or '',
-                'responsavel': c.responsavel or '',
-                'descricao': c.descricao or '',
-                'data_abertura': c.data_abertura_formatada(),
-                'status': c.status or 'Aberto',
-                'sla_info': c.sla_info,
-            }
-        }), 200
+            if not usuario_pode_ver_chamado(current_user, chamado):
+                return jsonify({'sucesso': False, 'erro': 'Sem permissão'}), 403
+        sla_info = obter_sla_para_exibicao(chamado)
+        chamado_dict = {
+            'id': chamado_id,
+            'numero_chamado': chamado.numero_chamado,
+            'rl_codigo': chamado.rl_codigo,
+            'categoria': chamado.categoria,
+            'tipo_solicitacao': chamado.tipo_solicitacao,
+            'gate': chamado.gate,
+            'responsavel': chamado.responsavel,
+            'descricao': chamado.descricao,
+            'data_abertura': chamado.data_abertura_formatada(),
+            'status': chamado.status,
+            'sla_info': sla_info,
+        }
+        return jsonify({'sucesso': True, 'chamado': chamado_dict}), 200
     except Exception as e:
         logger.exception("Erro ao buscar chamado %s: %s", chamado_id, e)
         return jsonify({'sucesso': False, 'erro': ERRO_INTERNO_MSG}), 500
