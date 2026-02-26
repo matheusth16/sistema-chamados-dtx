@@ -188,3 +188,63 @@ def test_bulk_status_supervisor_outra_area_retorna_erro_por_chamado(client_logad
     erros_ids = [e.get('id') for e in data['erros']]
     assert 'ch_ti' in erros_ids
     assert data.get('atualizados', 0) >= 0
+
+
+def test_api_chamados_paginar_sem_login_retorna_401(client):
+    """CT-PAG-01: GET /api/chamados/paginar sem autenticação retorna 401 JSON."""
+    r = client.get('/api/chamados/paginar')
+    assert r.status_code == 401
+    data = r.get_json()
+    assert data is not None and data.get('requer_login') is True
+
+
+def test_api_chamado_por_id_solicitante_chamado_de_outro_retorna_403(client_logado_solicitante):
+    """CT-ID-01: Solicitante acessando chamado de outro usuário retorna 403 Acesso negado."""
+    mock_doc = MagicMock()
+    mock_doc.exists = True
+    mock_doc.id = 'ch_123'
+    # solicitante_id diferente do current_user (sol_1) para simular chamado de outro
+    mock_doc.to_dict.return_value = {
+        'numero_chamado': 'CHM-0001',
+        'categoria': 'Chamado',
+        'status': 'Aberto',
+        'descricao': 'Desc',
+        'area': 'Planejamento',
+        'solicitante_id': 'outro_usuario_id',
+        'responsavel': 'Alguém',
+        'tipo_solicitacao': 'Manutencao',
+    }
+    with patch('app.routes.api.db') as mock_db:
+        mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
+        r = client_logado_solicitante.get('/api/chamado/ch_123')
+    assert r.status_code == 403
+    data = r.get_json()
+    assert data is not None and data.get('sucesso') is False
+    assert 'acesso negado' in data.get('erro', '').lower() or 'negado' in data.get('erro', '').lower()
+
+
+def test_api_chamado_por_id_supervisor_sua_area_retorna_200(client_logado_supervisor):
+    """CT-ID-02: Supervisor vê chamado da sua área (Manutencao) e retorna 200."""
+    mock_doc = MagicMock()
+    mock_doc.exists = True
+    mock_doc.id = 'ch_manutencao_1'
+    mock_doc.to_dict.return_value = {
+        'numero_chamado': 'CHM-0002',
+        'categoria': 'Chamado',
+        'status': 'Aberto',
+        'descricao': 'Descrição',
+        'area': 'Manutencao',
+        'solicitante_id': 'sol_1',
+        'responsavel': 'Supervisor Teste',
+        'tipo_solicitacao': 'Manutencao',
+    }
+    with patch('app.routes.api.db') as mock_db:
+        mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
+        with patch('app.routes.api.obter_sla_para_exibicao', return_value=None):
+            r = client_logado_supervisor.get('/api/chamado/ch_manutencao_1')
+    assert r.status_code == 200
+    data = r.get_json()
+    assert data.get('sucesso') is True
+    assert 'chamado' in data
+    assert data['chamado'].get('numero_chamado') == 'CHM-0002'
+    assert data['chamado'].get('status') == 'Aberto'

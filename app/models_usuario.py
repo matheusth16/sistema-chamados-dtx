@@ -6,6 +6,29 @@ from app.firebase_retry import firebase_retry
 
 logger = logging.getLogger(__name__)
 
+
+def _encrypt_nome_if_enabled(nome: str):
+    """Criptografa o nome para armazenamento se ENCRYPT_PII_AT_REST estiver ativo."""
+    try:
+        from flask import current_app
+        if current_app.config.get('ENCRYPT_PII_AT_REST') and nome:
+            from app.services.crypto import encrypt_at_rest
+            return encrypt_at_rest(nome)
+    except RuntimeError:
+        pass  # fora do contexto de aplicação
+    return nome
+
+
+def _decrypt_nome_if_encrypted(valor):
+    """Descriptografa o nome ao ler do banco, se for payload criptografado."""
+    if not valor:
+        return valor
+    try:
+        from app.services.crypto import decrypt_at_rest
+        return decrypt_at_rest(valor)
+    except Exception:
+        return valor
+
 # Chave de cache para lista de usuários (usada em app/routes/usuarios.py)
 CACHE_KEY_USUARIOS = 'usuarios_list'
 
@@ -35,10 +58,11 @@ class Usuario(UserMixin):
         return check_password_hash(self.senha_hash, senha) if self.senha_hash else False
     
     def to_dict(self):
-        """Converte para dicionário para salvar no Firestore"""
+        """Converte para dicionário para salvar no Firestore (nome pode ser criptografado se ENCRYPT_PII_AT_REST)."""
+        nome_armazenar = _encrypt_nome_if_enabled(self.nome) if self.nome else self.nome
         return {
             'email': self.email,
-            'nome': self.nome,
+            'nome': nome_armazenar,
             'perfil': self.perfil,
             'areas': self.areas,
             'senha_hash': self.senha_hash
@@ -46,16 +70,17 @@ class Usuario(UserMixin):
     
     @classmethod
     def from_dict(cls, data: dict, id: str = None):
-        """Cria um objeto Usuario a partir de um dicionário do Firestore"""
+        """Cria um objeto Usuario a partir de um dicionário do Firestore (nome descriptografado se criptografado)."""
         areas = data.get('areas', [])
         # Migração: se tem area string mas não tem areas array
         if not areas and data.get('area'):
             areas = [data.get('area')]
-            
+        nome_raw = data.get('nome')
+        nome = _decrypt_nome_if_encrypted(nome_raw) if nome_raw else nome_raw
         usuario = cls(
             id=id,
             email=data.get('email'),
-            nome=data.get('nome'),
+            nome=nome,
             perfil=data.get('perfil', 'solicitante'),
             areas=areas
         )
@@ -148,8 +173,19 @@ class Usuario(UserMixin):
     
     @classmethod
     def get_all(cls):
-        """Retorna lista de todos os usuários"""
+        """Retorna lista de todos os usuários (ordenada por nome). Com criptografia PII, ordenação é em memória."""
         try:
+            try:
+                from flask import current_app
+                use_encrypt = current_app.config.get('ENCRYPT_PII_AT_REST')
+            except RuntimeError:
+                use_encrypt = False
+            if use_encrypt:
+                # Nome criptografado: não ordenar no Firestore; ordenar após descriptografar
+                docs = db.collection('usuarios').stream()
+                usuarios = [cls.from_dict(doc.to_dict(), doc.id) for doc in docs]
+                usuarios.sort(key=lambda u: (u.nome or '').upper())
+                return usuarios
             docs = db.collection('usuarios').order_by('nome').stream()
             usuarios = []
             for doc in docs:

@@ -7,6 +7,12 @@ from unittest.mock import patch, MagicMock
 os.environ.setdefault('FLASK_ENV', 'testing')
 
 
+def pytest_configure(config):
+    """Registra markers customizados (regressão, api)."""
+    config.addinivalue_line("markers", "regression: testes críticos de regressão (suite de smoke).")
+    config.addinivalue_line("markers", "api: testes de contrato e validação de API.")
+
+
 @pytest.fixture
 def app():
     """Cria aplicação Flask para testes."""

@@ -76,13 +76,15 @@ def salvar_anexo(arquivo):
     if url:
         return url
 
-    # 2) Fallback: armazenamento local (pasta app/static/uploads)
-    # Em Cloud Run o disco é efêmero: o arquivo pode sumir após reinício ou em outra instância.
+    # 2) Em produção (ex.: Cloud Run): não usar disco — é efêmero e o anexo some após reinício/outra instância.
     if current_app.config.get('ENV') == 'production':
-        logger.warning(
-            "Anexo salvo em disco local (Firebase Storage falhou). "
-            "Em Cloud Run os anexos podem ficar indisponíveis. Defina FIREBASE_STORAGE_BUCKET e verifique o Firebase."
+        logger.error(
+            "Firebase Storage falhou em produção. Anexo NÃO foi salvo. "
+            "Defina FIREBASE_STORAGE_BUCKET (ex: seu-projeto.appspot.com) e garanta que a conta de serviço do Cloud Run tenha permissão no bucket (Storage Object Admin)."
         )
+        return None
+
+    # 3) Fallback: armazenamento local apenas em desenvolvimento
     pasta_upload = current_app.config['UPLOAD_FOLDER']
     if not os.path.exists(pasta_upload):
         os.makedirs(pasta_upload)

@@ -103,9 +103,11 @@ Logs são gravados em `logs/sistema_chamados.log` (formato JSON com rotação).
 O Firebase é inicializado em `app/database.py`:
 
 - **Desenvolvimento:** arquivo `credentials.json` na raiz do projeto (conta de serviço do Firebase).
-- **Produção (ex.: Cloud Run):** pode usar Application Default Credentials (não é obrigatório ter `credentials.json`).
+- **Produção (ex.: Cloud Run):** usa Application Default Credentials (ADC).
 
-Nenhuma variável de ambiente é obrigatória para o Firebase; o caminho do certificado é fixo em relação à raiz do projeto quando o arquivo existe.
+| Variável | Descrição | Obrigatório em produção |
+|----------|-----------|-------------------------|
+| `FIREBASE_STORAGE_BUCKET` | Nome do bucket do Firebase Storage para anexos (ex.: `seu-projeto.appspot.com`). Sem isso, em produção os uploads **falham** (não há fallback para disco no Cloud Run). A conta de serviço do Cloud Run precisa da permissão **Storage Object Admin** no bucket. | **Sim**, para anexos funcionarem |
 
 ---
 
@@ -126,6 +128,9 @@ SECRET_KEY=dev-secret-key-change-in-production
 FLASK_ENV=production
 SECRET_KEY=<valor de openssl rand -hex 32>
 APP_BASE_URL=https://seu-dominio.com
+
+# Obrigatório para anexos (ex.: Cloud Run)
+FIREBASE_STORAGE_BUCKET=seu-projeto-id.appspot.com
 
 # Recomendado com múltiplos workers
 REDIS_URL=redis://:senha@redis-host:6379/0

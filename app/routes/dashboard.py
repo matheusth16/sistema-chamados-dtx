@@ -3,7 +3,7 @@ import logging
 import io
 from datetime import datetime
 from typing import List, Dict, Any
-from flask import render_template, request, redirect, url_for, send_file, flash, Response
+from flask import render_template, request, redirect, url_for, send_file, flash, Response, current_app
 from urllib.parse import urlparse
 from app.i18n import flash_t
 from flask_login import login_required, current_user
@@ -297,7 +297,9 @@ def editar_chamado_pagina() -> Response:
         arquivo_anexo = request.files.get('anexo')
         if arquivo_anexo and arquivo_anexo.filename:
             caminho_anexo = salvar_anexo(arquivo_anexo)
-            if caminho_anexo:
+            if caminho_anexo is None and current_app.config.get('ENV') == 'production':
+                flash_t('error_attachment_upload_production', 'warning')
+            elif caminho_anexo:
                 anexos_existentes = data_chamado.get('anexos', [])
                 anexo_principal = data_chamado.get('anexo')
                 if anexo_principal and anexo_principal not in anexos_existentes:
@@ -452,25 +454,136 @@ def exportar_avancado() -> Response:
         return redirect(url_for('main.admin'))
 
 
+def _relatorios_ordenar_supervisores(lista: List[Dict], campo: str, asc: bool) -> List[Dict]:
+    """Ordena lista de métricas de supervisores por campo (total_chamados, carga_atual, taxa_resolucao_percentual, tempo_medio_resolucao_horas, supervisor_nome, area)."""
+    reverse = not asc
+    if campo == 'total':
+        return sorted(lista, key=lambda x: x.get('total_chamados', 0), reverse=reverse)
+    if campo == 'carga':
+        return sorted(lista, key=lambda x: x.get('carga_atual', 0), reverse=reverse)
+    if campo == 'taxa':
+        return sorted(lista, key=lambda x: x.get('taxa_resolucao_percentual', 0), reverse=reverse)
+    if campo == 'tempo':
+        return sorted(lista, key=lambda x: x.get('tempo_medio_resolucao_horas', 0), reverse=reverse)
+    if campo == 'nome':
+        return sorted(lista, key=lambda x: (x.get('supervisor_nome') or '').lower(), reverse=reverse)
+    if campo == 'area':
+        return sorted(lista, key=lambda x: (x.get('area') or '').lower(), reverse=reverse)
+    if campo == 'sla':
+        def _sla_key(x):
+            v = x.get('percentual_dentro_sla')
+            return (v is None, -(v or 0))
+        return sorted(lista, key=_sla_key, reverse=reverse)
+    return lista
+
+
+def _relatorios_ordenar_areas(lista: List[Dict], campo: str, asc: bool) -> List[Dict]:
+    """Ordena lista de métricas por área (total_chamados, abertos, taxa_resolucao_percentual, tempo_medio_resolucao_horas, area)."""
+    reverse = not asc
+    if campo == 'total':
+        return sorted(lista, key=lambda x: x.get('total_chamados', 0), reverse=reverse)
+    if campo == 'abertos':
+        return sorted(lista, key=lambda x: x.get('abertos', 0), reverse=reverse)
+    if campo == 'taxa':
+        return sorted(lista, key=lambda x: x.get('taxa_resolucao_percentual', 0), reverse=reverse)
+    if campo == 'tempo':
+        return sorted(lista, key=lambda x: x.get('tempo_medio_resolucao_horas', 0), reverse=reverse)
+    if campo == 'area':
+        return sorted(lista, key=lambda x: (x.get('area') or '').lower(), reverse=reverse)
+    return lista
+
+
 @main.route('/admin/relatorios')
 @requer_supervisor_area
 @limiter.limit("30 per minute")
 def relatorios() -> Response:
-    """Dashboard de relatórios e análises. Use ?atualizar=1 para forçar dados frescos."""
+    """Dashboard de relatórios e análises. Use ?atualizar=1 para forçar dados frescos.
+    Query params: pagina_sup, pagina_area, ordenar_sup, ordenar_area, ordem_sup, ordem_area (asc|desc), busca_sup, busca_area."""
     try:
         atualizar = request.args.get('atualizar') == '1'
         relatorio = analisador.obter_relatorio_completo(usar_cache=not atualizar)
         insights = relatorio.get('insights', [])
-        # Ordenar por prioridade: aviso primeiro, depois sucesso, depois info
         ordem_tipo = {'aviso': 0, 'sucesso': 1, 'info': 2}
         insights = sorted(insights, key=lambda x: ordem_tipo.get(x.get('tipo'), 3))
+
+        itens_por_pagina = getattr(Config, 'ITENS_POR_PAGINA', 10)
+
+        # Supervisores: lista completa para gráficos e para filtrar/ordenar/paginar
+        metricas_supervisores_full = list(relatorio.get('metricas_supervisores', []))
+        busca_sup = (request.args.get('busca_sup') or '').strip().lower()
+        if busca_sup:
+            metricas_supervisores_full = [
+                s for s in metricas_supervisores_full
+                if busca_sup in (s.get('supervisor_nome') or '').lower()
+                or busca_sup in (s.get('supervisor_email') or '').lower()
+                or busca_sup in (s.get('area') or '').lower()
+            ]
+        ordenar_sup = request.args.get('ordenar_sup') or 'carga'
+        ordem_sup = (request.args.get('ordem_sup') or 'desc').lower()
+        if ordem_sup not in ('asc', 'desc'):
+            ordem_sup = 'desc'
+        metricas_supervisores_full = _relatorios_ordenar_supervisores(
+            metricas_supervisores_full, ordenar_sup, ordem_sup == 'asc'
+        )
+        total_supervisores = len(metricas_supervisores_full)
+        total_paginas_sup = max(1, (total_supervisores + itens_por_pagina - 1) // itens_por_pagina)
+        pagina_sup = request.args.get('pagina_sup', 1, type=int)
+        if pagina_sup < 1:
+            pagina_sup = 1
+        if pagina_sup > total_paginas_sup:
+            pagina_sup = total_paginas_sup
+        inicio_sup = (pagina_sup - 1) * itens_por_pagina
+        metricas_supervisores = metricas_supervisores_full[inicio_sup : inicio_sup + itens_por_pagina]
+
+        # Áreas: lista completa para gráficos e para filtrar/ordenar/paginar
+        metricas_areas_full = list(relatorio.get('metricas_areas', []))
+        busca_area = (request.args.get('busca_area') or '').strip().lower()
+        if busca_area:
+            metricas_areas_full = [
+                a for a in metricas_areas_full
+                if busca_area in (a.get('area') or '').lower()
+            ]
+        ordenar_area = request.args.get('ordenar_area') or 'total'
+        ordem_area = (request.args.get('ordem_area') or 'desc').lower()
+        if ordem_area not in ('asc', 'desc'):
+            ordem_area = 'desc'
+        metricas_areas_full = _relatorios_ordenar_areas(
+            metricas_areas_full, ordenar_area, ordem_area == 'asc'
+        )
+        total_areas = len(metricas_areas_full)
+        total_paginas_area = max(1, (total_areas + itens_por_pagina - 1) // itens_por_pagina)
+        pagina_area = request.args.get('pagina_area', 1, type=int)
+        if pagina_area < 1:
+            pagina_area = 1
+        if pagina_area > total_paginas_area:
+            pagina_area = total_paginas_area
+        inicio_area = (pagina_area - 1) * itens_por_pagina
+        metricas_areas = metricas_areas_full[inicio_area : inicio_area + itens_por_pagina]
+
         return render_template(
             'relatorios.html',
             relatorio=relatorio,
             metricas_gerais=relatorio.get('metricas_gerais', {}),
-            metricas_supervisores=relatorio.get('metricas_supervisores', []),
-            metricas_areas=relatorio.get('metricas_areas', []),
-            insights=insights
+            metricas_supervisores=metricas_supervisores,
+            metricas_supervisores_full=metricas_supervisores_full,
+            metricas_areas=metricas_areas,
+            metricas_areas_full=metricas_areas_full,
+            insights=insights,
+            data_geracao=relatorio.get('data_geracao'),
+            pagina_sup=pagina_sup,
+            total_paginas_sup=total_paginas_sup,
+            total_supervisores=total_supervisores,
+            itens_por_pagina_sup=itens_por_pagina,
+            ordenar_sup=ordenar_sup,
+            ordem_sup=ordem_sup,
+            busca_sup=request.args.get('busca_sup', ''),
+            pagina_area=pagina_area,
+            total_paginas_area=total_paginas_area,
+            total_areas=total_areas,
+            itens_por_pagina_area=itens_por_pagina,
+            ordenar_area=ordenar_area,
+            ordem_area=ordem_area,
+            busca_area=request.args.get('busca_area', ''),
         )
     except Exception as e:
         logger.exception(f"Erro ao gerar relatórios: {str(e)}")

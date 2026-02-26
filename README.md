@@ -80,6 +80,7 @@ Na raiz do projeto você pode rodar scripts de manutenção (criação de usuár
 ```bash
 python scripts/verificar_dependencias.py  # Audit + testes (recomendado antes de commit)
 python scripts/gerar_vapid_keys.py        # Chaves Web Push
+python scripts/gerar_chave_criptografia.py # Chave para criptografia de PII (LGPD)
 python scripts/criar_usuario.py            # Criar usuário no sistema
 ```
 
@@ -158,6 +159,9 @@ firebase deploy --only firestore:indexes --project seu-projeto-id
 - ✅ Em produção, `SECRET_KEY` é obrigatória (valor forte e único)
 - ✅ Headers de segurança: `X-Content-Type-Options: nosniff`, `X-Frame-Options: SAMEORIGIN`, HSTS em HTTPS
 - ✅ Validação de Origin/Referer em POST sensíveis quando `APP_BASE_URL` está definido
+- ✅ **Criptografia em repouso**: opcional para PII (ex.: nome de usuário) via `ENCRYPTION_KEY` e `ENCRYPT_PII_AT_REST`; gere a chave com `python scripts/gerar_chave_criptografia.py`
+- ✅ **Dados em trânsito**: sessão e cookies em HTTPS; SMTP com TLS; APIs externas em HTTPS
+- ✅ **Conformidade LGPD**: política de segurança e boas práticas em **[docs/POLITICA_SEGURANCA_LGPD.md](docs/POLITICA_SEGURANCA_LGPD.md)**
 
 ## 📖 Documentação
 
@@ -165,6 +169,7 @@ firebase deploy --only firestore:indexes --project seu-projeto-id
 |-----------|-----------|
 | [docs/ENV.md](docs/ENV.md) | Variáveis de ambiente (.env) |
 | [docs/API.md](docs/API.md) | Referência completa da API |
+| [docs/POLITICA_SEGURANCA_LGPD.md](docs/POLITICA_SEGURANCA_LGPD.md) | Segurança, criptografia e conformidade LGPD |
 | [docs/DEPLOYMENT_PLAN.md](docs/DEPLOYMENT_PLAN.md) | Deploy (Cloud Run, Firebase) |
 | [scripts/README.md](scripts/README.md) | Scripts de manutenção |
 | `firestore.rules` | Regras de segurança Firestore |

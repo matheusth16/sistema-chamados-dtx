@@ -144,9 +144,12 @@ def api_editar_chamado():
             ).save()
 
         # Anexo (Adicionando múltiplos anexos)
+        aviso_anexo = None
         if arquivo_anexo and arquivo_anexo.filename:
             caminho_anexo = salvar_anexo(arquivo_anexo)
-            if caminho_anexo:
+            if caminho_anexo is None and current_app.config.get('ENV') == 'production':
+                aviso_anexo = 'O anexo não pôde ser salvo (Firebase Storage indisponível). Configure FIREBASE_STORAGE_BUCKET.'
+            elif caminho_anexo:
                 # Recarrega anexos existentes e adiciona o novo
                 anexos_existentes = data_chamado.get('anexos', [])
                 anexo_principal = data_chamado.get('anexo')
@@ -179,9 +182,15 @@ def api_editar_chamado():
                 update_data,
                 max_retries=3
             )
-            return jsonify({'sucesso': True, 'mensagem': 'Chamado atualizado com sucesso', 'dados': update_data}), 200
+            resp = {'sucesso': True, 'mensagem': 'Chamado atualizado com sucesso', 'dados': update_data}
+            if aviso_anexo:
+                resp['aviso_anexo'] = aviso_anexo
+            return jsonify(resp), 200
         else:
-            return jsonify({'sucesso': True, 'mensagem': 'Nenhuma alteração foi feita'}), 200
+            resp = {'sucesso': True, 'mensagem': 'Nenhuma alteração foi feita'}
+            if aviso_anexo:
+                resp['aviso_anexo'] = aviso_anexo
+            return jsonify(resp), 200
 
     except Exception as e:
         logger.exception("Erro em api_editar_chamado: %s", e)

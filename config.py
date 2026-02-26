@@ -47,13 +47,20 @@ class Config:
     WTF_CSRF_ENABLED = True
     WTF_CSRF_TIME_LIMIT = None  # Sem limite de tempo para tokens CSRF
     
-    # 7. Session Security
+    # 7. Session Security e dados em trânsito
     PERMANENT_SESSION_LIFETIME = 86400  # 24 horas em segundos
     SESSION_COOKIE_SECURE = os.getenv('SESSION_COOKIE_SECURE', 'True') == 'True'  # HTTPS em produção
     SESSION_COOKIE_HTTPONLY = True  # Não acessível via JavaScript
     SESSION_COOKIE_SAMESITE = 'Lax'  # Proteção contra CSRF
+    # Em produção, servir sempre via HTTPS (HSTS é aplicado em app/__init__.py). SMTP usa MAIL_USE_TLS.
     
-    # 8. Validação de Entrada
+    # 8. Criptografia em repouso (LGPD)
+    # Gere uma chave: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    ENCRYPTION_KEY = os.getenv('ENCRYPTION_KEY', '').strip()
+    # Se True, o campo 'nome' em usuarios é criptografado no Firestore (requer ENCRYPTION_KEY)
+    ENCRYPT_PII_AT_REST = os.getenv('ENCRYPT_PII_AT_REST', 'false').lower() in ('true', '1', 'yes')
+
+    # 9. Validação de Entrada
     MAX_DESCRICAO_CHARS = 5000
     MIN_DESCRICAO_CHARS = 3
     EXTENSOES_UPLOAD_PERMITIDAS = {'png', 'jpg', 'jpeg', 'pdf', 'xlsx'}

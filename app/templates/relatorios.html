@@ -77,10 +77,14 @@
             <div>
                 <h1 class="text-2xl font-black text-gray-800 tracking-tight">{{ t('reports_analysis') }}</h1>
                 <p class="text-sm text-gray-500 font-medium">{{ t('reports_subtitle') }}</p>
+                {% if data_geracao %}
+                <p class="text-xs text-gray-400 mt-1" aria-label="{{ t('last_update') }}">{{ t('last_update') }}: {{ data_geracao[:19]|replace('T', ' ') }}</p>
+                {% endif %}
             </div>
         </div>
         <a href="{{ url_for('main.relatorios', atualizar=1) }}"
-           class="inline-flex items-center px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white font-medium rounded-lg shadow transition text-sm whitespace-nowrap">
+           class="inline-flex items-center px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white font-medium rounded-lg shadow transition text-sm whitespace-nowrap"
+           aria-label="{{ t('refresh_data') }}">
             <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
             </svg>
@@ -382,167 +386,277 @@
     {% endif %}
 
     <!-- DESEMPENHO POR SUPERVISOR -->
-    {% if metricas_supervisores %}
-    <div class="gsap-scroll-reveal mb-8">
+    {% if metricas_supervisores_full is defined and metricas_supervisores_full %}
+    <div class="gsap-scroll-reveal mb-8" id="secao-supervisores">
         <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
-            <span class="bg-indigo-100 text-indigo-600 p-1.5 rounded-lg mr-2">
+            <span class="bg-indigo-100 text-indigo-600 p-1.5 rounded-lg mr-2" aria-hidden="true">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
             </span>
             {{ t('team_performance') }}
         </h2>
+
+        <!-- Busca supervisores -->
+        <form method="get" action="{{ url_for('main.relatorios') }}" class="mb-4 flex flex-wrap items-center gap-2">
+            <input type="hidden" name="pagina_sup" value="1">
+            <input type="hidden" name="ordenar_sup" value="{{ ordenar_sup }}">
+            <input type="hidden" name="ordem_sup" value="{{ ordem_sup }}">
+            <input type="hidden" name="pagina_area" value="{{ pagina_area }}">
+            <input type="hidden" name="busca_area" value="{{ busca_area }}">
+            <input type="hidden" name="ordenar_area" value="{{ ordenar_area }}">
+            <input type="hidden" name="ordem_area" value="{{ ordem_area }}">
+            <input type="search" name="busca_sup" value="{{ busca_sup }}" placeholder="{{ t('search_supervisors_placeholder') }}"
+                   class="rounded-lg border border-gray-200 px-3 py-1.5 text-sm w-64 max-w-full" aria-label="{{ t('search_supervisors_placeholder') }}">
+            <button type="submit" class="rounded-lg bg-indigo-100 text-indigo-700 px-3 py-1.5 text-sm font-medium hover:bg-indigo-200 transition">{{ t('search') }}</button>
+        </form>
         
         <!-- Tabelas e Gráficos de Perf -->
         <div class="grid grid-cols-1 xl:grid-cols-4 gap-6">
             
             <!-- Tabela de Supervisores -->
-            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden xl:col-span-3 min-w-0">
-                <table class="w-full min-w-0 table-fixed text-left text-sm">
-                    <thead class="bg-gray-50/50 border-b border-gray-100 uppercase text-xs font-bold tracking-wider text-gray-500">
-                        <tr>
-                            <th class="w-[18%] px-2 py-2">{{ t('supervisor') }}</th>
-                            <th class="w-[14%] px-2 py-2">{{ t('area_th') }}</th>
-                            <th class="w-[8%] px-2 py-2 text-center">{{ t('total') }}</th>
-                            <th class="w-[8%] px-2 py-2 text-center">{{ t('workload') }}</th>
-                            <th class="w-[8%] px-2 py-2 text-center">{{ t('completed_short') }}</th>
-                            <th class="w-[14%] px-2 py-2">{{ t('rate') }}</th>
-                            <th class="w-[12%] px-2 py-2 text-right">{{ t('time') }}</th>
-                            <th class="w-[10%] px-2 py-2 text-right">{{ t('sla_percent') }}</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-100">
-                        {% for sup in metricas_supervisores %}
-                        <tr class="hover:bg-blue-50/30 transition group">
-                            <td class="px-2 py-2">
-                                <div class="flex items-center min-w-0">
-                                    <div class="w-7 h-7 rounded-full bg-blue-100 text-blue-600 font-bold flex items-center justify-center mr-2 text-xs shrink-0">
-                                        {{ sup.supervisor_nome[0] }}
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden xl:col-span-3 min-w-0 flex flex-col">
+                <div class="overflow-auto flex-1 min-h-0" style="max-height: 440px;">
+                    <table class="w-full min-w-0 table-fixed text-left text-sm" aria-label="{{ t('table_supervisors_caption') }}">
+                        <thead class="bg-gray-50/50 border-b border-gray-100 uppercase text-xs font-bold tracking-wider text-gray-500 sticky top-0 z-10">
+                            <tr>
+                                <th class="w-[18%] px-2 py-2">
+                                    <a href="{{ url_for('main.relatorios', busca_sup=busca_sup, ordenar_sup='nome', ordem_sup='desc' if ordenar_sup == 'nome' and ordem_sup == 'asc' else 'asc', pagina_sup=1, pagina_area=pagina_area, busca_area=busca_area, ordenar_area=ordenar_area, ordem_area=ordem_area) }}" class="hover:text-indigo-600">{{ t('supervisor') }}</a>
+                                </th>
+                                <th class="w-[14%] px-2 py-2">
+                                    <a href="{{ url_for('main.relatorios', busca_sup=busca_sup, ordenar_sup='area', ordem_sup='desc' if ordenar_sup == 'area' and ordem_sup == 'asc' else 'asc', pagina_sup=1, pagina_area=pagina_area, busca_area=busca_area, ordenar_area=ordenar_area, ordem_area=ordem_area) }}" class="hover:text-indigo-600">{{ t('area_th') }}</a>
+                                </th>
+                                <th class="w-[8%] px-2 py-2 text-center">
+                                    <a href="{{ url_for('main.relatorios', busca_sup=busca_sup, ordenar_sup='total', ordem_sup='asc' if ordenar_sup == 'total' and ordem_sup == 'desc' else 'desc', pagina_sup=1, pagina_area=pagina_area, busca_area=busca_area, ordenar_area=ordenar_area, ordem_area=ordem_area) }}" class="hover:text-indigo-600 block">{{ t('total') }}</a>
+                                </th>
+                                <th class="w-[8%] px-2 py-2 text-center">
+                                    <a href="{{ url_for('main.relatorios', busca_sup=busca_sup, ordenar_sup='carga', ordem_sup='asc' if ordenar_sup == 'carga' and ordem_sup == 'desc' else 'desc', pagina_sup=1, pagina_area=pagina_area, busca_area=busca_area, ordenar_area=ordenar_area, ordem_area=ordem_area) }}" class="hover:text-indigo-600 block">{{ t('workload') }}</a>
+                                </th>
+                                <th class="w-[8%] px-2 py-2 text-center">{{ t('completed_short') }}</th>
+                                <th class="w-[14%] px-2 py-2">
+                                    <a href="{{ url_for('main.relatorios', busca_sup=busca_sup, ordenar_sup='taxa', ordem_sup='asc' if ordenar_sup == 'taxa' and ordem_sup == 'desc' else 'desc', pagina_sup=1, pagina_area=pagina_area, busca_area=busca_area, ordenar_area=ordenar_area, ordem_area=ordem_area) }}" class="hover:text-indigo-600">{{ t('rate') }}</a>
+                                </th>
+                                <th class="w-[12%] px-2 py-2 text-right">
+                                    <a href="{{ url_for('main.relatorios', busca_sup=busca_sup, ordenar_sup='tempo', ordem_sup='asc' if ordenar_sup == 'tempo' and ordem_sup == 'desc' else 'desc', pagina_sup=1, pagina_area=pagina_area, busca_area=busca_area, ordenar_area=ordenar_area, ordem_area=ordem_area) }}" class="hover:text-indigo-600 block">{{ t('time') }}</a>
+                                </th>
+                                <th class="w-[10%] px-2 py-2 text-right">
+                                    <a href="{{ url_for('main.relatorios', busca_sup=busca_sup, ordenar_sup='sla', ordem_sup='asc' if ordenar_sup == 'sla' and ordem_sup == 'desc' else 'desc', pagina_sup=1, pagina_area=pagina_area, busca_area=busca_area, ordenar_area=ordenar_area, ordem_area=ordem_area) }}" class="hover:text-indigo-600 block">{{ t('sla_percent') }}</a>
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            {% for sup in metricas_supervisores %}
+                            <tr class="hover:bg-blue-50/30 transition group">
+                                <td class="px-2 py-2">
+                                    <div class="flex items-center min-w-0">
+                                        <div class="w-7 h-7 rounded-full bg-blue-100 text-blue-600 font-bold flex items-center justify-center mr-2 text-xs shrink-0">
+                                            {{ sup.supervisor_nome[0] }}
+                                        </div>
+                                        <div class="min-w-0">
+                                            <div class="font-bold text-gray-800 truncate" title="{{ sup.supervisor_nome }}">{{ nome_curto(sup.supervisor_nome) }}</div>
+                                            <div class="text-xs text-gray-400 truncate" title="{{ sup.supervisor_email }}">{{ sup.supervisor_email }}</div>
+                                        </div>
                                     </div>
-                                    <div class="min-w-0">
-                                        <div class="font-bold text-gray-800 truncate" title="{{ sup.supervisor_nome }}">{{ nome_curto(sup.supervisor_nome) }}</div>
-                                        <div class="text-xs text-gray-400 truncate" title="{{ sup.supervisor_email }}">{{ sup.supervisor_email }}</div>
+                                </td>
+                                <td class="px-2 py-2 text-gray-600 truncate" title="{{ sup.area }}">{{ sup.area.split(', ')|map('translate_sector')|join(', ') if ', ' in sup.area else translate_sector(sup.area) }}</td>
+                                <td class="px-2 py-2 text-center">
+                                    <span class="inline-flex justify-center font-bold text-gray-700 bg-gray-100 px-1.5 py-0.5 rounded text-xs">{{ sup.total_chamados }}</span>
+                                </td>
+                                <td class="px-2 py-2 text-center">
+                                    <span class="inline-flex justify-center font-bold text-xs shadow-sm 
+                                        {% if sup.carga_atual > 10 %}
+                                            bg-red-500 text-white
+                                        {% elif sup.carga_atual > 5 %}
+                                            bg-yellow-400 text-yellow-900
+                                        {% else %}
+                                            bg-emerald-100 text-emerald-800
+                                        {% endif %}
+                                        px-1.5 py-0.5 rounded">
+                                        {{ sup.carga_atual }}
+                                    </span>
+                                </td>
+                                <td class="px-2 py-2 text-center font-bold text-emerald-600 text-xs">{{ sup.concluidos }}</td>
+                                <td class="px-2 py-2">
+                                    <div class="flex items-center gap-1.5">
+                                        <div class="flex-1 min-w-0 bg-gray-100 rounded-full h-1.5">
+                                            <div class="bg-indigo-500 h-1.5 rounded-full" data-width="{{ sup.taxa_resolucao_percentual }}"></div>
+                                        </div>
+                                        <span class="text-xs font-bold text-gray-700 shrink-0 w-8 text-right">{{ sup.taxa_resolucao_percentual }}%</span>
                                     </div>
-                                </div>
-                            </td>
-                            <td class="px-2 py-2 text-gray-600 truncate" title="{{ sup.area }}">{{ sup.area.split(', ')|map('translate_sector')|join(', ') if ', ' in sup.area else translate_sector(sup.area) }}</td>
-                            <td class="px-2 py-2 text-center">
-                                <span class="inline-flex justify-center font-bold text-gray-700 bg-gray-100 px-1.5 py-0.5 rounded text-xs">{{ sup.total_chamados }}</span>
-                            </td>
-                            <td class="px-2 py-2 text-center">
-                                <span class="inline-flex justify-center font-bold text-xs shadow-sm 
-                                    {% if sup.carga_atual > 10 %}
-                                        bg-red-500 text-white
-                                    {% elif sup.carga_atual > 5 %}
-                                        bg-yellow-400 text-yellow-900
+                                </td>
+                                <td class="px-2 py-2 text-right font-mono text-gray-500 text-xs">{{ sup.tempo_medio_resolucao_horas }}h</td>
+                                <td class="px-2 py-2 text-right">
+                                    {% if sup.percentual_dentro_sla is not none %}
+                                    <span class="font-bold text-xs {% if sup.percentual_dentro_sla >= 80 %}text-green-600{% elif sup.percentual_dentro_sla >= 60 %}text-teal-600{% else %}text-amber-600{% endif %}">{{ sup.percentual_dentro_sla }}%</span>
                                     {% else %}
-                                        bg-emerald-100 text-emerald-800
+                                    <span class="text-gray-400 text-xs">—</span>
                                     {% endif %}
-                                    px-1.5 py-0.5 rounded">
-                                    {{ sup.carga_atual }}
-                                </span>
-                            </td>
-                            <td class="px-2 py-2 text-center font-bold text-emerald-600 text-xs">{{ sup.concluidos }}</td>
-                            <td class="px-2 py-2">
-                                <div class="flex items-center gap-1.5">
-                                    <div class="flex-1 min-w-0 bg-gray-100 rounded-full h-1.5">
-                                        <div class="bg-indigo-500 h-1.5 rounded-full" data-width="{{ sup.taxa_resolucao_percentual }}"></div>
-                                    </div>
-                                    <span class="text-xs font-bold text-gray-700 shrink-0 w-8 text-right">{{ sup.taxa_resolucao_percentual }}%</span>
-                                </div>
-                            </td>
-                            <td class="px-2 py-2 text-right font-mono text-gray-500 text-xs">{{ sup.tempo_medio_resolucao_horas }}h</td>
-                            <td class="px-2 py-2 text-right">
-                                {% if sup.percentual_dentro_sla is not none %}
-                                <span class="font-bold text-xs {% if sup.percentual_dentro_sla >= 80 %}text-green-600{% elif sup.percentual_dentro_sla >= 60 %}text-teal-600{% else %}text-amber-600{% endif %}">{{ sup.percentual_dentro_sla }}%</span>
-                                {% else %}
-                                <span class="text-gray-400 text-xs">—</span>
-                                {% endif %}
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% if total_paginas_sup > 1 %}
+                <div class="border-t border-gray-100 px-3 py-2 flex items-center justify-between text-sm text-gray-500 bg-gray-50/50">
+                    <span>{{ t('showing') }} {{ (pagina_sup - 1) * itens_por_pagina_sup + 1 }} {{ t('to') }} {{ [pagina_sup * itens_por_pagina_sup, total_supervisores]|min }} {{ t('of') }} {{ total_supervisores }}</span>
+                    <div class="flex gap-1">
+                        {% if pagina_sup > 1 %}
+                        <a href="{{ url_for('main.relatorios', pagina_sup=1, busca_sup=busca_sup, ordenar_sup=ordenar_sup, ordem_sup=ordem_sup, pagina_area=pagina_area, busca_area=busca_area, ordenar_area=ordenar_area, ordem_area=ordem_area) }}" class="px-2 py-1 rounded hover:bg-gray-200" title="{{ t('first') }}">&laquo;</a>
+                        <a href="{{ url_for('main.relatorios', pagina_sup=pagina_sup-1, busca_sup=busca_sup, ordenar_sup=ordenar_sup, ordem_sup=ordem_sup, pagina_area=pagina_area, busca_area=busca_area, ordenar_area=ordenar_area, ordem_area=ordem_area) }}" class="px-2 py-1 rounded hover:bg-gray-200" title="{{ t('previous') }}">&lsaquo;</a>
+                        {% endif %}
+                        <span class="px-2 py-1">{{ t('page') }} {{ pagina_sup }} {{ t('of') }} {{ total_paginas_sup }}</span>
+                        {% if pagina_sup < total_paginas_sup %}
+                        <a href="{{ url_for('main.relatorios', pagina_sup=pagina_sup+1, busca_sup=busca_sup, ordenar_sup=ordenar_sup, ordem_sup=ordem_sup, pagina_area=pagina_area, busca_area=busca_area, ordenar_area=ordenar_area, ordem_area=ordem_area) }}" class="px-2 py-1 rounded hover:bg-gray-200" title="{{ t('next') }}">&rsaquo;</a>
+                        <a href="{{ url_for('main.relatorios', pagina_sup=total_paginas_sup, busca_sup=busca_sup, ordenar_sup=ordenar_sup, ordem_sup=ordem_sup, pagina_area=pagina_area, busca_area=busca_area, ordenar_area=ordenar_area, ordem_area=ordem_area) }}" class="px-2 py-1 rounded hover:bg-gray-200" title="{{ t('last') }}">&raquo;</a>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
             </div>
 
-            <!-- Gráfico de Carga -->
+            <!-- Gráfico de Carga (Top 3) -->
             <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col xl:col-span-1">
-                <h3 class="text-sm font-bold text-gray-800 mb-4 whitespace-nowrap">{{ t('workload_distributed') }}</h3>
-                <div class="chart-container flex-1" style="position: relative; min-height: 200px; width: 100%;">
+                <h3 class="text-sm font-bold text-gray-800 mb-4 whitespace-nowrap" id="titulo-carga">{{ t('top_3_workload') }}</h3>
+                <div class="chart-container flex-1" style="position: relative; min-height: 200px; width: 100%;" aria-describedby="titulo-carga">
                     <canvas id="chartCarga"></canvas>
                 </div>
+                <p id="chartCargaEmpty" class="text-xs text-gray-500 text-center py-2 hidden">{{ t('no_workload_at_moment') }}</p>
             </div>
         </div>
+    </div>
+    {% else %}
+    <div class="gsap-scroll-reveal mb-8">
+        <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
+            <span class="bg-indigo-100 text-indigo-600 p-1.5 rounded-lg mr-2" aria-hidden="true">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+            </span>
+            {{ t('team_performance') }}
+        </h2>
+        <p class="text-gray-500 text-sm py-6 text-center bg-gray-50/50 rounded-2xl border border-gray-100">{{ t('no_supervisors_data') }}</p>
     </div>
     {% endif %}
 
     <!-- DESEMPENHO POR ÁREA -->
-    {% if metricas_areas %}
-    <div class="gsap-scroll-reveal mb-8">
+    {% if metricas_areas_full is defined and metricas_areas_full %}
+    <div class="gsap-scroll-reveal mb-8" id="secao-areas">
         <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
-            <span class="bg-pink-100 text-pink-600 p-1.5 rounded-lg mr-2">
+            <span class="bg-pink-100 text-pink-600 p-1.5 rounded-lg mr-2" aria-hidden="true">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
             </span>
             {{ t('area_performance') }}
         </h2>
+
+        <!-- Busca áreas -->
+        <form method="get" action="{{ url_for('main.relatorios') }}" class="mb-4 flex flex-wrap items-center gap-2">
+            <input type="hidden" name="pagina_area" value="1">
+            <input type="hidden" name="ordenar_area" value="{{ ordenar_area }}">
+            <input type="hidden" name="ordem_area" value="{{ ordem_area }}">
+            <input type="hidden" name="pagina_sup" value="{{ pagina_sup }}">
+            <input type="hidden" name="busca_sup" value="{{ busca_sup }}">
+            <input type="hidden" name="ordenar_sup" value="{{ ordenar_sup }}">
+            <input type="hidden" name="ordem_sup" value="{{ ordem_sup }}">
+            <input type="search" name="busca_area" value="{{ busca_area }}" placeholder="{{ t('search_areas_placeholder') }}"
+                   class="rounded-lg border border-gray-200 px-3 py-1.5 text-sm w-64 max-w-full" aria-label="{{ t('search_areas_placeholder') }}">
+            <button type="submit" class="rounded-lg bg-pink-100 text-pink-700 px-3 py-1.5 text-sm font-medium hover:bg-pink-200 transition">{{ t('search') }}</button>
+        </form>
         
         <div class="grid grid-cols-1 xl:grid-cols-4 gap-6">
             <!-- Tabela de Áreas -->
-            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden xl:col-span-3 min-w-0">
-                <table class="w-full min-w-0 table-fixed text-left text-sm">
-                    <thead class="bg-gray-50/50 border-b border-gray-100 uppercase text-xs font-bold tracking-wider text-gray-500">
-                        <tr>
-                            <th class="w-[18%] px-2 py-2">{{ t('area_th') }}</th>
-                            <th class="w-[8%] px-2 py-2 text-center">{{ t('total') }}</th>
-                            <th class="w-[8%] px-2 py-2 text-center">{{ t('open') }}</th>
-                            <th class="w-[8%] px-2 py-2 text-center">{{ t('completed_short') }}</th>
-                            <th class="w-[14%] px-2 py-2">{{ t('rate') }}</th>
-                            <th class="w-[10%] px-2 py-2 text-right">{{ t('time') }}</th>
-                            <th class="w-[10%] px-2 py-2 text-center">{{ t('sups_short') }}</th>
-                            <th class="w-[14%] px-2 py-2 text-right">{{ t('balanced') }}</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-100">
-                        {% for area in metricas_areas %}
-                        <tr class="hover:bg-pink-50/20 transition group">
-                            <td class="px-2 py-2 font-bold text-gray-800">
-                                <div class="flex items-center min-w-0">
-                                    <div class="w-1.5 h-1.5 rounded-full bg-pink-400 mr-1.5 shrink-0"></div>
-                                    <span class="truncate" title="{{ area.area }}">{{ translate_sector(area.area) }}</span>
-                                </div>
-                            </td>
-                            <td class="px-2 py-2 text-center">
-                                <span class="inline-flex justify-center font-bold text-gray-700 bg-gray-100 px-1.5 py-0.5 rounded text-xs">{{ area.total_chamados }}</span>
-                            </td>
-                            <td class="px-2 py-2 text-center text-xs text-orange-600 font-bold">{{ area.abertos }}</td>
-                            <td class="px-2 py-2 text-center text-xs text-emerald-600 font-bold">{{ area.concluidos }}</td>
-                            <td class="px-2 py-2">
-                                <div class="flex items-center gap-1.5">
-                                    <div class="flex-1 min-w-0 bg-gray-100 rounded-full h-1.5">
-                                        <div class="bg-pink-500 h-1.5 rounded-full" data-width="{{ area.taxa_resolucao_percentual }}"></div>
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden xl:col-span-3 min-w-0 flex flex-col">
+                <div class="overflow-auto flex-1 min-h-0" style="max-height: 440px;">
+                    <table class="w-full min-w-0 table-fixed text-left text-sm" aria-label="{{ t('table_areas_caption') }}">
+                        <thead class="bg-gray-50/50 border-b border-gray-100 uppercase text-xs font-bold tracking-wider text-gray-500 sticky top-0 z-10">
+                            <tr>
+                                <th class="w-[18%] px-2 py-2">
+                                    <a href="{{ url_for('main.relatorios', busca_area=busca_area, ordenar_area='area', ordem_area='desc' if ordenar_area == 'area' and ordem_area == 'asc' else 'asc', pagina_area=1, pagina_sup=pagina_sup, busca_sup=busca_sup, ordenar_sup=ordenar_sup, ordem_sup=ordem_sup) }}" class="hover:text-pink-600">{{ t('area_th') }}</a>
+                                </th>
+                                <th class="w-[8%] px-2 py-2 text-center">
+                                    <a href="{{ url_for('main.relatorios', busca_area=busca_area, ordenar_area='total', ordem_area='asc' if ordenar_area == 'total' and ordem_area == 'desc' else 'desc', pagina_area=1, pagina_sup=pagina_sup, busca_sup=busca_sup, ordenar_sup=ordenar_sup, ordem_sup=ordem_sup) }}" class="hover:text-pink-600 block">{{ t('total') }}</a>
+                                </th>
+                                <th class="w-[8%] px-2 py-2 text-center">
+                                    <a href="{{ url_for('main.relatorios', busca_area=busca_area, ordenar_area='abertos', ordem_area='asc' if ordenar_area == 'abertos' and ordem_area == 'desc' else 'desc', pagina_area=1, pagina_sup=pagina_sup, busca_sup=busca_sup, ordenar_sup=ordenar_sup, ordem_sup=ordem_sup) }}" class="hover:text-pink-600 block">{{ t('open') }}</a>
+                                </th>
+                                <th class="w-[8%] px-2 py-2 text-center">{{ t('completed_short') }}</th>
+                                <th class="w-[14%] px-2 py-2">
+                                    <a href="{{ url_for('main.relatorios', busca_area=busca_area, ordenar_area='taxa', ordem_area='asc' if ordenar_area == 'taxa' and ordem_area == 'desc' else 'desc', pagina_area=1, pagina_sup=pagina_sup, busca_sup=busca_sup, ordenar_sup=ordenar_sup, ordem_sup=ordem_sup) }}" class="hover:text-pink-600">{{ t('rate') }}</a>
+                                </th>
+                                <th class="w-[10%] px-2 py-2 text-right">
+                                    <a href="{{ url_for('main.relatorios', busca_area=busca_area, ordenar_area='tempo', ordem_area='asc' if ordenar_area == 'tempo' and ordem_area == 'desc' else 'desc', pagina_area=1, pagina_sup=pagina_sup, busca_sup=busca_sup, ordenar_sup=ordenar_sup, ordem_sup=ordem_sup) }}" class="hover:text-pink-600 block">{{ t('time') }}</a>
+                                </th>
+                                <th class="w-[10%] px-2 py-2 text-center">{{ t('sups_short') }}</th>
+                                <th class="w-[14%] px-2 py-2 text-right">{{ t('balanced') }}</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            {% for area in metricas_areas %}
+                            <tr class="hover:bg-pink-50/20 transition group">
+                                <td class="px-2 py-2 font-bold text-gray-800">
+                                    <div class="flex items-center min-w-0">
+                                        <div class="w-1.5 h-1.5 rounded-full bg-pink-400 mr-1.5 shrink-0"></div>
+                                        <span class="truncate" title="{{ area.area }}">{{ translate_sector(area.area) }}</span>
                                     </div>
-                                    <span class="text-xs font-bold text-gray-700 shrink-0 w-8 text-right">{{ area.taxa_resolucao_percentual }}%</span>
-                                </div>
-                            </td>
-                            <td class="px-2 py-2 text-right font-mono text-gray-500 text-xs">{{ area.tempo_medio_resolucao_horas }}h</td>
-                            <td class="px-2 py-2 text-center text-xs font-semibold text-gray-500">{{ area.supervisores_alocados }}</td>
-                            <td class="px-2 py-2 text-right">
-                                <span class="font-bold text-teal-800 bg-teal-100 px-1.5 py-0.5 rounded border border-teal-200 text-xs">
-                                    {{ area.taxa_automacao_percentual }}%
-                                </span>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+                                </td>
+                                <td class="px-2 py-2 text-center">
+                                    <span class="inline-flex justify-center font-bold text-gray-700 bg-gray-100 px-1.5 py-0.5 rounded text-xs">{{ area.total_chamados }}</span>
+                                </td>
+                                <td class="px-2 py-2 text-center text-xs text-orange-600 font-bold">{{ area.abertos }}</td>
+                                <td class="px-2 py-2 text-center text-xs text-emerald-600 font-bold">{{ area.concluidos }}</td>
+                                <td class="px-2 py-2">
+                                    <div class="flex items-center gap-1.5">
+                                        <div class="flex-1 min-w-0 bg-gray-100 rounded-full h-1.5">
+                                            <div class="bg-pink-500 h-1.5 rounded-full" data-width="{{ area.taxa_resolucao_percentual }}"></div>
+                                        </div>
+                                        <span class="text-xs font-bold text-gray-700 shrink-0 w-8 text-right">{{ area.taxa_resolucao_percentual }}%</span>
+                                    </div>
+                                </td>
+                                <td class="px-2 py-2 text-right font-mono text-gray-500 text-xs">{{ area.tempo_medio_resolucao_horas }}h</td>
+                                <td class="px-2 py-2 text-center text-xs font-semibold text-gray-500">{{ area.supervisores_alocados }}</td>
+                                <td class="px-2 py-2 text-right">
+                                    <span class="font-bold text-teal-800 bg-teal-100 px-1.5 py-0.5 rounded border border-teal-200 text-xs">
+                                        {{ area.taxa_automacao_percentual }}%
+                                    </span>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% if total_paginas_area > 1 %}
+                <div class="border-t border-gray-100 px-3 py-2 flex items-center justify-between text-sm text-gray-500 bg-gray-50/50">
+                    <span>{{ t('showing') }} {{ (pagina_area - 1) * itens_por_pagina_area + 1 }} {{ t('to') }} {{ [pagina_area * itens_por_pagina_area, total_areas]|min }} {{ t('of') }} {{ total_areas }}</span>
+                    <div class="flex gap-1">
+                        {% if pagina_area > 1 %}
+                        <a href="{{ url_for('main.relatorios', pagina_area=1, busca_area=busca_area, ordenar_area=ordenar_area, ordem_area=ordem_area, pagina_sup=pagina_sup, busca_sup=busca_sup, ordenar_sup=ordenar_sup, ordem_sup=ordem_sup) }}" class="px-2 py-1 rounded hover:bg-gray-200" title="{{ t('first') }}">&laquo;</a>
+                        <a href="{{ url_for('main.relatorios', pagina_area=pagina_area-1, busca_area=busca_area, ordenar_area=ordenar_area, ordem_area=ordem_area, pagina_sup=pagina_sup, busca_sup=busca_sup, ordenar_sup=ordenar_sup, ordem_sup=ordem_sup) }}" class="px-2 py-1 rounded hover:bg-gray-200" title="{{ t('previous') }}">&lsaquo;</a>
+                        {% endif %}
+                        <span class="px-2 py-1">{{ t('page') }} {{ pagina_area }} {{ t('of') }} {{ total_paginas_area }}</span>
+                        {% if pagina_area < total_paginas_area %}
+                        <a href="{{ url_for('main.relatorios', pagina_area=pagina_area+1, busca_area=busca_area, ordenar_area=ordenar_area, ordem_area=ordem_area, pagina_sup=pagina_sup, busca_sup=busca_sup, ordenar_sup=ordenar_sup, ordem_sup=ordem_sup) }}" class="px-2 py-1 rounded hover:bg-gray-200" title="{{ t('next') }}">&rsaquo;</a>
+                        <a href="{{ url_for('main.relatorios', pagina_area=total_paginas_area, busca_area=busca_area, ordenar_area=ordenar_area, ordem_area=ordem_area, pagina_sup=pagina_sup, busca_sup=busca_sup, ordenar_sup=ordenar_sup, ordem_sup=ordem_sup) }}" class="px-2 py-1 rounded hover:bg-gray-200" title="{{ t('last') }}">&raquo;</a>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
             </div>
 
-            <!-- Gráfico de Taxa por Área -->
+            <!-- Gráfico de Taxa por Área (Top N) -->
             <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col xl:col-span-1">
-                <h3 class="text-sm font-bold text-gray-800 mb-4 whitespace-nowrap">{{ t('resolution_rate_by_area') }}</h3>
-                <div class="chart-container flex-1" style="position: relative; min-height: 200px; width: 100%;">
+                <h3 class="text-sm font-bold text-gray-800 mb-4 whitespace-nowrap" id="titulo-areas">{{ t('top_areas_resolution') }}</h3>
+                <div class="chart-container flex-1" style="position: relative; min-height: 200px; width: 100%;" aria-describedby="titulo-areas">
                     <canvas id="chartAreas"></canvas>
                 </div>
+                <p id="chartAreasEmpty" class="text-xs text-gray-500 text-center py-2 hidden">{{ t('no_areas_data') }}</p>
             </div>
         </div>
+    </div>
+    {% else %}
+    <div class="gsap-scroll-reveal mb-8">
+        <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
+            <span class="bg-pink-100 text-pink-600 p-1.5 rounded-lg mr-2" aria-hidden="true">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+            </span>
+            {{ t('area_performance') }}
+        </h2>
+        <p class="text-gray-500 text-sm py-6 text-center bg-gray-50/50 rounded-2xl border border-gray-100">{{ t('no_areas_data') }}</p>
     </div>
     {% endif %}
 
@@ -551,10 +665,10 @@
 <!-- Chart.js Library -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-<!-- Dados JSON para os gráficos -->
+<!-- Dados JSON para os gráficos (listas completas para Top 3 / Top N) -->
 <script type="application/json" id="dados-gerais">{{ metricas_gerais|tojson|safe }}</script>
-<script type="application/json" id="dados-supervisores">{{ metricas_supervisores|tojson|safe }}</script>
-<script type="application/json" id="dados-areas">{{ metricas_areas|tojson|safe }}</script>
+<script type="application/json" id="dados-supervisores">{% if metricas_supervisores_full is defined %}{{ metricas_supervisores_full|tojson|safe }}{% else %}[]{% endif %}</script>
+<script type="application/json" id="dados-areas">{% if metricas_areas_full is defined %}{{ metricas_areas_full|tojson|safe }}{% else %}[]{% endif %}</script>
 
 <script>
 // Aguardar carregar completo da página
@@ -647,48 +761,74 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Gráfico: Carga de Trabalho
-    if (document.getElementById('chartCarga') && dadosSupervisores.length > 0) {
-        const ctxCarga = document.getElementById('chartCarga').getContext('2d');
-        const top3 = dadosSupervisores.slice().sort(function(a, b) { return b.carga_atual - a.carga_atual; }).slice(0, 3);
-        const nomes = top3.map(s => s.supervisor_nome.split(' ')[0]);
-        const cargas = top3.map(s => s.carga_atual);
-        
-        new Chart(ctxCarga, {
-            type: 'bar',
-            data: {
-                labels: nomes,
-                datasets: [{
-                    label: '{{ t("open") }} + {{ t("in_progress_tickets") }}',
-                    data: cargas,
-                    backgroundColor: cargas.map(c => c > 10 ? '#EF4444' : c > 5 ? '#FBBF24' : '#10B981'),
-                    borderColor: '#1F2937',
-                    borderWidth: 1
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                animation: false,
-                scales: {
-                    y: { beginAtZero: true }
+    // Gráfico: Carga de Trabalho (Top 3)
+    const chartCargaEl = document.getElementById('chartCarga');
+    const chartCargaEmptyEl = document.getElementById('chartCargaEmpty');
+    if (chartCargaEl && dadosSupervisores.length > 0) {
+        const top3 = dadosSupervisores.slice().sort(function(a, b) { return (b.carga_atual || 0) - (a.carga_atual || 0); }).slice(0, 3);
+        const nomes = top3.map(s => (s.supervisor_nome || '').split(' ')[0] || '');
+        const cargas = top3.map(s => s.carga_atual || 0);
+        const maxCarga = Math.max.apply(null, cargas);
+
+        if (maxCarga === 0 && chartCargaEmptyEl) {
+            chartCargaEmptyEl.classList.remove('hidden');
+        } else {
+            if (chartCargaEmptyEl) chartCargaEmptyEl.classList.add('hidden');
+            new Chart(chartCargaEl.getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: nomes,
+                    datasets: [{
+                        label: '{{ t("open") }} + {{ t("in_progress_tickets") }}',
+                        data: cargas,
+                        backgroundColor: cargas.map(c => c > 10 ? '#EF4444' : c > 5 ? '#FBBF24' : '#10B981'),
+                        borderColor: '#1F2937',
+                        borderWidth: 1
+                    }]
                 },
-                plugins: {
-                    legend: { display: false }
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            suggestedMax: Math.max(1, maxCarga)
+                        }
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(ctx) {
+                                    return (ctx.raw || 0) + ' chamados em carga';
+                                }
+                            }
+                        }
+                    }
                 }
-            }
-        });
+            });
+        }
+    } else if (chartCargaEmptyEl) {
+        chartCargaEmptyEl.classList.remove('hidden');
     }
 
-    // Gráfico: Taxa por Área
-    if (document.getElementById('chartAreas') && dadosAreas.length > 0) {
-        const ctxArea = document.getElementById('chartAreas').getContext('2d');
+    // Gráfico: Taxa por Área (Top N, barras horizontais quando muitas áreas)
+    const chartAreasEl = document.getElementById('chartAreas');
+    const chartAreasEmptyEl = document.getElementById('chartAreasEmpty');
+    const TOP_N_AREAS = 6;
+    if (chartAreasEl && dadosAreas.length > 0) {
         const sectorTranslations = JSON.parse('{{ {"Manutencao": t("maintenance"), "Engenharia": t("engineering"), "Qualidade": t("quality"), "Comercial": t("commercial"), "Planejamento": t("planning"), "Material": t("indirect_material")}|tojson|safe }}');
         function trSector(name) { return sectorTranslations[name] || name; }
-        const areasNomes = dadosAreas.map(a => trSector(a.area));
-        const taxas = dadosAreas.map(a => a.taxa_resolucao_percentual);
-        
-        new Chart(ctxArea, {
+        const sorted = dadosAreas.slice().sort(function(a, b) { return (b.total_chamados || 0) - (a.total_chamados || 0); });
+        const topN = sorted.slice(0, TOP_N_AREAS);
+        const areasNomes = topN.map(a => trSector(a.area));
+        const taxas = topN.map(a => a.taxa_resolucao_percentual || 0);
+        const useHorizontal = topN.length > 4;
+
+        if (chartAreasEmptyEl) chartAreasEmptyEl.classList.add('hidden');
+
+        new Chart(chartAreasEl.getContext('2d'), {
             type: 'bar',
             data: {
                 labels: areasNomes,
@@ -701,20 +841,30 @@ document.addEventListener('DOMContentLoaded', function() {
                 }]
             },
             options: {
+                indexAxis: useHorizontal ? 'y' : 'x',
                 responsive: true,
                 maintainAspectRatio: false,
                 animation: false,
-                scales: {
-                    y: { 
-                        beginAtZero: true,
-                        max: 100
-                    }
+                scales: useHorizontal ? {
+                    x: { beginAtZero: true, max: 100 },
+                    y: { ticks: { autoSkip: false } }
+                } : {
+                    y: { beginAtZero: true, max: 100 }
                 },
                 plugins: {
-                    legend: { display: false }
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function(ctx) {
+                                return (ctx.raw || 0) + '%';
+                            }
+                        }
+                    }
                 }
             }
         });
+    } else if (chartAreasEmptyEl) {
+        chartAreasEmptyEl.classList.remove('hidden');
     }
 
     // Aplicar larguras das barras de progresso

@@ -11,6 +11,7 @@ from app.models_usuario import Usuario
 from app.models_historico import Historico
 from app.models_categorias import CategoriaSetor, CategoriaImpacto
 from app.utils import gerar_numero_chamado
+from app.i18n import flash_t
 from app.services.validators import validar_novo_chamado
 from app.services.upload import salvar_anexo
 from app.services.assignment import atribuidor
@@ -69,7 +70,8 @@ def index() -> Response:
     descricao = request.form.get('descricao')
     impacto = request.form.get('impacto')
     gate = request.form.get('gate')
-    caminho_anexo = salvar_anexo(request.files.get('anexo'))
+    arquivo_anexo = request.files.get('anexo')
+    caminho_anexo = salvar_anexo(arquivo_anexo)
     solicitante_nome = current_user.nome
     solicitante_id = current_user.id
     area_solicitante = current_user.area
@@ -138,6 +140,9 @@ def index() -> Response:
         )
         chamado_id = doc_ref[1].id
         Historico(chamado_id=chamado_id, usuario_id=solicitante_id, usuario_nome=solicitante_nome, acao='criacao').save()
+
+        if arquivo_anexo and arquivo_anexo.filename and caminho_anexo is None and current_app.config.get('ENV') == 'production':
+            flash_t('error_attachment_upload_production', 'warning')
 
         try:
             responsavel_usuario = Usuario.get_by_id(responsavel_id) if responsavel_id else None

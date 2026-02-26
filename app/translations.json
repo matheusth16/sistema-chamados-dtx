@@ -1628,6 +1628,11 @@
         "en": "Error generating reports. Please try again.",
         "es": "Error al generar informes. Por favor inténtalo de nuevo."
     },
+    "error_attachment_upload_production": {
+        "pt_BR": "O anexo não pôde ser salvo (Firebase Storage indisponível em produção). Configure FIREBASE_STORAGE_BUCKET no ambiente. O chamado foi criado/atualizado sem o anexo.",
+        "en": "Attachment could not be saved (Firebase Storage unavailable in production). Set FIREBASE_STORAGE_BUCKET in the environment. The ticket was created/updated without the attachment.",
+        "es": "El adjunto no pudo guardarse (Firebase Storage no disponible en producción). Configure FIREBASE_STORAGE_BUCKET. El ticket se creó/actualizó sin el adjunto."
+    },
     "error_loading_index_info": {
         "pt_BR": "Erro ao carregar informações de índices",
         "en": "Error loading index information",
@@ -1827,5 +1832,70 @@
         "pt_BR": "Tempo Médio por Área (h)",
         "en": "Avg. Time by Area (h)",
         "es": "Tiempo Medio por Área (h)"
+    },
+    "last_update": {
+        "pt_BR": "Última atualização",
+        "en": "Last update",
+        "es": "Última actualización"
+    },
+    "top_3_workload": {
+        "pt_BR": "Top 3 em carga de trabalho",
+        "en": "Top 3 by workload",
+        "es": "Top 3 por carga de trabajo"
+    },
+    "no_workload_at_moment": {
+        "pt_BR": "Nenhuma carga no momento",
+        "en": "No workload at the moment",
+        "es": "Sin carga en este momento"
+    },
+    "top_areas_resolution": {
+        "pt_BR": "Top áreas por taxa de resolução",
+        "en": "Top areas by resolution rate",
+        "es": "Top áreas por tasa de resolución"
+    },
+    "view_all": {
+        "pt_BR": "Ver todas",
+        "en": "View all",
+        "es": "Ver todas"
+    },
+    "search_supervisors_placeholder": {
+        "pt_BR": "Buscar por nome ou e-mail...",
+        "en": "Search by name or email...",
+        "es": "Buscar por nombre o correo..."
+    },
+    "search_areas_placeholder": {
+        "pt_BR": "Buscar por área...",
+        "en": "Search by area...",
+        "es": "Buscar por área..."
+    },
+    "no_supervisors_data": {
+        "pt_BR": "Nenhum supervisor com chamados no período.",
+        "en": "No supervisors with tickets in the period.",
+        "es": "Ningún supervisor con tickets en el período."
+    },
+    "no_areas_data": {
+        "pt_BR": "Nenhuma área com dados no período.",
+        "en": "No areas with data in the period.",
+        "es": "Ningún área con datos en el período."
+    },
+    "sort_asc": {
+        "pt_BR": "Ordenar crescente",
+        "en": "Sort ascending",
+        "es": "Ordenar ascendente"
+    },
+    "sort_desc": {
+        "pt_BR": "Ordenar decrescente",
+        "en": "Sort descending",
+        "es": "Ordenar descendente"
+    },
+    "table_supervisors_caption": {
+        "pt_BR": "Performance da equipe por supervisor",
+        "en": "Team performance by supervisor",
+        "es": "Rendimiento del equipo por supervisor"
+    },
+    "table_areas_caption": {
+        "pt_BR": "Performance por área",
+        "en": "Performance by area",
+        "es": "Rendimiento por área"
     }
 }
