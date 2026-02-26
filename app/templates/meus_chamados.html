@@ -167,25 +167,13 @@
                     </td>
 
                     <td class="px-5 py-4 whitespace-nowrap text-sm font-medium flex justify-center">
-                        <button onclick="abrirDetalhes(this)"
-                            data-id="{{ chamado.id }}"
-                            data-numero="{{ chamado.numero_chamado }}"
-                            data-categoria="{{ chamado.categoria }}"
-                            data-tipo="{{ chamado.tipo_solicitacao }}"
-                            data-gate="{{ chamado.gate or '' }}"
-                            data-descricao="{{ chamado.descricao }}"
-                            data-responsavel="{{ chamado.responsavel or '' }}"
-                            data-status="{{ chamado.status }}"
-                            data-data-abertura="{{ chamado.data_abertura_formatada() }}"
-                            data-data-conclusao="{{ chamado.data_conclusao_formatada() }}"
-                            data-rl="{{ chamado.rl_codigo or '' }}"
-                            data-anexo="{{ chamado.anexo or '' }}"
+                        <a href="{{ url_for('main.visualizar_detalhe_chamado', chamado_id=chamado.id) }}" target="_blank"
                             class="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors" title="{{ t('view_details') }}">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                             </svg>
-                        </button>
+                        </a>
                     </td>
                 </tr>
                 {% endfor %}
@@ -260,148 +248,3 @@
         </div>
         {% endif %}
     </div>
-
-</div>
-
-<!-- Modal de Detalhes do Chamado -->
-<div id="modal-detalhes" class="hidden fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50 p-4">
-    <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[80vh] overflow-y-auto">
-        <div class="sticky top-0 bg-gradient-to-r from-blue-600 to-blue-800 px-6 py-4 flex items-center justify-between">
-            <h3 class="text-xl font-bold text-white" id="modal-titulo">{{ t('viewing_chamado') }}</h3>
-            <button onclick="fecharDetalhes()" class="text-white hover:bg-blue-700 p-1 rounded transition">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                </svg>
-            </button>
-        </div>
-
-        <div class="px-6 py-4 space-y-4">
-            <div class="grid grid-cols-2 gap-4">
-                <div>
-                    <p class="text-xs font-bold text-gray-600 uppercase">{{ t('category') }}</p>
-                    <p class="text-sm font-semibold text-gray-900" id="modal-categoria">—</p>
-                </div>
-                <div>
-                    <p class="text-xs font-bold text-gray-600 uppercase">{{ t('status') }}</p>
-                    <p class="text-sm font-semibold" id="modal-status">—</p>
-                </div>
-            </div>
-
-            <div class="grid grid-cols-2 gap-4">
-                <div>
-                    <p class="text-xs font-bold text-gray-600 uppercase">{{ t('type_sector') }}</p>
-                    <p class="text-sm text-gray-900" id="modal-tipo">—</p>
-                </div>
-                <div>
-                    <p class="text-xs font-bold text-gray-600 uppercase">{{ t('assigned_to') }}</p>
-                    <p class="text-sm text-gray-900" id="modal-responsavel">—</p>
-                </div>
-            </div>
-
-            <div>
-                <p class="text-xs font-bold text-gray-600 uppercase">{{ t('description') }}</p>
-                <p class="text-sm text-gray-900 mt-1" id="modal-descricao">—</p>
-            </div>
-
-            <div class="grid grid-cols-2 gap-4">
-                <div>
-                    <p class="text-xs font-bold text-gray-600 uppercase">{{ t('date') }}</p>
-                    <p class="text-sm text-gray-900" id="modal-data-abertura">—</p>
-                </div>
-                <div>
-                    <p class="text-xs font-bold text-gray-600 uppercase">{{ t('completion_date') }}</p>
-                    <p class="text-sm text-gray-900" id="modal-data-conclusao">—</p>
-                </div>
-            </div>
-
-            <!-- Seção de Anexo -->
-            <div id="modal-area-anexo" class="hidden">
-                <label class="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">📎 {{ t('attached_file') }}</label>
-                <a id="modal-link-anexo" href="#" target="_blank" class="inline-flex items-center px-4 py-2 border border-blue-300 shadow-sm text-sm font-medium rounded-md text-blue-700 bg-blue-50 hover:bg-blue-100 transition">
-                    📥 {{ t('download_attachment') }}
-                </a>
-            </div>
-
-            {% if current_user.is_authenticated %}
-            <div class="bg-blue-50 border border-blue-200 rounded p-3 text-center">
-                <p class="text-xs text-blue-700 font-medium">{{ t('responsible_for_ticket') }}<br>
-                <span class="text-blue-600 font-semibold" id="modal-responsavel-contato">—</span></p>
-            </div>
-            {% endif %}
-        </div>
-
-        <div class="bg-gray-50 px-6 py-4 flex justify-end border-t border-gray-200">
-            <button onclick="fecharDetalhes()" class="px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold rounded-md transition">
-                {{ t('close') }}
-            </button>
-        </div>
-    </div>
-</div>
-
-<script>
-const categoryTranslations = {
-    'Nao Aplicavel': '{{ t("not_applicable") }}',
-    'Projetos': '{{ t("projects") }}'
-};
-
-const statusTranslations = {
-    'Aberto': '{{ t("option_open") }}',
-    'Em Atendimento': '{{ t("option_in_progress") }}',
-    'Concluído': '{{ t("option_completed") }}'
-};
-
-function abrirDetalhes(btn) {
-    const modal = document.getElementById('modal-detalhes');
-    document.getElementById('modal-titulo').textContent = '{{ t("ticket_num") }}' + btn.dataset.numero;
-    const catRaw = btn.dataset.categoria;
-    document.getElementById('modal-categoria').textContent = categoryTranslations[catRaw] || catRaw;
-    document.getElementById('modal-tipo').textContent = btn.dataset.tipo || '—';
-    document.getElementById('modal-descricao').textContent = btn.dataset.descricao;
-    document.getElementById('modal-responsavel').textContent = btn.dataset.responsavel || '—';
-    const statusRaw = btn.dataset.status;
-    document.getElementById('modal-status').textContent = statusTranslations[statusRaw] || statusRaw;
-    document.getElementById('modal-responsavel-contato').textContent = btn.dataset.responsavel || '{{ t("unassigned") }}';
-    document.getElementById('modal-data-abertura').textContent = btn.dataset.dataAbertura;
-    document.getElementById('modal-data-conclusao').textContent = btn.dataset.dataConclusao || '—';
-    
-    // Processar Anexo
-    const divAnexo = document.getElementById('modal-area-anexo');
-    const linkAnexo = document.getElementById('modal-link-anexo');
-    
-    if (btn.dataset.anexo && btn.dataset.anexo !== 'None' && btn.dataset.anexo !== '') {
-        const anexoVal = btn.dataset.anexo;
-        const isUrl = anexoVal.indexOf('http://') === 0 || anexoVal.indexOf('https://') === 0;
-        linkAnexo.href = isUrl ? anexoVal : `/static/uploads/${anexoVal}`;
-        linkAnexo.innerText = isUrl ? `📥 {{ t('download_attachment') }}` : `📥 {{ t('download_attachment') }} (${anexoVal})`;
-        divAnexo.classList.remove('hidden');
-    } else {
-        divAnexo.classList.add('hidden');
-    }
-    
-    // Colorir status
-    const statusEl = document.getElementById('modal-status');
-    statusEl.className = 'text-sm font-bold px-3 py-1 rounded-full inline-block ';
-    if (btn.dataset.status === 'Concluído') {
-        statusEl.className += 'bg-green-100 text-green-800';
-    } else if (btn.dataset.status === 'Em Atendimento') {
-        statusEl.className += 'bg-yellow-100 text-yellow-800';
-    } else {
-        statusEl.className += 'bg-blue-100 text-blue-800';
-    }
-    
-    modal.classList.remove('hidden');
-}
-
-function fecharDetalhes() {
-    document.getElementById('modal-detalhes').classList.add('hidden');
-}
-
-// Fechar modal ao clicar fora
-document.getElementById('modal-detalhes').addEventListener('click', (e) => {
-    if (e.target.id === 'modal-detalhes') {
-        fecharDetalhes();
-    }
-});
-</script>
-
-{% endblock %}

@@ -4,11 +4,15 @@ Serviço de upload de anexos.
 Em produção (e quando o Firebase Storage está disponível): envia o arquivo para
 Firebase Storage (pasta chamados/) e retorna a URL pública.
 Caso contrário: salva em disco local (app/static/uploads) e retorna o nome do arquivo.
+No Cloud Run o disco é efêmero; anexos devem usar Firebase Storage.
 """
 import os
+import logging
 from datetime import datetime
 from werkzeug.utils import secure_filename
 from flask import current_app
+
+logger = logging.getLogger(__name__)
 
 
 def _upload_firebase_storage(arquivo, nome_final: str):
@@ -19,7 +23,11 @@ def _upload_firebase_storage(arquivo, nome_final: str):
     try:
         from firebase_admin import storage
         bucket = storage.bucket()
-    except Exception:
+    except Exception as e:
+        logger.warning(
+            "Firebase Storage indisponível (anexo usará disco local): %s - %s",
+            type(e).__name__, e, exc_info=False
+        )
         return None
 
     try:
@@ -31,8 +39,14 @@ def _upload_firebase_storage(arquivo, nome_final: str):
             content_type=arquivo.content_type or 'application/octet-stream'
         )
         blob.make_public()
-        return blob.public_url
-    except Exception:
+        url = blob.public_url
+        logger.info("Anexo enviado ao Firebase Storage: %s", nome_final)
+        return url
+    except Exception as e:
+        logger.warning(
+            "Falha ao enviar anexo ao Firebase Storage (%s): %s - %s",
+            nome_final, type(e).__name__, e, exc_info=True
+        )
         return None
 
 
@@ -63,6 +77,12 @@ def salvar_anexo(arquivo):
         return url
 
     # 2) Fallback: armazenamento local (pasta app/static/uploads)
+    # Em Cloud Run o disco é efêmero: o arquivo pode sumir após reinício ou em outra instância.
+    if current_app.config.get('ENV') == 'production':
+        logger.warning(
+            "Anexo salvo em disco local (Firebase Storage falhou). "
+            "Em Cloud Run os anexos podem ficar indisponíveis. Defina FIREBASE_STORAGE_BUCKET e verifique o Firebase."
+        )
     pasta_upload = current_app.config['UPLOAD_FOLDER']
     if not os.path.exists(pasta_upload):
         os.makedirs(pasta_upload)

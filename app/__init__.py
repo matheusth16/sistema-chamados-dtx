@@ -48,6 +48,17 @@ def create_app():
         from app.models_usuario import Usuario
         return Usuario.get_by_id(user_id)
 
+    # Para rotas /api/*, retornar 401 JSON em vez de redirecionar (evita "Unexpected token '<'" no frontend)
+    @login_manager.unauthorized_handler
+    def unauthorized():
+        if request.path.startswith('/api/'):
+            return jsonify({'sucesso': False, 'erro': 'Não autenticado.', 'requer_login': True}), 401
+        from flask import redirect, url_for, flash
+        from flask_login import current_user
+        if not current_user.is_authenticated:
+            flash(login_manager.login_message, login_manager.login_message_category or 'info')
+        return redirect(url_for(login_manager.login_view, next=request.url))
+
     # Configuração de i18n (Internacionalização)
     _configurar_i18n(app)
 

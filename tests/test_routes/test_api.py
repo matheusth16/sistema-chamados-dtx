@@ -139,10 +139,14 @@ def test_api_push_vapid_public_requer_login(client):
     assert r.status_code == 302
 
 
-def test_api_supervisores_disponibilidade_sem_login_redireciona(client):
-    """GET /api/supervisores/disponibilidade sem login redireciona."""
+def test_api_supervisores_disponibilidade_sem_login_retorna_401_json(client):
+    """GET /api/supervisores/disponibilidade sem login retorna 401 JSON (não redirect)."""
     r = client.get('/api/supervisores/disponibilidade')
-    assert r.status_code == 302
+    assert r.status_code == 401
+    data = r.get_json()
+    assert data is not None
+    assert data.get('sucesso') is False
+    assert 'requer_login' in data or 'erro' in data
 
 
 def test_bulk_status_supervisor_outra_area_retorna_erro_por_chamado(client_logado_supervisor):

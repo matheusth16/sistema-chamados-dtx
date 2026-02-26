@@ -1,0 +1,263 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto space-y-3 -mt-2">
+    <!-- Back btn -->
+    <div>
+        <a href="javascript:history.back()" class="inline-flex items-center text-sm font-medium text-gray-500 hover:text-indigo-600 transition-colors bg-white px-3 py-1.5 rounded-lg shadow-sm border border-gray-100">
+            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+            {{ t('back') if t else 'Voltar' }}
+        </a>
+    </div>
+
+    <!-- Ticket Card -->
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 flex flex-col overflow-hidden">
+        <!-- Header -->
+        <div class="px-5 py-4 border-b border-gray-100 flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white gap-3">
+            <div>
+                <div class="flex flex-wrap items-center gap-3 mb-1">
+                    <h3 class="text-2xl font-black text-gray-800">{{ t('ticket_num') if t else 'Chamado ' }}{{ chamado.numero_chamado }}</h3>
+                    <div class="flex items-center space-x-2">
+                        <span class="px-2.5 py-1 {% if chamado.categoria == 'Projetos' %}bg-pink-100 text-pink-700{% else %}bg-indigo-100 text-indigo-700{% endif %} rounded-lg text-xs font-bold uppercase tracking-wider">
+                            {{ chamado.categoria }}
+                        </span>
+                        {% if chamado.tipo_solicitacao %}
+                        <span class="px-2.5 py-1 bg-gray-100 text-gray-600 rounded-lg text-xs font-bold uppercase tracking-wider">
+                            {{ chamado.tipo_solicitacao }}
+                        </span>
+                        {% endif %}
+                        {% if chamado.rl_codigo %}
+                        <span class="px-2.5 py-1 bg-pink-50 text-pink-700 rounded-lg text-xs font-bold uppercase tracking-wider">
+                            {{ t('rl_short') if t else 'RL ' }} {{ chamado.rl_codigo }}
+                        </span>
+                        {% endif %}
+                    </div>
+                </div>
+                <p class="text-gray-500 text-sm font-medium">{{ t('complete_details') if t else 'Detalhes completos da solicitação' }}</p>
+            </div>
+            
+            {% if current_user.perfil in ['admin', 'supervisor'] %}
+            <a href="{{ url_for('main.visualizar_historico', chamado_id=chamado.id) }}" class="inline-flex items-center text-sm font-medium text-purple-600 bg-purple-50 hover:bg-purple-100 px-4 py-2 rounded-xl transition-colors">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                {{ t('view_history') if t else 'Ver Histórico' }}
+            </a>
+            {% endif %}
+        </div>
+
+        <!-- Body -->
+        <div class="p-5 bg-gray-50/30">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                
+                <!-- Coluna Principal (Esquerda) -->
+                <div class="lg:col-span-2 space-y-6">
+                    
+                    <!-- Descrição -->
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+                        <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">{{ t('problem_description') if t else 'Descrição do Problema' }}</label>
+                        
+                        {% if pode_editar %}
+                        <textarea id="modal-descricao" form="form-status" name="nova_descricao" rows="4"
+                            class="w-full text-gray-700 bg-gray-50/50 p-4 rounded-xl border border-gray-200 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 text-sm leading-relaxed resize-none overflow-hidden transition-all"
+                            placeholder="{{ t('edit_description_placeholder') if t else 'Descreva o chamado' }}"
+                            oninput="this.style.height = ''; this.style.height = this.scrollHeight + 'px'">{{ chamado.descricao }}</textarea>
+                        <script>
+                            // Ajusta a altura inicial do textarea para remover a barra de rolagem
+                            document.addEventListener("DOMContentLoaded", function() {
+                                var tx = document.getElementById('modal-descricao');
+                                if(tx) {
+                                    tx.style.height = tx.scrollHeight + 'px';
+                                }
+                            });
+                        </script>
+                        {% else %}
+                        <div class="bg-gray-50/50 p-4 rounded-xl text-sm text-gray-700 leading-relaxed border border-transparent whitespace-pre-line">{{ chamado.descricao }}</div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Arquivos e Anexos -->
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+                        <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">{{ t('attached_file') if t else 'Anexos' }}</label>
+                        
+                        <div class="space-y-4">
+                            {% set tem_anexo = false %}
+                            <!-- Anexos Atuais -->
+                            {% if chamado.anexo and chamado.anexo != 'None' %}
+                                {% set tem_anexo = true %}
+                                <div class="flex flex-wrap gap-2">
+                                    {% set is_url = chamado.anexo.startswith('http://') or chamado.anexo.startswith('https://') %}
+                                    <a href="{{ chamado.anexo if is_url else url_for('static', filename='uploads/' + chamado.anexo) }}" target="_blank"
+                                        class="inline-flex items-center px-4 py-2 border border-indigo-100 shadow-sm text-sm font-medium rounded-xl text-indigo-700 bg-indigo-50/50 hover:bg-indigo-100 hover:border-indigo-300 transition-colors group">
+                                        <svg class="w-5 h-5 mr-2 text-indigo-500 group-hover:text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path></svg>
+                                        <span>{{ t('download_attachment') if t else 'Baixar Anexo' }}</span>
+                                    </a>
+                                </div>
+                            {% endif %}
+                            
+                            {% if chamado.anexos %}
+                                {% for anx in chamado.anexos %}
+                                    {% if anx and anx != 'None' %}
+                                        {% set tem_anexo = true %}
+                                        <div class="flex flex-wrap gap-2 mt-2">
+                                            {% set is_url = anx.startswith('http://') or anx.startswith('https://') %}
+                                            <a href="{{ anx if is_url else url_for('static', filename='uploads/' + anx) }}" target="_blank"
+                                                class="inline-flex items-center px-4 py-2 border border-indigo-100 shadow-sm text-sm font-medium rounded-xl text-indigo-700 bg-indigo-50/50 hover:bg-indigo-100 hover:border-indigo-300 transition-colors group">
+                                                <svg class="w-5 h-5 mr-2 text-indigo-500 group-hover:text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path></svg>
+                                                <span>{{ anx }}</span>
+                                            </a>
+                                        </div>
+                                    {% endif %}
+                                {% endfor %}
+                            {% endif %}
+
+                            {% if not tem_anexo %}
+                            <p class="text-sm text-gray-500 italic mb-2">Sem anexos atuais.</p>
+                            {% endif %}
+
+                            <!-- Dropzone para Novo Anexo (Apenas se puder editar) -->
+                            {% if pode_editar %}
+                            <div class="pt-3 {% if tem_anexo %}border-t border-gray-100{% endif %}">
+                                <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">{{ t('new_attachment') if t else 'Novo Anexo' }}</label>
+                                <div class="relative border-2 border-dashed border-gray-200 hover:border-indigo-400 bg-gray-50/50 hover:bg-indigo-50/30 rounded-xl p-4 transition-all group flex flex-col items-center justify-center cursor-pointer">
+                                    <input type="file" id="modal-input-anexo" form="form-status" name="anexo" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer text-sm">
+                                    <svg class="w-6 h-6 text-gray-400 group-hover:text-indigo-500 mb-1 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                    </svg>
+                                    <p class="text-[13px] font-medium text-gray-600 group-hover:text-indigo-600 transition-colors" id="nome-arquivo-selecionado">Clique para enviar um arquivo</p>
+                                    <p class="text-[11px] text-gray-400">ou arraste e solte aqui</p>
+                                </div>
+                            </div>
+                            {% endif %}
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- Barra Lateral (Direita) -->
+                <div class="space-y-4">
+                    
+                    <!-- Info Abertura -->
+                    <div class="bg-white p-5 rounded-xl shadow-sm border border-indigo-100 relative overflow-hidden">
+                        <div class="absolute left-0 top-0 bottom-0 w-1 bg-indigo-500"></div>
+                        <h4 class="font-bold text-gray-800 text-sm mb-3 uppercase tracking-wider flex items-center">
+                            <svg class="w-4 h-4 mr-2 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                            {{ t('opening_info') if t else 'Informações de Abertura' }}
+                        </h4>
+                        <div class="space-y-3 text-sm">
+                            <div class="flex flex-col border-b border-gray-50 pb-2">
+                                <span class="text-[11px] text-gray-400 font-bold uppercase tracking-wider mb-0.5">{{ t('date') if t else 'Data de Abertura' }}</span>
+                                <span class="font-semibold text-gray-800">{{ chamado.data_abertura_formatada() }}</span>
+                            </div>
+                            <div class="flex flex-col border-b border-gray-50 pb-2">
+                                <span class="text-[11px] text-gray-400 font-bold uppercase tracking-wider mb-0.5">{{ t('requester') if t else 'Solicitante' }}</span>
+                                <span class="font-semibold text-gray-800">{{ chamado.solicitante_nome or '—' }}</span>
+                            </div>
+                            <div class="flex flex-col">
+                                <span class="text-[11px] text-gray-400 font-bold uppercase tracking-wider mb-0.5">{{ t('completion_date') if t else 'Data de Conclusão' }}</span>
+                                <span class="font-semibold text-gray-800">{{ chamado.data_conclusao_formatada() or '—' }}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Formulário de Edição / Visualização do Status -->
+                    <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
+                        <h4 class="font-bold text-gray-800 text-sm mb-3 uppercase tracking-wider flex items-center">
+                            <svg class="w-4 h-4 mr-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                            {{ t('ticket_details') if t else 'Detalhes do Chamado' }}
+                        </h4>
+                        
+                        {% if pode_editar %}
+                        <form id="form-status" action="{{ url_for('main.editar_chamado_pagina') }}" method="POST" enctype="multipart/form-data" class="space-y-3">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                            <input type="hidden" name="chamado_id" value="{{ chamado.id }}">
+
+                            <div>
+                                <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5">{{ t('current_status') if t else 'Status Atual' }}</label>
+                                <div>
+                                    <span class="inline-flex px-3 py-1.5 rounded-lg text-sm font-bold shadow-sm border border-gray-100 
+                                    {% if chamado.status == 'Concluído' %}bg-emerald-100 text-emerald-800{% elif chamado.status == 'Em Atendimento' %}bg-amber-100 text-amber-800{% else %}bg-blue-100 text-blue-800{% endif %}">
+                                        {{ chamado.status }}
+                                    </span>
+                                </div>
+
+                                <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mt-3 mb-1.5">{{ t('change_status_to') if t else 'Alterar Status Para' }}</label>
+                                <select name="novo_status"
+                                    class="block w-full bg-gray-50 border-gray-200 text-sm rounded-xl focus:ring-indigo-500 focus:border-indigo-500 transition-colors py-2 px-3 focus:bg-white shadow-sm">
+                                    <option value="Aberto" {% if chamado.status == 'Aberto' %}selected{% endif %}>{{ t('option_open') if t else 'Aberto' }}</option>
+                                    <option value="Em Atendimento" {% if chamado.status == 'Em Atendimento' %}selected{% endif %}>{{ t('option_in_progress') if t else 'Em Atendimento' }}</option>
+                                    <option value="Concluído" {% if chamado.status == 'Concluído' %}selected{% endif %}>{{ t('option_completed') if t else 'Concluído' }}</option>
+                                </select>
+                            </div>
+
+                            <div class="pt-1">
+                                <label class="block text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-1">{{ t('responsible') if t else 'Responsável' }}</label>
+                                <select name="novo_responsavel_id"
+                                    class="block w-full bg-gray-50 border-gray-200 text-sm rounded-xl focus:ring-indigo-500 focus:border-indigo-500 transition-colors py-2 px-3 focus:bg-white shadow-sm">
+                                    <option value="">{{ t('no_change') if t else 'Sem alteração' }} (Atual: {{ chamado.responsavel or '—' }})</option>
+                                    {% for sup in supervisores_detalhados %}
+                                    <option value="{{ sup.id }}">{{ sup.nome }} ({{ sup.area }})</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <div class="pt-3 mt-3 border-t border-gray-100 pb-1">
+                                <button type="submit" id="btn-submit-status"
+                                    class="w-full flex justify-center py-2.5 px-4 rounded-xl shadow-sm text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors items-center">
+                                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                                    {{ t('save_change') if t else 'Salvar Alteração' }}
+                                </button>
+                            </div>
+                        </form>
+                        {% else %}
+                        <!-- Visualização Somente Leitura -->
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">{{ t('status') if t else 'Status' }}</label>
+                                <div>
+                                    <span class="inline-flex px-3 py-1.5 rounded-lg text-sm font-bold shadow-sm border border-gray-100 
+                                    {% if chamado.status == 'Concluído' %}bg-emerald-100 text-emerald-800{% elif chamado.status == 'Em Atendimento' %}bg-amber-100 text-amber-800{% else %}bg-blue-100 text-blue-800{% endif %}">
+                                        {{ chamado.status }}
+                                    </span>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">{{ t('assigned_to') if t else 'Atribuído a' }}</label>
+                                <div class="text-sm font-semibold text-gray-800">
+                                    {{ chamado.responsavel or '—' }}
+                                </div>
+                            </div>
+                            
+                            <div class="bg-indigo-50/50 border border-indigo-100 rounded-xl p-4 text-center mt-6">
+                                <p class="text-[10px] text-indigo-700 font-bold uppercase tracking-widest">{{ t('responsible_for_ticket') if t else 'Contato' }}</p>
+                                <p class="text-indigo-900 font-bold text-sm mt-1">{{ chamado.responsavel or 'Equipe Responsável' }}</p>
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if pode_editar %}
+<script>
+    const inputFile = document.getElementById('modal-input-anexo');
+    const nomeArquivoEl = document.getElementById('nome-arquivo-selecionado');
+    
+    if(inputFile) {
+        inputFile.addEventListener('change', function(e) {
+            if(e.target.files.length > 0) {
+                nomeArquivoEl.textContent = e.target.files[0].name;
+                nomeArquivoEl.classList.remove('text-gray-600');
+                nomeArquivoEl.classList.add('text-indigo-600', 'font-bold');
+            } else {
+                nomeArquivoEl.textContent = 'Clique para enviar um arquivo';
+                nomeArquivoEl.classList.add('text-gray-600');
+                nomeArquivoEl.classList.remove('text-indigo-600', 'font-bold');
+            }
+        });
+    }
+</script>
+{% endif %}
+{% endblock %}

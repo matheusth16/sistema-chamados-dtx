@@ -1,6 +1,6 @@
 """Rotas de autenticação: login e logout."""
 import logging
-from flask import render_template, request, redirect, url_for, Response
+from flask import render_template, request, redirect, url_for, Response, session
 from flask_login import login_user, logout_user, current_user, login_required
 from app.i18n import flash_t
 from app.routes import main
@@ -14,6 +14,11 @@ logger = logging.getLogger(__name__)
 @limiter.limit("5 per minute")
 def login() -> Response:
     """GET: formulário de login. POST: valida credenciais e cria sessão."""
+    # Remove last_activity de sessão antiga para evitar "desconectado por inatividade"
+    # na primeira requisição após login (quando o cookie ainda tinha timestamp antigo).
+    if not current_user.is_authenticated:
+        session.pop('last_activity', None)
+
     if current_user.is_authenticated:
         logger.info(f"Usuário {current_user.email} ({current_user.perfil}) já autenticado, redirecionando...")
         if current_user.perfil == 'solicitante':

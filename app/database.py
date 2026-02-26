@@ -67,17 +67,26 @@ def _inicializar_firebase_com_retry(max_tentativas: int = 3, delay_inicial: floa
                 'credentials.json'
             )
             
+            # Storage bucket: necessário para Firebase Storage (anexos). Sem isso, storage.bucket() falha.
+            bucket_env = os.getenv('FIREBASE_STORAGE_BUCKET', '').strip()
+
             if os.path.exists(cert_path):
                 # Inicializa com arquivo de credenciais (desenvolvimento local)
                 logger.info(f"Carregando credentials.json de: {cert_path}")
                 cred = credentials.Certificate(cert_path)
-                firebase_admin.initialize_app(cred)
-                logger.info("✓ Firebase inicializado com credentials.json (arquivo local)")
+                storage_bucket = bucket_env or f"{cred.project_id}.appspot.com"
+                firebase_admin.initialize_app(cred, {'storageBucket': storage_bucket})
+                logger.info("✓ Firebase inicializado com credentials.json (arquivo local). Storage bucket: %s", storage_bucket)
             else:
                 # Inicializa com Application Default Credentials (Cloud Run/GCP)
                 logger.info("credentials.json não encontrado. Usando ADC (Application Default Credentials)")
-                firebase_admin.initialize_app()
-                logger.info("✓ Firebase inicializado com ADC (Cloud credentials)")
+                storage_bucket = bucket_env or (os.getenv('GOOGLE_CLOUD_PROJECT') and f"{os.getenv('GOOGLE_CLOUD_PROJECT')}.appspot.com")
+                if storage_bucket:
+                    firebase_admin.initialize_app(options={'storageBucket': storage_bucket})
+                    logger.info("✓ Firebase inicializado com ADC. Storage bucket: %s", storage_bucket)
+                else:
+                    firebase_admin.initialize_app()
+                    logger.warning("✓ Firebase inicializado com ADC. FIREBASE_STORAGE_BUCKET não definido: anexos usarão disco local (efêmero no Cloud Run).")
             
             return  # Sucesso - sai da função
             

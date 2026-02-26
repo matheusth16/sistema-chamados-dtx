@@ -245,7 +245,13 @@
         
         fetch(`/api/supervisores/disponibilidade?area=${encodeURIComponent(setor)}`)
             .then(response => {
-                if (!response.ok) throw new Error('Erro na rede: ' + response.status);
+                const contentType = (response.headers.get('content-type') || '').toLowerCase();
+                const isJson = contentType.includes('application/json');
+                if (!response.ok) {
+                    if (isJson) return response.json().then(data => Promise.reject(data));
+                    return response.text().then(() => Promise.reject(new Error('Erro na rede: ' + response.status)));
+                }
+                if (!isJson) return Promise.reject(new Error('Resposta não é JSON'));
                 return response.json();
             })
             .then(data => {
