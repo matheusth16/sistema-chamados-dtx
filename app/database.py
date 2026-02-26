@@ -68,25 +68,31 @@ def _inicializar_firebase_com_retry(max_tentativas: int = 3, delay_inicial: floa
             )
             
             # Storage bucket: necessário para Firebase Storage (anexos). Sem isso, storage.bucket() falha.
+            # Use o nome exato do bucket do Firebase Console > Storage (ex.: projeto.firebasestorage.app ou projeto.appspot.com).
             bucket_env = os.getenv('FIREBASE_STORAGE_BUCKET', '').strip()
 
             if os.path.exists(cert_path):
                 # Inicializa com arquivo de credenciais (desenvolvimento local)
                 logger.info(f"Carregando credentials.json de: {cert_path}")
                 cred = credentials.Certificate(cert_path)
-                storage_bucket = bucket_env or f"{cred.project_id}.appspot.com"
+                # Padrão: novo formato .firebasestorage.app (Firebase Console); legado é .appspot.com
+                storage_bucket = bucket_env or f"{cred.project_id}.firebasestorage.app"
                 firebase_admin.initialize_app(cred, {'storageBucket': storage_bucket})
                 logger.info("✓ Firebase inicializado com credentials.json (arquivo local). Storage bucket: %s", storage_bucket)
             else:
                 # Inicializa com Application Default Credentials (Cloud Run/GCP)
                 logger.info("credentials.json não encontrado. Usando ADC (Application Default Credentials)")
-                storage_bucket = bucket_env or (os.getenv('GOOGLE_CLOUD_PROJECT') and f"{os.getenv('GOOGLE_CLOUD_PROJECT')}.appspot.com")
+                proj = os.getenv('GOOGLE_CLOUD_PROJECT', '').strip()
+                storage_bucket = bucket_env or (f"{proj}.firebasestorage.app" if proj else None) or (f"{proj}.appspot.com" if proj else None)
                 if storage_bucket:
                     firebase_admin.initialize_app(options={'storageBucket': storage_bucket})
                     logger.info("✓ Firebase inicializado com ADC. Storage bucket: %s", storage_bucket)
                 else:
                     firebase_admin.initialize_app()
-                    logger.warning("✓ Firebase inicializado com ADC. FIREBASE_STORAGE_BUCKET não definido: anexos usarão disco local (efêmero no Cloud Run).")
+                    logger.warning(
+                        "✓ Firebase inicializado com ADC. FIREBASE_STORAGE_BUCKET não definido: anexos em produção falharão. "
+                        "Defina FIREBASE_STORAGE_BUCKET com o valor do Firebase Console > Storage (ex.: projeto.firebasestorage.app)."
+                    )
             
             return  # Sucesso - sai da função
             

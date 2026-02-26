@@ -79,7 +79,7 @@ Após deploy completar:
    - Acesse: Cloud Run → sistema-chamados-dtx → Logs
    - Procure por mensagem de erro
 
-**Anexos:** Os arquivos são armazenados no **Firebase Storage** (pasta `chamados/`), com leitura por link. Tamanho máximo: **5 MB**. Formatos: imagens (png, jpg, jpeg), PDF e Excel (xlsx). **Em produção (Cloud Run) é obrigatório configurar `FIREBASE_STORAGE_BUCKET`** (ex.: `seu-projeto.appspot.com`) e conceder à conta de serviço do Cloud Run a permissão "Storage Object Admin" no bucket. Sem isso, uploads em produção falham (não há fallback para disco, pois o disco é efêmero).
+**Anexos:** Os arquivos vão para o **Firebase Storage** (pasta `chamados/`). Tamanho máximo: **5 MB**. Formatos: imagens, PDF, xlsx. Em produção: 1) No **Firebase Console > Storage**, copie o nome do bucket (ex.: `gs://sistema-de-chamados-dtx-aero.firebasestorage.app` → use `sistema-de-chamados-dtx-aero.firebasestorage.app`). 2) No Cloud Run, defina a variável **`FIREBASE_STORAGE_BUCKET`** com esse valor. 3) No GCP IAM, dê à **conta de serviço do Cloud Run** a permissão **Storage Object Admin** no bucket. Sem isso, uploads em produção falham e o Storage fica vazio.
 
 ---
 

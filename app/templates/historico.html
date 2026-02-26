@@ -134,11 +134,45 @@
                                         </div>
                                     </div>
                                 {% elif evento.acao == 'alteracao_dados' %}
-                                    <div class="mt-3 p-4 bg-white rounded-lg border-l-4 border-purple-500 shadow-sm">
-                                        <p class="text-sm text-gray-700 flex items-center gap-2">
-                                            <span class="font-semibold text-purple-700">{{ t('changed_field') }}</span>
-                                            <span class="px-2 py-1 bg-purple-100 text-purple-800 rounded text-xs font-medium">{{ evento.campo_alterado }}</span>
-                                        </p>
+                                    <div class="mt-3 p-4 bg-white rounded-lg border-l-4 border-purple-500 shadow-sm space-y-3">
+                                        {% if evento.campo_alterado in ('anexo', 'novo anexo') %}
+                                            <p class="text-sm text-gray-700">
+                                                <span class="font-semibold text-purple-700">{{ t('history_attachment_added') }}:</span>
+                                                <span class="font-medium text-gray-800">{{ evento.detalhe or (evento.valor_novo.split('/')[-1] if evento.valor_novo else '') }}</span>
+                                            </p>
+                                            {% if evento.valor_novo and (evento.valor_novo.startswith('http') or evento.valor_novo.startswith('/')) %}
+                                            <a href="{{ evento.valor_novo }}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-sm font-medium transition">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                                                {{ t('history_open_attachment') }}
+                                            </a>
+                                            {% endif %}
+                                        {% elif evento.campo_alterado == 'descrição' and (evento.valor_anterior or evento.valor_novo) %}
+                                            <div class="space-y-2">
+                                                {% if evento.valor_anterior %}
+                                                <div>
+                                                    <p class="text-xs font-bold text-gray-500 uppercase mb-1">{{ t('history_previous_description') }}</p>
+                                                    <div class="p-3 bg-gray-50 rounded-lg border border-gray-200 text-sm text-gray-700 whitespace-pre-wrap break-words">{{ evento.valor_anterior }}</div>
+                                                </div>
+                                                {% endif %}
+                                                {% if evento.valor_novo %}
+                                                <div>
+                                                    <p class="text-xs font-bold text-gray-500 uppercase mb-1">{{ t('history_new_description') }}</p>
+                                                    <div class="p-3 bg-green-50 rounded-lg border border-green-200 text-sm text-gray-800 whitespace-pre-wrap break-words">{{ evento.valor_novo }}</div>
+                                                </div>
+                                                {% endif %}
+                                            </div>
+                                        {% else %}
+                                            <p class="text-sm text-gray-700 flex items-center gap-2">
+                                                <span class="font-semibold text-purple-700">{{ t('changed_field') }}</span>
+                                                <span class="px-2 py-1 bg-purple-100 text-purple-800 rounded text-xs font-medium">{{ evento.campo_alterado }}</span>
+                                                {% if evento.valor_anterior or evento.valor_novo %}
+                                                <span class="text-gray-600">—</span>
+                                                <span class="px-2 py-1 bg-red-100 text-red-800 rounded text-xs">{{ evento.valor_anterior or '-' }}</span>
+                                                <span class="text-gray-400">→</span>
+                                                <span class="px-2 py-1 bg-green-100 text-green-800 rounded text-xs">{{ evento.valor_novo or '-' }}</span>
+                                                {% endif %}
+                                            </p>
+                                        {% endif %}
                                     </div>
                                 {% elif evento.acao == 'criacao' %}
                                     <div class="mt-3 p-4 bg-green-50 rounded-lg border border-green-200 shadow-sm">

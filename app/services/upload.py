@@ -80,7 +80,8 @@ def salvar_anexo(arquivo):
     if current_app.config.get('ENV') == 'production':
         logger.error(
             "Firebase Storage falhou em produção. Anexo NÃO foi salvo. "
-            "Defina FIREBASE_STORAGE_BUCKET (ex: seu-projeto.appspot.com) e garanta que a conta de serviço do Cloud Run tenha permissão no bucket (Storage Object Admin)."
+            "Defina FIREBASE_STORAGE_BUCKET com o nome do bucket do Firebase Console > Storage (ex.: projeto.firebasestorage.app). "
+            "Garanta que a conta de serviço do Cloud Run tenha permissão Storage Object Admin no bucket."
         )
         return None
 

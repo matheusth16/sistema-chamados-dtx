@@ -282,16 +282,19 @@ def editar_chamado_pagina() -> Response:
                 ).save()
 
         nova_descricao = request.form.get('nova_descricao', '').strip()
-        if nova_descricao and nova_descricao != (data_chamado.get('descricao') or '').strip():
+        descricao_anterior = (data_chamado.get('descricao') or '').strip()
+        if nova_descricao and nova_descricao != descricao_anterior:
             update_data['descricao'] = nova_descricao
+            # Limita tamanho para não estourar Firestore (1 doc = 1MB)
+            max_len = 3000
             Historico(
                 chamado_id=chamado_id,
                 usuario_id=current_user.id,
                 usuario_nome=current_user.nome,
                 acao='alteracao_dados',
                 campo_alterado='descrição',
-                valor_anterior='(Texto anterior)',
-                valor_novo='(Novo texto)'
+                valor_anterior=(descricao_anterior[:max_len] + ('...' if len(descricao_anterior) > max_len else '')),
+                valor_novo=(nova_descricao[:max_len] + ('...' if len(nova_descricao) > max_len else ''))
             ).save()
 
         arquivo_anexo = request.files.get('anexo')
@@ -313,9 +316,10 @@ def editar_chamado_pagina() -> Response:
                     usuario_id=current_user.id,
                     usuario_nome=current_user.nome,
                     acao='alteracao_dados',
-                    campo_alterado='novo anexo',
+                    campo_alterado='anexo',
                     valor_anterior='-',
-                    valor_novo=caminho_anexo
+                    valor_novo=caminho_anexo,
+                    detalhe=arquivo_anexo.filename
                 ).save()
 
         if update_data:

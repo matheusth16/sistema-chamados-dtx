@@ -107,7 +107,7 @@ O Firebase é inicializado em `app/database.py`:
 
 | Variável | Descrição | Obrigatório em produção |
 |----------|-----------|-------------------------|
-| `FIREBASE_STORAGE_BUCKET` | Nome do bucket do Firebase Storage para anexos (ex.: `seu-projeto.appspot.com`). Sem isso, em produção os uploads **falham** (não há fallback para disco no Cloud Run). A conta de serviço do Cloud Run precisa da permissão **Storage Object Admin** no bucket. | **Sim**, para anexos funcionarem |
+| `FIREBASE_STORAGE_BUCKET` | Nome **exato** do bucket do Firebase Storage (Firebase Console > Storage: use o valor do bucket, ex. `projeto.firebasestorage.app` ou `projeto.appspot.com`). Sem isso, em produção os uploads falham. A conta de serviço do Cloud Run precisa da permissão **Storage Object Admin** no bucket. Se não definir, o app tenta `GOOGLE_CLOUD_PROJECT.firebasestorage.app` no Cloud Run. | **Recomendado** (senão usa projeto.firebasestorage.app se GOOGLE_CLOUD_PROJECT estiver definido) |
 
 ---
 
@@ -129,8 +129,8 @@ FLASK_ENV=production
 SECRET_KEY=<valor de openssl rand -hex 32>
 APP_BASE_URL=https://seu-dominio.com
 
-# Obrigatório para anexos (ex.: Cloud Run)
-FIREBASE_STORAGE_BUCKET=seu-projeto-id.appspot.com
+# Para anexos no Cloud Run (use o bucket do Firebase Console > Storage, ex.: projeto.firebasestorage.app)
+# FIREBASE_STORAGE_BUCKET=seu-projeto.firebasestorage.app
 
 # Recomendado com múltiplos workers
 REDIS_URL=redis://:senha@redis-host:6379/0

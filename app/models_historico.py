@@ -15,6 +15,7 @@ class Historico:
                  valor_anterior = None,
                  valor_novo = None,
                  data_acao = None,
+                 detalhe: str = None,
                  id: str = None):
         
         self.id = id
@@ -26,10 +27,11 @@ class Historico:
         self.valor_anterior = valor_anterior
         self.valor_novo = valor_novo
         self.data_acao = data_acao or firestore.SERVER_TIMESTAMP
-    
+        self.detalhe = detalhe  # ex: nome do arquivo anexado para exibição
+
     def to_dict(self):
         """Converte para dicionário para salvar no Firestore"""
-        return {
+        d = {
             'chamado_id': self.chamado_id,
             'usuario_id': self.usuario_id,
             'usuario_nome': self.usuario_nome,
@@ -39,7 +41,10 @@ class Historico:
             'valor_novo': self.valor_novo,
             'data_acao': self.data_acao
         }
-    
+        if self.detalhe is not None:
+            d['detalhe'] = self.detalhe
+        return d
+
     @classmethod
     def from_dict(cls, data: dict, id: str = None):
         """Cria um objeto Historico a partir de um dicionário do Firestore"""
@@ -52,7 +57,8 @@ class Historico:
             campo_alterado=data.get('campo_alterado'),
             valor_anterior=data.get('valor_anterior'),
             valor_novo=data.get('valor_novo'),
-            data_acao=data.get('data_acao')
+            data_acao=data.get('data_acao'),
+            detalhe=data.get('detalhe')
         )
     
     def save(self):

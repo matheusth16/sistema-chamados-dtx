@@ -131,16 +131,19 @@ def api_editar_chamado():
                 ).save()
 
         # Descrição
-        if nova_descricao and nova_descricao.strip() != data_chamado.get('descricao', '').strip():
-            update_data['descricao'] = nova_descricao.strip()
+        descricao_anterior = (data_chamado.get('descricao') or '').strip()
+        nova_descricao_stripped = (nova_descricao or '').strip()
+        if nova_descricao_stripped and nova_descricao_stripped != descricao_anterior:
+            update_data['descricao'] = nova_descricao_stripped
+            max_len = 3000
             Historico(
                 chamado_id=chamado_id,
                 usuario_id=current_user.id,
                 usuario_nome=current_user.nome,
                 acao='alteracao_dados',
                 campo_alterado='descrição',
-                valor_anterior='(Texto anterior)',
-                valor_novo='(Novo texto)'
+                valor_anterior=(descricao_anterior[:max_len] + ('...' if len(descricao_anterior) > max_len else '')),
+                valor_novo=(nova_descricao_stripped[:max_len] + ('...' if len(nova_descricao_stripped) > max_len else ''))
             ).save()
 
         # Anexo (Adicionando múltiplos anexos)
@@ -170,9 +173,10 @@ def api_editar_chamado():
                     usuario_id=current_user.id,
                     usuario_nome=current_user.nome,
                     acao='alteracao_dados',
-                    campo_alterado='novo anexo',
+                    campo_alterado='anexo',
                     valor_anterior='-',
-                    valor_novo=caminho_anexo
+                    valor_novo=caminho_anexo,
+                    detalhe=arquivo_anexo.filename
                 ).save()
 
         if update_data:

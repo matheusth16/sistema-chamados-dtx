@@ -997,6 +997,26 @@
         "en": "Changed field:",
         "es": "Campo cambiado:"
     },
+    "history_attachment_added": {
+        "pt_BR": "Anexo adicionado",
+        "en": "Attachment added",
+        "es": "Archivo adjunto añadido"
+    },
+    "history_open_attachment": {
+        "pt_BR": "Abrir anexo",
+        "en": "Open attachment",
+        "es": "Abrir archivo"
+    },
+    "history_previous_description": {
+        "pt_BR": "Texto anterior",
+        "en": "Previous text",
+        "es": "Texto anterior"
+    },
+    "history_new_description": {
+        "pt_BR": "Texto novo",
+        "en": "New text",
+        "es": "Texto nuevo"
+    },
     "ticket_started_successfully": {
         "pt_BR": "Chamado iniciado com sucesso",
         "en": "Ticket started successfully",
