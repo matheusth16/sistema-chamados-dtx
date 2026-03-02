@@ -106,6 +106,43 @@ Edita chamado (status, descrição, responsável, anexo). Apenas **supervisor** 
 
 ---
 
+## Chamado por ID
+
+### GET `/api/chamado/<chamado_id>`
+
+Retorna os dados completos de um chamado. Requer login. O usuário só pode ver chamados que tem permissão (solicitante: próprio chamado; supervisor: área; admin: todos).
+
+**Resposta 200:**
+```json
+{
+  "sucesso": true,
+  "chamado": {
+    "id": "...",
+    "numero_chamado": "CHM-0001",
+    "categoria": "...",
+    "tipo_solicitacao": "...",
+    "descricao": "...",
+    "status": "...",
+    "responsavel": "...",
+    "responsavel_id": "...",
+    "solicitante_id": "...",
+    "solicitante_nome": "...",
+    "data_abertura": "...",
+    "data_conclusao": "...",
+    "anexos": [],
+    "area": "...",
+    "gate": "...",
+    "impacto": "...",
+    "prioridade": 1,
+    "rl_codigo": "..."
+  }
+}
+```
+
+**Respostas:** 403 (sem permissão), 404 (chamado não encontrado), 500 (erro interno).
+
+---
+
 ## Paginação e listagem de chamados
 
 ### GET `/api/chamados/paginar`
@@ -208,6 +245,20 @@ Marca uma notificação como lida.
 { "sucesso": true }
 ```
 Em erro: `{ "sucesso": false }` (500).
+
+---
+
+### POST `/api/notificacoes/ler-todas`
+
+Marca todas as notificações do usuário logado como lidas.
+
+**Headers:** `X-CSRFToken: <token>`.
+
+**Resposta 200:**
+```json
+{ "sucesso": true, "marcadas": 5 }
+```
+- **marcadas:** quantidade de notificações marcadas como lidas.
 
 ---
 

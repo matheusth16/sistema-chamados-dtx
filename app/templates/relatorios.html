@@ -12,43 +12,6 @@
     }
 
     /* ── Insight Cards Premium Animations ── */
-    @keyframes insight-shimmer {
-        0% { transform: translateX(-100%); }
-        100% { transform: translateX(100%); }
-    }
-    @keyframes pulse-glow {
-        0%, 100% { opacity: 0.4; transform: scale(1); }
-        50% { opacity: 0.7; transform: scale(1.05); }
-    }
-    .insight-card {
-        transition: transform 0.35s cubic-bezier(.22,.61,.36,1), box-shadow 0.35s cubic-bezier(.22,.61,.36,1);
-    }
-    .insight-card:hover {
-        transform: translateY(-4px) scale(1.01);
-    }
-    .insight-card .insight-shimmer {
-        position: absolute; inset: 0;
-        background: linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.35) 50%, transparent 60%);
-        opacity: 0;
-        transition: opacity 0.3s;
-    }
-    .insight-card:hover .insight-shimmer {
-        opacity: 1;
-        animation: insight-shimmer 1.6s ease-in-out infinite;
-    }
-    .insight-card .insight-orb {
-        position: absolute;
-        border-radius: 9999px;
-        filter: blur(50px);
-        pointer-events: none;
-        animation: pulse-glow 4s ease-in-out infinite;
-    }
-    .insight-card .insight-icon-badge {
-        transition: transform 0.35s cubic-bezier(.22,.61,.36,1), box-shadow 0.35s cubic-bezier(.22,.61,.36,1);
-    }
-    .insight-card:hover .insight-icon-badge {
-        transform: scale(1.12) rotate(-3deg);
-    }
     .insight-card .insight-metric-value {
         transition: transform 0.3s, letter-spacing 0.3s;
     }
@@ -101,49 +64,38 @@
 
     <!-- INSIGHTS E ALERTAS -->
     <div class="mb-8">
-        <h2 class="text-xl font-bold text-gray-800 mb-5 flex items-center">
-            <span class="bg-gradient-to-br from-blue-500 to-indigo-600 text-white p-2 rounded-xl mr-3 shadow-md shadow-blue-200" aria-hidden="true">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-            </span>
+        <h2 class="text-lg font-bold text-gray-800 mb-5 flex items-center">
+            <svg class="w-5 h-5 text-blue-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
             {{ t('insights_alerts') }}
         </h2>
         <div class="gsap-scroll-reveal-stagger flex flex-wrap gap-5">
             {% for insight in insights %}
             <div class="insight-card gsap-scroll-reveal-item flex-1 min-w-full md:min-w-[calc(50%-1.25rem)] lg:min-w-[calc(33.333%-1.25rem)] max-w-full relative overflow-hidden rounded-2xl min-h-[170px] flex flex-col cursor-default
+                bg-white border hover:shadow-md transition-shadow
                 {% if insight.tipo == 'aviso' %}
-                    bg-gradient-to-br from-amber-50 via-orange-50/60 to-white border border-amber-200/60 shadow-sm hover:shadow-xl hover:shadow-amber-100/60
+                    border-amber-200
                 {% elif insight.tipo == 'sucesso' %}
-                    bg-gradient-to-br from-emerald-50 via-teal-50/60 to-white border border-emerald-200/60 shadow-sm hover:shadow-xl hover:shadow-emerald-100/60
+                    border-emerald-200
                 {% else %}
-                    bg-gradient-to-br from-blue-50 via-indigo-50/60 to-white border border-blue-200/60 shadow-sm hover:shadow-xl hover:shadow-blue-100/60
+                    border-blue-200
                 {% endif %}">
 
-                <!-- Decorative orb -->
-                <div class="insight-orb
-                    {% if insight.tipo == 'aviso' %}bg-amber-300/30
-                    {% elif insight.tipo == 'sucesso' %}bg-emerald-300/30
-                    {% else %}bg-blue-300/30{% endif %}"
-                    style="width: 120px; height: 120px; top: -30px; right: -30px;"></div>
-
-                <!-- Shimmer overlay -->
-                <div class="insight-shimmer rounded-2xl"></div>
-
                 <!-- Top accent bar -->
-                <div class="absolute top-0 left-0 right-0 h-1 rounded-t-2xl
-                    {% if insight.tipo == 'aviso' %}bg-gradient-to-r from-amber-400 via-orange-400 to-amber-300
-                    {% elif insight.tipo == 'sucesso' %}bg-gradient-to-r from-emerald-400 via-teal-400 to-emerald-300
-                    {% else %}bg-gradient-to-r from-blue-400 via-indigo-400 to-blue-300{% endif %}"></div>
+                <div class="absolute top-0 left-0 right-0 h-1
+                    {% if insight.tipo == 'aviso' %}bg-amber-400
+                    {% elif insight.tipo == 'sucesso' %}bg-emerald-400
+                    {% else %}bg-blue-400{% endif %}"></div>
 
                 <div class="relative z-10 p-5 pt-6 flex-1 flex flex-col">
                     <!-- Header with icon badge -->
                     <div class="flex items-start gap-3.5 mb-3">
-                        <div class="insight-icon-badge shrink-0 w-11 h-11 rounded-xl flex items-center justify-center shadow-md backdrop-blur-sm
+                        <div class="insight-icon-badge shrink-0 w-10 h-10 rounded-lg flex items-center justify-center border
                             {% if insight.tipo == 'aviso' %}
-                                bg-gradient-to-br from-amber-400 to-orange-500 text-white shadow-amber-200/50
+                                bg-amber-50 text-amber-600 border-amber-200
                             {% elif insight.tipo == 'sucesso' %}
-                                bg-gradient-to-br from-emerald-400 to-teal-500 text-white shadow-emerald-200/50
+                                bg-emerald-50 text-emerald-600 border-emerald-200
                             {% else %}
-                                bg-gradient-to-br from-blue-400 to-indigo-500 text-white shadow-blue-200/50
+                                bg-blue-50 text-blue-600 border-blue-200
                             {% endif %}">
                             {% if insight.tipo == 'aviso' %}
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
@@ -211,14 +163,13 @@
             
             <!-- Card Total -->
             <div class="insight-card gsap-scroll-reveal-item relative overflow-hidden rounded-2xl min-h-[140px] flex flex-col cursor-default
-                bg-gradient-to-br from-blue-50/80 via-white to-white border border-blue-100/60 shadow-sm hover:shadow-xl hover:shadow-blue-100/60">
-                <div class="insight-shimmer rounded-2xl"></div>
-                <div class="absolute top-0 left-0 right-0 h-1 rounded-t-2xl bg-gradient-to-r from-blue-400 via-blue-300 to-indigo-300"></div>
+                bg-white border border-blue-200 shadow-sm hover:shadow-md transition-shadow">
+                <div class="absolute top-0 left-0 right-0 h-1 bg-blue-400"></div>
                 <div class="relative z-10 p-5 flex-1 flex flex-col justify-between">
                     <div class="flex justify-between items-start mb-3">
                         <p class="text-gray-500 text-sm font-bold tracking-wide uppercase truncate mr-2 mt-1">{{ t('total_tickets') }}</p>
-                        <div class="insight-icon-badge shrink-0 w-11 h-11 rounded-xl flex items-center justify-center shadow-md backdrop-blur-sm
-                            bg-gradient-to-br from-blue-400 to-blue-500 text-white shadow-blue-200/50" aria-hidden="true">
+                        <div class="insight-icon-badge shrink-0 w-10 h-10 rounded-lg flex items-center justify-center border
+                            bg-blue-50 text-blue-600 border-blue-200" aria-hidden="true">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
                         </div>
                     </div>
@@ -231,14 +182,13 @@
 
             <!-- Card Abertos -->
             <div class="insight-card gsap-scroll-reveal-item relative overflow-hidden rounded-2xl min-h-[140px] flex flex-col cursor-default
-                bg-gradient-to-br from-orange-50/80 via-white to-white border border-orange-100/60 shadow-sm hover:shadow-xl hover:shadow-orange-100/60">
-                <div class="insight-shimmer rounded-2xl"></div>
-                <div class="absolute top-0 left-0 right-0 h-1 rounded-t-2xl bg-gradient-to-r from-orange-400 via-orange-300 to-amber-300"></div>
+                bg-white border border-orange-200 shadow-sm hover:shadow-md transition-shadow">
+                <div class="absolute top-0 left-0 right-0 h-1 bg-orange-400"></div>
                 <div class="relative z-10 p-5 flex-1 flex flex-col justify-between">
                     <div class="flex justify-between items-start mb-3">
                         <p class="text-gray-500 text-sm font-bold tracking-wide uppercase truncate mr-2 mt-1">{{ t('open') }}</p>
-                        <div class="insight-icon-badge shrink-0 w-11 h-11 rounded-xl flex items-center justify-center shadow-md backdrop-blur-sm
-                            bg-gradient-to-br from-orange-400 to-orange-500 text-white shadow-orange-200/50" aria-hidden="true">
+                        <div class="insight-icon-badge shrink-0 w-10 h-10 rounded-lg flex items-center justify-center border
+                            bg-orange-50 text-orange-600 border-orange-200" aria-hidden="true">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
                         </div>
                     </div>
@@ -251,14 +201,13 @@
 
             <!-- Card Em Andamento -->
             <div class="insight-card gsap-scroll-reveal-item relative overflow-hidden rounded-2xl min-h-[140px] flex flex-col cursor-default
-                bg-gradient-to-br from-amber-50/80 via-white to-white border border-amber-100/60 shadow-sm hover:shadow-xl hover:shadow-amber-100/60">
-                <div class="insight-shimmer rounded-2xl"></div>
-                <div class="absolute top-0 left-0 right-0 h-1 rounded-t-2xl bg-gradient-to-r from-amber-400 via-amber-300 to-yellow-300"></div>
+                bg-white border border-amber-200 shadow-sm hover:shadow-md transition-shadow">
+                <div class="absolute top-0 left-0 right-0 h-1 bg-amber-400"></div>
                 <div class="relative z-10 p-5 flex-1 flex flex-col justify-between">
                     <div class="flex justify-between items-start mb-3">
                         <p class="text-gray-500 text-sm font-bold tracking-wide uppercase truncate mr-2 mt-1">{{ t('in_progress_tickets') }}</p>
-                        <div class="insight-icon-badge shrink-0 w-11 h-11 rounded-xl flex items-center justify-center shadow-md backdrop-blur-sm
-                            bg-gradient-to-br from-amber-400 to-amber-500 text-white shadow-amber-200/50" aria-hidden="true">
+                        <div class="insight-icon-badge shrink-0 w-10 h-10 rounded-lg flex items-center justify-center border
+                            bg-amber-50 text-amber-600 border-amber-200" aria-hidden="true">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                         </div>
                     </div>
@@ -271,14 +220,13 @@
 
             <!-- Card Concluídos -->
             <div class="insight-card gsap-scroll-reveal-item relative overflow-hidden rounded-2xl min-h-[140px] flex flex-col cursor-default
-                bg-gradient-to-br from-emerald-50/80 via-white to-white border border-emerald-100/60 shadow-sm hover:shadow-xl hover:shadow-emerald-100/60">
-                <div class="insight-shimmer rounded-2xl"></div>
-                <div class="absolute top-0 left-0 right-0 h-1 rounded-t-2xl bg-gradient-to-r from-emerald-400 via-emerald-300 to-green-300"></div>
+                bg-white border border-emerald-200 shadow-sm hover:shadow-md transition-shadow">
+                <div class="absolute top-0 left-0 right-0 h-1 bg-emerald-400"></div>
                 <div class="relative z-10 p-5 flex-1 flex flex-col justify-between">
                     <div class="flex justify-between items-start mb-3">
                         <p class="text-gray-500 text-sm font-bold tracking-wide uppercase truncate mr-2 mt-1">{{ t('completed_tickets') }}</p>
-                        <div class="insight-icon-badge shrink-0 w-11 h-11 rounded-xl flex items-center justify-center shadow-md backdrop-blur-sm
-                            bg-gradient-to-br from-emerald-400 to-emerald-500 text-white shadow-emerald-200/50" aria-hidden="true">
+                        <div class="insight-icon-badge shrink-0 w-10 h-10 rounded-lg flex items-center justify-center border
+                            bg-emerald-50 text-emerald-600 border-emerald-200" aria-hidden="true">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"></path></svg>
                         </div>
                     </div>
@@ -289,34 +237,31 @@
                 </div>
             </div>
 
-            <!-- Card Taxa de Resolução (Destaque Maior) -->
+            <!-- Card Taxa de Resolução -->
             <div class="insight-card gsap-scroll-reveal-item relative overflow-hidden rounded-2xl min-h-[140px] flex flex-col cursor-default
-                bg-gradient-to-br from-purple-600 to-indigo-700 text-white border border-transparent shadow-lg shadow-purple-900/20 hover:shadow-2xl hover:shadow-indigo-500/30">
-                <!-- Decorative orb -->
-                <div class="insight-orb bg-white/10" style="width: 150px; height: 150px; bottom: -50px; left: -50px;"></div>
-                <div class="insight-shimmer rounded-2xl opacity-0" style="background: linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.2) 50%, transparent 60%);"></div>
+                bg-white border border-indigo-200 shadow-sm hover:shadow-md transition-shadow">
+                <div class="absolute top-0 left-0 right-0 h-1 bg-indigo-500"></div>
                 
                 <div class="relative z-10 p-5 flex-1 flex flex-col justify-between">
                     <div class="flex justify-between items-start mb-3">
-                        <p class="text-indigo-100 text-sm font-bold tracking-wide uppercase truncate mr-2 mt-1">{{ t('resolution_rate') }}</p>
-                        <div class="insight-icon-badge shrink-0 w-11 h-11 rounded-xl flex items-center justify-center shadow-md backdrop-blur-md bg-white/20 border border-white/30" aria-hidden="true">
-                            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
+                        <p class="text-gray-500 text-sm font-bold tracking-wide uppercase truncate mr-2 mt-1">{{ t('resolution_rate') }}</p>
+                        <div class="insight-icon-badge shrink-0 w-10 h-10 rounded-lg flex items-center justify-center border bg-indigo-50 text-indigo-600 border-indigo-200" aria-hidden="true">
+                            <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
                         </div>
                     </div>
-                    <p class="insight-metric-value text-4xl font-black tracking-tighter">{{ metricas_gerais.taxa_resolucao_percentual }}%</p>
+                    <p class="insight-metric-value text-4xl font-black text-indigo-600 tracking-tighter">{{ metricas_gerais.taxa_resolucao_percentual }}%</p>
                 </div>
             </div>
 
             <!-- Card Dentro do SLA -->
             <div class="insight-card gsap-scroll-reveal-item relative overflow-hidden rounded-2xl min-h-[140px] flex flex-col cursor-default
-                bg-gradient-to-br from-teal-50/80 via-white to-white border border-teal-100/60 shadow-sm hover:shadow-xl hover:shadow-teal-100/60">
-                <div class="insight-shimmer rounded-2xl"></div>
-                <div class="absolute top-0 left-0 right-0 h-1 rounded-t-2xl bg-gradient-to-r from-teal-400 via-teal-300 to-emerald-300"></div>
+                bg-white border border-teal-200 shadow-sm hover:shadow-md transition-shadow">
+                <div class="absolute top-0 left-0 right-0 h-1 bg-teal-400"></div>
                 <div class="relative z-10 p-5 flex-1 flex flex-col justify-between">
                     <div class="flex justify-between items-start mb-3">
                         <p class="text-gray-500 text-sm font-bold tracking-wide uppercase truncate mr-2 mt-1">{{ t('within_sla') }}</p>
-                        <div class="insight-icon-badge shrink-0 w-11 h-11 rounded-xl flex items-center justify-center shadow-md backdrop-blur-sm
-                            bg-gradient-to-br from-teal-400 to-teal-500 text-white shadow-teal-200/50" title="{{ t('sla_tooltip') }}" aria-hidden="true">
+                        <div class="insight-icon-badge shrink-0 w-10 h-10 rounded-lg flex items-center justify-center border
+                            bg-teal-50 text-teal-600 border-teal-200" title="{{ t('sla_tooltip') }}" aria-hidden="true">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                         </div>
                     </div>
@@ -392,6 +337,64 @@
     </div>
     {% endif %}
 
+    <!-- GAMIFICAÇÃO: TOP 3 DA SEMANA -->
+    {% if current_user.perfil in ['supervisor', 'admin'] and ranking_gamificacao %}
+    <div class="gsap-scroll-reveal mb-8">
+        <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
+            <span class="bg-yellow-100 text-yellow-600 p-1.5 rounded-lg mr-2" aria-hidden="true">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/></svg>
+            </span>
+            {{ t('top_3_week') }}
+        </h2>
+        <p class="text-sm text-gray-500 mb-4">{{ t('top_3_desc') }}</p>
+        
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+            {% for usuario in ranking_gamificacao %}
+            <!-- Card -->
+            <div class="gsap-scroll-reveal-item bg-white rounded-2xl p-4 border border-slate-100 shadow-sm hover:shadow-md transition-all group flex flex-col items-center text-center relative cursor-default">
+                
+                <!-- Medalha -->
+                {% if loop.index == 1 %}
+                <div class="absolute -top-3 left-1/2 -translate-x-1/2 bg-yellow-100 text-yellow-800 rounded-full px-3 py-0.5 flex items-center gap-1 font-bold text-[10px] uppercase border border-yellow-200 z-10 whitespace-nowrap" title="{{ t('1st_place') }}">
+                    🥇 {{ t('1st_place') }}
+                </div>
+                {% elif loop.index == 2 %}
+                <div class="absolute -top-3 left-1/2 -translate-x-1/2 bg-slate-100 text-slate-700 rounded-full px-3 py-0.5 flex items-center gap-1 font-bold text-[10px] uppercase border border-slate-200 z-10 whitespace-nowrap" title="{{ t('2nd_place') }}">
+                    🥈 {{ t('2nd_place') }}
+                </div>
+                {% elif loop.index == 3 %}
+                <div class="absolute -top-3 left-1/2 -translate-x-1/2 bg-orange-50 text-orange-800 rounded-full px-3 py-0.5 flex items-center gap-1 font-bold text-[10px] uppercase border border-orange-200 z-10 whitespace-nowrap" title="{{ t('3rd_place') }}">
+                    🥉 {{ t('3rd_place') }}
+                </div>
+                {% else %}
+                <div class="absolute -top-3 left-1/2 -translate-x-1/2 bg-gray-100 text-gray-500 rounded-full w-5 h-5 flex items-center justify-center font-bold text-[10px] border border-gray-200 z-10">
+                    {{ loop.index }}º
+                </div>
+                {% endif %}
+
+                <!-- Avatar -->
+                <div class="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-bold text-lg mb-2 border border-slate-200 mt-2">
+                    {{ usuario.nome[0] if usuario.nome else '?' }}
+                </div>
+                
+                <!-- Nome -->
+                <h4 class="text-slate-800 font-bold text-sm truncate w-full" title="{{ usuario.nome }}">{{ nome_curto(usuario.nome) if usuario.nome else 'Usuário' }}</h4>
+                
+                <!-- Status -->
+                <div class="flex items-center gap-2 mt-2 w-full pt-2 border-t border-slate-50 justify-center">
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                        {{ t('level_abbv') }} {{ usuario.level }}
+                    </span>
+                    <span class="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">
+                        {{ usuario.exp_semanal }} XP
+                    </span>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
     <!-- DESEMPENHO POR SUPERVISOR -->
     {% if metricas_supervisores_full is defined and metricas_supervisores_full %}
     <div class="gsap-scroll-reveal mb-8" id="secao-supervisores">
@@ -413,7 +416,7 @@
             <input type="hidden" name="ordem_area" value="{{ ordem_area }}">
             <input type="search" name="busca_sup" value="{{ busca_sup }}" placeholder="{{ t('search_supervisors_placeholder') }}"
                    class="rounded-lg border border-gray-200 px-3 py-1.5 text-sm w-64 max-w-full" aria-label="{{ t('search_supervisors_placeholder') }}">
-            <button type="submit" class="rounded-lg bg-indigo-100 text-indigo-700 px-3 py-1.5 text-sm font-medium hover:bg-indigo-200 transition">{{ t('search') }}</button>
+            <button type="submit" class="rounded-lg bg-indigo-100 text-indigo-700 px-3 py-1.5 text-sm font-medium hover:bg-indigo-200 transition">Buscar</button>
         </form>
         
         <!-- Tabelas e Gráficos de Perf -->
@@ -451,10 +454,10 @@
                         </thead>
                         <tbody class="divide-y divide-gray-100">
                             {% for sup in metricas_supervisores %}
-                            <tr class="hover:bg-blue-50/30 transition group">
+                            <tr class="hover:bg-slate-50/80 transition group border-b border-gray-50 last:border-none">
                                 <td class="px-2 py-2">
                                     <div class="flex items-center min-w-0">
-                                        <div class="w-7 h-7 rounded-full bg-blue-100 text-blue-600 font-bold flex items-center justify-center mr-2 text-xs shrink-0">
+                                        <div class="w-6 h-6 rounded bg-slate-100 text-slate-600 font-bold flex items-center justify-center mr-2 text-[10px] shrink-0">
                                             {{ sup.supervisor_nome[0] }}
                                         </div>
                                         <div class="min-w-0">
@@ -465,16 +468,16 @@
                                 </td>
                                 <td class="px-2 py-2 text-gray-600 truncate" title="{{ sup.area }}">{{ sup.area.split(', ')|map('translate_sector')|join(', ') if ', ' in sup.area else translate_sector(sup.area) }}</td>
                                 <td class="px-2 py-2 text-center">
-                                    <span class="inline-flex justify-center font-bold text-gray-700 bg-gray-100 px-1.5 py-0.5 rounded text-xs">{{ sup.total_chamados }}</span>
+                                    <span class="inline-flex justify-center font-bold text-gray-700 bg-gray-50 border border-gray-200 px-1.5 py-0.5 rounded text-xs">{{ sup.total_chamados }}</span>
                                 </td>
                                 <td class="px-2 py-2 text-center">
                                     <span class="inline-flex justify-center font-bold text-xs shadow-sm 
                                         {% if sup.carga_atual > 10 %}
-                                            bg-red-500 text-white
+                                            bg-red-50 text-red-700 border border-red-200
                                         {% elif sup.carga_atual > 5 %}
-                                            bg-yellow-400 text-yellow-900
+                                            bg-amber-50 text-amber-700 border border-amber-200
                                         {% else %}
-                                            bg-emerald-100 text-emerald-800
+                                            bg-slate-50 text-slate-700 border border-slate-200
                                         {% endif %}
                                         px-1.5 py-0.5 rounded">
                                         {{ sup.carga_atual }}
@@ -483,8 +486,8 @@
                                 <td class="px-2 py-2 text-center font-bold text-emerald-600 text-xs">{{ sup.concluidos }}</td>
                                 <td class="px-2 py-2">
                                     <div class="flex items-center gap-1.5">
-                                        <div class="flex-1 min-w-0 bg-gray-100 rounded-full h-1.5">
-                                            <div class="bg-indigo-500 h-1.5 rounded-full" data-width="{{ sup.taxa_resolucao_percentual }}"></div>
+                                        <div class="flex-1 min-w-0 bg-slate-100 rounded-full h-1.5">
+                                            <div class="bg-indigo-400 h-1.5 rounded-full" data-width="{{ sup.taxa_resolucao_percentual }}"></div>
                                         </div>
                                         <span class="text-xs font-bold text-gray-700 shrink-0 w-8 text-right">{{ sup.taxa_resolucao_percentual }}%</span>
                                     </div>
@@ -563,7 +566,7 @@
             <input type="hidden" name="ordem_sup" value="{{ ordem_sup }}">
             <input type="search" name="busca_area" value="{{ busca_area }}" placeholder="{{ t('search_areas_placeholder') }}"
                    class="rounded-lg border border-gray-200 px-3 py-1.5 text-sm w-64 max-w-full" aria-label="{{ t('search_areas_placeholder') }}">
-            <button type="submit" class="rounded-lg bg-pink-100 text-pink-700 px-3 py-1.5 text-sm font-medium hover:bg-pink-200 transition">{{ t('search') }}</button>
+            <button type="submit" class="rounded-lg bg-pink-100 text-pink-700 px-3 py-1.5 text-sm font-medium hover:bg-pink-200 transition">Buscar</button>
         </form>
         
         <div class="grid grid-cols-1 xl:grid-cols-4 gap-6">
@@ -595,22 +598,22 @@
                         </thead>
                         <tbody class="divide-y divide-gray-100">
                             {% for area in metricas_areas %}
-                            <tr class="hover:bg-pink-50/20 transition group">
+                            <tr class="hover:bg-slate-50/80 transition group border-b border-gray-50 last:border-none">
                                 <td class="px-2 py-2 font-bold text-gray-800">
                                     <div class="flex items-center min-w-0">
-                                        <div class="w-1.5 h-1.5 rounded-full bg-pink-400 mr-1.5 shrink-0"></div>
+                                        <div class="w-1.5 h-1.5 rounded-full bg-slate-400 mr-1.5 shrink-0"></div>
                                         <span class="truncate" title="{{ area.area }}">{{ translate_sector(area.area) }}</span>
                                     </div>
                                 </td>
                                 <td class="px-2 py-2 text-center">
-                                    <span class="inline-flex justify-center font-bold text-gray-700 bg-gray-100 px-1.5 py-0.5 rounded text-xs">{{ area.total_chamados }}</span>
+                                    <span class="inline-flex justify-center font-bold text-gray-700 bg-gray-50 border border-gray-200 px-1.5 py-0.5 rounded text-xs">{{ area.total_chamados }}</span>
                                 </td>
-                                <td class="px-2 py-2 text-center text-xs text-orange-600 font-bold">{{ area.abertos }}</td>
-                                <td class="px-2 py-2 text-center text-xs text-emerald-600 font-bold">{{ area.concluidos }}</td>
+                                <td class="px-2 py-2 text-center text-xs text-slate-600 font-bold">{{ area.abertos }}</td>
+                                <td class="px-2 py-2 text-center text-xs text-slate-600 font-bold">{{ area.concluidos }}</td>
                                 <td class="px-2 py-2">
                                     <div class="flex items-center gap-1.5">
-                                        <div class="flex-1 min-w-0 bg-gray-100 rounded-full h-1.5">
-                                            <div class="bg-pink-500 h-1.5 rounded-full" data-width="{{ area.taxa_resolucao_percentual }}"></div>
+                                        <div class="flex-1 min-w-0 bg-slate-100 rounded-full h-1.5">
+                                            <div class="bg-indigo-400 h-1.5 rounded-full" data-width="{{ area.taxa_resolucao_percentual }}"></div>
                                         </div>
                                         <span class="text-xs font-bold text-gray-700 shrink-0 w-8 text-right">{{ area.taxa_resolucao_percentual }}%</span>
                                     </div>
@@ -618,7 +621,7 @@
                                 <td class="px-2 py-2 text-right font-mono text-gray-500 text-xs">{{ area.tempo_medio_resolucao_horas }}h</td>
                                 <td class="px-2 py-2 text-center text-xs font-semibold text-gray-500">{{ area.supervisores_alocados }}</td>
                                 <td class="px-2 py-2 text-right">
-                                    <span class="font-bold text-teal-800 bg-teal-100 px-1.5 py-0.5 rounded border border-teal-200 text-xs">
+                                    <span class="font-bold text-slate-800 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-200 text-xs">
                                         {{ area.taxa_automacao_percentual }}%
                                     </span>
                                 </td>
@@ -672,7 +675,8 @@
 <!-- Chart.js Library -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-<!-- Dados JSON para os gráficos (listas completas para Top 3 / Top N) -->
+<!-- Dados JSON para os gráficos (listas completas para Top 3 / Top N).
+     Segurança: |safe é seguro aqui pois os dados vêm exclusivamente do backend (métricas/traduções), nunca de input do usuário. -->
 <script type="application/json" id="dados-gerais">{{ metricas_gerais|tojson|safe }}</script>
 <script type="application/json" id="dados-supervisores">{% if metricas_supervisores_full is defined %}{{ metricas_supervisores_full|tojson|safe }}{% else %}[]{% endif %}</script>
 <script type="application/json" id="dados-areas">{% if metricas_areas_full is defined %}{{ metricas_areas_full|tojson|safe }}{% else %}[]{% endif %}</script>
@@ -825,6 +829,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const chartAreasEmptyEl = document.getElementById('chartAreasEmpty');
     const TOP_N_AREAS = 6;
     if (chartAreasEl && dadosAreas.length > 0) {
+        // Dados de tradução do backend (t()); |safe seguro pois controlado pelo servidor
         const sectorTranslations = JSON.parse('{{ {"Manutencao": t("maintenance"), "Engenharia": t("engineering"), "Qualidade": t("quality"), "Comercial": t("commercial"), "Planejamento": t("planning"), "Material": t("indirect_material")}|tojson|safe }}');
         function trSector(name) { return sectorTranslations[name] || name; }
         const sorted = dadosAreas.slice().sort(function(a, b) { return (b.total_chamados || 0) - (a.total_chamados || 0); });

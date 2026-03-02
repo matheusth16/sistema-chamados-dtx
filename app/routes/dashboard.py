@@ -132,15 +132,7 @@ def admin() -> Response:
         key=lambda x: x['nome'].upper()
     )
 
-    # Ranking Gamificação (Top 5 da Semana)
-    # Pegamos os usuários logados/ativos (ideal buscar do banco filtrando por exp_semanal > 0, mas em memória resolve se a base não for tão monstruosa de técnicos)
-    # Como não temos uma query que retorna *todos* sempre ou dependemos de criptografia (já lidada em get_all),
-    # reaproveitamos usuarios_gestao que já possui supervisores/admins
-    ranking_gamificacao = sorted(
-        [u for u in usuarios_gestao if u.exp_semanal > 0],
-        key=lambda u: u.exp_semanal, 
-        reverse=True
-    )[:5]
+    # Ranking Gamificação movido para /relatorios
 
     chamados_ref = db.collection('chamados')
     # Supervisor vê apenas chamados das suas áreas (filtro no Firestore para não trazer outros setores)
@@ -186,7 +178,6 @@ def admin() -> Response:
         lista_responsaveis=lista_responsaveis,
         supervisores_detalhados=supervisores_detalhados,
         lista_gates=lista_gates,
-        ranking_gamificacao=ranking_gamificacao,
         max=max,
         min=min,
     )
@@ -310,7 +301,11 @@ def editar_chamado_pagina() -> Response:
 
         arquivo_anexo = request.files.get('anexo')
         if arquivo_anexo and arquivo_anexo.filename:
-            caminho_anexo = salvar_anexo(arquivo_anexo)
+            try:
+                caminho_anexo = salvar_anexo(arquivo_anexo)
+            except ValueError as e:
+                flash(str(e), 'danger')
+                return redirect(url_for('main.visualizar_detalhe_chamado', chamado_id=chamado_id))
             if caminho_anexo is None and current_app.config.get('ENV') == 'production':
                 flash_t('error_attachment_upload_production', 'warning')
             elif caminho_anexo:
@@ -587,9 +582,19 @@ def relatorios() -> Response:
         inicio_area = (pagina_area - 1) * itens_por_pagina
         metricas_areas = metricas_areas_full[inicio_area : inicio_area + itens_por_pagina]
 
+        # Ranking Gamificação Top 3 da Semana
+        # Aproveitar os usuários puxados do banco ou base no relatorio
+        usuarios_gestao = Usuario.get_all()
+        ranking_gamificacao = sorted(
+            [u for u in usuarios_gestao if u.exp_semanal > 0 and u.perfil in ('supervisor', 'admin') and u.nome],
+            key=lambda u: u.exp_semanal, 
+            reverse=True
+        )[:3]
+
         return render_template(
             'relatorios.html',
             relatorio=relatorio,
+            ranking_gamificacao=ranking_gamificacao,
             metricas_gerais=relatorio.get('metricas_gerais') or {},
             metricas_supervisores=metricas_supervisores,
             metricas_supervisores_full=metricas_supervisores_full,
@@ -620,6 +625,7 @@ def relatorios() -> Response:
             return render_template(
                 'relatorios.html',
                 relatorio={},
+                ranking_gamificacao=[],
                 metricas_gerais={},
                 metricas_supervisores=[],
                 metricas_supervisores_full=[],

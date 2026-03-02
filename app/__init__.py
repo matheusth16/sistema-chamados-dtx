@@ -87,11 +87,26 @@ def _configurar_seguranca(app: Flask) -> None:
         """Adiciona headers de segurança a todas as respostas."""
         response.headers['X-Content-Type-Options'] = 'nosniff'  # Impede MIME sniffing
         response.headers['X-Frame-Options'] = 'SAMEORIGIN'      # Proteção contra clickjacking
+        # Permissions-Policy: desabilita APIs do browser não usadas (câmera, microfone, geolocalização)
+        response.headers['Permissions-Policy'] = (
+            'camera=(), microphone=(), geolocation=(), payment=()'
+        )
         if request.is_secure and current_app.env == 'production':
             # HSTS força HTTPS em conexões futuras (31536000 = 1 ano)
             response.headers['Strict-Transport-Security'] = (
                 'max-age=31536000; includeSubDomains'
             )
+            # CSP em produção: reduz superfície de XSS (ajuste default-src/script-src se usar CDN)
+            csp = (
+                "default-src 'self'; "
+                "script-src 'self' https://cdn.jsdelivr.net 'unsafe-inline'; "
+                "style-src 'self' https://cdn.jsdelivr.net 'unsafe-inline'; "
+                "img-src 'self' data: https: blob:; "
+                "font-src 'self' https://cdn.jsdelivr.net; "
+                "connect-src 'self'; "
+                "frame-ancestors 'self';"
+            )
+            response.headers['Content-Security-Policy'] = csp
         return response
 
     @app.before_request

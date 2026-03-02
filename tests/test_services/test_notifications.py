@@ -4,10 +4,12 @@ from unittest.mock import patch, MagicMock
 
 
 def test_enviar_email_retorna_false_sem_destinatario(app):
-    """enviar_email retorna False quando destinatário está vazio."""
+    """enviar_email retorna (False, None) quando destinatário está vazio."""
     from app.services.notifications import enviar_email
     with app.app_context():
-        assert enviar_email('', 'Assunto', '<p>Teste</p>') is False
+        ok, err = enviar_email('', 'Assunto', '<p>Teste</p>')
+        assert ok is False
+        assert err is None
 
 
 def test_criar_notificacao_retorna_none_sem_usuario_id():

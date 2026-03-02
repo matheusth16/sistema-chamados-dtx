@@ -7,6 +7,8 @@ from app.i18n import flash_t
 from app.routes import main
 from app.limiter import limiter
 from app.models_usuario import Usuario
+from app.utils import mask_email_for_log, get_client_ip
+from app.services.login_attempts import LoginAttemptTracker, MAX_LOGIN_ATTEMPTS, LOCKOUT_DURATION
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +23,11 @@ def login() -> Response:
         session.pop('last_activity', None)
 
     if current_user.is_authenticated:
-        logger.info(f"Usuário {current_user.email} ({current_user.perfil}) já autenticado, redirecionando...")
+        logger.info(
+            "Usuário %s (%s) já autenticado, redirecionando...",
+            mask_email_for_log(current_user.email),
+            current_user.perfil,
+        )
         if current_user.perfil == 'solicitante':
             return redirect(url_for('main.index'))
         return redirect(url_for('main.admin'))
@@ -29,20 +35,45 @@ def login() -> Response:
     if request.method == 'POST':
         email = request.form.get('email', '').strip()
         senha = request.form.get('senha', '')
+        client_ip = get_client_ip()
 
         if not email or not senha:
             flash_t('email_password_required', 'danger')
             return redirect(url_for('main.login'))
 
+        # Verifica se o IP está bloqueado
+        if LoginAttemptTracker.is_locked_out(client_ip):
+            flash_t(
+                'login_temporarily_blocked',
+                'danger',
+                duration=LOCKOUT_DURATION // 60  # Converte para minutos
+            )
+            logger.warning(
+                "Tentativa de login em IP bloqueado: %s (email: %s)",
+                client_ip,
+                mask_email_for_log(email),
+            )
+            return redirect(url_for('main.login'))
+
         usuario = Usuario.get_by_email(email)
         if usuario and usuario.check_password(senha):
-            # remember=False ensures it's a session cookie that expires on browser close
-            login_user(usuario, remember=False)
-            logger.info(f"Login bem-sucedido: {usuario.email} ({usuario.nome}, Perfil: {usuario.perfil})")
+            # Login bem-sucedido: reseta tentativas
+            LoginAttemptTracker.reset_attempts(client_ip)
+            LoginAttemptTracker.reset_attempts(email)
+            
+            # Verifica se o usuário selecionou "manter-me conectado"
+            remember = request.form.get('remember-me') == 'on'
+            # Se remember=True, cria persistent cookie válido por 30 dias
+            # Se remember=False, cria session cookie que expira ao fechar navegador
+            login_user(usuario, remember=remember, duration=None if remember else None)
+            LoginAttemptTracker.log_success_attempt(email, client_ip, usuario.perfil)
             
             # Verificar se precisa trocar senha (exceto admins)
             if usuario.must_change_password and usuario.perfil != 'admin':
-                logger.info(f"Redirecionando {usuario.email} para troca de senha obrigatória")
+                logger.info(
+                    "Redirecionando %s para troca de senha obrigatória",
+                    mask_email_for_log(usuario.email),
+                )
                 flash_t('password_change_required_alert', 'warning')
                 return redirect(url_for('main.alterar_senha_obrigatoria'))
             
@@ -51,7 +82,25 @@ def login() -> Response:
                 return redirect(url_for('main.index'))
             return redirect(url_for('main.admin'))
 
-        logger.warning(f"Falha de autenticação: email {email} ou senha incorretos")
+        # Login falhou: incrementa tentativas
+        attempts = LoginAttemptTracker.increment_attempt(client_ip)
+        LoginAttemptTracker.log_failed_attempt(email, client_ip, "credenciais inválidas")
+        
+        # Verifica se excedeu o limite de tentativas
+        if attempts >= MAX_LOGIN_ATTEMPTS:
+            LoginAttemptTracker.apply_lockout(client_ip)
+            flash_t(
+                'too_many_login_attempts',
+                'danger',
+                duration=LOCKOUT_DURATION // 60  # Converte para minutos
+            )
+            logger.error(
+                "Bloqueio ativado após %d tentativas falhas do IP %s",
+                attempts,
+                client_ip,
+            )
+            return redirect(url_for('main.login'))
+        
         flash_t('invalid_email_password', 'danger')
         return redirect(url_for('main.login'))
 
@@ -64,7 +113,7 @@ def logout() -> Response:
     """Finaliza a sessão do usuário."""
     email = current_user.email
     logout_user()
-    logger.info(f"Logout: {email}")
+    logger.info("Logout: %s", mask_email_for_log(email))
     flash_t('logout_success', 'info')
     return redirect(url_for('main.login'))
 
@@ -110,7 +159,10 @@ def alterar_senha_obrigatoria() -> Response:
             )
             
             if sucesso:
-                logger.info(f"Senha alterada com sucesso no primeiro acesso: {current_user.email}")
+                logger.info(
+                    "Senha alterada com sucesso no primeiro acesso: %s",
+                    mask_email_for_log(current_user.email),
+                )
                 flash_t('password_changed_success', 'success')
                 
                 # Redirecionar para o dashboard apropriado

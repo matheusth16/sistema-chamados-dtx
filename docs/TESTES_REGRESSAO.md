@@ -29,9 +29,17 @@ A suite de regressão cobre:
 
 ---
 
-## 3. Como Executar
+## 3. Execução e regressão
 
-### Suite dedicada de regressão (recomendado)
+### 3.1 Quando executar
+
+- **Antes de cada merge/PR:** suite de regressão (`tests/test_regression/`) ou suite completa.
+- **Antes de release/deploy:** suite completa + cobertura.
+- **Em CI/CD:** configurar pipeline para rodar `pytest tests/ -v` (ou `pytest -m regression -v` se usar markers) em todo commit na branch principal.
+
+### 3.2 Comandos de execução
+
+#### Suite dedicada de regressão (recomendado antes de merge)
 
 ```bash
 pytest tests/test_regression/ -v
@@ -39,7 +47,7 @@ pytest tests/test_regression/ -v
 
 Todos os testes em `tests/test_regression/` são considerados de regressão e devem passar antes de merge/deploy.
 
-### Marcar testes existentes como regressão
+#### Marcar testes existentes como regressão
 
 Testes em outros módulos podem ser marcados com `@pytest.mark.regression`. Para rodar apenas esses:
 
@@ -49,15 +57,29 @@ pytest -m regression -v
 
 (Requer registro do marker em `conftest.py`; veja seção 4.)
 
-### Suite completa (smoke + regressão)
+#### Suite completa (smoke + regressão)
 
 Para máxima segurança, rode toda a suíte antes de release:
 
 ```bash
 pytest tests/ -v
-# ou
+```
+
+#### Suite completa com cobertura
+
+```bash
+pytest tests/ -v --cov=app --cov-report=term-missing
+```
+
+Focar em rotas e serviços de negócio; manter cobertura estável ou crescente.
+
+#### Script de verificação (audit + testes)
+
+```bash
 python scripts/verificar_dependencias.py --no-audit
 ```
+
+Executa os testes sem o audit de dependências (útil em CI).
 
 ---
 
@@ -88,3 +110,16 @@ Assim, é possível marcar testes em qualquer arquivo com `@pytest.mark.regressi
 - Remover ou ajustar testes obsoletos quando um recurso for descontinuado ou o comportamento for alterado por design.
 
 Este documento deve ser revisado quando o escopo de regressão for ampliado ou reduzido.
+
+---
+
+## 7. Documentos alinhados
+
+Para manter consistência entre execução, casos de teste e requisitos:
+
+| Documento | Uso |
+|-----------|-----|
+| [CASOS_DE_TESTE.md](CASOS_DE_TESTE.md) | Casos passo a passo e mapeamento para pytest (inclui lacunas: senha, dashboard, export, admin, segurança). |
+| [PLANO_DE_TESTES.md](PLANO_DE_TESTES.md) | Estratégia, escopo e critérios de saída; atualizar quando novos cenários forem incluídos. |
+| [API.md](API.md) | Contratos dos endpoints; testes de API devem seguir códigos e estrutura documentados. |
+| [ANALISE_REQUISITOS_QA.md](ANALISE_REQUISITOS_QA.md) | Regras de negócio; base para cenários de regressão. |

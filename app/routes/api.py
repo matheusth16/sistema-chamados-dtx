@@ -145,7 +145,10 @@ def api_editar_chamado():
 
         # Anexo (Adicionando múltiplos anexos)
         if arquivo_anexo and arquivo_anexo.filename:
-            caminho_anexo = salvar_anexo(arquivo_anexo)
+            try:
+                caminho_anexo = salvar_anexo(arquivo_anexo)
+            except ValueError as e:
+                return jsonify({'sucesso': False, 'erro': str(e)}), 400
             if caminho_anexo:
                 # Recarrega anexos existentes e adiciona o novo
                 anexos_existentes = data_chamado.get('anexos', [])

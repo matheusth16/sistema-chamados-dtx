@@ -63,6 +63,8 @@ Copie `.env.example` para `.env` e preencha conforme o ambiente (desenvolvimento
 
 Se `MAIL_SERVER` estiver vazio, o envio por e-mail fica desabilitado.
 
+**Envio pelo seu e-mail pessoal (SMTP):** para que o aviso ao supervisor saia exclusivamente do seu e-mail pessoal, use **somente** as variáveis `MAIL_*` (ex.: Gmail com [Senha de app](https://myaccount.google.com/apppasswords)) e **não** defina `RESEND_API_KEY`. O sistema usará SMTP; o supervisor receberá o e-mail com remetente igual ao seu e-mail pessoal.
+
 ---
 
 ## Microsoft Teams
@@ -86,6 +88,15 @@ Se ambas estiverem vazias, a inscrição/Web Push fica desabilitada.
 
 ---
 
+## Criptografia de PII em repouso (LGPD)
+
+| Variável               | Descrição | Padrão | Exemplo |
+|------------------------|-----------|--------|---------|
+| `ENCRYPTION_KEY`       | Chave Fernet (base64, 32 bytes) para criptografia de campos sensíveis. Gere com: `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`. Deve ser mantida em cofre de segredos; nunca versionada. | (vazio) | (string base64) |
+| `ENCRYPT_PII_AT_REST`  | Se `true`, ativa criptografia do campo nome na coleção de usuários (requer `ENCRYPTION_KEY` configurada). | `false` | `true` |
+
+---
+
 ## Logging
 
 | Variável         | Descrição | Padrão | Exemplo |
@@ -94,7 +105,19 @@ Se ambas estiverem vazias, a inscrição/Web Push fica desabilitada.
 | `LOG_MAX_BYTES`  | Tamanho máximo por arquivo de log antes de rotação (bytes). | `2097152` (2 MB) | `5242880` |
 | `LOG_BACKUP_COUNT` | Quantidade de arquivos de log rotacionados mantidos. | `5` | `10` |
 
-Logs são gravados em `logs/sistema_chamados.log` (formato JSON com rotação).
+Logs são gravados em `logs/sistema_chamados.log` (formato JSON com rotação). Em produção, e-mails em logs são mascarados (ex.: `u***@dominio.com`).
+
+---
+
+## Auditoria de dependências
+
+Execute periodicamente para verificar vulnerabilidades conhecidas nas dependências Python:
+
+```bash
+pip audit
+```
+
+Recomenda-se integrar `pip audit` no pipeline de CI e corrigir vulnerabilidades reportadas. Ver também `requirements.txt` na raiz do projeto.
 
 ---
 

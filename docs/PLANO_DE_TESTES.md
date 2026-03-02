@@ -21,7 +21,7 @@
 
 | Módulo | Escopo |
 |--------|--------|
-| Autenticação | Login, logout, redirecionamento por perfil, rotas protegidas |
+| Autenticação | Login, logout, redirecionamento por perfil, rotas protegidas, alterar senha obrigatória |
 | Chamados (criação) | Validação de formulário, regra Projetos+RL, anexos, atribuição |
 | API Status | Atualizar status (unitário), bulk-status (permissão + área) |
 | API Edição | Editar chamado (supervisor/admin, área, campos) |
@@ -33,6 +33,9 @@
 | Validadores | Descrição, tipo, categoria Projetos, RL, anexo |
 | Utilitários e exceções | Número de chamado, exceções customizadas |
 | Health / Service Worker | Health 200, sw.js servido |
+| Dashboard / Export / Relatórios | GET /admin, /exportar, /admin/relatorios (permissão supervisor/admin) |
+| Admin (usuários, categorias, traduções) | CRUD e listagens apenas para perfil admin; testes de permissão |
+| Segurança | Validação Origin/Referer em POST sensíveis; rate limit (quando testável) |
 
 ### 2.2 Fora do Escopo (Nesta Fase)
 
@@ -90,6 +93,10 @@
 8. **Notificações:** listar, marcar lida, ler-todas (estrutura e 401 sem login).
 9. **Permissões:** `usuario_pode_ver_chamado` para admin, supervisor (área própria/outra), solicitante.
 10. **Health / SW:** GET `/health` 200; GET `/sw.js` 200 e content-type JavaScript.
+11. **Alterar senha obrigatória:** troca com dados válidos; senha &lt; 6 caracteres rejeitada; usuário sem obrigação redirecionado.
+12. **Dashboard / Export / Relatórios:** GET /admin 200 (supervisor/admin); export e relatórios 403 para solicitante, 200 para supervisor/admin.
+13. **Admin (usuários, categorias, traduções):** rotas apenas para admin; listagem 200 para admin.
+14. **Segurança:** POST com Origin inválido rejeitado quando APP_BASE_URL definido; rate limit em login (se testável).
 
 ---
 
@@ -105,8 +112,9 @@
 ## 6. Critérios de Saída
 
 - Todos os testes planejados implementados e passando.
-- Testes de regressão executados antes de merge/deploy (ex.: `python scripts/verificar_dependencias.py` ou `pytest`).
+- **Execução e regressão:** testes de regressão executados antes de merge/deploy. Comandos: `pytest tests/test_regression/ -v` (regressão) ou `pytest tests/ -v` (suite completa); com cobertura: `pytest tests/ -v --cov=app --cov-report=term-missing`. Ver [TESTES_REGRESSAO.md](TESTES_REGRESSAO.md) para quando e como executar.
 - Nenhum teste que dependa de credenciais Firebase ou Redis em CI (apenas mocks).
+- Documentação de testes alinhada: ao alterar comportamento ou API, atualizar [API.md](API.md), [ANALISE_REQUISITOS_QA.md](ANALISE_REQUISITOS_QA.md), [CASOS_DE_TESTE.md](CASOS_DE_TESTE.md) e este plano conforme necessário.
 
 ---
 
@@ -131,8 +139,9 @@
 
 ## 9. Próximos Passos
 
-- Manter [CASOS_DE_TESTE.md](CASOS_DE_TESTE.md) atualizado com os cenários passo a passo.
+- Manter [CASOS_DE_TESTE.md](CASOS_DE_TESTE.md) atualizado com os cenários passo a passo (incluindo lacunas preenchidas: alterar senha, dashboard, export, relatórios, admin usuários/categorias/traduções, segurança Origin, rate limit).
+- Implementar ou completar testes automatizados para os novos casos (CT-SENHA-*, CT-DASH-01, CT-EXP-*, CT-ADM-*, CT-TRAD-01, CT-SEC-01, CT-RATE-01) conforme mapeamento em CASOS_DE_TESTE.
 - Adicionar testes de integração para dashboard e relatórios quando estável.
 - Considerar testes E2E para fluxos principais (login → criar chamado → ver lista) em fase posterior.
 
-Este plano deve ser revisado quando houver mudança relevante de escopo ou de requisitos.
+**Revisão do plano:** Este plano deve ser revisado quando houver mudança relevante de escopo ou de requisitos. Manter documentação alinhada: API.md, ANALISE_REQUISITOS_QA.md, CASOS_DE_TESTE.md e TESTES_REGRESSAO.md em sincronia com o código.

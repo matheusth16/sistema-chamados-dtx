@@ -56,9 +56,15 @@ if resultado['tem_proxima']:
 
 def _construir_query_base(query_ref, args):
     """
-    OTIMIZAÇÃO 1: Aplica filtros baseados em índices Firestore
-    
-    Retorna: (query_filtrada, categoria_filtrada, categoria, status, gate)
+    Aplica filtros baseados em índices Firestore (status, gate, responsavel).
+    Categoria e search são aplicados depois em memória (ver _aplicar_filtros_em_memoria).
+
+    Args:
+        query_ref: Referência da coleção ou query Firestore.
+        args: Dict com chaves status, gate, categoria, responsavel (query params).
+
+    Returns:
+        Tuple (query_filtrada, categoria_filtrada, categoria, status, gate).
     """
     status = args.get('status')
     gate = args.get('gate')

@@ -32,10 +32,8 @@ def gerenciar_usuarios() -> Response:
             erros.append('name_min_chars')
         if perfil not in ['solicitante', 'supervisor', 'admin']:
             erros.append('invalid_profile')
-        if perfil in ['supervisor', 'admin'] and not areas:
+        if perfil == 'supervisor' and not areas:
             erros.append('area_required_for_supervisor')
-        if not senha or len(senha) < 6:
-            erros.append('password_min_chars')
         if erros:
             for e in erros:
                 flash_t(e, 'danger')
@@ -50,7 +48,7 @@ def gerenciar_usuarios() -> Response:
                 must_change_password=(perfil in ['solicitante', 'supervisor']),
                 password_changed_at=None
             )
-            u.set_password(senha)
+            u.set_password('123456')  # Senha padrão para todos os novos usuários
             u.save()
             cache_delete(CACHE_KEY_USUARIOS)
             Usuario.invalidar_cache_supervisores_por_area()
@@ -104,10 +102,8 @@ def editar_usuario(usuario_id: str) -> Response:
             erros.append('name_min_chars')
         if perfil not in ['solicitante', 'supervisor', 'admin']:
             erros.append('invalid_profile')
-        if perfil in ['supervisor', 'admin'] and not areas:
+        if perfil == 'supervisor' and not areas:
             erros.append('area_required_for_supervisor')
-        if senha and len(senha) < 6:
-            erros.append('password_min_chars')
         if erros:
             for e in erros:
                 flash_t(e, 'danger')
@@ -121,8 +117,6 @@ def editar_usuario(usuario_id: str) -> Response:
             update_data['perfil'] = perfil
         if set(areas) != set(usuario.areas):
             update_data['areas'] = areas
-        if senha:
-            update_data['senha'] = senha
         if update_data:
             usuario.update(**update_data)
             cache_delete(CACHE_KEY_USUARIOS)
@@ -140,7 +134,7 @@ def editar_usuario(usuario_id: str) -> Response:
 @requer_perfil('admin')
 @limiter.limit("30 per minute")
 def deletar_usuario(usuario_id: str) -> Response:
-    """Deleta usuário."""
+    """Deleta usuário (exceto admin@dtx.com)."""
     try:
         usuario = Usuario.get_by_id(usuario_id)
         if not usuario:
@@ -148,6 +142,13 @@ def deletar_usuario(usuario_id: str) -> Response:
             return redirect(url_for('main.gerenciar_usuarios'))
         if usuario_id == current_user.id:
             flash_t('cannot_delete_own_account', 'warning')
+            return redirect(url_for('main.gerenciar_usuarios'))
+        if usuario.email == 'admin@dtx.com':
+            flash_t('cannot_delete_root_admin', 'danger')
+            logger.warning(
+                "Tentativa de deletar admin@dtx.com por %s",
+                current_user.email,
+            )
             return redirect(url_for('main.gerenciar_usuarios'))
         nome_usuario = usuario.nome
         usuario.delete()
@@ -159,6 +160,43 @@ def deletar_usuario(usuario_id: str) -> Response:
     except Exception as e:
         logger.exception(f"Erro ao deletar usuário: {str(e)}")
         flash_t('error_deleting_user', 'danger', error=str(e))
+        return redirect(url_for('main.gerenciar_usuarios'))
+
+@main.route('/admin/usuarios/<usuario_id>/resetar-senha', methods=['POST'])
+@requer_perfil('admin')
+@limiter.limit("30 per minute")
+def resetar_senha_usuario(usuario_id: str) -> Response:
+    """Reseta a senha de um usuário para a senha padrão (123456)."""
+    try:
+        usuario = Usuario.get_by_id(usuario_id)
+        if not usuario:
+            flash_t('user_not_found', 'danger')
+            return redirect(url_for('main.gerenciar_usuarios'))
+        
+        if usuario_id == current_user.id:
+            flash_t('cannot_reset_own_password', 'warning')
+            return redirect(url_for('main.gerenciar_usuarios'))
+        
+        nome_usuario = usuario.nome
+        usuario.set_password('123456')
+        usuario.update(
+            must_change_password=(usuario.perfil in ['solicitante', 'supervisor'])
+        )
+        
+        cache_delete(CACHE_KEY_USUARIOS)
+        cache_delete(f'usuario_{usuario_id}')
+        
+        logger.info(
+            "Senha resetada para %s por %s",
+            usuario.email,
+            current_user.email,
+        )
+        flash_t('user_password_reset_success', 'success', nome=nome_usuario)
+        return redirect(url_for('main.gerenciar_usuarios'))
+        
+    except Exception as e:
+        logger.exception(f"Erro ao resetar senha do usuário: {str(e)}")
+        flash_t('error_resetting_password', 'danger', error=str(e))
         return redirect(url_for('main.gerenciar_usuarios'))
 
 @main.route('/admin/usuarios/<usuario_id>/reset-exp', methods=['POST'])

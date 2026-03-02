@@ -49,7 +49,9 @@ Este documento descreve as medidas de segurança e o alinhamento do **Sistema de
 - **Origin/Referer**: Validação em rotas POST sensíveis quando `APP_BASE_URL` está definida.
 - **Rate limiting**: Limite de requisições por IP (ex.: login 5/min; APIs configuráveis).
 - **Timeout de sessão**: Encerramento automático após 15 minutos de inatividade.
-- **Headers de segurança**: `X-Content-Type-Options: nosniff`, `X-Frame-Options: SAMEORIGIN`.
+- **Headers de segurança**: `X-Content-Type-Options: nosniff`, `X-Frame-Options: SAMEORIGIN`, `Permissions-Policy` (câmera, microfone, geolocalização desabilitados). Em produção: **Content-Security-Policy (CSP)** para mitigar XSS.
+- **Upload de anexos**: validação por extensão e por **magic bytes** (conteúdo real); tamanho máximo 10 MB.
+- **Logs**: em produção, e-mails não são registrados em texto claro; usa-se mascaramento (ex.: `u***@dominio.com`) para conformidade e menor exposição de PII.
 
 ---
 
@@ -101,11 +103,14 @@ A organização deve indicar um **Encarregado de Dados (DPO)** e divulgar canal 
 
 | Medida                    | Onde está no código / config                              |
 |---------------------------|------------------------------------------------------------|
-| Criptografia (Fernet)     | `app/services/crypto.py`, `config.ENCRYPTION_KEY`, `ENCRYPT_PII_AT_REST` |
+| Criptografia (Fernet)     | `app/services/crypto.py`, `config.py` (ENCRYPTION_KEY, ENCRYPT_PII_AT_REST) |
 | Hash de senha             | `app/models_usuario.py` (Werkzeug)                         |
 | Cookies e HSTS            | `config.py` (session), `app/__init__.py` (headers)          |
+| CSP e Permissions-Policy  | `app/__init__.py` (headers em produção)                     |
 | CSRF e Origin             | `app/__init__.py`, rotas em `app/routes/`                  |
 | Rate limit e timeout      | `app/limiter.py`, `app/__init__.py` (timeout sessão)        |
+| Upload (extensão + magic bytes) | `app/services/validators.py`, `app/services/upload.py`; tamanho máx. 10 MB em `config.py` |
+| Mascaramento de PII em logs | `app/utils.py` (mask_email_for_log), `app/routes/auth.py` |
 | Firestore (somente backend) | `firestore.rules`, `app/database.py`                     |
 
 Para ativar criptografia de PII em repouso, configure no `.env`:

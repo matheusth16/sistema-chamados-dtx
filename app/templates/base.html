@@ -1,310 +1,495 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="pt-br">
-
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="csrf-token" content="{{ csrf_token() if csrf_token() else '' }}">
-    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-    <meta http-equiv="Pragma" content="no-cache">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="csrf-token"
+      content="{{ csrf_token() if csrf_token() else '' }}"
+    />
+    <meta
+      http-equiv="Cache-Control"
+      content="no-cache, no-store, must-revalidate"
+    />
+    <meta http-equiv="Pragma" content="no-cache" />
     <title>Sistema de Chamados - DTX Aerospace</title>
-    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <link
+      rel="icon"
+      type="image/x-icon"
+      href="{{ url_for('static', filename='favicon.ico') }}"
+    />
     <!-- Em produção, use Tailwind via PostCSS ou CLI: https://tailwindcss.com/docs/installation -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js?t=1" crossorigin="anonymous"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js?t=1"
-        crossorigin="anonymous"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollToPlugin.min.js?t=1"
-        crossorigin="anonymous"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    <script
+      src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js?t=1"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js?t=1"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollToPlugin.min.js?t=1"
+      crossorigin="anonymous"
+    ></script>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap"
+      rel="stylesheet"
+    />
     <style>
-        body {
-            font-family: 'Inter', sans-serif;
-        }
+      body {
+        font-family: "Inter", sans-serif;
+      }
     </style>
-</head>
+  </head>
 
-<body class="bg-gray-50 text-gray-800" data-debug="{% if config.DEBUG %}true{% endif %}">
+  <body
+    class="bg-white text-gray-800"
+    data-debug="{% if config.DEBUG %}true{% endif %}"
+  >
     <script>
-        // Define flag de debug para JS: apenas em desenvolvimento (evita console.log em produção)
-        window.DTX_DEBUG = document.body.getAttribute('data-debug') === 'true';
+      // Define flag de debug para JS: apenas em desenvolvimento (evita console.log em produção)
+      window.DTX_DEBUG = document.body.getAttribute("data-debug") === "true";
     </script>
 
-    {% block body_overlay %}{% endblock %}
-
-    {% include "components/navbar.html" %}
+    {% block body_overlay %}{% endblock %} {% include "components/navbar.html"
+    %}
 
     <main class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-        <div id="flash-messages" class="space-y-2 mb-6">
-            {% for category, message in messages %}
-            <div
-                class="px-4 py-3 rounded-md border text-sm font-medium
-                    {% if category == 'danger' %}bg-red-50 text-red-800 border-red-200{% elif category == 'success' %}bg-green-50 text-green-800 border-green-200{% elif category == 'info' %}bg-blue-50 text-blue-800 border-blue-200{% else %}bg-gray-50 text-gray-800 border-gray-200{% endif %}">
-                {{ message }}
-            </div>
-            {% endfor %}
+      {% with messages = get_flashed_messages(with_categories=true) %} {% if
+      messages %}
+      <div id="flash-messages" class="space-y-2 mb-6">
+        {% for category, message in messages %}
+        <div
+          class="px-4 py-3 rounded-md border text-sm font-medium {% if category == 'danger' %}bg-red-50 text-red-800 border-red-200{% elif category == 'success' %}bg-green-50 text-green-800 border-green-200{% elif category == 'info' %}bg-blue-50 text-blue-800 border-blue-200{% else %}bg-gray-50 text-gray-800 border-gray-200{% endif %}"
+        >
+          {{ message }}
         </div>
-        <script>
-            setTimeout(function () {
-                var el = document.getElementById('flash-messages');
-                if (el) { el.remove(); }
-            }, 5000);
-        </script>
-        {% endif %}
-        {% endwith %}
-        {% block content %}{% endblock %}
+        {% endfor %}
+      </div>
+      <script>
+        setTimeout(function () {
+          var el = document.getElementById("flash-messages");
+          if (el) {
+            el.remove();
+          }
+        }, 5000);
+      </script>
+      {% endif %} {% endwith %} {% block content %}{% endblock %}
     </main>
 
     <footer class="bg-white border-t mt-12">
-        <div class="max-w-7xl mx-auto py-6 px-4 overflow-hidden sm:px-6 lg:px-8">
-            <p class="mt-8 text-center text-base text-gray-400">
-                &copy; 2026 DTX Aerospace - Sistema de Planejamento Interno.
-            </p>
-        </div>
+      <div class="max-w-7xl mx-auto py-6 px-4 overflow-hidden sm:px-6 lg:px-8">
+        <p class="mt-8 text-center text-base text-gray-400">
+          &copy; 2026 DTX Aerospace - Sistema de Planejamento Interno.
+        </p>
+      </div>
     </footer>
 
     <!-- GSAP Motion: animações de entrada (conteúdo, flash, elementos com .gsap-animate) -->
     <script src="{{ url_for('static', filename='js/gsap-motion.js') }}"></script>
 
-    {% if current_user.is_authenticated and current_user.perfil in ['supervisor', 'admin'] %}
+    {% if current_user.is_authenticated and current_user.perfil in
+    ['supervisor', 'admin'] %}
     <script>
-        (function () {
-            var btn = document.getElementById('btn-sino');
-            var badge = document.getElementById('sino-badge');
-            var lista = document.getElementById('sino-lista');
-            var dropdown = document.getElementById('sino-dropdown');
-            var btnMarcarTodas = document.getElementById('btn-sino-marcar-todas');
-            if (!btn || !lista) return;
+      (function () {
+        var btn = document.getElementById("btn-sino");
+        var badge = document.getElementById("sino-badge");
+        var lista = document.getElementById("sino-lista");
+        var dropdown = document.getElementById("sino-dropdown");
+        var btnMarcarTodas = document.getElementById("btn-sino-marcar-todas");
+        if (!btn || !lista) return;
 
-            function dataRelativa(isoStr) {
-                if (!isoStr) return '';
-                var d = new Date(isoStr);
-                if (isNaN(d.getTime())) return '';
-                var now = new Date();
-                var diffMs = now - d;
-                var diffMin = Math.floor(diffMs / 60000);
-                var diffH = Math.floor(diffMs / 3600000);
-                var diffD = Math.floor(diffMs / 86400000);
-                if (diffMin < 1) return 'Agora';
-                if (diffMin < 60) return 'Há ' + diffMin + ' min';
-                if (diffH < 24) return 'Há ' + diffH + ' h';
-                if (diffD === 1) return 'Ontem';
-                if (diffD < 7) return 'Há ' + diffD + ' dias';
-                return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: d.getFullYear() !== now.getFullYear() ? 'numeric' : undefined });
-            }
+        function dataRelativa(isoStr) {
+          if (!isoStr) return "";
+          var d = new Date(isoStr);
+          if (isNaN(d.getTime())) return "";
+          var now = new Date();
+          var diffMs = now - d;
+          var diffMin = Math.floor(diffMs / 60000);
+          var diffH = Math.floor(diffMs / 3600000);
+          var diffD = Math.floor(diffMs / 86400000);
+          if (diffMin < 1) return "Agora";
+          if (diffMin < 60) return "Há " + diffMin + " min";
+          if (diffH < 24) return "Há " + diffH + " h";
+          if (diffD === 1) return "Ontem";
+          if (diffD < 7) return "Há " + diffD + " dias";
+          return d.toLocaleDateString("pt-BR", {
+            day: "2-digit",
+            month: "2-digit",
+            year: d.getFullYear() !== now.getFullYear() ? "numeric" : undefined,
+          });
+        }
 
-            function atualizarBadge(total) {
-                if (!badge) return;
-                badge.textContent = total > 99 ? '99+' : total;
-                badge.classList.toggle('hidden', total === 0);
-                if (btnMarcarTodas) btnMarcarTodas.classList.toggle('hidden', total === 0);
-            }
+        function atualizarBadge(total) {
+          if (!badge) return;
+          badge.textContent = total > 99 ? "99+" : total;
+          badge.classList.toggle("hidden", total === 0);
+          if (btnMarcarTodas)
+            btnMarcarTodas.classList.toggle("hidden", total === 0);
+        }
 
-            function abrirDropdown() {
-                if (dropdown) {
-                    dropdown.classList.remove('opacity-0', 'invisible', 'scale-95', 'translate-y-2');
-                    dropdown.classList.add('opacity-100', 'visible', 'scale-100', 'translate-y-0');
-                    btn.setAttribute('aria-expanded', 'true');
-                }
-            }
-            function fecharDropdown() {
-                if (dropdown) {
-                    dropdown.classList.add('opacity-0', 'invisible', 'scale-95', 'translate-y-2');
-                    dropdown.classList.remove('opacity-100', 'visible', 'scale-100', 'translate-y-0');
-                    btn.setAttribute('aria-expanded', 'false');
-                }
-            }
-            function dropdownAberto() {
-                return dropdown && !dropdown.classList.contains('invisible');
-            }
+        function abrirDropdown() {
+          if (dropdown) {
+            dropdown.classList.remove(
+              "opacity-0",
+              "invisible",
+              "scale-95",
+              "translate-y-2",
+            );
+            dropdown.classList.add(
+              "opacity-100",
+              "visible",
+              "scale-100",
+              "translate-y-0",
+            );
+            btn.setAttribute("aria-expanded", "true");
+          }
+        }
+        function fecharDropdown() {
+          if (dropdown) {
+            dropdown.classList.add(
+              "opacity-0",
+              "invisible",
+              "scale-95",
+              "translate-y-2",
+            );
+            dropdown.classList.remove(
+              "opacity-100",
+              "visible",
+              "scale-100",
+              "translate-y-0",
+            );
+            btn.setAttribute("aria-expanded", "false");
+          }
+        }
+        function dropdownAberto() {
+          return dropdown && !dropdown.classList.contains("invisible");
+        }
 
-            function carregarNotificacoes() {
-                fetch('{{ url_for("main.api_notificacoes_listar") }}', { credentials: 'same-origin' })
-                    .then(function (r) { return r.json(); })
-                    .then(function (data) {
-                        var total = data.total_nao_lidas !== undefined ? data.total_nao_lidas : 0;
-                        atualizarBadge(total);
-                        var notifs = data.notificacoes || [];
-                        if (notifs.length === 0) {
-                            lista.innerHTML = '<div class="p-3 text-sm text-gray-500 text-center">Nenhuma notificação</div>';
-                            return;
-                        }
-                        var csrf = document.querySelector('meta[name="csrf-token"]') && document.querySelector('meta[name="csrf-token"]').content || '';
-                        lista.innerHTML = notifs.map(function (n) {
-                            var urlChamado = '/chamado/' + (n.chamado_id || '') + '/historico';
-                            var lidaClass = n.lida ? 'bg-gray-50' : 'bg-blue-50';
-                            var relativa = dataRelativa(n.data_criacao);
-                            return '<a href="' + urlChamado + '" class="block p-3 text-left hover:bg-gray-100 ' + lidaClass + ' notif-item" data-id="' + (n.id || '') + '">' +
-                                '<div class="font-semibold text-gray-800 text-sm">' + (n.titulo || '') + '</div>' +
-                                '<div class="text-xs text-gray-600 mt-0.5">' + (n.mensagem || '') + '</div>' +
-                                (relativa ? '<div class="text-xs text-gray-400 mt-1">' + relativa + '</div>' : '') +
-                                '</a>';
-                        }).join('');
-                        lista.querySelectorAll('.notif-item').forEach(function (el) {
-                            el.addEventListener('click', function () {
-                                var id = el.getAttribute('data-id');
-                                if (id) {
-                                    fetch('{{ url_for("main.api_notificacoes_marcar_lida", notificacao_id="__ID__") }}'.replace('__ID__', id), {
-                                        method: 'POST',
-                                        credentials: 'same-origin',
-                                        headers: { 'X-CSRFToken': csrf, 'Content-Type': 'application/json' }
-                                    }).then(function () { });
-                                }
-                            });
-                        });
-                    })
-                    .catch(function () {
-                        lista.innerHTML = '<div class="p-3 text-sm text-gray-500 text-center">Erro ao carregar</div>';
-                    });
-            }
-
-            function atualizarSóBadge() {
-                fetch('{{ url_for("main.api_notificacoes_listar") }}', { credentials: 'same-origin' })
-                    .then(function (r) { return r.json(); })
-                    .then(function (data) {
-                        if (data.total_nao_lidas !== undefined) atualizarBadge(data.total_nao_lidas);
-                    }).catch(function () {});
-            }
-
-            var navNotificacoes = document.getElementById('nav-notificacoes');
-            btn.addEventListener('click', function (e) {
-                e.stopPropagation();
-                if (dropdownAberto()) {
-                    fecharDropdown();
-                } else {
-                    carregarNotificacoes();
-                    abrirDropdown();
-                }
-            });
-            document.addEventListener('click', function (e) {
-                if (dropdownAberto() && navNotificacoes && !navNotificacoes.contains(e.target)) fecharDropdown();
-            });
-            if (btnMarcarTodas) {
-                btnMarcarTodas.addEventListener('click', function (e) {
-                    e.preventDefault();
-                    fetch('{{ url_for("main.api_notificacoes_ler_todas") }}', {
-                        method: 'POST',
-                        credentials: 'same-origin',
-                        headers: { 'X-CSRFToken': (document.querySelector('meta[name="csrf-token"]') && document.querySelector('meta[name="csrf-token"]').content) || '', 'Content-Type': 'application/json' }
-                    }).then(function (r) { return r.json(); }).then(function () { carregarNotificacoes(); }).catch(function () {});
+        function carregarNotificacoes() {
+          fetch('{{ url_for("main.api_notificacoes_listar") }}', {
+            credentials: "same-origin",
+          })
+            .then(function (r) {
+              return r.json();
+            })
+            .then(function (data) {
+              var total =
+                data.total_nao_lidas !== undefined ? data.total_nao_lidas : 0;
+              atualizarBadge(total);
+              var notifs = data.notificacoes || [];
+              if (notifs.length === 0) {
+                lista.innerHTML =
+                  '<div class="p-3 text-sm text-gray-500 text-center">Nenhuma notificação</div>';
+                return;
+              }
+              var csrf =
+                (document.querySelector('meta[name="csrf-token"]') &&
+                  document.querySelector('meta[name="csrf-token"]').content) ||
+                "";
+              lista.innerHTML = notifs
+                .map(function (n) {
+                  var urlChamado =
+                    "/chamado/" + (n.chamado_id || "") + "/historico";
+                  var lidaClass = n.lida ? "bg-gray-50" : "bg-blue-50";
+                  var relativa = dataRelativa(n.data_criacao);
+                  return (
+                    '<a href="' +
+                    urlChamado +
+                    '" class="block p-3 text-left hover:bg-gray-100 ' +
+                    lidaClass +
+                    ' notif-item" data-id="' +
+                    (n.id || "") +
+                    '">' +
+                    '<div class="font-semibold text-gray-800 text-sm">' +
+                    (n.titulo || "") +
+                    "</div>" +
+                    '<div class="text-xs text-gray-600 mt-0.5">' +
+                    (n.mensagem || "") +
+                    "</div>" +
+                    (relativa
+                      ? '<div class="text-xs text-gray-400 mt-1">' +
+                        relativa +
+                        "</div>"
+                      : "") +
+                    "</a>"
+                  );
+                })
+                .join("");
+              lista.querySelectorAll(".notif-item").forEach(function (el) {
+                el.addEventListener("click", function () {
+                  var id = el.getAttribute("data-id");
+                  if (id) {
+                    fetch(
+                      '{{ url_for("main.api_notificacoes_marcar_lida", notificacao_id="__ID__") }}'.replace(
+                        "__ID__",
+                        id,
+                      ),
+                      {
+                        method: "POST",
+                        credentials: "same-origin",
+                        headers: {
+                          "X-CSRFToken": csrf,
+                          "Content-Type": "application/json",
+                        },
+                      },
+                    ).then(function () {});
+                  }
                 });
-            }
-
-            carregarNotificacoes();
-            var pollInterval = setInterval(function () {
-                if (document.visibilityState === 'visible') atualizarSóBadge();
-            }, 60000);
-            document.addEventListener('visibilitychange', function () {
-                if (document.visibilityState === 'visible') atualizarSóBadge();
+              });
+            })
+            .catch(function () {
+              lista.innerHTML =
+                '<div class="p-3 text-sm text-gray-500 text-center">Erro ao carregar</div>';
             });
-        })();
+        }
+
+        function atualizarSóBadge() {
+          fetch('{{ url_for("main.api_notificacoes_listar") }}', {
+            credentials: "same-origin",
+          })
+            .then(function (r) {
+              return r.json();
+            })
+            .then(function (data) {
+              if (data.total_nao_lidas !== undefined)
+                atualizarBadge(data.total_nao_lidas);
+            })
+            .catch(function () {});
+        }
+
+        var navNotificacoes = document.getElementById("nav-notificacoes");
+        btn.addEventListener("click", function (e) {
+          e.stopPropagation();
+          if (dropdownAberto()) {
+            fecharDropdown();
+          } else {
+            carregarNotificacoes();
+            abrirDropdown();
+          }
+        });
+        document.addEventListener("click", function (e) {
+          if (
+            dropdownAberto() &&
+            navNotificacoes &&
+            !navNotificacoes.contains(e.target)
+          )
+            fecharDropdown();
+        });
+        if (btnMarcarTodas) {
+          btnMarcarTodas.addEventListener("click", function (e) {
+            e.preventDefault();
+            fetch('{{ url_for("main.api_notificacoes_ler_todas") }}', {
+              method: "POST",
+              credentials: "same-origin",
+              headers: {
+                "X-CSRFToken":
+                  (document.querySelector('meta[name="csrf-token"]') &&
+                    document.querySelector('meta[name="csrf-token"]')
+                      .content) ||
+                  "",
+                "Content-Type": "application/json",
+              },
+            })
+              .then(function (r) {
+                return r.json();
+              })
+              .then(function () {
+                carregarNotificacoes();
+              })
+              .catch(function () {});
+          });
+        }
+
+        carregarNotificacoes();
+        var pollInterval = setInterval(function () {
+          if (document.visibilityState === "visible") atualizarSóBadge();
+        }, 60000);
+        document.addEventListener("visibilitychange", function () {
+          if (document.visibilityState === "visible") atualizarSóBadge();
+        });
+      })();
     </script>
     <!-- Web Push: registrar SW; banner para pedir permissão e inscrever no clique -->
-    <div id="webpush-banner" class="hidden fixed top-16 left-1/2 -translate-x-1/2 z-50 bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg text-sm flex items-center gap-3 max-w-md">
-        <span>Receber avisos de novos chamados no navegador?</span>
-        <button type="button" id="webpush-ativar" class="px-3 py-1 bg-white text-blue-600 font-semibold rounded hover:bg-blue-50">Ativar</button>
-        <button type="button" id="webpush-dispensar" class="px-2 py-1 text-blue-100 hover:text-white">Agora não</button>
+    <div
+      id="webpush-banner"
+      class="hidden fixed top-16 left-1/2 -translate-x-1/2 z-50 bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg text-sm flex items-center gap-3 max-w-md"
+    >
+      <span>Receber avisos de novos chamados no navegador?</span>
+      <button
+        type="button"
+        id="webpush-ativar"
+        class="px-3 py-1 bg-white text-blue-600 font-semibold rounded hover:bg-blue-50"
+      >
+        Ativar
+      </button>
+      <button
+        type="button"
+        id="webpush-dispensar"
+        class="px-2 py-1 text-blue-100 hover:text-white"
+      >
+        Agora não
+      </button>
     </div>
     <script>
-        (function () {
-            if (!('Notification' in window) || !('serviceWorker' in navigator)) return;
-            var vapidPublicKey = null;
-            var BANNER_KEY = 'webpush_banner_dispensado';
-            function csrfHeader() {
-                var m = document.querySelector('meta[name="csrf-token"]');
-                return m && m.content ? { 'X-CSRFToken': m.content } : {};
+      (function () {
+        if (!("Notification" in window) || !("serviceWorker" in navigator))
+          return;
+        var vapidPublicKey = null;
+        var BANNER_KEY = "webpush_banner_dispensado";
+        function csrfHeader() {
+          var m = document.querySelector('meta[name="csrf-token"]');
+          return m && m.content ? { "X-CSRFToken": m.content } : {};
+        }
+        function inscrever() {
+          if (!vapidPublicKey) return Promise.resolve();
+          return navigator.serviceWorker.ready
+            .then(function (reg) {
+              if (!reg) return null;
+              return reg.pushManager.subscribe({
+                userVisibleOnly: true,
+                applicationServerKey: vapidPublicKey,
+              });
+            })
+            .then(function (sub) {
+              if (!sub) return;
+              var subJson = sub.toJSON
+                ? sub.toJSON()
+                : {
+                    endpoint: sub.endpoint,
+                    keys: sub.getKey && {
+                      p256dh: sub.getKey("p256dh"),
+                      auth: sub.getKey("auth"),
+                    },
+                  };
+              if (!subJson || !subJson.endpoint) return;
+              return fetch('{{ url_for("main.api_push_subscribe") }}', {
+                method: "POST",
+                credentials: "same-origin",
+                headers: Object.assign(
+                  { "Content-Type": "application/json" },
+                  csrfHeader(),
+                ),
+                body: JSON.stringify({ subscription: subJson }),
+              });
+            });
+        }
+        navigator.serviceWorker
+          .register('{{ url_for("main.service_worker_js") }}')
+          .then(function () {
+            return fetch('{{ url_for("main.api_push_vapid_public") }}', {
+              credentials: "same-origin",
+            });
+          })
+          .then(function (r) {
+            return r.json();
+          })
+          .then(function (data) {
+            vapidPublicKey = data.vapid_public_key || null;
+            if (!vapidPublicKey) return;
+            if (Notification.permission === "granted") {
+              inscrever().catch(function () {});
+              return;
             }
-            function inscrever() {
-                if (!vapidPublicKey) return Promise.resolve();
-                return navigator.serviceWorker.ready.then(function (reg) {
-                    if (!reg) return null;
-                    return reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: vapidPublicKey });
-                }).then(function (sub) {
-                    if (!sub) return;
-                    var subJson = sub.toJSON ? sub.toJSON() : { endpoint: sub.endpoint, keys: sub.getKey && { p256dh: sub.getKey('p256dh'), auth: sub.getKey('auth') } };
-                    if (!subJson || !subJson.endpoint) return;
-                    return fetch('{{ url_for("main.api_push_subscribe") }}', {
-                        method: 'POST',
-                        credentials: 'same-origin',
-                        headers: Object.assign({ 'Content-Type': 'application/json' }, csrfHeader()),
-                        body: JSON.stringify({ subscription: subJson })
-                    });
-                });
-            }
-            navigator.serviceWorker.register('{{ url_for("main.service_worker_js") }}').then(function () {
-                return fetch('{{ url_for("main.api_push_vapid_public") }}', { credentials: 'same-origin' });
-            }).then(function (r) { return r.json(); }).then(function (data) {
-                vapidPublicKey = data.vapid_public_key || null;
-                if (!vapidPublicKey) return;
-                if (Notification.permission === 'granted') {
-                    inscrever().catch(function () {});
-                    return;
-                }
-                if (Notification.permission === 'denied') return;
-                if (sessionStorage.getItem(BANNER_KEY)) return;
-                var banner = document.getElementById('webpush-banner');
-                var btnAtivar = document.getElementById('webpush-ativar');
-                var btnDispensar = document.getElementById('webpush-dispensar');
-                if (banner) banner.classList.remove('hidden');
-                if (btnAtivar) btnAtivar.addEventListener('click', function () {
-                    var labelAtivar = btnAtivar.textContent;
-                    btnAtivar.disabled = true;
-                    btnAtivar.textContent = 'Ativando...';
-                    Notification.requestPermission().then(function (permission) {
-                        if (permission !== 'granted') {
-                            if (banner) banner.classList.add('hidden');
-                            return;
-                        }
-                        inscrever().then(function () {
-                            if (banner) banner.classList.add('hidden');
-                        }).catch(function () {
-                            btnAtivar.disabled = false;
-                            btnAtivar.textContent = 'Tente novamente';
-                        });
-                    }).catch(function () {
+            if (Notification.permission === "denied") return;
+            if (sessionStorage.getItem(BANNER_KEY)) return;
+            var banner = document.getElementById("webpush-banner");
+            var btnAtivar = document.getElementById("webpush-ativar");
+            var btnDispensar = document.getElementById("webpush-dispensar");
+            if (banner) banner.classList.remove("hidden");
+            if (btnAtivar)
+              btnAtivar.addEventListener("click", function () {
+                var labelAtivar = btnAtivar.textContent;
+                btnAtivar.disabled = true;
+                btnAtivar.textContent = "Ativando...";
+                Notification.requestPermission()
+                  .then(function (permission) {
+                    if (permission !== "granted") {
+                      if (banner) banner.classList.add("hidden");
+                      return;
+                    }
+                    inscrever()
+                      .then(function () {
+                        if (banner) banner.classList.add("hidden");
+                      })
+                      .catch(function () {
                         btnAtivar.disabled = false;
-                        btnAtivar.textContent = labelAtivar;
-                    });
-                });
-                if (btnDispensar) btnDispensar.addEventListener('click', function () {
-                    if (banner) banner.classList.add('hidden');
-                    sessionStorage.setItem(BANNER_KEY, '1');
-                });
-            }).catch(function () {});
-        })();
+                        btnAtivar.textContent = "Tente novamente";
+                      });
+                  })
+                  .catch(function () {
+                    btnAtivar.disabled = false;
+                    btnAtivar.textContent = labelAtivar;
+                  });
+              });
+            if (btnDispensar)
+              btnDispensar.addEventListener("click", function () {
+                if (banner) banner.classList.add("hidden");
+                sessionStorage.setItem(BANNER_KEY, "1");
+              });
+          })
+          .catch(function () {});
+      })();
     </script>
     {% endif %}
 
     <!-- Toggle menu hamburger (supervisor/admin) -->
     <script>
-        (function () {
-            var btn = document.getElementById('btn-hamburger');
-            var menu = document.getElementById('nav-menu-dropdown');
-            if (!btn || !menu) return;
-            function open() {
-                menu.classList.remove('opacity-0', 'invisible', 'scale-95', 'translate-y-2'); menu.parentElement.dataset.open = 'true';
-                menu.classList.add('opacity-100', 'visible', 'scale-100', 'translate-y-0');
-                btn.setAttribute('aria-expanded', 'true');
-            }
-            function close() {
-                menu.classList.add('opacity-0', 'invisible', 'scale-95', 'translate-y-2'); menu.parentElement.dataset.open = 'false';
-                menu.classList.remove('opacity-100', 'visible', 'scale-100', 'translate-y-0');
-                btn.setAttribute('aria-expanded', 'false');
-            }
-            function toggle() {
-                if (menu.classList.contains('invisible')) open(); else close();
-            }
-            btn.addEventListener('click', function (e) { e.stopPropagation(); toggle(); });
-            document.addEventListener('click', function () { if (!menu.classList.contains('invisible')) close(); });
-            document.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(); });
-        })();
+      (function () {
+        var btn = document.getElementById("btn-hamburger");
+        var menu = document.getElementById("nav-menu-dropdown");
+        if (!btn || !menu) return;
+        function open() {
+          menu.classList.remove(
+            "opacity-0",
+            "invisible",
+            "scale-95",
+            "translate-y-2",
+          );
+          menu.parentElement.dataset.open = "true";
+          menu.classList.add(
+            "opacity-100",
+            "visible",
+            "scale-100",
+            "translate-y-0",
+          );
+          btn.setAttribute("aria-expanded", "true");
+        }
+        function close() {
+          menu.classList.add(
+            "opacity-0",
+            "invisible",
+            "scale-95",
+            "translate-y-2",
+          );
+          menu.parentElement.dataset.open = "false";
+          menu.classList.remove(
+            "opacity-100",
+            "visible",
+            "scale-100",
+            "translate-y-0",
+          );
+          btn.setAttribute("aria-expanded", "false");
+        }
+        function toggle() {
+          if (menu.classList.contains("invisible")) open();
+          else close();
+        }
+        btn.addEventListener("click", function (e) {
+          e.stopPropagation();
+          toggle();
+        });
+        document.addEventListener("click", function () {
+          if (!menu.classList.contains("invisible")) close();
+        });
+        document.addEventListener("keydown", function (e) {
+          if (e.key === "Escape") close();
+        });
+      })();
     </script>
 
     <!-- Bloco para scripts adicionais de páginas específicas -->
     {% block page_scripts %}{% endblock %}
-
-</body>
-
+  </body>
 </html>

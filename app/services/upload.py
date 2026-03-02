@@ -12,6 +12,8 @@ from datetime import datetime
 from werkzeug.utils import secure_filename
 from flask import current_app
 
+from app.services.validators import _arquivo_permitido, _arquivo_conteudo_permitido
+
 logger = logging.getLogger(__name__)
 
 
@@ -64,6 +66,15 @@ def salvar_anexo(arquivo):
     """
     if not arquivo or not arquivo.filename or arquivo.filename.strip() == '':
         return None
+
+    if not _arquivo_permitido(arquivo.filename):
+        raise ValueError("Formato de arquivo inválido. Permitidos: png, jpg, jpeg, pdf, xlsx.")
+
+    # Validação por conteúdo (magic bytes) para evitar upload malicioso com extensão falsa
+    ok, msg = _arquivo_conteudo_permitido(arquivo)
+    if not ok:
+        logger.warning("Upload rejeitado: conteúdo não corresponde à extensão: %s", msg)
+        raise ValueError(msg or "Formato de arquivo inválido.")
 
     nome_seguro = secure_filename(arquivo.filename)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")

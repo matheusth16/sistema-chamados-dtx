@@ -3,9 +3,27 @@ Funções utilitárias compartilhadas entre rotas.
 """
 from datetime import datetime
 from typing import Any, Optional
-from app.database import db
+from flask import current_app, request
 from firebase_admin import firestore
-from flask import current_app
+from app.database import db
+
+
+def mask_email_for_log(email: Optional[str]) -> str:
+    """
+    Em produção, mascara e-mail em logs (LGPD/segurança).
+    Ex.: user@empresa.com -> u***@empresa.com
+    """
+    if not email or not isinstance(email, str) or "@" not in email:
+        return email or ""
+    try:
+        if current_app.config.get("ENV") == "production":
+            local, _, domain = email.strip().partition("@")
+            if not local or not domain:
+                return "***@***"
+            return f"{local[0]}***@{domain}"
+    except Exception:
+        pass
+    return email
 
 
 def formatar_data_para_excel(val: Any) -> str:
@@ -61,3 +79,25 @@ def gerar_numero_chamado() -> str:
         current_app.logger.exception('Erro ao gerar número de chamado via transação')
         timestamp_num = int(datetime.now().timestamp()) % 10000
         return f'CHM-{timestamp_num:04d}'
+
+
+def get_client_ip() -> str:
+    """
+    Obtém o endereço IP real do cliente, considerando proxies reversos.
+    Verifica os headers X-Forwarded-For (lista de IPs), X-Real-IP e remote_addr.
+    
+    Returns:
+        Endereço IP do cliente
+    """
+    # Verifica X-Forwarded-For (primeiro IP da lista é o cliente original)
+    if request.headers.get('X-Forwarded-For'):
+        # X-Forwarded-For pode conter múltiplos IPs (client, proxy1, proxy2...)
+        # O primeiro é sempre o cliente original
+        return request.headers.get('X-Forwarded-For').split(',')[0].strip()
+    
+    # Verifica X-Real-IP (usado por alguns proxies reversos)
+    if request.headers.get('X-Real-IP'):
+        return request.headers.get('X-Real-IP')
+    
+    # Fallback para request.remote_addr (conexão direta)
+    return request.remote_addr or 'unknown'

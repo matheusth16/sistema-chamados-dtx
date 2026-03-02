@@ -27,6 +27,7 @@ def test_login_post_sucesso_redireciona_conforme_perfil(client):
     usuario.area = 'Planejamento'
     usuario.check_password = MagicMock(return_value=True)
     usuario.get_id = lambda: 'user_1'  # Flask-Login serializa na sessão; precisa ser string
+    usuario.must_change_password = False  # evita redirect para troca de senha; testa redirect por perfil
     with patch('app.routes.auth.Usuario.get_by_email', return_value=usuario):
         r = client.post('/login', data={'email': 'sol@test.com', 'senha': 'ok'}, follow_redirects=False)
     assert r.status_code == 302

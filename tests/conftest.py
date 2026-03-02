@@ -52,6 +52,8 @@ def _usuario_mock(uid, email, nome, perfil, area='Geral', areas=None):
     u.check_password = MagicMock(return_value=True)
     # Flask-Login serializa user_id na sessão; get_id deve retornar string
     u.get_id = lambda: str(uid)
+    # Para testes que assumem acesso após login (dashboard, API): sem obrigação de trocar senha
+    u.must_change_password = False
     return u
 
 

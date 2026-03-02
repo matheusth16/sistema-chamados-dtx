@@ -579,11 +579,169 @@
 
 ---
 
+## 11. Alterar senha obrigatória
+
+### CT-SENHA-01: Troca de senha com dados válidos
+
+| Campo | Descrição |
+|-------|-----------|
+| **ID** | CT-SENHA-01 |
+| **Tipo** | I |
+| **Objetivo** | Usuário com must_change_password=True altera senha e é redirecionado conforme perfil. |
+| **Pré-condição** | Usuário logado com must_change_password=True; nova senha ≥ 6 caracteres, confirmação igual, diferente de 123456. |
+| **Passos** | 1. GET `/alterar-senha-obrigatoria`<br>2. POST `/alterar-senha-obrigatoria` com `nova_senha` e `confirmar_senha` válidos |
+| **Resultado esperado** | 2. 302 para `/` (solicitante) ou `/admin` (supervisor/admin); flash de sucesso. |
+| **Prioridade** | Média |
+
+---
+
+### CT-SENHA-02: Senha com menos de 6 caracteres
+
+| Campo | Descrição |
+|-------|-----------|
+| **ID** | CT-SENHA-02 |
+| **Tipo** | I |
+| **Objetivo** | Nova senha com menos de 6 caracteres é rejeitada. |
+| **Passos** | 1. POST `/alterar-senha-obrigatoria` com `nova_senha=12345`, `confirmar_senha=12345` (usuário com must_change_password) |
+| **Resultado esperado** | 200 ou 302 para mesma página; flash de erro (mínimo 6 caracteres). |
+| **Prioridade** | Média |
+
+---
+
+### CT-SENHA-03: Usuário sem obrigação de troca acessa rota
+
+| Campo | Descrição |
+|-------|-----------|
+| **ID** | CT-SENHA-03 |
+| **Tipo** | I |
+| **Objetivo** | Usuário já com senha alterada ou admin é redirecionado para dashboard. |
+| **Passos** | 1. GET `/alterar-senha-obrigatoria` com usuário logado onde must_change_password=False (ou admin) |
+| **Resultado esperado** | 302 para `/` ou `/admin` (não permanece na tela de troca). |
+| **Prioridade** | Baixa |
+
+---
+
+## 12. Dashboard, export e relatórios
+
+### CT-DASH-01: GET /admin com login retorna 200
+
+| Campo | Descrição |
+|-------|-----------|
+| **ID** | CT-DASH-01 |
+| **Tipo** | I |
+| **Objetivo** | Supervisor ou admin acessa dashboard e recebe página de listagem. |
+| **Pré-condição** | Cliente logado como supervisor ou admin. |
+| **Passos** | 1. GET `/admin` |
+| **Resultado esperado** | 200; HTML com conteúdo do dashboard (lista/filtros). |
+| **Prioridade** | Alta |
+
+---
+
+### CT-EXP-01: Exportar sem permissão retorna 403
+
+| Campo | Descrição |
+|-------|-----------|
+| **ID** | CT-EXP-01 |
+| **Tipo** | I |
+| **Objetivo** | Solicitante não acessa export. |
+| **Pré-condição** | Cliente logado como solicitante. |
+| **Passos** | 1. GET `/exportar` ou GET `/admin/relatorios` |
+| **Resultado esperado** | 403 ou 302 para login/dashboard conforme implementação. |
+| **Prioridade** | Média |
+
+---
+
+### CT-EXP-02: Exportar com supervisor/admin retorna 200
+
+| Campo | Descrição |
+|-------|-----------|
+| **ID** | CT-EXP-02 |
+| **Tipo** | I |
+| **Objetivo** | Supervisor ou admin acessa export ou relatórios. |
+| **Pré-condição** | Cliente logado como supervisor ou admin; mock de dados se necessário. |
+| **Passos** | 1. GET `/exportar` ou GET `/admin/relatorios` |
+| **Resultado esperado** | 200 (planilha ou página de relatórios). |
+| **Prioridade** | Média |
+
+---
+
+## 13. Admin: usuários, categorias, traduções
+
+### CT-ADM-01: Rotas admin apenas para admin (usuários/categorias/traduções)
+
+| Campo | Descrição |
+|-------|-----------|
+| **ID** | CT-ADM-01 |
+| **Tipo** | I |
+| **Objetivo** | Solicitante ou supervisor não acessa CRUD de usuários, categorias ou traduções (apenas admin). |
+| **Pré-condição** | Cliente logado como solicitante ou supervisor. |
+| **Passos** | 1. GET `/admin/usuarios`, GET `/admin/categorias`, GET `/admin/traducoes` |
+| **Resultado esperado** | 403 ou redirecionamento conforme regra de perfil (apenas admin). |
+| **Prioridade** | Alta |
+
+---
+
+### CT-ADM-02: Admin acessa listagem de usuários e categorias
+
+| Campo | Descrição |
+|-------|-----------|
+| **ID** | CT-ADM-02 |
+| **Tipo** | I |
+| **Objetivo** | Admin consegue abrir páginas de listagem. |
+| **Pré-condição** | Cliente logado como admin. |
+| **Passos** | 1. GET `/admin/usuarios`, GET `/admin/categorias` |
+| **Resultado esperado** | 200; HTML com lista (ou vazia). |
+| **Prioridade** | Média |
+
+---
+
+### CT-TRAD-01: GET /admin/traducoes exige admin
+
+| Campo | Descrição |
+|-------|-----------|
+| **ID** | CT-TRAD-01 |
+| **Tipo** | I |
+| **Objetivo** | Rota de traduções só é acessível por admin. |
+| **Passos** | 1. GET `/admin/traducoes` como supervisor ou solicitante |
+| **Resultado esperado** | 403 ou redirect. GET como admin → 200. |
+| **Prioridade** | Média |
+
+---
+
+## 14. Segurança (Origin/Referer) e rate limit
+
+### CT-SEC-01: POST sensível com Origin inválido rejeitado
+
+| Campo | Descrição |
+|-------|-----------|
+| **ID** | CT-SEC-01 |
+| **Tipo** | I |
+| **Objetivo** | Quando APP_BASE_URL está definido, requisição POST com Origin diferente é rejeitada. |
+| **Pré-condição** | App configurado com APP_BASE_URL; cliente envia header Origin de outro domínio. |
+| **Passos** | 1. POST para endpoint sensível (ex.: `/api/atualizar-status`) com header `Origin: https://site-estranho.com` |
+| **Resultado esperado** | 403 ou 400 (rejeição por origem). |
+| **Prioridade** | Média |
+
+---
+
+### CT-RATE-01: Rate limit em login (quando testável)
+
+| Campo | Descrição |
+|-------|-----------|
+| **ID** | CT-RATE-01 |
+| **Tipo** | I |
+| **Objetivo** | Exceder limite de tentativas de login (ex.: 5/min) retorna 429 ou bloqueio. |
+| **Passos** | 1. Enviar N+1 requisições POST `/login` no mesmo minuto (N = limite configurado) |
+| **Resultado esperado** | Última requisição retorna 429 ou mensagem de limite excedido (se rate limit ativo em testes). |
+| **Prioridade** | Baixa |
+
+---
+
 ## Resumo por prioridade
 
-- **Alta:** CT-AUTH-01 a 07, CT-CHAM-01 a 06 e 09, CT-STAT-01 a 05, CT-EDIT-01 a 04, CT-PAG-02, CT-ID-01 e 02, CT-PERM-01 e 02, CT-HEALTH-01.
-- **Média:** CT-AUTH-07, CT-CHAM-07, 08, 10, CT-STAT-06 e 07, CT-PAG-01, CT-PERM-03, CT-NOT-01 e 02, CT-SW-01, CT-EXC-01.
-- **Baixa:** CT-PUSH-01.
+- **Alta:** CT-AUTH-01 a 07, CT-CHAM-01 a 06 e 09, CT-STAT-01 a 05, CT-EDIT-01 a 04, CT-PAG-02, CT-ID-01 e 02, CT-PERM-01 e 02, CT-HEALTH-01, CT-DASH-01, CT-ADM-01.
+- **Média:** CT-AUTH-07, CT-CHAM-07, 08, 10, CT-STAT-06 e 07, CT-PAG-01, CT-PERM-03, CT-NOT-01 e 02, CT-SW-01, CT-EXC-01, CT-SENHA-01 e 02, CT-EXP-01 e 02, CT-ADM-02, CT-TRAD-01, CT-SEC-01.
+- **Baixa:** CT-PUSH-01, CT-SENHA-03, CT-RATE-01.
 
 Estes casos podem ser implementados como testes automatizados (pytest) conforme o [PLANO_DE_TESTES.md](PLANO_DE_TESTES.md). Muitos já possuem equivalentes em `tests/`; este documento serve como especificação funcional e checklist de cobertura.
 
@@ -610,3 +768,9 @@ Estes casos podem ser implementados como testes automatizados (pytest) conforme 
 | CT-PERM-01 a 03 | test_services/test_permissions.py | TestUsuarioPodeVerChamado.* |
 | CT-CHAM-* (validação) | test_services/test_validators.py | test_validar_novo_chamado_* |
 | CT-EXC-01 | test_exceptions.py | TestChamadoFromDictLevantaValidacaoChamadoError.* |
+| CT-SENHA-01 a 03 | test_routes/test_auth.py | test_alterar_senha_* (a implementar conforme cenários) |
+| CT-DASH-01, CT-EXP-* | test_routes/test_dashboard.py | test_admin_*, test_exportar_* (a implementar) |
+| CT-ADM-01, CT-ADM-02 | test_routes/test_usuarios.py, test_routes/test_categorias.py | test_*_requer_admin (a implementar) |
+| CT-TRAD-01 | test_routes/test_traducoes.py | test_traducoes_requer_admin (a implementar) |
+| CT-SEC-01 | test_routes/test_security_origin.py | test_*_origin_invalida |
+| CT-RATE-01 | test_routes/test_auth.py | test_rate_limit_login (a implementar se configurável em test) |

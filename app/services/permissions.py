@@ -11,13 +11,14 @@ def usuario_pode_ver_chamado(user, chamado) -> bool:
     """Verifica se o usuário tem permissão para ver/editar o chamado.
     
     Admin: pode ver tudo.
-    Supervisor: pode ver apenas se a ÁREA DO CHAMADO está nas suas áreas.
-    (Não basta o responsável ser de outro setor que o supervisor também atende;
-     cada supervisor vê só os chamados dos setores que ele gerencia.)
+    Supervisor: pode ver se (1) a ÁREA DO CHAMADO está nas suas áreas,
+    ou (2) ele é o solicitante (abriu o chamado para outra pessoa).
+    Assim, na aba "Meus Chamados", o supervisor consegue visualizar detalhes,
+    escrever e adicionar anexos nos chamados que abriu.
     
     Args:
         user: Objeto Usuario (current_user)
-        chamado: Objeto Chamado (com .area, .responsavel_id)
+        chamado: Objeto Chamado (com .area, .responsavel_id, .solicitante_id)
     
     Returns:
         True se pode ver, False caso contrário.
@@ -28,14 +29,16 @@ def usuario_pode_ver_chamado(user, chamado) -> bool:
     if user.perfil != 'supervisor':
         return False
     
-    # Supervisor vê apenas chamados cujo setor está nas suas áreas
-    return chamado.area in user.areas
+    # Supervisor vê chamados da sua área ou que ele mesmo abriu (solicitante)
+    if getattr(chamado, 'solicitante_id', None) == user.id:
+        return True
+    return chamado.area in getattr(user, 'areas', [])
 
 
 def usuario_pode_ver_chamado_otimizado(user, chamado, cache_usuarios: dict = None) -> bool:
-    """Versão otimizada: mesma regra de usuario_pode_ver_chamado (por área do chamado).
+    """Versão otimizada: mesma regra de usuario_pode_ver_chamado.
     
-    Supervisor vê apenas chamados cujo setor está nas suas áreas.
+    Supervisor vê chamados da sua área ou que ele abriu (solicitante_id).
     cache_usuarios é ignorado nesta regra (mantido por compatibilidade de assinatura).
     """
     if user.perfil == 'admin':
@@ -44,4 +47,6 @@ def usuario_pode_ver_chamado_otimizado(user, chamado, cache_usuarios: dict = Non
     if user.perfil != 'supervisor':
         return False
     
-    return chamado.area in user.areas
+    if getattr(chamado, 'solicitante_id', None) == user.id:
+        return True
+    return chamado.area in getattr(user, 'areas', [])

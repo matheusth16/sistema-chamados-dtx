@@ -40,41 +40,78 @@ def _get_resend_api_key() -> str:
     return (os.getenv('RESEND_API_KEY') or '').strip()
 
 
-def enviar_email(destinatario: str, assunto: str, corpo_html: str, corpo_texto: str = None) -> bool:
+def _ensure_env_loaded():
+    """Carrega .env da raiz do projeto se ainda não estiver no ambiente (fallback quando Flask config não tem MAIL_*)."""
+    root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+    env_path = os.path.join(root, '.env')
+    if os.path.isfile(env_path):
+        load_dotenv(env_path, override=True)
+
+
+def _mail_setting(key: str, default=None):
+    """Lê MAIL_* do Flask config; se vazio, carrega .env e usa os.getenv."""
+    try:
+        val = getattr(current_app.config, key, None) if current_app else None
+    except RuntimeError:
+        val = None
+    if val is not None and (key != 'MAIL_SERVER' or (isinstance(val, str) and val.strip())):
+        return val
+    _ensure_env_loaded()
+    return os.getenv(key, default)
+
+
+def enviar_email(destinatario: str, assunto: str, corpo_html: str, corpo_texto: str = None):
     """
     Envia e-mail via SMTP (Outlook/Office 365 ou outro).
-    Retorna True se enviado com sucesso, False caso contrário.
-    Se MAIL_SERVER não estiver configurado, não envia e retorna False.
+    Retorna (True, None) se enviado com sucesso, (False, mensagem_erro ou None) caso contrário.
+    Se MAIL_SERVER não estiver configurado, não envia e retorna (False, None).
+    Usa Flask config; se MAIL_SERVER estiver vazio, faz fallback para .env (os.getenv).
     """
-    server = _config('MAIL_SERVER') or ''
+    server = (_config('MAIL_SERVER') or os.getenv('MAIL_SERVER') or '').strip()
+    if not server:
+        _ensure_env_loaded()
+        server = (os.getenv('MAIL_SERVER') or '').strip()
     if not server or not destinatario or not destinatario.strip():
         if not destinatario or not destinatario.strip():
             logger.warning("Notificação por e-mail ignorada: destinatário vazio")
-        return False
+        return (False, None)
     destinatario = destinatario.strip()
+
+    port = _mail_setting('MAIL_PORT') or 587
+    try:
+        port = int(port)
+    except (TypeError, ValueError):
+        port = 587
+    use_tls = _mail_setting('MAIL_USE_TLS')
+    if use_tls is None:
+        use_tls = True
+    else:
+        use_tls = str(use_tls).lower() in ('true', '1', 'yes')
+    from_addr = (_mail_setting('MAIL_DEFAULT_SENDER') or _mail_setting('MAIL_USERNAME') or 'noreply@localhost').strip()
+    user = (_mail_setting('MAIL_USERNAME') or '').strip()
+    password = _mail_setting('MAIL_PASSWORD') or ''
+
     try:
         msg = MIMEMultipart('alternative')
         msg['Subject'] = assunto
-        msg['From'] = _config('MAIL_DEFAULT_SENDER') or _config('MAIL_USERNAME') or 'noreply@localhost'
+        msg['From'] = from_addr
         msg['To'] = destinatario
 
         if corpo_texto:
             msg.attach(MIMEText(corpo_texto, 'plain', 'utf-8'))
         msg.attach(MIMEText(corpo_html, 'html', 'utf-8'))
 
-        with smtplib.SMTP(_config('MAIL_SERVER'), _config('MAIL_PORT') or 587) as s:
-            if _config('MAIL_USE_TLS'):
+        with smtplib.SMTP(server, port) as s:
+            if use_tls:
                 s.starttls()
-            user = _config('MAIL_USERNAME')
-            password = _config('MAIL_PASSWORD')
             if user and password:
                 s.login(user, password)
             s.sendmail(msg['From'], destinatario, msg.as_string())
         logger.info(f"E-mail enviado para {destinatario}: {assunto[:50]}")
-        return True
+        return (True, None)
     except Exception as e:
         logger.exception(f"Falha ao enviar e-mail para {destinatario}: {e}")
-        return False
+        return (False, str(e))
 
 
 def enviar_email_resend(destinatario: str, assunto: str, corpo_html: str, corpo_texto: str = None,
@@ -228,7 +265,15 @@ def notificar_aprovador_novo_chamado(chamado_id: str, numero_chamado: str, categ
                 reply_to=solicitante_email or None,
             )
         else:
-            enviar_email(responsavel_usuario.email, assunto, corpo_html, corpo_texto)
+            ok, err = enviar_email(responsavel_usuario.email, assunto, corpo_html, corpo_texto)
+            if ok:
+                current_app.logger.info("E-mail enviado com sucesso para %s", responsavel_usuario.email)
+            else:
+                current_app.logger.warning(
+                    "Falha ao enviar e-mail para %s: %s",
+                    responsavel_usuario.email,
+                    err or "verifique MAIL_* e logs",
+                )
     else:
         logger.debug("Aprovador sem e-mail cadastrado; notificação por e-mail não enviada")
 

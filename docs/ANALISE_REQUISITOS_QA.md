@@ -147,7 +147,7 @@ O sistema é uma aplicação web de **gerenciamento de chamados** com:
 
 | Área | O que validar |
 |------|----------------|
-| Auth | Login/logout, redirecionamento por perfil, rotas protegidas (302/401) |
+| Auth | Login/logout, redirecionamento por perfil, rotas protegidas (302/401), alterar senha obrigatória |
 | Chamado (criação) | Validação de campos, regra Projetos+RL, anexos, atribuição, histórico |
 | Status | Atualização unitária (qualquer logado), bulk (só supervisor/admin, permissão por área) |
 | Edição | Apenas supervisor/admin; supervisor só da sua área; campos e histórico |
@@ -156,5 +156,8 @@ O sistema é uma aplicação web de **gerenciamento de chamados** com:
 | Notificações / Push | Listar, marcar lida, VAPID, subscribe |
 | Health / SW | Health 200; sw.js servido |
 | Validação/Erros | 400/403/404/500 e mensagens conforme especificação |
+| Dashboard / Export / Relatórios | GET /admin, /exportar, /admin/relatorios; permissão supervisor/admin |
+| Admin (usuários, categorias, traduções) | Rotas apenas para admin; listagem e CRUD |
+| Segurança | Validação Origin/Referer quando APP_BASE_URL; rate limit (login, bulk) |
 
-Este documento serve de base para o **Plano de Testes** e para os **Casos de Teste** detalhados.
+Este documento serve de base para o **Plano de Testes** e para os **Casos de Teste** detalhados. Manter alinhado com [PLANO_DE_TESTES.md](PLANO_DE_TESTES.md), [CASOS_DE_TESTE.md](CASOS_DE_TESTE.md) e [API.md](API.md) quando houver mudança de requisitos ou contrato.

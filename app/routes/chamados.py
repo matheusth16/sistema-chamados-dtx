@@ -69,7 +69,13 @@ def index() -> Response:
     descricao = request.form.get('descricao')
     impacto = request.form.get('impacto')
     gate = request.form.get('gate')
-    caminho_anexo = salvar_anexo(request.files.get('anexo'))
+    try:
+        caminho_anexo = salvar_anexo(request.files.get('anexo'))
+    except ValueError as e:
+        flash(str(e), 'danger')
+        setores = CategoriaSetor.get_all()
+        impactos = CategoriaImpacto.get_all()
+        return render_template('formulario.html', setores=setores, impactos=impactos)
     solicitante_nome = current_user.nome
     solicitante_id = current_user.id
     area_solicitante = current_user.area
@@ -151,6 +157,7 @@ def index() -> Response:
                 area=area_solicitante or 'Geral',
                 solicitante_nome=solicitante_nome,
                 responsavel_usuario=responsavel_usuario,
+                solicitante_email=getattr(current_user, 'email', None) or None,
             )
             if responsavel_id:
                 criar_notificacao(

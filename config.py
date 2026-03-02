@@ -25,9 +25,9 @@ class Config:
     # 2. Caminho ABSOLUTO para a pasta de uploads (Evita erros no Windows/OneDrive)
     UPLOAD_FOLDER = os.path.join(basedir, 'app', 'static', 'uploads')
     
-    # 3. Segurança: Limita o tamanho do arquivo a 16MB (Padrão Flask)
+    # 3. Segurança: Limita o tamanho do arquivo a 10MB
     # Se passar disso, o sistema rejeita automaticamente.
-    MAX_CONTENT_LENGTH = 16 * 1024 * 1024
+    MAX_CONTENT_LENGTH = 10 * 1024 * 1024
     
     # 4. Paginação
     ITENS_POR_PAGINA = 10
@@ -52,6 +52,10 @@ class Config:
     SESSION_COOKIE_SECURE = os.getenv('SESSION_COOKIE_SECURE', 'True') == 'True'  # HTTPS em produção
     SESSION_COOKIE_HTTPONLY = True  # Não acessível via JavaScript
     SESSION_COOKIE_SAMESITE = 'Lax'  # Proteção contra CSRF
+    REMEMBER_COOKIE_DURATION = 2592000  # 30 dias em segundos (Flask-Login padrão é 31 dias)
+    REMEMBER_COOKIE_SECURE = SESSION_COOKIE_SECURE  # Mesmo padrão de SESSION_COOKIE_SECURE
+    REMEMBER_COOKIE_HTTPONLY = True  # Não acessível via JavaScript
+    REMEMBER_COOKIE_SAMESITE = 'Lax'  # Proteção contra CSRF
     
     # 8. Validação de Entrada
     MAX_DESCRICAO_CHARS = 5000
@@ -71,9 +75,18 @@ class Config:
     MAIL_DEFAULT_SENDER = os.getenv('MAIL_DEFAULT_SENDER', '')
     TEAMS_WEBHOOK_URL = os.getenv('TEAMS_WEBHOOK_URL', '')
 
+    # Resend (e-mail transacional). Se definido, notifications.py usa Resend em vez de SMTP.
+    RESEND_API_KEY = os.getenv('RESEND_API_KEY', '').strip()
+    RESEND_FROM_EMAIL = os.getenv('RESEND_FROM_EMAIL', '')
+    RESEND_FROM_NAME = os.getenv('RESEND_FROM_NAME', '')
+
     # Web Push (notificações no navegador). Gere chaves com: python gerar_vapid_keys.py
     VAPID_PUBLIC_KEY = os.getenv('VAPID_PUBLIC_KEY', '')
     VAPID_PRIVATE_KEY = os.getenv('VAPID_PRIVATE_KEY', '')
+
+    # Criptografia de PII em repouso (LGPD). Gere chave: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    ENCRYPTION_KEY = os.getenv('ENCRYPTION_KEY', '').strip()
+    ENCRYPT_PII_AT_REST = os.getenv('ENCRYPT_PII_AT_REST', 'false').lower() in ('true', '1', 'yes')
 
     # Logging: nível (DEBUG, INFO, WARNING, ERROR). Em produção use INFO ou WARNING.
     LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO').upper()
