@@ -89,7 +89,7 @@ def enviar_email(destinatario: str, assunto: str, corpo_html: str, corpo_texto: 
         use_tls = str(use_tls).lower() in ('true', '1', 'yes')
     from_addr = (_mail_setting('MAIL_DEFAULT_SENDER') or _mail_setting('MAIL_USERNAME') or 'noreply@localhost').strip()
     user = (_mail_setting('MAIL_USERNAME') or '').strip()
-    password = _mail_setting('MAIL_PASSWORD') or ''
+    password = (_mail_setting('MAIL_PASSWORD') or '').strip()
 
     try:
         msg = MIMEMultipart('alternative')

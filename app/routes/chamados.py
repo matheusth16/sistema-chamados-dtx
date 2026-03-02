@@ -1,5 +1,6 @@
 """Rotas de criação e listagem de chamados (solicitante)."""
 import logging
+from datetime import datetime
 from flask import render_template, request, redirect, url_for, Response, flash, current_app
 from flask_login import current_user
 from firebase_admin import firestore
@@ -193,12 +194,77 @@ def index() -> Response:
         return redirect(url_for('main.index'))
 
 
+def _eh_erro_indice_firestore(exc: Exception) -> bool:
+    """Verifica se a exceção é de índice do Firestore (FAILED_PRECONDITION / index)."""
+    msg = (getattr(exc, 'message', '') or str(exc) or '').lower()
+    return 'failed_precondition' in msg or 'index' in msg or 'requires an index' in msg
+
+
+def _meus_chamados_fallback_sem_indice(user_id: str, status_filtro: str, itens_por_pagina: int, pagina_atual: int):
+    """
+    Fallback quando a query com order_by falha por falta de índice:
+    busca só por solicitante_id (não exige índice composto), ordena em memória e pagina.
+    """
+    q = db.collection('chamados').where('solicitante_id', '==', user_id).limit(500)
+    docs = list(q.stream())
+    # Filtra por status se pedido
+    if status_filtro:
+        docs = [d for d in docs if (d.to_dict() or {}).get('status') == status_filtro]
+    # Ordena por data_abertura desc (None por último)
+    def _data_key(d):
+        data = (d.to_dict() or {}).get('data_abertura')
+        if data is None or data == firestore.SERVER_TIMESTAMP:
+            return None
+        if hasattr(data, 'to_pydatetime'):
+            return data.to_pydatetime()
+        return data
+    docs.sort(key=lambda d: (_data_key(d) is None, _data_key(d) or datetime.min), reverse=True)  # mais recentes primeiro
+    # Contagens por status
+    status_counts = {'Aberto': 0, 'Em Atendimento': 0, 'Concluído': 0}
+    for d in docs:
+        st = (d.to_dict() or {}).get('status', 'Aberto')
+        if st in status_counts:
+            status_counts[st] += 1
+    total_chamados = len(docs)
+    total_paginas = max(1, (total_chamados + itens_por_pagina - 1) // itens_por_pagina)
+    pagina_atual = max(1, min(pagina_atual, total_paginas))
+    inicio = (pagina_atual - 1) * itens_por_pagina
+    fim = inicio + itens_por_pagina
+    docs_pagina = docs[inicio:fim]
+    chamados = []
+    for doc in docs_pagina:
+        try:
+            data = doc.to_dict()
+            if not data:
+                continue
+            c = Chamado.from_dict(data, doc.id)
+            chamados.append(c)
+        except Exception as doc_err:
+            logger.warning("Chamado %s ignorado (dados inválidos): %s", doc.id, doc_err)
+    cursor_next = docs_pagina[-1].id if len(docs_pagina) == itens_por_pagina and fim < total_chamados else None
+    cursor_prev = docs_pagina[0].id if inicio > 0 else None
+    return {
+        'chamados': chamados,
+        'pagina_atual': pagina_atual,
+        'total_paginas': total_paginas,
+        'total_chamados': total_chamados,
+        'status_counts': status_counts,
+        'cursor_next': cursor_next,
+        'cursor_prev': cursor_prev,
+    }
+
+
 @main.route('/meus-chamados')
 @requer_solicitante
 @limiter.limit("30 per minute")
 def meus_chamados() -> Response:
     """GET: lista de chamados do solicitante com paginação por cursor (menos leituras no Firestore)."""
     try:
+        if not getattr(current_user, 'id', None):
+            logger.warning("meus_chamados: current_user.id ausente")
+            flash('Erro ao carregar seus chamados. Sessão inválida.', 'danger')
+            return redirect(url_for('main.index'))
+
         status_filtro = request.args.get('status', '')
         cursor = request.args.get('cursor', '').strip()
         cursor_prev = request.args.get('cursor_prev', '').strip() or None
@@ -248,13 +314,17 @@ def meus_chamados() -> Response:
         if tem_proxima:
             docs = docs[:itens_por_pagina]
         cursor_next = docs[-1].id if docs and tem_proxima else None
-        # cursor_prev já veio da URL (cursor que mostra a página anterior)
 
         chamados = []
         for doc in docs:
-            data = doc.to_dict()
-            c = Chamado.from_dict(data, doc.id)
-            chamados.append(c)
+            try:
+                data = doc.to_dict()
+                if not data:
+                    continue
+                c = Chamado.from_dict(data, doc.id)
+                chamados.append(c)
+            except Exception as doc_err:
+                logger.warning("Chamado %s ignorado (dados inválidos): %s", doc.id, doc_err)
 
         return render_template(
             'meus_chamados.html',
@@ -269,6 +339,22 @@ def meus_chamados() -> Response:
             cursor_prev=cursor_prev,
         )
     except Exception as e:
+        if _eh_erro_indice_firestore(e):
+            logger.warning("Índice Firestore indisponível, usando fallback para meus_chamados: %s", e)
+            try:
+                resultado = _meus_chamados_fallback_sem_indice(
+                    current_user.id, status_filtro, itens_por_pagina, pagina_atual
+                )
+                return render_template(
+                    'meus_chamados.html',
+                    itens_por_pagina=itens_por_pagina,
+                    status_filtro=status_filtro,
+                    **resultado,
+                )
+            except Exception as fallback_err:
+                logger.exception("Fallback meus_chamados também falhou: %s", fallback_err)
+                flash('Erro ao carregar seus chamados. Tente novamente.', 'danger')
+                return redirect(url_for('main.index'))
         logger.exception("Erro ao buscar chamados do solicitante: %s", e)
-        flash('Erro ao carregar seus chamados.', 'danger')
+        flash('Erro ao carregar seus chamados. Tente novamente ou verifique os logs.', 'danger')
         return redirect(url_for('main.index'))
