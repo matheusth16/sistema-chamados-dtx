@@ -2,11 +2,13 @@
 import logging
 from flask import render_template, request, redirect, url_for, Response, flash, current_app
 from flask_login import current_user
+from firebase_admin import firestore
 from app.routes import main
 from app.limiter import limiter
 from app.decoradores import requer_solicitante
 from app.database import db
 from app.models import Chamado
+from app.services.pagination import obter_total_por_contagem
 from app.models_usuario import Usuario
 from app.models_historico import Historico
 from app.models_categorias import CategoriaSetor, CategoriaImpacto
@@ -31,18 +33,17 @@ def index() -> Response:
         setores = CategoriaSetor.get_all()
         impactos = CategoriaImpacto.get_all()
 
-        # Contagem de chamados do solicitante para o mini resumo
+        # Contagem por agregação (count) — sem ler documentos
         status_counts = {'Aberto': 0, 'Em Atendimento': 0, 'Concluído': 0}
         try:
-            docs = db.collection('chamados').where(
-                'solicitante_id', '==', current_user.id
-            ).stream()
-            for doc in docs:
-                st = doc.to_dict().get('status', 'Aberto')
-                if st in status_counts:
-                    status_counts[st] += 1
+            for st in ('Aberto', 'Em Atendimento', 'Concluído'):
+                q = db.collection('chamados').where(
+                    'solicitante_id', '==', current_user.id
+                ).where('status', '==', st)
+                c = obter_total_por_contagem(q)
+                status_counts[st] = c if c is not None else 0
         except Exception as e:
-            logger.warning(f"Erro ao contar chamados do solicitante: {e}")
+            logger.warning("Erro ao contar chamados do solicitante: %s", e)
 
         return render_template(
             'formulario.html',
@@ -196,58 +197,78 @@ def index() -> Response:
 @requer_solicitante
 @limiter.limit("30 per minute")
 def meus_chamados() -> Response:
-    """GET: lista de chamados criados pelo solicitante."""
+    """GET: lista de chamados do solicitante com paginação por cursor (menos leituras no Firestore)."""
     try:
-        # Buscar todos os chamados do solicitante
-        chamados_ref = db.collection('chamados').where('solicitante_id', '==', current_user.id)
-        docs = chamados_ref.stream()
-        
+        status_filtro = request.args.get('status', '')
+        cursor = request.args.get('cursor', '').strip()
+        cursor_prev = request.args.get('cursor_prev', '').strip() or None
+        pagina_atual = request.args.get('pagina', 1, type=int)
+        itens_por_pagina = 10
+
+        # Query base: solicitante + opcional status, ordenado por data_abertura desc
+        q = db.collection('chamados').where('solicitante_id', '==', current_user.id)
+        if status_filtro:
+            q = q.where('status', '==', status_filtro)
+        q = q.order_by('data_abertura', direction=firestore.Query.DESCENDING)
+
+        # Total e contagens por status via agregação (count) — sem ler todos os docs
+        total_chamados = obter_total_por_contagem(q) or 0
+        status_counts = {'Aberto': 0, 'Em Atendimento': 0, 'Concluído': 0}
+        try:
+            base_ref = db.collection('chamados').where('solicitante_id', '==', current_user.id)
+            for st in ('Aberto', 'Em Atendimento', 'Concluído'):
+                cq = base_ref.where('status', '==', st)
+                c = obter_total_por_contagem(cq)
+                status_counts[st] = c if c is not None else 0
+        except Exception as e:
+            logger.debug("Contagem por status em meus_chamados: %s", e)
+
+        total_paginas = max(1, (total_chamados + itens_por_pagina - 1) // itens_por_pagina)
+        if pagina_atual < 1:
+            pagina_atual = 1
+        if pagina_atual > total_paginas:
+            pagina_atual = total_paginas
+
+        # Página de documentos: limit + start_after(cursor)
+        if cursor:
+            try:
+                cursor_doc = db.collection('chamados').document(cursor).get()
+                if cursor_doc.exists:
+                    q_page = q.start_after(cursor_doc).limit(itens_por_pagina + 1)
+                else:
+                    q_page = q.limit(itens_por_pagina + 1)
+            except Exception as e:
+                logger.debug("Cursor inválido em meus_chamados: %s", e)
+                q_page = q.limit(itens_por_pagina + 1)
+        else:
+            q_page = q.limit(itens_por_pagina + 1)
+
+        docs = list(q_page.stream())
+        tem_proxima = len(docs) > itens_por_pagina
+        if tem_proxima:
+            docs = docs[:itens_por_pagina]
+        cursor_next = docs[-1].id if docs and tem_proxima else None
+        # cursor_prev já veio da URL (cursor que mostra a página anterior)
+
         chamados = []
         for doc in docs:
             data = doc.to_dict()
             c = Chamado.from_dict(data, doc.id)
             chamados.append(c)
-        
-        # Filtro por status (opcional)
-        status_filtro = request.args.get('status', '')
-        if status_filtro:
-            chamados = [c for c in chamados if c.status == status_filtro]
-        
-        # Ordenar por data de abertura (mais recente primeiro)
-        chamados_ordenados = sorted(chamados, key=lambda c: c.data_abertura or '', reverse=True)
-        
-        # Paginação
-        pagina = request.args.get('pagina', 1, type=int)
-        itens_por_pagina = 10
-        total_chamados = len(chamados_ordenados)
-        inicio = (pagina - 1) * itens_por_pagina
-        fim = inicio + itens_por_pagina
-        total_paginas = (total_chamados + itens_por_pagina - 1) // itens_por_pagina
-        
-        if pagina < 1 or pagina > total_paginas:
-            pagina = 1
-            chamados_pagina = chamados_ordenados[:itens_por_pagina]
-        else:
-            chamados_pagina = chamados_ordenados[inicio:fim]
-        
-        # Contar chamados por status
-        status_counts = {
-            'Aberto': len([c for c in chamados if c.status == 'Aberto']),
-            'Em Atendimento': len([c for c in chamados if c.status == 'Em Atendimento']),
-            'Concluído': len([c for c in chamados if c.status == 'Concluído'])
-        }
-        
+
         return render_template(
             'meus_chamados.html',
-            chamados=chamados_pagina,
-            pagina_atual=pagina,
+            chamados=chamados,
+            pagina_atual=pagina_atual,
             total_paginas=total_paginas,
             total_chamados=total_chamados,
             itens_por_pagina=itens_por_pagina,
             status_filtro=status_filtro,
-            status_counts=status_counts
+            status_counts=status_counts,
+            cursor_next=cursor_next,
+            cursor_prev=cursor_prev,
         )
     except Exception as e:
-        logger.exception(f"Erro ao buscar chamados do solicitante: {str(e)}")
+        logger.exception("Erro ao buscar chamados do solicitante: %s", e)
         flash('Erro ao carregar seus chamados.', 'danger')
         return redirect(url_for('main.index'))

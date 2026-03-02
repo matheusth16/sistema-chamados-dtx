@@ -66,6 +66,23 @@
         {"fieldPath": "perfil", "order": "ASCENDING"},
         {"fieldPath": "area", "order": "ASCENDING"}
       ]
+    },
+    {
+      "collectionGroup": "chamados",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "solicitante_id", "order": "ASCENDING"},
+        {"fieldPath": "data_abertura", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "chamados",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "solicitante_id", "order": "ASCENDING"},
+        {"fieldPath": "status", "order": "ASCENDING"},
+        {"fieldPath": "data_abertura", "order": "DESCENDING"}
+      ]
     }
   ],
   "fieldOverrides": []

@@ -114,6 +114,34 @@ gcloud run logs read sistema-chamados-dtx --region us-central1 --limit 50 --foll
 
 ---
 
+## Acompanhamento de uso (plano Spark)
+
+Para não estourar a cota do Firebase no plano Spark (ex.: 50k reads/dia no Firestore), o sistema já usa:
+
+- **Rate limits** em produção (200/hora, 2000/dia por cliente; exportações limitadas a 3/hora).
+- **Cache** do relatório completo (5 min), reduzindo leituras repetidas.
+- **Paginação por cursor** em "Meus chamados" e **contagem por agregação (count)** para totais, em vez de carregar todos os documentos.
+- **Limite** nas queries de analytics (`MAX_CHAMADOS_ANALYTICS`), capando leituras por relatório.
+
+**Onde acompanhar uso:**
+
+- **Firestore:** [Firebase Console → Firestore → Usage](https://console.firebase.google.com) (ou Google Cloud Console → Firestore → Uso). Verifique leituras/escritas por dia.
+- **Storage:** Firebase Console → Storage → Usage. Limites do Spark (ex.: 5 GB armazenado, 1 GB download/dia em buckets legados).
+
+Mantenha rate limits e cache ativos em produção; em desenvolvimento eles podem estar desativados.
+
+---
+
+## Índices Firestore (Meus chamados)
+
+Se a rota "Meus chamados" exigir índices compostos, faça o deploy após alterar `firestore.indexes.json`:
+
+```bash
+firebase deploy --only firestore:indexes --project sistema-de-chamados-dtx-aero
+```
+
+---
+
 ## SE FALHAR NO BUILD
 
 Erro 51 ainda aparecer? Aumente o timeout do build:

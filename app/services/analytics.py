@@ -22,6 +22,9 @@ logger = logging.getLogger(__name__)
 _RELATORIO_CACHE: Dict[str, Any] = {}
 _RELATORIO_CACHE_TTL_SEC = 300  # 5 minutos
 
+# Limite máximo de documentos em queries de analytics (evita estourar cota Firestore no plano Spark)
+MAX_CHAMADOS_ANALYTICS = 2000
+
 # SLA por categoria (dias para conclusão): Projetos 2 dias, demais 3 dias
 SLA_DIAS_PROJETOS = 2
 SLA_DIAS_PADRAO = 3
@@ -106,7 +109,7 @@ class AnalisadorChamados:
     # ========== MÉTRICAS GERAIS ==========
     
     def obter_metricas_gerais(self, dias: int = 30) -> Dict[str, Any]:
-        """Retorna métricas gerais dos últimos N dias
+        """Retorna métricas gerais dos últimos N dias (até MAX_CHAMADOS_ANALYTICS docs).
         
         Incluindo:
         - Total de chamados
@@ -117,10 +120,9 @@ class AnalisadorChamados:
         try:
             data_limite = datetime.now() - timedelta(days=dias)
             
-            # Query todos os chamados no período
             chamados_ref = self.get_db().collection('chamados')\
-                .where('data_abertura', '>=', data_limite)
-            
+                .where('data_abertura', '>=', data_limite)\
+                .limit(MAX_CHAMADOS_ANALYTICS)
             chamados = list(chamados_ref.stream())
             
             total = len(chamados)
@@ -241,10 +243,9 @@ class AnalisadorChamados:
             metricas = []
             
             for sup in supervisores_ativos:
-                # Chamados atribuídos a este supervisor
                 chamados_ref = self.get_db().collection('chamados')\
-                    .where('responsavel_id', '==', sup.id)
-                
+                    .where('responsavel_id', '==', sup.id)\
+                    .limit(MAX_CHAMADOS_ANALYTICS)
                 chamados = list(chamados_ref.stream())
                 total = len(chamados)
                 abertos = sum(1 for doc in chamados if doc.to_dict().get('status') == 'Aberto')
@@ -346,10 +347,9 @@ class AnalisadorChamados:
             metricas = []
 
             for area in sorted(areas_uniques):
-                # Chamados criados por solicitantes dessa área
                 chamados_ref = self.get_db().collection('chamados')\
-                    .where('area', '==', area)
-                
+                    .where('area', '==', area)\
+                    .limit(MAX_CHAMADOS_ANALYTICS)
                 chamados = list(chamados_ref.stream())
                 total = len(chamados)
                 abertos = sum(1 for doc in chamados if doc.to_dict().get('status') == 'Aberto')
@@ -407,12 +407,13 @@ class AnalisadorChamados:
         - Tempo médio de resolução: Automática vs Manual
         - Distribuição de carga após atribuição
         
-        Limita aos últimos `dias` para evitar carregar todo o histórico (performance).
+        Limita aos últimos `dias` e a MAX_CHAMADOS_ANALYTICS docs (performance e cota Firestore).
         """
         try:
             data_limite = datetime.now() - timedelta(days=dias)
             chamados_ref = self.get_db().collection('chamados')\
-                .where('data_abertura', '>=', data_limite)
+                .where('data_abertura', '>=', data_limite)\
+                .limit(MAX_CHAMADOS_ANALYTICS)
             chamados = list(chamados_ref.stream())
             
             # Separar automáticos e manuais

@@ -134,7 +134,7 @@ def editar_usuario(usuario_id: str) -> Response:
 @requer_perfil('admin')
 @limiter.limit("30 per minute")
 def deletar_usuario(usuario_id: str) -> Response:
-    """Deleta usuário (exceto admin@dtx.com)."""
+    """Deleta usuário (exceto admin@dtx.aero)."""
     try:
         usuario = Usuario.get_by_id(usuario_id)
         if not usuario:
@@ -143,10 +143,10 @@ def deletar_usuario(usuario_id: str) -> Response:
         if usuario_id == current_user.id:
             flash_t('cannot_delete_own_account', 'warning')
             return redirect(url_for('main.gerenciar_usuarios'))
-        if usuario.email == 'admin@dtx.com':
+        if usuario.email == 'admin@dtx.aero':
             flash_t('cannot_delete_root_admin', 'danger')
             logger.warning(
-                "Tentativa de deletar admin@dtx.com por %s",
+                "Tentativa de deletar admin@dtx.aero por %s",
                 current_user.email,
             )
             return redirect(url_for('main.gerenciar_usuarios'))
