@@ -21,7 +21,6 @@ logger = logging.getLogger(__name__)
 
 @main.route('/admin/categorias', methods=['GET'])
 @requer_perfil('admin')
-@limiter.limit("30 per minute")
 def admin_categorias() -> Response:
     """Página de administração de categorias (setores, gates, impactos)."""
     try:
@@ -43,7 +42,6 @@ def admin_categorias() -> Response:
 
 @main.route('/admin/categorias/setor/nova', methods=['POST'])
 @requer_perfil('admin')
-@limiter.limit("30 per minute")
 def criar_setor() -> Response:
     """Cria um novo setor."""
     try:
@@ -73,7 +71,6 @@ def criar_setor() -> Response:
 
 @main.route('/admin/categorias/gate/nova', methods=['POST'])
 @requer_perfil('admin')
-@limiter.limit("30 per minute")
 def criar_gate() -> Response:
     """Cria um novo gate."""
     try:
@@ -111,7 +108,6 @@ def criar_gate() -> Response:
 
 @main.route('/admin/categorias/impacto/nova', methods=['POST'])
 @requer_perfil('admin')
-@limiter.limit("30 per minute")
 def criar_impacto() -> Response:
     """Cria um novo impacto."""
     try:
@@ -141,7 +137,6 @@ def criar_impacto() -> Response:
 
 @main.route('/admin/categorias/setor/<setor_id>/editar', methods=['POST'])
 @requer_perfil('admin')
-@limiter.limit("30 per minute")
 def editar_setor(setor_id: str) -> Response:
     """Edita um setor existente."""
     try:
@@ -166,7 +161,6 @@ def editar_setor(setor_id: str) -> Response:
 
 @main.route('/admin/categorias/setor/<setor_id>/excluir', methods=['POST'])
 @requer_perfil('admin')
-@limiter.limit("30 per minute")
 def excluir_setor(setor_id: str) -> Response:
     """Exclui um setor."""
     try:
@@ -187,7 +181,6 @@ def excluir_setor(setor_id: str) -> Response:
 
 @main.route('/admin/categorias/gate/<gate_id>/editar', methods=['POST'])
 @requer_perfil('admin')
-@limiter.limit("30 per minute")
 def editar_gate(gate_id: str) -> Response:
     """Edita um gate existente."""
     try:
@@ -212,7 +205,6 @@ def editar_gate(gate_id: str) -> Response:
 
 @main.route('/admin/categorias/gate/<gate_id>/excluir', methods=['POST'])
 @requer_perfil('admin')
-@limiter.limit("30 per minute")
 def excluir_gate(gate_id: str) -> Response:
     """Exclui um gate."""
     try:
@@ -233,7 +225,6 @@ def excluir_gate(gate_id: str) -> Response:
 
 @main.route('/admin/categorias/impacto/<impacto_id>/editar', methods=['POST'])
 @requer_perfil('admin')
-@limiter.limit("30 per minute")
 def editar_impacto(impacto_id: str) -> Response:
     """Edita um impacto existente."""
     try:
@@ -258,7 +249,6 @@ def editar_impacto(impacto_id: str) -> Response:
 
 @main.route('/admin/categorias/impacto/<impacto_id>/excluir', methods=['POST'])
 @requer_perfil('admin')
-@limiter.limit("30 per minute")
 def excluir_impacto(impacto_id: str) -> Response:
     """Exclui um impacto."""
     try:

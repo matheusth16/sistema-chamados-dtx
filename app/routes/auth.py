@@ -14,7 +14,6 @@ logger = logging.getLogger(__name__)
 
 
 @main.route('/login', methods=['GET', 'POST'])
-@limiter.limit("5 per minute")
 def login() -> Response:
     """GET: formulário de login. POST: valida credenciais e cria sessão."""
     # Remove last_activity de sessão antiga para evitar "desconectado por inatividade"

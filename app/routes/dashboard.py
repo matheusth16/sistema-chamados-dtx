@@ -80,7 +80,6 @@ def _filtrar_chamados_por_permissao(docs, user) -> list:
 
 @main.route('/admin', methods=['GET', 'POST'])
 @requer_supervisor_area
-@limiter.limit("30 per minute")
 def admin() -> Response:
     """GET: dashboard com chamados. POST: alteração de status."""
     if request.method == 'POST':
@@ -185,7 +184,6 @@ def admin() -> Response:
 
 @main.route('/chamado/<chamado_id>')
 @login_required
-@limiter.limit("60 per minute")
 def visualizar_detalhe_chamado(chamado_id: str) -> Response:
     """Exibe detalhes do chamado. Solicitante vê só os próprios; supervisor/admin conforme permissão."""
     try:
@@ -226,7 +224,6 @@ def visualizar_detalhe_chamado(chamado_id: str) -> Response:
 
 @main.route('/chamado/editar', methods=['POST'])
 @login_required
-@limiter.limit("30 per minute")
 def editar_chamado_pagina() -> Response:
     """Processa o formulário de edição da página de detalhes do chamado (status, responsável, descrição, anexo)."""
     if current_user.perfil not in ('supervisor', 'admin'):
@@ -366,7 +363,6 @@ def visualizar_historico(chamado_id: str) -> Response:
 
 @main.route('/exportar')
 @requer_supervisor_area
-@limiter.limit("3 per hour")  # Evita abuso; cada exportação gera muitas leituras no Firestore
 def exportar() -> Response:
     """Exporta chamados filtrados para Excel (até MAX_EXPORT_CHAMADOS)."""
     try:
@@ -414,7 +410,6 @@ def exportar() -> Response:
 
 @main.route('/exportar-avancado')
 @requer_supervisor_area
-@limiter.limit("3 per hour")  # Evita abuso; cada exportação gera muitas leituras no Firestore
 def exportar_avancado() -> Response:
     """Exporta relatório completo em Excel com múltiplas abas (até MAX_EXPORT_CHAMADOS)."""
     try:
@@ -505,7 +500,6 @@ def _relatorios_ordenar_areas(lista: List[Dict], campo: str, asc: bool) -> List[
 
 @main.route('/admin/relatorios')
 @requer_supervisor_area
-@limiter.limit("30 per minute")
 def relatorios() -> Response:
     """Dashboard de relatórios e análises. Use ?atualizar=1 para forçar dados frescos.
     Query params: pagina_sup, pagina_area, ordenar_sup, ordenar_area, ordem_sup, ordem_area (asc|desc), busca_sup, busca_area."""

@@ -257,7 +257,6 @@ def _meus_chamados_fallback_sem_indice(user_id: str, status_filtro: str, itens_p
 
 @main.route('/meus-chamados')
 @requer_solicitante
-@limiter.limit("30 per minute")
 def meus_chamados() -> Response:
     """GET: lista de chamados do solicitante com paginação por cursor (menos leituras no Firestore)."""
     try:

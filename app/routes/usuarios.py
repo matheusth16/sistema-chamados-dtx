@@ -14,7 +14,6 @@ logger = logging.getLogger(__name__)
 
 @main.route('/admin/usuarios', methods=['GET', 'POST'])
 @requer_perfil('admin')
-@limiter.limit("30 per minute")
 def gerenciar_usuarios() -> Response:
     """GET: lista usuários. POST: cria usuário."""
     if request.method == 'POST' and request.form.get('acao') == 'criar':
@@ -69,7 +68,6 @@ def gerenciar_usuarios() -> Response:
 
 @main.route('/admin/usuarios/novo', methods=['GET'])
 @requer_perfil('admin')
-@limiter.limit("30 per minute")
 def novo_usuario_form() -> Response:
     """Exibe formulário de criação de usuário."""
     return render_template('usuario_form.html', usuario=None)
@@ -77,7 +75,6 @@ def novo_usuario_form() -> Response:
 
 @main.route('/admin/usuarios/<usuario_id>/editar', methods=['GET', 'POST'])
 @requer_perfil('admin')
-@limiter.limit("30 per minute")
 def editar_usuario(usuario_id: str) -> Response:
     """GET: exibe formulário de edição. POST: edita usuário."""
     try:
@@ -132,7 +129,6 @@ def editar_usuario(usuario_id: str) -> Response:
 
 @main.route('/admin/usuarios/<usuario_id>/deletar', methods=['POST'])
 @requer_perfil('admin')
-@limiter.limit("30 per minute")
 def deletar_usuario(usuario_id: str) -> Response:
     """Deleta usuário (exceto admin@dtx.aero)."""
     try:
@@ -164,7 +160,6 @@ def deletar_usuario(usuario_id: str) -> Response:
 
 @main.route('/admin/usuarios/<usuario_id>/resetar-senha', methods=['POST'])
 @requer_perfil('admin')
-@limiter.limit("30 per minute")
 def resetar_senha_usuario(usuario_id: str) -> Response:
     """Reseta a senha de um usuário para a senha padrão (123456)."""
     try:
@@ -201,7 +196,6 @@ def resetar_senha_usuario(usuario_id: str) -> Response:
 
 @main.route('/admin/usuarios/<usuario_id>/reset-exp', methods=['POST'])
 @requer_perfil('admin')
-@limiter.limit("10 per minute")
 def resetar_exp_usuario(usuario_id: str) -> Response:
     """Zera a experiência e nível do usuário."""
     try:

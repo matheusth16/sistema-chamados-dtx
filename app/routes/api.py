@@ -193,7 +193,6 @@ def api_editar_chamado():
 
 @main.route('/api/bulk-status', methods=['POST'])
 @login_required
-@limiter.limit("20 per minute")
 def bulk_atualizar_status():
     """Atualiza status de múltiplos chamados em lote. Apenas supervisor/admin."""
     if current_user.perfil not in ('supervisor', 'admin'):
@@ -334,7 +333,6 @@ def api_push_subscribe():
 
 @main.route('/api/chamado/<chamado_id>', methods=['GET'])
 @login_required
-@limiter.limit("60 per minute")
 def api_chamado_por_id(chamado_id: str):
     """Retorna um chamado por ID (JSON). Usado pelo dashboard para atualizar a linha após fechar o modal/aba de detalhes."""
     try:
@@ -370,7 +368,6 @@ def api_chamado_por_id(chamado_id: str):
 
 @main.route('/api/chamados/paginar', methods=['GET'])
 @login_required
-@limiter.limit("60 per minute")
 def api_chamados_paginar():
     """Paginação com cursor para chamados."""
     try:
@@ -416,7 +413,6 @@ def api_chamados_paginar():
 
 @main.route('/api/carregar-mais', methods=['POST'])
 @login_required
-@limiter.limit("60 per minute")
 def carregar_mais():
     """Carregar mais chamados (infinite scroll)."""
     try:
@@ -452,7 +448,6 @@ def carregar_mais():
 
 @main.route('/api/supervisores/disponibilidade', methods=['GET'])
 @login_required
-@limiter.limit("30 per minute")
 def api_disponibilidade_supervisores():
     """Disponibilidade de supervisores por área (lista ao selecionar setor no formulário)."""
     try:

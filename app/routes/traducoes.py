@@ -11,7 +11,6 @@ logger = logging.getLogger(__name__)
 
 @main.route('/admin/traducoes', methods=['GET', 'POST'])
 @requer_perfil('admin')
-@limiter.limit("30 per minute")
 def admin_traducoes() -> Response:
     """GET: Lista e gerencia todas as traduções globais JSON. POST: Salva edição de tradução"""
     from app.i18n import get_translations_dict, save_translations_dict
