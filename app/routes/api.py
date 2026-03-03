@@ -15,6 +15,7 @@ from app.services.notifications import notificar_solicitante_status
 from app.services.notifications_inapp import listar_para_usuario, contar_nao_lidas, marcar_como_lida, marcar_todas_como_lidas
 from app.services.webpush_service import salvar_inscricao
 from app.services.assignment import atribuidor
+from app.utils_areas import setor_para_area
 from app.services.upload import salvar_anexo
 from app.services.status_service import atualizar_status_chamado
 from app.services.permissions import usuario_pode_ver_chamado
@@ -453,10 +454,11 @@ def carregar_mais():
 @login_required
 @limiter.limit("30 per minute")
 def api_disponibilidade_supervisores():
-    """Disponibilidade de supervisores por área."""
+    """Disponibilidade de supervisores por área (lista ao selecionar setor no formulário)."""
     try:
         area = request.args.get('area', 'Geral')
-        disponibilidade = atribuidor.obter_disponibilidade(area)
+        area_resolvida = setor_para_area(area)
+        disponibilidade = atribuidor.obter_disponibilidade(area_resolvida)
         return jsonify({'sucesso': True, **disponibilidade}), 200
     except Exception as e:
         logger.exception("Erro ao obter disponibilidade: %s", e)

@@ -16,6 +16,7 @@ from typing import Optional, Dict, List
 from google.cloud.firestore_v1.base_query import FieldFilter, BaseCompositeFilter
 from app.database import db
 from app.models_usuario import Usuario
+from app.utils_areas import setor_para_area
 
 logger = logging.getLogger(__name__)
 
@@ -84,6 +85,7 @@ class AtribuidorAutomatico:
             ...     print(f"Erro: {resultado['motivo']}")
         """
         try:
+            area = setor_para_area(area) or area
             logger.debug(f"Atribuindo chamado: area={area}, categoria={categoria}, prioridade={prioridade}")
             
             # 1. Busca supervisores da área
@@ -223,6 +225,7 @@ class AtribuidorAutomatico:
         Útil para dashboard e análises
         """
         try:
+            area = setor_para_area(area) or area
             supervisores = Usuario.get_supervisores_por_area(area)
             supervisores_com_carga = self._contar_chamados_abertos(supervisores)
             

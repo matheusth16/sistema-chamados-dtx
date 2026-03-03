@@ -128,7 +128,7 @@ def admin() -> Response:
     
     # Para o formulário de edição do modal: lista com ID, Nome e Área
     supervisores_detalhados = sorted(
-        [{'id': u.id, 'nome': u.nome, 'area': u.area} for u in usuarios_gestao if u.perfil in ('supervisor', 'admin') and u.nome],
+        [{'id': u.id, 'nome': u.nome, 'area': u.area} for u in usuarios_gestao if u.perfil == 'supervisor' and u.nome],
         key=lambda x: x['nome'].upper()
     )
 
@@ -208,7 +208,7 @@ def visualizar_detalhe_chamado(chamado_id: str) -> Response:
         pode_editar = current_user.perfil in ('supervisor', 'admin')
         usuarios_gestao = Usuario.get_all()
         supervisores_detalhados = sorted(
-            [{'id': u.id, 'nome': u.nome, 'area': u.area} for u in usuarios_gestao if u.perfil in ('supervisor', 'admin') and u.nome],
+            [{'id': u.id, 'nome': u.nome, 'area': u.area} for u in usuarios_gestao if u.perfil == 'supervisor' and u.nome],
             key=lambda x: (x['nome'] or '').upper()
         ) if pode_editar else []
         return render_template(

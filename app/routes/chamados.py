@@ -14,6 +14,7 @@ from app.models_usuario import Usuario
 from app.models_historico import Historico
 from app.models_categorias import CategoriaSetor, CategoriaImpacto
 from app.utils import gerar_numero_chamado
+from app.utils_areas import setor_para_area
 from app.services.validators import validar_novo_chamado
 from app.services.upload import salvar_anexo
 from app.services.assignment import atribuidor
@@ -27,7 +28,6 @@ logger = logging.getLogger(__name__)
 
 @main.route('/', methods=['GET', 'POST'])
 @requer_solicitante
-@limiter.limit("10 per hour")
 def index() -> Response:
     """GET: formulário de novo chamado. POST: processa e salva no Firestore."""
     if request.method != 'POST':
@@ -97,8 +97,9 @@ def index() -> Response:
             responsavel_nome_form = None
 
     if not responsavel_id_form or not responsavel_nome_form:
+        area_para_atribuicao = setor_para_area(tipo) if tipo else (area_solicitante or 'Geral')
         resultado_atribuicao = atribuidor.atribuir(
-            area=tipo or area_solicitante or 'Geral',
+            area=area_para_atribuicao,
             categoria=categoria,
             prioridade=0 if categoria == 'Projetos' else 1
         )
@@ -113,8 +114,8 @@ def index() -> Response:
             motivo_atribuicao = f"Aguardando atribuição manual: {resultado_atribuicao['motivo']}"
             flash(f"⚠️ {resultado_atribuicao['motivo']}", 'warning')
 
-    # Área do chamado: setor solicitado (tipo) ou área do solicitante (uma única string)
-    area_chamado = tipo or (area_solicitante if area_solicitante else 'Geral')
+    # Área do chamado: normalizada para o valor usado no cadastro de usuários (filtro dashboard)
+    area_chamado = setor_para_area(tipo) if tipo else (area_solicitante if area_solicitante else 'Geral')
 
     try:
         # ✅ Gera o número APENAS aqui, pouco antes de salvar, garantindo que se algo falhar antes, o número não é consumido
