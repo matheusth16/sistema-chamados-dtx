@@ -16,7 +16,7 @@ from urllib.parse import quote as url_quote
 import json
 
 from dotenv import load_dotenv
-from flask import current_app
+from flask import current_app, request
 
 logger = logging.getLogger(__name__)
 
@@ -210,15 +210,30 @@ def enviar_teams(webhook_url: str, titulo: str, texto: str, link_url: str = None
         return False
 
 
+def _base_url() -> str:
+    """URL base da aplicação (para links em e-mails). Usa config, .env ou request."""
+    base = (_config('APP_BASE_URL') or '').strip()
+    if not base:
+        _ensure_env_loaded()
+        base = (os.getenv('APP_BASE_URL') or '').strip()
+    if not base:
+        try:
+            if request and getattr(request, 'url_root', None):
+                base = request.url_root.rstrip('/')
+        except RuntimeError:
+            pass
+    return base.rstrip('/') if base else ''
+
+
 def _link_chamado(chamado_id: str) -> str:
     """URL para visualizar o chamado (histórico)."""
-    base = (_config('APP_BASE_URL') or '').rstrip('/')
+    base = _base_url()
     return f"{base}/chamado/{chamado_id}/historico" if base else ''
 
 
 def _link_dashboard() -> str:
     """URL do painel (admin/supervisor ou index)."""
-    base = (_config('APP_BASE_URL') or '').rstrip('/')
+    base = _base_url()
     return f"{base}/admin" if base else ''
 
 
