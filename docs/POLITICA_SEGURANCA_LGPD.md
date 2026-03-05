@@ -41,7 +41,7 @@ Este documento descreve as medidas de segurança e o alinhamento do **Sistema de
   - Cookies de sessão: `SESSION_COOKIE_SECURE=True`, `HttpOnly`, `SameSite=Lax`.
   - Header **HSTS** (Strict-Transport-Security) é aplicado nas respostas em produção.
 - **E-mail**: Uso de **TLS** para SMTP (`MAIL_USE_TLS`).
-- **APIs externas**: Resend, Firebase e demais integrações utilizam HTTPS.
+- **APIs externas**: Firebase e demais integrações utilizam HTTPS.
 
 ### 3.3 Outras medidas
 

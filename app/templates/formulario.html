@@ -243,7 +243,7 @@
         campoResponsavel.value = "{{ t('loading_supervisors') }}";
         campoResponsavel.classList.add('opacity-50');
         
-        fetch(`/api/supervisores/disponibilidade?area=${encodeURIComponent(setor)}`)
+        fetch(`/api/supervisores/lista?area=${encodeURIComponent(setor)}`)
             .then(response => {
                 const contentType = (response.headers.get('content-type') || '').toLowerCase();
                 const isJson = contentType.includes('application/json');
@@ -261,7 +261,7 @@
                     if (lista.length === 1) {
                         // Um só: mostra texto fixo e envia esse responsável
                         const s = lista[0];
-                        const disp = s.disponivel ? '✓' : '⚠️';
+                        const disp = '✓';
                         campoResponsavel.value = disp + ' ' + s.nome;
                         campoResponsavel.classList.remove('hidden');
                         hiddenId.value = s.id || '';
@@ -281,7 +281,7 @@
                             const opt = document.createElement('option');
                             opt.value = s.id || '';
                             opt.setAttribute('data-nome', s.nome || '');
-                            const disp = s.disponivel ? '✓' : '⚠️';
+                            const disp = '✓';
                             opt.textContent = disp + ' ' + s.nome;
                             selectResponsavel.appendChild(opt);
                         });

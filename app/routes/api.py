@@ -446,15 +446,32 @@ def carregar_mais():
         return jsonify({'sucesso': False, 'erro': ERRO_INTERNO_MSG}), 500
 
 
-@main.route('/api/supervisores/disponibilidade', methods=['GET'])
+@main.route('/api/supervisores/lista', methods=['GET'])
 @login_required
-def api_disponibilidade_supervisores():
-    """Disponibilidade de supervisores por área (lista ao selecionar setor no formulário)."""
+def api_lista_supervisores():
+    """Lista simples de supervisores por área para o formulário (rápida, sem contar carga)."""
+    area = request.args.get('area', '').strip() or 'Geral'
     try:
-        area = request.args.get('area', 'Geral')
-        area_resolvida = setor_para_area(area)
-        disponibilidade = atribuidor.obter_disponibilidade(area_resolvida)
-        return jsonify({'sucesso': True, **disponibilidade}), 200
+        area_resolvida = setor_para_area(area) or area
+        supervisores = Usuario.get_supervisores_por_area(area_resolvida)
+        dados = [
+            {
+                'id': u.id,
+                'nome': u.nome,
+                'email': u.email,
+            }
+            for u in supervisores
+        ]
+        return jsonify({
+            'sucesso': True,
+            'area': area_resolvida,
+            'supervisores': dados,
+        }), 200
     except Exception as e:
-        logger.exception("Erro ao obter disponibilidade: %s", e)
-        return jsonify({'sucesso': False, 'erro': ERRO_INTERNO_MSG}), 500
+        logger.exception("Erro ao listar supervisores: %s", e)
+        return jsonify({
+            'sucesso': False,
+            'area': area,
+            'supervisores': [],
+            'erro': ERRO_INTERNO_MSG,
+        }), 200

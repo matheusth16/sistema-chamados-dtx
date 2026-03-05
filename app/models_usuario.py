@@ -254,8 +254,8 @@ class Usuario(UserMixin):
                 # Precisamos criar o objeto Usuario primeiro para que from_dict
                 # faça a conversão de 'area' (string) para 'areas' (array)
                 usuario = cls.from_dict(user_dict, doc.id)
-                # Agora verificar se a área desejada está nas áreas do usuário
-                if area in usuario.areas:
+                areas_usuario = getattr(usuario, 'areas', None) or []
+                if isinstance(areas_usuario, list) and area in areas_usuario:
                     usuarios.append(usuario)
             
             # Buscar todos os admins e filtrar por área
@@ -263,7 +263,8 @@ class Usuario(UserMixin):
             for doc in docs_admin:
                 user_dict = doc.to_dict()
                 usuario = cls.from_dict(user_dict, doc.id)
-                if area in usuario.areas:
+                areas_usuario = getattr(usuario, 'areas', None) or []
+                if isinstance(areas_usuario, list) and area in areas_usuario:
                     usuarios.append(usuario)
             
             return usuarios

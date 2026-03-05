@@ -52,6 +52,21 @@ Copie `.env.example` para `.env` e preencha conforme o ambiente (desenvolvimento
 
 ## E-mail (notificações)
 
+**Opção 1 – Microsoft Graph (recomendado):** se o TI configurou um app no Azure com permissão `Mail.Send`, use as variáveis abaixo. O sistema envia via API (sem SMTP, sem senha de app/MFA).
+
+| Variável               | Descrição | Padrão | Exemplo |
+|------------------------|-----------|--------|---------|
+| `GRAPH_TENANT_ID`      | ID do diretório (tenant) Azure AD. | (vazio) | (GUID) |
+| `GRAPH_CLIENT_ID`      | ID do aplicativo (client id) Azure AD. | (vazio) | (GUID) |
+| `GRAPH_CLIENT_SECRET`  | Segredo do cliente do app. | (vazio) | (string) |
+| `GRAPH_SEND_AS_USER`   | UPN da caixa que envia (ex.: `dtxls.support@dtx.aero`). | (vazio) | `dtxls.support@dtx.aero` |
+
+Se `GRAPH_CLIENT_ID` e `GRAPH_SEND_AS_USER` estiverem definidos, o sistema usa Graph; caso contrário, usa SMTP (variáveis abaixo).
+
+**Dica:** Se aparecer "Python-dotenv could not parse statement starting at line X", algum valor no `.env` tem caractere especial (`#`, `=`, aspas). Coloque o valor entre aspas duplas (ex.: `GRAPH_CLIENT_SECRET="seu-segredo#com#cerquilhas"`). Se o Graph retornar **403 ErrorAccessDenied**, verifique: (1) permissão **Mail.Send** (aplicação) e consentimento de administrador no app Azure; (2) valor correto do client secret (e que está sendo lido corretamente, sem quebra por causa do parsing do .env).
+
+**Opção 2 – SMTP:**
+
 | Variável              | Descrição | Padrão | Exemplo |
 |-----------------------|-----------|--------|---------|
 | `MAIL_SERVER`         | Host SMTP para envio de e-mails. | (vazio) | `smtp.gmail.com` |
@@ -61,9 +76,9 @@ Copie `.env.example` para `.env` e preencha conforme o ambiente (desenvolvimento
 | `MAIL_PASSWORD`       | Senha ou app password SMTP. | (vazio) | (senha segura) |
 | `MAIL_DEFAULT_SENDER` | Remetente padrão dos e-mails. | (vazio) | `Chamados DTX <noreply@empresa.com>` |
 
-Se `MAIL_SERVER` estiver vazio, o envio por e-mail fica desabilitado.
+Se `MAIL_SERVER` estiver vazio e Graph não estiver configurado, o envio por e-mail fica desabilitado.
 
-**Envio pelo seu e-mail pessoal (SMTP):** para que o aviso ao supervisor saia exclusivamente do seu e-mail pessoal, use **somente** as variáveis `MAIL_*` (ex.: Gmail com [Senha de app](https://myaccount.google.com/apppasswords)) e **não** defina `RESEND_API_KEY`. O sistema usará SMTP; o supervisor receberá o e-mail com remetente igual ao seu e-mail pessoal.
+**Office 365 / Outlook:** use `MAIL_SERVER=smtp.office365.com`, `MAIL_PORT=587`, `MAIL_USE_TLS=true`. O administrador do tenant precisa habilitar "Authenticated SMTP" na caixa de correio (Manage email apps). Se aparecer o erro `5.7.139 ... the request did not meet the criteria to be authenticated successfully`, verifique: (1) `MAIL_USERNAME` e `MAIL_PASSWORD` corretos; (2) conta com MFA pode exigir senha de app; (3) políticas de "autenticação básica" ou Conditional Access podem bloquear — contate o administrador.
 
 ---
 

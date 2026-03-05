@@ -75,10 +75,11 @@ class Config:
     MAIL_DEFAULT_SENDER = os.getenv('MAIL_DEFAULT_SENDER', '')
     TEAMS_WEBHOOK_URL = os.getenv('TEAMS_WEBHOOK_URL', '')
 
-    # Resend (e-mail transacional). Se definido, notifications.py usa Resend em vez de SMTP.
-    RESEND_API_KEY = os.getenv('RESEND_API_KEY', '').strip()
-    RESEND_FROM_EMAIL = os.getenv('RESEND_FROM_EMAIL', '')
-    RESEND_FROM_NAME = os.getenv('RESEND_FROM_NAME', '')
+    # Microsoft Graph (envio de e-mail via API, sem SMTP/MFA). Se definido, notifications.py usa Graph em vez de SMTP.
+    GRAPH_TENANT_ID = os.getenv('GRAPH_TENANT_ID', '').strip()
+    GRAPH_CLIENT_ID = os.getenv('GRAPH_CLIENT_ID', '').strip()
+    GRAPH_CLIENT_SECRET = os.getenv('GRAPH_CLIENT_SECRET', '').strip()
+    GRAPH_SEND_AS_USER = os.getenv('GRAPH_SEND_AS_USER', '').strip()  # UPN da caixa, ex.: dtxls.support@dtx.aero
 
     # Web Push (notificações no navegador). Gere chaves com: python gerar_vapid_keys.py
     VAPID_PUBLIC_KEY = os.getenv('VAPID_PUBLIC_KEY', '')
