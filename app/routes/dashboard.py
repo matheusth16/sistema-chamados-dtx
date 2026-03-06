@@ -19,6 +19,8 @@ from app.models_usuario import Usuario
 from app.models_historico import Historico
 from app.utils import formatar_data_para_excel, extrair_numero_chamado
 from app.services.filters import aplicar_filtros_dashboard, aplicar_filtros_dashboard_com_paginacao
+from app.services.dashboard_service import obter_contexto_admin, _filtrar_chamados_por_permissao
+from app.services.contadores_uso import verificar_e_incrementar_relatorio, verificar_e_incrementar_export
 from app.services.excel_export_service import MAX_EXPORT_CHAMADOS
 from app.services.analytics import analisador, obter_sla_para_exibicao
 from app.services.pagination import OptimizadorQuery
@@ -26,7 +28,9 @@ from app.services.status_service import atualizar_status_chamado
 from app.services.permissions import usuario_pode_ver_chamado, usuario_pode_ver_chamado_otimizado
 from app.services.upload import salvar_anexo
 from app.firebase_retry import execute_with_retry
-from app.models_categorias import CategoriaGate
+from app.models_categorias import CategoriaGate, CategoriaSetor
+from google.api_core.exceptions import FailedPrecondition
+from app.services.notifications import notificar_setores_adicionais_chamado
 
 logger = logging.getLogger(__name__)
 
@@ -41,41 +45,6 @@ def _same_origin(referrer: str) -> bool:
         return ref.netloc == base.netloc and ref.scheme == base.scheme
     except Exception:
         return False
-
-
-def _filtrar_chamados_por_permissao(docs, user) -> list:
-    """Filtra chamados que o usuário pode ver, com cache para evitar N+1 queries."""
-    chamados = []
-    
-    if user.perfil == 'admin':
-        # Admin vê tudo, sem checagem extra
-        for doc in docs:
-            chamados.append(Chamado.from_dict(doc.to_dict(), doc.id))
-        return chamados
-    
-    # Supervisor: usar versão otimizada com cache de usuários
-    # Primeiro, coletamos todos os chamados e responsável IDs
-    chamados_raw = []
-    responsavel_ids = set()
-    for doc in docs:
-        c = Chamado.from_dict(doc.to_dict(), doc.id)
-        chamados_raw.append(c)
-        if c.responsavel_id:
-            responsavel_ids.add(c.responsavel_id)
-    
-    # Pré-carrega todos os responsáveis de uma vez (evita N+1)
-    cache_usuarios = {}
-    for uid in responsavel_ids:
-        u = Usuario.get_by_id(uid)
-        if u:
-            cache_usuarios[uid] = u
-    
-    # Filtra usando a versão otimizada
-    for c in chamados_raw:
-        if usuario_pode_ver_chamado_otimizado(user, c, cache_usuarios):
-            chamados.append(c)
-    
-    return chamados
 
 
 @main.route('/admin', methods=['GET', 'POST'])
@@ -118,68 +87,16 @@ def admin() -> Response:
             flash_t('error_updating_with_msg', 'danger', error=str(e))
             return redirect(url_for('main.admin', **request.args))
 
-    # Lista de responsáveis (apenas supervisores; admin do sistema não aparece no filtro)
-    usuarios_gestao = Usuario.get_all()
-    lista_responsaveis = sorted(
-        [u.nome for u in usuarios_gestao if u.perfil == 'supervisor' and u.nome],
-        key=lambda x: x.upper()
-    )
-    
-    # Para o formulário de edição do modal: lista com ID, Nome e Área
-    supervisores_detalhados = sorted(
-        [{'id': u.id, 'nome': u.nome, 'area': u.area} for u in usuarios_gestao if u.perfil == 'supervisor' and u.nome],
-        key=lambda x: x['nome'].upper()
-    )
-
-    # Ranking Gamificação movido para /relatorios
-
-    chamados_ref = db.collection('chamados')
-    # Supervisor vê apenas chamados das suas áreas (filtro no Firestore para não trazer outros setores)
-    if current_user.perfil == 'supervisor' and getattr(current_user, 'areas', None):
-        areas = current_user.areas[:10]  # Firestore 'in' aceita no máximo 10
-        if areas:
-            chamados_ref = chamados_ref.where('area', 'in', areas)
-    docs = aplicar_filtros_dashboard(chamados_ref, request.args)
-    chamados = _filtrar_chamados_por_permissao(docs, current_user)
-
-    def _chave(c):
-        concluido = c.status == 'Concluído'
-        num_id = extrair_numero_chamado(c.numero_chamado)
-        if concluido:
-            return (True, 0, num_id)
-        prioridade_cat = 0 if c.categoria == 'Projetos' else 1
-        return (False, prioridade_cat, num_id)
-    chamados_ordenados = sorted(chamados, key=_chave)
-    pagina = request.args.get('pagina', 1, type=int)
-    itens_por_pagina = Config.ITENS_POR_PAGINA
-    total_chamados = len(chamados_ordenados)
-    inicio = (pagina - 1) * itens_por_pagina
-    fim = inicio + itens_por_pagina
-    total_paginas = (total_chamados + itens_por_pagina - 1) // itens_por_pagina
-    if pagina < 1 or pagina > total_paginas:
-        pagina = 1
-        chamados_pagina = chamados_ordenados[:itens_por_pagina]
-    else:
-        chamados_pagina = chamados_ordenados[inicio:fim]
-    # SLA por chamado para exibição na Gestão (sem query extra)
-    for c in chamados_pagina:
-        c.sla_info = obter_sla_para_exibicao(c)
-    # Gates disponíveis (para dropdown dinâmico)
-    lista_gates = sorted([g.nome_pt for g in CategoriaGate.get_all()])
-    
-    return render_template(
-        'dashboard.html',
-        chamados=chamados_pagina,
-        pagina_atual=pagina,
-        total_paginas=total_paginas,
-        total_chamados=total_chamados,
-        itens_por_pagina=itens_por_pagina,
-        lista_responsaveis=lista_responsaveis,
-        supervisores_detalhados=supervisores_detalhados,
-        lista_gates=lista_gates,
-        max=max,
-        min=min,
-    )
+    itens_por_pagina = getattr(Config, 'ITENS_POR_PAGINA_DASHBOARD', 25) or 25
+    try:
+        contexto = obter_contexto_admin(current_user, request.args, itens_por_pagina=itens_por_pagina)
+        return render_template('dashboard.html', **contexto)
+    except FailedPrecondition as e:
+        msg = str(e).lower()
+        if 'currently building' in msg or 'cannot be used yet' in msg:
+            logger.warning("Índice Firestore em construção: %s", e)
+            return render_template('dashboard_indice_construindo.html'), 503
+        raise
 
 
 @main.route('/chamado/<chamado_id>')
@@ -205,16 +122,22 @@ def visualizar_detalhe_chamado(chamado_id: str) -> Response:
         )
         pode_editar = current_user.perfil in ('supervisor', 'admin')
         usuarios_gestao = Usuario.get_all()
+        supervisores_list = [u for u in usuarios_gestao if u.perfil == 'supervisor' and u.nome]
+        if pode_editar and current_user.perfil == 'supervisor' and getattr(current_user, 'areas', None):
+            user_areas_set = set(current_user.areas)
+            supervisores_list = [u for u in supervisores_list if user_areas_set & set(getattr(u, 'areas', []))]
         supervisores_detalhados = sorted(
-            [{'id': u.id, 'nome': u.nome, 'area': u.area} for u in usuarios_gestao if u.perfil == 'supervisor' and u.nome],
+            [{'id': u.id, 'nome': u.nome, 'area': u.area} for u in supervisores_list],
             key=lambda x: (x['nome'] or '').upper()
         ) if pode_editar else []
+        setores = [s for s in CategoriaSetor.get_all() if getattr(s, 'ativo', True)]
         return render_template(
             'visualizar_chamado.html',
             chamado=chamado,
             voltar_url=voltar_url,
             pode_editar=pode_editar,
-            supervisores_detalhados=supervisores_detalhados
+            supervisores_detalhados=supervisores_detalhados,
+            setores=setores
         )
     except Exception as e:
         logger.exception("Erro ao exibir chamado %s: %s", chamado_id, e)
@@ -250,13 +173,18 @@ def editar_chamado_pagina() -> Response:
 
     try:
         novo_status = request.form.get('novo_status')
-        if novo_status and novo_status in ('Aberto', 'Em Atendimento', 'Concluído') and novo_status != data_chamado.get('status'):
+        motivo_cancelamento = (request.form.get('motivo_cancelamento') or '').strip()
+        if novo_status and novo_status in ('Aberto', 'Em Atendimento', 'Concluído', 'Cancelado') and novo_status != data_chamado.get('status'):
+            if novo_status == 'Cancelado' and not motivo_cancelamento:
+                flash('Informe o motivo do cancelamento.', 'danger')
+                return redirect(url_for('main.visualizar_detalhe_chamado', chamado_id=chamado_id))
             resultado = atualizar_status_chamado(
                 chamado_id=chamado_id,
                 novo_status=novo_status,
                 usuario_id=current_user.id,
                 usuario_nome=current_user.nome,
                 data_chamado=data_chamado,
+                motivo_cancelamento=motivo_cancelamento if novo_status == 'Cancelado' else None,
             )
             if resultado.get('sucesso'):
                 flash(resultado.get('mensagem', 'Status atualizado.'), 'success')
@@ -325,6 +253,42 @@ def editar_chamado_pagina() -> Response:
                     detalhe=arquivo_anexo.filename
                 ).save()
 
+        # Setores adicionais (supervisor pode incluir outros setores e notificar supervisores desses setores)
+        setores_adicionais_form = request.form.getlist('setores_adicionais')
+        setores_adicionais_form = [s.strip() for s in setores_adicionais_form if s and str(s).strip()]
+        setores_atuais = data_chamado.get('setores_adicionais') or []
+        if not isinstance(setores_atuais, list):
+            setores_atuais = []
+        # Lista desejada = exatamente o que veio no form (checkboxes marcados)
+        setores_novos_lista = setores_adicionais_form
+        setores_novos_para_notificar = [s for s in setores_novos_lista if s not in setores_atuais]
+        if setores_novos_lista != setores_atuais:
+            update_data['setores_adicionais'] = setores_novos_lista
+            if setores_novos_para_notificar:
+                try:
+                    notificar_setores_adicionais_chamado(
+                        chamado_id=chamado_id,
+                        numero_chamado=data_chamado.get('numero_chamado') or chamado.numero_chamado,
+                        setores_novos=setores_novos_para_notificar,
+                        categoria=data_chamado.get('categoria') or chamado.categoria,
+                        tipo_solicitacao=data_chamado.get('tipo_solicitacao') or chamado.tipo_solicitacao,
+                        descricao_resumo=(data_chamado.get('descricao') or '')[:500],
+                        solicitante_nome=data_chamado.get('solicitante_nome') or chamado.solicitante_nome or '—',
+                        quem_adicionou_nome=current_user.nome,
+                    )
+                except Exception as e:
+                    logger.exception("Erro ao notificar setores adicionais: %s", e)
+                    flash('Setores adicionados, mas houve falha ao enviar alguns e-mails.', 'warning')
+            Historico(
+                chamado_id=chamado_id,
+                usuario_id=current_user.id,
+                usuario_nome=current_user.nome,
+                acao='alteracao_dados',
+                campo_alterado='setores adicionais',
+                valor_anterior=', '.join(setores_atuais) if setores_atuais else '-',
+                valor_novo=', '.join(setores_novos_lista) if setores_novos_lista else '-',
+            ).save()
+
         if update_data:
             execute_with_retry(
                 db.collection('chamados').document(chamado_id).update,
@@ -365,6 +329,14 @@ def visualizar_historico(chamado_id: str) -> Response:
 @requer_supervisor_area
 def exportar() -> Response:
     """Exporta chamados filtrados para Excel (até MAX_EXPORT_CHAMADOS)."""
+    limite_export = getattr(Config, 'EXPORT_EXCEL_MAX_POR_USUARIO_POR_DIA', 0) or 0
+    if limite_export > 0:
+        pode, msg = verificar_e_incrementar_export(current_user.id, limite_export)
+        if not pode:
+            if msg:
+                flash(msg, 'warning')
+            flash_t('error_exporting_data', 'danger')
+            return redirect(url_for('main.admin'))
     try:
         chamados_ref = db.collection('chamados')
         resultado = aplicar_filtros_dashboard_com_paginacao(
@@ -412,6 +384,14 @@ def exportar() -> Response:
 @requer_supervisor_area
 def exportar_avancado() -> Response:
     """Exporta relatório completo em Excel com múltiplas abas (até MAX_EXPORT_CHAMADOS)."""
+    limite_export = getattr(Config, 'EXPORT_EXCEL_MAX_POR_USUARIO_POR_DIA', 0) or 0
+    if limite_export > 0:
+        pode, msg = verificar_e_incrementar_export(current_user.id, limite_export)
+        if not pode:
+            if msg:
+                flash(msg, 'warning')
+            flash_t('error_exporting_report', 'danger')
+            return redirect(url_for('main.admin'))
     try:
         from app.services.excel_export_service import exportador_excel
         
@@ -506,6 +486,15 @@ def relatorios() -> Response:
     erro_relatorio = False
     try:
         atualizar = request.args.get('atualizar') == '1'
+        if atualizar:
+            limite = getattr(Config, 'RELATORIO_MAX_POR_USUARIO_POR_DIA', 0) or 0
+            if limite > 0:
+                pode, msg = verificar_e_incrementar_relatorio(current_user.id, limite)
+                if not pode:
+                    flash_t('generic_error', 'danger')
+                    if msg:
+                        flash(msg, 'warning')
+                    return redirect(url_for('main.relatorios'))
         try:
             relatorio = analisador.obter_relatorio_completo(usar_cache=not atualizar) or {}
         except Exception as e_analytics:

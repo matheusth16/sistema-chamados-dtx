@@ -12,7 +12,7 @@ SETOR_PARA_AREA = {
 
 def setor_para_area(setor_nome: str) -> str:
     """
-    Converte nome do setor (valor do formulário Tipo/Setor) para a área
+    Converte nome do setor (valor do formulário Atribuir ao setor) para a área
     usada no cadastro de usuários (supervisores). Assim a busca por
     supervisores e o filtro do dashboard usam o mesmo identificador.
     """

@@ -10,13 +10,18 @@ Em produção com Gunicorn/Cloud Run, defina REDIS_URL para cache e rate limit c
 import os
 import time
 import logging
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 logger = logging.getLogger(__name__)
 
 _redis_client = None
 _memory_cache: dict = {}
 _MEMORY_TTL: dict = {}  # key -> expires_at
+
+# Cache em memória para dados estáticos (categorias, lista de supervisores) — não serializa em Redis
+_static_cache: dict = {}
+_static_expiry: dict = {}  # key -> expires_at (timestamp)
+_STATIC_TTL_DEFAULT = 300  # 5 minutos
 
 
 def _get_redis():
@@ -87,3 +92,22 @@ def cache_delete(key: str) -> None:
 def is_redis_available() -> bool:
     """Retorna True se o Redis está em uso."""
     return _get_redis() is not None
+
+
+def get_static_cached(
+    key: str,
+    fetcher: Callable[[], Any],
+    ttl_seconds: int = _STATIC_TTL_DEFAULT,
+) -> Any:
+    """
+    Obtém valor do cache estático (só em memória por processo).
+    Se expirado ou ausente, chama fetcher(), armazena e retorna.
+    Uso: categorias, lista de supervisores (reduz leituras quando muitos usuários acessam junto).
+    """
+    now = time.time()
+    if key in _static_expiry and now < _static_expiry[key]:
+        return _static_cache[key]
+    val = fetcher()
+    _static_cache[key] = val
+    _static_expiry[key] = now + ttl_seconds
+    return val

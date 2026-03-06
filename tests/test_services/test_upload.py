@@ -20,7 +20,7 @@ def test_salvar_anexo_com_firebase_storage_retorna_url(app):
     """Quando Firebase Storage está disponível, retorna URL pública."""
     fake_file = MagicMock()
     fake_file.filename = 'doc.pdf'
-    fake_file.stream = BytesIO(b'conteudo')
+    fake_file.stream = BytesIO(b'%PDF-1.4 minimal')  # magic bytes PDF para _arquivo_conteudo_permitido
     fake_file.content_type = 'application/pdf'
     fake_file.stream.seek = MagicMock()
 
@@ -35,9 +35,10 @@ def test_salvar_anexo_firebase_falha_dev_salva_local(app):
     """Em desenvolvimento, quando Firebase falha, salva em disco local e retorna nome do arquivo."""
     app.config['ENV'] = 'development'
     app.config['UPLOAD_FOLDER'] = '/tmp/test_uploads_sistema_chamados'
+    # PNG magic bytes (8 bytes) para passar em _arquivo_conteudo_permitido
     fake_file = MagicMock()
     fake_file.filename = 'test.png'
-    fake_file.stream = BytesIO(b'x')
+    fake_file.stream = BytesIO(b'\x89PNG\r\n\x1a\n' + b'x' * 10)
     fake_file.content_type = 'image/png'
     fake_file.stream.seek = MagicMock()
     fake_file.save = MagicMock()

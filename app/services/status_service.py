@@ -19,21 +19,28 @@ from app.firebase_retry import execute_with_retry
 logger = logging.getLogger(__name__)
 
 
+STATUS_VALIDOS = ('Aberto', 'Em Atendimento', 'Concluído', 'Cancelado')
+
+
 def atualizar_status_chamado(
     chamado_id: str,
     novo_status: str,
     usuario_id: str,
     usuario_nome: str,
     data_chamado: dict = None,
+    motivo_cancelamento: str = None,
 ) -> dict:
     """Atualiza o status de um chamado, registra histórico e envia notificação.
+
+    Para status 'Cancelado', motivo_cancelamento é obrigatório.
     
     Args:
         chamado_id: ID do chamado no Firestore
-        novo_status: Novo status ('Aberto', 'Em Atendimento', 'Concluído')
+        novo_status: Novo status ('Aberto', 'Em Atendimento', 'Concluído', 'Cancelado')
         usuario_id: ID do usuário que está fazendo a alteração
         usuario_nome: Nome do usuário que está fazendo a alteração
         data_chamado: Dict do chamado (opcional, busca se não informado)
+        motivo_cancelamento: Obrigatório quando novo_status == 'Cancelado'
     
     Returns:
         dict com:
@@ -42,6 +49,14 @@ def atualizar_status_chamado(
             'erro': str (se falhar)
     """
     try:
+        if novo_status not in STATUS_VALIDOS:
+            return {'sucesso': False, 'erro': f'Status inválido: {novo_status}'}
+
+        if novo_status == 'Cancelado':
+            motivo = (motivo_cancelamento or '').strip()
+            if not motivo:
+                return {'sucesso': False, 'erro': 'Motivo do cancelamento é obrigatório'}
+
         # Busca dados do chamado se não fornecidos
         if data_chamado is None:
             doc = db.collection('chamados').document(chamado_id).get()
@@ -55,6 +70,9 @@ def atualizar_status_chamado(
         update_data = {'status': novo_status}
         if novo_status == 'Concluído':
             update_data['data_conclusao'] = firestore.SERVER_TIMESTAMP
+        elif novo_status == 'Cancelado':
+            update_data['motivo_cancelamento'] = (motivo_cancelamento or '').strip()
+            update_data['data_cancelamento'] = firestore.SERVER_TIMESTAMP
         
         # Atualiza no Firestore com retry
         execute_with_retry(
@@ -74,14 +92,22 @@ def atualizar_status_chamado(
                 valor_anterior=status_anterior,
                 valor_novo=novo_status
             ).save()
+            if novo_status == 'Cancelado' and (motivo_cancelamento or '').strip():
+                Historico(
+                    chamado_id=chamado_id,
+                    usuario_id=usuario_id,
+                    usuario_nome=usuario_nome,
+                    acao='alteracao_dados',
+                    campo_alterado='motivo_cancelamento',
+                    valor_anterior='-',
+                    valor_novo=(motivo_cancelamento or '').strip()[:500]
+                ).save()
         
-        # Envia notificação ao solicitante
+        # Envia notificação ao solicitante (não para Cancelado)
         if novo_status in ('Em Atendimento', 'Concluído'):
             _notificar_solicitante(chamado_id, data_chamado, novo_status)
             
-        # Gamificação: Conceder pontos ao responsável pela ação
-        # Evitar dar pontos se o status não mudou real ou se quem mudou foi o solicitante
-        # Geralmente quem altera status para Em Atendimento / Concluído é técnico/admin
+        # Gamificação: apenas para Em Atendimento / Concluído (não para Cancelado)
         if status_anterior != novo_status:
             if novo_status == 'Concluído':
                 GamificationService.avaliar_resolucao_chamado(usuario_id, data_chamado)

@@ -7,6 +7,13 @@ __pycache__/
 .coverage
 htmlcov/
 .coverage.*
+coverage.xml
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+*.egg
+dist/
+build/
 
 # --- Ambiente Virtual ---
 .venv/
@@ -15,7 +22,11 @@ env/
 
 # --- Segredos e Configurações ---
 .env
+.env.local
+.env.*.local
 credentials.json
+*.pem
+*.key
 
 # --- Logs ---
 logs/
@@ -34,7 +45,25 @@ app/static/uploads/*
 
 # --- Firebase (emulador/debug) ---
 firebase-debug.log
+firestore-debug.log
+ui-debug.log
+database-debug.log
 
 # --- Sistema Operacional ---
 .DS_Store
 Thumbs.db
+*.swp
+*~
+
+# --- IDE / Editor ---
+.idea/
+.vscode/
+*.sublime-*
+
+# --- Backups e temporários ---
+*.bak
+*.tmp
+.ipynb_checkpoints/
+
+# --- Backup de arquivos não utilizados (análise de código morto) ---
+_backup_nao_utilizados/

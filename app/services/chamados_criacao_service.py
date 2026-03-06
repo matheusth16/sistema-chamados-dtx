@@ -1,0 +1,197 @@
+"""
+Serviço de criação de chamados.
+
+Centraliza a lógica de: validação, upload, atribuição de responsável,
+Grupo RL, persistência e notificações. Usado pela rota de novo chamado.
+"""
+import logging
+from typing import Any, Dict, Optional, Tuple
+
+from flask import current_app
+
+from app.database import db
+from app.models import Chamado
+from app.models_grupo_rl import GrupoRL
+from app.models_historico import Historico
+from app.models_usuario import Usuario
+from app.utils import gerar_numero_chamado
+from app.utils_areas import setor_para_area
+from app.services.upload import salvar_anexo
+from app.services.assignment import atribuidor
+from app.services.notifications import notificar_aprovador_novo_chamado
+from app.services.notifications_inapp import criar_notificacao
+from app.services.webpush_service import enviar_webpush_usuario
+from app.firebase_retry import execute_with_retry
+
+logger = logging.getLogger(__name__)
+
+
+def _resolver_responsavel(
+    form: Dict[str, Any],
+    solicitante_id: str,
+    solicitante_nome: str,
+    area_solicitante: Optional[str],
+) -> Tuple[str, str, str]:
+    """
+    Retorna (responsavel_nome, responsavel_id, motivo_atribuicao).
+    Usa responsável escolhido no formulário ou atribuição automática.
+    """
+    responsavel_id_form = (form.get('responsavel_id') or '').strip()
+    responsavel_nome_form = (form.get('responsavel_nome') or '').strip()
+    if responsavel_id_form and responsavel_nome_form:
+        usuario_escolhido = Usuario.get_by_id(responsavel_id_form)
+        if usuario_escolhido and usuario_escolhido.perfil in ('supervisor', 'admin'):
+            return (
+                responsavel_nome_form,
+                responsavel_id_form,
+                f"Escolhido pelo solicitante: {responsavel_nome_form}",
+            )
+    tipo = form.get('tipo')
+    categoria = form.get('categoria')
+    area_para_atribuicao = setor_para_area(tipo) if tipo else (area_solicitante or 'Geral')
+    resultado = atribuidor.atribuir(
+        area=area_para_atribuicao,
+        categoria=categoria,
+        prioridade=0 if categoria == 'Projetos' else 1,
+    )
+    if resultado['sucesso']:
+        return (
+            resultado['supervisor']['nome'],
+            resultado['supervisor']['id'],
+            f"Atribuído automaticamente a {resultado['supervisor']['nome']}",
+        )
+    return (
+        solicitante_nome,
+        solicitante_id,
+        f"Aguardando atribuição manual: {resultado['motivo']}",
+    )
+
+
+def criar_chamado(
+    form: Dict[str, Any],
+    files: Any,
+    solicitante_id: str,
+    solicitante_nome: str,
+    area_solicitante: Optional[str] = None,
+    solicitante_email: Optional[str] = None,
+) -> Tuple[Optional[str], Optional[str], Optional[str], Optional[str]]:
+    """
+    Cria um novo chamado no Firestore e dispara notificações.
+
+    Args:
+        form: request.form (categoria, rl_codigo, tipo, descricao, impacto, gate, etc.)
+        files: request.files (para anexo)
+        solicitante_id: ID do usuário solicitante
+        solicitante_nome: Nome do solicitante
+        area_solicitante: Área do solicitante (opcional)
+        solicitante_email: Email do solicitante para notificações (opcional)
+
+    Returns:
+        (chamado_id, numero_chamado, erro, aviso_atribuicao)
+        Em sucesso: (id, numero, None, aviso ou None). Em falha: (None, None, mensagem_erro, None).
+    """
+    categoria = form.get('categoria')
+    rl_codigo = form.get('rl_codigo')
+    tipo = form.get('tipo')
+    descricao = form.get('descricao')
+    impacto = form.get('impacto')
+    gate = form.get('gate')
+
+    try:
+        caminho_anexo = salvar_anexo(files.get('anexo') if files else None)
+    except ValueError as e:
+        return (None, None, str(e), None)
+
+    responsavel, responsavel_id, motivo_atribuicao = _resolver_responsavel(
+        form, solicitante_id, solicitante_nome, area_solicitante
+    )
+    area_chamado = setor_para_area(tipo) if tipo else (area_solicitante if area_solicitante else 'Geral')
+
+    grupo_rl_id = None
+    if categoria == 'Projetos' and rl_codigo:
+        try:
+            grupo = GrupoRL.get_or_create(
+                rl_codigo=rl_codigo,
+                criado_por_id=solicitante_id,
+                area=area_chamado,
+            )
+            grupo_rl_id = grupo.id
+        except Exception as e:
+            logger.exception("Erro ao obter/criar GrupoRL para RL %s: %s", rl_codigo, e)
+
+    try:
+        numero_chamado = gerar_numero_chamado()
+        novo_chamado = Chamado(
+            numero_chamado=numero_chamado,
+            categoria=categoria,
+            rl_codigo=rl_codigo if categoria == 'Projetos' else None,
+            tipo_solicitacao=tipo,
+            gate=gate,
+            impacto=impacto,
+            descricao=descricao,
+            anexo=caminho_anexo,
+            responsavel=responsavel,
+            responsavel_id=responsavel_id,
+            motivo_atribuicao=motivo_atribuicao,
+            solicitante_id=solicitante_id,
+            solicitante_nome=solicitante_nome,
+            area=area_chamado,
+            status='Aberto',
+            grupo_rl_id=grupo_rl_id,
+        )
+        doc_ref = execute_with_retry(
+            db.collection('chamados').add,
+            novo_chamado.to_dict(),
+            max_retries=3,
+        )
+        chamado_id = doc_ref[1].id
+        Historico(
+            chamado_id=chamado_id,
+            usuario_id=solicitante_id,
+            usuario_nome=solicitante_nome,
+            acao='criacao',
+        ).save()
+
+        try:
+            responsavel_usuario = Usuario.get_by_id(responsavel_id) if responsavel_id else None
+            descricao_resumo = (descricao or '')[:500]
+            notificar_aprovador_novo_chamado(
+                chamado_id=chamado_id,
+                numero_chamado=numero_chamado,
+                categoria=categoria,
+                tipo_solicitacao=tipo,
+                descricao_resumo=descricao_resumo,
+                area=area_solicitante or 'Geral',
+                solicitante_nome=solicitante_nome,
+                responsavel_usuario=responsavel_usuario,
+                solicitante_email=solicitante_email,
+            )
+            if responsavel_id:
+                criar_notificacao(
+                    usuario_id=responsavel_id,
+                    chamado_id=chamado_id,
+                    numero_chamado=numero_chamado,
+                    titulo=f"Novo chamado: {numero_chamado}",
+                    mensagem=f"{categoria} · Solicitante: {solicitante_nome}",
+                    tipo='novo_chamado',
+                )
+                base_url = current_app.config.get('APP_BASE_URL', '').rstrip('/')
+                url_chamado = f"{base_url}/chamado/{chamado_id}/historico" if base_url else None
+                try:
+                    enviar_webpush_usuario(
+                        responsavel_id,
+                        titulo=f"Novo chamado: {numero_chamado}",
+                        corpo=f"{categoria} · {solicitante_nome}",
+                        url=url_chamado,
+                    )
+                except Exception as wp_e:
+                    logger.debug("Web Push não enviado: %s", wp_e)
+        except Exception as e:
+            logger.warning("Notificação ao aprovador não enviada: %s", e)
+
+        logger.info("Chamado criado: %s (ID: %s)", numero_chamado, chamado_id)
+        aviso = motivo_atribuicao if "Aguardando atribuição" in motivo_atribuicao else None
+        return (chamado_id, numero_chamado, None, aviso)
+    except Exception as e:
+        logger.exception("Erro ao salvar chamado no Firestore: %s", e)
+        return (None, None, "Não foi possível salvar o chamado. Tente novamente.", None)

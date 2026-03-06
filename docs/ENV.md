@@ -52,20 +52,7 @@ Copie `.env.example` para `.env` e preencha conforme o ambiente (desenvolvimento
 
 ## E-mail (notificações)
 
-**Opção 1 – Microsoft Graph (recomendado):** se o TI configurou um app no Azure com permissão `Mail.Send`, use as variáveis abaixo. O sistema envia via API (sem SMTP, sem senha de app/MFA).
-
-| Variável               | Descrição | Padrão | Exemplo |
-|------------------------|-----------|--------|---------|
-| `GRAPH_TENANT_ID`      | ID do diretório (tenant) Azure AD. | (vazio) | (GUID) |
-| `GRAPH_CLIENT_ID`      | ID do aplicativo (client id) Azure AD. | (vazio) | (GUID) |
-| `GRAPH_CLIENT_SECRET`  | Segredo do cliente do app. | (vazio) | (string) |
-| `GRAPH_SEND_AS_USER`   | UPN da caixa que envia (ex.: `dtxls.support@dtx.aero`). | (vazio) | `dtxls.support@dtx.aero` |
-
-Se `GRAPH_CLIENT_ID` e `GRAPH_SEND_AS_USER` estiverem definidos, o sistema usa Graph; caso contrário, usa SMTP (variáveis abaixo).
-
-**Dica:** Se aparecer "Python-dotenv could not parse statement starting at line X", algum valor no `.env` tem caractere especial (`#`, `=`, aspas). Coloque o valor entre aspas duplas (ex.: `GRAPH_CLIENT_SECRET="seu-segredo#com#cerquilhas"`). Se o Graph retornar **403 ErrorAccessDenied**, verifique: (1) permissão **Mail.Send** (aplicação) e consentimento de administrador no app Azure; (2) valor correto do client secret (e que está sendo lido corretamente, sem quebra por causa do parsing do .env).
-
-**Opção 2 – SMTP:**
+O envio de e-mail usa **SMTP**. Configure as variáveis abaixo.
 
 | Variável              | Descrição | Padrão | Exemplo |
 |-----------------------|-----------|--------|---------|
@@ -76,19 +63,9 @@ Se `GRAPH_CLIENT_ID` e `GRAPH_SEND_AS_USER` estiverem definidos, o sistema usa G
 | `MAIL_PASSWORD`       | Senha ou app password SMTP. | (vazio) | (senha segura) |
 | `MAIL_DEFAULT_SENDER` | Remetente padrão dos e-mails. | (vazio) | `Chamados DTX <noreply@empresa.com>` |
 
-Se `MAIL_SERVER` estiver vazio e Graph não estiver configurado, o envio por e-mail fica desabilitado.
+Se `MAIL_SERVER` estiver vazio, o envio por e-mail fica desabilitado.
 
-**Office 365 / Outlook:** use `MAIL_SERVER=smtp.office365.com`, `MAIL_PORT=587`, `MAIL_USE_TLS=true`. O administrador do tenant precisa habilitar "Authenticated SMTP" na caixa de correio (Manage email apps). Se aparecer o erro `5.7.139 ... the request did not meet the criteria to be authenticated successfully`, verifique: (1) `MAIL_USERNAME` e `MAIL_PASSWORD` corretos; (2) conta com MFA pode exigir senha de app; (3) políticas de "autenticação básica" ou Conditional Access podem bloquear — contate o administrador.
-
----
-
-## Microsoft Teams
-
-| Variável            | Descrição | Padrão | Exemplo |
-|---------------------|-----------|--------|---------|
-| `TEAMS_WEBHOOK_URL` | URL do webhook do canal do Teams para notificações (ex.: novo chamado). | (vazio) | `https://outlook.office.com/webhook/...` |
-
-Se vazia, notificações para Teams não são enviadas.
+**Office 365 / Outlook:** use `MAIL_SERVER=smtp.office365.com`, `MAIL_PORT=587`, `MAIL_USE_TLS=true`. O administrador do tenant pode precisar habilitar "Authenticated SMTP" na caixa de correio (Manage email apps). Com MFA, use senha de app.
 
 ---
 
@@ -173,9 +150,8 @@ APP_BASE_URL=https://seu-dominio.com
 # Recomendado com múltiplos workers
 REDIS_URL=redis://:senha@redis-host:6379/0
 
-# Opcionais: e-mail, Teams, Web Push, logging
+# Opcionais: e-mail, Web Push, logging
 # MAIL_SERVER=...
-# TEAMS_WEBHOOK_URL=...
 # VAPID_PUBLIC_KEY=...
 # VAPID_PRIVATE_KEY=...
 # LOG_LEVEL=INFO

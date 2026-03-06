@@ -10,16 +10,20 @@ from flask import session, flash
 # Cache do dicionário de traduções e caminho do arquivo
 _TRANSLATIONS_CACHE = None
 _TRANSLATIONS_FILE = os.path.join(os.path.dirname(__file__), 'translations.json')
+_TRANSLATIONS_MTIME = None
 
 def get_translations_dict():
-    """Carrega e retorna o dicionário de traduções do arquivo JSON."""
-    global _TRANSLATIONS_CACHE
-    if _TRANSLATIONS_CACHE is None:
-        try:
+    """Carrega e retorna o dicionário de traduções do arquivo JSON. Recarrega se o arquivo foi alterado."""
+    global _TRANSLATIONS_CACHE, _TRANSLATIONS_MTIME
+    try:
+        mtime = os.path.getmtime(_TRANSLATIONS_FILE) if os.path.isfile(_TRANSLATIONS_FILE) else 0
+        if _TRANSLATIONS_CACHE is None or _TRANSLATIONS_MTIME != mtime:
+            _TRANSLATIONS_MTIME = mtime
             with open(_TRANSLATIONS_FILE, 'r', encoding='utf-8') as f:
                 _TRANSLATIONS_CACHE = json.load(f)
-        except Exception as e:
-            print(f"Erro ao carregar traduções: {e}")
+    except Exception as e:
+        print(f"Erro ao carregar traduções: {e}")
+        if _TRANSLATIONS_CACHE is None:
             _TRANSLATIONS_CACHE = {}
     return _TRANSLATIONS_CACHE
 
@@ -63,6 +67,18 @@ STATUS_KEYS_MAP = {
     'Aberto': 'option_open',
     'Em Atendimento': 'option_in_progress',
     'Concluído': 'option_completed',
+    'Cancelado': 'option_cancelled',
+}
+
+# Nomes de campos (histórico/auditoria) -> chave de tradução para o rótulo exibido
+FIELD_LABEL_KEYS = {
+    'motivo_cancelamento': 'cancellation_reason',
+    'status': 'status',
+    'responsável': 'assigned_to',
+    'descrição': 'description',
+    'anexo': 'attached_file',
+    'novo anexo': 'new_attachment',
+    'setores adicionais': 'additional_sectors',
 }
 
 def get_language_code(lang_param):
@@ -122,6 +138,17 @@ def get_translated_status(status_name, language='pt_BR'):
         return get_translation(translation_key, language)
     return status_name
 
+def get_translated_field_label(field_name, language='pt_BR'):
+    """
+    Traduz o nome de um campo (ex: motivo_cancelamento) para o rótulo exibido no histórico.
+    """
+    if not field_name:
+        return field_name
+    key = FIELD_LABEL_KEYS.get(field_name)
+    if key:
+        return get_translation(key, language)
+    return field_name
+
 def get_translation(key, language='pt_BR', **kwargs):
     """
     Obtém a tradução de uma chave para um idioma específico.
@@ -137,15 +164,21 @@ def get_translation(key, language='pt_BR', **kwargs):
     language = get_language_code(language)
     translations = get_translations_dict()
     
-    if key in translations and language in translations[key] and translations[key][language]:
-        texto = translations[key][language]
-        if kwargs:
-            try:
-                return texto.format(**kwargs)
-            except KeyError:
-                pass
-        return texto
-    # Retorna a chave como fallback
+    if key in translations:
+        d = translations[key]
+        # Tenta o idioma solicitado
+        if language in d and d[language]:
+            texto = d[language]
+            if kwargs:
+                try:
+                    return texto.format(**kwargs)
+                except KeyError:
+                    pass
+            return texto
+        # Fallback para pt_BR se o idioma solicitado não tiver a chave
+        if 'pt_BR' in d and d['pt_BR']:
+            return d['pt_BR']
+    # Retorna a chave só se a chave não existir no dicionário
     return key
 
 def flash_t(key, category='message', **kwargs):

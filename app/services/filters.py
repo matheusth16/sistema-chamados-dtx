@@ -2,6 +2,7 @@
 Serviço de Filtros para Dashboard de Chamados
 
 Aplicar múltiplos filtros a queries do Firestore para buscar chamados específicos.
+Usa order_by(data_abertura DESC) para paginação por cursor consistente.
 Usa indexação Firestore para performance, com fallback para filtros em memória.
 
 **Filtros Disponíveis:**
@@ -54,6 +55,9 @@ if resultado['tem_proxima']:
 - Cursor vazio ou inválido reinicia do início
 """
 
+from firebase_admin import firestore
+
+
 def _construir_query_base(query_ref, args):
     """
     Aplica filtros baseados em índices Firestore (status, gate, responsavel).
@@ -70,6 +74,7 @@ def _construir_query_base(query_ref, args):
     gate = args.get('gate')
     categoria = args.get('categoria')
     responsavel = args.get('responsavel', '').strip()
+    rl_codigo = (args.get('rl_codigo') or '').strip()
 
     query_filtrada = query_ref
 
@@ -81,6 +86,10 @@ def _construir_query_base(query_ref, args):
 
     if responsavel:
         query_filtrada = query_filtrada.where('responsavel', '==', responsavel)
+
+    # Filtro direto por código RL (Projetos): permite ver todos os chamados de uma RL específica
+    if rl_codigo:
+        query_filtrada = query_filtrada.where('rl_codigo', '==', rl_codigo)
 
     categoria_filtrada = categoria and categoria not in ['', 'Todas']
 
@@ -130,58 +139,81 @@ def _aplicar_filtros_em_memoria(docs, status, gate, categoria, search):
     return resultado
 
 
-def aplicar_filtros_dashboard_com_paginacao(query_ref, args, limite=50, cursor=None):
+def aplicar_filtros_dashboard_com_paginacao(query_ref, args, limite=50, cursor=None, cursor_anterior=None):
     """
     OTIMIZAÇÃO 3: Paginação por cursor (cursor-based pagination)
     
     Ao invés de usar offset, que é ineficiente no Firestore,
     usamos documentos "cursor" para saber por onde começar.
+    Ordem fixa: data_abertura DESC (exige índice composto).
     
     Args:
         query_ref: Referência da coleção Firestore
         args: Argumentos da URL (filtros)
         limite: Documentos por página (padrão: 50)
-        cursor: ID do último documento da página anterior (para paginação)
+        cursor: ID do último documento da página anterior (para próxima página)
+        cursor_anterior: ID do primeiro documento da página atual (para página anterior)
     
     Returns:
         {
             'docs': [DocumentSnapshot, ...],
-            'proximo_cursor': ID do último documento,
-            'tem_proxima': bool (há mais documentos?)
+            'proximo_cursor': ID do último documento da página,
+            'tem_proxima': bool,
+            'cursor_anterior': ID do primeiro documento da página (para link "voltar"),
+            'tem_anterior': bool
         }
     """
     query_filtrada, categoria_filtrada, categoria, status, gate = _construir_query_base(query_ref, args)
     search = args.get('search')
-    
-    # Se há um cursor, começa depois daquele documento
+    # Ordem fixa para cursor-based pagination (exige índice com data_abertura DESC)
+    query_filtrada = query_filtrada.order_by(
+        'data_abertura', direction=firestore.Query.DESCENDING
+    )
+    col_ref = getattr(query_ref, 'parent', query_ref)
     q = query_filtrada
-    if cursor:
+    if cursor_anterior:
         try:
-            cursor_doc = query_ref.document(cursor).get()
+            cursor_ant_doc = col_ref.document(cursor_anterior).get()
+            if cursor_ant_doc.exists:
+                q = q.end_before(cursor_ant_doc)
+        except Exception:
+            pass
+    elif cursor:
+        try:
+            cursor_doc = col_ref.document(cursor).get()
             if cursor_doc.exists:
                 q = q.start_after(cursor_doc)
-        except:
-            # Se cursor é inválido, ignora e começa do início
+        except Exception:
             pass
-    
-    # Busca LIMITE + 1 para saber se há próxima página
+    if cursor_anterior:
+        docs_stream = list(q.limit(limite + 1).stream())
+        docs_stream.reverse()
+        tem_anterior = len(docs_stream) > limite
+        if tem_anterior:
+            docs_stream = docs_stream[:limite]
+        docs_filtrados = _aplicar_filtros_em_memoria(docs_stream, status, gate, categoria, search)
+        primeiro_id = docs_filtrados[0].id if docs_filtrados else None
+        ultimo_id = docs_filtrados[-1].id if docs_filtrados else None
+        return {
+            'docs': docs_filtrados,
+            'proximo_cursor': ultimo_id,
+            'tem_proxima': True,
+            'cursor_anterior': primeiro_id,
+            'tem_anterior': tem_anterior,
+        }
     docs_stream = list(q.limit(limite + 1).stream())
-    
     tem_proxima = len(docs_stream) > limite
     if tem_proxima:
         docs_stream = docs_stream[:limite]
-    
-    # Se há filtros em memória, aplica (como ele filt também pode reduzir docs)
     docs_filtrados = _aplicar_filtros_em_memoria(docs_stream, status, gate, categoria, search)
-    
-    proximo_cursor = None
-    if docs_filtrados:
-        proximo_cursor = docs_filtrados[-1].id
-    
+    proximo_cursor = docs_filtrados[-1].id if docs_filtrados else None
+    primeiro_id = docs_filtrados[0].id if docs_filtrados else None
     return {
         'docs': docs_filtrados,
         'proximo_cursor': proximo_cursor,
-        'tem_proxima': tem_proxima and len(docs_filtrados) == limite
+        'tem_proxima': tem_proxima and len(docs_filtrados) == limite,
+        'cursor_anterior': primeiro_id,
+        'tem_anterior': bool(cursor),
     }
 
 

@@ -81,7 +81,7 @@
     <footer class="bg-white border-t mt-12">
       <div class="max-w-7xl mx-auto py-6 px-4 overflow-hidden sm:px-6 lg:px-8">
         <p class="mt-8 text-center text-base text-gray-400">
-          &copy; 2026 DTX Aerospace - Sistema de Planejamento Interno.
+          &copy; 2026 DTX Aerospace - {% set _fs = t('footer_system_name') %}{{ _fs if _fs != 'footer_system_name' else 'Sistema de Planejamento Interno' }}.
         </p>
       </div>
     </footer>

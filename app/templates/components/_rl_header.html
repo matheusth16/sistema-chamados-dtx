@@ -1,0 +1,8 @@
+{# Cabeçalho de grupo por RL — reutilizável em dashboard e meus_chamados #}
+{% if rl %}
+<tr class="bg-pink-50/40">
+    <td colspan="{{ colspan|default(9) }}" class="px-5 py-2 text-xs font-bold text-pink-800 uppercase tracking-widest">
+        {{ t('rl_short') }} {{ rl }}
+    </td>
+</tr>
+{% endif %}

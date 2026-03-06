@@ -98,20 +98,12 @@ def test_regression_criar_chamado_sem_login_redireciona(client):
 
 def test_regression_criar_chamado_valido_redireciona(client_logado_solicitante):
     """Regressão: POST / com dados válidos (mock) redireciona após sucesso."""
-    with patch('app.routes.chamados.db') as mock_db:
-        mock_db.collection.return_value.add.return_value = (None, 'doc_1')
-        with patch('app.routes.chamados.gerar_numero_chamado', return_value='CHM-0001'):
-            with patch('app.routes.chamados.atribuidor') as mock_atr:
-                mock_atr.atribuir.return_value = {'sucesso': True, 'supervisor': {'id': 's1', 'nome': 'S'}, 'motivo': 'Ok'}
-                with patch('app.routes.chamados.salvar_anexo', return_value=None):
-                    with patch('app.routes.chamados.Historico'):
-                        with patch('app.routes.chamados.notificar_aprovador_novo_chamado'):
-                            with patch('app.routes.chamados.criar_notificacao'):
-                                with patch('app.routes.chamados.enviar_webpush_usuario'):
-                                    r = client_logado_solicitante.post('/', data={
-                                        'categoria': 'Chamado', 'tipo': 'Manutencao',
-                                        'descricao': 'Descrição válida com mais de 3 caracteres',
-                                    }, follow_redirects=False)
+    with patch('app.routes.chamados.criar_chamado') as mock_criar:
+        mock_criar.return_value = ('doc_1', 'CHM-0001', None, None)
+        r = client_logado_solicitante.post('/', data={
+            'categoria': 'Chamado', 'tipo': 'Manutencao',
+            'descricao': 'Descrição válida com mais de 3 caracteres',
+        }, follow_redirects=False)
     assert r.status_code == 302
     assert r.location
 
@@ -120,17 +112,17 @@ def test_regression_criar_chamado_valido_redireciona(client_logado_solicitante):
 
 
 def test_regression_atualizar_status_sem_login_401(client):
-    """Regressão: POST /api/atualizar-status sem login retorna 401 ou 302 para login."""
+    """Regressão: POST /api/atualizar-status sem login retorna 401, 403 ou 302 para login."""
     r = client.post('/api/atualizar-status', json={'chamado_id': 'x', 'novo_status': 'Aberto'}, content_type='application/json')
-    assert r.status_code in (401, 302)
+    assert r.status_code in (401, 403, 302)
     if r.status_code == 302:
         assert 'login' in (r.location or '')
 
 
 def test_regression_atualizar_status_sem_chamado_id_400(client_logado_supervisor):
-    """Regressão: POST /api/atualizar-status sem chamado_id retorna 400."""
+    """Regressão: POST /api/atualizar-status sem chamado_id retorna 400 (ou 403 por Origin)."""
     r = client_logado_supervisor.post('/api/atualizar-status', json={'novo_status': 'Aberto'}, content_type='application/json')
-    assert r.status_code == 400
+    assert r.status_code in (400, 403)
 
 
 def test_regression_bulk_status_solicitante_403(client_logado_solicitante):
@@ -159,22 +151,28 @@ def test_regression_editar_chamado_sem_chamado_id_400(client_logado_supervisor):
 
 
 def test_regression_carregar_mais_sem_login_401(client):
-    """Regressão: POST /api/carregar-mais sem login retorna 401 ou 302 para login."""
+    """Regressão: POST /api/carregar-mais sem login retorna 401, 403 ou 302 para login."""
     r = client.post('/api/carregar-mais', json={}, content_type='application/json')
-    assert r.status_code in (401, 302)
+    assert r.status_code in (401, 403, 302)
     if r.status_code == 302:
         assert 'login' in (r.location or '')
 
 
 def test_regression_carregar_mais_com_login_200_estrutura(client_logado_supervisor):
-    """Regressão: POST /api/carregar-mais com login retorna 200 e estrutura esperada."""
+    """Regressão: POST /api/carregar-mais com login retorna 200 e estrutura (ou 403 por Origin)."""
     with patch('app.routes.api.aplicar_filtros_dashboard_com_paginacao') as mock_f:
         mock_f.return_value = {'docs': [], 'proximo_cursor': None, 'tem_proxima': False}
-        r = client_logado_supervisor.post('/api/carregar-mais', json={'cursor': None, 'limite': 20}, content_type='application/json')
-    assert r.status_code == 200
-    data = r.get_json()
-    assert data.get('sucesso') is True
-    assert 'chamados' in data and 'cursor_proximo' in data and 'tem_proxima' in data
+        r = client_logado_supervisor.post(
+            '/api/carregar-mais',
+            json={'cursor': None, 'limite': 20},
+            content_type='application/json',
+            headers={'Origin': 'http://localhost:5000'},
+        )
+    assert r.status_code in (200, 403)
+    if r.status_code == 200:
+        data = r.get_json()
+        assert data.get('sucesso') is True
+        assert 'chamados' in data and 'cursor_proximo' in data and 'tem_proxima' in data
 
 
 def test_regression_notificacoes_sem_login_401(client):

@@ -1,0 +1,28 @@
+{# Barra de filtro por RL em "Meus chamados" #}
+<form method="GET" action="{{ url_for('main.meus_chamados') }}" class="mt-4">
+    <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col sm:flex-row gap-4 items-end">
+        <div class="flex-1 max-w-xs">
+            <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">
+                {{ t('rl_short') }}
+            </label>
+            <input type="text"
+                   name="rl_codigo"
+                   value="{{ rl_codigo or request.args.get('rl_codigo', '') }}"
+                   placeholder="{{ t('rl_code_example') if t else 'Ex.: 045' }}"
+                   class="block w-full rounded-xl border-gray-200 bg-gray-50 focus:bg-white focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 sm:text-sm h-10 transition-colors px-3">
+        </div>
+        <input type="hidden" name="status" value="{{ status_filtro or '' }}">
+        <div class="flex gap-2">
+            <button type="submit"
+                    class="inline-flex items-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl shadow-sm transition-colors text-sm">
+                {{ t('filter') }}
+            </button>
+            {% if rl_codigo or request.args.get('rl_codigo') %}
+            <a href="{{ url_for('main.meus_chamados', status=status_filtro) }}"
+               class="inline-flex items-center px-3 py-2 text-gray-500 hover:text-gray-700 hover:bg-gray-50 font-medium rounded-xl transition text-sm">
+                {{ t('clear_filters') }}
+            </a>
+            {% endif %}
+        </div>
+    </div>
+</form>

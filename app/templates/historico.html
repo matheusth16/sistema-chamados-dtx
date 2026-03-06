@@ -119,7 +119,7 @@
                                 {% if evento.acao == 'alteracao_status' %}
                                     <div class="mt-3 p-4 bg-white rounded-lg border-l-4 border-blue-500 shadow-sm">
                                         <div class="flex items-center gap-3">
-                                            <span class="text-sm text-gray-600 font-medium">{{ evento.campo_alterado }}:</span>
+                                            <span class="text-sm text-gray-600 font-medium">{{ evento.campo_alterado|translate_field_label }}:</span>
                                             <div class="flex items-center gap-2">
                                                 <span class="px-3 py-1 bg-red-100 text-red-800 rounded-md text-sm font-bold shadow-sm">
                                                     {% if evento.campo_alterado == 'Status' %}{{ translate_status(evento.valor_anterior) }}{% elif evento.campo_alterado == 'Setor/Gate' %}{{ translate_sector(evento.valor_anterior) }}{% elif evento.campo_alterado == 'Categoria' %}{{ translate_category(evento.valor_anterior) }}{% else %}{{ evento.valor_anterior }}{% endif %}
@@ -164,7 +164,7 @@
                                         {% else %}
                                             <p class="text-sm text-gray-700 flex items-center gap-2">
                                                 <span class="font-semibold text-purple-700">{{ t('changed_field') }}</span>
-                                                <span class="px-2 py-1 bg-purple-100 text-purple-800 rounded text-xs font-medium">{{ evento.campo_alterado }}</span>
+                                                <span class="px-2 py-1 bg-purple-100 text-purple-800 rounded text-xs font-medium">{{ evento.campo_alterado|translate_field_label }}</span>
                                                 {% if evento.valor_anterior or evento.valor_novo %}
                                                 <span class="text-gray-600">—</span>
                                                 <span class="px-2 py-1 bg-red-100 text-red-800 rounded text-xs">{{ evento.valor_anterior or '-' }}</span>

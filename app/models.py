@@ -3,6 +3,7 @@ import pytz
 from firebase_admin import firestore
 from app.exceptions import ChamadoNaoEncontradoError, ValidacaoChamadoError
 
+
 class Chamado:
     """Representação de um documento Chamado no Firestore"""
     
@@ -26,12 +27,20 @@ class Chamado:
                  data_conclusao = None,
                  responsavel_id: str = None,
                  motivo_atribuicao: str = None,
+                 setores_adicionais: list = None,
+                 motivo_cancelamento: str = None,
+                 data_cancelamento = None,
+                 grupo_rl_id: str = None,
                  id: str = None):
         
         self.id = id
         self.numero_chamado = numero_chamado
         self.categoria = categoria
+        self.setores_adicionais = setores_adicionais or []  # Setores adicionados pelo supervisor (ex.: Material, Engenharia)
+        self.motivo_cancelamento = motivo_cancelamento  # Obrigatório quando status == 'Cancelado'
+        self.data_cancelamento = data_cancelamento
         self.rl_codigo = rl_codigo
+        self.grupo_rl_id = grupo_rl_id  # Referência ao grupo lógico de RL (coleção grupos_rl)
         # Prioridade centralizada: Projetos = 0, demais = informado ou 1
         self.prioridade = 0 if categoria == 'Projetos' else (prioridade if prioridade is not None else 1)
         self.tipo_solicitacao = tipo_solicitacao
@@ -87,7 +96,14 @@ class Chamado:
         if dt and isinstance(dt, datetime):
             return dt.strftime('%d/%m/%Y %H:%M')
         return '-'
-    
+
+    def data_cancelamento_formatada(self):
+        """Retorna data_cancelamento formatada como string"""
+        dt = self._converter_timestamp(self.data_cancelamento)
+        if dt and isinstance(dt, datetime):
+            return dt.strftime('%d/%m/%Y %H:%M')
+        return '-'
+
     def to_dict(self):
         """Converte para dicionário para salvar no Firestore"""
         return {
@@ -109,7 +125,11 @@ class Chamado:
             'area': self.area,
             'status': self.status,
             'data_abertura': self.data_abertura,
-            'data_conclusao': self.data_conclusao
+            'data_conclusao': self.data_conclusao,
+            'setores_adicionais': self.setores_adicionais,
+            'motivo_cancelamento': self.motivo_cancelamento,
+            'data_cancelamento': self.data_cancelamento,
+            'grupo_rl_id': self.grupo_rl_id,
         }
     
     @classmethod
@@ -128,7 +148,7 @@ class Chamado:
             id=id,
             numero_chamado=data.get('numero_chamado'),
             categoria=_str(data.get('categoria')),
-            rl_codigo=data.get('rl_codigo'),
+            rl_codigo=_str(data.get('rl_codigo')),
             prioridade=data.get('prioridade', 1),
             tipo_solicitacao=_str(data.get('tipo_solicitacao')),
             gate=data.get('gate'),
@@ -144,7 +164,11 @@ class Chamado:
             area=data.get('area'),
             status=data.get('status', 'Aberto'),
             data_abertura=data.get('data_abertura'),
-            data_conclusao=data.get('data_conclusao')
+            data_conclusao=data.get('data_conclusao'),
+            setores_adicionais=data.get('setores_adicionais') if isinstance(data.get('setores_adicionais'), list) else [],
+            motivo_cancelamento=data.get('motivo_cancelamento'),
+            data_cancelamento=data.get('data_cancelamento'),
+            grupo_rl_id=data.get('grupo_rl_id'),
         )
     
     def __repr__(self):

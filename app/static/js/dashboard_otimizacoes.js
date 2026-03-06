@@ -71,7 +71,7 @@ async function atualizarStatusAjax(selectElement) {
     }
 
     // Valida o status
-    const statusValidos = ['Aberto', 'Em Atendimento', 'Concluído'];
+    const statusValidos = ['Aberto', 'Em Atendimento', 'Concluído', 'Cancelado'];
     if (!statusValidos.includes(novoStatus)) {
         debugLog('❌ Status inválido:', novoStatus);
         mostrarNotificacao(`Erro: Status inválido "${novoStatus}"`, 'danger');
@@ -84,6 +84,16 @@ async function atualizarStatusAjax(selectElement) {
         return;
     }
 
+    let motivoCancelamento = '';
+    if (novoStatus === 'Cancelado') {
+        motivoCancelamento = (window.prompt('Informe o motivo do cancelamento:') || '').trim();
+        if (!motivoCancelamento) {
+            mostrarNotificacao('O cancelamento exige um motivo.', 'warning');
+            selectElement.value = statusAnterior;
+            return;
+        }
+    }
+
     try {
         // Desabilita o select durante o request
         selectElement.disabled = true;
@@ -94,6 +104,9 @@ async function atualizarStatusAjax(selectElement) {
             chamado_id: chamadoId,
             novo_status: novoStatus
         };
+        if (novoStatus === 'Cancelado' && motivoCancelamento) {
+            payload.motivo_cancelamento = motivoCancelamento;
+        }
         debugLog('📤 Payload enviado:', JSON.stringify(payload, null, 2));
 
         // Faz o request AJAX (CSRF no header para proteção)

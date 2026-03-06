@@ -82,15 +82,18 @@ def test_aplicar_filtros_em_memoria_busca_por_texto():
 
 
 def test_aplicar_filtros_dashboard_com_paginacao_retorna_estrutura():
-    """aplicar_filtros_dashboard_com_paginacao retorna dict com docs, proximo_cursor, tem_proxima."""
+    """aplicar_filtros_dashboard_com_paginacao retorna dict com docs, proximo_cursor, tem_proxima, cursor_anterior, tem_anterior."""
     query_ref = MagicMock()
     query_ref.where.return_value = query_ref
+    query_ref.order_by.return_value = query_ref
     query_ref.limit.return_value = query_ref
     query_ref.stream.return_value = []
     resultado = aplicar_filtros_dashboard_com_paginacao(query_ref, {}, limite=50, cursor=None)
     assert 'docs' in resultado
     assert 'proximo_cursor' in resultado
     assert 'tem_proxima' in resultado
+    assert 'cursor_anterior' in resultado
+    assert 'tem_anterior' in resultado
     assert resultado['docs'] == []
     assert resultado['tem_proxima'] is False
     assert resultado['proximo_cursor'] is None
@@ -109,6 +112,7 @@ def test_aplicar_filtros_dashboard_com_paginacao_tem_proxima():
     doc3.to_dict.return_value = {'categoria': 'Geral', 'status': 'Aberto', 'gate': None}
     query_ref = MagicMock()
     query_ref.where.return_value = query_ref
+    query_ref.order_by.return_value = query_ref
     query_ref.limit.return_value = query_ref
     # limite=2 -> limit(3).stream(); 3 docs = tem_proxima True, página fica com doc1, doc2
     query_ref.stream.return_value = [doc1, doc2, doc3]
@@ -122,6 +126,7 @@ def test_aplicar_filtros_dashboard_retorna_lista():
     """aplicar_filtros_dashboard (legado) retorna lista de docs."""
     query_ref = MagicMock()
     query_ref.where.return_value = query_ref
+    query_ref.order_by.return_value = query_ref
     query_ref.limit.return_value = query_ref
     query_ref.stream.return_value = []
     docs = aplicar_filtros_dashboard(query_ref, {})

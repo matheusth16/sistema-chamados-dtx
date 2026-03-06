@@ -75,6 +75,8 @@ def obter_sla_para_exibicao(chamado: Any) -> Optional[Dict[str, Any]]:
         now = datetime.now(timezone.utc)
     else:
         now = datetime.utcnow()
+    if status == 'Cancelado':
+        return None  # Chamados cancelados não entram em SLA
     if status == 'Concluído':
         dt_conclusao = _to_datetime(data_conclusao)
         if not dt_conclusao:

@@ -60,12 +60,17 @@ class Config:
     # 8. Validação de Entrada
     MAX_DESCRICAO_CHARS = 5000
     MIN_DESCRICAO_CHARS = 3
-    EXTENSOES_UPLOAD_PERMITIDAS = {'png', 'jpg', 'jpeg', 'pdf', 'xlsx'}
+    # Anexos: imagens, PDF, Excel (todas as extensões comuns), Word (todas as extensões comuns)
+    EXTENSOES_UPLOAD_PERMITIDAS = {
+        'png', 'jpg', 'jpeg', 'pdf',
+        'xls', 'xlsx', 'xlsm', 'xlsb', 'xltx', 'xltm', 'csv',
+        'doc', 'docx', 'docm', 'dotx', 'dotm',
+    }
     
     # Firebase: Será inicializado em app/database.py
     # As credenciais vão em credentials.json na raiz do projeto
 
-    # Notificações (URL base para links em e-mail/Teams/Web Push)
+    # Notificações (URL base para links em e-mail/Web Push)
     APP_BASE_URL = os.getenv('APP_BASE_URL', '')
     MAIL_SERVER = os.getenv('MAIL_SERVER', '')
     MAIL_PORT = int(os.getenv('MAIL_PORT', '587'))
@@ -73,13 +78,6 @@ class Config:
     MAIL_USERNAME = os.getenv('MAIL_USERNAME', '')
     MAIL_PASSWORD = os.getenv('MAIL_PASSWORD', '')
     MAIL_DEFAULT_SENDER = os.getenv('MAIL_DEFAULT_SENDER', '')
-    TEAMS_WEBHOOK_URL = os.getenv('TEAMS_WEBHOOK_URL', '')
-
-    # Microsoft Graph (envio de e-mail via API, sem SMTP/MFA). Se definido, notifications.py usa Graph em vez de SMTP.
-    GRAPH_TENANT_ID = os.getenv('GRAPH_TENANT_ID', '').strip()
-    GRAPH_CLIENT_ID = os.getenv('GRAPH_CLIENT_ID', '').strip()
-    GRAPH_CLIENT_SECRET = os.getenv('GRAPH_CLIENT_SECRET', '').strip()
-    GRAPH_SEND_AS_USER = os.getenv('GRAPH_SEND_AS_USER', '').strip()  # UPN da caixa, ex.: dtxls.support@dtx.aero
 
     # Web Push (notificações no navegador). Gere chaves com: python gerar_vapid_keys.py
     VAPID_PUBLIC_KEY = os.getenv('VAPID_PUBLIC_KEY', '')
@@ -88,6 +86,10 @@ class Config:
     # Criptografia de PII em repouso (LGPD). Gere chave: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
     ENCRYPTION_KEY = os.getenv('ENCRYPTION_KEY', '').strip()
     ENCRYPT_PII_AT_REST = os.getenv('ENCRYPT_PII_AT_REST', 'false').lower() in ('true', '1', 'yes')
+
+    # Limite por usuário (relatórios/export): 0 = desativado. Ex.: 10 para máx 10 atualizações/export por usuário por dia.
+    RELATORIO_MAX_POR_USUARIO_POR_DIA = int(os.getenv('RELATORIO_MAX_POR_USUARIO_POR_DIA', '0'))
+    EXPORT_EXCEL_MAX_POR_USUARIO_POR_DIA = int(os.getenv('EXPORT_EXCEL_MAX_POR_USUARIO_POR_DIA', '0'))
 
     # Logging: nível (DEBUG, INFO, WARNING, ERROR). Em produção use INFO ou WARNING.
     LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO').upper()

@@ -27,10 +27,10 @@ def test_validar_novo_chamado_descricao_minimo_caracteres():
 
 
 def test_validar_novo_chamado_tipo_obrigatorio():
-    """Sem setor/tipo retorna erro."""
+    """Sem setor atribuído retorna erro."""
     form = {'descricao': 'Descrição válida aqui', 'tipo': '', 'categoria': 'Chamado'}
     erros = validar_novo_chamado(form)
-    assert any('Setor' in e or 'Tipo' in e for e in erros)
+    assert any('setor' in e.lower() or 'atribuir' in e.lower() for e in erros)
 
 
 def test_validar_novo_chamado_projetos_exige_rl_preenchido():

@@ -3,6 +3,7 @@ from flask_login import LoginManager
 from flask_wtf.csrf import CSRFProtect
 from config import Config
 import logging
+import time
 from logging.handlers import RotatingFileHandler
 from pythonjsonlogger import jsonlogger
 from urllib.parse import urlparse
@@ -61,12 +62,37 @@ def create_app():
     # Timeout de inatividade (15 minutos)
     _configurar_timeout_sessao(app)
 
+    # Métricas de tempo de resposta por rota (log para análise de gargalos)
+    _configurar_metricas_performance(app)
+
     # API de status exige CSRF; o frontend envia o token no header X-CSRFToken (meta csrf-token)
 
     # Firebase é inicializado em app/database.py
     # Não há tabelas para criar (Firestore é NoSQL)
     
     return app
+
+
+def _configurar_metricas_performance(app: Flask) -> None:
+    """Registra tempo de resposta por rota em log (path, status, duração em ms) para análise de gargalos."""
+    logger_perf = logging.getLogger("app.performance")
+
+    @app.before_request
+    def _iniciar_tempo():
+        request._inicio_request = time.perf_counter()
+
+    @app.after_request
+    def _logar_tempo(response):
+        if hasattr(request, "_inicio_request"):
+            duracao_ms = (time.perf_counter() - request._inicio_request) * 1000
+            logger_perf.info(
+                "request path=%s method=%s status=%s duration_ms=%.2f",
+                request.path,
+                request.method,
+                response.status_code,
+                duracao_ms,
+            )
+        return response
 
 
 def _configurar_seguranca(app: Flask) -> None:
@@ -190,8 +216,18 @@ def _configurar_seguranca(app: Flask) -> None:
             app.logger.error(f"Erro ao parsear origin '{origin}': {e}")
             req_origin = ''
         
-        # Compara origem da requisição com a autorizada
-        if req_origin and req_origin != base_origin:
+        # Origens aceitas: APP_BASE_URL e, em desenvolvimento, a própria URL do servidor (localhost)
+        origens_aceitas = {base_origin}
+        if app.config.get('ENV') == 'development' or app.debug:
+            try:
+                server_origin = f"{request.scheme}://{request.host}".lower()
+                if server_origin not in origens_aceitas:
+                    origens_aceitas.add(server_origin)
+            except Exception:
+                pass
+
+        # Compara origem da requisição com as autorizadas
+        if req_origin and req_origin not in origens_aceitas:
             app.logger.warning(
                 f"[CSRF] POST {path} de origem não autorizada. "
                 f"Origem: {req_origin}, Autorizada: {base_origin}. "
@@ -207,7 +243,7 @@ def _configurar_seguranca(app: Flask) -> None:
 
 def _configurar_i18n(app: Flask) -> None:
     """Configura sistema de internacionalização (i18n)"""
-    from app.i18n import get_translation, get_translated_sector, get_translated_category, get_translated_status
+    from app.i18n import get_translation, get_translated_sector, get_translated_category, get_translated_status, get_translated_field_label
     
     @app.before_request
     def antes_da_requisicao():
@@ -250,6 +286,11 @@ def _configurar_i18n(app: Flask) -> None:
                 return partes[0]
             return f"{partes[0]} {partes[-1][0]}."
         
+        # Extensões de anexo permitidas (para exibir e para o atributo accept do input file)
+        _ext = sorted(app.config.get('EXTENSOES_UPLOAD_PERMITIDAS', set()))
+        extensoes_permitidas = _ext
+        accept_anexo = ','.join('.' + e for e in _ext)
+
         return dict(
             t=t,
             translate_sector=translate_sector,
@@ -261,7 +302,9 @@ def _configurar_i18n(app: Flask) -> None:
                 'pt_BR': 'Português (Brasil)',
                 'en': 'English',
                 'es': 'Español'
-            }
+            },
+            extensoes_permitidas=extensoes_permitidas,
+            accept_anexo=accept_anexo,
         )
         
     # Registra funções as Jinja filters (para usar com o pipe |)
@@ -279,6 +322,11 @@ def _configurar_i18n(app: Flask) -> None:
     def filter_translate_status(status_name):
         lang = session.get('language', 'pt_BR')
         return get_translated_status(status_name, lang)
+
+    @app.template_filter('translate_field_label')
+    def filter_translate_field_label(field_name):
+        lang = session.get('language', 'pt_BR')
+        return get_translated_field_label(field_name, lang)
 
 def _configurar_timeout_sessao(app: Flask) -> None:
     """Configura logout automático por inatividade de sessão (15 minutos)"""

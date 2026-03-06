@@ -36,11 +36,11 @@
                     <h3 class="text-2xl font-black text-gray-800">{{ t('ticket_num') if t else 'Chamado ' }}{{ chamado.numero_chamado }}</h3>
                     <div class="flex items-center space-x-2">
                         <span class="px-2.5 py-1 {% if chamado.categoria == 'Projetos' %}bg-pink-100 text-pink-700{% else %}bg-indigo-100 text-indigo-700{% endif %} rounded-lg text-xs font-bold uppercase tracking-wider">
-                            {{ chamado.categoria }}
+                            {{ translate_category(chamado.categoria) if chamado.categoria else chamado.categoria }}
                         </span>
                         {% if chamado.tipo_solicitacao %}
                         <span class="px-2.5 py-1 bg-gray-100 text-gray-600 rounded-lg text-xs font-bold uppercase tracking-wider">
-                            {{ chamado.tipo_solicitacao }}
+                            {{ translate_sector(chamado.tipo_solicitacao) if chamado.tipo_solicitacao else chamado.tipo_solicitacao }}
                         </span>
                         {% endif %}
                         {% if chamado.rl_codigo %}
@@ -93,7 +93,7 @@
 
                     <!-- Arquivos e Anexos -->
                     <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-                        <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">{{ t('attached_file') if t else 'Anexos' }}</label>
+                        <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">{% set _af = t('attached_file') %}{{ _af if _af != 'attached_file' else 'Anexos' }}</label>
                         
                         <div class="space-y-4">
                             {% set tem_anexo = false %}
@@ -127,21 +127,24 @@
                             {% endif %}
 
                             {% if not tem_anexo %}
-                            <p class="text-sm text-gray-500 italic mb-2">Sem anexos atuais.</p>
+                            <p class="text-sm text-gray-500 italic mb-2">{% set _na = t('no_attachments_current') %}{{ _na if _na != 'no_attachments_current' else 'Sem anexos atuais.' }}</p>
                             {% endif %}
 
                             <!-- Dropzone para Novo Anexo (Apenas se puder editar) -->
                             {% if pode_editar %}
                             <div class="pt-3 {% if tem_anexo %}border-t border-gray-100{% endif %}">
-                                <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">{{ t('new_attachment') if t else 'Novo Anexo' }}</label>
-                                <div class="relative border-2 border-dashed border-gray-200 hover:border-indigo-400 bg-gray-50/50 hover:bg-indigo-50/30 rounded-xl p-4 transition-all group flex flex-col items-center justify-center cursor-pointer">
-                                    <input type="file" id="modal-input-anexo" form="form-status" name="anexo" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer text-sm">
-                                    <svg class="w-6 h-6 text-gray-400 group-hover:text-indigo-500 mb-1 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                                    </svg>
-                                    <p class="text-[13px] font-medium text-gray-600 group-hover:text-indigo-600 transition-colors" id="nome-arquivo-selecionado">Clique para enviar um arquivo</p>
-                                    <p class="text-[11px] text-gray-400">ou arraste e solte aqui</p>
-                                </div>
+                                <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">{% set _natt = t('new_attachment') %}{{ _natt if _natt != 'new_attachment' else 'Novo Anexo' }}</label>
+                                <label for="modal-input-anexo" class="relative border-2 border-dashed border-gray-200 hover:border-indigo-400 bg-gray-50/50 hover:bg-indigo-50/30 rounded-xl p-4 transition-all group flex flex-col items-center justify-center cursor-pointer block" data-upload-placeholder="{% set _cu = t('click_to_upload_file') %}{{ _cu if _cu != 'click_to_upload_file' else 'Clique para enviar um arquivo' }}">
+                                    <input type="file" id="modal-input-anexo" form="form-status" name="anexo" class="sr-only" accept="{{ accept_anexo }}">
+                                    <span class="pointer-events-none flex flex-col items-center">
+                                        <svg class="w-6 h-6 text-gray-400 group-hover:text-indigo-500 mb-1 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                        </svg>
+                                        <p class="text-[13px] font-medium text-gray-600 group-hover:text-indigo-600 transition-colors" id="nome-arquivo-selecionado">{% set _cu2 = t('click_to_upload_file') %}{{ _cu2 if _cu2 != 'click_to_upload_file' else 'Clique para enviar um arquivo' }}</p>
+                                        <p class="text-[11px] text-gray-400">{% set _od = t('or_drag_drop') %}{{ _od if _od != 'or_drag_drop' else 'ou arraste e solte aqui' }}</p>
+                                        <p class="text-[10px] text-gray-400 mt-1" title="{{ extensoes_permitidas|join(', ') }}">{% set _ft = t('file_types_short') %}{{ _ft if _ft != 'file_types_short' else 'Imagens, PDF, Excel e Word. Máx. 10MB' }}</p>
+                                    </span>
+                                </label>
                             </div>
                             {% endif %}
                         </div>
@@ -191,18 +194,25 @@
                                 <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5">{{ t('current_status') if t else 'Status Atual' }}</label>
                                 <div>
                                     <span class="inline-flex px-3 py-1.5 rounded-lg text-sm font-bold shadow-sm border border-gray-100 
-                                    {% if chamado.status == 'Concluído' %}bg-emerald-100 text-emerald-800{% elif chamado.status == 'Em Atendimento' %}bg-amber-100 text-amber-800{% else %}bg-blue-100 text-blue-800{% endif %}">
-                                        {{ chamado.status }}
+                                    {% if chamado.status == 'Concluído' %}bg-emerald-100 text-emerald-800{% elif chamado.status == 'Em Atendimento' %}bg-amber-100 text-amber-800{% elif chamado.status == 'Cancelado' %}bg-red-100 text-red-800{% else %}bg-blue-100 text-blue-800{% endif %}">
+                                        {{ translate_status(chamado.status) if chamado.status else chamado.status }}
                                     </span>
                                 </div>
 
                                 <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mt-3 mb-1.5">{{ t('change_status_to') if t else 'Alterar Status Para' }}</label>
-                                <select name="novo_status"
+                                <select name="novo_status" id="select-novo-status"
                                     class="block w-full bg-gray-50 border-gray-200 text-sm rounded-xl focus:ring-indigo-500 focus:border-indigo-500 transition-colors py-2 px-3 focus:bg-white shadow-sm">
                                     <option value="Aberto" {% if chamado.status == 'Aberto' %}selected{% endif %}>{{ t('option_open') if t else 'Aberto' }}</option>
                                     <option value="Em Atendimento" {% if chamado.status == 'Em Atendimento' %}selected{% endif %}>{{ t('option_in_progress') if t else 'Em Atendimento' }}</option>
                                     <option value="Concluído" {% if chamado.status == 'Concluído' %}selected{% endif %}>{{ t('option_completed') if t else 'Concluído' }}</option>
+                                    <option value="Cancelado" {% if chamado.status == 'Cancelado' %}selected{% endif %}>{{ t('option_cancelled') if t else 'Cancelado' }}</option>
                                 </select>
+                                <div id="wrap-motivo-cancelamento" class="mt-3 {% if chamado.status != 'Cancelado' %}hidden{% endif %}">
+                                    <label for="motivo_cancelamento" class="block text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-1">{% set _cr = t('cancellation_reason') %}{{ _cr if _cr != 'cancellation_reason' else 'Motivo do cancelamento' }} <span class="text-red-500">*</span></label>
+                                    <textarea id="motivo_cancelamento" form="form-status" name="motivo_cancelamento" rows="2" maxlength="500"
+                                        class="block w-full rounded-xl border border-gray-200 bg-gray-50 focus:border-red-500 focus:ring-red-200 text-sm px-3 py-2"
+                                        placeholder="{% set _crp = t('cancellation_reason_placeholder') %}{{ _crp if _crp != 'cancellation_reason_placeholder' else 'Informe o motivo do cancelamento' }}">{{ chamado.motivo_cancelamento or '' }}</textarea>
+                                </div>
                             </div>
 
                             <div class="pt-1">
@@ -214,6 +224,29 @@
                                     <option value="{{ sup.id }}">{{ sup.nome }} ({{ sup.area }})</option>
                                     {% endfor %}
                                 </select>
+                            </div>
+
+                            <!-- Setores adicionais: incluir outros setores no chamado (notifica supervisores desses setores por e-mail) -->
+                            <div class="pt-3 mt-3 border-t border-gray-100">
+                                <label class="block text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-2">{{ t('additional_sectors') if t else 'Setores adicionais' }}</label>
+                                <p class="text-xs text-gray-500 mb-2">{{ t('additional_sectors_help') if t else 'Marque os setores a incluir no chamado. Os supervisores desses setores receberão e-mail informando a abertura.' }}</p>
+                                {% if chamado.setores_adicionais %}
+                                <div class="flex flex-wrap gap-1.5 mb-2">
+                                    {% for setor_nome in chamado.setores_adicionais %}
+                                    <span class="inline-flex px-2.5 py-1 rounded-lg text-xs font-medium bg-teal-100 text-teal-800">{{ translate_sector(setor_nome) if setor_nome else setor_nome }}</span>
+                                    {% endfor %}
+                                </div>
+                                {% endif %}
+                                <div class="flex flex-wrap gap-x-4 gap-y-1.5 max-h-32 overflow-y-auto py-1">
+                                    {% for setor in setores %}
+                                    <label class="inline-flex items-center gap-1.5 cursor-pointer text-sm text-gray-700">
+                                        <input type="checkbox" name="setores_adicionais" value="{{ setor.nome_pt }}" form="form-status"
+                                            {% if setor.nome_pt in (chamado.setores_adicionais or []) %}checked{% endif %}
+                                            class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                                        <span>{{ translate_sector(setor.nome_pt) if setor.nome_pt else setor.nome_pt }}</span>
+                                    </label>
+                                    {% endfor %}
+                                </div>
                             </div>
 
                             <div class="pt-3 mt-3 border-t border-gray-100 pb-1">
@@ -231,17 +264,36 @@
                                 <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">{{ t('status') if t else 'Status' }}</label>
                                 <div>
                                     <span class="inline-flex px-3 py-1.5 rounded-lg text-sm font-bold shadow-sm border border-gray-100 
-                                    {% if chamado.status == 'Concluído' %}bg-emerald-100 text-emerald-800{% elif chamado.status == 'Em Atendimento' %}bg-amber-100 text-amber-800{% else %}bg-blue-100 text-blue-800{% endif %}">
-                                        {{ chamado.status }}
+                                    {% if chamado.status == 'Concluído' %}bg-emerald-100 text-emerald-800{% elif chamado.status == 'Em Atendimento' %}bg-amber-100 text-amber-800{% elif chamado.status == 'Cancelado' %}bg-red-100 text-red-800{% else %}bg-blue-100 text-blue-800{% endif %}">
+                                        {{ translate_status(chamado.status) if chamado.status else chamado.status }}
                                     </span>
                                 </div>
                             </div>
+                            {% if chamado.status == 'Cancelado' and chamado.motivo_cancelamento %}
+                            <div>
+                                <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">{% set _cr2 = t('cancellation_reason') %}{{ _cr2 if _cr2 != 'cancellation_reason' else 'Motivo do cancelamento' }}</label>
+                                <div class="text-sm text-gray-700 bg-red-50 border border-red-100 rounded-xl p-3">{{ chamado.motivo_cancelamento }}</div>
+                                {% if chamado.data_cancelamento_formatada() and chamado.data_cancelamento_formatada() != '-' %}
+                                <p class="text-xs text-gray-500 mt-1">{{ t('cancelled_on') if t else 'Cancelado em' }}: {{ chamado.data_cancelamento_formatada() }}</p>
+                                {% endif %}
+                            </div>
+                            {% endif %}
                             <div>
                                 <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">{{ t('assigned_to') if t else 'Atribuído a' }}</label>
                                 <div class="text-sm font-semibold text-gray-800">
                                     {{ chamado.responsavel or '—' }}
                                 </div>
                             </div>
+                            {% if chamado.setores_adicionais %}
+                            <div>
+                                <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">{{ t('additional_sectors') if t else 'Setores adicionais' }}</label>
+                                <div class="flex flex-wrap gap-1.5">
+                                    {% for setor_nome in chamado.setores_adicionais %}
+                                    <span class="inline-flex px-2.5 py-1 rounded-lg text-xs font-medium bg-teal-100 text-teal-800">{{ translate_sector(setor_nome) if setor_nome else setor_nome }}</span>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                            {% endif %}
                             
                             <div class="bg-indigo-50/50 border border-indigo-100 rounded-xl p-4 text-center mt-6">
                                 <p class="text-[10px] text-indigo-700 font-bold uppercase tracking-widest">{{ t('responsible_for_ticket') if t else 'Contato' }}</p>
@@ -259,6 +311,15 @@
 
 {% if pode_editar %}
 <script>
+    (function() {
+        var select = document.getElementById('select-novo-status');
+        var wrapMotivo = document.getElementById('wrap-motivo-cancelamento');
+        if (select && wrapMotivo) {
+            select.addEventListener('change', function() {
+                wrapMotivo.classList.toggle('hidden', this.value !== 'Cancelado');
+            });
+        }
+    })();
     const inputFile = document.getElementById('modal-input-anexo');
     const nomeArquivoEl = document.getElementById('nome-arquivo-selecionado');
     
@@ -269,7 +330,8 @@
                 nomeArquivoEl.classList.remove('text-gray-600');
                 nomeArquivoEl.classList.add('text-indigo-600', 'font-bold');
             } else {
-                nomeArquivoEl.textContent = 'Clique para enviar um arquivo';
+                var label = document.querySelector('[data-upload-placeholder]');
+                nomeArquivoEl.textContent = label ? label.getAttribute('data-upload-placeholder') : 'Clique para enviar um arquivo';
                 nomeArquivoEl.classList.add('text-gray-600');
                 nomeArquivoEl.classList.remove('text-indigo-600', 'font-bold');
             }

@@ -169,6 +169,16 @@
         "en": "Responsible",
         "es": "Responsable"
     },
+    "additional_sectors": {
+        "pt_BR": "Setores adicionais",
+        "en": "Additional sectors",
+        "es": "Sectores adicionales"
+    },
+    "additional_sectors_help": {
+        "pt_BR": "Marque os setores a incluir no chamado. Os supervisores desses setores receberão e-mail informando a inclusão.",
+        "en": "Check the sectors to include in this ticket. Supervisors of those sectors will receive an email notifying them.",
+        "es": "Marque los sectores a incluir en el ticket. Los supervisores de esos sectores recibirán un correo informando."
+    },
     "complete_details": {
         "pt_BR": "Detalhes completos da solicitação",
         "en": "Complete details of the request",
@@ -215,9 +225,19 @@
         "es": "Buscar"
     },
     "file_types": {
-        "pt_BR": "PNG, JPG, PDF ou XLSX até 10MB",
-        "en": "PNG, JPG, PDF or XLSX up to 10MB",
-        "es": "PNG, JPG, PDF o XLSX hasta 10MB"
+        "pt_BR": "Formatos permitidos:",
+        "en": "Allowed formats:",
+        "es": "Formatos permitidos:"
+    },
+    "file_types_short": {
+        "pt_BR": "Imagens, PDF, Excel e Word. Máx. 10MB",
+        "en": "Images, PDF, Excel and Word. Max 10MB",
+        "es": "Imágenes, PDF, Excel y Word. Máx. 10MB"
+    },
+    "file_max_size": {
+        "pt_BR": "Máx. 10MB",
+        "en": "Max 10MB",
+        "es": "Máx. 10MB"
     },
     "request_category": {
         "pt_BR": "Categoria da Solicitação",
@@ -255,9 +275,9 @@
         "es": "Descripción del Problema"
     },
     "type_sector": {
-        "pt_BR": "Tipo / Setor",
-        "en": "Type / Sector",
-        "es": "Tipo / Sector"
+        "pt_BR": "Atribuir ao setor:",
+        "en": "Assign to sector:",
+        "es": "Asignar al sector:"
     },
     "option_open": {
         "pt_BR": "Aberto",
@@ -318,6 +338,16 @@
         "pt_BR": "Sair",
         "en": "Sign Out",
         "es": "Cerrar Sesión"
+    },
+    "logout_account": {
+        "pt_BR": "Sair da Conta",
+        "en": "Log out",
+        "es": "Cerrar sesión"
+    },
+    "profile_admin": {
+        "pt_BR": "Administrador",
+        "en": "Administrator",
+        "es": "Administrador"
     },
     "spanish": {
         "pt_BR": "Español",
@@ -654,6 +684,36 @@
         "en": "Completed",
         "es": "Completado"
     },
+    "option_cancelled": {
+        "pt_BR": "Cancelado",
+        "en": "Cancelled",
+        "es": "Cancelado"
+    },
+    "cancellation_reason": {
+        "pt_BR": "Motivo do cancelamento",
+        "en": "Cancellation reason",
+        "es": "Motivo de cancelación"
+    },
+    "cancellation_reason_placeholder": {
+        "pt_BR": "Informe o motivo do cancelamento",
+        "en": "Enter the cancellation reason",
+        "es": "Indique el motivo de cancelación"
+    },
+    "cancelled_on": {
+        "pt_BR": "Cancelado em",
+        "en": "Cancelled on",
+        "es": "Cancelado el"
+    },
+    "cancelled": {
+        "pt_BR": "Cancelado",
+        "en": "Cancelled",
+        "es": "Cancelado"
+    },
+    "cancelled_tickets": {
+        "pt_BR": "Cancelados",
+        "en": "Cancelled",
+        "es": "Cancelados"
+    },
     "or_drag_drop": {
         "pt_BR": "ou arraste e solte",
         "en": "or drag and drop",
@@ -734,6 +794,31 @@
         "en": "DTX Aerospace. All rights reserved.",
         "es": "DTX Aerospace. Todos los derechos reservados."
     },
+    "footer_system_name": {
+        "pt_BR": "Sistema de Planejamento Interno",
+        "en": "Internal Planning System",
+        "es": "Sistema de Planificación Interna"
+    },
+    "level_label": {
+        "pt_BR": "Nível",
+        "en": "Level",
+        "es": "Nivel"
+    },
+    "xp_weekly": {
+        "pt_BR": "XP Semanal",
+        "en": "Weekly XP",
+        "es": "XP Semanal"
+    },
+    "progress_global": {
+        "pt_BR": "Progresso global",
+        "en": "Global progress",
+        "es": "Progreso global"
+    },
+    "xp_total_label": {
+        "pt_BR": "XP Total",
+        "en": "Total XP",
+        "es": "XP Total"
+    },
     "opening_date": {
         "pt_BR": "Data de Abertura",
         "en": "Opening Date",
@@ -774,6 +859,16 @@
         "pt_BR": "Anexos Atuais",
         "en": "Current Attachments",
         "es": "Archivos Adjuntos Actuales"
+    },
+    "no_attachments_current": {
+        "pt_BR": "Sem anexos atuais.",
+        "en": "No current attachments.",
+        "es": "Sin archivos adjuntos actuales."
+    },
+    "click_to_upload_file": {
+        "pt_BR": "Clique para enviar um arquivo",
+        "en": "Click to upload a file",
+        "es": "Haga clic para enviar un archivo"
     },
     "new_attachment": {
         "pt_BR": "Novo Anexo (Adicionar)",

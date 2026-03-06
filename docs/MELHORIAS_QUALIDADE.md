@@ -164,9 +164,6 @@ MAIL_PORT=587
 MAIL_USERNAME=
 MAIL_PASSWORD=
 
-# Microsoft Teams (opcional)
-TEAMS_WEBHOOK_URL=
-
 # Web Push (opcional)
 VAPID_PUBLIC_KEY=
 VAPID_PRIVATE_KEY=
@@ -192,8 +189,7 @@ LOG_LEVEL=WARNING,\
 MAIL_SERVER=smtp.office365.com,\
 MAIL_PORT=587,\
 MAIL_USERNAME=seu-email@company.com,\
-MAIL_PASSWORD=seu-password,\
-TEAMS_WEBHOOK_URL=https://outlook.webhook.office.com/...
+MAIL_PASSWORD=seu-password
 "
 ```
 

@@ -11,7 +11,7 @@ from app.models import Chamado
 from app.models_usuario import Usuario
 from app.models_historico import Historico
 from app.services.filters import aplicar_filtros_dashboard_com_paginacao
-from app.services.notifications import notificar_solicitante_status
+from app.services.notifications import notificar_solicitante_status, notificar_setores_adicionais_chamado
 from app.services.notifications_inapp import listar_para_usuario, contar_nao_lidas, marcar_como_lida, marcar_todas_como_lidas
 from app.services.webpush_service import salvar_inscricao
 from app.services.assignment import atribuidor
@@ -48,14 +48,18 @@ def atualizar_status_ajax():
             return jsonify({'sucesso': False, 'erro': 'chamado_id é obrigatório'}), 400
         if not novo_status:
             return jsonify({'sucesso': False, 'erro': 'novo_status é obrigatório'}), 400
-        if novo_status not in ['Aberto', 'Em Atendimento', 'Concluído']:
+        if novo_status not in ['Aberto', 'Em Atendimento', 'Concluído', 'Cancelado']:
             return jsonify({'sucesso': False, 'erro': f'Status inválido "{novo_status}"'}), 400
+        motivo_cancelamento = (dados.get('motivo_cancelamento') or '').strip()
+        if novo_status == 'Cancelado' and not motivo_cancelamento:
+            return jsonify({'sucesso': False, 'erro': 'Motivo do cancelamento é obrigatório'}), 400
 
         resultado = atualizar_status_chamado(
             chamado_id=chamado_id,
             novo_status=novo_status,
             usuario_id=current_user.id,
             usuario_nome=current_user.nome,
+            motivo_cancelamento=motivo_cancelamento if novo_status == 'Cancelado' else None,
         )
         if resultado['sucesso']:
             return jsonify({'sucesso': True, 'mensagem': resultado['mensagem'], 'novo_status': novo_status}), 200
@@ -76,6 +80,10 @@ def api_editar_chamado():
     try:
         chamado_id = request.form.get('chamado_id')
         novo_status = request.form.get('novo_status')
+        motivo_cancelamento = (request.form.get('motivo_cancelamento') or '').strip()
+        if not motivo_cancelamento and request.get_json(silent=True):
+            motivo_cancelamento = (request.get_json() or {}).get('motivo_cancelamento') or ''
+            motivo_cancelamento = str(motivo_cancelamento).strip()
         nova_descricao = request.form.get('nova_descricao')
         novo_responsavel_id = request.form.get('novo_responsavel_id')
         arquivo_anexo = request.files.get('anexo')
@@ -99,13 +107,16 @@ def api_editar_chamado():
         update_data = {}
 
         # Status (atualização via serviço centralizado — já faz o update no Firestore)
-        if novo_status and novo_status in ['Aberto', 'Em Atendimento', 'Concluído'] and novo_status != data_chamado.get('status'):
+        if novo_status and novo_status in ['Aberto', 'Em Atendimento', 'Concluído', 'Cancelado'] and novo_status != data_chamado.get('status'):
+            if novo_status == 'Cancelado' and not motivo_cancelamento:
+                return jsonify({'sucesso': False, 'erro': 'Motivo do cancelamento é obrigatório'}), 400
             resultado_status = atualizar_status_chamado(
                 chamado_id=chamado_id,
                 novo_status=novo_status,
                 usuario_id=current_user.id,
                 usuario_nome=current_user.nome,
                 data_chamado=data_chamado,
+                motivo_cancelamento=motivo_cancelamento if novo_status == 'Cancelado' else None,
             )
             if not resultado_status['sucesso']:
                 return jsonify({'sucesso': False, 'erro': resultado_status.get('erro', 'Erro ao atualizar status')}), 500
@@ -175,6 +186,42 @@ def api_editar_chamado():
                     valor_anterior='-',
                     valor_novo=caminho_anexo
                 ).save()
+
+        # Setores adicionais (supervisor pode incluir outros setores; notifica supervisores desses setores)
+        setores_adicionais_form = request.form.getlist('setores_adicionais')
+        if not setores_adicionais_form and request.get_json(silent=True):
+            setores_adicionais_form = (request.get_json() or {}).get('setores_adicionais') or []
+        setores_adicionais_form = [str(s).strip() for s in setores_adicionais_form if s and str(s).strip()]
+        setores_atuais = data_chamado.get('setores_adicionais') or []
+        if not isinstance(setores_atuais, list):
+            setores_atuais = []
+        setores_novos_lista = setores_adicionais_form
+        setores_novos_para_notificar = [s for s in setores_novos_lista if s not in setores_atuais]
+        if setores_novos_lista != setores_atuais:
+            update_data['setores_adicionais'] = setores_novos_lista
+            if setores_novos_para_notificar:
+                try:
+                    notificar_setores_adicionais_chamado(
+                        chamado_id=chamado_id,
+                        numero_chamado=data_chamado.get('numero_chamado', ''),
+                        setores_novos=setores_novos_para_notificar,
+                        categoria=data_chamado.get('categoria', ''),
+                        tipo_solicitacao=data_chamado.get('tipo_solicitacao', ''),
+                        descricao_resumo=(data_chamado.get('descricao') or '')[:500],
+                        solicitante_nome=data_chamado.get('solicitante_nome', '—'),
+                        quem_adicionou_nome=current_user.nome,
+                    )
+                except Exception as e:
+                    logger.exception("Erro ao notificar setores adicionais: %s", e)
+            Historico(
+                chamado_id=chamado_id,
+                usuario_id=current_user.id,
+                usuario_nome=current_user.nome,
+                acao='alteracao_dados',
+                campo_alterado='setores adicionais',
+                valor_anterior=', '.join(setores_atuais) if setores_atuais else '-',
+                valor_novo=', '.join(setores_novos_lista) if setores_novos_lista else '-',
+            ).save()
 
         if update_data:
             # Atualiza documento com retry automático

@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto mt-12 px-4">
+    <div class="bg-amber-50 border border-amber-200 rounded-xl shadow-sm p-8 text-center">
+        <div class="inline-flex items-center justify-center w-14 h-14 rounded-full bg-amber-100 text-amber-600 mb-4">
+            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+        </div>
+        <h1 class="text-xl font-semibold text-gray-800 mb-2">Índice do banco em construção</h1>
+        <p class="text-gray-600 mb-6">O Firestore está finalizando um índice necessário para o dashboard. Isso costuma levar alguns minutos. Atualize a página em instantes.</p>
+        <a href="{{ url_for('main.admin') }}" class="inline-flex items-center px-5 py-2.5 border border-transparent text-sm font-medium rounded-lg text-white bg-indigo-600 hover:bg-indigo-700">
+            Atualizar página
+        </a>
+    </div>
+</div>
+{% endblock %}

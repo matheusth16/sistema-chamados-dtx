@@ -7,23 +7,45 @@ Centraliza regras de negócio para criação/edição de chamados:
 - Extensões e validação de anexos (extensão + magic bytes para evitar upload malicioso)
 """
 import re
+from flask import current_app
 
-# Lista de extensões permitidas no sistema
-EXTENSOES_PERMITIDAS = {'png', 'jpg', 'jpeg', 'pdf', 'xlsx'}
+# Fallback se config não estiver disponível (ex.: testes)
+def _get_extensoes_permitidas():
+    try:
+        return current_app.config.get('EXTENSOES_UPLOAD_PERMITIDAS', set())
+    except RuntimeError:
+        return {'png', 'jpg', 'jpeg', 'pdf', 'xls', 'xlsx', 'xlsm', 'xlsb', 'xltx', 'xltm', 'csv', 'doc', 'docx', 'docm', 'dotx', 'dotm'}
+
+def get_extensoes_permitidas():
+    """Retorna o conjunto de extensões permitidas (para exibição em templates)."""
+    return _get_extensoes_permitidas()
 
 # Magic bytes (início do arquivo) por extensão - validação por conteúdo real
+# Office Open XML (xlsx, docx, xlsm, docm, xltx, xltm, dotx, dotm) = ZIP
+# OLE (xls, xlsb, doc) = formato binário antigo
+# CSV: sem assinatura única; validação apenas por extensão
 _MAGIC_BYTES = {
     'png': (b'\x89PNG\r\n\x1a\n',),
     'jpg': (b'\xff\xd8\xff',),
     'jpeg': (b'\xff\xd8\xff',),
     'pdf': (b'%PDF',),
-    'xlsx': (b'PK',),  # XLSX é ZIP (Office Open XML)
+    'xlsx': (b'PK',),
+    'xlsm': (b'PK',),
+    'xltx': (b'PK',),
+    'xltm': (b'PK',),
+    'xls': (b'\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1',),
+    'xlsb': (b'\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1',),
+    'doc': (b'\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1',),
+    'docx': (b'PK',),
+    'docm': (b'PK',),
+    'dotx': (b'PK',),
+    'dotm': (b'PK',),
 }
 
 
 def _arquivo_permitido(filename: str) -> bool:
-    """Verifica se a extensão do arquivo é válida (permitidas: png, jpg, jpeg, pdf, xlsx)."""
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in EXTENSOES_PERMITIDAS
+    """Verifica se a extensão do arquivo é permitida."""
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in _get_extensoes_permitidas()
 
 
 def _arquivo_conteudo_permitido(arquivo) -> tuple[bool, str]:
@@ -35,8 +57,9 @@ def _arquivo_conteudo_permitido(arquivo) -> tuple[bool, str]:
     if not arquivo or not getattr(arquivo, 'filename', None) or not arquivo.filename.strip():
         return True, ''
     ext = arquivo.filename.rsplit('.', 1)[-1].lower() if '.' in arquivo.filename else ''
+    # CSV e outros sem magic bytes: aceitar por extensão (validação apenas no nome)
     if ext not in _MAGIC_BYTES:
-        return False, f"Formato de arquivo não suportado para validação: {ext}"
+        return True, ''
     expected_sigs = _MAGIC_BYTES[ext]
     try:
         stream = getattr(arquivo, 'stream', None)
@@ -69,7 +92,7 @@ def validar_novo_chamado(form, arquivo=None):
 
     Regras:
         - Descrição obrigatória, mínimo 3 caracteres.
-        - Setor/Tipo obrigatório.
+        - Atribuição ao setor obrigatória.
         - Categoria Projetos exige rl_codigo preenchido (letras, números e caracteres; 1 a 100 caracteres).
         - Anexo: apenas extensões em EXTENSOES_PERMITIDAS (tamanho máximo em config).
     """
@@ -86,7 +109,7 @@ def validar_novo_chamado(form, arquivo=None):
         erros.append("A descrição deve ter no mínimo 3 caracteres.")
     
     if not tipo:
-        erros.append("É necessário selecionar um Setor/Tipo.")
+        erros.append("É necessário atribuir um setor.")
 
     # 2. Validação Específica da DTX (Regra do RL)
     # Para Projetos: código RL obrigatório — letras, números e caracteres (1 a 100)
@@ -103,7 +126,7 @@ def validar_novo_chamado(form, arquivo=None):
     # 3. Validação de Arquivo (Se houver upload): extensão + conteúdo (magic bytes)
     if arquivo and arquivo.filename != '':
         if not _arquivo_permitido(arquivo.filename):
-            erros.append(f"Formato de arquivo inválido. Permitidos: {', '.join(EXTENSOES_PERMITIDAS)}")
+            erros.append(f"Formato de arquivo inválido. Permitidos: {', '.join(sorted(_get_extensoes_permitidas()))}")
         else:
             ok, msg = _arquivo_conteudo_permitido(arquivo)
             if not ok:

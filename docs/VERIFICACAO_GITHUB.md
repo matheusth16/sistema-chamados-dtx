@@ -54,7 +54,6 @@ Foram revisados os arquivos:
 | APP_BASE_URL | `https://seu-dominio.com` | Sim (genérico) |
 | MAIL_USERNAME | `seu-email@empresa.com` | Sim (placeholder) |
 | MAIL_PASSWORD | `sua-senha-app` | Sim (placeholder) |
-| TEAMS_WEBHOOK_URL | `https://outlook.office.com/webhook/...` | Sim (URL genérica) |
 | VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY | vazios | Sim |
 | REDIS_URL | comentado | Sim |
 

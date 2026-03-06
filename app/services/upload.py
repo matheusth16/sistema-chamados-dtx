@@ -68,7 +68,8 @@ def salvar_anexo(arquivo):
         return None
 
     if not _arquivo_permitido(arquivo.filename):
-        raise ValueError("Formato de arquivo inválido. Permitidos: png, jpg, jpeg, pdf, xlsx.")
+        ext_list = ', '.join(sorted(current_app.config.get('EXTENSOES_UPLOAD_PERMITIDAS', set())))
+        raise ValueError(f"Formato de arquivo inválido. Permitidos: {ext_list}.")
 
     # Validação por conteúdo (magic bytes) para evitar upload malicioso com extensão falsa
     ok, msg = _arquivo_conteudo_permitido(arquivo)
