@@ -4,10 +4,12 @@ Serviço de Permissões: verifica se um usuário pode ver/editar um chamado.
 Centraliza a lógica de permissão que estava duplicada em 4+ locais.
 """
 
+from typing import Any, Optional
+
 from app.models_usuario import Usuario
 
 
-def usuario_pode_ver_chamado(user, chamado) -> bool:
+def usuario_pode_ver_chamado(user: Usuario, chamado: Any) -> bool:
     """Verifica se o usuário tem permissão para ver/editar o chamado.
     
     Admin: pode ver tudo.
@@ -35,7 +37,11 @@ def usuario_pode_ver_chamado(user, chamado) -> bool:
     return chamado.area in getattr(user, 'areas', [])
 
 
-def usuario_pode_ver_chamado_otimizado(user, chamado, cache_usuarios: dict = None) -> bool:
+def usuario_pode_ver_chamado_otimizado(
+    user: Usuario,
+    chamado: Any,
+    cache_usuarios: Optional[dict] = None,
+) -> bool:
     """Versão otimizada: mesma regra de usuario_pode_ver_chamado.
     
     Supervisor vê chamados da sua área ou que ele abriu (solicitante_id).

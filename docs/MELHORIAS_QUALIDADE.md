@@ -14,7 +14,7 @@ Este documento detalha **7 melhorias críticas e médias** identificadas na aná
 
 | # | Prioridade | Issue | Tempo Est. | Impacto |
 |---|-----------|-------|-----------|---------|
-| 1 | 🔴 CRÍTICO | Remover `total_global` da paginação | 30min | Evita OOM crash |
+| 1 | 🔴 CRÍTICO | ~~Remover `total_global` da paginação~~ ✅ **Concluído** | — | Evita OOM crash |
 | 2 | 🔴 CRÍTICO | Criar arquivo `docs/ENV.md` | 20min | Melhora onboarding |
 | 3 | 🟡 MÉDIO | Ajustar rate limits | 10min | Melhora UX |
 | 4 | 🟡 MÉDIO | Adicionar docstrings em services | 2h | Manutenibilidade |
@@ -26,97 +26,16 @@ Este documento detalha **7 melhorias críticas e médias** identificadas na aná
 
 ---
 
-## 🔴 CRÍTICO - Melhoria #1: Remover `total_global` da Paginação
+## 🔴 CRÍTICO - Melhoria #1: Remover `total_global` da Paginação ✅ CONCLUÍDO
 
-### Problema
+### Status
 
-**Arquivo:** `app/services/pagination.py` (linha 95)
+**Implementado.** A paginação em `app/services/pagination.py` **não** retorna mais `total_global`; usa apenas cursor e contagem por página, evitando carregar todos os documentos em memória (OOM). O frontend e as rotas já foram ajustados para não depender de total global.
 
-```python
-return {
-    'docs': docs_pagina,
-    'cursor_atual': cursor_atual,
-    'cursor_proximo': cursor_proximo,
-    'tem_anterior': tem_anterior,
-    'tem_proximo': tem_proximo,
-    'total_pagina': len(docs_pagina),
-    'limite': self.limite,
-    'indice_inicio': indice_inicio,
-    'indice_fim': indice_fim,
-    'total_global': len(docs)  # ⚠️ PROBLEMA AQUI
-}
-```
+### Referência (estado atual)
 
-### Impacto
-
-- **Memory Leak:** Com 10.000 chamados, carrega **~50MB+ em memória** por requisição
-- **OOM Crash:** Em produção com múltiplos usuários simultâneos
-- **Performance:** Queries ficam lentas ao carregar todos os docs
-
-### Solução
-
-#### Opção A: Usar Firestore Aggregation (Recomendado)
-
-```python
-from firebase_admin import firestore
-
-def obter_total_global(query):
-    """
-    Obtém contagem total sem carregar documentos.
-    Usa Firestore native aggregation para performance.
-    """
-    try:
-        from google.cloud.firestore_v1.base_query import _query_response_to_snapshot
-        aggregation_query = query.count()
-        result = aggregation_query.get()
-        return result[0][0].value
-    except Exception:
-        return None  # Fallback: retornar None sem total
-```
-
-#### Opção B: Remover Completamente (Mais Simples)
-
-```python
-def paginar(self, docs: List[Any], pagina: int = 1, cursor_anterior: Optional[str] = None) -> Dict[str, Any]:
-    """Pagina uma lista de documentos"""
-    if not docs:
-        return self._pagina_vazia()
-    
-    # ... código de paginação ...
-    
-    return {
-        'docs': docs_pagina,
-        'cursor_atual': cursor_atual,
-        'cursor_proximo': cursor_proximo,
-        'tem_anterior': tem_anterior,
-        'tem_proximo': tem_proximo,
-        'total_pagina': len(docs_pagina),
-        'limite': self.limite,
-        # 'total_global': len(docs)  ❌ REMOVIDO
-    }
-```
-
-### Passos para Implementar
-
-- [ ] Abrir `app/services/pagination.py`
-- [ ] Localizar método `paginar()` (linha ~20)
-- [ ] Escolher Opção A ou B acima
-- [ ] Remover ou substituir linha `'total_global': len(docs)`
-- [ ] Atualizar frontend para não exibir total se usado
-- [ ] Testar paginação com 100+ chamados
-
-### Validação
-
-```bash
-# Testar em desenvolvimento
-python run.py
-
-# Acessar qualquer página com múltiplos chamados
-curl http://localhost:5000/api/chamados/paginar?limite=50
-
-# Verificar resposta JSON - NOT deve ter total_global
-# Se implementou Opção A, deve retornar número correto
-```
+- A resposta de paginação contém: `docs`, `cursor_atual`, `cursor_proximo`, `tem_anterior`, `tem_proximo`, `total_pagina`, `limite`, `indice_inicio`, `indice_fim` — **sem** `total_global`.
+- Contagem global (quando necessária) é feita via agregação quando aplicável, sem carregar todos os docs.
 
 ---
 
@@ -852,10 +771,9 @@ curl -X POST http://localhost:5000/api/atualizar-status \
 
 ### Críticos (Fazer Primeiro)
 
-- [ ] **Melhoria #1:** Remover `total_global` da paginação
-  - [ ] Editar `app/services/pagination.py`
-  - [ ] Testar paginação com múltiplos chamados
-  - [ ] Verificar resposta JSON
+- [x] **Melhoria #1:** Remover `total_global` da paginação ✅ **Concluído**
+  - [x] Paginação já não retorna `total_global`; usa cursor e contagem por página
+  - [x] Resposta JSON sem total global; frontend/rotas ajustados
   
 - [ ] **Melhoria #2:** Criar `docs/ENV.md`
   - [ ] Criar arquivo em `docs/ENV.md`

@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
 {% block content %}
-<style>
+<style nonce="{{ csp_nonce }}">
     /* Otimizações de performance */
     canvas {
         -webkit-font-smoothing: antialiased;
@@ -677,11 +677,11 @@
 
 <!-- Dados JSON para os gráficos (listas completas para Top 3 / Top N).
      Segurança: |safe é seguro aqui pois os dados vêm exclusivamente do backend (métricas/traduções), nunca de input do usuário. -->
-<script type="application/json" id="dados-gerais">{{ metricas_gerais|tojson|safe }}</script>
-<script type="application/json" id="dados-supervisores">{% if metricas_supervisores_full is defined %}{{ metricas_supervisores_full|tojson|safe }}{% else %}[]{% endif %}</script>
-<script type="application/json" id="dados-areas">{% if metricas_areas_full is defined %}{{ metricas_areas_full|tojson|safe }}{% else %}[]{% endif %}</script>
+<script type="application/json" id="dados-gerais" nonce="{{ csp_nonce }}">{{ metricas_gerais|tojson|safe }}</script>
+<script type="application/json" id="dados-supervisores" nonce="{{ csp_nonce }}">{% if metricas_supervisores_full is defined %}{{ metricas_supervisores_full|tojson|safe }}{% else %}[]{% endif %}</script>
+<script type="application/json" id="dados-areas" nonce="{{ csp_nonce }}">{% if metricas_areas_full is defined %}{{ metricas_areas_full|tojson|safe }}{% else %}[]{% endif %}</script>
 
-<script>
+<script nonce="{{ csp_nonce }}">
 // Aguardar carregar completo da página
 document.addEventListener('DOMContentLoaded', function() {
     // Mostrar loading

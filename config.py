@@ -21,6 +21,8 @@ if _env == 'production' and (not os.getenv('SECRET_KEY') or _secret == _dev_secr
 class Config:
     """Configuração base da aplicação"""
     SECRET_KEY = _secret
+    # Ambiente: use sempre app.config.get('ENV') (development, production, testing)
+    ENV = _env
     
     # 2. Caminho ABSOLUTO para a pasta de uploads (Evita erros no Windows/OneDrive)
     UPLOAD_FOLDER = os.path.join(basedir, 'app', 'static', 'uploads')
@@ -31,6 +33,8 @@ class Config:
     
     # 4. Paginação
     ITENS_POR_PAGINA = 10
+    # Dashboard admin: itens por página na listagem (padrão 25)
+    ITENS_POR_PAGINA_DASHBOARD = 25
     
     # 5. Rate Limiting (limite de requisições por janela de tempo)
     # Em desenvolvimento: desativado para melhor UX

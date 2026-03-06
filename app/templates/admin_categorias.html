@@ -237,7 +237,7 @@
 </div>
 
 <!-- Modais de edição serão adicionados -->
-<script>
+<script nonce="{{ csp_nonce }}">
 function mostrarAba(abaName) {
     // Esconde todas as abas
     document.querySelectorAll('.tab-content').forEach(el => {

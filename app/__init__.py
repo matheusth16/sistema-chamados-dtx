@@ -1,5 +1,6 @@
-from flask import Flask, session, request, jsonify
+from flask import Flask, session, request, jsonify, g
 from flask_login import LoginManager
+import secrets
 from flask_wtf.csrf import CSRFProtect
 from config import Config
 import logging
@@ -108,6 +109,16 @@ def _configurar_seguranca(app: Flask) -> None:
     """
     from flask import current_app
 
+    @app.before_request
+    def _gerar_csp_nonce():
+        """Gera nonce por requisição para CSP (permite remover 'unsafe-inline')."""
+        g.csp_nonce = secrets.token_urlsafe(16)
+
+    @app.context_processor
+    def _injetar_csp_nonce():
+        """Disponibiliza nonce CSP nos templates para uso em <script nonce=""> e <style nonce="">."""
+        return {'csp_nonce': g.get('csp_nonce', '')}
+
     @app.after_request
     def _adicionar_headers_seguranca(response):
         """Adiciona headers de segurança a todas as respostas."""
@@ -117,21 +128,22 @@ def _configurar_seguranca(app: Flask) -> None:
         response.headers['Permissions-Policy'] = (
             'camera=(), microphone=(), geolocation=(), payment=()'
         )
-        if request.is_secure and current_app.env == 'production':
+        if request.is_secure and current_app.config.get('ENV') == 'production':
             # HSTS força HTTPS em conexões futuras (31536000 = 1 ano)
             response.headers['Strict-Transport-Security'] = (
                 'max-age=31536000; includeSubDomains'
             )
-            # CSP em produção: reduz superfície de XSS (ajuste default-src/script-src se usar CDN)
+            # CSP em produção: nonce para scripts/estilos inline (sem 'unsafe-inline')
+            nonce = g.get('csp_nonce', '')
             csp = (
                 "default-src 'self'; "
-                "script-src 'self' https://cdn.jsdelivr.net 'unsafe-inline'; "
-                "style-src 'self' https://cdn.jsdelivr.net 'unsafe-inline'; "
+                "script-src 'self' https://cdn.tailwindcss.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net 'nonce-{nonce}'; "
+                "style-src 'self' https://fonts.googleapis.com https://cdn.jsdelivr.net 'nonce-{nonce}'; "
                 "img-src 'self' data: https: blob:; "
-                "font-src 'self' https://cdn.jsdelivr.net; "
+                "font-src 'self' https://cdn.jsdelivr.net https://fonts.gstatic.com; "
                 "connect-src 'self'; "
                 "frame-ancestors 'self';"
-            )
+            ).format(nonce=nonce)
             response.headers['Content-Security-Policy'] = csp
         return response
 

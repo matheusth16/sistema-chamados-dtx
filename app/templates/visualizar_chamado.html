@@ -9,7 +9,7 @@
             {{ t('back') if t else 'Voltar' }}
         </a>
     </div>
-    <script>
+    <script nonce="{{ csp_nonce }}">
         (function() {
             var btn = document.getElementById('btn-voltar-detalhes');
             var voltarFallback = btn.getAttribute('href');
@@ -77,7 +77,7 @@
                             class="w-full text-gray-700 bg-gray-50/50 p-4 rounded-xl border border-gray-200 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 text-sm leading-relaxed resize-none overflow-hidden transition-all"
                             placeholder="{{ t('edit_description_placeholder') if t else 'Descreva o chamado' }}"
                             oninput="this.style.height = ''; this.style.height = this.scrollHeight + 'px'">{{ chamado.descricao }}</textarea>
-                        <script>
+                        <script nonce="{{ csp_nonce }}">
                             // Ajusta a altura inicial do textarea para remover a barra de rolagem
                             document.addEventListener("DOMContentLoaded", function() {
                                 var tx = document.getElementById('modal-descricao');
@@ -310,7 +310,7 @@
 </div>
 
 {% if pode_editar %}
-<script>
+<script nonce="{{ csp_nonce }}">
     (function() {
         var select = document.getElementById('select-novo-status');
         var wrapMotivo = document.getElementById('wrap-motivo-cancelamento');

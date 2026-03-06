@@ -36,7 +36,7 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap"
       rel="stylesheet"
     />
-    <style>
+    <style nonce="{{ csp_nonce }}">
       body {
         font-family: "Inter", sans-serif;
       }
@@ -47,7 +47,7 @@
     class="bg-white text-gray-800"
     data-debug="{% if config.DEBUG %}true{% endif %}"
   >
-    <script>
+    <script nonce="{{ csp_nonce }}">
       // Define flag de debug para JS: apenas em desenvolvimento (evita console.log em produção)
       window.DTX_DEBUG = document.body.getAttribute("data-debug") === "true";
     </script>
@@ -56,6 +56,8 @@
     %}
 
     <main class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+      {# Na página de abertura de chamado (formulário), as mensagens flash aparecem apenas dentro do bloco de conteúdo #}
+      {% if request.endpoint != 'main.index' %}
       {% with messages = get_flashed_messages(with_categories=true) %} {% if
       messages %}
       <div id="flash-messages" class="space-y-2 mb-6">
@@ -67,7 +69,7 @@
         </div>
         {% endfor %}
       </div>
-      <script>
+      <script nonce="{{ csp_nonce }}">
         setTimeout(function () {
           var el = document.getElementById("flash-messages");
           if (el) {
@@ -75,7 +77,9 @@
           }
         }, 5000);
       </script>
-      {% endif %} {% endwith %} {% block content %}{% endblock %}
+      {% endif %} {% endwith %}
+      {% endif %}
+      {% block content %}{% endblock %}
     </main>
 
     <footer class="bg-white border-t mt-12">
@@ -91,7 +95,7 @@
 
     {% if current_user.is_authenticated and current_user.perfil in
     ['supervisor', 'admin'] %}
-    <script>
+    <script nonce="{{ csp_nonce }}">
       (function () {
         var btn = document.getElementById("btn-sino");
         var badge = document.getElementById("sino-badge");
@@ -332,7 +336,7 @@
         Agora não
       </button>
     </div>
-    <script>
+    <script nonce="{{ csp_nonce }}">
       (function () {
         if (!("Notification" in window) || !("serviceWorker" in navigator))
           return;
@@ -435,7 +439,7 @@
     {% endif %}
 
     <!-- Toggle menu hamburger (supervisor/admin) -->
-    <script>
+    <script nonce="{{ csp_nonce }}">
       (function () {
         var btn = document.getElementById("btn-hamburger");
         var menu = document.getElementById("nav-menu-dropdown");

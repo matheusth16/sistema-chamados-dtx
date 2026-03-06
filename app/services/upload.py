@@ -9,6 +9,8 @@ No Cloud Run o disco é efêmero; anexos devem usar Firebase Storage.
 import os
 import logging
 from datetime import datetime
+from typing import Any, Optional
+
 from werkzeug.utils import secure_filename
 from flask import current_app
 
@@ -17,7 +19,7 @@ from app.services.validators import _arquivo_permitido, _arquivo_conteudo_permit
 logger = logging.getLogger(__name__)
 
 
-def _upload_firebase_storage(arquivo, nome_final: str):
+def _upload_firebase_storage(arquivo: Any, nome_final: str) -> Optional[str]:
     """
     Envia o arquivo para Firebase Storage em chamados/nome_final.
     Retorna a URL pública ou None em caso de falha.
@@ -52,7 +54,7 @@ def _upload_firebase_storage(arquivo, nome_final: str):
         return None
 
 
-def salvar_anexo(arquivo):
+def salvar_anexo(arquivo: Any) -> Optional[str]:
     """
     Salva o anexo e retorna o identificador para guardar no chamado:
     - URL do Firebase Storage (https://...) quando Storage está disponível;

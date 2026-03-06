@@ -51,7 +51,7 @@
 {% endblock %}
 
 {% block page_scripts %}
-<script>
+<script nonce="{{ csp_nonce }}">
 document.addEventListener('DOMContentLoaded', function() {
     // Busca simples
     const searchInput = document.getElementById('searchInput');

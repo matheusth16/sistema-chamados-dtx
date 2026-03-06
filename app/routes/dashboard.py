@@ -12,7 +12,7 @@ import pandas as pd
 from config import Config
 from app.routes import main
 from app.limiter import limiter
-from app.decoradores import requer_supervisor_area
+from app.decoradores import requer_perfil, requer_supervisor_area
 from app.database import db
 from app.models import Chamado
 from app.models_usuario import Usuario
@@ -87,7 +87,7 @@ def admin() -> Response:
             flash_t('error_updating_with_msg', 'danger', error=str(e))
             return redirect(url_for('main.admin', **request.args))
 
-    itens_por_pagina = getattr(Config, 'ITENS_POR_PAGINA_DASHBOARD', 25) or 25
+    itens_por_pagina = Config.ITENS_POR_PAGINA_DASHBOARD
     try:
         contexto = obter_contexto_admin(current_user, request.args, itens_por_pagina=itens_por_pagina)
         return render_template('dashboard.html', **contexto)
@@ -640,6 +640,7 @@ def relatorios() -> Response:
 
 @main.route('/admin/indices-firestore')
 @login_required
+@requer_perfil('admin')
 def indices_firestore() -> Response:
     """Página de documentação dos índices Firestore."""
     try:

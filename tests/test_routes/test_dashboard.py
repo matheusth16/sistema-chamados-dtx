@@ -143,7 +143,9 @@ def test_indices_firestore_com_admin_retorna_200(client_logado_admin):
     assert b'indice' in r.data.lower() or b'firestore' in r.data.lower() or b'index' in r.data.lower()
 
 
-def test_indices_firestore_com_solicitante_retorna_200(client_logado_solicitante):
-    """GET /admin/indices-firestore com solicitante retorna 200 (rota usa login_required, não requer admin)."""
+def test_indices_firestore_com_solicitante_redireciona(client_logado_solicitante):
+    """GET /admin/indices-firestore com solicitante redireciona (rota requer perfil admin)."""
     r = client_logado_solicitante.get('/admin/indices-firestore', follow_redirects=False)
-    assert r.status_code == 200
+    assert r.status_code == 302
+    # Solicitante é redirecionado para main.index (/), não para a página de índices
+    assert r.location and '/admin/indices-firestore' not in (r.location or '')
