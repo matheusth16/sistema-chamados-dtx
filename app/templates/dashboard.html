@@ -1,34 +1,109 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="space-y-6">
+<style nonce="{{ csp_nonce }}">
+  /* Dashboard: design tokens e ritmo visual (Web Designer) */
+  .dashboard-page {
+    --dash-surface: rgba(255,255,255,0.92);
+    --dash-accent: #4f46e5;
+    --dash-accent-muted: rgba(79, 70, 229, 0.08);
+    --dash-border: rgba(226, 232, 240, 0.9);
+    --dash-radius: 1.5rem;
+    --dash-spacing-row: 1rem;
+  }
+  .dashboard-header {
+    background: var(--dash-surface);
+    border-radius: var(--dash-radius);
+    border: 1px solid var(--dash-border);
+    box-shadow: 0 8px 30px rgba(0,0,0,0.04), 0 1px 0 rgba(255,255,255,0.6) inset;
+  }
+  .dashboard-table-wrap {
+    background: var(--dash-surface);
+    border-radius: var(--dash-radius);
+    border: 1px solid var(--dash-border);
+    box-shadow: 0 8px 30px rgba(0,0,0,0.04);
+  }
+  .dashboard-table-wrap thead th {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: rgba(248, 250, 252, 0.95);
+    backdrop-filter: saturate(180%) blur(8px);
+    border-bottom: 1px solid var(--dash-border);
+    padding: 1rem 1.25rem;
+  }
+  .dashboard-table-wrap tbody tr {
+    transition: background-color 0.15s ease, box-shadow 0.15s ease;
+  }
+  .dashboard-table-wrap .table-scroll {
+    max-height: min(70vh, 800px);
+    overflow-y: auto;
+    overflow-x: auto;
+  }
+  .dashboard-table-wrap tbody tr:hover {
+    background-color: var(--dash-accent-muted);
+  }
+  .dashboard-empty-state {
+    padding: 3rem 1.5rem;
+    background: linear-gradient(180deg, rgba(248,250,252,0.6) 0%, rgba(241,245,249,0.4) 100%);
+  }
+  .dashboard-empty-state .empty-icon {
+    width: 5rem;
+    height: 5rem;
+    border-radius: 50%;
+    background: linear-gradient(145deg, #e2e8f0 0%, #cbd5e1 100%);
+    box-shadow: inset 0 2px 4px rgba(255,255,255,0.8), 0 4px 12px rgba(0,0,0,0.06);
+  }
+  .dashboard-pagination a {
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.75rem;
+    transition: background-color 0.2s, color 0.2s;
+  }
+  .dashboard-pagination a:hover {
+    background-color: #f1f5f9;
+    color: #0f172a;
+  }
+  .dashboard-pagination a:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.25);
+  }
+</style>
 
-    <!-- Header com Info do Usuário -->
-    <div
-        class="flex flex-col md:flex-row justify-between items-center bg-gray-50/50 p-6 rounded-2xl border border-gray-100 gap-4 mb-2">
-        <div class="flex items-center gap-4">
-            <div class="bg-indigo-100 text-indigo-600 p-3 rounded-xl hidden sm:block">
-                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+<div class="dashboard-page space-y-6">
+
+    <!-- Header: âncora visual = contagem + título -->
+    <div class="dashboard-header flex flex-col md:flex-row justify-between items-center p-6 gap-4 relative overflow-hidden gsap-stagger-container">
+        <div class="absolute -top-32 -right-20 w-64 h-64 bg-indigo-500/10 rounded-full blur-[60px] pointer-events-none" aria-hidden="true"></div>
+        <div class="absolute -bottom-24 -left-20 w-48 h-48 bg-blue-500/10 rounded-full blur-[50px] pointer-events-none" aria-hidden="true"></div>
+
+        <div class="flex items-center gap-5 relative z-10 gsap-stagger">
+            <div class="bg-gradient-to-tr from-indigo-100 to-white text-indigo-600 p-3.5 rounded-2xl hidden sm:block shadow-inner border border-indigo-50/50" aria-hidden="true">
+                <svg class="w-8 h-8 drop-shadow-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
             </div>
             <div>
-                <h2 class="text-2xl font-black text-gray-800 tracking-tight">{{ t('dashboard_title') }}</h2>
-                <div class="text-sm text-gray-500 flex items-center gap-2 mt-1">
-                    <span class="font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">{{ total_chamados }}</span> 
+                <h2 class="font-display text-2xl sm:text-3xl font-extrabold text-slate-800 tracking-tight">{{ t('dashboard_title') }}</h2>
+                <div class="text-sm font-medium text-slate-500 flex flex-wrap items-center gap-2 mt-2">
+                    <span class="font-bold text-indigo-700 bg-indigo-50 border border-indigo-100/50 px-3 py-1 rounded-xl shadow-sm ring-1 ring-indigo-100/50">{{ total_chamados }}</span>
                     <span>{{ t('found_tickets') }}{% if total_paginas %} ({{ t('page') }} {{ pagina_atual }} {{ t('of') }} {{ total_paginas }}){% endif %}</span>
                     {% if current_user.is_authenticated %}
-                    <span class="text-gray-300">|</span>
-                    <span class="inline-flex items-center text-gray-600 font-medium bg-gray-100 px-2 py-0.5 rounded-full text-xs">
-                        <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+                    <span class="text-slate-300 font-light mx-1" aria-hidden="true">|</span>
+                    <span class="inline-flex items-center text-slate-600 font-bold bg-slate-100 border border-slate-200/60 px-3 py-1.5 rounded-xl text-xs shadow-sm">
+                        <svg class="w-3.5 h-3.5 mr-1.5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
                         {{ current_user.nome }}
                     </span>
                     {% endif %}
                 </div>
             </div>
         </div>
-        <div class="flex gap-2 w-full md:w-auto flex-col md:flex-row justify-end">
+        <div class="flex flex-wrap gap-3 w-full md:w-auto justify-end relative z-10 gsap-stagger">
             <a href="{{ url_for('main.exportar', **request.args) }}"
-                class="inline-flex items-center px-4 py-2 bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 font-semibold rounded-xl transition justify-center text-sm shadow-sm group">
-                <svg class="w-5 h-5 mr-2 text-green-500 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                class="inline-flex items-center min-h-[44px] px-4 py-2.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-bold rounded-xl transition-all shadow-sm group hover:border-slate-300 text-sm focus:ring-2 focus:ring-offset-1 focus:ring-slate-200 focus-visible:outline-none"
+                aria-label="{{ t('export') }}">
+                <svg class="w-4 h-4 mr-2 text-emerald-500 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                         d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                 </svg>
@@ -36,9 +111,9 @@
             </a>
             {% if current_user.is_authenticated and current_user.perfil in ['admin', 'supervisor'] %}
             <a href="{{ url_for('main.exportar_avancado', **request.args) }}"
-                class="inline-flex items-center px-4 py-2 bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 font-semibold rounded-xl transition justify-center text-sm shadow-sm group"
+                class="inline-flex items-center min-h-[44px] px-4 py-2.5 bg-gradient-to-r from-emerald-50 to-white hover:from-emerald-100 hover:to-emerald-50 text-emerald-800 border border-emerald-200/60 font-bold rounded-xl transition-all shadow-sm group text-sm focus:ring-2 focus:ring-offset-1 focus:ring-emerald-200"
                 title="Exportar relatório profissional com múltiplas abas">
-                <svg class="w-5 h-5 mr-2 text-emerald-500 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg class="w-4 h-4 mr-2 text-emerald-600 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                         d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
@@ -48,7 +123,8 @@
 
             {% if current_user.is_authenticated %}
             <a href="{{ url_for('main.logout') }}"
-                class="inline-flex items-center px-3 py-2 text-gray-400 hover:text-red-600 hover:bg-red-50 font-medium rounded-xl transition justify-center text-sm ml-1" title="{{ t('logout') }}">
+                class="inline-flex items-center min-h-[44px] px-3 py-2.5 text-slate-400 hover:text-red-600 hover:bg-red-50 border border-transparent hover:border-red-100 font-bold rounded-xl transition-all shadow-sm hover:shadow-inner text-sm ml-1 focus:ring-2 focus:ring-offset-1 focus:ring-red-200"
+                title="{{ t('logout') }}" aria-label="{{ t('logout') }}">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                         d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
@@ -103,51 +179,60 @@
 
     {% include 'components/_filters_bar_dashboard.html' %}
 
-    <!-- Gamificação movida para a aba de relatórios -->
+    <!-- Barra de ações em massa: touch-friendly (min 44px) -->
     <div id="bulk-bar"
-        class="hidden mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg flex flex-wrap items-center gap-3">
-        <span class="text-sm font-medium text-blue-900">{{ t('bulk_change_status') }}:</span>
-        <select id="bulk-status"
-            class="text-sm border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 border px-2 py-1">
-            <option value="Aberto">{{ t('open') }}</option>
-            <option value="Em Atendimento">{{ t('in_progress') }}</option>
-            <option value="Concluído">{{ t('completed') }}</option>
-        </select>
-        <button type="button" id="bulk-apply"
-            class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-md transition">{{
-            t('apply') }}</button>
-        <span id="bulk-count" class="text-sm text-blue-700"></span>
+        class="hidden mb-4 p-4 bg-white/95 backdrop-blur-sm shadow-[0_4px_20px_rgb(0,0,0,0.04)] border border-indigo-100/60 rounded-2xl flex flex-wrap items-center justify-between gap-4 sticky top-[4.5rem] z-30 transition-all duration-300">
+        <div class="flex items-center gap-3">
+            <div class="p-2.5 bg-indigo-50 text-indigo-500 rounded-xl shrink-0" aria-hidden="true">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+            </div>
+            <span class="text-sm font-black text-indigo-900 uppercase tracking-wide">{{ t('bulk_change_status') }}</span>
+        </div>
+        <div class="flex items-center gap-3 w-full sm:w-auto flex-wrap">
+            <span id="bulk-count" class="text-xs font-bold text-indigo-600 bg-indigo-50 px-2.5 py-1.5 rounded-lg hidden sm:inline-block" aria-live="polite"></span>
+            <select id="bulk-status"
+                class="flex-1 sm:flex-none min-h-[44px] text-sm border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 border px-3 py-2.5 bg-white shadow-sm outline-none transition-all font-medium text-slate-700"
+                aria-label="{{ t('status') }}">
+                <option value="Aberto">{{ t('open') }}</option>
+                <option value="Em Atendimento">{{ t('in_progress') }}</option>
+                <option value="Concluído">{{ t('completed') }}</option>
+            </select>
+            <button type="button" id="bulk-apply"
+                class="min-h-[44px] px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl shadow-md shadow-indigo-500/20 transition-all hover:-translate-y-0.5 flex-none active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-indigo-500">{{
+                t('apply') }}</button>
+        </div>
     </div>
 
-    <div class="bg-white shadow-sm rounded-2xl overflow-hidden border border-gray-100 p-1">
-        <table class="min-w-full divide-y divide-gray-100">
-            <thead class="bg-gray-50/50">
-                <tr>
-                    <th class="px-5 py-4 text-left">
-                        <input type="checkbox" id="bulk-select-all"
-                            class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
-                            title="{{ t('select_all') }}">
-                    </th>
-                    <th class="px-5 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-widest sortable" data-column="1" onclick="sortTable(1, 'number')">
-                        {{ t('id_ref') }}<span class="sort-icon">↕</span>
-                    </th>
-                    <th class="px-5 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-widest filterable" data-column="2" onclick="showFilterDropdown(2, this)">
-                        {{ t('category') }}
-                    </th>
-                    <th class="px-5 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-widest filterable" data-column="3" onclick="showFilterDropdown(3, this)">
-                        {{ t('sector_gate') }}
-                    </th>
-                    <th class="px-5 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-widest filterable" data-column="4" onclick="showFilterDropdown(4, this)">{{ t('assigned_to') }}</th>
-                    <th class="px-5 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-widest">{{ t('description') }}</th>
-                    <th class="px-5 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-widest filterable" data-column="6" onclick="showFilterDropdown(6, this)">
-                        {{ t('status') }}
-                    </th>
-                    <th class="px-5 py-4 text-center text-xs font-bold text-gray-400 uppercase tracking-widest sortable" data-column="7" onclick="sortTable(7, 'text')">
-                        SLA<span class="sort-icon">↕</span>
-                    </th>
-                    <th class="px-5 py-4 text-center text-xs font-bold text-gray-400 uppercase tracking-widest min-w-[7rem]">{{ t('actions') }}</th>
-                </tr>
-            </thead>
+    <div class="dashboard-table-wrap overflow-hidden gsap-stagger-container">
+        <div class="table-scroll overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-100/80">
+                <thead class="bg-slate-50/80">
+                    <tr>
+                        <th class="px-5 py-4 text-left">
+                            <input type="checkbox" id="bulk-select-all"
+                                class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer h-4 w-4 shadow-sm"
+                                title="{{ t('select_all') }}">
+                        </th>
+                        <th class="px-5 py-4 text-left text-[11px] font-black text-slate-500 uppercase tracking-widest sortable hover:bg-slate-100 transition-colors cursor-pointer group" data-column="1" onclick="sortTable(1, 'number')">
+                            {{ t('id_ref') }}<span class="sort-icon ml-1 text-slate-300 group-hover:text-indigo-400">↕</span>
+                        </th>
+                        <th class="px-5 py-4 text-left text-[11px] font-black text-slate-500 uppercase tracking-widest filterable cursor-pointer hover:bg-slate-100 transition-colors" data-column="2" onclick="showFilterDropdown(2, this)">
+                            {{ t('category') }}
+                        </th>
+                        <th class="px-5 py-4 text-left text-[11px] font-black text-slate-500 uppercase tracking-widest filterable cursor-pointer hover:bg-slate-100 transition-colors" data-column="3" onclick="showFilterDropdown(3, this)">
+                            {{ t('sector_gate') }}
+                        </th>
+                        <th class="px-5 py-4 text-left text-[11px] font-black text-slate-500 uppercase tracking-widest filterable cursor-pointer hover:bg-slate-100 transition-colors" data-column="4" onclick="showFilterDropdown(4, this)">{{ t('assigned_to') }}</th>
+                        <th class="px-5 py-4 text-left text-[11px] font-black text-slate-500 uppercase tracking-widest">{{ t('description') }}</th>
+                        <th class="px-5 py-4 text-left text-[11px] font-black text-slate-500 uppercase tracking-widest filterable cursor-pointer hover:bg-slate-100 transition-colors" data-column="6" onclick="showFilterDropdown(6, this)">
+                            {{ t('status') }}
+                        </th>
+                        <th class="px-5 py-4 text-center text-[11px] font-black text-slate-500 uppercase tracking-widest sortable hover:bg-slate-100 transition-colors cursor-pointer group" data-column="7" onclick="sortTable(7, 'text')">
+                            SLA<span class="sort-icon ml-1 text-slate-300 group-hover:text-indigo-400">↕</span>
+                        </th>
+                        <th class="px-5 py-4 text-center text-[11px] font-black text-slate-500 uppercase tracking-widest min-w-[7rem]">{{ t('actions') }}</th>
+                    </tr>
+                </thead>
             <tbody class="bg-white divide-y divide-gray-50/80 gsap-stagger-container">
                 {% if chamados %}
                 {% for grupo in chamados|groupby('grupo_key') %}
@@ -159,41 +244,40 @@
                 {% endfor %}
                 {% else %}
                 <tr>
-                    <td colspan="9" class="px-6 py-10 text-center text-gray-500">
-                        <div class="flex flex-col items-center justify-center">
-                            <svg class="w-12 h-12 text-gray-300 mb-3" fill="none" stroke="currentColor"
-                                viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z">
-                                </path>
-                            </svg>
-                            <p class="text-lg font-medium">{{ t('no_tickets') }}</p>
-                            <p class="text-sm">{{ t('no_tickets_hint') }}</p>
+                    <td colspan="9" class="dashboard-empty-state text-center text-slate-500">
+                        <div class="flex flex-col items-center justify-center max-w-sm mx-auto">
+                            <div class="empty-icon flex items-center justify-center text-slate-400 mb-5">
+                                <svg class="w-12 h-12" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                            </div>
+                            <p class="text-xl font-display font-extrabold text-slate-800 tracking-tight">{{ t('no_tickets') }}</p>
+                            <p class="text-sm font-medium text-slate-500 mt-2 leading-relaxed">{{ t('no_tickets_hint') }}</p>
                         </div>
                     </td>
                 </tr>
                 {% endif %}
             </tbody>
         </table>
+        </div>
     </div>
 
-    <!-- Paginação por cursor (uma página por request) -->
+    <!-- Paginação: touch-friendly (min 44px), foco visível -->
     {% if tem_anterior or tem_proxima %}
-    <div
-        class="flex flex-col md:flex-row justify-between items-center bg-gray-50/50 p-4 rounded-2xl border border-gray-100 gap-4 mt-6">
-        <div class="text-sm text-gray-500 font-medium">
-            {{ t('showing') }} <span class="font-bold text-gray-800">{{ total_chamados }}</span> {{ t('found_tickets') }}
+    <div class="dashboard-pagination flex flex-col md:flex-row justify-between items-center bg-slate-50/50 p-5 rounded-2xl border border-gray-100 gap-4 mt-2">
+        <div class="text-sm text-slate-500 font-medium">
+            {{ t('showing') }} <span class="font-bold text-slate-800">{{ total_chamados }}</span> {{ t('found_tickets') }}
         </div>
-        <div class="flex items-center gap-1 bg-white border border-gray-200 rounded-xl p-1 shadow-sm">
+        <nav class="flex items-center gap-1 bg-white border border-slate-200/60 rounded-xl p-1.5 shadow-sm" aria-label="{{ t('pagination') if t('pagination') != 'pagination' else 'Paginação' }}">
             {% if tem_anterior and cursor_anterior %}
             <a href="{{ url_for('main.admin', cursor_prev=cursor_anterior, search=request.args.get('search', ''), categoria=request.args.get('categoria', ''), status=request.args.get('status', ''), gate=request.args.get('gate', ''), responsavel=request.args.get('responsavel', ''), rl_codigo=request.args.get('rl_codigo', '')) }}"
-                class="w-8 h-8 flex items-center justify-center rounded-lg text-sm font-medium text-gray-500 hover:bg-gray-50 hover:text-gray-900 transition-colors" title="{{ t('previous') }}">‹</a>
+                class="rounded-xl text-sm font-bold text-slate-500 hover:bg-slate-100 hover:text-slate-900" title="{{ t('previous') }}" aria-label="{{ t('previous') }}">&lsaquo;</a>
             {% endif %}
             {% if tem_proxima and proximo_cursor %}
             <a href="{{ url_for('main.admin', cursor=proximo_cursor, search=request.args.get('search', ''), categoria=request.args.get('categoria', ''), status=request.args.get('status', ''), gate=request.args.get('gate', ''), responsavel=request.args.get('responsavel', ''), rl_codigo=request.args.get('rl_codigo', '')) }}"
-                class="w-8 h-8 flex items-center justify-center rounded-lg text-sm font-medium text-gray-500 hover:bg-gray-50 hover:text-gray-900 transition-colors" title="{{ t('next') }}">›</a>
+                class="rounded-xl text-sm font-bold text-slate-500 hover:bg-slate-100 hover:text-slate-900" title="{{ t('next') }}" aria-label="{{ t('next') }}">&rsaquo;</a>
             {% endif %}
-        </div>
+        </nav>
     </div>
     {% endif %}
 

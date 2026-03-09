@@ -138,6 +138,15 @@
         {"fieldPath": "prioridade", "order": "ASCENDING"},
         {"fieldPath": "data_abertura", "order": "DESCENDING"}
       ]
+    },
+    {
+      "collectionGroup": "chamados",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "area", "order": "ASCENDING"},
+        {"fieldPath": "responsavel", "order": "ASCENDING"},
+        {"fieldPath": "data_abertura", "order": "DESCENDING"}
+      ]
     }
   ],
   "fieldOverrides": []

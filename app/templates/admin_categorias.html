@@ -4,46 +4,49 @@
 <div class="min-h-screen bg-gray-50 py-8">
     <div class="max-w-7xl mx-auto px-4">
         <!-- Cabeçalho -->
-        <div class="mb-8">
-            <h1 class="text-3xl font-bold text-gray-900">{{ t('category_administration') }}</h1>
-            <p class="text-gray-600 mt-2">{{ t('manage_categories_desc') }}</p>
-        </div>
-
-        <!-- Abas de navegação -->
-        <div class="mb-6 border-b border-gray-200">
-            <div class="flex space-x-8">
-                <button onclick="mostrarAba('setores')" id="btn-setores" class="px-4 py-2 border-b-2 border-blue-600 text-blue-600 font-medium">
-                    🏢 {{ t('sectors') }}
-                </button>
-                <button onclick="mostrarAba('gates')" id="btn-gates" class="px-4 py-2 border-b-2 border-gray-200 text-gray-600 font-medium hover:text-gray-900">
-                    🚪 {{ t('gates') }}
-                </button>
-                <button onclick="mostrarAba('impactos')" id="btn-impactos" class="px-4 py-2 border-b-2 border-gray-200 text-gray-600 font-medium hover:text-gray-900">
-                    ⚡ {{ t('impacts') }}
-                </button>
+        <div class="mb-8 bg-white/80 backdrop-blur-md rounded-[2rem] p-6 shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-white relative overflow-hidden">
+            <div class="absolute top-0 right-0 -mr-20 -mt-20 w-64 h-64 rounded-full bg-gradient-to-br from-blue-100 to-indigo-100 blur-[80px] opacity-60 pointer-events-none"></div>
+            <div class="relative z-10">
+                <h1 class="text-3xl font-black text-slate-800">{{ t('category_administration') }}</h1>
+                <p class="text-slate-500 font-medium mt-2">{{ t('manage_categories_desc') }}</p>
             </div>
         </div>
 
+        <!-- Abas de navegação -->
+        <div class="mb-8 bg-slate-100/50 p-1.5 rounded-2xl inline-flex flex-wrap gap-2">
+            <button onclick="mostrarAba('setores')" id="btn-setores" class="px-5 py-2.5 rounded-xl bg-white shadow-sm text-indigo-600 font-bold text-sm transition-all flex items-center gap-2 ring-1 ring-slate-200/50">
+                <span>🏢</span> {{ t('sectors') }}
+            </button>
+            <button onclick="mostrarAba('gates')" id="btn-gates" class="px-5 py-2.5 rounded-xl text-slate-500 hover:text-slate-800 font-bold text-sm transition-all hover:bg-white/50 flex items-center gap-2">
+                <span>🚪</span> {{ t('gates') }}
+            </button>
+            <button onclick="mostrarAba('impactos')" id="btn-impactos" class="px-5 py-2.5 rounded-xl text-slate-500 hover:text-slate-800 font-bold text-sm transition-all hover:bg-white/50 flex items-center gap-2">
+                <span>⚡</span> {{ t('impacts') }}
+            </button>
+        </div>
         <!-- ABA: SETORES -->
         <div id="aba-setores" class="tab-content">
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <!-- Formulário de criação -->
-                <div class="bg-white rounded-lg shadow p-6">
-                    <h2 class="text-xl font-bold text-gray-900 mb-4">{{ t('new_sector') }}</h2>
+                <div class="bg-white/80 backdrop-blur-sm rounded-[1.5rem] shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-white p-6 h-fit">
+                    <h2 class="text-lg font-black text-slate-800 mb-5 relative inline-block">
+                        {{ t('new_sector') }}
+                        <div class="absolute -bottom-1 left-0 w-1/2 h-1 bg-indigo-500 rounded-full"></div>
+                    </h2>
                     <form method="POST" action="{{ url_for('main.criar_setor') }}" class="space-y-4">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         <div>
-                            <label for="setor-nome" class="block text-sm font-medium text-gray-700">{{ t('name_portuguese') }}</label>
+                            <label for="setor-nome" class="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">{{ t('name_portuguese') }}</label>
                             <input type="text" id="setor-nome" name="nome_pt" required placeholder="{{ t('ex_maintenance') }}"
-                                   class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
-                            <p class="text-xs text-gray-500 mt-1">{{ t('auto_translated_note') }}</p>
+                                   class="block w-full bg-slate-50/80 border border-slate-200 font-medium text-sm text-slate-700 rounded-xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-400 transition-all py-3 px-4 focus:bg-white shadow-inner hover:border-slate-300">
+                            <p class="text-[11px] font-medium text-slate-400 mt-2 ml-1">{{ t('auto_translated_note') }}</p>
                         </div>
                         <div>
-                            <label for="setor-descricao" class="block text-sm font-medium text-gray-700">{{ t('description_optional') }}</label>
+                            <label for="setor-descricao" class="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">{{ t('description_optional') }}</label>
                             <textarea id="setor-descricao" name="descricao_pt" placeholder="{{ t('ex_maintenance_desc') }}"
-                                      rows="3" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"></textarea>
+                                      rows="3" class="block w-full bg-slate-50/80 border border-slate-200 font-medium text-sm text-slate-700 rounded-xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-400 transition-all py-3 px-4 focus:bg-white shadow-inner resize-none hover:border-slate-300"></textarea>
                         </div>
-                        <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded-md font-medium hover:bg-blue-700 transition">
+                        <button type="submit" class="w-full flex justify-center py-3 px-4 rounded-xl shadow-[0_4px_15px_rgb(79,70,229,0.3)] text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-500 hover:shadow-[0_6px_20px_rgb(79,70,229,0.4)] focus:outline-none focus:ring-4 focus:ring-indigo-200 focus:ring-offset-1 active:scale-[0.98] transition-all duration-300 items-center mt-6">
                             ➕ {{ t('add_sector') }}
                         </button>
                     </form>
@@ -51,31 +54,31 @@
 
                 <!-- Lista de setores -->
                 <div class="lg:col-span-2">
-                    <div class="bg-white rounded-lg shadow">
-                        <div class="px-6 py-4 border-b border-gray-200">
-                            <h2 class="text-xl font-bold text-gray-900">{{ t('registered_sectors') }}</h2>
+                    <div class="bg-white/80 backdrop-blur-sm rounded-[1.5rem] shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-white overflow-hidden">
+                        <div class="px-6 py-5 border-b border-slate-100 bg-slate-50/50">
+                            <h2 class="text-lg font-black text-slate-800">{{ t('registered_sectors') }}</h2>
                         </div>
-                        <div class="divide-y divide-gray-200">
+                        <div class="divide-y divide-slate-100">
                             {% if setores %}
                                 {% for setor in setores %}
-                                <div class="p-6 hover:bg-gray-50 transition">
+                                <div class="p-6 hover:bg-slate-50/80 transition-colors group">
                                     <div class="flex justify-between items-start mb-2">
                                         <div>
-                                            <h3 class="font-bold text-gray-900">{{ setor.nome_pt }}</h3>
-                                            <p class="text-sm text-gray-600">🇬🇧 {{ setor.nome_en }} | 🇪🇸 {{ setor.nome_es }}</p>
+                                            <h3 class="font-extrabold text-slate-800">{{ setor.nome_pt }}</h3>
+                                            <p class="text-xs font-semibold text-slate-400 mt-1 bg-slate-100/80 inline-block px-2 py-0.5 rounded-lg">🇬🇧 {{ setor.nome_en }} <span class="mx-1 text-slate-300">|</span> 🇪🇸 {{ setor.nome_es }}</p>
                                             {% if setor.descricao_pt %}
-                                            <p class="text-sm text-gray-500 mt-2">{{ setor.descricao_pt }}</p>
+                                            <p class="text-sm font-medium text-slate-500 mt-3">{{ setor.descricao_pt }}</p>
                                             {% endif %}
                                         </div>
-                                        <span class="inline-block px-3 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">{{ t('active') if setor.ativo else t('inactive') }}</span>
+                                        <span class="inline-flex px-3 py-1 bg-emerald-100 text-emerald-800 text-[10px] font-black uppercase tracking-wider rounded-xl shadow-sm border border-emerald-200">{{ t('active') if setor.ativo else t('inactive') }}</span>
                                     </div>
-                                    <div class="mt-3 flex gap-3">
-                                        <button onclick="editarSetor('{{ setor.id }}')" class="text-sm text-blue-600 hover:text-blue-800 font-medium">
+                                    <div class="mt-4 flex gap-2">
+                                        <button onclick="editarSetor('{{ setor.id }}')" class="text-xs px-3 py-1.5 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 font-bold transition-colors">
                                             ✏️ {{ t('edit') }}
                                         </button>
                                         <form method="POST" action="{{ url_for('main.excluir_setor', setor_id=setor.id) }}" class="inline" onsubmit="return confirm(`{{ t('confirm_delete_sector') }}`);">
                                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                                            <button type="submit" class="text-sm text-red-600 hover:text-red-800 font-medium">
+                                            <button type="submit" class="text-xs px-3 py-1.5 rounded-lg bg-red-50 text-red-700 hover:bg-red-100 font-bold transition-colors">
                                                 🗑️ {{ t('delete') }}
                                             </button>
                                         </form>
@@ -83,7 +86,7 @@
                                 </div>
                                 {% endfor %}
                             {% else %}
-                            <div class="p-6 text-center text-gray-500">
+                            <div class="p-8 text-center text-slate-500 font-medium">
                                 <p>{{ t('no_sectors_registered') }}</p>
                             </div>
                             {% endif %}
@@ -97,25 +100,28 @@
         <div id="aba-gates" class="tab-content hidden">
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <!-- Formulário de criação -->
-                <div class="bg-white rounded-lg shadow p-6">
-                    <h2 class="text-xl font-bold text-gray-900 mb-4">{{ t('new_gate') }}</h2>
+                <div class="bg-white/80 backdrop-blur-sm rounded-[1.5rem] shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-white p-6 h-fit">
+                    <h2 class="text-lg font-black text-slate-800 mb-5 relative inline-block">
+                        {{ t('new_gate') }}
+                        <div class="absolute -bottom-1 left-0 w-1/2 h-1 bg-indigo-500 rounded-full"></div>
+                    </h2>
                     <form method="POST" action="{{ url_for('main.criar_gate') }}" class="space-y-4">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         <div>
-                            <label for="gate-nome" class="block text-sm font-medium text-gray-700">{{ t('name_portuguese') }}</label>
+                            <label for="gate-nome" class="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">{{ t('name_portuguese') }}</label>
                             <input type="text" id="gate-nome" name="nome_pt" required placeholder="{{ t('ex_gate_5') }}"
-                                   class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
-                            <p class="text-xs text-gray-500 mt-1">{{ t('auto_translated_note') }}</p>
+                                   class="block w-full bg-slate-50/80 border border-slate-200 font-medium text-sm text-slate-700 rounded-xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-400 transition-all py-3 px-4 focus:bg-white shadow-inner hover:border-slate-300">
+                            <p class="text-[11px] font-medium text-slate-400 mt-2 ml-1">{{ t('auto_translated_note') }}</p>
                         </div>
                         <div>
-                            <label for="gate-descricao" class="block text-sm font-medium text-gray-700">{{ t('description_optional') }}</label>
+                            <label for="gate-descricao" class="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">{{ t('description_optional') }}</label>
                             <textarea id="gate-descricao" name="descricao_pt" placeholder="{{ t('ex_validation_req') }}"
-                                      rows="3" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"></textarea>
+                                      rows="3" class="block w-full bg-slate-50/80 border border-slate-200 font-medium text-sm text-slate-700 rounded-xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-400 transition-all py-3 px-4 focus:bg-white shadow-inner resize-none hover:border-slate-300"></textarea>
                         </div>
-                        <p class="text-xs text-gray-600 bg-blue-50 p-2 rounded">
+                        <p class="text-[11px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-100 p-3 rounded-xl mt-4">
                             {{ t('order_auto_assigned_note') }}
                         </p>
-                        <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded-md font-medium hover:bg-blue-700 transition">
+                        <button type="submit" class="w-full flex justify-center py-3 px-4 rounded-xl shadow-[0_4px_15px_rgb(79,70,229,0.3)] text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-500 hover:shadow-[0_6px_20px_rgb(79,70,229,0.4)] focus:outline-none focus:ring-4 focus:ring-indigo-200 focus:ring-offset-1 active:scale-[0.98] transition-all duration-300 items-center mt-6">
                             ➕ {{ t('add_gate') }}
                         </button>
                     </form>
@@ -123,31 +129,34 @@
 
                 <!-- Lista de gates -->
                 <div class="lg:col-span-2">
-                    <div class="bg-white rounded-lg shadow">
-                        <div class="px-6 py-4 border-b border-gray-200">
-                            <h2 class="text-xl font-bold text-gray-900">{{ t('registered_gates') }}</h2>
+                    <div class="bg-white/80 backdrop-blur-sm rounded-[1.5rem] shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-white overflow-hidden">
+                        <div class="px-6 py-5 border-b border-slate-100 bg-slate-50/50">
+                            <h2 class="text-lg font-black text-slate-800">{{ t('registered_gates') }}</h2>
                         </div>
-                        <div class="divide-y divide-gray-200">
+                        <div class="divide-y divide-slate-100">
                             {% if gates %}
                                 {% for gate in gates %}
-                                <div class="p-6 hover:bg-gray-50 transition">
+                                <div class="p-6 hover:bg-slate-50/80 transition-colors group">
                                     <div class="flex justify-between items-start mb-2">
                                         <div>
-                                            <h3 class="font-bold text-gray-900">#{{ gate.ordem }} - {{ gate.nome_pt }}</h3>
-                                            <p class="text-sm text-gray-600">🇬🇧 {{ gate.nome_en }} | 🇪🇸 {{ gate.nome_es }}</p>
+                                            <h3 class="font-extrabold text-slate-800">
+                                                <span class="bg-slate-200 text-slate-700 px-2 py-0.5 rounded text-xs mr-2">#{{ gate.ordem }}</span>
+                                                {{ gate.nome_pt }}
+                                            </h3>
+                                            <p class="text-xs font-semibold text-slate-400 mt-2 bg-slate-100/80 inline-block px-2 py-0.5 rounded-lg">🇬🇧 {{ gate.nome_en }} <span class="mx-1 text-slate-300">|</span> 🇪🇸 {{ gate.nome_es }}</p>
                                             {% if gate.descricao_pt %}
-                                            <p class="text-sm text-gray-500 mt-2">{{ gate.descricao_pt }}</p>
+                                            <p class="text-sm font-medium text-slate-500 mt-3">{{ gate.descricao_pt }}</p>
                                             {% endif %}
                                         </div>
-                                        <span class="inline-block px-3 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">{{ t('active') if gate.ativo else t('inactive') }}</span>
+                                        <span class="inline-flex px-3 py-1 bg-emerald-100 text-emerald-800 text-[10px] font-black uppercase tracking-wider rounded-xl shadow-sm border border-emerald-200">{{ t('active') if gate.ativo else t('inactive') }}</span>
                                     </div>
-                                    <div class="mt-3 flex gap-3">
-                                        <button onclick="editarGate('{{ gate.id }}')" class="text-sm text-blue-600 hover:text-blue-800 font-medium">
+                                    <div class="mt-4 flex gap-2">
+                                        <button onclick="editarGate('{{ gate.id }}')" class="text-xs px-3 py-1.5 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 font-bold transition-colors">
                                             ✏️ {{ t('edit') }}
                                         </button>
                                         <form method="POST" action="{{ url_for('main.excluir_gate', gate_id=gate.id) }}" class="inline" onsubmit="return confirm(`{{ t('confirm_delete_gate') }}`);">
                                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                                            <button type="submit" class="text-sm text-red-600 hover:text-red-800 font-medium">
+                                            <button type="submit" class="text-xs px-3 py-1.5 rounded-lg bg-red-50 text-red-700 hover:bg-red-100 font-bold transition-colors">
                                                 🗑️ {{ t('delete') }}
                                             </button>
                                         </form>
@@ -155,7 +164,7 @@
                                 </div>
                                 {% endfor %}
                             {% else %}
-                            <div class="p-6 text-center text-gray-500">
+                            <div class="p-8 text-center text-slate-500 font-medium">
                                 <p>{{ t('no_gates_registered') }}</p>
                             </div>
                             {% endif %}
@@ -169,22 +178,25 @@
         <div id="aba-impactos" class="tab-content hidden">
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <!-- Formulário de criação -->
-                <div class="bg-white rounded-lg shadow p-6">
-                    <h2 class="text-xl font-bold text-gray-900 mb-4">{{ t('new_impact') }}</h2>
+                <div class="bg-white/80 backdrop-blur-sm rounded-[1.5rem] shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-white p-6 h-fit">
+                    <h2 class="text-lg font-black text-slate-800 mb-5 relative inline-block">
+                        {{ t('new_impact') }}
+                        <div class="absolute -bottom-1 left-0 w-1/2 h-1 bg-indigo-500 rounded-full"></div>
+                    </h2>
                     <form method="POST" action="{{ url_for('main.criar_impacto') }}" class="space-y-4">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         <div>
-                            <label for="impacto-nome" class="block text-sm font-medium text-gray-700">{{ t('name_portuguese') }}</label>
+                            <label for="impacto-nome" class="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">{{ t('name_portuguese') }}</label>
                             <input type="text" id="impacto-nome" name="nome_pt" required placeholder="{{ t('ex_critical') }}"
-                                   class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
-                            <p class="text-xs text-gray-500 mt-1">{{ t('auto_translated_note') }}</p>
+                                   class="block w-full bg-slate-50/80 border border-slate-200 font-medium text-sm text-slate-700 rounded-xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-400 transition-all py-3 px-4 focus:bg-white shadow-inner hover:border-slate-300">
+                            <p class="text-[11px] font-medium text-slate-400 mt-2 ml-1">{{ t('auto_translated_note') }}</p>
                         </div>
                         <div>
-                            <label for="impacto-descricao" class="block text-sm font-medium text-gray-700">{{ t('description_optional') }}</label>
+                            <label for="impacto-descricao" class="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">{{ t('description_optional') }}</label>
                             <textarea id="impacto-descricao" name="descricao_pt" placeholder="{{ t('ex_critical_desc') }}"
-                                      rows="3" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"></textarea>
+                                      rows="3" class="block w-full bg-slate-50/80 border border-slate-200 font-medium text-sm text-slate-700 rounded-xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-400 transition-all py-3 px-4 focus:bg-white shadow-inner resize-none hover:border-slate-300"></textarea>
                         </div>
-                        <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded-md font-medium hover:bg-blue-700 transition">
+                        <button type="submit" class="w-full flex justify-center py-3 px-4 rounded-xl shadow-[0_4px_15px_rgb(79,70,229,0.3)] text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-500 hover:shadow-[0_6px_20px_rgb(79,70,229,0.4)] focus:outline-none focus:ring-4 focus:ring-indigo-200 focus:ring-offset-1 active:scale-[0.98] transition-all duration-300 items-center mt-6">
                             ➕ {{ t('add_impact') }}
                         </button>
                     </form>
@@ -192,31 +204,31 @@
 
                 <!-- Lista de impactos -->
                 <div class="lg:col-span-2">
-                    <div class="bg-white rounded-lg shadow">
-                        <div class="px-6 py-4 border-b border-gray-200">
-                            <h2 class="text-xl font-bold text-gray-900">{{ t('registered_impacts') }}</h2>
+                    <div class="bg-white/80 backdrop-blur-sm rounded-[1.5rem] shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-white overflow-hidden">
+                        <div class="px-6 py-5 border-b border-slate-100 bg-slate-50/50">
+                            <h2 class="text-lg font-black text-slate-800">{{ t('registered_impacts') }}</h2>
                         </div>
-                        <div class="divide-y divide-gray-200">
+                        <div class="divide-y divide-slate-100">
                             {% if impactos %}
                                 {% for impacto in impactos %}
-                                <div class="p-6 hover:bg-gray-50 transition">
+                                <div class="p-6 hover:bg-slate-50/80 transition-colors group">
                                     <div class="flex justify-between items-start mb-2">
                                         <div>
-                                            <h3 class="font-bold text-gray-900">{{ impacto.nome_pt }}</h3>
-                                            <p class="text-sm text-gray-600">🇬🇧 {{ impacto.nome_en }} | 🇪🇸 {{ impacto.nome_es }}</p>
+                                            <h3 class="font-extrabold text-slate-800">{{ impacto.nome_pt }}</h3>
+                                            <p class="text-xs font-semibold text-slate-400 mt-2 bg-slate-100/80 inline-block px-2 py-0.5 rounded-lg">🇬🇧 {{ impacto.nome_en }} <span class="mx-1 text-slate-300">|</span> 🇪🇸 {{ impacto.nome_es }}</p>
                                             {% if impacto.descricao_pt %}
-                                            <p class="text-sm text-gray-500 mt-2">{{ impacto.descricao_pt }}</p>
+                                            <p class="text-sm font-medium text-slate-500 mt-3">{{ impacto.descricao_pt }}</p>
                                             {% endif %}
                                         </div>
-                                        <span class="inline-block px-3 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">{{ t('active') if impacto.ativo else t('inactive') }}</span>
+                                        <span class="inline-flex px-3 py-1 bg-emerald-100 text-emerald-800 text-[10px] font-black uppercase tracking-wider rounded-xl shadow-sm border border-emerald-200">{{ t('active') if impacto.ativo else t('inactive') }}</span>
                                     </div>
-                                    <div class="mt-3 flex gap-3">
-                                        <button onclick="editarImpacto('{{ impacto.id }}')" class="text-sm text-blue-600 hover:text-blue-800 font-medium">
+                                    <div class="mt-4 flex gap-2">
+                                        <button onclick="editarImpacto('{{ impacto.id }}')" class="text-xs px-3 py-1.5 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 font-bold transition-colors">
                                             ✏️ {{ t('edit') }}
                                         </button>
                                         <form method="POST" action="{{ url_for('main.excluir_impacto', impacto_id=impacto.id) }}" class="inline" onsubmit="return confirm(`{{ t('confirm_delete_impact') }}`);">
                                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                                            <button type="submit" class="text-sm text-red-600 hover:text-red-800 font-medium">
+                                            <button type="submit" class="text-xs px-3 py-1.5 rounded-lg bg-red-50 text-red-700 hover:bg-red-100 font-bold transition-colors">
                                                 🗑️ {{ t('delete') }}
                                             </button>
                                         </form>
@@ -224,7 +236,7 @@
                                 </div>
                                 {% endfor %}
                             {% else %}
-                            <div class="p-6 text-center text-gray-500">
+                            <div class="p-8 text-center text-slate-500 font-medium">
                                 <p>{{ t('no_impacts_registered') }}</p>
                             </div>
                             {% endif %}
@@ -246,16 +258,16 @@ function mostrarAba(abaName) {
     
     // Remove destaque de todos os botões
     document.querySelectorAll('[id^="btn-"]').forEach(btn => {
-        btn.classList.remove('border-blue-600', 'text-blue-600');
-        btn.classList.add('border-gray-200', 'text-gray-600');
+        btn.classList.remove('bg-white', 'shadow-sm', 'text-indigo-600', 'ring-1', 'ring-slate-200/50');
+        btn.classList.add('text-slate-500', 'hover:text-slate-800', 'hover:bg-white/50');
     });
     
     // Mostra a aba selecionada
     document.getElementById(`aba-${abaName}`).classList.remove('hidden');
     
     // Destaca o botão selecionado
-    document.getElementById(`btn-${abaName}`).classList.remove('border-gray-200', 'text-gray-600');
-    document.getElementById(`btn-${abaName}`).classList.add('border-blue-600', 'text-blue-600');
+    document.getElementById(`btn-${abaName}`).classList.remove('text-slate-500', 'hover:text-slate-800', 'hover:bg-white/50');
+    document.getElementById(`btn-${abaName}`).classList.add('bg-white', 'shadow-sm', 'text-indigo-600', 'ring-1', 'ring-slate-200/50');
 }
 
 function editarSetor(setorId) {

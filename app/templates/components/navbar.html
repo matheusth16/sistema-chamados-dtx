@@ -157,12 +157,12 @@
 
                 <!-- Seletor de Idioma -->
                 <div class="relative group">
-                    <button class="relative p-2.5 rounded-xl text-gray-200 hover:text-white hover:bg-white/10 transition-all duration-300 inline-flex items-center justify-center outline-none focus-visible:ring-2 focus-visible:ring-blue-400 border border-transparent hover:border-white/10">
-                        <div class="flex items-center gap-1.5 font-bold text-sm tracking-wide">
-                            <svg class="w-4 h-4 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <button class="relative p-2 sm:p-2.5 rounded-xl text-gray-200 hover:text-white hover:bg-white/10 transition-all duration-300 inline-flex items-center justify-center outline-none focus-visible:ring-2 focus-visible:ring-blue-400 border border-transparent hover:border-white/10 shadow-sm">
+                        <div class="flex items-center gap-1.5 font-bold text-xs sm:text-sm tracking-wide">
+                            <svg class="w-4 h-4 opacity-70 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
-                            <span class="uppercase">
+                            <span class="uppercase font-extrabold tracking-widest hidden sm:block">
                                 {% if current_language == 'en' %}EN
                                 {% elif current_language == 'es' %}ES
                                 {% else %}PT{% endif %}
@@ -173,22 +173,22 @@
                         </div>
                     </button>
                     <!-- Dropdown Idiomas -->
-                    <div class="absolute right-0 mt-3 w-48 bg-white/95 backdrop-blur-2xl text-gray-700 rounded-2xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.3)] border border-gray-100/50 opacity-0 invisible scale-95 translate-y-2 group-hover:opacity-100 group-hover:visible group-hover:scale-100 group-hover:translate-y-0 transform origin-top-right transition-all duration-300 cubic-bezier(0.16, 1, 0.3, 1) z-50">
-                        <div class="px-4 py-3 border-b border-gray-100/80">
-                            <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider">Selecione o Idioma</h3>
+                    <div class="absolute right-0 mt-3 w-48 bg-white/80 backdrop-blur-3xl text-gray-800 rounded-2xl shadow-[0_20px_60px_-15px_rgba(0,0,0,0.5)] border border-white/40 opacity-0 invisible scale-95 translate-y-3 group-hover:opacity-100 group-hover:visible group-hover:scale-100 group-hover:translate-y-0 transform origin-top-right transition-all duration-300 ease-out z-[220]">
+                        <div class="px-4 py-3 border-b border-gray-100/50">
+                            <h3 class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Selecione o Idioma</h3>
                         </div>
                         <div class="p-2 space-y-1">
-                            <a href="?lang=pt_BR" class="flex items-center justify-between px-3 py-2.5 text-sm rounded-xl transition-all duration-200 {% if current_language == 'pt_BR' %}bg-blue-50 text-blue-700 font-bold shadow-sm{% else %}font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900{% endif %}">
+                            <a href="?lang=pt_BR" class="flex items-center justify-between px-3 py-2.5 text-sm rounded-xl transition-all duration-200 {% if current_language == 'pt_BR' %}bg-blue-50 text-blue-700 font-bold shadow-sm border border-blue-100{% else %}font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 border border-transparent{% endif %}">
                                 <span>{{ t('lang_portuguese') }}</span>
-                                <span class="text-[10px] font-black px-2 py-0.5 rounded-lg {% if current_language == 'pt_BR' %}bg-blue-100 text-blue-800{% else %}bg-gray-100 text-gray-500{% endif %} uppercase tracking-wider">PT</span>
+                                <span class="text-[9px] font-black px-1.5 py-0.5 rounded-md {% if current_language == 'pt_BR' %}bg-blue-200/50 text-blue-800{% else %}bg-gray-100 text-gray-500{% endif %} uppercase tracking-widest">PT</span>
                             </a>
-                            <a href="?lang=en" class="flex items-center justify-between px-3 py-2.5 text-sm rounded-xl transition-all duration-200 {% if current_language == 'en' %}bg-blue-50 text-blue-700 font-bold shadow-sm{% else %}font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900{% endif %}">
+                            <a href="?lang=en" class="flex items-center justify-between px-3 py-2.5 text-sm rounded-xl transition-all duration-200 {% if current_language == 'en' %}bg-blue-50 text-blue-700 font-bold shadow-sm border border-blue-100{% else %}font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 border border-transparent{% endif %}">
                                 <span>{{ t('lang_english') }}</span>
-                                <span class="text-[10px] font-black px-2 py-0.5 rounded-lg {% if current_language == 'en' %}bg-blue-100 text-blue-800{% else %}bg-gray-100 text-gray-500{% endif %} uppercase tracking-wider">EN</span>
+                                <span class="text-[9px] font-black px-1.5 py-0.5 rounded-md {% if current_language == 'en' %}bg-blue-200/50 text-blue-800{% else %}bg-gray-100 text-gray-500{% endif %} uppercase tracking-widest">EN</span>
                             </a>
-                            <a href="?lang=es" class="flex items-center justify-between px-3 py-2.5 text-sm rounded-xl transition-all duration-200 {% if current_language == 'es' %}bg-blue-50 text-blue-700 font-bold shadow-sm{% else %}font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900{% endif %}">
+                            <a href="?lang=es" class="flex items-center justify-between px-3 py-2.5 text-sm rounded-xl transition-all duration-200 {% if current_language == 'es' %}bg-blue-50 text-blue-700 font-bold shadow-sm border border-blue-100{% else %}font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 border border-transparent{% endif %}">
                                 <span>Español</span>
-                                <span class="text-[10px] font-black px-2 py-0.5 rounded-lg {% if current_language == 'es' %}bg-blue-100 text-blue-800{% else %}bg-gray-100 text-gray-500{% endif %} uppercase tracking-wider">ES</span>
+                                <span class="text-[9px] font-black px-1.5 py-0.5 rounded-md {% if current_language == 'es' %}bg-blue-200/50 text-blue-800{% else %}bg-gray-100 text-gray-500{% endif %} uppercase tracking-widest">ES</span>
                             </a>
                         </div>
                     </div>
@@ -197,73 +197,78 @@
                 <!-- Perfil do Usuário -->
                 {% if current_user.is_authenticated %}
                 <div class="relative group ml-1 sm:ml-2">
-                    <button class="flex items-center gap-3 pl-3 pr-2 py-1.5 rounded-2xl transition-all duration-300 hover:bg-white/10 border border-transparent hover:border-white/10 outline-none focus-visible:ring-2 focus-visible:ring-blue-400">
+                    <button class="flex items-center gap-3 pl-2 sm:pl-3 pr-1 sm:pr-2 py-1.5 rounded-full sm:rounded-2xl transition-all duration-300 hover:bg-white/10 border border-transparent hover:border-white/10 outline-none focus-visible:ring-2 focus-visible:ring-blue-400 group-hover:shadow-[0_0_20px_rgba(255,255,255,0.1)]">
                         <div class="text-right hidden sm:block">
-                            <div class="text-sm font-bold text-white leading-tight">
+                            <div class="text-sm font-bold text-white leading-none tracking-tight">
                                 {{ current_user.nome }}
                             </div>
                             {% if current_user.area %}
-                            <div class="text-xs font-medium text-blue-300 leading-tight mt-0.5 opacity-80">{{ translate_sector(current_user.area) }}</div>
+                            <div class="text-[10px] font-bold text-blue-200 leading-none mt-1 tracking-wider uppercase opacity-90">{{ translate_sector(current_user.area) }}</div>
                             {% endif %}
                         </div>
                         <div class="relative">
-                            <div class="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 p-[2px] shadow-lg">
-                                <div class="w-full h-full rounded-full bg-[#0b1b3d] flex items-center justify-center overflow-hidden border border-[#0b1b3d]">
-                                    <svg class="w-6 h-6 text-blue-100" fill="currentColor" viewBox="0 0 24 24"><path d="M24 20.993V24H0v-2.996A14.977 14.977 0 0112.004 15c4.904 0 9.26 2.354 11.996 5.993zM16.002 8.999a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+                            <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-gradient-to-tr from-blue-400 to-indigo-500 p-[2px] shadow-lg group-hover:scale-105 transition-transform duration-300">
+                                <div class="w-full h-full rounded-full bg-slate-900 flex items-center justify-center overflow-hidden border border-slate-800">
+                                    <svg class="w-5 h-5 sm:w-6 sm:h-6 text-white/80" fill="currentColor" viewBox="0 0 24 24"><path d="M24 20.993V24H0v-2.996A14.977 14.977 0 0112.004 15c4.904 0 9.26 2.354 11.996 5.993zM16.002 8.999a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
                                 </div>
                             </div>
-                            <!-- Indicador Status -->
-                            <div class="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-[#0b1b3d] rounded-full"></div>
+                            <!-- Indicador Status Animado -->
+                            <div class="absolute bottom-0 right-0 w-3 h-3 bg-emerald-400 border-2 border-[#0b1b3d] rounded-full shadow-[0_0_8px_rgba(52,211,153,0.6)]"></div>
                         </div>
                     </button>
                     
                     <!-- Dropdown Meu Perfil -->
-                    <div class="absolute right-0 mt-3 w-64 bg-white/95 backdrop-blur-2xl text-gray-800 rounded-2xl shadow-[0_15px_50px_-12px_rgba(0,0,0,0.4)] border border-gray-100/50 opacity-0 invisible scale-95 translate-y-2 group-hover:opacity-100 group-hover:visible group-hover:scale-100 group-hover:translate-y-0 transform origin-top-right transition-all duration-300 cubic-bezier(0.16, 1, 0.3, 1) z-50">
-                        <div class="p-4 border-b border-gray-100/80 bg-gradient-to-br from-gray-50/50 to-white rounded-t-2xl">
-                            <div class="font-bold text-gray-900">{{ current_user.nome }}</div>
-                            <div class="text-xs text-gray-500 mt-1 flex items-center gap-1.5 font-medium">
-                                <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg> 
+                    <div class="absolute right-0 mt-3 w-64 bg-white/80 backdrop-blur-3xl text-gray-800 rounded-3xl shadow-[0_20px_60px_-15px_rgba(0,0,0,0.5)] border border-white/40 opacity-0 invisible scale-95 translate-y-3 group-hover:opacity-100 group-hover:visible group-hover:scale-100 group-hover:translate-y-0 transform origin-top-right transition-all duration-300 ease-out z-[220] overflow-hidden">
+                        <div class="p-5 border-b border-gray-100/30 bg-gradient-to-b from-white to-white/50 relative">
+                            <!-- Glare effect inside dropdown header -->
+                            <div class="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/80 to-transparent pointer-events-none"></div>
+                            
+                            <div class="font-display font-black text-gray-900 text-lg tracking-tight relative z-10">{{ current_user.nome }}</div>
+                            <div class="text-xs text-gray-500 mt-1 flex items-center gap-1.5 font-medium relative z-10">
+                                <svg class="w-3.5 h-3.5 shrink-0 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg> 
                                 {{ current_user.email }}
                             </div>
                             {% if current_user.perfil == 'admin' %}
-                                <div class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-purple-100 text-purple-700 text-[10px] font-black uppercase tracking-wider mt-3 shadow-sm border border-purple-200/50">
+                                <div class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-gradient-to-r from-purple-100 to-fuchsia-100 text-purple-700 text-[10px] font-black uppercase tracking-wider mt-3 shadow-sm border border-purple-200/50 relative z-10">
                                     <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
                                     {% set _pa = t('profile_admin') %}{{ _pa if _pa != 'profile_admin' else 'Administrador' }}
                                 </div>
                             {% elif current_user.perfil == 'supervisor' %}
-                                <div class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-blue-100 text-blue-700 text-[10px] font-black uppercase tracking-wider mt-3 shadow-sm border border-blue-200/50">{% set _sv = t('supervisor') %}{{ _sv if _sv != 'supervisor' else 'Supervisor' }}</div>
+                                <div class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-700 text-[10px] font-black uppercase tracking-wider mt-3 shadow-sm border border-blue-200/50 relative z-10">{% set _sv = t('supervisor') %}{{ _sv if _sv != 'supervisor' else 'Supervisor' }}</div>
                             {% else %}
-                                <div class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-gray-100 text-gray-700 text-[10px] font-black uppercase tracking-wider mt-3 shadow-sm border border-gray-200/50">{% set _rq = t('requester') %}{{ _rq if _rq != 'requester' else 'Solicitante' }}</div>
+                                <div class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-gray-100 text-gray-700 text-[10px] font-black uppercase tracking-wider mt-3 shadow-sm border border-gray-200/50 relative z-10">{% set _rq = t('requester') %}{{ _rq if _rq != 'requester' else 'Solicitante' }}</div>
                             {% endif %}
                         </div>
 
                         <!-- Gamificação no Dropdown -->
                         {% if current_user.level is defined and current_user.perfil in ['supervisor', 'admin'] %}
-                        <div class="px-4 py-3 bg-gradient-to-br from-yellow-50 to-orange-50/30 border-b border-gray-100/80">
+                        <div class="px-5 py-4 bg-gradient-to-br from-orange-50/80 to-amber-50/40 border-b border-gray-100/30">
                             <div class="flex items-center justify-between mb-2">
-                                <div class="flex items-center gap-1.5">
-                                    <div class="w-6 h-6 rounded-lg bg-gradient-to-br from-yellow-400 to-orange-500 shadow-sm shadow-yellow-500/30 flex items-center justify-center text-white">
-                                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+                                <div class="flex items-center gap-2">
+                                    <div class="w-6 h-6 rounded-[8px] bg-gradient-to-br from-amber-400 to-orange-500 shadow-md shadow-orange-500/30 flex items-center justify-center text-white ring-2 ring-white/50">
+                                        <svg class="w-3.5 h-3.5 drop-shadow-sm" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
                                     </div>
-                                    <span class="text-xs font-black text-yellow-800 tracking-wide uppercase">{% set _ll = t('level_label') %}{{ _ll if _ll != 'level_label' else 'Nível' }} {{ current_user.level }}</span>
+                                    <span class="font-display text-[11px] font-black text-orange-900 tracking-wider uppercase">{% set _ll = t('level_label') %}{{ _ll if _ll != 'level_label' else 'Nível' }} {{ current_user.level }}</span>
                                 </div>
-                                <div class="text-[10px] font-black text-orange-600 bg-orange-100 px-2 py-0.5 rounded-full">{{ current_user.exp_semanal }} {% set _xw = t('xp_weekly') %}{{ _xw if _xw != 'xp_weekly' else 'XP Semanal' }}</div>
+                                <div class="text-[10px] font-black text-orange-600 bg-orange-100 shadow-sm border border-orange-200/50 px-2 py-0.5 rounded-md">{{ current_user.exp_semanal }} XP <span class="hidden sm:inline">{% set _xw = t('xp_weekly') %}{{ 'Semanal' if _xw == 'xp_weekly' else '' }}</span></div>
                             </div>
-                            <div class="w-full bg-orange-100 rounded-full h-1.5 overflow-hidden shadow-inner">
+                            <div class="w-full bg-orange-100/80 rounded-full h-1.5 overflow-hidden shadow-inner border border-orange-200/50">
                                 {% set exp_next_level = current_user.level * 100 %}
                                 {% set exp_progress = (current_user.exp_total % 100) %}
-                                <div class="bg-gradient-to-r from-yellow-400 to-orange-500 h-1.5 rounded-full" style="width: {{ exp_progress }}%"></div>
+                                <div class="bg-gradient-to-r from-amber-400 to-orange-500 h-full rounded-full relative" style="width: {{ exp_progress }}%">
+                                    <div class="absolute inset-0 bg-white/20"></div>
+                                </div>
                             </div>
-                            <div class="text-[10px] text-gray-500 font-medium text-right mt-1.5 flex justify-between">
+                            <div class="text-[9px] text-orange-700/70 font-bold uppercase tracking-widest text-right mt-2 flex justify-between">
                                 <span>{% set _pg = t('progress_global') %}{{ _pg if _pg != 'progress_global' else 'Progresso global' }}</span>
-                                <span>{{ current_user.exp_total }} {% set _xt = t('xp_total_label') %}{{ _xt if _xt != 'xp_total_label' else 'XP Total' }}</span>
+                                <span>{{ current_user.exp_total }} XP Total</span>
                             </div>
                         </div>
                         {% endif %}
 
-                        <div class="p-2">
-                            <a href="{{ url_for('main.logout') }}" class="flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 rounded-xl transition-colors group">
-                                <div class="p-1.5 rounded-lg bg-red-100 text-red-600 group-hover:bg-red-200 transition-colors">
+                        <div class="p-2 bg-gray-50/30">
+                            <a href="{{ url_for('main.logout') }}" class="flex items-center gap-3 px-3 py-2.5 text-sm font-black tracking-wide text-red-600 hover:text-red-700 hover:bg-red-50 rounded-xl transition-all group border border-transparent hover:border-red-100">
+                                <div class="p-1.5 rounded-lg bg-red-100 text-red-600 group-hover:bg-red-600 group-hover:text-white transition-colors duration-300 shadow-sm shadow-red-100">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
                                 </div>
                                 {% set _logout = t('logout_account') %}{{ _logout if _logout != 'logout_account' else t('logout') }}

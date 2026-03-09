@@ -25,7 +25,7 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
                 </svg>
             </div>
-            <h2 class="mt-6 text-3xl font-extrabold text-gray-900">{{ t('login_title') }}</h2>
+            <h2 class="font-display mt-6 text-3xl font-extrabold text-gray-900 tracking-tight">{{ t('login_title') }}</h2>
             <p class="mt-2 text-sm text-gray-600">{{ t('login_subtitle') }}</p>
         </div>
 
@@ -41,7 +41,7 @@
                     name="email" 
                     type="email" 
                     required 
-                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm h-10 border px-3" 
+                    class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-indigo-400 focus:ring-4 focus:ring-indigo-400/20 sm:text-sm h-11 border px-4 transition-all duration-200" 
                     placeholder="{{ t('ex_email') }}">
             </div>
 
@@ -54,7 +54,7 @@
                         name="senha" 
                         type="password" 
                         required 
-                        class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm h-10 border px-3 pr-10" 
+                        class="block w-full rounded-xl border-gray-300 shadow-sm focus:border-indigo-400 focus:ring-4 focus:ring-indigo-400/20 sm:text-sm h-11 border px-4 pr-10 transition-all duration-200" 
                         placeholder="••••••••">
                     <button type="button" id="toggle-senha" aria-label="Mostrar senha" title="Mostrar senha"
                         class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600 focus:outline-none">
@@ -75,14 +75,14 @@
                     id="remember-me" 
                     name="remember-me" 
                     type="checkbox" 
-                    class="h-4 w-4 rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                <label for="remember-me" class="ml-2 block text-sm text-gray-700">
+                    class="h-4 w-4 rounded border-gray-300 text-indigo-600 shadow-sm focus:border-indigo-400 focus:ring-4 focus:ring-indigo-400/20 cursor-pointer transition-all duration-200">
+                <label for="remember-me" class="ml-2 block text-sm font-medium text-gray-700 cursor-pointer">
                     {{ t('remember_me', default='Manter-me conectado por 30 dias') }}
                 </label>
             </div>
 
             <!-- Botão de Login -->
-            <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md shadow transition h-10">
+            <button type="submit" class="w-full bg-[#0b1b3d] hover:bg-[#15295c] text-white font-bold py-2.5 px-4 rounded-xl shadow-lg shadow-[#0b1b3d]/20 transition-all duration-300 h-11 active:scale-[0.98] outline-none focus-visible:ring-4 focus-visible:ring-[#0b1b3d]/30">
                 {{ t('sign_in') }}
             </button>
         </form>

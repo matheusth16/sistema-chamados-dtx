@@ -54,12 +54,29 @@ def atualizar_status_ajax():
         if novo_status == 'Cancelado' and not motivo_cancelamento:
             return jsonify({'sucesso': False, 'erro': 'Motivo do cancelamento é obrigatório'}), 400
 
+        doc_chamado = db.collection('chamados').document(chamado_id).get()
+        if not doc_chamado.exists:
+            return jsonify({'sucesso': False, 'erro': 'Chamado não encontrado'}), 404
+        
+        chamado_obj = Chamado.from_dict(doc_chamado.to_dict(), chamado_id)
+        
+        if current_user.perfil == 'solicitante':
+            if chamado_obj.solicitante_id != current_user.id:
+                return jsonify({'sucesso': False, 'erro': 'Acesso negado: Você só pode atualizar seus próprios chamados'}), 403
+            if novo_status != 'Cancelado':
+                return jsonify({'sucesso': False, 'erro': 'Acesso negado: Solicitantes só podem Cancelar chamados'}), 403
+        elif current_user.perfil == 'supervisor':
+            from app.services.permissions import usuario_pode_ver_chamado
+            if not usuario_pode_ver_chamado(current_user, chamado_obj):
+                return jsonify({'sucesso': False, 'erro': 'Acesso negado: Sem permissão ou fora da sua área'}), 403
+
         resultado = atualizar_status_chamado(
             chamado_id=chamado_id,
             novo_status=novo_status,
             usuario_id=current_user.id,
             usuario_nome=current_user.nome,
             motivo_cancelamento=motivo_cancelamento if novo_status == 'Cancelado' else None,
+            data_chamado=doc_chamado.to_dict()
         )
         if resultado['sucesso']:
             return jsonify({'sucesso': True, 'mensagem': resultado['mensagem'], 'novo_status': novo_status}), 200
@@ -91,174 +108,28 @@ def api_editar_chamado():
         if not chamado_id:
             return jsonify({'sucesso': False, 'erro': 'ID do chamado é obrigatório'}), 400
 
-        doc_chamado = db.collection('chamados').document(chamado_id).get()
-        if not doc_chamado.exists:
-            return jsonify({'sucesso': False, 'erro': 'Chamado não encontrado'}), 404
-
-        data_chamado = doc_chamado.to_dict()
+        from app.services.edicao_chamado_service import processar_edicao_chamado
         
-        # Validar permissão da área (Supervisor só edita chamados de sua área, a menos que seja admin)
-        if current_user.perfil == 'supervisor':
-            responsavel_atual_obj = Usuario.get_by_id(data_chamado.get('responsavel_id')) if data_chamado.get('responsavel_id') else None
-            tem_area_comum = bool(set(responsavel_atual_obj.areas) & set(current_user.areas)) if responsavel_atual_obj else False
-            if not (data_chamado.get('area') in current_user.areas or data_chamado.get('responsavel_id') == current_user.id or tem_area_comum):
-                return jsonify({'sucesso': False, 'erro': 'Você só pode editar chamados da sua área'}), 403
-
-        update_data = {}
-
-        # Status (atualização via serviço centralizado — já faz o update no Firestore)
-        if novo_status and novo_status in ['Aberto', 'Em Atendimento', 'Concluído', 'Cancelado'] and novo_status != data_chamado.get('status'):
-            if novo_status == 'Cancelado' and not motivo_cancelamento:
-                return jsonify({'sucesso': False, 'erro': 'Motivo do cancelamento é obrigatório'}), 400
-            resultado_status = atualizar_status_chamado(
-                chamado_id=chamado_id,
-                novo_status=novo_status,
-                usuario_id=current_user.id,
-                usuario_nome=current_user.nome,
-                data_chamado=data_chamado,
-                motivo_cancelamento=motivo_cancelamento if novo_status == 'Cancelado' else None,
-            )
-            if not resultado_status['sucesso']:
-                return jsonify({'sucesso': False, 'erro': resultado_status.get('erro', 'Erro ao atualizar status')}), 500
-
-        # Responsável (reatribuição)
-        novo_responsavel_nome = None
-        if novo_responsavel_id and novo_responsavel_id != data_chamado.get('responsavel_id'):
-            novo_resp_obj = Usuario.get_by_id(novo_responsavel_id)
-            if novo_resp_obj:
-                novo_responsavel_nome = novo_resp_obj.nome
-                update_data['responsavel_id'] = novo_responsavel_id
-                update_data['responsavel'] = novo_responsavel_nome
-                # Chamado guarda uma única área; usa a primeira do responsável se houver várias
-                update_data['area'] = (novo_resp_obj.areas[0] if getattr(novo_resp_obj, 'areas', None) else novo_resp_obj.area)
-
-                Historico(
-                    chamado_id=chamado_id,
-                    usuario_id=current_user.id,
-                    usuario_nome=current_user.nome,
-                    acao='alteracao_dados',
-                    campo_alterado='responsável',
-                    valor_anterior=data_chamado.get('responsavel'),
-                    valor_novo=novo_responsavel_nome
-                ).save()
-
-        # SLA personalizado
-        novo_sla_str = request.form.get('sla_dias', '').strip()
-        if novo_sla_str != '':
-            sla_atual = data_chamado.get('sla_dias')
-            if novo_sla_str == '0':
-                novo_sla = None
-            else:
-                try:
-                    novo_sla = int(novo_sla_str)
-                    if novo_sla < 1 or novo_sla > 365:
-                        raise ValueError
-                except ValueError:
-                    return jsonify({'sucesso': False, 'erro': 'SLA inválido. Informe um número entre 1 e 365 dias, ou 0 para redefinir ao padrão.'}), 400
-            if novo_sla != sla_atual:
-                from firebase_admin import firestore as fs_admin
-                update_data['sla_dias'] = fs_admin.DELETE_FIELD if novo_sla is None else novo_sla
-                Historico(
-                    chamado_id=chamado_id,
-                    usuario_id=current_user.id,
-                    usuario_nome=current_user.nome,
-                    acao='alteracao_dados',
-                    campo_alterado='sla_dias',
-                    valor_anterior=str(sla_atual) if sla_atual is not None else 'padrão',
-                    valor_novo=str(novo_sla) if novo_sla is not None else 'padrão',
-                ).save()
-
-        # Descrição
-        if nova_descricao and nova_descricao.strip() != data_chamado.get('descricao', '').strip():
-            update_data['descricao'] = nova_descricao.strip()
-            Historico(
-                chamado_id=chamado_id,
-                usuario_id=current_user.id,
-                usuario_nome=current_user.nome,
-                acao='alteracao_dados',
-                campo_alterado='descrição',
-                valor_anterior='(Texto anterior)',
-                valor_novo='(Novo texto)'
-            ).save()
-
-        # Anexo (Adicionando múltiplos anexos)
-        if arquivo_anexo and arquivo_anexo.filename:
-            try:
-                caminho_anexo = salvar_anexo(arquivo_anexo)
-            except ValueError as e:
-                return jsonify({'sucesso': False, 'erro': str(e)}), 400
-            if caminho_anexo:
-                # Recarrega anexos existentes e adiciona o novo
-                anexos_existentes = data_chamado.get('anexos', [])
-                anexo_principal = data_chamado.get('anexo')
-                
-                # Garante que o anexo principal original também está na lista
-                if anexo_principal and anexo_principal not in anexos_existentes:
-                    anexos_existentes.insert(0, anexo_principal)
-                
-                anexos_existentes.append(caminho_anexo)
-                update_data['anexos'] = anexos_existentes
-                
-                # Se ainda não tinha anexo principal, define este como tal
-                if not anexo_principal:
-                    update_data['anexo'] = caminho_anexo
-                
-                Historico(
-                    chamado_id=chamado_id,
-                    usuario_id=current_user.id,
-                    usuario_nome=current_user.nome,
-                    acao='alteracao_dados',
-                    campo_alterado='novo anexo',
-                    valor_anterior='-',
-                    valor_novo=caminho_anexo
-                ).save()
-
-        # Setores adicionais (supervisor pode incluir outros setores; notifica supervisores desses setores)
         setores_adicionais_form = request.form.getlist('setores_adicionais')
         if not setores_adicionais_form and request.get_json(silent=True):
-            setores_adicionais_form = (request.get_json() or {}).get('setores_adicionais') or []
-        setores_adicionais_form = [str(s).strip() for s in setores_adicionais_form if s and str(s).strip()]
-        setores_atuais = data_chamado.get('setores_adicionais') or []
-        if not isinstance(setores_atuais, list):
-            setores_atuais = []
-        setores_novos_lista = setores_adicionais_form
-        setores_novos_para_notificar = [s for s in setores_novos_lista if s not in setores_atuais]
-        if setores_novos_lista != setores_atuais:
-            update_data['setores_adicionais'] = setores_novos_lista
-            if setores_novos_para_notificar:
-                try:
-                    notificar_setores_adicionais_chamado(
-                        chamado_id=chamado_id,
-                        numero_chamado=data_chamado.get('numero_chamado', ''),
-                        setores_novos=setores_novos_para_notificar,
-                        categoria=data_chamado.get('categoria', ''),
-                        tipo_solicitacao=data_chamado.get('tipo_solicitacao', ''),
-                        descricao_resumo=(data_chamado.get('descricao') or '')[:500],
-                        solicitante_nome=data_chamado.get('solicitante_nome', '—'),
-                        quem_adicionou_nome=current_user.nome,
-                    )
-                except Exception as e:
-                    logger.exception("Erro ao notificar setores adicionais: %s", e)
-            Historico(
-                chamado_id=chamado_id,
-                usuario_id=current_user.id,
-                usuario_nome=current_user.nome,
-                acao='alteracao_dados',
-                campo_alterado='setores adicionais',
-                valor_anterior=', '.join(setores_atuais) if setores_atuais else '-',
-                valor_novo=', '.join(setores_novos_lista) if setores_novos_lista else '-',
-            ).save()
-
-        if update_data:
-            # Atualiza documento com retry automático
-            execute_with_retry(
-                db.collection('chamados').document(chamado_id).update,
-                update_data,
-                max_retries=3
-            )
-            return jsonify({'sucesso': True, 'mensagem': 'Chamado atualizado com sucesso', 'dados': update_data}), 200
+            setores_adicionais_form = (request.get_json(silent=True) or {}).get('setores_adicionais') or []
+            
+        resultado = processar_edicao_chamado(
+            usuario_atual=current_user,
+            chamado_id=chamado_id,
+            novo_status=novo_status,
+            motivo_cancelamento=motivo_cancelamento,
+            nova_descricao=nova_descricao,
+            novo_responsavel_id=novo_responsavel_id,
+            novo_sla_str=(request.form.get('sla_dias') or '').strip(),
+            arquivo_anexo=arquivo_anexo,
+            setores_adicionais_lista=setores_adicionais_form
+        )
+        
+        if resultado.get('sucesso'):
+            return jsonify({'sucesso': True, 'mensagem': resultado.get('mensagem'), 'dados': resultado.get('dados', {})}), 200
         else:
-            return jsonify({'sucesso': True, 'mensagem': 'Nenhuma alteração foi feita'}), 200
+            return jsonify({'sucesso': False, 'erro': resultado.get('erro')}), 400
 
     except Exception as e:
         logger.exception("Erro em api_editar_chamado: %s", e)

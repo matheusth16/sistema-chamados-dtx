@@ -32,15 +32,38 @@
       src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollToPlugin.min.js?t=1"
       crossorigin="anonymous"
     ></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
       rel="stylesheet"
     />
     <!-- CSS para filtros e ordenação de tabelas -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/table-filters.css') }}">
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/table-filters.css') }}"
+    />
+    <script nonce="{{ csp_nonce }}">
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Inter', 'sans-serif'],
+              display: ['"Plus Jakarta Sans"', 'sans-serif'],
+            }
+          }
+        }
+      }
+    </script>
     <style nonce="{{ csp_nonce }}">
       body {
         font-family: "Inter", sans-serif;
+      }
+      /* Custom Focus Ring globally */
+      *:focus-visible {
+        outline: none;
+        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+        border-color: #818cf8 !important;
       }
     </style>
   </head>
@@ -58,36 +81,71 @@
     %}
 
     <main class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-      {# Na página de abertura de chamado (formulário), as mensagens flash aparecem apenas dentro do bloco de conteúdo #}
-      {% if request.endpoint != 'main.index' %}
-      {% with messages = get_flashed_messages(with_categories=true) %} {% if
-      messages %}
-      <div id="flash-messages" class="space-y-2 mb-6">
-        {% for category, message in messages %}
+      {# Flash messages as floating toasts #} {% if request.endpoint !=
+      'main.index' %} {% with messages =
+      get_flashed_messages(with_categories=true) %} {% if messages %}
+      <div
+        id="flash-messages"
+        class="fixed top-20 right-4 z-[250] flex flex-col gap-3 pointer-events-none w-full max-w-sm"
+      >
+        {% for category, message in messages %} {% set border_color =
+        'border-red-500' if category == 'danger' else 'border-green-500' if
+        category == 'success' else 'border-blue-500' if category == 'info' else
+        'border-gray-500' %} {% set bg_color = 'bg-red-50 text-red-800' if
+        category == 'danger' else 'bg-green-50 text-green-800' if category ==
+        'success' else 'bg-blue-50 text-blue-800' if category == 'info' else
+        'bg-gray-50 text-gray-800' %}
         <div
-          class="px-4 py-3 rounded-md border text-sm font-medium {% if category == 'danger' %}bg-red-50 text-red-800 border-red-200{% elif category == 'success' %}bg-green-50 text-green-800 border-green-200{% elif category == 'info' %}bg-blue-50 text-blue-800 border-blue-200{% else %}bg-gray-50 text-gray-800 border-gray-200{% endif %}"
+          class="pointer-events-auto px-4 py-3 sm:px-5 sm:py-4 rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border-l-4 {{ border_color }} {{ bg_color }} transform transition-all flex items-start justify-between gap-3 flash-toast"
         >
-          {{ message }}
+          <div class="flex-1 text-sm font-medium">{{ message }}</div>
+          <button
+            type="button"
+            class="shrink-0 text-current opacity-60 hover:opacity-100 transition-opacity focus:outline-none"
+            onclick="this.closest('.flash-toast').style.display = 'none'"
+          >
+            <svg
+              class="h-4 w-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          </button>
         </div>
         {% endfor %}
       </div>
       <script nonce="{{ csp_nonce }}">
+        // Auto-remove com animação fade out nativa / simples
         setTimeout(function () {
           var el = document.getElementById("flash-messages");
           if (el) {
-            el.remove();
+            // Em vez de remove bruto, diminui opacidade
+            el.style.transition =
+              "opacity 0.5s ease-out, transform 0.5s ease-out";
+            el.style.opacity = "0";
+            el.style.transform = "translateY(-20px)";
+            setTimeout(function () {
+              el.remove();
+            }, 500);
           }
         }, 5000);
       </script>
-      {% endif %} {% endwith %}
-      {% endif %}
-      {% block content %}{% endblock %}
+      {% endif %} {% endwith %} {% endif %} {% block content %}{% endblock %}
     </main>
 
     <footer class="bg-white border-t mt-12">
       <div class="max-w-7xl mx-auto py-6 px-4 overflow-hidden sm:px-6 lg:px-8">
         <p class="mt-8 text-center text-base text-gray-400">
-          &copy; 2026 DTX Aerospace - {% set _fs = t('footer_system_name') %}{{ _fs if _fs != 'footer_system_name' else 'Sistema de Planejamento Interno' }}.
+          &copy; 2026 DTX Aerospace - {% set _fs = t('footer_system_name') %}{{
+          _fs if _fs != 'footer_system_name' else 'Sistema de Planejamento
+          Interno' }}.
         </p>
       </div>
     </footer>

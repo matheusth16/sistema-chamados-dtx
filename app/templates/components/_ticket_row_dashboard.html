@@ -1,10 +1,12 @@
-{# Linha de chamado no dashboard — com checkbox bulk, SLA e ações (ver, histórico) #}
+{# Linha de chamado no dashboard — checkbox e ações com min 44px touch (Web Designer) #}
 <tr data-chamado-id="{{ chamado.id }}" data-prioridade="{{ chamado.prioridade }}" data-rl-codigo="{{ chamado.rl_codigo or '' }}"
     data-detail-url="{{ url_for('main.visualizar_detalhe_chamado', chamado_id=chamado.id) }}"
-    class="gsap-stagger hover:bg-indigo-50/50 transition duration-150 group cursor-default {% if chamado.categoria == 'Projetos' %}bg-pink-50 border-l-2 border-l-pink-300{% endif %}">
-    <td class="px-5 py-4 whitespace-nowrap">
-        <input type="checkbox" class="bulk-cb rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
-            value="{{ chamado.id }}" data-id="{{ chamado.id }}">
+    class="gsap-stagger transition-colors duration-200 group cursor-default {% if chamado.categoria == 'Projetos' %}bg-rose-50/80 hover:bg-rose-100/90 border-l-2 border-l-rose-400{% else %}hover:bg-indigo-50/50{% endif %}">
+    <td class="px-5 py-4 whitespace-nowrap align-middle">
+        <label class="inline-flex items-center justify-center min-w-[44px] min-h-[44px] -m-2 cursor-pointer rounded-xl hover:bg-white/50 focus-within:ring-2 focus-within:ring-indigo-500/30 focus-within:ring-offset-1">
+            <input type="checkbox" class="bulk-cb rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer w-4 h-4"
+                value="{{ chamado.id }}" data-id="{{ chamado.id }}" aria-label="{{ t('select_ticket') if t and t('select_ticket') != 'select_ticket' else 'Selecionar chamado' }}">
+        </label>
     </td>
     <td class="px-5 py-4 whitespace-nowrap" data-cell="numero">
         <div class="text-sm font-black text-gray-800">{{ chamado.numero_chamado }}</div>
@@ -15,8 +17,8 @@
         {% endif %}
     </td>
     <td class="px-5 py-4 whitespace-nowrap" data-cell="categoria">
-        <span class="px-2.5 py-1 inline-flex text-xs leading-5 font-bold rounded-lg 
-                {% if chamado.categoria == 'Projetos' %}bg-pink-100 text-pink-700{% else %}bg-indigo-100 text-indigo-700{% endif %}">
+        <span class="px-2.5 py-1 inline-flex text-xs leading-5 font-bold rounded-lg shadow-sm border border-transparent
+                {% if chamado.categoria == 'Projetos' %}bg-rose-50 text-rose-700 border-rose-100{% else %}bg-indigo-50 text-indigo-700 border-indigo-100/50{% endif %}">
             {{ translate_category(chamado.categoria) }}
         </span>
     </td>
@@ -27,11 +29,11 @@
     <td class="px-5 py-4 whitespace-nowrap" data-cell="responsavel">
         <div class="flex items-center">
             {% if chamado.responsavel %}
-            <div class="h-6 w-6 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-xs font-bold mr-2">
+            <div class="h-7 w-7 rounded-full bg-gradient-to-br from-indigo-100 to-blue-50 text-indigo-700 flex items-center justify-center text-xs font-black mr-2.5 shadow-inner border border-indigo-50">
                 {{ chamado.responsavel[0] }}
             </div>
             {% endif %}
-            <span class="text-sm font-medium text-gray-700">{{ nome_curto(chamado.responsavel) or '—' }}</span>
+            <span class="text-sm font-bold text-slate-700">{{ nome_curto(chamado.responsavel) or '—' }}</span>
         </div>
     </td>
     <td class="px-5 py-4" data-cell="descricao">
@@ -52,28 +54,29 @@
     </td>
     <td class="px-5 py-4 whitespace-nowrap text-center" data-cell="sla">
         {% if chamado.sla_info %}
-        <span class="px-2 py-1 inline-flex text-xs font-bold rounded-lg
-                {% if chamado.sla_info.dentro_prazo %}bg-emerald-100 text-emerald-700
-                {% elif chamado.sla_info.em_risco %}bg-amber-100 text-amber-700
-                {% else %}bg-red-100 text-red-700{% endif %}"
+        <span class="px-2.5 py-1 inline-flex text-xs font-bold rounded-lg shadow-sm border border-transparent
+                {% if chamado.sla_info.dentro_prazo %}bg-emerald-50 text-emerald-700 border-emerald-100/50
+                {% elif chamado.sla_info.em_risco %}bg-amber-50 text-amber-700 border-amber-100/50
+                {% else %}bg-red-50 text-red-700 border-red-100/50{% endif %}"
                 title="{% if chamado.sla_dias %}{{ t('sla_custom_tooltip') if t else 'SLA personalizado' }}: {{ chamado.sla_dias }} dias{% else %}{{ t('sla_tooltip') }}{% endif %}">
             {% if chamado.sla_info.label == 'No prazo' %}{{ t('on_time') }}{% elif chamado.sla_info.label == 'Atrasado' %}{{ t('delayed') }}{% elif chamado.sla_info.label == 'Em risco' %}{{ t('at_risk') }}{% else %}{{ chamado.sla_info.label }}{% endif %}
         </span>
         {% else %}
-        <span class="text-gray-300 text-xs">—</span>
+        <span class="text-slate-300 text-xs font-bold">—</span>
         {% endif %}
     </td>
-    <td class="px-5 py-4 text-sm font-medium flex items-center justify-center space-x-2 min-w-[7rem] shrink-0">
+    <td class="px-5 py-4 text-sm font-medium flex items-center justify-center gap-1 min-w-[7rem] shrink-0">
         <a href="{{ url_for('main.visualizar_detalhe_chamado', chamado_id=chamado.id) }}" target="_blank" rel="opener"
-            class="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors" title="{{ t('view_details') }}">
+            class="inline-flex items-center justify-center min-w-[44px] min-h-[44px] p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all hover:scale-105 active:scale-95 hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/30 focus-visible:ring-offset-1"
+            title="{{ t('view_details') }}" aria-label="{{ t('view_details') }}">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
             </svg>
         </a>
         <a href="{{ url_for('main.visualizar_historico', chamado_id=chamado.id) }}"
-            class="p-1.5 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
-            title="{{ t('view_history') }}">
+            class="inline-flex items-center justify-center min-w-[44px] min-h-[44px] p-2 text-slate-400 hover:text-purple-600 hover:bg-purple-50 rounded-xl transition-all hover:scale-105 active:scale-95 hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/30 focus-visible:ring-offset-1"
+            title="{{ t('view_history') }}" aria-label="{{ t('view_history') }}">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>

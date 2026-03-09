@@ -168,165 +168,31 @@ def editar_chamado_pagina() -> Response:
         flash_t('only_view_history_your_area', 'danger')
         return redirect(url_for('main.admin'))
 
-    data_chamado = doc_chamado.to_dict()
-    update_data = {}
-
-    try:
-        novo_status = request.form.get('novo_status')
-        motivo_cancelamento = (request.form.get('motivo_cancelamento') or '').strip()
-        if novo_status and novo_status in ('Aberto', 'Em Atendimento', 'Concluído', 'Cancelado') and novo_status != data_chamado.get('status'):
-            if novo_status == 'Cancelado' and not motivo_cancelamento:
-                flash('Informe o motivo do cancelamento.', 'danger')
-                return redirect(url_for('main.visualizar_detalhe_chamado', chamado_id=chamado_id))
-            resultado = atualizar_status_chamado(
-                chamado_id=chamado_id,
-                novo_status=novo_status,
-                usuario_id=current_user.id,
-                usuario_nome=current_user.nome,
-                data_chamado=data_chamado,
-                motivo_cancelamento=motivo_cancelamento if novo_status == 'Cancelado' else None,
-            )
-            if resultado.get('sucesso'):
-                flash(resultado.get('mensagem', 'Status atualizado.'), 'success')
-            else:
-                flash(resultado.get('erro', 'Erro ao atualizar status.'), 'danger')
-
-        novo_responsavel_id = request.form.get('novo_responsavel_id', '').strip()
-        if novo_responsavel_id and novo_responsavel_id != data_chamado.get('responsavel_id'):
-            novo_resp = Usuario.get_by_id(novo_responsavel_id)
-            if novo_resp:
-                update_data['responsavel_id'] = novo_resp.id
-                update_data['responsavel'] = novo_resp.nome
-                update_data['area'] = (novo_resp.areas[0] if getattr(novo_resp, 'areas', None) else novo_resp.area or data_chamado.get('area'))
-                Historico(
-                    chamado_id=chamado_id,
-                    usuario_id=current_user.id,
-                    usuario_nome=current_user.nome,
-                    acao='alteracao_dados',
-                    campo_alterado='responsável',
-                    valor_anterior=data_chamado.get('responsavel'),
-                    valor_novo=novo_resp.nome
-                ).save()
-
-        nova_descricao = request.form.get('nova_descricao', '').strip()
-        descricao_anterior = (data_chamado.get('descricao') or '').strip()
-        if nova_descricao and nova_descricao != descricao_anterior:
-            update_data['descricao'] = nova_descricao
-            # Limita tamanho para não estourar Firestore (1 doc = 1MB)
-            max_len = 3000
-            Historico(
-                chamado_id=chamado_id,
-                usuario_id=current_user.id,
-                usuario_nome=current_user.nome,
-                acao='alteracao_dados',
-                campo_alterado='descrição',
-                valor_anterior=(descricao_anterior[:max_len] + ('...' if len(descricao_anterior) > max_len else '')),
-                valor_novo=(nova_descricao[:max_len] + ('...' if len(nova_descricao) > max_len else ''))
-            ).save()
-
-        # SLA personalizado
-        novo_sla_str = request.form.get('sla_dias', '').strip()
-        if novo_sla_str != '':
-            sla_atual = data_chamado.get('sla_dias')
-            if novo_sla_str == '0':
-                novo_sla = None  # Reset ao padrão
-            else:
-                try:
-                    novo_sla = int(novo_sla_str)
-                    if novo_sla < 1 or novo_sla > 365:
-                        raise ValueError
-                except ValueError:
-                    flash('SLA inválido. Informe um número entre 1 e 365 dias, ou 0 para redefinir ao padrão.', 'danger')
-                    return redirect(url_for('main.visualizar_detalhe_chamado', chamado_id=chamado_id))
-            if novo_sla != sla_atual:
-                from firebase_admin import firestore as fs_admin
-                update_data['sla_dias'] = fs_admin.DELETE_FIELD if novo_sla is None else novo_sla
-                Historico(
-                    chamado_id=chamado_id,
-                    usuario_id=current_user.id,
-                    usuario_nome=current_user.nome,
-                    acao='alteracao_dados',
-                    campo_alterado='sla_dias',
-                    valor_anterior=str(sla_atual) if sla_atual is not None else 'padrão',
-                    valor_novo=str(novo_sla) if novo_sla is not None else 'padrão',
-                ).save()
-
-        arquivo_anexo = request.files.get('anexo')
-        if arquivo_anexo and arquivo_anexo.filename:
-            try:
-                caminho_anexo = salvar_anexo(arquivo_anexo)
-            except ValueError as e:
-                flash(str(e), 'danger')
-                return redirect(url_for('main.visualizar_detalhe_chamado', chamado_id=chamado_id))
-            if caminho_anexo is None and current_app.config.get('ENV') == 'production':
-                flash_t('error_attachment_upload_production', 'warning')
-            elif caminho_anexo:
-                anexos_existentes = data_chamado.get('anexos', [])
-                anexo_principal = data_chamado.get('anexo')
-                if anexo_principal and anexo_principal not in anexos_existentes:
-                    anexos_existentes.insert(0, anexo_principal)
-                anexos_existentes.append(caminho_anexo)
-                update_data['anexos'] = anexos_existentes
-                if not anexo_principal:
-                    update_data['anexo'] = caminho_anexo
-                Historico(
-                    chamado_id=chamado_id,
-                    usuario_id=current_user.id,
-                    usuario_nome=current_user.nome,
-                    acao='alteracao_dados',
-                    campo_alterado='anexo',
-                    valor_anterior='-',
-                    valor_novo=caminho_anexo,
-                    detalhe=arquivo_anexo.filename
-                ).save()
-
-        # Setores adicionais (supervisor pode incluir outros setores e notificar supervisores desses setores)
-        setores_adicionais_form = request.form.getlist('setores_adicionais')
-        setores_adicionais_form = [s.strip() for s in setores_adicionais_form if s and str(s).strip()]
-        setores_atuais = data_chamado.get('setores_adicionais') or []
-        if not isinstance(setores_atuais, list):
-            setores_atuais = []
-        # Lista desejada = exatamente o que veio no form (checkboxes marcados)
-        setores_novos_lista = setores_adicionais_form
-        setores_novos_para_notificar = [s for s in setores_novos_lista if s not in setores_atuais]
-        if setores_novos_lista != setores_atuais:
-            update_data['setores_adicionais'] = setores_novos_lista
-            if setores_novos_para_notificar:
-                try:
-                    notificar_setores_adicionais_chamado(
-                        chamado_id=chamado_id,
-                        numero_chamado=data_chamado.get('numero_chamado') or chamado.numero_chamado,
-                        setores_novos=setores_novos_para_notificar,
-                        categoria=data_chamado.get('categoria') or chamado.categoria,
-                        tipo_solicitacao=data_chamado.get('tipo_solicitacao') or chamado.tipo_solicitacao,
-                        descricao_resumo=(data_chamado.get('descricao') or '')[:500],
-                        solicitante_nome=data_chamado.get('solicitante_nome') or chamado.solicitante_nome or '—',
-                        quem_adicionou_nome=current_user.nome,
-                    )
-                except Exception as e:
-                    logger.exception("Erro ao notificar setores adicionais: %s", e)
-                    flash('Setores adicionados, mas houve falha ao enviar alguns e-mails.', 'warning')
-            Historico(
-                chamado_id=chamado_id,
-                usuario_id=current_user.id,
-                usuario_nome=current_user.nome,
-                acao='alteracao_dados',
-                campo_alterado='setores adicionais',
-                valor_anterior=', '.join(setores_atuais) if setores_atuais else '-',
-                valor_novo=', '.join(setores_novos_lista) if setores_novos_lista else '-',
-            ).save()
-
-        if update_data:
-            execute_with_retry(
-                db.collection('chamados').document(chamado_id).update,
-                update_data,
-                max_retries=3
-            )
-            if not (novo_status and novo_status != data_chamado.get('status')):
-                flash('Alterações salvas.', 'success')
-    except Exception as e:
-        logger.exception("Erro ao editar chamado na página: %s", e)
-        flash_t('error_updating_with_msg', 'danger', error=str(e))
+    from app.services.edicao_chamado_service import processar_edicao_chamado
+    
+    setores_adicionais_form = request.form.getlist('setores_adicionais')
+    
+    resultado = processar_edicao_chamado(
+        usuario_atual=current_user,
+        chamado_id=chamado_id,
+        novo_status=request.form.get('novo_status'),
+        motivo_cancelamento=(request.form.get('motivo_cancelamento') or '').strip(),
+        nova_descricao=request.form.get('nova_descricao', ''),
+        novo_responsavel_id=(request.form.get('novo_responsavel_id') or '').strip(),
+        novo_sla_str=(request.form.get('sla_dias') or '').strip(),
+        arquivo_anexo=request.files.get('anexo'),
+        setores_adicionais_lista=setores_adicionais_form
+    )
+    
+    if resultado.get('sucesso'):
+        mensagem = resultado.get('mensagem', 'Alterações salvas.')
+        flash(mensagem, 'success' if 'sucesso' in mensagem.lower() or 'salvas' in mensagem.lower() or 'foi feita' in mensagem.lower() else 'info')
+    else:
+        erro = resultado.get('erro', '')
+        if erro:
+            flash(erro, 'danger')
+        else:
+            flash_t('error_updating_with_msg', 'danger', error="Erro desconhecido")
 
     return redirect(url_for('main.visualizar_detalhe_chamado', chamado_id=chamado_id))
 

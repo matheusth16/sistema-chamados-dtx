@@ -90,10 +90,12 @@ def criar_chamado(
         (chamado_id, numero_chamado, erro, aviso_atribuicao)
         Em sucesso: (id, numero, None, aviso ou None). Em falha: (None, None, mensagem_erro, None).
     """
+    import bleach
+    
     categoria = form.get('categoria')
     rl_codigo = form.get('rl_codigo')
     tipo = form.get('tipo')
-    descricao = form.get('descricao')
+    descricao = bleach.clean(form.get('descricao') or '', tags=[], strip=True)
     impacto = form.get('impacto')
     gate = form.get('gate')
 

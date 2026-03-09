@@ -1,8 +1,11 @@
-{# Cabeçalho de grupo por RL — reutilizável em dashboard e meus_chamados #}
+{# Cabeçalho de grupo por RL — âncora visual de agrupamento (Web Designer) #}
 {% if rl %}
-<tr class="rl-header-row bg-pink-50/40" data-rl="{{ rl }}">
-    <td colspan="{{ colspan|default(9) }}" class="px-5 py-2 text-xs font-bold text-pink-800 uppercase tracking-widest">
-        {{ t('rl_short') }} {{ rl }}
+<tr class="rl-header-row bg-pink-50/60 border-l-4 border-pink-400" data-rl="{{ rl }}">
+    <td colspan="{{ colspan|default(9) }}" class="px-5 py-3 text-xs font-black text-pink-800 uppercase tracking-widest">
+        <span class="inline-flex items-center gap-2">
+            <span class="inline-flex w-6 h-6 rounded-md bg-pink-200/80 items-center justify-center text-pink-700 shrink-0" aria-hidden="true">RL</span>
+            {{ rl }}
+        </span>
     </td>
 </tr>
 {% endif %}
