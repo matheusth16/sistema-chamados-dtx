@@ -1,5 +1,6 @@
 {# Linha de chamado no dashboard — com checkbox bulk, SLA e ações (ver, histórico) #}
 <tr data-chamado-id="{{ chamado.id }}" data-prioridade="{{ chamado.prioridade }}" data-rl-codigo="{{ chamado.rl_codigo or '' }}"
+    data-detail-url="{{ url_for('main.visualizar_detalhe_chamado', chamado_id=chamado.id) }}"
     class="gsap-stagger hover:bg-indigo-50/50 transition duration-150 group cursor-default {% if chamado.categoria == 'Projetos' %}bg-pink-50 border-l-2 border-l-pink-300{% endif %}">
     <td class="px-5 py-4 whitespace-nowrap">
         <input type="checkbox" class="bulk-cb rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"

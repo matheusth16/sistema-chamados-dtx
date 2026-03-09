@@ -202,6 +202,7 @@
 {% block page_scripts %}
     <!-- As funções abrirModal e fecharModal já estão definidas inline acima -->
     <script src="{{ url_for('static', filename='js/dashboard_otimizacoes.js') }}?v=4"></script>
+    <script src="{{ url_for('static', filename='js/table-row-click.js') }}"></script>
     
     <script nonce="{{ csp_nonce }}">
         // Interceptar submit do formulário de status no modal para enviar via AJAX
