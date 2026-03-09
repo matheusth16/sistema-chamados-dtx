@@ -121,19 +121,29 @@
         <table class="min-w-full divide-y divide-gray-100">
             <thead class="bg-gray-50/50">
                 <tr>
-                    <th class="px-5 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-widest">{{ t('id_ref') }}</th>
-                    <th class="px-5 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-widest">{{ t('category') }}</th>
-                    <th class="px-5 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-widest">{{ t('type_sector') }}</th>
+                    <th class="px-5 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-widest sortable" data-column="0" onclick="sortTable(0, 'number')">
+                        {{ t('id_ref') }}<span class="sort-icon">↕</span>
+                    </th>
+                    <th class="px-5 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-widest filterable" data-column="1" onclick="showFilterDropdown(1, this)">
+                        {{ t('category') }}
+                    </th>
+                    <th class="px-5 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-widest filterable" data-column="2" onclick="showFilterDropdown(2, this)">
+                        {{ t('type_sector') }}
+                    </th>
                     <th class="px-5 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-widest">{{ t('description') }}</th>
-                    <th class="px-5 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-widest">{{ t('assigned_to') }}</th>
-                    <th class="px-5 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-widest">{{ t('status') }}</th>
-                    <th class="px-5 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-widest">{{ t('date') }}</th>
+                    <th class="px-5 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-widest filterable" data-column="4" onclick="showFilterDropdown(4, this)">{{ t('assigned_to') }}</th>
+                    <th class="px-5 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-widest filterable" data-column="5" onclick="showFilterDropdown(5, this)">
+                        {{ t('status') }}
+                    </th>
+                    <th class="px-5 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-widest sortable" data-column="6" onclick="sortTable(6, 'date')">
+                        {{ t('date') }}<span class="sort-icon">↕</span>
+                    </th>
                     <th class="px-5 py-4 text-center text-xs font-bold text-gray-400 uppercase tracking-widest">{{ t('actions') }}</th>
                 </tr>
             </thead>
             <tbody class="bg-white divide-y divide-gray-50/80">
-                {% for grupo in chamados|groupby('rl_codigo') %}
-                {% set rl = grupo.grouper %}
+                {% for grupo in chamados|groupby('grupo_key') %}
+                {% set rl = grupo.grouper.split('|')[1] %}
                 {% set colspan = 8 %}
                 {% include 'components/_rl_header.html' with context %}
                 {% for chamado in grupo.list %}
@@ -205,4 +215,8 @@
         {% endif %}
     </div>
 </div>
+{% endblock %}
+
+{% block page_scripts %}
+<script src="{{ url_for('static', filename='js/table-filters.js') }}"></script>
 {% endblock %}

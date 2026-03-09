@@ -70,8 +70,52 @@ def create_app():
 
     # Firebase é inicializado em app/database.py
     # Não há tabelas para criar (Firestore é NoSQL)
-    
+
+    # Agendamento: relatório semanal toda sexta-feira às 10h (Brasília)
+    if not app.testing:
+        _iniciar_scheduler(app)
+
     return app
+
+
+def _iniciar_scheduler(app: Flask) -> None:
+    """Inicia APScheduler com o job de relatório semanal (sexta 10h BRT)."""
+    try:
+        from apscheduler.schedulers.background import BackgroundScheduler
+        import pytz
+
+        def _job_relatorio():
+            with app.app_context():
+                try:
+                    from app.services.report_service import enviar_relatorio_semanal
+                    resultado = enviar_relatorio_semanal()
+                    app.logger.info("Relatório semanal concluído: %s", resultado)
+                except Exception as exc:
+                    app.logger.exception("Erro no job de relatório semanal: %s", exc)
+
+        scheduler = BackgroundScheduler(
+            timezone=pytz.timezone("America/Sao_Paulo"),
+            job_defaults={"coalesce": True, "max_instances": 1},
+        )
+        scheduler.add_job(
+            _job_relatorio,
+            trigger="cron",
+            day_of_week="fri",
+            hour=10,
+            minute=0,
+            id="relatorio_semanal",
+        )
+        scheduler.start()
+        app.logger.info("Scheduler iniciado — relatório semanal toda sexta às 10h (BRT)")
+
+        import atexit
+        atexit.register(lambda: scheduler.shutdown(wait=False))
+
+    except ImportError:
+        app.logger.warning(
+            "APScheduler não instalado; relatório semanal não será agendado. "
+            "Execute: pip install 'APScheduler>=3.10.0'"
+        )
 
 
 def _configurar_metricas_performance(app: Flask) -> None:

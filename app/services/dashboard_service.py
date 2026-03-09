@@ -84,10 +84,23 @@ def obter_contexto_admin(user: Any, args: Dict[str, Any], itens_por_pagina: int 
         num_id = extrair_numero_chamado(c.numero_chamado)
         if concluido:
             return (True, 0, num_id)
-        prioridade_cat = 0 if c.categoria == 'Projetos' else 1
+        # Usa campo prioridade do modelo (0=Projetos, 1=demais)
+        prioridade_cat = getattr(c, 'prioridade', 1)
         return (False, prioridade_cat, num_id)
 
     chamados_ordenados = sorted(chamados, key=_chave)
+
+    # Calcula grupo_key para ordenar grupos Projetos antes dos demais no Jinja groupby
+    from collections import defaultdict
+    _grupo_prio: dict = defaultdict(lambda: 1)
+    for c in chamados_ordenados:
+        rl = c.rl_codigo or ''
+        if getattr(c, 'prioridade', 1) == 0:
+            _grupo_prio[rl] = 0
+    for c in chamados_ordenados:
+        rl = c.rl_codigo or ''
+        c.grupo_key = f"{_grupo_prio[rl]}|{rl}"
+
     for c in chamados_ordenados:
         c.sla_info = obter_sla_para_exibicao(c)
     gates = get_static_cached("categorias_gate", CategoriaGate.get_all, ttl_seconds=300)

@@ -30,8 +30,10 @@ SLA_DIAS_PROJETOS = 2
 SLA_DIAS_PADRAO = 3
 
 
-def _sla_dias_por_categoria(categoria: str) -> int:
-    """Retorna o prazo em dias do SLA para a categoria."""
+def _sla_dias_por_categoria(categoria: str, sla_dias_custom: Optional[int] = None) -> int:
+    """Retorna o prazo em dias do SLA. Se sla_dias_custom for fornecido (>0), usa-o."""
+    if sla_dias_custom is not None and isinstance(sla_dias_custom, int) and sla_dias_custom > 0:
+        return sla_dias_custom
     return SLA_DIAS_PROJETOS if (categoria or '').strip() == 'Projetos' else SLA_DIAS_PADRAO
 
 
@@ -46,13 +48,14 @@ def _to_datetime(ts: Any) -> Optional[datetime]:
     return None
 
 
-def _dentro_sla(data_abertura, data_conclusao, categoria: str) -> Optional[bool]:
+def _dentro_sla(data_abertura, data_conclusao, categoria: str,
+                sla_dias_custom: Optional[int] = None) -> Optional[bool]:
     """True se concluído dentro do SLA, False se fora. None se não for possível calcular."""
     dt_abertura = _to_datetime(data_abertura)
     dt_conclusao = _to_datetime(data_conclusao)
     if not dt_abertura or not dt_conclusao:
         return None
-    dias = _sla_dias_por_categoria(categoria or '')
+    dias = _sla_dias_por_categoria(categoria or '', sla_dias_custom)
     limite = dt_abertura + timedelta(days=dias)
     return dt_conclusao <= limite
 
@@ -65,10 +68,11 @@ def obter_sla_para_exibicao(chamado: Any) -> Optional[Dict[str, Any]]:
     data_conclusao = getattr(chamado, 'data_conclusao', None)
     categoria = getattr(chamado, 'categoria', None) or ''
     status = getattr(chamado, 'status', None) or 'Aberto'
+    sla_dias_custom = getattr(chamado, 'sla_dias', None)
     dt_abertura = _to_datetime(data_abertura)
     if not dt_abertura:
         return None
-    dias = _sla_dias_por_categoria(categoria)
+    dias = _sla_dias_por_categoria(categoria, sla_dias_custom)
     limite = dt_abertura + timedelta(days=dias)
     # Comparação consistente: ambos naive ou ambos aware (evita TypeError)
     if limite.tzinfo is not None:
@@ -151,8 +155,9 @@ class AnalisadorChamados:
                     if dt_ab and dt_con:
                         tempo = (dt_con - dt_ab).total_seconds() / 3600
                         tempos_resolucao.append(tempo)
-                    # SLA (Projetos 2d, demais 3d)
-                    dentro = _dentro_sla(data_abertura, data_conclusao, categoria)
+                    # SLA (usa sla_dias personalizado se existir)
+                    sla_dias_raw = chamado.get('sla_dias')
+                    dentro = _dentro_sla(data_abertura, data_conclusao, categoria, sla_dias_raw)
                     if dentro is True:
                         concluidos_dentro_sla += 1
                     elif dentro is False:
@@ -184,7 +189,7 @@ class AnalisadorChamados:
                     categoria = chamado.get('categoria') or ''
                     dt_ab = _to_datetime(data_abertura)
                     if dt_ab is not None:
-                        dias_sla = _sla_dias_por_categoria(categoria)
+                        dias_sla = _sla_dias_por_categoria(categoria, chamado.get('sla_dias'))
                         limite = dt_ab + timedelta(days=dias_sla)
                         if limite.tzinfo is not None:
                             now = datetime.now(timezone.utc)
@@ -272,7 +277,7 @@ class AnalisadorChamados:
                         if dt_ab and dt_con:
                             tempo = (dt_con - dt_ab).total_seconds() / 3600
                             tempos_resolucao.append(tempo)
-                        d = _dentro_sla(data_abertura, data_conclusao, categoria)
+                        d = _dentro_sla(data_abertura, data_conclusao, categoria, chamado.get('sla_dias'))
                         if d is True:
                             dentro_sla += 1
                         elif d is False:

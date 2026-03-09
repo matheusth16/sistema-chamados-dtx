@@ -249,6 +249,21 @@
                                 </div>
                             </div>
 
+                            <!-- SLA Personalizado -->
+                            <div class="pt-3 mt-3 border-t border-gray-100">
+                                <label class="block text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-1">
+                                    {{ t('sla_custom_label') if t else 'SLA Personalizado (dias)' }}
+                                    {% if chamado.sla_dias %}
+                                    <span class="ml-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-700 uppercase">{{ t('sla_custom_badge') if t else 'Personalizado' }}</span>
+                                    {% endif %}
+                                </label>
+                                <p class="text-xs text-gray-400 mb-1.5">{{ t('sla_custom_help') if t else 'Deixe em branco para manter. Digite 0 para voltar ao padrão.' }}</p>
+                                <input type="number" name="sla_dias" form="form-status" min="0" max="365"
+                                    value="{{ chamado.sla_dias if chamado.sla_dias is not none else '' }}"
+                                    placeholder="{{ chamado.sla_dias if chamado.sla_dias else (t('sla_default_placeholder') if t else 'Padrão') }}"
+                                    class="block w-full bg-gray-50 border border-gray-200 text-sm rounded-xl focus:ring-amber-500 focus:border-amber-500 transition-colors py-2 px-3 focus:bg-white shadow-sm">
+                            </div>
+
                             <div class="pt-3 mt-3 border-t border-gray-100 pb-1">
                                 <button type="submit" id="btn-submit-status"
                                     class="w-full flex justify-center py-2.5 px-4 rounded-xl shadow-sm text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors items-center">
@@ -294,7 +309,16 @@
                                 </div>
                             </div>
                             {% endif %}
-                            
+                            {% if chamado.sla_dias %}
+                            <div>
+                                <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">{{ t('sla_custom_label') if t else 'SLA' }}</label>
+                                <span class="inline-flex px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-100 text-amber-700">
+                                    {{ chamado.sla_dias }} {{ 'dias' }}
+                                    <span class="ml-1 opacity-60">({{ t('sla_custom_badge') if t else 'personalizado' }})</span>
+                                </span>
+                            </div>
+                            {% endif %}
+
                             <div class="bg-indigo-50/50 border border-indigo-100 rounded-xl p-4 text-center mt-6">
                                 <p class="text-[10px] text-indigo-700 font-bold uppercase tracking-widest">{{ t('responsible_for_ticket') if t else 'Contato' }}</p>
                                 <p class="text-indigo-900 font-bold text-sm mt-1">{{ chamado.responsavel or 'Equipe Responsável' }}</p>

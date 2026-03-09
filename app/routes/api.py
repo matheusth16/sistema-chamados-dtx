@@ -142,6 +142,32 @@ def api_editar_chamado():
                     valor_novo=novo_responsavel_nome
                 ).save()
 
+        # SLA personalizado
+        novo_sla_str = request.form.get('sla_dias', '').strip()
+        if novo_sla_str != '':
+            sla_atual = data_chamado.get('sla_dias')
+            if novo_sla_str == '0':
+                novo_sla = None
+            else:
+                try:
+                    novo_sla = int(novo_sla_str)
+                    if novo_sla < 1 or novo_sla > 365:
+                        raise ValueError
+                except ValueError:
+                    return jsonify({'sucesso': False, 'erro': 'SLA inválido. Informe um número entre 1 e 365 dias, ou 0 para redefinir ao padrão.'}), 400
+            if novo_sla != sla_atual:
+                from firebase_admin import firestore as fs_admin
+                update_data['sla_dias'] = fs_admin.DELETE_FIELD if novo_sla is None else novo_sla
+                Historico(
+                    chamado_id=chamado_id,
+                    usuario_id=current_user.id,
+                    usuario_nome=current_user.nome,
+                    acao='alteracao_dados',
+                    campo_alterado='sla_dias',
+                    valor_anterior=str(sla_atual) if sla_atual is not None else 'padrão',
+                    valor_novo=str(novo_sla) if novo_sla is not None else 'padrão',
+                ).save()
+
         # Descrição
         if nova_descricao and nova_descricao.strip() != data_chamado.get('descricao', '').strip():
             update_data['descricao'] = nova_descricao.strip()

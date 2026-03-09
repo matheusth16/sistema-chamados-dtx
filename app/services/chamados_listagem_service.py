@@ -50,10 +50,14 @@ def listar_meus_chamados_fallback(
             return data.to_pydatetime()
         return data
 
-    docs.sort(
-        key=lambda d: (_data_key(d) is None, _data_key(d) or datetime.min),
-        reverse=True,
-    )
+    # Ordena por prioridade (0=Projetos primeiro) e depois por data
+    def _sort_key(d):
+        data_dict = d.to_dict() or {}
+        prioridade = data_dict.get('prioridade', 1)
+        data = _data_key(d)
+        return (prioridade, data is None, -(data.timestamp() if data else 0))
+    
+    docs.sort(key=_sort_key)
     status_counts = {'Aberto': 0, 'Em Atendimento': 0, 'Concluído': 0, 'Cancelado': 0}
     for d in docs:
         st = (d.to_dict() or {}).get('status', 'Aberto')
@@ -80,6 +84,18 @@ def listar_meus_chamados_fallback(
         else None
     )
     cursor_prev = docs_pagina[0].id if inicio > 0 else None
+
+    # Calcula grupo_key para ordenar grupos Projetos antes dos demais no Jinja groupby
+    from collections import defaultdict
+    _grupo_prio: dict = defaultdict(lambda: 1)
+    for c in chamados:
+        rl = c.rl_codigo or ''
+        if getattr(c, 'prioridade', 1) == 0:
+            _grupo_prio[rl] = 0
+    for c in chamados:
+        rl = c.rl_codigo or ''
+        c.grupo_key = f"{_grupo_prio[rl]}|{rl}"
+
     return {
         'chamados': chamados,
         'pagina_atual': pagina_atual,
@@ -113,7 +129,8 @@ def listar_meus_chamados(
         q = q.where('status', '==', status_filtro)
     if rl_codigo:
         q = q.where('rl_codigo', '==', rl_codigo)
-    q = q.order_by('data_abertura', direction=firestore.Query.DESCENDING)
+    # Ordena por prioridade (Projetos=0 primeiro) e depois por data_abertura
+    q = q.order_by('prioridade').order_by('data_abertura', direction=firestore.Query.DESCENDING)
 
     total_chamados = obter_total_por_contagem(q) or 0
     status_counts = {'Aberto': 0, 'Em Atendimento': 0, 'Concluído': 0, 'Cancelado': 0}
@@ -158,6 +175,17 @@ def listar_meus_chamados(
             chamados.append(Chamado.from_dict(data, doc.id))
         except Exception as doc_err:
             logger.warning("Chamado %s ignorado (dados inválidos): %s", doc.id, doc_err)
+
+    # Calcula grupo_key para ordenar grupos Projetos antes dos demais no Jinja groupby
+    from collections import defaultdict
+    _grupo_prio: dict = defaultdict(lambda: 1)
+    for c in chamados:
+        rl = c.rl_codigo or ''
+        if getattr(c, 'prioridade', 1) == 0:
+            _grupo_prio[rl] = 0
+    for c in chamados:
+        rl = c.rl_codigo or ''
+        c.grupo_key = f"{_grupo_prio[rl]}|{rl}"
 
     return {
         'chamados': chamados,

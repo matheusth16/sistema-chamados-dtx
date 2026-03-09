@@ -1,6 +1,6 @@
 {# Linha de chamado no dashboard — com checkbox bulk, SLA e ações (ver, histórico) #}
-<tr data-chamado-id="{{ chamado.id }}"
-    class="gsap-stagger hover:bg-indigo-50/50 transition duration-150 group cursor-default {% if chamado.categoria == 'Projetos' %}bg-red-50/20{% endif %}">
+<tr data-chamado-id="{{ chamado.id }}" data-prioridade="{{ chamado.prioridade }}" data-rl-codigo="{{ chamado.rl_codigo or '' }}"
+    class="gsap-stagger hover:bg-indigo-50/50 transition duration-150 group cursor-default {% if chamado.categoria == 'Projetos' %}bg-pink-50 border-l-2 border-l-pink-300{% endif %}">
     <td class="px-5 py-4 whitespace-nowrap">
         <input type="checkbox" class="bulk-cb rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
             value="{{ chamado.id }}" data-id="{{ chamado.id }}">
@@ -55,7 +55,7 @@
                 {% if chamado.sla_info.dentro_prazo %}bg-emerald-100 text-emerald-700
                 {% elif chamado.sla_info.em_risco %}bg-amber-100 text-amber-700
                 {% else %}bg-red-100 text-red-700{% endif %}"
-                title="{{ t('sla_tooltip') }}">
+                title="{% if chamado.sla_dias %}{{ t('sla_custom_tooltip') if t else 'SLA personalizado' }}: {{ chamado.sla_dias }} dias{% else %}{{ t('sla_tooltip') }}{% endif %}">
             {% if chamado.sla_info.label == 'No prazo' %}{{ t('on_time') }}{% elif chamado.sla_info.label == 'Atrasado' %}{{ t('delayed') }}{% elif chamado.sla_info.label == 'Em risco' %}{{ t('at_risk') }}{% else %}{{ chamado.sla_info.label }}{% endif %}
         </span>
         {% else %}

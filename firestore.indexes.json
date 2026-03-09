@@ -109,6 +109,35 @@
         {"fieldPath": "area", "order": "ASCENDING"},
         {"fieldPath": "data_abertura", "order": "DESCENDING"}
       ]
+    },
+    {
+      "collectionGroup": "chamados",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "solicitante_id", "order": "ASCENDING"},
+        {"fieldPath": "prioridade", "order": "ASCENDING"},
+        {"fieldPath": "data_abertura", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "chamados",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "solicitante_id", "order": "ASCENDING"},
+        {"fieldPath": "status", "order": "ASCENDING"},
+        {"fieldPath": "prioridade", "order": "ASCENDING"},
+        {"fieldPath": "data_abertura", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "chamados",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "solicitante_id", "order": "ASCENDING"},
+        {"fieldPath": "rl_codigo", "order": "ASCENDING"},
+        {"fieldPath": "prioridade", "order": "ASCENDING"},
+        {"fieldPath": "data_abertura", "order": "DESCENDING"}
+      ]
     }
   ],
   "fieldOverrides": []

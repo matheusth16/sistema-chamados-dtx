@@ -128,20 +128,30 @@
                             class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
                             title="{{ t('select_all') }}">
                     </th>
-                    <th class="px-5 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-widest">{{ t('id_ref') }}</th>
-                    <th class="px-5 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-widest">{{ t('category') }}</th>
-                    <th class="px-5 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-widest">{{ t('sector_gate') }}</th>
-                    <th class="px-5 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-widest">{{ t('assigned_to') }}</th>
+                    <th class="px-5 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-widest sortable" data-column="1" onclick="sortTable(1, 'number')">
+                        {{ t('id_ref') }}<span class="sort-icon">↕</span>
+                    </th>
+                    <th class="px-5 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-widest filterable" data-column="2" onclick="showFilterDropdown(2, this)">
+                        {{ t('category') }}
+                    </th>
+                    <th class="px-5 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-widest filterable" data-column="3" onclick="showFilterDropdown(3, this)">
+                        {{ t('sector_gate') }}
+                    </th>
+                    <th class="px-5 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-widest filterable" data-column="4" onclick="showFilterDropdown(4, this)">{{ t('assigned_to') }}</th>
                     <th class="px-5 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-widest">{{ t('description') }}</th>
-                    <th class="px-5 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-widest">{{ t('status') }}</th>
-                    <th class="px-5 py-4 text-center text-xs font-bold text-gray-400 uppercase tracking-widest">SLA</th>
+                    <th class="px-5 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-widest filterable" data-column="6" onclick="showFilterDropdown(6, this)">
+                        {{ t('status') }}
+                    </th>
+                    <th class="px-5 py-4 text-center text-xs font-bold text-gray-400 uppercase tracking-widest sortable" data-column="7" onclick="sortTable(7, 'text')">
+                        SLA<span class="sort-icon">↕</span>
+                    </th>
                     <th class="px-5 py-4 text-center text-xs font-bold text-gray-400 uppercase tracking-widest min-w-[7rem]">{{ t('actions') }}</th>
                 </tr>
             </thead>
             <tbody class="bg-white divide-y divide-gray-50/80 gsap-stagger-container">
                 {% if chamados %}
-                {% for grupo in chamados|groupby('rl_codigo') %}
-                {% set rl = grupo.grouper %}
+                {% for grupo in chamados|groupby('grupo_key') %}
+                {% set rl = grupo.grouper.split('|')[1] %}
                 {% include 'components/_rl_header.html' with context %}
                 {% for chamado in grupo.list %}
                 {% include 'components/_ticket_row_dashboard.html' with context %}
@@ -353,5 +363,8 @@
             });
         })();
     </script>
+
+    <!-- Script de filtros e ordenação de tabelas -->
+    <script src="{{ url_for('static', filename='js/table-filters.js') }}"></script>
 
     {% endblock %}

@@ -1,5 +1,5 @@
 {# Linha de chamado em "Meus chamados" — sem checkbox bulk, sem SLA #}
-<tr class="hover:bg-indigo-50/50 transition duration-150 group cursor-default {% if chamado.status == 'Concluído' %}bg-emerald-50/20{% elif chamado.status == 'Em Atendimento' %}bg-amber-50/20{% elif chamado.status == 'Cancelado' %}bg-red-50/20{% endif %}">
+<tr data-prioridade="{{ chamado.prioridade }}" data-rl-codigo="{{ chamado.rl_codigo or '' }}" class="hover:bg-indigo-50/50 transition duration-150 group cursor-default {% if chamado.categoria == 'Projetos' %}bg-pink-50 border-l-2 border-l-pink-300{% elif chamado.status == 'Concluído' %}bg-emerald-50/20{% elif chamado.status == 'Em Atendimento' %}bg-amber-50/20{% elif chamado.status == 'Cancelado' %}bg-red-50/20{% endif %}">
     <td class="px-5 py-4 whitespace-nowrap">
         <div class="text-sm font-black text-gray-800">{{ chamado.numero_chamado }}</div>
         {% if chamado.rl_codigo %}

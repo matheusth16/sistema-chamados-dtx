@@ -850,6 +850,31 @@
         "en": "Projects: 2 days. Others: 3 days.",
         "es": "Proyectos: 2 días. Otros: 3 días."
     },
+    "sla_custom_label": {
+        "pt_BR": "SLA Personalizado (dias)",
+        "en": "Custom SLA (days)",
+        "es": "SLA Personalizado (días)"
+    },
+    "sla_custom_badge": {
+        "pt_BR": "Personalizado",
+        "en": "Custom",
+        "es": "Personalizado"
+    },
+    "sla_custom_help": {
+        "pt_BR": "Deixe em branco para manter o atual. Digite 0 para voltar ao padrão (Projetos: 2d, demais: 3d).",
+        "en": "Leave blank to keep the current value. Enter 0 to reset to default (Projects: 2d, others: 3d).",
+        "es": "Deje en blanco para mantener el valor actual. Ingrese 0 para restablecer al predeterminado (Proyectos: 2d, otros: 3d)."
+    },
+    "sla_custom_tooltip": {
+        "pt_BR": "SLA personalizado",
+        "en": "Custom SLA",
+        "es": "SLA personalizado"
+    },
+    "sla_default_placeholder": {
+        "pt_BR": "Padrão",
+        "en": "Default",
+        "es": "Predeterminado"
+    },
     "edit_description_placeholder": {
         "pt_BR": "Edite ou adicione texto à descrição existente...",
         "en": "Edit or add text to the existing description...",

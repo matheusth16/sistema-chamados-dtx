@@ -31,6 +31,7 @@ class Chamado:
                  motivo_cancelamento: str = None,
                  data_cancelamento = None,
                  grupo_rl_id: str = None,
+                 sla_dias: int = None,
                  id: str = None):
         
         self.id = id
@@ -41,6 +42,7 @@ class Chamado:
         self.data_cancelamento = data_cancelamento
         self.rl_codigo = rl_codigo
         self.grupo_rl_id = grupo_rl_id  # Referência ao grupo lógico de RL (coleção grupos_rl)
+        self.sla_dias = sla_dias  # SLA personalizado em dias (None = padrão por categoria)
         # Prioridade centralizada: Projetos = 0, demais = informado ou 1
         self.prioridade = 0 if categoria == 'Projetos' else (prioridade if prioridade is not None else 1)
         self.tipo_solicitacao = tipo_solicitacao
@@ -130,6 +132,7 @@ class Chamado:
             'motivo_cancelamento': self.motivo_cancelamento,
             'data_cancelamento': self.data_cancelamento,
             'grupo_rl_id': self.grupo_rl_id,
+            'sla_dias': self.sla_dias,
         }
     
     @classmethod
@@ -169,6 +172,7 @@ class Chamado:
             motivo_cancelamento=data.get('motivo_cancelamento'),
             data_cancelamento=data.get('data_cancelamento'),
             grupo_rl_id=data.get('grupo_rl_id'),
+            sla_dias=data.get('sla_dias'),
         )
     
     def __repr__(self):
