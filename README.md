@@ -10,7 +10,7 @@
 - **Dashboard Completo**: Visualização, filtros, histórico de alterações e bulk status
 - **Autenticação Segura**: Login com Firebase Authentication e perfis (solicitante, supervisor, admin)
 - **Upload de Anexos**: Suporte a arquivos (PDFs, imagens, etc.)
-- **Internacionalização (i18n)**: Traduções PT/EN e painel de administração de textos
+- **Internacionalização (i18n)**: Traduções PT/EN e painel de administração de textos (idioma padrão: **EN**, com suporte a `?lang=pt_BR`)
 - **Logs Estruturados**: Rastreamento completo de ações
 - **Rate Limiting**: Proteção contra abuso de requisições (Redis em produção)
 
@@ -171,6 +171,7 @@ firebase deploy --only firestore:indexes --project seu-projeto-id
 | [docs/API.md](docs/API.md) | Referência completa da API |
 | [docs/POLITICA_SEGURANCA_LGPD.md](docs/POLITICA_SEGURANCA_LGPD.md) | Segurança, criptografia e conformidade LGPD |
 | [docs/DEPLOYMENT_PLAN.md](docs/DEPLOYMENT_PLAN.md) | Deploy (Cloud Run, Firebase) |
+| [docs/onboarding.md](docs/onboarding.md) | Onboarding interativo: visão de produto e detalhes técnicos |
 | [scripts/README.md](scripts/README.md) | Scripts de manutenção |
 | `firestore.rules` | Regras de segurança Firestore |
 | `firestore.indexes.json` | Índices Firestore |
