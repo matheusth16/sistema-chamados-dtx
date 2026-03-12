@@ -77,8 +77,11 @@
       window.DTX_DEBUG = document.body.getAttribute("data-debug") === "true";
     </script>
 
-    {% block body_overlay %}{% endblock %} {% include "components/navbar.html"
-    %}
+    {% block body_overlay %}{% endblock %} {% include "components/navbar.html" %}
+
+    {% if current_user.is_authenticated and not current_user.onboarding_completo %}
+    {% include "components/onboarding.html" %}
+    {% endif %}
 
     <main class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
       {# Flash messages as floating toasts #} {% if request.endpoint !=
@@ -552,6 +555,10 @@
         });
       })();
     </script>
+
+    {% if current_user.is_authenticated and not current_user.onboarding_completo %}
+    <script src="{{ url_for('static', filename='js/onboarding.js') }}"></script>
+    {% endif %}
 
     <!-- Bloco para scripts adicionais de páginas específicas -->
     {% block page_scripts %}{% endblock %}

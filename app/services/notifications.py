@@ -148,36 +148,36 @@ def notificar_aprovador_novo_chamado(chamado_id: str, numero_chamado: str, categ
         if solicitante_email and solicitante_email.strip():
             solicitante_linha += f" ({solicitante_email.strip()})"
         corpo_texto = (
-            f"Número: {numero_chamado}\n"
-            f"Categoria: {categoria}\n"
-            f"Tipo: {tipo_solicitacao}\n"
-            f"Área: {area}\n"
-            f"Solicitante: {solicitante_linha}\n"
-            f"Resumo: {resumo_truncado}\n\n"
-            "Use os botões no e-mail (Ver chamado / Abrir painel) para acessar."
+            f"Number: {numero_chamado}\n"
+            f"Category: {categoria}\n"
+            f"Type: {tipo_solicitacao}\n"
+            f"Area: {area}\n"
+            f"Requester: {solicitante_linha}\n"
+            f"Summary: {resumo_truncado}\n\n"
+            "Use the buttons in the email (View ticket / Open dashboard) to access."
         )
         # Botões curtos no HTML; só exibe se houver link
         botoes_html = ""
         if link:
-            botoes_html += f'<a href="{link}" style="background: #2563eb; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; margin-right: 8px; display: inline-block;">Ver chamado</a> '
+            botoes_html += f'<a href="{link}" style="background: #2563eb; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; margin-right: 8px; display: inline-block;">View ticket</a> '
         if link_dash:
-            botoes_html += f'<a href="{link_dash}" style="background: #6b7280; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; display: inline-block;">Abrir painel (Gestão)</a>'
+            botoes_html += f'<a href="{link_dash}" style="background: #6b7280; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; display: inline-block;">Open dashboard</a>'
         if not botoes_html:
-            botoes_html = '<span style="color: #6b7280;">Defina APP_BASE_URL para exibir os links.</span>'
+            botoes_html = '<span style="color: #6b7280;">Set APP_BASE_URL to display links.</span>'
         corpo_html = (
             f'<div style="font-family: Arial, sans-serif; max-width: 560px;">'
-            f'<h2 style="color: #2563eb; margin-bottom: 16px;">Novo chamado atribuído</h2>'
-            f'<p>Olá, um novo chamado foi atribuído a você.</p>'
+            f'<h2 style="color: #2563eb; margin-bottom: 16px;">New ticket assigned</h2>'
+            f'<p>Hello, a new ticket has been assigned to you.</p>'
             f'<ul style="background: #f3f4f6; padding: 16px 16px 16px 32px; border-radius: 8px; margin: 16px 0;">'
-            f'<li><strong>Número:</strong> {numero_chamado}</li>'
-            f'<li><strong>Categoria:</strong> {categoria}</li>'
-            f'<li><strong>Tipo:</strong> {tipo_solicitacao}</li>'
-            f'<li><strong>Área:</strong> {area}</li>'
-            f'<li><strong>Solicitante:</strong> {solicitante_linha}</li>'
+            f'<li><strong>Number:</strong> {numero_chamado}</li>'
+            f'<li><strong>Category:</strong> {categoria}</li>'
+            f'<li><strong>Type:</strong> {tipo_solicitacao}</li>'
+            f'<li><strong>Area:</strong> {area}</li>'
+            f'<li><strong>Requester:</strong> {solicitante_linha}</li>'
             f'</ul>'
             f'<p style="margin: 12px 0;">{resumo_truncado}</p>'
             f'<p style="margin-top: 20px;">{botoes_html}</p>'
-            f'<p style="margin-top: 24px; color: #6b7280; font-size: 12px;"><em>Sistema de Chamados - DTX</em></p>'
+            f'<p style="margin-top: 24px; color: #6b7280; font-size: 12px;"><em>Ticket System - DTX</em></p>'
             f'</div>'
         )
 
@@ -235,37 +235,37 @@ def notificar_setores_adicionais_chamado(chamado_id: str, numero_chamado: str, s
         email = getattr(usuario, 'email', None)
         if not email or not str(email).strip():
             continue
-        assunto = f"Chamado {numero_chamado}: seu setor foi incluído"
+        assunto = f"Ticket {numero_chamado}: your department has been included"
         corpo_texto = (
-            f"Número: {numero_chamado}\n"
-            f"Seu setor foi incluído neste chamado por {quem_adicionou_nome}.\n"
-            f"Setores adicionados: {setores_str}\n"
-            f"Categoria: {categoria}\nTipo: {tipo_solicitacao}\n"
-            f"Solicitante: {solicitante_nome}\n"
-            f"Resumo: {resumo_truncado}\n\n"
-            "Use os botões no e-mail para acessar o chamado."
+            f"Number: {numero_chamado}\n"
+            f"Your department was included in this ticket by {quem_adicionou_nome}.\n"
+            f"Departments added: {setores_str}\n"
+            f"Category: {categoria}\nType: {tipo_solicitacao}\n"
+            f"Requester: {solicitante_nome}\n"
+            f"Summary: {resumo_truncado}\n\n"
+            "Use the buttons in the email to access the ticket."
         )
         botoes_html = ""
         if link:
-            botoes_html += f'<a href="{link}" style="background: #2563eb; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; margin-right: 8px; display: inline-block;">Ver chamado</a> '
+            botoes_html += f'<a href="{link}" style="background: #2563eb; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; margin-right: 8px; display: inline-block;">View ticket</a> '
         if link_dash:
-            botoes_html += f'<a href="{link_dash}" style="background: #6b7280; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; display: inline-block;">Abrir painel</a>'
+            botoes_html += f'<a href="{link_dash}" style="background: #6b7280; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; display: inline-block;">Open dashboard</a>'
         if not botoes_html:
-            botoes_html = '<span style="color: #6b7280;">Defina APP_BASE_URL para exibir os links.</span>'
+            botoes_html = '<span style="color: #6b7280;">Set APP_BASE_URL to display links.</span>'
         corpo_html = (
             f'<div style="font-family: Arial, sans-serif; max-width: 560px;">'
-            f'<h2 style="color: #2563eb; margin-bottom: 16px;">Chamado: seu setor foi incluído</h2>'
-            f'<p>Olá, o chamado <strong>{numero_chamado}</strong> teve seu setor incluído por <strong>{quem_adicionou_nome}</strong>.</p>'
-            f'<p><strong>Setores adicionados:</strong> {setores_str}</p>'
+            f'<h2 style="color: #2563eb; margin-bottom: 16px;">Ticket: your department has been included</h2>'
+            f'<p>Hello, ticket <strong>{numero_chamado}</strong> had your department included by <strong>{quem_adicionou_nome}</strong>.</p>'
+            f'<p><strong>Departments added:</strong> {setores_str}</p>'
             f'<ul style="background: #f3f4f6; padding: 16px 16px 16px 32px; border-radius: 8px; margin: 16px 0;">'
-            f'<li><strong>Número:</strong> {numero_chamado}</li>'
-            f'<li><strong>Categoria:</strong> {categoria}</li>'
-            f'<li><strong>Tipo:</strong> {tipo_solicitacao}</li>'
-            f'<li><strong>Solicitante:</strong> {solicitante_nome}</li>'
+            f'<li><strong>Number:</strong> {numero_chamado}</li>'
+            f'<li><strong>Category:</strong> {categoria}</li>'
+            f'<li><strong>Type:</strong> {tipo_solicitacao}</li>'
+            f'<li><strong>Requester:</strong> {solicitante_nome}</li>'
             f'</ul>'
             f'<p style="margin: 12px 0;">{resumo_truncado}</p>'
             f'<p style="margin-top: 20px;">{botoes_html}</p>'
-            f'<p style="margin-top: 24px; color: #6b7280; font-size: 12px;"><em>Sistema de Chamados - DTX</em></p>'
+            f'<p style="margin-top: 24px; color: #6b7280; font-size: 12px;"><em>Ticket System - DTX</em></p>'
             f'</div>'
         )
         ok, err = enviar_email(email.strip(), assunto, corpo_html, corpo_texto)

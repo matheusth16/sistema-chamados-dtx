@@ -41,7 +41,7 @@ def create_app():
     login_manager = LoginManager()
     login_manager.init_app(app)
     login_manager.login_view = 'main.login'  # Redireciona para login se não autenticado
-    login_manager.login_message = 'Por favor, faça login para continuar.'
+    login_manager.login_message = 'Please log in to continue.'
     login_manager.login_message_category = 'info'
     
     # Carregador de usuários para Flask-Login
@@ -304,8 +304,8 @@ def _configurar_i18n(app: Flask) -> None:
     @app.before_request
     def antes_da_requisicao():
         """Define o idioma para a requisição atual"""
-        # Obtém idioma do parâmetro URL ou da sessão
-        lang = request.args.get('lang') or session.get('language', 'pt_BR')
+        # Obtém idioma do parâmetro URL ou da sessão (default: EN)
+        lang = request.args.get('lang') or session.get('language', 'en')
         session['language'] = lang
     
     @app.context_processor
@@ -313,22 +313,22 @@ def _configurar_i18n(app: Flask) -> None:
         """Injeta função de tradução e idioma no contexto Jinja"""
         def t(key, **kwargs):
             """Função para traduzir uma chave no template"""
-            lang = session.get('language', 'pt_BR')
+            lang = session.get('language', 'en')
             return get_translation(key, lang, **kwargs)
         
         def translate_sector(sector_name):
             """Traduz o nome de um setor no template"""
-            lang = session.get('language', 'pt_BR')
+            lang = session.get('language', 'en')
             return get_translated_sector(sector_name, lang)
         
         def translate_category(category_name):
             """Traduz o nome de uma categoria no template"""
-            lang = session.get('language', 'pt_BR')
+            lang = session.get('language', 'en')
             return get_translated_category(category_name, lang)
         
         def translate_status(status_name):
             """Traduz o status de um chamado no template"""
-            lang = session.get('language', 'pt_BR')
+            lang = session.get('language', 'en')
             return get_translated_status(status_name, lang)
 
         def nome_curto(nome):
@@ -353,7 +353,7 @@ def _configurar_i18n(app: Flask) -> None:
             translate_category=translate_category,
             translate_status=translate_status,
             nome_curto=nome_curto,
-            current_language=session.get('language', 'pt_BR'),
+            current_language=session.get('language', 'en'),
             get_supported_languages=lambda: {
                 'pt_BR': 'Português (Brasil)',
                 'en': 'English',
@@ -366,22 +366,22 @@ def _configurar_i18n(app: Flask) -> None:
     # Registra funções as Jinja filters (para usar com o pipe |)
     @app.template_filter('translate_sector')
     def filter_translate_sector(sector_name):
-        lang = session.get('language', 'pt_BR')
+        lang = session.get('language', 'en')
         return get_translated_sector(sector_name, lang)
 
     @app.template_filter('translate_category')
     def filter_translate_category(category_name):
-        lang = session.get('language', 'pt_BR')
+        lang = session.get('language', 'en')
         return get_translated_category(category_name, lang)
 
     @app.template_filter('translate_status')
     def filter_translate_status(status_name):
-        lang = session.get('language', 'pt_BR')
+        lang = session.get('language', 'en')
         return get_translated_status(status_name, lang)
 
     @app.template_filter('translate_field_label')
     def filter_translate_field_label(field_name):
-        lang = session.get('language', 'pt_BR')
+        lang = session.get('language', 'en')
         return get_translated_field_label(field_name, lang)
 
 def _configurar_timeout_sessao(app: Flask) -> None:
@@ -407,7 +407,7 @@ def _configurar_timeout_sessao(app: Flask) -> None:
             if ultima_atividade is not None and (agora - ultima_atividade > limite_segundos):
                 logout_user()
                 session.clear() # Limpa a sessão
-                flash('Sua sessão expirou por inatividade. Faça login novamente.', 'info')
+                flash('Your session has expired due to inactivity. Please log in again.', 'info')
                 # Redireciona para login e impede a requisição atual de continuar
                 return redirect(url_for('main.login'))
                 

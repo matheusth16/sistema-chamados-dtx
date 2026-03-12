@@ -175,7 +175,15 @@
                     <!-- Dropdown Idiomas -->
                     <div class="absolute right-0 mt-3 w-48 bg-white/80 backdrop-blur-3xl text-gray-800 rounded-2xl shadow-[0_20px_60px_-15px_rgba(0,0,0,0.5)] border border-white/40 opacity-0 invisible scale-95 translate-y-3 group-hover:opacity-100 group-hover:visible group-hover:scale-100 group-hover:translate-y-0 transform origin-top-right transition-all duration-300 ease-out z-[220]">
                         <div class="px-4 py-3 border-b border-gray-100/50">
-                            <h3 class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Selecione o Idioma</h3>
+                            <h3 class="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                                {% if current_language == 'en' %}
+                                    Select language
+                                {% elif current_language == 'es' %}
+                                    Seleccione el idioma
+                                {% else %}
+                                    Selecione o idioma
+                                {% endif %}
+                            </h3>
                         </div>
                         <div class="p-2 space-y-1">
                             <a href="?lang=pt_BR" class="flex items-center justify-between px-3 py-2.5 text-sm rounded-xl transition-all duration-200 {% if current_language == 'pt_BR' %}bg-blue-50 text-blue-700 font-bold shadow-sm border border-blue-100{% else %}font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 border border-transparent{% endif %}">
@@ -250,12 +258,12 @@
                                     </div>
                                     <span class="font-display text-[11px] font-black text-orange-900 tracking-wider uppercase">{% set _ll = t('level_label') %}{{ _ll if _ll != 'level_label' else 'Nível' }} {{ current_user.level }}</span>
                                 </div>
-                                <div class="text-[10px] font-black text-orange-600 bg-orange-100 shadow-sm border border-orange-200/50 px-2 py-0.5 rounded-md">{{ current_user.exp_semanal }} XP <span class="hidden sm:inline">{% set _xw = t('xp_weekly') %}{{ 'Semanal' if _xw == 'xp_weekly' else '' }}</span></div>
+                                <div class="text-[10px] font-black text-orange-600 bg-orange-100 shadow-sm border border-orange-200/50 px-2 py-0.5 rounded-md">{{ current_user.exp_semanal }} XP <span class="hidden sm:inline">{% set _xw = t('xp_weekly') %}{{ _xw if _xw != 'xp_weekly' else 'Weekly XP' }}</span></div>
                             </div>
                             <div class="w-full bg-orange-100/80 rounded-full h-1.5 overflow-hidden shadow-inner border border-orange-200/50">
                                 {% set exp_next_level = current_user.level * 100 %}
                                 {% set exp_progress = (current_user.exp_total % 100) %}
-                                <div class="bg-gradient-to-r from-amber-400 to-orange-500 h-full rounded-full relative" style="width: {{ exp_progress }}%">
+                                <div class="bg-gradient-to-r from-amber-400 to-orange-500 h-full rounded-full relative" style="width: {{ exp_progress }}%;">
                                     <div class="absolute inset-0 bg-white/20"></div>
                                 </div>
                             </div>

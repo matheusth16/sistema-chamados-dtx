@@ -1,0 +1,15 @@
+{#
+  Onboarding tour — injetado em base.html quando onboarding_completo == false.
+  O JS (onboarding.js) lê os data-attributes e monta toda a UI dinamicamente.
+#}
+<div
+  id="onboarding-root"
+  data-perfil="{{ current_user.perfil }}"
+  data-nome="{{ current_user.nome | e }}"
+  data-passo="{{ current_user.onboarding_passo }}"
+  data-lang="{{ current_language | default('pt_BR') }}"
+  data-url-avancar="{{ url_for('main.api_onboarding_avancar') }}"
+  data-url-concluir="{{ url_for('main.api_onboarding_concluir') }}"
+  data-url-pular="{{ url_for('main.api_onboarding_pular') }}"
+  aria-hidden="true"
+></div>

@@ -16,23 +16,28 @@ class Usuario(UserMixin):
     
     def __init__(self, id: str, email: str, nome: str, perfil: str = 'solicitante', areas: list = None,
                  exp_total: int = 0, exp_semanal: int = 0, level: int = 1, conquistas: list = None,
-                 must_change_password: bool = False, password_changed_at=None):
+                 must_change_password: bool = False, password_changed_at=None,
+                 onboarding_completo: bool = False, onboarding_passo: int = 0):
         self.id = id
         self.email = email
         self.nome = nome
         self.perfil = perfil  # 'solicitante', 'supervisor' ou 'admin'
         self.areas = areas or []  # Lista de setores/departamentos
         self.senha_hash = None
-        
+
         # Controle de senha
         self.must_change_password = must_change_password
         self.password_changed_at = password_changed_at
-        
+
         # Sistemas de Gamificação
         self.exp_total = exp_total
         self.exp_semanal = exp_semanal
         self.level = level
         self.conquistas = conquistas or []
+
+        # Onboarding
+        self.onboarding_completo = onboarding_completo
+        self.onboarding_passo = onboarding_passo
     
     @property
     def area(self):
@@ -60,7 +65,9 @@ class Usuario(UserMixin):
             'exp_total': self.exp_total,
             'exp_semanal': self.exp_semanal,
             'level': self.level,
-            'conquistas': self.conquistas
+            'conquistas': self.conquistas,
+            'onboarding_completo': self.onboarding_completo,
+            'onboarding_passo': self.onboarding_passo,
         }
     
     @classmethod
@@ -90,7 +97,9 @@ class Usuario(UserMixin):
             level=data.get('level', 1),
             conquistas=data.get('conquistas', []),
             must_change_password=data.get('must_change_password', False),
-            password_changed_at=password_changed_at
+            password_changed_at=password_changed_at,
+            onboarding_completo=data.get('onboarding_completo', False),
+            onboarding_passo=data.get('onboarding_passo', 0),
         )
         usuario.senha_hash = data.get('senha_hash')
         return usuario
@@ -168,6 +177,14 @@ class Usuario(UserMixin):
                 self.password_changed_at = kwargs['password_changed_at']
                 update_data['password_changed_at'] = kwargs['password_changed_at'].isoformat() if kwargs['password_changed_at'] else None
             
+            if 'onboarding_completo' in kwargs:
+                self.onboarding_completo = kwargs['onboarding_completo']
+                update_data['onboarding_completo'] = kwargs['onboarding_completo']
+
+            if 'onboarding_passo' in kwargs:
+                self.onboarding_passo = kwargs['onboarding_passo']
+                update_data['onboarding_passo'] = kwargs['onboarding_passo']
+
             if 'gamification' in kwargs:
                 g_data = kwargs['gamification']
                 if 'exp_total' in g_data:

@@ -68,4 +68,6 @@ Thumbs.db
 # --- Backup de arquivos não utilizados (análise de código morto) ---
 _backup_nao_utilizados/
 
+# --- Ferramentas de IA / Editor ---
+.claude/
 .cursor/

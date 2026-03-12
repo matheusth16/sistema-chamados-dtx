@@ -123,12 +123,12 @@ def _tabela_html(chamados: List[Dict[str, Any]], link_base: str) -> str:
     """Gera tabela HTML com os chamados."""
     cabecalho = (
         "<tr style='background:#f3f4f6;'>"
-        "<th style='padding:8px 10px;text-align:left;font-size:12px;'>Chamado</th>"
-        "<th style='padding:8px 10px;text-align:left;font-size:12px;'>Categoria</th>"
-        "<th style='padding:8px 10px;text-align:left;font-size:12px;'>Tipo</th>"
-        "<th style='padding:8px 10px;text-align:left;font-size:12px;'>Solicitante</th>"
-        "<th style='padding:8px 10px;text-align:left;font-size:12px;'>Abertura</th>"
-        "<th style='padding:8px 10px;text-align:left;font-size:12px;'>Dias</th>"
+        "<th style='padding:8px 10px;text-align:left;font-size:12px;'>Ticket</th>"
+        "<th style='padding:8px 10px;text-align:left;font-size:12px;'>Category</th>"
+        "<th style='padding:8px 10px;text-align:left;font-size:12px;'>Type</th>"
+        "<th style='padding:8px 10px;text-align:left;font-size:12px;'>Requester</th>"
+        "<th style='padding:8px 10px;text-align:left;font-size:12px;'>Opened</th>"
+        "<th style='padding:8px 10px;text-align:left;font-size:12px;'>Days</th>"
         "<th style='padding:8px 10px;text-align:left;font-size:12px;'>SLA</th>"
         "</tr>"
     )
@@ -179,46 +179,46 @@ def _corpo_supervisor(
     secoes = ""
     if atrasados:
         secoes += (
-            f'<h3 style="color:#dc2626;margin:24px 0 4px;">Atrasados ({len(atrasados)})</h3>'
-            '<p style="color:#6b7280;font-size:11px;margin:0 0 8px;">SLA vencido — padrão: Projetos 2 dias / demais 3 dias (tickets com SLA personalizado aplicam seu próprio prazo)</p>'
+            f'<h3 style="color:#dc2626;margin:24px 0 4px;">Overdue ({len(atrasados)})</h3>'
+            '<p style="color:#6b7280;font-size:11px;margin:0 0 8px;">SLA exceeded — default: Projects 2 days / others 3 days (tickets with custom SLA apply their own deadline)</p>'
             + _tabela_html(atrasados, link_base)
         )
     if outros:
         secoes += (
-            f'<h3 style="color:#2563eb;margin:24px 0 4px;">Abertos / Em Atendimento ({len(outros)})</h3>'
+            f'<h3 style="color:#2563eb;margin:24px 0 4px;">Open / In Progress ({len(outros)})</h3>'
             + _tabela_html(outros, link_base)
         )
 
     btn = (
         f'<a href="{link_dash}" style="background:#2563eb;color:white;padding:10px 20px;'
-        f'text-decoration:none;border-radius:6px;display:inline-block;margin-top:20px;">Abrir painel</a>'
+        f'text-decoration:none;border-radius:6px;display:inline-block;margin-top:20px;">Open dashboard</a>'
         if link_dash else ""
     )
 
     html = (
         '<div style="font-family:Arial,sans-serif;max-width:760px;">'
-        f'<h2 style="color:#111827;">Relatório Semanal — {data_ref}</h2>'
-        f'<p>Olá, <strong>{nome}</strong>.</p>'
+        f'<h2 style="color:#111827;">Weekly Report — {data_ref}</h2>'
+        f'<p>Hello, <strong>{nome}</strong>.</p>'
         f'<p><strong>Total:</strong> {len(chamados)} &nbsp;|&nbsp; '
-        f'<span style="color:#dc2626;">Atrasados: {len(atrasados)}</span> &nbsp;|&nbsp; '
-        f'Outros: {len(outros)}</p>'
+        f'<span style="color:#dc2626;">Overdue: {len(atrasados)}</span> &nbsp;|&nbsp; '
+        f'Others: {len(outros)}</p>'
         f'{secoes}{btn}'
-        '<p style="margin-top:24px;color:#9ca3af;font-size:11px;"><em>Sistema de Chamados — DTX</em></p>'
+        '<p style="margin-top:24px;color:#9ca3af;font-size:11px;"><em>Ticket System — DTX</em></p>'
         '</div>'
     )
 
     linhas = [
-        f"Relatório Semanal — {data_ref}",
-        f"Olá, {nome}.",
-        f"Total: {len(chamados)} | Atrasados: {len(atrasados)} | Outros: {len(outros)}",
+        f"Weekly Report — {data_ref}",
+        f"Hello, {nome}.",
+        f"Total: {len(chamados)} | Overdue: {len(atrasados)} | Others: {len(outros)}",
         "",
     ]
     if atrasados:
-        linhas.append("== ATRASADOS ==")
+        linhas.append("== OVERDUE ==")
         for c in atrasados:
             linhas.append(f"  {c['numero']} | {c['categoria']} | {c['solicitante']} | {c['data_abertura_fmt']} ({c['dias_aberto']}d)")
     if outros:
-        linhas.append("== ABERTOS / EM ATENDIMENTO ==")
+        linhas.append("== OPEN / IN PROGRESS ==")
         for c in outros:
             linhas.append(f"  {c['numero']} | {c['categoria']} | {c['solicitante']} | {c['data_abertura_fmt']} ({c['dias_aberto']}d)")
 
@@ -330,7 +330,7 @@ def _enviar_resumo_admins(
     linhas_sup = []
     for resp_id, lista in sorted(grupos.items(), key=lambda x: -len(x[1])):
         sup = Usuario.get_by_id(resp_id) if resp_id else None
-        nome_sup = (sup.nome if sup else None) or resp_id or "Sem responsável"
+        nome_sup = (sup.nome if sup else None) or resp_id or "No assignee"
         n_atras = sum(1 for c in lista if c["atrasado"])
         cor = "#dc2626" if n_atras else "#16a34a"
         linhas_sup.append(
@@ -344,9 +344,9 @@ def _enviar_resumo_admins(
     tabela_sup = (
         '<table style="width:100%;border-collapse:collapse;">'
         '<tr style="background:#f3f4f6;">'
-        '<th style="padding:8px 10px;text-align:left;font-size:12px;">Responsável</th>'
+        '<th style="padding:8px 10px;text-align:left;font-size:12px;">Assignee</th>'
         '<th style="padding:8px 10px;text-align:left;font-size:12px;">Total</th>'
-        '<th style="padding:8px 10px;text-align:left;font-size:12px;">Atrasados</th>'
+        '<th style="padding:8px 10px;text-align:left;font-size:12px;">Overdue</th>'
         "</tr>"
         + "".join(linhas_sup)
         + "</table>"
@@ -354,21 +354,21 @@ def _enviar_resumo_admins(
 
     btn = (
         f'<a href="{link_dash}" style="background:#2563eb;color:white;padding:10px 20px;'
-        f'text-decoration:none;border-radius:6px;display:inline-block;margin-top:20px;">Abrir painel</a>'
+        f'text-decoration:none;border-radius:6px;display:inline-block;margin-top:20px;">Open dashboard</a>'
         if link_dash else ""
     )
 
     html_admin = (
         '<div style="font-family:Arial,sans-serif;max-width:760px;">'
-        f'<h2 style="color:#111827;">Resumo Semanal — {data_ref}</h2>'
-        f'<p><strong>Total abertos:</strong> {len(chamados)} &nbsp;|&nbsp; '
-        f'<span style="color:#dc2626;"><strong>Atrasados:</strong> {len(atrasados)}</span></p>'
-        '<h3 style="margin-top:20px;">Por responsável</h3>'
+        f'<h2 style="color:#111827;">Weekly Summary — {data_ref}</h2>'
+        f'<p><strong>Total open:</strong> {len(chamados)} &nbsp;|&nbsp; '
+        f'<span style="color:#dc2626;"><strong>Overdue:</strong> {len(atrasados)}</span></p>'
+        '<h3 style="margin-top:20px;">By assignee</h3>'
         f'{tabela_sup}'
-        f'<h3 style="color:#dc2626;margin-top:24px;">Chamados atrasados ({len(atrasados)})</h3>'
-        + (_tabela_html(atrasados, link_base) if atrasados else '<p style="color:#6b7280;">Nenhum.</p>')
+        f'<h3 style="color:#dc2626;margin-top:24px;">Overdue tickets ({len(atrasados)})</h3>'
+        + (_tabela_html(atrasados, link_base) if atrasados else '<p style="color:#6b7280;">None.</p>')
         + f'{btn}'
-        '<p style="margin-top:24px;color:#9ca3af;font-size:11px;"><em>Sistema de Chamados — DTX</em></p>'
+        '<p style="margin-top:24px;color:#9ca3af;font-size:11px;"><em>Ticket System — DTX</em></p>'
         '</div>'
     )
 

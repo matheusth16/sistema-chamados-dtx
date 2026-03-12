@@ -88,7 +88,7 @@ def get_language_code(lang_param):
     """
     if lang_param in SUPPORTED_LANGUAGES:
         return lang_param
-    return 'pt_BR'
+    return 'en'
 
 def get_translated_sector(sector_name, language='pt_BR'):
     """
@@ -191,7 +191,7 @@ def flash_t(key, category='message', **kwargs):
         **kwargs: Argumentos para formatação
     """
     try:
-        lang = session.get('language', 'pt_BR')
+        lang = session.get('language', 'en')
     except RuntimeError:
         # Fora do contexto da requisição
         lang = 'pt_BR'

@@ -390,6 +390,49 @@ def carregar_mais():
         return jsonify({'sucesso': False, 'erro': ERRO_INTERNO_MSG}), 500
 
 
+@main.route('/api/onboarding/avancar', methods=['POST'])
+@login_required
+def api_onboarding_avancar():
+    """Salva o passo atual do tour de onboarding."""
+    try:
+        dados = request.get_json() or {}
+        passo = dados.get('passo')
+        if passo is None or not isinstance(passo, int) or passo < 0:
+            return jsonify({'sucesso': False, 'erro': 'passo inválido'}), 400
+        from app.services.onboarding_service import avancar_passo
+        ok = avancar_passo(current_user.id, passo)
+        return jsonify({'sucesso': ok}), 200
+    except Exception as e:
+        logger.exception("Erro em api_onboarding_avancar: %s", e)
+        return jsonify({'sucesso': False, 'erro': ERRO_INTERNO_MSG}), 500
+
+
+@main.route('/api/onboarding/concluir', methods=['POST'])
+@login_required
+def api_onboarding_concluir():
+    """Marca o onboarding como concluído."""
+    try:
+        from app.services.onboarding_service import concluir_onboarding
+        ok = concluir_onboarding(current_user.id)
+        return jsonify({'sucesso': ok}), 200
+    except Exception as e:
+        logger.exception("Erro em api_onboarding_concluir: %s", e)
+        return jsonify({'sucesso': False, 'erro': ERRO_INTERNO_MSG}), 500
+
+
+@main.route('/api/onboarding/pular', methods=['POST'])
+@login_required
+def api_onboarding_pular():
+    """Pula o tour e marca onboarding como concluído."""
+    try:
+        from app.services.onboarding_service import concluir_onboarding
+        ok = concluir_onboarding(current_user.id)
+        return jsonify({'sucesso': ok}), 200
+    except Exception as e:
+        logger.exception("Erro em api_onboarding_pular: %s", e)
+        return jsonify({'sucesso': False, 'erro': ERRO_INTERNO_MSG}), 500
+
+
 @main.route('/api/supervisores/lista', methods=['GET'])
 @login_required
 def api_lista_supervisores():
