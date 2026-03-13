@@ -1,0 +1,6 @@
+# Dependências de desenvolvimento (não vão para produção/Docker)
+-r requirements.txt
+
+pytest==8.4.2
+pytest-cov==6.0.0
+coverage==7.13.4
