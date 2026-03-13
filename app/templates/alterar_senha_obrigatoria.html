@@ -47,7 +47,7 @@
                         minlength="6"
                         class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm h-10 border px-3 pr-10" 
                         placeholder="••••••••">
-                    <button type="button" id="toggle-nova_senha" aria-label="Mostrar senha" title="Mostrar senha"
+                    <button type="button" id="toggle-nova_senha" aria-label="{{ t('show_password') }}" title="{{ t('show_password') }}"
                         class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600 focus:outline-none">
                         <svg id="icon-nova_senha-eye" class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
@@ -73,7 +73,7 @@
                         minlength="6"
                         class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm h-10 border px-3 pr-10" 
                         placeholder="••••••••">
-                    <button type="button" id="toggle-confirmar_senha" aria-label="Mostrar senha" title="Mostrar senha"
+                    <button type="button" id="toggle-confirmar_senha" aria-label="{{ t('show_password') }}" title="{{ t('show_password') }}"
                         class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600 focus:outline-none">
                         <svg id="icon-confirmar_senha-eye" class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
@@ -124,8 +124,8 @@ function setupPasswordToggle(inputId) {
     btn.addEventListener('click', function() {
         var isPassword = input.type === 'password';
         input.type = isPassword ? 'text' : 'password';
-        btn.setAttribute('aria-label', isPassword ? 'Ocultar senha' : 'Mostrar senha');
-        btn.setAttribute('title', isPassword ? 'Ocultar senha' : 'Mostrar senha');
+        btn.setAttribute('aria-label', isPassword ? '{{ t("hide_password") }}' : '{{ t("show_password") }}');
+        btn.setAttribute('title', isPassword ? '{{ t("hide_password") }}' : '{{ t("show_password") }}');
         iconEye.classList.toggle('hidden', isPassword);
         iconEyeOff.classList.toggle('hidden', !isPassword);
     });

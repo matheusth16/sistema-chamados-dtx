@@ -8,8 +8,11 @@ Consolida a lógica que estava repetida em 3 locais:
 """
 
 import logging
+import threading
 from firebase_admin import firestore
+from flask import current_app, session
 from app.database import db
+from app.i18n import get_translation, get_translated_status
 from app.models_historico import Historico
 from app.models_usuario import Usuario
 from app.services.notifications import notificar_solicitante_status
@@ -103,9 +106,22 @@ def atualizar_status_chamado(
                     valor_novo=(motivo_cancelamento or '').strip()[:500]
                 ).save()
         
-        # Envia notificação ao solicitante (não para Cancelado)
+        # Envia notificação ao solicitante em background (não para Cancelado)
         if novo_status in ('Em Atendimento', 'Concluído'):
-            _notificar_solicitante(chamado_id, data_chamado, novo_status)
+            try:
+                _app = current_app._get_current_object()
+                _cid = chamado_id
+                _data = data_chamado
+                _status = novo_status
+
+                def _notif():
+                    with _app.app_context():
+                        _notificar_solicitante(_cid, _data, _status)
+
+                threading.Thread(target=_notif, daemon=True).start()
+            except RuntimeError:
+                # Fora de contexto Flask (testes) — notifica de forma síncrona
+                _notificar_solicitante(chamado_id, data_chamado, novo_status)
             
         # Gamificação: apenas para Em Atendimento / Concluído (não para Cancelado)
         if status_anterior != novo_status:
@@ -114,9 +130,15 @@ def atualizar_status_chamado(
             elif novo_status == 'Em Atendimento':
                 GamificationService.avaliar_atendimento_inicial(usuario_id)
         
+        try:
+            lang = session.get('language', 'en')
+        except RuntimeError:
+            lang = 'en'
+        status_traduzido = get_translated_status(novo_status, lang)
+        mensagem = get_translation('status_changed_to', lang, status=status_traduzido)
         return {
             'sucesso': True,
-            'mensagem': f'Status alterado para {novo_status}',
+            'mensagem': mensagem,
             'novo_status': novo_status
         }
     

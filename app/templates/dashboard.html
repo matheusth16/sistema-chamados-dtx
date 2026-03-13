@@ -284,8 +284,23 @@
 {% endblock %}
 
 {% block page_scripts %}
+    <!-- Mensagens i18n para dashboard_otimizacoes.js -->
+    <script nonce="{{ csp_nonce }}">
+    window.DTX_MSGS = {
+        cancel_reason_prompt: {{ t('cancel_reason_prompt') | tojson }},
+        cancel_requires_reason: {{ t('cancel_requires_reason') | tojson }},
+        error_form_not_found: {{ t('error_form_not_found') | tojson }},
+        error_id_not_found: {{ t('error_id_not_found') | tojson }},
+        error_id_empty: {{ t('error_id_empty') | tojson }},
+        error_status_not_selected: {{ t('error_status_not_selected') | tojson }},
+        error_invalid_status: {{ t('error_invalid_status') | tojson }},
+        error_server: {{ t('error_server') | tojson }},
+        error_update: {{ t('error_update') | tojson }},
+        error_connection: {{ t('error_connection') | tojson }}
+    };
+    </script>
     <!-- As funções abrirModal e fecharModal já estão definidas inline acima -->
-    <script src="{{ url_for('static', filename='js/dashboard_otimizacoes.js') }}?v=4"></script>
+    <script src="{{ url_for('static', filename='js/dashboard_otimizacoes.js') }}?v=5"></script>
     <script src="{{ url_for('static', filename='js/table-row-click.js') }}"></script>
     
     <script nonce="{{ csp_nonce }}">
@@ -332,8 +347,8 @@
                             if (data.sucesso) {
                                 window.location.reload();
                             } else {
-                                alert('Erro: ' + (data.erro || 'Desconhecido'));
-                                if (btnSubmit) { btnSubmit.disabled = false; btnSubmit.innerText = 'Salvar Alteração'; }
+                                alert(data.erro || '{{ t("error_unknown") }}');
+                                if (btnSubmit) { btnSubmit.disabled = false; btnSubmit.innerText = '{{ t("save_change") }}'; }
                             }
                         })
                         .catch(function (error) {
@@ -357,7 +372,7 @@
                 var n = cbs.length;
                 if (n > 0) {
                     bulkBar.classList.remove('hidden');
-                    bulkCount.textContent = n + ' selecionado(s)';
+                    bulkCount.textContent = n + ' {{ t("items_selected_suffix") }}';
                 } else {
                     bulkBar.classList.add('hidden');
                     if (bulkSelectAll) bulkSelectAll.checked = false;
@@ -392,11 +407,11 @@
                         if (data.sucesso) {
                             window.location.reload();
                         } else {
-                            alert(data.erro || 'Erro ao atualizar');
+                            alert(data.erro || '{{ t("error_update") }}');
                             bulkApply.disabled = false;
                         }
                     }).catch(function () {
-                        alert('Erro de rede');
+                        alert('{{ t("error_connection") }}');
                         bulkApply.disabled = false;
                     });
                 });

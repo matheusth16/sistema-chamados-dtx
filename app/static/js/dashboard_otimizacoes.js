@@ -9,6 +9,20 @@ const DEBUG = Boolean(window.DTX_DEBUG) || (
     window.location && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
 );
 
+// i18n messages injected by the template via window.DTX_MSGS
+const MSGS = window.DTX_MSGS || {
+    cancel_reason_prompt: 'Informe o motivo do cancelamento:',
+    cancel_requires_reason: 'O cancelamento exige um motivo.',
+    error_form_not_found: 'Erro: Formulário não encontrado',
+    error_id_not_found: 'Erro: Campo ID não encontrado',
+    error_id_empty: 'Erro: ID do chamado vazio. Recarregue a página.',
+    error_status_not_selected: 'Erro: Status não selecionado',
+    error_invalid_status: 'Erro: Status inválido',
+    error_server: 'Erro do servidor. Contate o administrador.',
+    error_update: 'Erro ao atualizar',
+    error_connection: 'Erro de conexão. Tente novamente.'
+};
+
 function debugLog() {
     if (!DEBUG || !window.console) return;
     console.log.apply(console, arguments);
@@ -28,7 +42,7 @@ async function atualizarStatusAjax(selectElement) {
     
     if (!form) {
         debugLog('❌ Erro: formulário não encontrado');
-        mostrarNotificacao('Erro: Formulário não encontrado', 'danger');
+        mostrarNotificacao(MSGS.error_form_not_found, 'danger');
         return;
     }
 
@@ -51,7 +65,7 @@ async function atualizarStatusAjax(selectElement) {
     // Validações rigorosas
     if (!form.querySelector('input[name="chamado_id"]')) {
         debugLog('❌ Campo input[name="chamado_id"] não encontrado no formulário');
-        mostrarNotificacao('Erro: Campo ID não encontrado', 'danger');
+        mostrarNotificacao(MSGS.error_id_not_found, 'danger');
         return;
     }
 
@@ -60,13 +74,13 @@ async function atualizarStatusAjax(selectElement) {
             input_value: chamadoIdInput?.value,
             input_html: chamadoIdInput?.outerHTML
         });
-        mostrarNotificacao('Erro: ID do chamado vazio. Recarregue a página.', 'danger');
+        mostrarNotificacao(MSGS.error_id_empty, 'danger');
         return;
     }
 
     if (!novoStatus) {
         debugLog('❌ novo_status está vazio');
-        mostrarNotificacao('Erro: Status não selecionado', 'danger');
+        mostrarNotificacao(MSGS.error_status_not_selected, 'danger');
         return;
     }
 
@@ -74,7 +88,7 @@ async function atualizarStatusAjax(selectElement) {
     const statusValidos = ['Aberto', 'Em Atendimento', 'Concluído', 'Cancelado'];
     if (!statusValidos.includes(novoStatus)) {
         debugLog('❌ Status inválido:', novoStatus);
-        mostrarNotificacao(`Erro: Status inválido "${novoStatus}"`, 'danger');
+        mostrarNotificacao(`${MSGS.error_invalid_status} "${novoStatus}"`, 'danger');
         selectElement.value = statusAnterior;
         return;
     }
@@ -86,9 +100,9 @@ async function atualizarStatusAjax(selectElement) {
 
     let motivoCancelamento = '';
     if (novoStatus === 'Cancelado') {
-        motivoCancelamento = (window.prompt('Informe o motivo do cancelamento:') || '').trim();
+        motivoCancelamento = (window.prompt(MSGS.cancel_reason_prompt) || '').trim();
         if (!motivoCancelamento) {
-            mostrarNotificacao('O cancelamento exige um motivo.', 'warning');
+            mostrarNotificacao(MSGS.cancel_requires_reason, 'warning');
             selectElement.value = statusAnterior;
             return;
         }
@@ -133,7 +147,7 @@ async function atualizarStatusAjax(selectElement) {
             debugLog('❌ Erro ao parsear JSON:', parseError);
             debugLog('Resposta raw:', text);
             selectElement.value = statusAnterior;
-            mostrarNotificacao('Erro do servidor. Contate o administrador.', 'danger');
+            mostrarNotificacao(MSGS.error_server, 'danger');
             return false;
         }
 
@@ -153,14 +167,14 @@ async function atualizarStatusAjax(selectElement) {
             // ❌ Erro: reverte o status
             debugLog('❌ Erro na resposta:', resultado);
             selectElement.value = statusAnterior;
-            mostrarNotificacao(resultado.erro || 'Erro ao atualizar', 'danger');
+            mostrarNotificacao(resultado.erro || MSGS.error_update, 'danger');
             return false;
         }
     } catch (erro) {
         debugLog('❌ Erro de conexão:', erro);
         debugLog('Stack trace:', erro.stack);
         selectElement.value = statusAnterior;
-        mostrarNotificacao('Erro de conexão. Tente novamente.', 'danger');
+        mostrarNotificacao(MSGS.error_connection, 'danger');
         return false;
     } finally {
         selectElement.disabled = false;
@@ -208,6 +222,7 @@ function mostrarNotificacao(mensagem, tipo = 'info') {
     const classes = {
         success: 'bg-green-50 text-green-800 border-green-200',
         danger: 'bg-red-50 text-red-800 border-red-200',
+        warning: 'bg-yellow-50 text-yellow-800 border-yellow-200',
         info: 'bg-blue-50 text-blue-800 border-blue-200'
     };
 

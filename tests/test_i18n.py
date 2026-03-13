@@ -19,10 +19,10 @@ def test_get_language_code_valido_retorna_codigo():
     assert get_language_code('es') == 'es'
 
 
-def test_get_language_code_invalido_retorna_pt_BR():
-    """get_language_code com código inválido retorna pt_BR."""
-    assert get_language_code('xx') == 'pt_BR'
-    assert get_language_code(None) == 'pt_BR'
+def test_get_language_code_invalido_retorna_padrao():
+    """get_language_code com código inválido retorna o idioma padrão (en)."""
+    assert get_language_code('xx') == 'en'
+    assert get_language_code(None) == 'en'
 
 
 def test_get_translation_chave_existente_pt_BR():

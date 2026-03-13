@@ -18,8 +18,10 @@
       type="image/x-icon"
       href="{{ url_for('static', filename='favicon.ico') }}"
     />
-    <!-- Em produção, use Tailwind via PostCSS ou CLI: https://tailwindcss.com/docs/installation -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/tailwind.min.css') }}"
+    />
     <script
       src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js?t=1"
       crossorigin="anonymous"
@@ -43,29 +45,6 @@
       rel="stylesheet"
       href="{{ url_for('static', filename='css/table-filters.css') }}"
     />
-    <script nonce="{{ csp_nonce }}">
-      tailwind.config = {
-        theme: {
-          extend: {
-            fontFamily: {
-              sans: ['Inter', 'sans-serif'],
-              display: ['"Plus Jakarta Sans"', 'sans-serif'],
-            }
-          }
-        }
-      }
-    </script>
-    <style nonce="{{ csp_nonce }}">
-      body {
-        font-family: "Inter", sans-serif;
-      }
-      /* Custom Focus Ring globally */
-      *:focus-visible {
-        outline: none;
-        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
-        border-color: #818cf8 !important;
-      }
-    </style>
   </head>
 
   <body
@@ -312,14 +291,14 @@
             });
         }
 
+        var _ultimoPollBadge = 0;
         function atualizarSóBadge() {
-          fetch('{{ url_for("main.api_notificacoes_listar") }}', {
+          fetch('{{ url_for("main.api_notificacoes_contar") }}', {
             credentials: "same-origin",
           })
-            .then(function (r) {
-              return r.json();
-            })
+            .then(function (r) { return r.json(); })
             .then(function (data) {
+              _ultimoPollBadge = Date.now();
               if (data.total_nao_lidas !== undefined)
                 atualizarBadge(data.total_nao_lidas);
             })
@@ -370,11 +349,16 @@
         }
 
         carregarNotificacoes();
-        var pollInterval = setInterval(function () {
+        var _POLL_MS = 120000; // 2 minutos
+        var _DEBOUNCE_MS = 30000; // ignora visibilitychange se polou há < 30s
+        setInterval(function () {
           if (document.visibilityState === "visible") atualizarSóBadge();
-        }, 60000);
+        }, _POLL_MS);
         document.addEventListener("visibilitychange", function () {
-          if (document.visibilityState === "visible") atualizarSóBadge();
+          if (
+            document.visibilityState === "visible" &&
+            Date.now() - _ultimoPollBadge > _DEBOUNCE_MS
+          ) atualizarSóBadge();
         });
       })();
     </script>

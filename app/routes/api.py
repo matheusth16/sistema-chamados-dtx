@@ -129,7 +129,8 @@ def api_editar_chamado():
         if resultado.get('sucesso'):
             return jsonify({'sucesso': True, 'mensagem': resultado.get('mensagem'), 'dados': resultado.get('dados', {})}), 200
         else:
-            return jsonify({'sucesso': False, 'erro': resultado.get('erro')}), 400
+            http_code = resultado.get('codigo', 400)
+            return jsonify({'sucesso': False, 'erro': resultado.get('erro')}), http_code
 
     except Exception as e:
         logger.exception("Erro em api_editar_chamado: %s", e)
@@ -215,6 +216,18 @@ def api_notificacoes_listar():
     except Exception as e:
         logger.exception("Erro ao listar notificações: %s", e)
         return jsonify({'notificacoes': [], 'total_nao_lidas': 0}), 200
+
+
+@main.route('/api/notificacoes/contar', methods=['GET'])
+@login_required
+def api_notificacoes_contar():
+    """Retorna apenas o total de notificações não lidas (sem transferir os documentos)."""
+    try:
+        total = contar_nao_lidas(current_user.id)
+        return jsonify({'total_nao_lidas': total}), 200
+    except Exception as e:
+        logger.exception("Erro ao contar notificações: %s", e)
+        return jsonify({'total_nao_lidas': 0}), 200
 
 
 @main.route('/api/notificacoes/<notificacao_id>/ler', methods=['POST'])

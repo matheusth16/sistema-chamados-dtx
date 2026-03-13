@@ -75,11 +75,12 @@ def contar_nao_lidas(usuario_id: str) -> int:
     if not usuario_id:
         return 0
     try:
-        docs = db.collection('notificacoes')\
+        result = db.collection('notificacoes')\
             .where('usuario_id', '==', usuario_id)\
             .where('lida', '==', False)\
-            .stream()
-        return sum(1 for _ in docs)
+            .count()\
+            .get()
+        return result[0][0].value
     except Exception as e:
         logger.exception(f"Erro ao contar notificações: {e}")
         return 0
@@ -106,13 +107,22 @@ def marcar_todas_como_lidas(usuario_id: str) -> int:
     if not usuario_id:
         return 0
     try:
-        docs = db.collection('notificacoes').where('usuario_id', '==', usuario_id).where('lida', '==', False).stream()
-        count = 0
-        for doc in docs:
-            doc.reference.update({'lida': True})
-            count += 1
-        if count:
-            logger.debug(f"Notificações marcadas como lidas: usuario={usuario_id}, count={count}")
+        docs = list(
+            db.collection('notificacoes')
+            .where('usuario_id', '==', usuario_id)
+            .where('lida', '==', False)
+            .stream()
+        )
+        count = len(docs)
+        if not count:
+            return 0
+        # Firestore batch limit: 500 ops
+        for i in range(0, count, 500):
+            batch = db.batch()
+            for doc in docs[i:i + 500]:
+                batch.update(doc.reference, {'lida': True})
+            batch.commit()
+        logger.debug(f"Notificações marcadas como lidas: usuario={usuario_id}, count={count}")
         return count
     except Exception as e:
         logger.exception(f"Erro ao marcar todas notificações como lidas: {e}")

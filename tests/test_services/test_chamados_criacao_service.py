@@ -1,11 +1,11 @@
 """Testes do serviço de criação de chamados (criar_chamado)."""
 
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, call
 
 from app.services.chamados_criacao_service import criar_chamado
 
 
-def test_criar_chamado_com_dados_validos_retorna_id_e_numero():
+def test_criar_chamado_com_dados_validos_retorna_id_e_numero(app):
     """criar_chamado com form válido e mocks retorna (chamado_id, numero_chamado, None, aviso)."""
     form = {
         'categoria': 'Manutencao',
@@ -31,23 +31,24 @@ def test_criar_chamado_com_dados_validos_retorna_id_e_numero():
                     mock_ref.id = 'chamado_id_123'
                     mock_retry.return_value = (None, mock_ref)
                     with patch('app.services.chamados_criacao_service.Historico') as mock_hist:
-                        with patch('app.services.chamados_criacao_service.notificar_aprovador_novo_chamado'):
-                            with patch('app.services.chamados_criacao_service.criar_notificacao'):
-                                with patch('app.services.chamados_criacao_service.enviar_webpush_usuario'):
-                                    chamado_id, numero, erro, aviso = criar_chamado(
-                                        form=form,
-                                        files=files,
-                                        solicitante_id='sol1',
-                                        solicitante_nome='Solicitante Teste',
-                                        area_solicitante='Manutencao',
-                                        solicitante_email='sol@test.com',
-                                    )
+                        # threading.Thread mockado para não disparar thread real no teste
+                        with patch('app.services.chamados_criacao_service.threading.Thread') as mock_thread:
+                            with app.app_context():
+                                chamado_id, numero, erro, aviso = criar_chamado(
+                                    form=form,
+                                    files=files,
+                                    solicitante_id='sol1',
+                                    solicitante_nome='Solicitante Teste',
+                                    area_solicitante='Manutencao',
+                                    solicitante_email='sol@test.com',
+                                )
 
     assert chamado_id == 'chamado_id_123'
     assert numero == '2026-099'
     assert erro is None
     mock_retry.assert_called_once()
     mock_hist.return_value.save.assert_called_once()
+    mock_thread.return_value.start.assert_called_once()  # thread de notificação disparada
 
 
 def test_criar_chamado_anexo_invalido_retorna_erro():

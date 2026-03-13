@@ -3,12 +3,11 @@ import logging
 import io
 from datetime import datetime
 from typing import List, Dict, Any
-from flask import render_template, request, redirect, url_for, send_file, flash, Response, current_app
+from flask import render_template, request, redirect, url_for, send_file, flash, Response, current_app, session
 from urllib.parse import urlparse
-from app.i18n import flash_t
+from app.i18n import flash_t, get_translation
 from flask_login import login_required, current_user
 from firebase_admin import firestore
-import pandas as pd
 from config import Config
 from app.routes import main
 from app.limiter import limiter
@@ -185,14 +184,15 @@ def editar_chamado_pagina() -> Response:
     )
     
     if resultado.get('sucesso'):
-        mensagem = resultado.get('mensagem', 'Alterações salvas.')
-        flash(mensagem, 'success' if 'sucesso' in mensagem.lower() or 'salvas' in mensagem.lower() or 'foi feita' in mensagem.lower() else 'info')
+        lang = session.get('language', 'en')
+        mensagem = resultado.get('mensagem') or get_translation('changes_saved', lang)
+        flash(mensagem, 'success')
     else:
         erro = resultado.get('erro', '')
         if erro:
             flash(erro, 'danger')
         else:
-            flash_t('error_updating_with_msg', 'danger', error="Erro desconhecido")
+            flash_t('error_server', 'danger')
 
     return redirect(url_for('main.visualizar_detalhe_chamado', chamado_id=chamado_id))
 
@@ -255,6 +255,7 @@ def exportar() -> Response:
                 'Conclusão': formatar_data_para_excel(c.data_conclusao),
                 'Descrição': c.descricao
             })
+        import pandas as pd  # lazy: evita carregar numpy/pyarrow na inicialização
         df = pd.DataFrame(dados)
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='openpyxl') as writer:

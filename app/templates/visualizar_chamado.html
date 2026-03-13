@@ -243,9 +243,9 @@
                                 <div class="relative">
                                     <select name="novo_responsavel_id"
                                         class="appearance-none block w-full bg-slate-50/80 border border-slate-200 text-sm font-semibold text-slate-700 rounded-xl focus:ring-indigo-400 focus:border-indigo-400 transition-all py-3 px-4 focus:bg-white shadow-inner focus:ring-4 hover:border-slate-300">
-                                        <option value="">{{ t('no_change') if t else 'Sem alteração' }} (Atual: {{ chamado.responsavel or '—' }})</option>
+                                        <option value="">{{ t('no_change') if t else 'Sem alteração' }} ({{ t('current_label') if t else 'Atual' }}: {{ chamado.responsavel or '—' }})</option>
                                         {% for sup in supervisores_detalhados %}
-                                        <option value="{{ sup.id }}">{{ sup.nome }} ({{ sup.area }})</option>
+                                        <option value="{{ sup.id }}">{{ sup.nome }} ({{ translate_sector_list(sup.area) if sup.area else '—' }})</option>
                                         {% endfor %}
                                     </select>
                                     <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-slate-400">
@@ -340,7 +340,7 @@
                             <div>
                                 <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">{{ t('sla_custom_label') if t else 'SLA' }}</label>
                                 <span class="inline-flex px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-100 text-amber-700">
-                                    {{ chamado.sla_dias }} {{ 'dias' }}
+                                    {{ chamado.sla_dias }} {{ t('days') if t else 'dias' }}
                                     <span class="ml-1 opacity-60">({{ t('sla_custom_badge') if t else 'personalizado' }})</span>
                                 </span>
                             </div>
@@ -348,7 +348,7 @@
 
                             <div class="bg-indigo-50/50 border border-indigo-100/50 rounded-xl p-4 text-center mt-6 shadow-inner">
                                 <p class="text-[10px] text-indigo-700 font-black uppercase tracking-widest">{{ t('responsible_for_ticket') if t else 'Contato' }}</p>
-                                <p class="text-indigo-950 font-bold text-sm mt-1 bg-white inline-block px-3 py-1 rounded-lg border border-indigo-100 mt-2">{{ chamado.responsavel or 'Equipe Responsável' }}</p>
+                                <p class="text-indigo-950 font-bold text-sm mt-1 bg-white inline-block px-3 py-1 rounded-lg border border-indigo-100 mt-2">{{ chamado.responsavel or (t('responsible_team') if t else 'Equipe Responsável') }}</p>
                             </div>
                         </div>
                         {% endif %}

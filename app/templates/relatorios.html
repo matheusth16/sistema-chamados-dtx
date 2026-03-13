@@ -149,9 +149,9 @@
                                 {% if insight.tipo == 'aviso' %}bg-amber-100 text-amber-700
                                 {% elif insight.tipo == 'sucesso' %}bg-emerald-100 text-emerald-700
                                 {% else %}bg-blue-100 text-blue-700{% endif %}">
-                                {% if insight.tipo == 'aviso' %}⚠ Alerta
-                                {% elif insight.tipo == 'sucesso' %}✓ OK
-                                {% else %}ℹ Info{% endif %}
+                                {% if insight.tipo == 'aviso' %}{{ t('insight_badge_warning') }}
+                                {% elif insight.tipo == 'sucesso' %}{{ t('insight_badge_ok') }}
+                                {% else %}{{ t('insight_badge_info') }}{% endif %}
                             </span>
                         </div>
                     </div>

@@ -22,4 +22,4 @@ ENV PYTHONUNBUFFERED=1
 ENV PORT=8080
 
 # Comando para iniciar a aplicação
-CMD exec gunicorn --bind 0.0.0.0:${PORT} --workers 4 --threads 2 --worker-class gthread --worker-tmp-dir /dev/shm --timeout 120 run:app
+CMD exec gunicorn --bind 0.0.0.0:${PORT} --workers 1 --threads 8 --worker-class gthread --worker-tmp-dir /dev/shm --timeout 120 run:app

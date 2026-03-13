@@ -5,6 +5,7 @@ Centraliza a lógica de: validação, upload, atribuição de responsável,
 Grupo RL, persistência e notificações. Usado pela rota de novo chamado.
 """
 import logging
+import threading
 from typing import Any, Dict, Optional, Tuple
 
 from flask import current_app
@@ -154,42 +155,48 @@ def criar_chamado(
             acao='criacao',
         ).save()
 
-        try:
-            responsavel_usuario = Usuario.get_by_id(responsavel_id) if responsavel_id else None
-            descricao_resumo = (descricao or '')[:500]
-            notificar_aprovador_novo_chamado(
-                chamado_id=chamado_id,
-                numero_chamado=numero_chamado,
-                categoria=categoria,
-                tipo_solicitacao=tipo,
-                descricao_resumo=descricao_resumo,
-                area=area_solicitante or 'Geral',
-                solicitante_nome=solicitante_nome,
-                responsavel_usuario=responsavel_usuario,
-                solicitante_email=solicitante_email,
-            )
-            if responsavel_id:
-                criar_notificacao(
-                    usuario_id=responsavel_id,
-                    chamado_id=chamado_id,
-                    numero_chamado=numero_chamado,
-                    titulo=f"Novo chamado: {numero_chamado}",
-                    mensagem=f"{categoria} · Solicitante: {solicitante_nome}",
-                    tipo='novo_chamado',
-                )
-                base_url = current_app.config.get('APP_BASE_URL', '').rstrip('/')
-                url_chamado = f"{base_url}/chamado/{chamado_id}/historico" if base_url else None
+        _app = current_app._get_current_object()
+
+        def _notificar():
+            """Envia todas as notificações em background para não bloquear o request."""
+            with _app.app_context():
                 try:
-                    enviar_webpush_usuario(
-                        responsavel_id,
-                        titulo=f"Novo chamado: {numero_chamado}",
-                        corpo=f"{categoria} · {solicitante_nome}",
-                        url=url_chamado,
+                    responsavel_usuario = Usuario.get_by_id(responsavel_id) if responsavel_id else None
+                    notificar_aprovador_novo_chamado(
+                        chamado_id=chamado_id,
+                        numero_chamado=numero_chamado,
+                        categoria=categoria,
+                        tipo_solicitacao=tipo,
+                        descricao_resumo=(descricao or '')[:500],
+                        area=area_solicitante or 'Geral',
+                        solicitante_nome=solicitante_nome,
+                        responsavel_usuario=responsavel_usuario,
+                        solicitante_email=solicitante_email,
                     )
-                except Exception as wp_e:
-                    logger.debug("Web Push não enviado: %s", wp_e)
-        except Exception as e:
-            logger.warning("Notificação ao aprovador não enviada: %s", e)
+                    if responsavel_id:
+                        criar_notificacao(
+                            usuario_id=responsavel_id,
+                            chamado_id=chamado_id,
+                            numero_chamado=numero_chamado,
+                            titulo=f"Novo chamado: {numero_chamado}",
+                            mensagem=f"{categoria} · Solicitante: {solicitante_nome}",
+                            tipo='novo_chamado',
+                        )
+                        base_url = _app.config.get('APP_BASE_URL', '').rstrip('/')
+                        url_chamado = f"{base_url}/chamado/{chamado_id}/historico" if base_url else None
+                        try:
+                            enviar_webpush_usuario(
+                                responsavel_id,
+                                titulo=f"Novo chamado: {numero_chamado}",
+                                corpo=f"{categoria} · {solicitante_nome}",
+                                url=url_chamado,
+                            )
+                        except Exception as wp_e:
+                            logger.debug("Web Push não enviado: %s", wp_e)
+                except Exception as e:
+                    logger.warning("Notificação ao aprovador não enviada: %s", e)
+
+        threading.Thread(target=_notificar, daemon=True).start()
 
         logger.info("Chamado criado: %s (ID: %s)", numero_chamado, chamado_id)
         aviso = motivo_atribuicao if "Aguardando atribuição" in motivo_atribuicao else None

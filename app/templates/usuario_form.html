@@ -75,7 +75,7 @@
                 <!-- Áreas (visível apenas para supervisor) -->
                 <div id="areaDiv" class="hidden">
                     <label class="block text-sm font-medium text-gray-700 mb-2">{{ t('areas_sectors_select_one_or_more') }}</label>
-                    <p class="text-xs text-gray-500 mb-2">Supervisores devem ser atribuídos a uma ou mais áreas. Administradores não precisam de áreas específicas.</p>
+                    <p class="text-xs text-gray-500 mb-2">{{ t('supervisor_area_help') }}</p>
                     <div class="grid grid-cols-2 gap-2 bg-gray-50 p-3 rounded-md border border-gray-300">
                         {% set areas_usuario = usuario.areas if usuario and usuario.areas else [] %}
                         <label class="inline-flex items-center"><input type="checkbox" name="areas" value="Manutencao"
@@ -103,10 +103,10 @@
                 <!-- Senha -->
                 <div class="bg-blue-50 border border-blue-200 rounded-md p-4">
                     <p class="text-sm text-blue-800">
-                        <strong>ℹ️ Sobre a senha:</strong> Todos os usuários são criados com a senha padrão <code class="bg-blue-100 px-2 py-1 rounded">123456</code>. 
-                        Na primeira vez que fizerem login, serão obrigados a criar uma nova senha.
+                        <strong>ℹ️ {{ t('password_info_header') }}</strong> {{ t('password_info_created_with') }} <code class="bg-blue-100 px-2 py-1 rounded">123456</code>.
+                        {{ t('password_info_first_login') }}
                     </p>
-                    <p class="text-xs text-blue-600 mt-2">Se precisar resetar a senha de um usuário existente, use o botão "Resetar Senha" na lista de usuários.</p>
+                    <p class="text-xs text-blue-600 mt-2">{{ t('password_reset_hint') }}</p>
                 </div>
 
                 <!-- Botões -->

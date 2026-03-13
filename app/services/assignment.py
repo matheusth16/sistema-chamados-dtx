@@ -13,7 +13,6 @@ Uso:
 
 import logging
 from typing import Optional, Dict, List
-from google.cloud.firestore_v1.base_query import FieldFilter, BaseCompositeFilter
 from app.database import db
 from app.models_usuario import Usuario
 from app.utils_areas import setor_para_area
@@ -147,38 +146,43 @@ class AtribuidorAutomatico:
     
     def _contar_chamados_abertos(self, supervisores: List[Usuario]) -> List[Dict]:
         """
-        Conta quantos chamados abertos cada supervisor tem
-        
+        Conta quantos chamados abertos cada supervisor tem.
+
+        Usa uma única query IN (em chunks de 30) em vez de uma query por supervisor,
+        eliminando o N+1 original.
+
         Returns: Lista com dicts contendo usuario e chamados_abertos
         """
-        supervisores_com_carga = []
-        
+        if not supervisores:
+            return []
+
+        nomes = [sup.nome for sup in supervisores]
+        contagem: Dict[str, int] = {nome: 0 for nome in nomes}
+
+        try:
+            # Firestore IN suporta até 30 valores por query
+            _CHUNK = 30
+            for i in range(0, len(nomes), _CHUNK):
+                chunk = nomes[i:i + _CHUNK]
+                docs = db.collection('chamados')\
+                    .where('responsavel', 'in', chunk)\
+                    .stream()
+                for doc in docs:
+                    d = doc.to_dict()
+                    if d.get('status') != 'Concluído':
+                        resp = d.get('responsavel')
+                        if resp in contagem:
+                            contagem[resp] += 1
+        except Exception as e:
+            logger.warning(f"Erro ao contar chamados em batch: {e}")
+
+        result = []
         for sup in supervisores:
-            try:
-                # Conta chamados não concluídos atribuídos ao supervisor
-                filtro = BaseCompositeFilter('AND', [
-                    FieldFilter('responsavel', '==', sup.nome),
-                    FieldFilter('status', '!=', 'Concluído'),
-                ])
-                docs = db.collection('chamados').where(filter=filtro).stream()
-                
-                count = sum(1 for _ in docs)
-                
-                supervisores_com_carga.append({
-                    'usuario': sup,
-                    'chamados_abertos': count
-                })
-                
-                logger.debug(f"Supervisor {sup.nome}: {count} chamados abertos")
-            
-            except Exception as e:
-                logger.warning(f"Erro ao contar chamados para {sup.nome}: {e}")
-                supervisores_com_carga.append({
-                    'usuario': sup,
-                    'chamados_abertos': 0
-                })
-        
-        return supervisores_com_carga
+            count = contagem[sup.nome]
+            logger.debug(f"Supervisor {sup.nome}: {count} chamados abertos")
+            result.append({'usuario': sup, 'chamados_abertos': count})
+
+        return result
     
     def _atribuir_balanceamento(self, supervisores_com_carga: List[Dict], area: str) -> Optional[Dict]:
         """

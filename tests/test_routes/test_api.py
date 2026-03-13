@@ -31,7 +31,7 @@ def test_api_editar_chamado_chamado_inexistente_retorna_404(client_logado_superv
     """POST /api/editar-chamado com ID inexistente retorna 404."""
     mock_doc = MagicMock()
     mock_doc.exists = False
-    with patch('app.routes.api.db') as mock_db:
+    with patch('app.services.edicao_chamado_service.db') as mock_db:
         mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
         r = client_logado_supervisor.post(
             '/api/editar-chamado',
@@ -59,9 +59,10 @@ def test_api_editar_chamado_supervisor_outra_area_retorna_403(client_logado_supe
         if uid == 'sup_1':
             return supervisor_user
         return None
-    with patch('app.routes.api.db') as mock_db:
+    # O serviço usa app.services.edicao_chamado_service.db, não app.routes.api.db
+    with patch('app.services.edicao_chamado_service.db') as mock_db:
         mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
-        with patch('app.routes.api.Usuario.get_by_id', side_effect=get_by_id_side_effect):
+        with patch('app.services.edicao_chamado_service.Usuario.get_by_id', side_effect=get_by_id_side_effect):
             r = client_logado_supervisor.post(
                 '/api/editar-chamado',
                 data={'chamado_id': 'ch_ti_123'},

@@ -5,6 +5,7 @@ Centraliza a lógica de listagem para "Meus chamados" (solicitante) com
 paginação por cursor, contagens por status e fallback quando o índice Firestore não existe.
 """
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from typing import Any, Dict, List
 
@@ -132,17 +133,24 @@ def listar_meus_chamados(
     # Ordena por prioridade (Projetos=0 primeiro) e depois por data_abertura
     q = q.order_by('prioridade').order_by('data_abertura', direction=firestore.Query.DESCENDING)
 
-    total_chamados = obter_total_por_contagem(q) or 0
-    status_counts = {'Aberto': 0, 'Em Atendimento': 0, 'Concluído': 0, 'Cancelado': 0}
-    try:
-        base_ref = db.collection('chamados').where('solicitante_id', '==', user_id)
-        if rl_codigo:
-            base_ref = base_ref.where('rl_codigo', '==', rl_codigo)
-        for st in ('Aberto', 'Em Atendimento', 'Concluído', 'Cancelado'):
-            c = obter_total_por_contagem(base_ref.where('status', '==', st))
-            status_counts[st] = c if c is not None else 0
-    except Exception as e:
-        logger.debug("Contagem por status em meus_chamados: %s", e)
+    base_ref = db.collection('chamados').where('solicitante_id', '==', user_id)
+    if rl_codigo:
+        base_ref = base_ref.where('rl_codigo', '==', rl_codigo)
+
+    _STATUS = ('Aberto', 'Em Atendimento', 'Concluído', 'Cancelado')
+
+    def _contar_total():
+        return obter_total_por_contagem(q) or 0
+
+    def _contar_status(st):
+        return st, obter_total_por_contagem(base_ref.where('status', '==', st)) or 0
+
+    # 5 aggregation queries independentes → rodam concorrentemente
+    with ThreadPoolExecutor(max_workers=5) as ex:
+        fut_total = ex.submit(_contar_total)
+        fut_status = [ex.submit(_contar_status, st) for st in _STATUS]
+        total_chamados = fut_total.result()
+        status_counts = {st: c for st, c in (f.result() for f in fut_status)}
 
     total_paginas = max(1, (total_chamados + itens_por_pagina - 1) // itens_por_pagina)
     pagina_atual = max(1, min(pagina_atual, total_paginas))

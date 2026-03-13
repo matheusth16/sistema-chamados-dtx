@@ -56,7 +56,7 @@
                         required 
                         class="block w-full rounded-xl border-gray-300 shadow-sm focus:border-indigo-400 focus:ring-4 focus:ring-indigo-400/20 sm:text-sm h-11 border px-4 pr-10 transition-all duration-200" 
                         placeholder="••••••••">
-                    <button type="button" id="toggle-senha" aria-label="Mostrar senha" title="Mostrar senha"
+                    <button type="button" id="toggle-senha" aria-label="{{ t('show_password') }}" title="{{ t('show_password') }}"
                         class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600 focus:outline-none">
                         <svg id="icon-senha-eye" class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
@@ -116,8 +116,8 @@
     btn.addEventListener('click', function() {
         var isPassword = input.type === 'password';
         input.type = isPassword ? 'text' : 'password';
-        btn.setAttribute('aria-label', isPassword ? 'Ocultar senha' : 'Mostrar senha');
-        btn.setAttribute('title', isPassword ? 'Ocultar senha' : 'Mostrar senha');
+        btn.setAttribute('aria-label', isPassword ? '{{ t("hide_password") }}' : '{{ t("show_password") }}');
+        btn.setAttribute('title', isPassword ? '{{ t("hide_password") }}' : '{{ t("show_password") }}');
         iconEye.classList.toggle('hidden', isPassword);
         iconEyeOff.classList.toggle('hidden', !isPassword);
     });

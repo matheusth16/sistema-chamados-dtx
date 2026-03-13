@@ -75,6 +75,23 @@ def create_app():
     if not app.testing:
         _iniciar_scheduler(app)
 
+    # Aquece os caches estáticos em background para reduzir latência do primeiro request
+    if not app.testing:
+        import threading
+        def _warmup():
+            with app.app_context():
+                try:
+                    from app.cache import get_static_cached
+                    from app.models_categorias import CategoriaSetor, CategoriaImpacto, CategoriaGate
+                    from app.models_usuario import Usuario
+                    get_static_cached('categorias_setor', CategoriaSetor.get_all)
+                    get_static_cached('categorias_impacto', CategoriaImpacto.get_all)
+                    get_static_cached('categorias_gate', CategoriaGate.get_all)
+                    get_static_cached('usuarios_all', Usuario.get_all)
+                except Exception:
+                    pass  # warmup é best-effort, nunca deve impedir o startup
+        threading.Thread(target=_warmup, daemon=True).start()
+
     return app
 
 
@@ -299,7 +316,7 @@ def _configurar_seguranca(app: Flask) -> None:
 
 def _configurar_i18n(app: Flask) -> None:
     """Configura sistema de internacionalização (i18n)"""
-    from app.i18n import get_translation, get_translated_sector, get_translated_category, get_translated_status, get_translated_field_label
+    from app.i18n import get_translation, get_translated_sector, get_translated_sector_list, get_translated_category, get_translated_status, get_translated_field_label
     
     @app.before_request
     def antes_da_requisicao():
@@ -320,6 +337,11 @@ def _configurar_i18n(app: Flask) -> None:
             """Traduz o nome de um setor no template"""
             lang = session.get('language', 'en')
             return get_translated_sector(sector_name, lang)
+
+        def translate_sector_list(sector_string):
+            """Traduz uma string de setores separados por vírgula (ex: 'Comercial, Planejamento')"""
+            lang = session.get('language', 'en')
+            return get_translated_sector_list(sector_string, lang)
         
         def translate_category(category_name):
             """Traduz o nome de uma categoria no template"""
@@ -350,6 +372,7 @@ def _configurar_i18n(app: Flask) -> None:
         return dict(
             t=t,
             translate_sector=translate_sector,
+            translate_sector_list=translate_sector_list,
             translate_category=translate_category,
             translate_status=translate_status,
             nome_curto=nome_curto,
@@ -457,6 +480,7 @@ def _configurar_logging(app: Flask) -> None:
         maxBytes=max_bytes,
         backupCount=backup_count,
         encoding='utf-8',
+        delay=True,  # evita PermissionError no Windows ao rotacionar (OneDrive/antivírus)
     )
     file_handler.setLevel(log_level)
     file_handler.setFormatter(jsonlogger.JsonFormatter())

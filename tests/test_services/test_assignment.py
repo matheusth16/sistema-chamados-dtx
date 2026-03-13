@@ -1,6 +1,6 @@
 """Testes do serviço de atribuição automática de chamados."""
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, call
 
 
 @patch('app.services.assignment.Usuario.get_supervisores_por_area')
@@ -31,3 +31,46 @@ def test_atribuidor_aceita_estrategias_validas():
     from app.services.assignment import AtribuidorAutomatico
     with pytest.raises(ValueError):
         AtribuidorAutomatico(estrategia='inexistente')
+
+
+@patch('app.services.assignment.db')
+def test_contar_chamados_abertos_usa_query_in_unica(mock_db):
+    """_contar_chamados_abertos deve fazer UMA query IN, não uma por supervisor."""
+    from app.services.assignment import AtribuidorAutomatico
+
+    sup_a = MagicMock()
+    sup_a.nome = 'Ana'
+    sup_b = MagicMock()
+    sup_b.nome = 'Bruno'
+
+    # Dois chamados abertos para Ana, um para Bruno, um concluído (não conta)
+    def make_doc(responsavel, status):
+        d = MagicMock()
+        d.to_dict.return_value = {'responsavel': responsavel, 'status': status}
+        return d
+
+    mock_stream = [
+        make_doc('Ana', 'Aberto'),
+        make_doc('Ana', 'Em Atendimento'),
+        make_doc('Bruno', 'Aberto'),
+        make_doc('Ana', 'Concluído'),  # não deve contar
+    ]
+
+    mock_db.collection.return_value\
+        .where.return_value\
+        .stream.return_value = iter(mock_stream)
+
+    atrib = AtribuidorAutomatico()
+    result = atrib._contar_chamados_abertos([sup_a, sup_b])
+
+    # Deve ter chamado .where('responsavel', 'in', ...) apenas uma vez
+    assert mock_db.collection.return_value.where.call_count == 1
+    where_call = mock_db.collection.return_value.where.call_args
+    assert where_call[0][0] == 'responsavel'
+    assert where_call[0][1] == 'in'
+    assert set(where_call[0][2]) == {'Ana', 'Bruno'}
+
+    # Contagens corretas
+    por_nome = {r['usuario'].nome: r['chamados_abertos'] for r in result}
+    assert por_nome['Ana'] == 2
+    assert por_nome['Bruno'] == 1

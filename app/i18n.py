@@ -106,6 +106,17 @@ def get_translated_sector(sector_name, language='pt_BR'):
         return get_translation(translation_key, language)
     return sector_name
 
+def get_translated_sector_list(sector_string, language='pt_BR'):
+    """
+    Traduz uma string de setores separados por vírgula.
+    Ex: 'Comercial, Planejamento' → 'Commercial, Planning'
+    """
+    if not sector_string:
+        return sector_string
+    parts = [p.strip() for p in sector_string.split(',')]
+    return ', '.join(get_translated_sector(p, language) for p in parts)
+
+
 def get_translated_category(category_name, language='pt_BR'):
     """
     Traduz o nome de uma categoria usando seu mapeamento de chave.
