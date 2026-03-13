@@ -1,28 +1,28 @@
-# Dependências de produção — sistema_chamados Flask + Firestore
-# Gerado manualmente a partir dos imports reais do app (não use pip freeze)
-
-# --- Web Framework ---
-Flask==3.0.3
-Flask-Login==0.6.3
-Flask-WTF==1.2.2
-Flask-Limiter==4.1.1
-
-# --- Firebase / Google Cloud ---
-firebase_admin==7.1.0
-google-cloud-storage==3.9.0
-
-# --- Servidor WSGI ---
-gunicorn==25.1.0
-
-# --- Exportação Excel ---
-openpyxl==3.1.5
-pandas==2.3.3
-
-# --- Web Push Notifications ---
-pywebpush==2.0.0
-
-# --- Utilitários ---
-python-dotenv==1.0.1
-python-json-logger==3.2.1
-pytz==2025.2
-redis==7.2.0
+# Production dependencies - sistema_chamados Flask + Firestore
+
+# --- Web Framework ---
+Flask==3.0.3
+Flask-Login==0.6.3
+Flask-WTF==1.2.2
+Flask-Limiter==4.1.1
+
+# --- Firebase / Google Cloud ---
+firebase_admin==7.1.0
+google-cloud-storage==3.9.0
+
+# --- WSGI Server ---
+gunicorn==25.1.0
+
+# --- Excel Export ---
+openpyxl==3.1.5
+pandas==2.3.3
+
+# --- Web Push Notifications ---
+pywebpush==2.0.0
+
+# --- Utilities ---
+bleach==6.2.0
+python-dotenv==1.0.1
+python-json-logger==3.2.1
+pytz==2025.2
+redis==7.2.0
