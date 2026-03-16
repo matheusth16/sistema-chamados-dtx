@@ -519,16 +519,16 @@
     card.innerHTML = buildCardHTML(step, index);
     bindCardEvents(index);
 
+    var targetEl = step.selector ? document.querySelector(step.selector) : null;
+    if (targetEl) { highlightTarget(targetEl); positionCard(targetEl); }
+    else          { centerCard(); }
+
     if (typeof gsap !== 'undefined') {
       gsap.fromTo(card,
         { opacity: 0, scale: 0.94, y: 10 },
         { opacity: 1, scale: 1, y: 0, duration: 0.32, ease: 'back.out(1.6)' }
       );
     }
-
-    var targetEl = step.selector ? document.querySelector(step.selector) : null;
-    if (targetEl) { highlightTarget(targetEl); positionCard(targetEl); }
-    else          { centerCard(); }
 
     if (index > 0) saveStep(index);
   }
@@ -685,6 +685,9 @@
     if (left + cardW > vw - pad) left = vw - cardW - pad;
     if (left < pad) left = pad;
 
+    if (typeof gsap !== 'undefined') {
+      gsap.set(card, { xPercent: 0, yPercent: 0, x: 0, y: 0 });
+    }
     Object.assign(card.style, {
       top: top + 'px', left: left + 'px',
       bottom: 'auto', right: 'auto', transform: 'none',
@@ -696,12 +699,19 @@
     if (window.innerWidth < 640) { bottomSheet(); return; }
     Object.assign(card.style, {
       top: '50%', left: '50%', bottom: 'auto', right: 'auto',
-      transform: 'translate(-50%, -50%)',
       maxWidth: '400px', width: 'calc(100vw - 32px)',
     });
+    if (typeof gsap !== 'undefined') {
+      gsap.set(card, { xPercent: -50, yPercent: -50, x: 0, y: 0 });
+    } else {
+      card.style.transform = 'translate(-50%, -50%)';
+    }
   }
 
   function bottomSheet() {
+    if (typeof gsap !== 'undefined') {
+      gsap.set(card, { xPercent: 0, yPercent: 0, x: 0, y: 0 });
+    }
     Object.assign(card.style, {
       top: 'auto', right: 'auto', transform: 'none',
       bottom: '16px', left: '16px',
