@@ -1,6 +1,7 @@
 """Rotas de criação e listagem de chamados (solicitante)."""
 import logging
 from flask import render_template, request, redirect, url_for, Response, flash
+from app.i18n import flash_t
 from flask_login import current_user
 from app.routes import main
 from app.limiter import limiter
@@ -74,7 +75,7 @@ def index() -> Response:
         return render_template('formulario.html', setores=setores, impactos=impactos)
     if aviso:
         flash(f"⚠️ {aviso}", 'warning')
-    flash('Chamado criado com sucesso!', 'success')
+    flash_t('ticket_created_success', 'success')
     return redirect(url_for('main.index'))
 
 
@@ -84,7 +85,7 @@ def meus_chamados() -> Response:
     """GET: lista de chamados do solicitante com paginação por cursor (menos leituras no Firestore)."""
     if not getattr(current_user, 'id', None):
         logger.warning("meus_chamados: current_user.id ausente")
-        flash('Erro ao carregar seus chamados. Sessão inválida.', 'danger')
+        flash_t('error_loading_tickets_session', 'danger')
         return redirect(url_for('main.index'))
 
     status_filtro = request.args.get('status', '')
@@ -127,8 +128,8 @@ def meus_chamados() -> Response:
                 )
             except Exception as fallback_err:
                 logger.exception("Fallback meus_chamados também falhou: %s", fallback_err)
-                flash('Erro ao carregar seus chamados. Tente novamente.', 'danger')
+                flash_t('error_loading_tickets_retry', 'danger')
                 return redirect(url_for('main.index'))
         logger.exception("Erro ao buscar chamados do solicitante: %s", e)
-        flash('Erro ao carregar seus chamados. Tente novamente ou verifique os logs.', 'danger')
+        flash_t('error_loading_tickets_logs', 'danger')
         return redirect(url_for('main.index'))

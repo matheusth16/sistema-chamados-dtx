@@ -194,17 +194,57 @@ def get_translation(key, language='pt_BR', **kwargs):
 
 def flash_t(key, category='message', **kwargs):
     """
-    Exibe uma mensagem flash traduzida.
-    
-    Args:
-        key (str): Chave da tradução
-        category (str): Categoria da mensagem (ex: 'success', 'danger')
-        **kwargs: Argumentos para formatação
+    Enfileira uma mensagem flash para ser traduzida na renderização do template.
+
+    Sem kwargs: armazena a chave diretamente (ex: 'ticket_created_success').
+    Com kwargs: armazena no formato '_t_:key|arg1=val1|arg2=val2' para que
+    o filtro resolve_flash_message possa reconstituir e traduzir.
     """
-    try:
-        lang = session.get('language', 'en')
-    except RuntimeError:
-        # Fora do contexto da requisição
-        lang = 'pt_BR'
-    msg = get_translation(key, lang, **kwargs)
-    flash(msg, category)
+    if not kwargs:
+        flash(key, category)
+    else:
+        encoded = '_t_:' + key + '|' + '|'.join(f'{k}={v}' for k, v in kwargs.items())
+        flash(encoded, category)
+
+
+def _build_reverse_map():
+    """Constrói mapa de texto pt_BR → chave para reverse lookup."""
+    translations = get_translations_dict()
+    reverse = {}
+    for key, langs in translations.items():
+        pt_text = langs.get('pt_BR', '')
+        if pt_text:
+            reverse[pt_text] = key
+    return reverse
+
+
+def resolve_flash_message(message, language):
+    """
+    Resolve uma mensagem flash para o idioma dado.
+    Suporta três formatos:
+    1. Chave direta: 'ticket_created_success'
+    2. Chave com kwargs: '_t_:key|arg=val'
+    3. Texto pt_BR legado: encontra a chave via reverse lookup e traduz
+    """
+    if message.startswith('_t_:'):
+        parts = message[4:].split('|')
+        key = parts[0]
+        kwargs = {}
+        for part in parts[1:]:
+            if '=' in part:
+                k, v = part.split('=', 1)
+                kwargs[k] = v
+        return get_translation(key, language, **kwargs)
+
+    # Tenta como chave direta
+    translated = get_translation(message, language)
+    if translated != message:
+        return translated
+
+    # Reverse lookup: texto pt_BR → chave → idioma correto
+    reverse_map = _build_reverse_map()
+    key = reverse_map.get(message)
+    if key:
+        return get_translation(key, language)
+
+    return message

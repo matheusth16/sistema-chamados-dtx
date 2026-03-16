@@ -316,7 +316,7 @@ def _configurar_seguranca(app: Flask) -> None:
 
 def _configurar_i18n(app: Flask) -> None:
     """Configura sistema de internacionalização (i18n)"""
-    from app.i18n import get_translation, get_translated_sector, get_translated_sector_list, get_translated_category, get_translated_status, get_translated_field_label
+    from app.i18n import get_translation, get_translated_sector, get_translated_sector_list, get_translated_category, get_translated_status, get_translated_field_label, resolve_flash_message
     
     @app.before_request
     def antes_da_requisicao():
@@ -329,8 +329,19 @@ def _configurar_i18n(app: Flask) -> None:
     def inject_i18n():
         """Injeta função de tradução e idioma no contexto Jinja"""
         def t(key, **kwargs):
-            """Função para traduzir uma chave no template"""
+            """Função para traduzir uma chave no template.
+            Também resolve mensagens flash no formato '_t_:key|arg=val'."""
             lang = session.get('language', 'en')
+            if key and key.startswith('_t_:'):
+                parts = key[4:].split('|')
+                actual_key = parts[0]
+                extra = {}
+                for part in parts[1:]:
+                    if '=' in part:
+                        k, v = part.split('=', 1)
+                        extra[k] = v
+                extra.update(kwargs)
+                return get_translation(actual_key, lang, **extra)
             return get_translation(key, lang, **kwargs)
         
         def translate_sector(sector_name):
@@ -407,10 +418,16 @@ def _configurar_i18n(app: Flask) -> None:
         lang = session.get('language', 'en')
         return get_translated_field_label(field_name, lang)
 
+    @app.template_filter('flash_msg')
+    def filter_flash_msg(message):
+        lang = session.get('language', 'en')
+        return resolve_flash_message(message, lang)
+
 def _configurar_timeout_sessao(app: Flask) -> None:
     """Configura logout automático por inatividade de sessão (15 minutos)"""
     from flask import session, redirect, url_for, flash, request
     from flask_login import current_user, logout_user
+    from app.i18n import flash_t
     from datetime import datetime, timezone
     
     @app.before_request
@@ -428,9 +445,11 @@ def _configurar_timeout_sessao(app: Flask) -> None:
             
             # Checa se excedeu os 15 minutos sem atividade
             if ultima_atividade is not None and (agora - ultima_atividade > limite_segundos):
+                lang = session.get('language', 'en')
                 logout_user()
-                session.clear() # Limpa a sessão
-                flash('Your session has expired due to inactivity. Please log in again.', 'info')
+                session.clear()
+                session['language'] = lang
+                flash_t('session_expired', 'info')
                 # Redireciona para login e impede a requisição atual de continuar
                 return redirect(url_for('main.login'))
                 

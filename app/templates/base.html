@@ -80,7 +80,7 @@
         <div
           class="pointer-events-auto px-4 py-3 sm:px-5 sm:py-4 rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border-l-4 {{ border_color }} {{ bg_color }} transform transition-all flex items-start justify-between gap-3 flash-toast"
         >
-          <div class="flex-1 text-sm font-medium">{{ message }}</div>
+          <div class="flex-1 text-sm font-medium">{{ t(message) }}</div>
           <button
             type="button"
             class="shrink-0 text-current opacity-60 hover:opacity-100 transition-opacity focus:outline-none"
@@ -134,6 +134,17 @@
 
     <!-- GSAP Motion: animações de entrada (conteúdo, flash, elementos com .gsap-animate) -->
     <script src="{{ url_for('static', filename='js/gsap-motion.js') }}"></script>
+    <script nonce="{{ csp_nonce }}">
+      window.DTX_i18n = {
+        time_now: "{{ t('time_now') }}",
+        time_minutes_ago: "{{ t('time_minutes_ago') }}",
+        time_hours_ago: "{{ t('time_hours_ago') }}",
+        time_yesterday: "{{ t('time_yesterday') }}",
+        time_days_ago: "{{ t('time_days_ago') }}",
+        notifications_empty: "{{ t('notifications_empty') }}",
+        locale: "{{ {'pt_BR': 'pt-BR', 'en': 'en-US', 'es': 'es-ES'}.get(current_language, 'en-US') }}"
+      };
+    </script>
 
     {% if current_user.is_authenticated and current_user.perfil in
     ['supervisor', 'admin'] %}
@@ -155,12 +166,12 @@
           var diffMin = Math.floor(diffMs / 60000);
           var diffH = Math.floor(diffMs / 3600000);
           var diffD = Math.floor(diffMs / 86400000);
-          if (diffMin < 1) return "Agora";
-          if (diffMin < 60) return "Há " + diffMin + " min";
-          if (diffH < 24) return "Há " + diffH + " h";
-          if (diffD === 1) return "Ontem";
-          if (diffD < 7) return "Há " + diffD + " dias";
-          return d.toLocaleDateString("pt-BR", {
+          if (diffMin < 1) return window.DTX_i18n.time_now;
+          if (diffMin < 60) return window.DTX_i18n.time_minutes_ago.replace("{n}", diffMin);
+          if (diffH < 24) return window.DTX_i18n.time_hours_ago.replace("{n}", diffH);
+          if (diffD === 1) return window.DTX_i18n.time_yesterday;
+          if (diffD < 7) return window.DTX_i18n.time_days_ago.replace("{n}", diffD);
+          return d.toLocaleDateString(window.DTX_i18n.locale, {
             day: "2-digit",
             month: "2-digit",
             year: d.getFullYear() !== now.getFullYear() ? "numeric" : undefined,
@@ -227,7 +238,7 @@
               var notifs = data.notificacoes || [];
               if (notifs.length === 0) {
                 lista.innerHTML =
-                  '<div class="p-3 text-sm text-gray-500 text-center">Nenhuma notificação</div>';
+                  '<div class="p-3 text-sm text-gray-500 text-center">' + window.DTX_i18n.notifications_empty + '</div>';
                 return;
               }
               var csrf =
@@ -367,20 +378,20 @@
       id="webpush-banner"
       class="hidden fixed top-16 left-1/2 -translate-x-1/2 z-50 bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg text-sm flex items-center gap-3 max-w-md"
     >
-      <span>Receber avisos de novos chamados no navegador?</span>
+      <span>{{ t('webpush_banner_text') }}</span>
       <button
         type="button"
         id="webpush-ativar"
         class="px-3 py-1 bg-white text-blue-600 font-semibold rounded hover:bg-blue-50"
       >
-        Ativar
+        {{ t('enable') }}
       </button>
       <button
         type="button"
         id="webpush-dispensar"
         class="px-2 py-1 text-blue-100 hover:text-white"
       >
-        Agora não
+        {{ t('not_now') }}
       </button>
     </div>
     <script nonce="{{ csp_nonce }}">

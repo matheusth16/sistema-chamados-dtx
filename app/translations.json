@@ -489,6 +489,11 @@
     "en": "Submit Request",
     "es": "Enviar Solicitud"
   },
+  "submit_request_loading": {
+    "pt_BR": "Enviando...",
+    "en": "Sending...",
+    "es": "Enviando..."
+  },
   "defined_automatically": {
     "pt_BR": "Definido automaticamente pelo sistema.",
     "en": "Defined automatically by the system.",
@@ -1794,6 +1799,21 @@
     "en": "Ticket successfully created!",
     "es": "¡Ticket creado con éxito!"
   },
+  "error_loading_tickets_session": {
+    "pt_BR": "Erro ao carregar seus chamados. Sessão inválida.",
+    "en": "Error loading your tickets. Invalid session.",
+    "es": "Error al cargar tus tickets. Sesión inválida."
+  },
+  "error_loading_tickets_retry": {
+    "pt_BR": "Erro ao carregar seus chamados. Tente novamente.",
+    "en": "Error loading your tickets. Please try again.",
+    "es": "Error al cargar tus tickets. Por favor, inténtalo de nuevo."
+  },
+  "error_loading_tickets_logs": {
+    "pt_BR": "Erro ao carregar seus chamados. Tente novamente ou verifique os logs.",
+    "en": "Error loading your tickets. Please try again or check the logs.",
+    "es": "Error al cargar tus tickets. Inténtalo de nuevo o revisa los registros."
+  },
   "error_saving_ticket": {
     "pt_BR": "Não foi possível salvar o chamado. Tente novamente.",
     "en": "Unable to save the ticket. Please try again.",
@@ -2353,5 +2373,100 @@
     "pt_BR": "Houve um problema ao salvar o arquivo em produção.",
     "en": "There was a problem saving the file in production.",
     "es": "Hubo un problema al guardar el archivo en producción."
+  },
+  "login_required_msg": {
+    "pt_BR": "Você precisa estar logado para acessar essa página.",
+    "en": "You need to be logged in to access this page.",
+    "es": "Necesitas estar conectado para acceder a esta página."
+  },
+  "access_denied_profiles": {
+    "pt_BR": "Acesso negado. Você precisa ter um dos seguintes perfis: {profiles}",
+    "en": "Access denied. You must have one of the following profiles: {profiles}",
+    "es": "Acceso denegado. Debes tener uno de los siguientes perfiles: {profiles}"
+  },
+  "access_denied_supervisors": {
+    "pt_BR": "Acesso negado. Apenas supervisores e admins podem acessar essa página.",
+    "en": "Access denied. Only supervisors and admins can access this page.",
+    "es": "Acceso denegado. Solo supervisores y administradores pueden acceder a esta página."
+  },
+  "access_denied_requesters": {
+    "pt_BR": "Acesso negado. Essa página é para solicitantes, supervisores e administradores.",
+    "en": "Access denied. This page is for requesters, supervisors, and administrators.",
+    "es": "Acceso denegado. Esta página es para solicitantes, supervisores y administradores."
+  },
+  "notifications_empty": {
+    "pt_BR": "Nenhuma notificação",
+    "en": "No notifications",
+    "es": "Sin notificaciones"
+  },
+  "time_now": {
+    "pt_BR": "Agora",
+    "en": "Just now",
+    "es": "Ahora"
+  },
+  "time_minutes_ago": {
+    "pt_BR": "Há {n} min",
+    "en": "{n} min ago",
+    "es": "Hace {n} min"
+  },
+  "time_hours_ago": {
+    "pt_BR": "Há {n} h",
+    "en": "{n} h ago",
+    "es": "Hace {n} h"
+  },
+  "time_yesterday": {
+    "pt_BR": "Ontem",
+    "en": "Yesterday",
+    "es": "Ayer"
+  },
+  "time_days_ago": {
+    "pt_BR": "Há {n} dias",
+    "en": "{n} days ago",
+    "es": "Hace {n} días"
+  },
+  "not_now": {
+    "pt_BR": "Agora não",
+    "en": "Not now",
+    "es": "Ahora no"
+  },
+  "enable": {
+    "pt_BR": "Ativar",
+    "en": "Enable",
+    "es": "Activar"
+  },
+  "quick_navigation": {
+    "pt_BR": "Navegação Rápida",
+    "en": "Quick Navigation",
+    "es": "Navegación Rápida"
+  },
+  "administration_section": {
+    "pt_BR": "Administração",
+    "en": "Administration",
+    "es": "Administración"
+  },
+  "mark_all_read": {
+    "pt_BR": "Marcar todas como lidas",
+    "en": "Mark all as read",
+    "es": "Marcar todas como leídas"
+  },
+  "loading_updates": {
+    "pt_BR": "Buscando atualizações...",
+    "en": "Loading updates...",
+    "es": "Cargando actualizaciones..."
+  },
+  "view_full_panel": {
+    "pt_BR": "Ver painel completo",
+    "en": "View full panel",
+    "es": "Ver panel completo"
+  },
+  "webpush_banner_text": {
+    "pt_BR": "Receber avisos de novos chamados no navegador?",
+    "en": "Receive notifications for new tickets in your browser?",
+    "es": "¿Recibir avisos de nuevos tickets en el navegador?"
+  },
+  "notifications": {
+    "pt_BR": "Notificações",
+    "en": "Notifications",
+    "es": "Notificaciones"
   }
 }
