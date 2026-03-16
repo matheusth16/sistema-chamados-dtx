@@ -3,9 +3,10 @@ Sistema de Internacionalização (i18n) para múltiplos idiomas.
 Suporta: Português-BR, Inglês e Espanhol.
 """
 
-import os
 import json
-from flask import session, flash
+import os
+
+from flask import flash
 
 # Cache do dicionário de traduções e caminho do arquivo
 _TRANSLATIONS_CACHE = None
@@ -17,9 +18,9 @@ def get_translations_dict():
     global _TRANSLATIONS_CACHE, _TRANSLATIONS_MTIME
     try:
         mtime = os.path.getmtime(_TRANSLATIONS_FILE) if os.path.isfile(_TRANSLATIONS_FILE) else 0
-        if _TRANSLATIONS_CACHE is None or _TRANSLATIONS_MTIME != mtime:
+        if _TRANSLATIONS_CACHE is None or mtime != _TRANSLATIONS_MTIME:
             _TRANSLATIONS_MTIME = mtime
-            with open(_TRANSLATIONS_FILE, 'r', encoding='utf-8') as f:
+            with open(_TRANSLATIONS_FILE, encoding='utf-8') as f:
                 _TRANSLATIONS_CACHE = json.load(f)
     except Exception as e:
         print(f"Erro ao carregar traduções: {e}")
@@ -93,11 +94,11 @@ def get_language_code(lang_param):
 def get_translated_sector(sector_name, language='pt_BR'):
     """
     Traduz o nome de um setor usando seu mapeamento de chave.
-    
+
     Args:
         sector_name (str): Nome do setor em português (ex: 'Engenharia')
         language (str): Código do idioma (pt_BR, en, es)
-    
+
     Returns:
         str: Texto traduzido ou o nome original se não encontrado
     """
@@ -120,11 +121,11 @@ def get_translated_sector_list(sector_string, language='pt_BR'):
 def get_translated_category(category_name, language='pt_BR'):
     """
     Traduz o nome de uma categoria usando seu mapeamento de chave.
-    
+
     Args:
         category_name (str): Nome da categoria em português (ex: 'Projetos')
         language (str): Código do idioma (pt_BR, en, es)
-    
+
     Returns:
         str: Texto traduzido ou o nome original se não encontrado
     """
@@ -136,11 +137,11 @@ def get_translated_category(category_name, language='pt_BR'):
 def get_translated_status(status_name, language='pt_BR'):
     """
     Traduz o nome de um status usando seu mapeamento de chave.
-    
+
     Args:
         status_name (str): Nome do status em português (ex: 'Aberto')
         language (str): Código do idioma (pt_BR, en, es)
-    
+
     Returns:
         str: Texto traduzido ou o nome original se não encontrado
     """
@@ -163,18 +164,18 @@ def get_translated_field_label(field_name, language='pt_BR'):
 def get_translation(key, language='pt_BR', **kwargs):
     """
     Obtém a tradução de uma chave para um idioma específico.
-    
+
     Args:
         key (str): Chave da tradução
         language (str): Código do idioma (pt_BR, en, es)
         **kwargs: Argumentos para formatação da string traduzida
-    
+
     Returns:
         str: Texto traduzido ou a chave se não encontrada
     """
     language = get_language_code(language)
     translations = get_translations_dict()
-    
+
     if key in translations:
         d = translations[key]
         # Tenta o idioma solicitado

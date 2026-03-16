@@ -1,6 +1,16 @@
 # Dependências de desenvolvimento (não vão para produção/Docker)
 -r requirements.txt
 
+# --- Testes ---
 pytest==8.4.2
 pytest-cov==6.0.0
 coverage==7.13.4
+pytest-playwright==0.6.2
+
+# --- Qualidade de código (lint-and-validate) ---
+ruff==0.9.10
+bandit==1.9.4
+mypy==1.15.0
+
+# --- Pre-commit hooks ---
+pre-commit==4.2.0

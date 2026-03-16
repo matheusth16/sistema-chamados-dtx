@@ -1,26 +1,30 @@
 """Rotas de API (JSON) e service worker: status, notificações, push, paginação, disponibilidade."""
-import os
 import logging
-from flask import request, redirect, url_for, send_from_directory, current_app, jsonify
-from flask_login import login_required, current_user
+import os
+
 from firebase_admin import firestore
-from app.routes import main
-from app.limiter import limiter
+from flask import current_app, jsonify, request, send_from_directory
+from flask_login import current_user, login_required
+
 from app.database import db
-from app.models import Chamado
-from app.models_usuario import Usuario
-from app.models_historico import Historico
-from app.services.filters import aplicar_filtros_dashboard_com_paginacao
-from app.services.notifications import notificar_solicitante_status, notificar_setores_adicionais_chamado
-from app.services.notifications_inapp import listar_para_usuario, contar_nao_lidas, marcar_como_lida, marcar_todas_como_lidas
-from app.services.webpush_service import salvar_inscricao
-from app.services.assignment import atribuidor
-from app.utils_areas import setor_para_area
-from app.services.upload import salvar_anexo
-from app.services.status_service import atualizar_status_chamado
-from app.services.permissions import usuario_pode_ver_chamado
-from app.services.analytics import obter_sla_para_exibicao
 from app.firebase_retry import execute_with_retry
+from app.models import Chamado
+from app.models_historico import Historico
+from app.models_usuario import Usuario
+from app.routes import main
+from app.services.analytics import obter_sla_para_exibicao
+from app.services.filters import aplicar_filtros_dashboard_com_paginacao
+from app.services.notifications_inapp import (
+    contar_nao_lidas,
+    listar_para_usuario,
+    marcar_como_lida,
+    marcar_todas_como_lidas,
+)
+from app.services.permissions import usuario_pode_ver_chamado
+from app.services.assignment import atribuidor  # noqa: F401  # usado em testes via patch
+from app.services.status_service import atualizar_status_chamado
+from app.services.webpush_service import salvar_inscricao
+from app.utils_areas import setor_para_area
 
 logger = logging.getLogger(__name__)
 
@@ -57,9 +61,9 @@ def atualizar_status_ajax():
         doc_chamado = db.collection('chamados').document(chamado_id).get()
         if not doc_chamado.exists:
             return jsonify({'sucesso': False, 'erro': 'Chamado não encontrado'}), 404
-        
+
         chamado_obj = Chamado.from_dict(doc_chamado.to_dict(), chamado_id)
-        
+
         if current_user.perfil == 'solicitante':
             if chamado_obj.solicitante_id != current_user.id:
                 return jsonify({'sucesso': False, 'erro': 'Acesso negado: Você só pode atualizar seus próprios chamados'}), 403
@@ -109,11 +113,11 @@ def api_editar_chamado():
             return jsonify({'sucesso': False, 'erro': 'ID do chamado é obrigatório'}), 400
 
         from app.services.edicao_chamado_service import processar_edicao_chamado
-        
+
         setores_adicionais_form = request.form.getlist('setores_adicionais')
         if not setores_adicionais_form and request.get_json(silent=True):
             setores_adicionais_form = (request.get_json(silent=True) or {}).get('setores_adicionais') or []
-            
+
         resultado = processar_edicao_chamado(
             usuario_atual=current_user,
             chamado_id=chamado_id,
@@ -125,7 +129,7 @@ def api_editar_chamado():
             arquivo_anexo=arquivo_anexo,
             setores_adicionais_lista=setores_adicionais_form
         )
-        
+
         if resultado.get('sucesso'):
             return jsonify({'sucesso': True, 'mensagem': resultado.get('mensagem'), 'dados': resultado.get('dados', {})}), 200
         else:

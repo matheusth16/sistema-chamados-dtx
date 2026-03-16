@@ -118,12 +118,12 @@
         </div>
         {% endif %}
 
-        <form id="form-chamado" action="/?lang={{ current_language }}" method="POST" enctype="multipart/form-data" class="px-8 pb-8 pt-2 space-y-6 gsap-stagger">
+        <form id="form-chamado" data-testid="chamado-form" action="/?lang={{ current_language }}" method="POST" enctype="multipart/form-data" class="px-8 pb-8 pt-2 space-y-6 gsap-stagger">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
 
             <div>
                 <label class="block text-xs font-black text-slate-500 uppercase tracking-widest mb-3">{{ t('request_category') }}</label>
-                <div class="flex space-x-6 bg-slate-50 p-1.5 rounded-xl border border-slate-200/60 inline-flex">
+                <div class="flex flex-wrap gap-2 bg-slate-50 p-1.5 rounded-xl border border-slate-200/60 w-full sm:w-auto">
                     <label for="cat_nao_aplicavel" class="flex items-center px-4 py-2 rounded-lg cursor-pointer transition-all duration-200 hover:bg-white has-[:checked]:bg-white has-[:checked]:shadow-sm has-[:checked]:ring-1 has-[:checked]:ring-slate-200">
                         <input type="radio" id="cat_nao_aplicavel" name="categoria" value="Nao Aplicavel" checked onclick="toggleRL(false)"
                                class="focus:ring-blue-500 h-4 w-4 text-blue-600 border-slate-300">
@@ -151,7 +151,7 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 pb-2 border-b border-gray-100">
                 <div>
                     <label for="tipo" class="block text-xs font-black text-slate-500 uppercase tracking-widest mb-1">{{ t('type_sector') }}</label>
-                    <select name="tipo" id="tipo" required onchange="filtrarResponsaveis()"
+                    <select name="tipo" id="tipo" data-testid="tipo-select" required onchange="filtrarResponsaveis()"
                             class="mt-1 block w-full pl-3 pr-10 py-2.5 text-base border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 sm:text-sm rounded-xl shadow-sm transition-all bg-white hover:border-slate-300">
                         <option value="" disabled selected>{{ t('select') }}</option>
                         {% for setor in setores %}
@@ -189,7 +189,7 @@
 
             <div>
                 <label for="descricao" class="block text-xs font-black text-slate-500 uppercase tracking-widest mb-1">{{ t('detailed_description') }}</label>
-                <textarea name="descricao" id="descricao" rows="4" required placeholder="{{ t('describe_problem') }}"
+                <textarea name="descricao" id="descricao" data-testid="descricao-textarea" rows="4" required placeholder="{{ t('describe_problem') }}"
                           class="mt-1 block w-full shadow-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 sm:text-sm border-slate-200 rounded-xl transition-all p-3 hover:border-slate-300 outline-none resize-y min-h-[100px]"></textarea>
             </div>
 
@@ -238,7 +238,7 @@
             </div>
 
             <div class="pt-6 pb-2">
-                <button id="btn-submit" type="submit"
+                <button id="btn-submit" data-testid="submit-btn" type="submit"
                         class="w-full flex justify-center items-center gap-2 py-3.5 px-4 border border-transparent rounded-xl shadow-[0_4px_15px_rgba(29,78,216,0.3)] text-sm font-bold text-white bg-gradient-to-r from-blue-700 to-blue-900 hover:from-blue-800 hover:to-[#0b1b3d] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-600 transition-all hover:scale-[1.01] hover:shadow-[0_6px_20px_rgba(29,78,216,0.4)] active:scale-[0.98]">
                     <svg id="btn-submit-icon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
                     <svg id="btn-submit-spinner" class="w-5 h-5 hidden animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>

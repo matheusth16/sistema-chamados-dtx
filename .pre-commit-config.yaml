@@ -1,0 +1,47 @@
+# Pre-commit hooks — sistema_chamados
+# Instalar: pip install pre-commit && pre-commit install
+# Rodar manualmente: pre-commit run --all-files
+# Referência: https://pre-commit.com/
+
+default_language_version:
+  python: python3.12
+
+repos:
+  # --- Ruff: linter + formatter (substitui flake8, isort, black) ---
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.9.10
+    hooks:
+      - id: ruff
+        name: "ruff — lint"
+        args: [--fix, --exit-non-zero-on-fix]
+      - id: ruff-format
+        name: "ruff — format"
+
+  # --- Bandit: análise de segurança (medium+ severity) ---
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.9.4
+    hooks:
+      - id: bandit
+        name: "bandit — security"
+        args:
+          - "-r"          # recursivo
+          - "-ll"         # somente medium e high severity (ignora low)
+          - "--exclude"
+          - "tests,.venv,venv,skills"
+        files: ^app/
+
+  # --- Checks básicos de arquivo ---
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+        name: "trailing whitespace"
+      - id: end-of-file-fixer
+        name: "end of file"
+      - id: check-yaml
+        name: "yaml válido"
+      - id: check-added-large-files
+        name: "arquivos grandes (>500KB)"
+        args: ["--maxkb=500"]
+      - id: debug-statements
+        name: "sem debugger/breakpoints no código"

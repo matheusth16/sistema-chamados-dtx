@@ -2468,5 +2468,20 @@
     "pt_BR": "Notificações",
     "en": "Notifications",
     "es": "Notificaciones"
+  },
+  "avg_resolution_time": {
+    "pt_BR": "Tempo Médio de Resolução",
+    "en": "Avg. Resolution Time",
+    "es": "Tiempo Promedio de Resolución"
+  },
+  "vs_prev_period": {
+    "pt_BR": "vs. período anterior",
+    "en": "vs. previous period",
+    "es": "vs. período anterior"
+  },
+  "hours_abbv": {
+    "pt_BR": "h",
+    "en": "h",
+    "es": "h"
   }
 }

@@ -270,11 +270,11 @@
         </div>
         <nav class="flex items-center gap-1 bg-white border border-slate-200/60 rounded-xl p-1.5 shadow-sm" aria-label="{{ t('pagination') if t('pagination') != 'pagination' else 'Paginação' }}">
             {% if tem_anterior and cursor_anterior %}
-            <a href="{{ url_for('main.admin', cursor_prev=cursor_anterior, search=request.args.get('search', ''), categoria=request.args.get('categoria', ''), status=request.args.get('status', ''), gate=request.args.get('gate', ''), responsavel=request.args.get('responsavel', ''), rl_codigo=request.args.get('rl_codigo', '')) }}"
+            <a href="{{ url_for('main.admin', cursor_prev=cursor_anterior, pagina=pagina_atual-1, search=request.args.get('search', ''), categoria=request.args.get('categoria', ''), status=request.args.get('status', ''), gate=request.args.get('gate', ''), responsavel=request.args.get('responsavel', ''), rl_codigo=request.args.get('rl_codigo', '')) }}"
                 class="rounded-xl text-sm font-bold text-slate-500 hover:bg-slate-100 hover:text-slate-900" title="{{ t('previous') }}" aria-label="{{ t('previous') }}">&lsaquo;</a>
             {% endif %}
             {% if tem_proxima and proximo_cursor %}
-            <a href="{{ url_for('main.admin', cursor=proximo_cursor, search=request.args.get('search', ''), categoria=request.args.get('categoria', ''), status=request.args.get('status', ''), gate=request.args.get('gate', ''), responsavel=request.args.get('responsavel', ''), rl_codigo=request.args.get('rl_codigo', '')) }}"
+            <a href="{{ url_for('main.admin', cursor=proximo_cursor, cursor_prev=request.args.get('cursor') or '', pagina=pagina_atual+1, search=request.args.get('search', ''), categoria=request.args.get('categoria', ''), status=request.args.get('status', ''), gate=request.args.get('gate', ''), responsavel=request.args.get('responsavel', ''), rl_codigo=request.args.get('rl_codigo', '')) }}"
                 class="rounded-xl text-sm font-bold text-slate-500 hover:bg-slate-100 hover:text-slate-900" title="{{ t('next') }}" aria-label="{{ t('next') }}">&rsaquo;</a>
             {% endif %}
         </nav>

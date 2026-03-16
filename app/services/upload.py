@@ -6,20 +6,20 @@ Firebase Storage (pasta chamados/) e retorna a URL pública.
 Caso contrário: salva em disco local (app/static/uploads) e retorna o nome do arquivo.
 No Cloud Run o disco é efêmero; anexos devem usar Firebase Storage.
 """
-import os
 import logging
+import os
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
-from werkzeug.utils import secure_filename
 from flask import current_app
+from werkzeug.utils import secure_filename
 
-from app.services.validators import _arquivo_permitido, _arquivo_conteudo_permitido
+from app.services.validators import _arquivo_conteudo_permitido, _arquivo_permitido
 
 logger = logging.getLogger(__name__)
 
 
-def _upload_firebase_storage(arquivo: Any, nome_final: str) -> Optional[str]:
+def _upload_firebase_storage(arquivo: Any, nome_final: str) -> str | None:
     """
     Envia o arquivo para Firebase Storage em chamados/nome_final.
     Retorna a URL pública ou None em caso de falha.
@@ -54,7 +54,7 @@ def _upload_firebase_storage(arquivo: Any, nome_final: str) -> Optional[str]:
         return None
 
 
-def salvar_anexo(arquivo: Any) -> Optional[str]:
+def salvar_anexo(arquivo: Any) -> str | None:
     """
     Salva o anexo e retorna o identificador para guardar no chamado:
     - URL do Firebase Storage (https://...) quando Storage está disponível;

@@ -16,16 +16,16 @@ ao endereço extraído do subject (3º segmento após "|").
 import logging
 import os
 from collections import defaultdict
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Tuple
+from datetime import UTC, datetime
+from typing import Any
 
 import pytz
 
 from app.database import db
 from app.models import Chamado
 from app.models_usuario import Usuario
-from app.services.analytics import obter_sla_para_exibicao, _to_datetime
-from app.services.notifications import enviar_email, _base_url, _link_dashboard
+from app.services.analytics import _to_datetime, obter_sla_para_exibicao
+from app.services.notifications import _base_url, _link_dashboard, enviar_email
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +56,7 @@ def _dias_aberto(ts: Any) -> int:
         return 0
     if dt.tzinfo is None:
         dt = pytz.utc.localize(dt)
-    return max(0, (datetime.now(timezone.utc) - dt).days)
+    return max(0, (datetime.now(UTC) - dt).days)
 
 
 def _relay_email() -> str:
@@ -75,11 +75,11 @@ def _relay_email() -> str:
 # Busca de chamados
 # ---------------------------------------------------------------------------
 
-def buscar_chamados_abertos() -> List[Dict[str, Any]]:
+def buscar_chamados_abertos() -> list[dict[str, Any]]:
     """
     Retorna todos os chamados Abertos / Em Atendimento enriquecidos com SLA.
     """
-    resultado: List[Dict[str, Any]] = []
+    resultado: list[dict[str, Any]] = []
     for status in ("Aberto", "Em Atendimento"):
         try:
             docs = (
@@ -119,7 +119,7 @@ def buscar_chamados_abertos() -> List[Dict[str, Any]]:
 # HTML helpers
 # ---------------------------------------------------------------------------
 
-def _tabela_html(chamados: List[Dict[str, Any]], link_base: str) -> str:
+def _tabela_html(chamados: list[dict[str, Any]], link_base: str) -> str:
     """Gera tabela HTML com os chamados."""
     cabecalho = (
         "<tr style='background:#f3f4f6;'>"
@@ -167,11 +167,11 @@ def _tabela_html(chamados: List[Dict[str, Any]], link_base: str) -> str:
 
 def _corpo_supervisor(
     nome: str,
-    chamados: List[Dict[str, Any]],
+    chamados: list[dict[str, Any]],
     link_dash: str,
     link_base: str,
     data_ref: str,
-) -> Tuple[str, str]:
+) -> tuple[str, str]:
     """Retorna (html, texto) do relatório para um supervisor."""
     atrasados = [c for c in chamados if c["atrasado"]]
     outros = [c for c in chamados if not c["atrasado"]]
@@ -229,7 +229,7 @@ def _corpo_supervisor(
 # Ponto de entrada
 # ---------------------------------------------------------------------------
 
-def enviar_relatorio_semanal() -> Dict[str, Any]:
+def enviar_relatorio_semanal() -> dict[str, Any]:
     """
     Busca chamados abertos/atrasados e envia para o relay um e-mail por supervisor:
 
@@ -262,7 +262,7 @@ def enviar_relatorio_semanal() -> Dict[str, Any]:
         return {"enviados": 0, "ignorados": 0, "erros": 0,
                 "total_chamados": 0, "total_atrasados": 0}
 
-    grupos: Dict[str, List] = defaultdict(list)
+    grupos: dict[str, list] = defaultdict(list)
     for c in chamados:
         grupos[c["responsavel_id"]].append(c)
 
@@ -305,8 +305,8 @@ def enviar_relatorio_semanal() -> Dict[str, Any]:
 
 
 def _enviar_resumo_admins(
-    chamados: List[Dict[str, Any]],
-    grupos: Dict[str, List],
+    chamados: list[dict[str, Any]],
+    grupos: dict[str, list],
     data_ref: str,
     link_dash: str,
     link_base: str,

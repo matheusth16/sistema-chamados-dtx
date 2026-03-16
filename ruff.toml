@@ -1,0 +1,61 @@
+# Ruff — linter e formatter para o projeto sistema_chamados (Flask + Python 3.12+)
+# Referência: https://docs.astral.sh/ruff/configuration/
+
+target-version = "py312"
+line-length = 100
+
+# Pastas a ignorar
+exclude = [
+    ".venv",
+    "venv",
+    "__pycache__",
+    "migrations",
+    "skills",
+    "*.egg-info",
+]
+
+[lint]
+# Regras ativas:
+#   E/W  — pycodestyle (estilo PEP 8)
+#   F    — pyflakes (imports não usados, variáveis indefinidas)
+#   I    — isort (ordenação de imports)
+#   B    — flake8-bugbear (armadilhas comuns de Python)
+#   UP   — pyupgrade (modernizar sintaxe para Python 3.12+)
+#   N    — pep8-naming (convenções de nomenclatura)
+#   C4   — flake8-comprehensions (list/dict comprehensions desnecessárias)
+#   SIM  — flake8-simplify (simplificações lógicas)
+select = ["E", "W", "F", "I", "B", "UP", "N", "C4", "SIM"]
+
+ignore = [
+    # Flask usa chamadas de função em defaults (ex: Blueprint, db.Column)
+    "B008",
+    # Linha longa em strings de comentário/docstring — tolerado
+    "E501",
+    # `assert` em testes é intencional
+    "B011",
+    # Simplificações que podem prejudicar legibilidade em Flask
+    "SIM108",
+    # f-string desnecessária — desabilitado para evitar refactor excessivo
+    "UP032",
+]
+
+# Regras que podem ser corrigidas automaticamente com --fix
+fixable = ["I", "UP", "C4", "E", "W", "F401"]
+
+[lint.per-file-ignores]
+# Testes podem usar assert nativo e imports mais livres
+"tests/**/*.py" = ["S101", "F811", "N802"]
+# __init__.py pode ter re-exports sem uso aparente
+"**/__init__.py" = ["F401"]
+# Nota: imports com # noqa: F401 em rotas são usados via patch() nos testes
+# Ex: `from app.services.assignment import atribuidor  # noqa: F401`
+
+[lint.isort]
+# Ordem de imports: stdlib → third-party → local
+known-first-party = ["app"]
+
+[format]
+# Formatter (substitui black)
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"

@@ -6,33 +6,33 @@ Grupo RL, persistência e notificações. Usado pela rota de novo chamado.
 """
 import logging
 import threading
-from typing import Any, Dict, Optional, Tuple
+from typing import Any
 
 from flask import current_app
 
 from app.database import db
+from app.firebase_retry import execute_with_retry
 from app.models import Chamado
 from app.models_grupo_rl import GrupoRL
 from app.models_historico import Historico
 from app.models_usuario import Usuario
-from app.utils import gerar_numero_chamado
-from app.utils_areas import setor_para_area
-from app.services.upload import salvar_anexo
 from app.services.assignment import atribuidor
 from app.services.notifications import notificar_aprovador_novo_chamado
 from app.services.notifications_inapp import criar_notificacao
+from app.services.upload import salvar_anexo
 from app.services.webpush_service import enviar_webpush_usuario
-from app.firebase_retry import execute_with_retry
+from app.utils import gerar_numero_chamado
+from app.utils_areas import setor_para_area
 
 logger = logging.getLogger(__name__)
 
 
 def _resolver_responsavel(
-    form: Dict[str, Any],
+    form: dict[str, Any],
     solicitante_id: str,
     solicitante_nome: str,
-    area_solicitante: Optional[str],
-) -> Tuple[str, str, str]:
+    area_solicitante: str | None,
+) -> tuple[str, str, str]:
     """
     Retorna (responsavel_nome, responsavel_id, motivo_atribuicao).
     Usa responsável escolhido no formulário ou atribuição automática.
@@ -69,13 +69,13 @@ def _resolver_responsavel(
 
 
 def criar_chamado(
-    form: Dict[str, Any],
+    form: dict[str, Any],
     files: Any,
     solicitante_id: str,
     solicitante_nome: str,
-    area_solicitante: Optional[str] = None,
-    solicitante_email: Optional[str] = None,
-) -> Tuple[Optional[str], Optional[str], Optional[str], Optional[str]]:
+    area_solicitante: str | None = None,
+    solicitante_email: str | None = None,
+) -> tuple[str | None, str | None, str | None, str | None]:
     """
     Cria um novo chamado no Firestore e dispara notificações.
 
@@ -92,7 +92,7 @@ def criar_chamado(
         Em sucesso: (id, numero, None, aviso ou None). Em falha: (None, None, mensagem_erro, None).
     """
     import bleach
-    
+
     categoria = form.get('categoria')
     rl_codigo = form.get('rl_codigo')
     tipo = form.get('tipo')

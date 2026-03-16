@@ -1,13 +1,15 @@
 from datetime import datetime
+
 import pytz
 from firebase_admin import firestore
-from app.exceptions import ChamadoNaoEncontradoError, ValidacaoChamadoError
+
+from app.exceptions import ValidacaoChamadoError
 
 
 class Chamado:
     """Representação de um documento Chamado no Firestore"""
-    
-    def __init__(self, 
+
+    def __init__(self,
                  categoria: str,
                  tipo_solicitacao: str,
                  descricao: str,
@@ -33,7 +35,7 @@ class Chamado:
                  grupo_rl_id: str = None,
                  sla_dias: int = None,
                  id: str = None):
-        
+
         self.id = id
         self.numero_chamado = numero_chamado
         self.categoria = categoria
@@ -60,7 +62,7 @@ class Chamado:
         self.status = status
         self.data_abertura = data_abertura or firestore.SERVER_TIMESTAMP
         self.data_conclusao = data_conclusao
-    
+
     def _converter_timestamp(self, ts):
         """Converte timestamp do Firestore para datetime em horário de Brasília.
         Tolera tipos inesperados (string, etc.) e retorna None em caso de falha.
@@ -84,14 +86,14 @@ class Chamado:
             return None
         except Exception:
             return None
-    
+
     def data_abertura_formatada(self):
         """Retorna data_abertura formatada como string"""
         dt = self._converter_timestamp(self.data_abertura)
         if dt and isinstance(dt, datetime):
             return dt.strftime('%d/%m/%Y %H:%M')
         return '-'
-    
+
     def data_conclusao_formatada(self):
         """Retorna data_conclusao formatada como string"""
         dt = self._converter_timestamp(self.data_conclusao)
@@ -134,7 +136,7 @@ class Chamado:
             'grupo_rl_id': self.grupo_rl_id,
             'sla_dias': self.sla_dias,
         }
-    
+
     @classmethod
     def from_dict(cls, data: dict, id: str = None):
         """Cria um objeto Chamado a partir de um dicionário do Firestore.
@@ -174,6 +176,6 @@ class Chamado:
             grupo_rl_id=data.get('grupo_rl_id'),
             sla_dias=data.get('sla_dias'),
         )
-    
+
     def __repr__(self):
         return f'<Chamado {self.id} - {self.categoria}>'

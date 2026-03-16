@@ -1,16 +1,18 @@
 """Serviço para centralizar a lógica de edição de chamados (dashboard e API)."""
 import logging
 import threading
+
 from flask import current_app, session
-from app.i18n import get_translation
+
 from app.database import db
+from app.firebase_retry import execute_with_retry
+from app.i18n import get_translation
 from app.models import Chamado
-from app.models_usuario import Usuario
 from app.models_historico import Historico
+from app.models_usuario import Usuario
+from app.services.notifications import notificar_setores_adicionais_chamado
 from app.services.status_service import atualizar_status_chamado
 from app.services.upload import salvar_anexo
-from app.services.notifications import notificar_setores_adicionais_chamado
-from app.firebase_retry import execute_with_retry
 
 logger = logging.getLogger(__name__)
 
@@ -183,16 +185,16 @@ def processar_edicao_chamado(
 
             if setores_novos_para_notificar:
                 _app = current_app._get_current_object()
-                _kwargs = dict(
-                    chamado_id=chamado_id,
-                    numero_chamado=data_chamado.get('numero_chamado') or chamado_obj.numero_chamado,
-                    setores_novos=setores_novos_para_notificar,
-                    categoria=data_chamado.get('categoria') or chamado_obj.categoria,
-                    tipo_solicitacao=data_chamado.get('tipo_solicitacao') or chamado_obj.tipo_solicitacao,
-                    descricao_resumo=(data_chamado.get('descricao') or '')[:500],
-                    solicitante_nome=data_chamado.get('solicitante_nome') or chamado_obj.solicitante_nome or '—',
-                    quem_adicionou_nome=usuario_atual.nome,
-                )
+                _kwargs = {
+                    'chamado_id': chamado_id,
+                    'numero_chamado': data_chamado.get('numero_chamado') or chamado_obj.numero_chamado,
+                    'setores_novos': setores_novos_para_notificar,
+                    'categoria': data_chamado.get('categoria') or chamado_obj.categoria,
+                    'tipo_solicitacao': data_chamado.get('tipo_solicitacao') or chamado_obj.tipo_solicitacao,
+                    'descricao_resumo': (data_chamado.get('descricao') or '')[:500],
+                    'solicitante_nome': data_chamado.get('solicitante_nome') or chamado_obj.solicitante_nome or '—',
+                    'quem_adicionou_nome': usuario_atual.nome,
+                }
 
                 def _notificar_setores():
                     with _app.app_context():

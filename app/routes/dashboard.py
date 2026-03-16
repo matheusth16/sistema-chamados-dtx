@@ -1,35 +1,44 @@
 """Rotas do painel administrativo: dashboard, exportar, histórico, relatórios, índices."""
-import logging
 import io
+import logging
 from datetime import datetime
-from typing import List, Dict, Any
-from flask import render_template, request, redirect, url_for, send_file, flash, Response, current_app, session
+from typing import Any
 from urllib.parse import urlparse
-from app.i18n import flash_t, get_translation
-from flask_login import login_required, current_user
-from firebase_admin import firestore
-from config import Config
-from app.routes import main
-from app.limiter import limiter
-from app.decoradores import requer_perfil, requer_supervisor_area
-from app.database import db
-from app.models import Chamado
-from app.models_usuario import Usuario
-from app.models_historico import Historico
-from app.utils import formatar_data_para_excel, extrair_numero_chamado
-from app.services.filters import aplicar_filtros_dashboard, aplicar_filtros_dashboard_com_paginacao
-from app.services.dashboard_service import obter_contexto_admin, _filtrar_chamados_por_permissao
-from app.services.contadores_uso import verificar_e_incrementar_relatorio, verificar_e_incrementar_export
-from app.services.excel_export_service import MAX_EXPORT_CHAMADOS
-from app.services.analytics import analisador, obter_sla_para_exibicao
-from app.services.pagination import OptimizadorQuery
-from app.services.status_service import atualizar_status_chamado
-from app.services.permissions import usuario_pode_ver_chamado, usuario_pode_ver_chamado_otimizado
-from app.services.upload import salvar_anexo
-from app.firebase_retry import execute_with_retry
-from app.models_categorias import CategoriaGate, CategoriaSetor
+
+from flask import (
+    Response,
+    flash,
+    redirect,
+    render_template,
+    request,
+    send_file,
+    session,
+    url_for,
+)
+from flask_login import current_user, login_required
 from google.api_core.exceptions import FailedPrecondition
-from app.services.notifications import notificar_setores_adicionais_chamado
+
+from app.database import db
+from app.decoradores import requer_perfil, requer_supervisor_area
+from app.i18n import flash_t, get_translation
+from app.models import Chamado
+from app.models_categorias import CategoriaSetor
+from app.models_historico import Historico
+from app.models_usuario import Usuario
+from app.routes import main
+from app.services.analytics import analisador
+from app.services.contadores_uso import (
+    verificar_e_incrementar_export,
+    verificar_e_incrementar_relatorio,
+)
+from app.services.dashboard_service import _filtrar_chamados_por_permissao, obter_contexto_admin
+from app.services.excel_export_service import MAX_EXPORT_CHAMADOS
+from app.services.filters import aplicar_filtros_dashboard_com_paginacao
+from app.services.pagination import OptimizadorQuery
+from app.services.permissions import usuario_pode_ver_chamado
+from app.services.status_service import atualizar_status_chamado
+from app.utils import formatar_data_para_excel
+from config import Config
 
 logger = logging.getLogger(__name__)
 
@@ -168,9 +177,9 @@ def editar_chamado_pagina() -> Response:
         return redirect(url_for('main.admin'))
 
     from app.services.edicao_chamado_service import processar_edicao_chamado
-    
+
     setores_adicionais_form = request.form.getlist('setores_adicionais')
-    
+
     resultado = processar_edicao_chamado(
         usuario_atual=current_user,
         chamado_id=chamado_id,
@@ -182,7 +191,7 @@ def editar_chamado_pagina() -> Response:
         arquivo_anexo=request.files.get('anexo'),
         setores_adicionais_lista=setores_adicionais_form
     )
-    
+
     if resultado.get('sucesso'):
         lang = session.get('language', 'en')
         mensagem = resultado.get('mensagem') or get_translation('changes_saved', lang)
@@ -238,7 +247,7 @@ def exportar() -> Response:
         docs = resultado['docs']
         chamados = _filtrar_chamados_por_permissao(docs, current_user)
 
-        dados: List[Dict[str, Any]] = []
+        dados: list[dict[str, Any]] = []
         for c in chamados:
             dados.append({
                 'Chamado': c.numero_chamado,
@@ -288,7 +297,7 @@ def exportar_avancado() -> Response:
             return redirect(url_for('main.admin'))
     try:
         from app.services.excel_export_service import exportador_excel
-        
+
         # Busca chamados com filtros e permissão (limitado para não estourar cota Firestore)
         chamados_ref = db.collection('chamados')
         resultado = aplicar_filtros_dashboard_com_paginacao(
@@ -296,11 +305,11 @@ def exportar_avancado() -> Response:
         )
         docs = resultado['docs']
         chamados = _filtrar_chamados_por_permissao(docs, current_user)
-        
+
         # Obtém métricas
         metricas_gerais = analisador.obter_metricas_gerais(dias=30)
         metricas_supervisores = analisador.obter_metricas_supervisores()
-        
+
         # Filtros aplicados (para documentar no Excel)
         filtros_aplicados = {}
         if request.args.get('search'):
@@ -311,7 +320,7 @@ def exportar_avancado() -> Response:
             filtros_aplicados['Status'] = request.args.get('status')
         if request.args.get('responsavel'):
             filtros_aplicados['Responsável'] = request.args.get('responsavel')
-        
+
         # Exporta relatório
         output = exportador_excel.exportar_relatorio_completo(
             chamados=chamados,
@@ -319,7 +328,7 @@ def exportar_avancado() -> Response:
             metricas_supervisores=metricas_supervisores,
             filtros_aplicados=filtros_aplicados
         )
-        
+
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
         return send_file(
             output,
@@ -333,7 +342,7 @@ def exportar_avancado() -> Response:
         return redirect(url_for('main.admin'))
 
 
-def _relatorios_ordenar_supervisores(lista: List[Dict], campo: str, asc: bool) -> List[Dict]:
+def _relatorios_ordenar_supervisores(lista: list[dict], campo: str, asc: bool) -> list[dict]:
     """Ordena lista de métricas de supervisores por campo (total_chamados, carga_atual, taxa_resolucao_percentual, tempo_medio_resolucao_horas, supervisor_nome, area)."""
     reverse = not asc
     if campo == 'total':
@@ -356,7 +365,7 @@ def _relatorios_ordenar_supervisores(lista: List[Dict], campo: str, asc: bool) -
     return lista
 
 
-def _relatorios_ordenar_areas(lista: List[Dict], campo: str, asc: bool) -> List[Dict]:
+def _relatorios_ordenar_areas(lista: list[dict], campo: str, asc: bool) -> list[dict]:
     """Ordena lista de métricas por área (total_chamados, abertos, taxa_resolucao_percentual, tempo_medio_resolucao_horas, area)."""
     reverse = not asc
     if campo == 'total':
@@ -464,7 +473,7 @@ def relatorios() -> Response:
         usuarios_gestao = Usuario.get_all()
         ranking_gamificacao = sorted(
             [u for u in usuarios_gestao if u.exp_semanal > 0 and u.perfil in ('supervisor', 'admin') and u.nome],
-            key=lambda u: u.exp_semanal, 
+            key=lambda u: u.exp_semanal,
             reverse=True
         )[:3]
 
@@ -473,6 +482,7 @@ def relatorios() -> Response:
             relatorio=relatorio,
             ranking_gamificacao=ranking_gamificacao,
             metricas_gerais=relatorio.get('metricas_gerais') or {},
+            metricas_delta=relatorio.get('metricas_delta') or {},
             metricas_supervisores=metricas_supervisores,
             metricas_supervisores_full=metricas_supervisores_full,
             metricas_areas=metricas_areas,
@@ -496,7 +506,7 @@ def relatorios() -> Response:
             erro_relatorio=erro_relatorio,
         )
     except Exception as e:
-        logger.exception(f"Erro ao gerar relatórios: %s", e)
+        logger.exception("Erro ao gerar relatórios: %s", e)
         try:
             # Tenta exibir a página de relatórios com dados vazios e mensagem de erro
             return render_template(

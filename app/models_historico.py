@@ -1,11 +1,14 @@
 from datetime import datetime
+
 import pytz
 from firebase_admin import firestore
+
 from app.database import db
+
 
 class Historico:
     """Representação do histórico de alterações em um chamado"""
-    
+
     def __init__(self,
                  chamado_id: str,
                  usuario_id: str,
@@ -17,7 +20,7 @@ class Historico:
                  data_acao = None,
                  detalhe: str = None,
                  id: str = None):
-        
+
         self.id = id
         self.chamado_id = chamado_id
         self.usuario_id = usuario_id
@@ -60,7 +63,7 @@ class Historico:
             data_acao=data.get('data_acao'),
             detalhe=data.get('detalhe')
         )
-    
+
     def save(self):
         """Salva o histórico no Firestore"""
         try:
@@ -77,7 +80,7 @@ class Historico:
             logger.error(f'Erro ao salvar histórico: {e}', exc_info=True)
             print(f'Erro ao salvar histórico: {e}')
             return False
-    
+
     @classmethod
     def get_by_chamado_id(cls, chamado_id: str):
         """Busca histórico de um chamado específico"""
@@ -85,7 +88,7 @@ class Historico:
             import logging
             logger = logging.getLogger(__name__)
             logger.info(f"Buscando histórico para chamado_id: {chamado_id}")
-            
+
             # Tenta buscar com ordenação (requer índice)
             try:
                 docs = db.collection('historico').where('chamado_id', '==', chamado_id).order_by('data_acao', direction=firestore.Query.DESCENDING).stream()
@@ -106,21 +109,21 @@ class Historico:
                         data = doc.to_dict()
                         logger.debug(f"Histórico encontrado (sem ordem): {doc.id} - {data}")
                         historico.append(cls.from_dict(data, doc.id))
-                    
+
                     # Ordena manualmente por data_acao (mais recente primeiro)
                     historico.sort(key=lambda h: h.data_acao if h.data_acao else '', reverse=True)
                     logger.info(f"✅ Total de {len(historico)} registros encontrados (ordenação manual)")
                     return historico
                 else:
                     raise index_error
-                    
+
         except Exception as e:
             import logging
             logger = logging.getLogger(__name__)
             logger.error(f'❌ Erro ao buscar histórico: {e}', exc_info=True)
             print(f'Erro ao buscar histórico: {e}')
             return []
-    
+
     def _converter_timestamp(self, ts):
         """Converte timestamp do Firestore para datetime em horário de Brasília"""
         if ts is None or ts == firestore.SERVER_TIMESTAMP:
@@ -137,13 +140,13 @@ class Historico:
                 dt = pytz.utc.localize(dt)
             return dt.astimezone(pytz.timezone('America/Sao_Paulo'))
         return ts
-    
+
     def data_acao_formatada(self):
         """Retorna data_acao formatada como string"""
         dt = self._converter_timestamp(self.data_acao)
         if dt and isinstance(dt, datetime):
             return dt.strftime('%d/%m/%Y %H:%M:%S')
         return '-'
-    
+
     def __repr__(self):
         return f'<Historico {self.chamado_id} - {self.acao}>'

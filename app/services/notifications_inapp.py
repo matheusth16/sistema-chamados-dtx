@@ -5,15 +5,17 @@ Armazenamento no Firestore, collection 'notificacoes'.
 
 import logging
 from datetime import datetime
-from typing import List, Dict, Any, Optional
+from typing import Any
+
 from firebase_admin import firestore
+
 from app.database import db
 
 logger = logging.getLogger(__name__)
 
 
 def criar_notificacao(usuario_id: str, chamado_id: str, numero_chamado: str,
-                      titulo: str, mensagem: str, tipo: str = 'novo_chamado') -> Optional[str]:
+                      titulo: str, mensagem: str, tipo: str = 'novo_chamado') -> str | None:
     """
     Cria uma notificação in-app para o usuário (ex.: aprovador quando recebe novo chamado).
     Retorna o id do documento criado ou None em caso de erro.
@@ -38,7 +40,7 @@ def criar_notificacao(usuario_id: str, chamado_id: str, numero_chamado: str,
         return None
 
 
-def listar_para_usuario(usuario_id: str, limite: int = 30, apenas_nao_lidas: bool = False) -> List[Dict[str, Any]]:
+def listar_para_usuario(usuario_id: str, limite: int = 30, apenas_nao_lidas: bool = False) -> list[dict[str, Any]]:
     """
     Lista notificações do usuário, mais recentes primeiro.
     Retorna lista de dicts com id, chamado_id, numero_chamado, titulo, mensagem, lida, data_criacao.

@@ -7,10 +7,12 @@ Uso:
     @requer_supervisor_area  # Supervisor pode ver/editar apenas sua área
 """
 
-from functools import wraps
-from flask import redirect, url_for, flash, current_app, session
-from flask_login import current_user
 import logging
+from functools import wraps
+
+from flask import current_app, redirect, url_for
+from flask_login import current_user
+
 from app.i18n import flash_t
 
 logger = logging.getLogger(__name__)
@@ -19,16 +21,16 @@ logger = logging.getLogger(__name__)
 def requer_perfil(*perfis_permitidos):
     """
     Decorador que verifica se o usuário tem um dos perfis permitidos
-    
+
     Parâmetros:
         *perfis_permitidos: String ou lista de strings com os perfis permitidos
                             Exemplos: 'admin', 'supervisor', ['admin', 'supervisor']
-    
+
     Exemplo:
         @requer_perfil('admin')
         def rota_admin():
             pass
-        
+
         @requer_perfil('supervisor', 'admin')
         def rota_gestao():
             pass
@@ -45,7 +47,7 @@ def requer_perfil(*perfis_permitidos):
             # Normaliza perfis_permitidos para uma lista
             perfis_lista = []
             for perfil in perfis_permitidos:
-                if isinstance(perfil, (list, tuple)):
+                if isinstance(perfil, list | tuple):
                     perfis_lista.extend(perfil)
                 else:
                     perfis_lista.append(perfil)
@@ -54,16 +56,16 @@ def requer_perfil(*perfis_permitidos):
             if current_user.perfil not in perfis_lista:
                 logger.warning(f"Acesso negado: usuário {current_user.email} (perfil {current_user.perfil}) tentou acessar {f.__name__}")
                 flash_t('access_denied_profiles', 'danger', profiles=', '.join(perfis_lista))
-                
+
                 # Redireciona para a página apropriada conforme o perfil
                 if current_user.perfil == 'solicitante':
                     return redirect(url_for('main.index'))
                 else:
                     return redirect(url_for('main.admin'))
-            
+
             # Perfil autorizado, executa a função
             return f(*args, **kwargs)
-        
+
         return funcao_decorada
     return decorador
 
@@ -72,7 +74,7 @@ def requer_supervisor_area(f):
     """
     Decorador especial para verificar se é supervisor/admin
     Se for supervisor, adiciona filtro automático por área
-    
+
     Uso:
         @requer_supervisor_area
         def rota_gestao():
@@ -93,14 +95,14 @@ def requer_supervisor_area(f):
             logger.warning(f"Acesso negado: solicitante {current_user.email} tentou acessar {f.__name__}")
             flash_t('access_denied_supervisors', 'danger')
             return redirect(url_for('main.index'))
-        
+
         # Se é supervisor, registra a área dele para uso posterior
         if current_user.perfil == 'supervisor':
             current_app.logger.debug(f"Supervisor {current_user.email} acessando {f.__name__} (Área: {current_user.area})")
-        
+
         # Executa a função
         return f(*args, **kwargs)
-    
+
     return funcao_decorada
 
 
@@ -122,8 +124,8 @@ def requer_solicitante(f):
             logger.warning(f"Acesso negado: {current_user.perfil} {current_user.email} tentou acessar rota {f.__name__}")
             flash_t('access_denied_requesters', 'danger')
             return redirect(url_for('main.login'))
-        
+
         # Executa a função
         return f(*args, **kwargs)
-    
+
     return funcao_decorada

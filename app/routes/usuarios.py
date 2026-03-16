@@ -1,13 +1,14 @@
 """Rotas de gerenciamento de usuários (CRUD). Apenas para admins."""
 import logging
-from flask import render_template, request, redirect, url_for, Response
+
+from flask import Response, redirect, render_template, request, url_for
 from flask_login import current_user
-from app.i18n import flash_t
-from app.routes import main
-from app.limiter import limiter
-from app.decoradores import requer_perfil
-from app.models_usuario import Usuario, CACHE_KEY_USUARIOS
+
 from app.cache import cache_delete
+from app.decoradores import requer_perfil
+from app.i18n import flash_t
+from app.models_usuario import CACHE_KEY_USUARIOS, Usuario
+from app.routes import main
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +22,6 @@ def gerenciar_usuarios() -> Response:
         nome = request.form.get('nome', '').strip()
         perfil = request.form.get('perfil', 'solicitante')
         areas = [a.strip() for a in request.form.getlist('areas') if a.strip()]
-        senha = request.form.get('senha', '')
         erros = []
         if not email or '@' not in email:
             erros.append('invalid_email')
@@ -88,7 +88,6 @@ def editar_usuario(usuario_id: str) -> Response:
         nome = request.form.get('nome', '').strip()
         perfil = request.form.get('perfil', usuario.perfil)
         areas = [a.strip() for a in request.form.getlist('areas') if a.strip()]
-        senha = request.form.get('senha', '').strip()
         erros = []
         if email and email != usuario.email:
             if '@' not in email:
@@ -167,20 +166,20 @@ def resetar_senha_usuario(usuario_id: str) -> Response:
         if not usuario:
             flash_t('user_not_found', 'danger')
             return redirect(url_for('main.gerenciar_usuarios'))
-        
+
         if usuario_id == current_user.id:
             flash_t('cannot_reset_own_password', 'warning')
             return redirect(url_for('main.gerenciar_usuarios'))
-        
+
         nome_usuario = usuario.nome
         usuario.set_password('123456')
         usuario.update(
             must_change_password=(usuario.perfil in ['solicitante', 'supervisor'])
         )
-        
+
         cache_delete(CACHE_KEY_USUARIOS)
         cache_delete(f'usuario_{usuario_id}')
-        
+
         logger.info(
             "Senha resetada para %s por %s",
             usuario.email,
@@ -188,7 +187,7 @@ def resetar_senha_usuario(usuario_id: str) -> Response:
         )
         flash_t('user_password_reset_success', 'success', nome=nome_usuario)
         return redirect(url_for('main.gerenciar_usuarios'))
-        
+
     except Exception as e:
         logger.exception(f"Erro ao resetar senha do usuário: {str(e)}")
         flash_t('error_resetting_password', 'danger', error=str(e))
@@ -203,7 +202,7 @@ def resetar_exp_usuario(usuario_id: str) -> Response:
         if not usuario:
             flash_t('user_not_found', 'danger')
             return redirect(url_for('main.gerenciar_usuarios'))
-        
+
         nome_usuario = usuario.nome
         usuario.update(gamification={
             'exp_total': 0,
@@ -211,17 +210,17 @@ def resetar_exp_usuario(usuario_id: str) -> Response:
             'level': 1,
             'conquistas': []
         })
-        
+
         cache_delete(CACHE_KEY_USUARIOS)
         cache_delete(f'usuario_{usuario_id}')
         Usuario.invalidar_cache_supervisores_por_area()
-        
+
         # Opcional: deletar cache do ranking
         cache_delete('ranking_gamificacao_semanal')
-        
+
         flash_t('user_exp_reset_success', 'success', nome=nome_usuario)
         return redirect(url_for('main.gerenciar_usuarios'))
-        
+
     except Exception as e:
         logger.exception(f"Erro ao resetar EXP do usuário: {str(e)}")
         flash_t('error_resetting_exp', 'danger', error=str(e))

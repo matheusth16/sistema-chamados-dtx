@@ -11,11 +11,12 @@ Em Cloud Run, usa Application Default Credentials (ADC) automaticamente.
 Em desenvolvimento local, busca credentials.json na raiz do projeto.
 """
 
-import firebase_admin
-from firebase_admin import credentials, firestore
+import logging
 import os
 import time
-import logging
+
+import firebase_admin
+from firebase_admin import credentials, firestore
 
 logger = logging.getLogger(__name__)
 
@@ -23,28 +24,28 @@ logger = logging.getLogger(__name__)
 def _inicializar_firebase_com_retry(max_tentativas: int = 3, delay_inicial: float = 1.0):
     """
     Inicializa Firebase Admin SDK com retry automático e exponential backoff.
-    
+
     Tenta inicializar Firebase até 3 vezes, aguardando progressivamente mais
     tempo entre cada tentativa em caso de falha.
-    
+
     Args:
         max_tentativas (int): Número máximo de tentativas de inicialização.
                              Padrão: 3 (delays: 1s, 2s, 4s)
         delay_inicial (float): Delay inicial em segundos antes de retry.
                               Padrão: 1.0
-    
+
     Raises:
         Exception: Se todas as tentativas falharem. Registra a falha em log.
-        
+
     Side Effects:
         - Inicializa firebase_admin._apps (app padrão do Firebase)
         - Registra tentativas e resultados no logger
-        
+
     Examples:
         >>> _inicializar_firebase_com_retry(max_tentativas=5)
         # INFO: Tentativa 1/5 para inicializar Firebase...
         # INFO: Firebase inicializado com credentials.json
-        
+
         >>> _inicializar_firebase_com_retry()
         # INFO: Firebase já inicializado
     """
@@ -57,16 +58,16 @@ def _inicializar_firebase_com_retry(max_tentativas: int = 3, delay_inicial: floa
         except ValueError:
             # Primera inicialização necessária
             pass
-        
+
         try:
             logger.info(f"Tentativa {tentativa}/{max_tentativas} para inicializar Firebase...")
-            
+
             # Caminho para credentials.json
             cert_path = os.path.join(
-                os.path.dirname(os.path.dirname(__file__)), 
+                os.path.dirname(os.path.dirname(__file__)),
                 'credentials.json'
             )
-            
+
             # Storage bucket: necessário para Firebase Storage (anexos). Sem isso, storage.bucket() falha.
             # Use o nome exato do bucket do Firebase Console > Storage (ex.: projeto.firebasestorage.app ou projeto.appspot.com).
             bucket_env = os.getenv('FIREBASE_STORAGE_BUCKET', '').strip()
@@ -93,14 +94,14 @@ def _inicializar_firebase_com_retry(max_tentativas: int = 3, delay_inicial: floa
                         "✓ Firebase inicializado com ADC. FIREBASE_STORAGE_BUCKET não definido: anexos em produção falharão. "
                         "Defina FIREBASE_STORAGE_BUCKET com o valor do Firebase Console > Storage (ex.: projeto.firebasestorage.app)."
                     )
-            
+
             return  # Sucesso - sai da função
-            
+
         except Exception as e:
             logger.warning(
                 f"⚠ Tentativa {tentativa}/{max_tentativas} falhou: {type(e).__name__}: {e}"
             )
-            
+
             if tentativa < max_tentativas:
                 # Calcula delay com exponential backoff: 1s, 2s, 4s, 8s, ...
                 delay = delay_inicial * (2 ** (tentativa - 1))

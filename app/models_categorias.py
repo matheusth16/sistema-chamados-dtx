@@ -2,13 +2,14 @@
 Modelo para Categorias do Sistema (Setores, Gates, Impactos).
 Cada categoria é traduzida automaticamente para PT, EN e ES.
 """
-from datetime import datetime
-import pytz
-from firebase_admin import firestore
-from app.database import db
-from app.services.translation_service import traduzir_categoria
-from app.firebase_retry import firebase_retry
 import logging
+from datetime import datetime
+
+import pytz
+
+from app.database import db
+from app.firebase_retry import firebase_retry
+from app.services.translation_service import traduzir_categoria
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +21,7 @@ CACHE_KEY_IMPACTOS = 'categorias_impactos_list'
 
 class CategoriaSetor:
     """Representa um Setor/Departamento do sistema"""
-    
+
     def __init__(self,
                  nome_pt: str,
                  nome_en: str = None,
@@ -39,7 +40,7 @@ class CategoriaSetor:
         self.descricao_es = descricao_es
         self.ativo = ativo
         self.data_criacao = datetime.now(pytz.timezone('America/Sao_Paulo'))
-    
+
     def to_dict(self):
         """Converte para dicionário para salvar no Firestore"""
         return {
@@ -52,7 +53,7 @@ class CategoriaSetor:
             'ativo': self.ativo,
             'data_criacao': self.data_criacao,
         }
-    
+
     @classmethod
     def from_dict(cls, data: dict, id: str = None):
         """Cria um objeto CategoriaSetor a partir de um dicionário"""
@@ -66,7 +67,7 @@ class CategoriaSetor:
             ativo=data.get('ativo', True),
             id=id,
         )
-    
+
     @firebase_retry(max_retries=3)
     def save(self):
         """Salva o setor no Firestore com retry automático"""
@@ -80,7 +81,7 @@ class CategoriaSetor:
         except Exception as e:
             logger.error(f"Erro ao salvar setor: {e}")
             raise
-    
+
     @classmethod
     def get_all(cls):
         """Retorna todos os setores"""
@@ -90,7 +91,7 @@ class CategoriaSetor:
         except Exception as e:
             logger.error(f"Erro ao buscar setores: {e}")
             return []
-    
+
     @classmethod
     def get_by_id(cls, setor_id: str):
         """Busca um setor pelo ID"""
@@ -106,7 +107,7 @@ class CategoriaSetor:
 
 class CategoriaGate:
     """Representa um Gate do sistema"""
-    
+
     def __init__(self,
                  nome_pt: str,
                  nome_en: str = None,
@@ -127,7 +128,7 @@ class CategoriaGate:
         self.ordem = ordem
         self.ativo = ativo
         self.data_criacao = datetime.now(pytz.timezone('America/Sao_Paulo'))
-    
+
     def to_dict(self):
         """Converte para dicionário para salvar no Firestore"""
         return {
@@ -141,7 +142,7 @@ class CategoriaGate:
             'ativo': self.ativo,
             'data_criacao': self.data_criacao,
         }
-    
+
     @classmethod
     def from_dict(cls, data: dict, id: str = None):
         """Cria um objeto CategoriaGate a partir de um dicionário"""
@@ -156,7 +157,7 @@ class CategoriaGate:
             ativo=data.get('ativo', True),
             id=id,
         )
-    
+
     @firebase_retry(max_retries=3)
     def save(self):
         """Salva o gate no Firestore com retry automático"""
@@ -170,7 +171,7 @@ class CategoriaGate:
         except Exception as e:
             logger.error(f"Erro ao salvar gate: {e}")
             raise
-    
+
     @classmethod
     def get_all(cls):
         """Retorna todos os gates ordenados por ordem"""
@@ -182,7 +183,7 @@ class CategoriaGate:
         except Exception as e:
             logger.error(f"Erro ao buscar gates: {e}")
             return []
-    
+
     @classmethod
     def get_by_id(cls, gate_id: str):
         """Busca um gate pelo ID"""
@@ -198,7 +199,7 @@ class CategoriaGate:
 
 class CategoriaImpacto:
     """Representa um Impacto/Severidade do sistema"""
-    
+
     def __init__(self,
                  nome_pt: str,
                  nome_en: str = None,
@@ -221,7 +222,7 @@ class CategoriaImpacto:
         self.cor = cor  # Cor para exibição (ex: #red, #orange, #yellow, #green)
         self.ativo = ativo
         self.data_criacao = datetime.now(pytz.timezone('America/Sao_Paulo'))
-    
+
     def to_dict(self):
         """Converte para dicionário para salvar no Firestore"""
         return {
@@ -236,7 +237,7 @@ class CategoriaImpacto:
             'ativo': self.ativo,
             'data_criacao': self.data_criacao,
         }
-    
+
     @classmethod
     def from_dict(cls, data: dict, id: str = None):
         """Cria um objeto CategoriaImpacto a partir de um dicionário"""
@@ -252,7 +253,7 @@ class CategoriaImpacto:
             ativo=data.get('ativo', True),
             id=id,
         )
-    
+
     def save(self):
         """Salva o impacto no Firestore"""
         try:
@@ -265,7 +266,7 @@ class CategoriaImpacto:
         except Exception as e:
             logger.error(f"Erro ao salvar impacto: {e}")
             raise
-    
+
     @classmethod
     def get_all(cls):
         """Retorna todos os impactos ativos"""
@@ -275,7 +276,7 @@ class CategoriaImpacto:
         except Exception as e:
             logger.error(f"Erro ao buscar impactos: {e}")
             return []
-    
+
     @classmethod
     def get_by_id(cls, impacto_id: str):
         """Busca um impacto pelo ID"""

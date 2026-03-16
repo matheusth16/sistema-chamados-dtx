@@ -1,14 +1,17 @@
-from flask import Flask, session, request, jsonify, g
-from flask_login import LoginManager
-import secrets
-from flask_wtf.csrf import CSRFProtect
-from config import Config
 import logging
-import time
-from logging.handlers import RotatingFileHandler
-from pythonjsonlogger import jsonlogger
-from urllib.parse import urlparse
 import os
+import secrets
+import time
+from datetime import UTC
+from logging.handlers import RotatingFileHandler
+from urllib.parse import urlparse
+
+from flask import Flask, g, jsonify, request, session
+from flask_login import LoginManager
+from flask_wtf.csrf import CSRFProtect
+from pythonjsonlogger import jsonlogger
+
+from config import Config
 
 # Rotas POST sensíveis que devem validar Origin/Referer quando APP_BASE_URL estiver definido
 _POST_ORIGIN_CHECK_PATHS = frozenset({
@@ -28,7 +31,7 @@ def create_app():
         app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
 
     # Inicializa CSRF Protection
-    csrf = CSRFProtect(app)
+    CSRFProtect(app)
 
     # Rate Limiting (limiter definido em app.limiter, usado pelos blueprints)
     from app.limiter import limiter
@@ -43,7 +46,7 @@ def create_app():
     login_manager.login_view = 'main.login'  # Redireciona para login se não autenticado
     login_manager.login_message = 'Please log in to continue.'
     login_manager.login_message_category = 'info'
-    
+
     # Carregador de usuários para Flask-Login
     @login_manager.user_loader
     def load_user(user_id):
@@ -59,7 +62,7 @@ def create_app():
 
     # Segurança: headers e validação Origin/Referer em POST sensíveis
     _configurar_seguranca(app)
-    
+
     # Timeout de inatividade (15 minutos)
     _configurar_timeout_sessao(app)
 
@@ -82,7 +85,11 @@ def create_app():
             with app.app_context():
                 try:
                     from app.cache import get_static_cached
-                    from app.models_categorias import CategoriaSetor, CategoriaImpacto, CategoriaGate
+                    from app.models_categorias import (
+                        CategoriaGate,
+                        CategoriaImpacto,
+                        CategoriaSetor,
+                    )
                     from app.models_usuario import Usuario
                     get_static_cached('categorias_setor', CategoriaSetor.get_all)
                     get_static_cached('categorias_impacto', CategoriaImpacto.get_all)
@@ -98,8 +105,8 @@ def create_app():
 def _iniciar_scheduler(app: Flask) -> None:
     """Inicia APScheduler com o job de relatório semanal (sexta 10h BRT)."""
     try:
-        from apscheduler.schedulers.background import BackgroundScheduler
         import pytz
+        from apscheduler.schedulers.background import BackgroundScheduler
 
         def _job_relatorio():
             with app.app_context():
@@ -160,11 +167,11 @@ def _configurar_metricas_performance(app: Flask) -> None:
 def _configurar_seguranca(app: Flask) -> None:
     """
     Configura headers de segurança e validação Origin/Referer em POST sensíveis.
-    
+
     Implementa:
     1. Headers de segurança (X-Content-Type-Options, X-Frame-Options, HSTS)
     2. Validação Origin/Referer para rotas POST críticas
-    
+
     A validação é ativada quando APP_BASE_URL está definida em config.
     Impede ataques CSRF através de forjamento de origem.
     """
@@ -212,19 +219,19 @@ def _configurar_seguranca(app: Flask) -> None:
     def _validar_origin_referer():
         """
         Valida Origin/Referer para POST em rotas sensíveis.
-        
+
         Se APP_BASE_URL está definida em config:
         - Rejeita requisições POST de origem diferente
         - Usa headers Origin (moderno) ou Referer (fallback)
         - Registra tentativas suspeitas em logs
-        
+
         Rotas protegidas (quando APP_BASE_URL está configurada):
         - /api/atualizar-status
         - /api/bulk-status
         - /api/push-subscribe
         - /api/carregar-mais
         - /api/notificacoes/*/ler
-        
+
         Examples:
             GET /admin    → Passa (não é POST)
             POST /api/atualizar-status com Origin válida    → Passa
@@ -233,25 +240,25 @@ def _configurar_seguranca(app: Flask) -> None:
         """
         # Obtém URL base configurada (ex: https://sistema-chamados.dtx.com)
         base_url = (current_app.config.get('APP_BASE_URL') or '').strip()
-        
+
         # Se não está configurada ou não é POST, pula validação
         if not base_url or request.method != 'POST':
             return None
-        
+
         # Verifica se a rota é crítica (precisa validação)
         path = request.path
         eh_rota_critica = (
             path in _POST_ORIGIN_CHECK_PATHS or
             (path.startswith('/api/notificacoes/') and path.endswith('/ler'))
         )
-        
+
         if not eh_rota_critica:
             return None
-        
+
         # ============================================================
         # VALIDAÇÃO DE ORIGEM
         # ============================================================
-        
+
         try:
             # Parse URL base para obter scheme + netloc (ex: https://sistema-chamados.dtx.com)
             base_parsed = urlparse(base_url)
@@ -259,12 +266,12 @@ def _configurar_seguranca(app: Flask) -> None:
         except Exception as e:
             app.logger.error(f"Erro ao parsear APP_BASE_URL '{base_url}': {e}")
             return None
-        
+
         # Obtém origin da requisição (tenta Origin header primeiro, depois Referer)
         origin_header = request.headers.get('Origin', '').strip().lower()
         referer_header = request.headers.get('Referer', '').strip().lower()
         origin = origin_header or referer_header
-        
+
         # ============================================================
         # REJEITA SE: Sem origin E sem referer
         # ============================================================
@@ -277,18 +284,18 @@ def _configurar_seguranca(app: Flask) -> None:
                 'sucesso': False,
                 'erro': 'Origem não informada'
             }), 403
-        
+
         # ============================================================
         # VALIDA A ORIGEM
         # ============================================================
-        
+
         try:
             req_parsed = urlparse(origin)
             req_origin = f"{req_parsed.scheme}://{req_parsed.netloc}".lower()
         except Exception as e:
             app.logger.error(f"Erro ao parsear origin '{origin}': {e}")
             req_origin = ''
-        
+
         # Origens aceitas: APP_BASE_URL e, em desenvolvimento, a própria URL do servidor (localhost)
         origens_aceitas = {base_origin}
         if app.config.get('ENV') == 'development' or app.debug:
@@ -310,21 +317,29 @@ def _configurar_seguranca(app: Flask) -> None:
                 'sucesso': False,
                 'erro': 'Origem não autorizada'
             }), 403
-        
+
         # Passou na validação
         return None
 
 def _configurar_i18n(app: Flask) -> None:
     """Configura sistema de internacionalização (i18n)"""
-    from app.i18n import get_translation, get_translated_sector, get_translated_sector_list, get_translated_category, get_translated_status, get_translated_field_label, resolve_flash_message
-    
+    from app.i18n import (
+        get_translated_category,
+        get_translated_field_label,
+        get_translated_sector,
+        get_translated_sector_list,
+        get_translated_status,
+        get_translation,
+        resolve_flash_message,
+    )
+
     @app.before_request
     def antes_da_requisicao():
         """Define o idioma para a requisição atual"""
         # Obtém idioma do parâmetro URL ou da sessão (default: EN)
         lang = request.args.get('lang') or session.get('language', 'en')
         session['language'] = lang
-    
+
     @app.context_processor
     def inject_i18n():
         """Injeta função de tradução e idioma no contexto Jinja"""
@@ -343,7 +358,7 @@ def _configurar_i18n(app: Flask) -> None:
                 extra.update(kwargs)
                 return get_translation(actual_key, lang, **extra)
             return get_translation(key, lang, **kwargs)
-        
+
         def translate_sector(sector_name):
             """Traduz o nome de um setor no template"""
             lang = session.get('language', 'en')
@@ -353,12 +368,12 @@ def _configurar_i18n(app: Flask) -> None:
             """Traduz uma string de setores separados por vírgula (ex: 'Comercial, Planejamento')"""
             lang = session.get('language', 'en')
             return get_translated_sector_list(sector_string, lang)
-        
+
         def translate_category(category_name):
             """Traduz o nome de uma categoria no template"""
             lang = session.get('language', 'en')
             return get_translated_category(category_name, lang)
-        
+
         def translate_status(status_name):
             """Traduz o status de um chamado no template"""
             lang = session.get('language', 'en')
@@ -374,29 +389,29 @@ def _configurar_i18n(app: Flask) -> None:
             if len(partes) == 1:
                 return partes[0]
             return f"{partes[0]} {partes[-1][0]}."
-        
+
         # Extensões de anexo permitidas (para exibir e para o atributo accept do input file)
         _ext = sorted(app.config.get('EXTENSOES_UPLOAD_PERMITIDAS', set()))
         extensoes_permitidas = _ext
         accept_anexo = ','.join('.' + e for e in _ext)
 
-        return dict(
-            t=t,
-            translate_sector=translate_sector,
-            translate_sector_list=translate_sector_list,
-            translate_category=translate_category,
-            translate_status=translate_status,
-            nome_curto=nome_curto,
-            current_language=session.get('language', 'en'),
-            get_supported_languages=lambda: {
+        return {
+            't': t,
+            'translate_sector': translate_sector,
+            'translate_sector_list': translate_sector_list,
+            'translate_category': translate_category,
+            'translate_status': translate_status,
+            'nome_curto': nome_curto,
+            'current_language': session.get('language', 'en'),
+            'get_supported_languages': lambda: {
                 'pt_BR': 'Português (Brasil)',
                 'en': 'English',
                 'es': 'Español'
             },
-            extensoes_permitidas=extensoes_permitidas,
-            accept_anexo=accept_anexo,
-        )
-        
+            'extensoes_permitidas': extensoes_permitidas,
+            'accept_anexo': accept_anexo,
+        }
+
     # Registra funções as Jinja filters (para usar com o pipe |)
     @app.template_filter('translate_sector')
     def filter_translate_sector(sector_name):
@@ -425,24 +440,26 @@ def _configurar_i18n(app: Flask) -> None:
 
 def _configurar_timeout_sessao(app: Flask) -> None:
     """Configura logout automático por inatividade de sessão (15 minutos)"""
-    from flask import session, redirect, url_for, flash, request
-    from flask_login import current_user, logout_user
-    from app.i18n import flash_t
     from datetime import datetime, timezone
-    
+
+    from flask import flash, redirect, request, session, url_for
+    from flask_login import current_user, logout_user
+
+    from app.i18n import flash_t
+
     @app.before_request
     def checar_inatividade():
         # Ignora rotas de arquivos estáticos
         if request.endpoint and request.endpoint.startswith('static'):
             return None
-            
+
         if current_user.is_authenticated:
             # Pega o timestamp atual
-            agora = datetime.now(timezone.utc).timestamp()
+            agora = datetime.now(UTC).timestamp()
             limite_segundos = 900  # 15 minutos
-            
+
             ultima_atividade = session.get('last_activity')
-            
+
             # Checa se excedeu os 15 minutos sem atividade
             if ultima_atividade is not None and (agora - ultima_atividade > limite_segundos):
                 lang = session.get('language', 'en')
@@ -452,31 +469,32 @@ def _configurar_timeout_sessao(app: Flask) -> None:
                 flash_t('session_expired', 'info')
                 # Redireciona para login e impede a requisição atual de continuar
                 return redirect(url_for('main.login'))
-                
+
             # Atualiza o timestamp da última atividade da sessão com a hora atual
             session['last_activity'] = agora
-    
+
     @app.before_request
     def verificar_troca_senha_obrigatoria():
         """Intercepta requisições para forçar troca de senha no primeiro acesso"""
         # Ignora rotas de arquivos estáticos
         if request.endpoint and request.endpoint.startswith('static'):
             return None
-        
+
         # Lista de rotas isentas da verificação
         rotas_isentas = [
             'main.alterar_senha_obrigatoria',
             'main.logout',
             'main.login'
         ]
-        
+
         # Verifica se usuário está autenticado e precisa trocar senha
-        if current_user.is_authenticated:
-            # Admins estão isentos da troca obrigatória
-            if current_user.perfil != 'admin' and current_user.must_change_password:
-                # Se não está em uma rota isenta, redireciona
-                if request.endpoint not in rotas_isentas:
-                    return redirect(url_for('main.alterar_senha_obrigatoria'))
+        if (
+            current_user.is_authenticated
+            and current_user.perfil != 'admin'
+            and current_user.must_change_password
+            and request.endpoint not in rotas_isentas
+        ):
+            return redirect(url_for('main.alterar_senha_obrigatoria'))
 
 
 def _configurar_logging(app: Flask) -> None:

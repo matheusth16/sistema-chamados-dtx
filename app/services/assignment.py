@@ -12,7 +12,7 @@ Uso:
 """
 
 import logging
-from typing import Optional, Dict, List
+
 from app.database import db
 from app.models_usuario import Usuario
 from app.utils_areas import setor_para_area
@@ -22,44 +22,44 @@ logger = logging.getLogger(__name__)
 
 class AtribuidorAutomatico:
     """Gerencia atribuição automática inteligente de chamados"""
-    
+
     # Estratégias disponíveis
     ESTRATEGIAS = {
         'balanceamento_carga': 'Supervisor com menos chamados abertos',
         'round_robin': 'Distribuição sequencial',
         'aleatorio': 'Distribuição aleatória',
     }
-    
+
     def __init__(self, estrategia: str = 'balanceamento_carga'):
         """
         Inicializa atribuidor
-        
+
         Args:
             estrategia: Uma das estratégias em ESTRATEGIAS
         """
         if estrategia not in self.ESTRATEGIAS:
             raise ValueError(f"Estratégia inválida: {estrategia}")
-        
+
         self.estrategia = estrategia
         self.contador_round_robin = {}  # Para rastrear round-robin por área
-    
-    def atribuir(self, area: str, categoria: str = None, prioridade: int = 1) -> Dict:
+
+    def atribuir(self, area: str, categoria: str = None, prioridade: int = 1) -> dict:
         """
         Atribui um chamado a um supervisor automaticamente.
-        
+
         Distribui novo chamado usando a estratégia configurada:
         - **Balanceamento de Carga:** Atribui ao supervisor com menos chamados abertos (padrão)
         - **Round-Robin:** Alterna sequencialmente entre supervisores
         - **Aleatório:** Seleciona supervisor aleatório
-        
+
         Args:
             area (str): Área/departamento do chamado (ex: 'Manutencao', 'Engenharia').
                         Deve corresponder à área de um supervisor.
-            categoria (str, optional): Categoria do chamado (ex: 'Projetos'). 
+            categoria (str, optional): Categoria do chamado (ex: 'Projetos').
                         Padrão: None. Pode ser usado para priorização futura.
             prioridade (int, optional): Nível de prioridade (0=crítica, 1=alta, 2=média, 3=baixa).
                         Padrão: 1. Pode influenciar em atribuição por prioridade.
-        
+
         Returns:
             dict: Resultado da atribuição com chaves:
                 - **sucesso** (bool): True se supervisor foi encontrado e atribuído
@@ -71,10 +71,10 @@ class AtribuidorAutomatico:
                     - chamados_abertos (int): Contagem atual de chamados abertos
                 - **motivo** (str): Razão da atribuição ou mensagem de erro
                 - **estrategia_usada** (str): Nome da estratégia aplicada
-                
+
         Raises:
             ValueError: Se area for inválida ou vazia
-            
+
         Examples:
             >>> resultado = atribuidor.atribuir('Suporte', 'Manutenção', prioridade=0)
             >>> if resultado['sucesso']:
@@ -86,10 +86,10 @@ class AtribuidorAutomatico:
         try:
             area = setor_para_area(area) or area
             logger.debug(f"Atribuindo chamado: area={area}, categoria={categoria}, prioridade={prioridade}")
-            
+
             # 1. Busca supervisores da área
             supervisores = Usuario.get_supervisores_por_area(area)
-            
+
             if not supervisores:
                 logger.warning(f"Nenhum supervisor encontrado para área: {area}")
                 return {
@@ -98,12 +98,12 @@ class AtribuidorAutomatico:
                     'motivo': f'Nenhum supervisor disponível para a área "{area}"',
                     'estrategia_usada': self.estrategia
                 }
-            
+
             logger.debug(f"Encontrados {len(supervisores)} supervisores para área {area}")
-            
+
             # 2. Conta chamados abertos por supervisor
             supervisores_com_carga = self._contar_chamados_abertos(supervisores)
-            
+
             # 3. Aplica estratégia de atribuição
             if self.estrategia == 'balanceamento_carga':
                 supervisor_escolhido = self._atribuir_balanceamento(supervisores_com_carga, area)
@@ -111,7 +111,7 @@ class AtribuidorAutomatico:
                 supervisor_escolhido = self._atribuir_round_robin(supervisores_com_carga, area)
             else:  # aleatorio
                 supervisor_escolhido = supervisores_com_carga[0]  # Sem estratégia específica
-            
+
             if not supervisor_escolhido:
                 return {
                     'sucesso': False,
@@ -119,9 +119,9 @@ class AtribuidorAutomatico:
                     'motivo': 'Não foi possível selecionar um supervisor',
                     'estrategia_usada': self.estrategia
                 }
-            
+
             logger.info(f"Chamado atribuído a {supervisor_escolhido['usuario'].nome} ({supervisor_escolhido['usuario'].email}) - {supervisor_escolhido['chamados_abertos']} chamados abertos")
-            
+
             return {
                 'sucesso': True,
                 'supervisor': {
@@ -134,7 +134,7 @@ class AtribuidorAutomatico:
                 'motivo': f"Atribuído com sucesso (estratégia: {self.estrategia})",
                 'estrategia_usada': self.estrategia
             }
-        
+
         except Exception as e:
             logger.exception(f"Erro ao atribuir chamado: {str(e)}")
             return {
@@ -143,8 +143,8 @@ class AtribuidorAutomatico:
                 'motivo': f'Erro ao atribuir: {str(e)}',
                 'estrategia_usada': self.estrategia
             }
-    
-    def _contar_chamados_abertos(self, supervisores: List[Usuario]) -> List[Dict]:
+
+    def _contar_chamados_abertos(self, supervisores: list[Usuario]) -> list[dict]:
         """
         Conta quantos chamados abertos cada supervisor tem.
 
@@ -157,13 +157,13 @@ class AtribuidorAutomatico:
             return []
 
         nomes = [sup.nome for sup in supervisores]
-        contagem: Dict[str, int] = {nome: 0 for nome in nomes}
+        contagem: dict[str, int] = {nome: 0 for nome in nomes}
 
         try:
             # Firestore IN suporta até 30 valores por query
-            _CHUNK = 30
-            for i in range(0, len(nomes), _CHUNK):
-                chunk = nomes[i:i + _CHUNK]
+            _chunk = 30
+            for i in range(0, len(nomes), _chunk):
+                chunk = nomes[i:i + _chunk]
                 docs = db.collection('chamados')\
                     .where('responsavel', 'in', chunk)\
                     .stream()
@@ -183,56 +183,56 @@ class AtribuidorAutomatico:
             result.append({'usuario': sup, 'chamados_abertos': count})
 
         return result
-    
-    def _atribuir_balanceamento(self, supervisores_com_carga: List[Dict], area: str) -> Optional[Dict]:
+
+    def _atribuir_balanceamento(self, supervisores_com_carga: list[dict], area: str) -> dict | None:
         """
         Estratégia: Atribui ao supervisor com menos chamados abertos
         Garante distribuição equilibrada de carga
         """
         if not supervisores_com_carga:
             return None
-        
+
         # Ordena por menos chamados abertos
         supervisor_escolhido = min(supervisores_com_carga, key=lambda x: x['chamados_abertos'])
-        
+
         logger.debug(f"Balanceamento: {supervisor_escolhido['usuario'].nome} selecionado ({supervisor_escolhido['chamados_abertos']} chamados)")
-        
+
         return supervisor_escolhido
-    
-    def _atribuir_round_robin(self, supervisores_com_carga: List[Dict], area: str) -> Optional[Dict]:
+
+    def _atribuir_round_robin(self, supervisores_com_carga: list[dict], area: str) -> dict | None:
         """
         Estratégia: Distribui sequencialmente entre supervisores
         Garante que cada supervisor recebe chamados na sequência
         """
         if not supervisores_com_carga:
             return None
-        
+
         # Inicializa contador se não existe para essa área
         if area not in self.contador_round_robin:
             self.contador_round_robin[area] = 0
-        
+
         # Seleciona o próximo supervisor na sequência
         idx = self.contador_round_robin[area] % len(supervisores_com_carga)
         supervisor_escolhido = supervisores_com_carga[idx]
-        
+
         # Incrementa para próximo
         self.contador_round_robin[area] = (idx + 1) % len(supervisores_com_carga)
-        
+
         logger.debug(f"Round-Robin: {supervisor_escolhido['usuario'].nome} selecionado (índice {idx})")
-        
+
         return supervisor_escolhido
-    
-    def obter_disponibilidade(self, area: str) -> Dict:
+
+    def obter_disponibilidade(self, area: str) -> dict:
         """
         Retorna informações sobre disponibilidade de supervisores numa área
-        
+
         Útil para dashboard e análises
         """
         try:
             area = setor_para_area(area) or area
             supervisores = Usuario.get_supervisores_por_area(area)
             supervisores_com_carga = self._contar_chamados_abertos(supervisores)
-            
+
             return {
                 'area': area,
                 'total_supervisores': len(supervisores_com_carga),
@@ -249,7 +249,7 @@ class AtribuidorAutomatico:
                 'carga_total': sum(sup['chamados_abertos'] for sup in supervisores_com_carga),
                 'carga_media': sum(sup['chamados_abertos'] for sup in supervisores_com_carga) / len(supervisores_com_carga) if supervisores_com_carga else 0
             }
-        
+
         except Exception as e:
             logger.exception(f"Erro ao obter disponibilidade: {str(e)}")
             return {

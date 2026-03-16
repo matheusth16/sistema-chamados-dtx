@@ -9,15 +9,17 @@ Consolida a lógica que estava repetida em 3 locais:
 
 import logging
 import threading
+
 from firebase_admin import firestore
 from flask import current_app, session
+
 from app.database import db
-from app.i18n import get_translation, get_translated_status
+from app.firebase_retry import execute_with_retry
+from app.i18n import get_translated_status, get_translation
 from app.models_historico import Historico
 from app.models_usuario import Usuario
-from app.services.notifications import notificar_solicitante_status
 from app.services.gamification_service import GamificationService
-from app.firebase_retry import execute_with_retry
+from app.services.notifications import notificar_solicitante_status
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +38,7 @@ def atualizar_status_chamado(
     """Atualiza o status de um chamado, registra histórico e envia notificação.
 
     Para status 'Cancelado', motivo_cancelamento é obrigatório.
-    
+
     Args:
         chamado_id: ID do chamado no Firestore
         novo_status: Novo status ('Aberto', 'Em Atendimento', 'Concluído', 'Cancelado')
@@ -44,7 +46,7 @@ def atualizar_status_chamado(
         usuario_nome: Nome do usuário que está fazendo a alteração
         data_chamado: Dict do chamado (opcional, busca se não informado)
         motivo_cancelamento: Obrigatório quando novo_status == 'Cancelado'
-    
+
     Returns:
         dict com:
             'sucesso': bool
@@ -66,9 +68,9 @@ def atualizar_status_chamado(
             if not doc.exists:
                 return {'sucesso': False, 'erro': 'Chamado não encontrado'}
             data_chamado = doc.to_dict()
-        
+
         status_anterior = data_chamado.get('status')
-        
+
         # Monta dados de atualização
         update_data = {'status': novo_status}
         if novo_status == 'Concluído':
@@ -76,14 +78,14 @@ def atualizar_status_chamado(
         elif novo_status == 'Cancelado':
             update_data['motivo_cancelamento'] = (motivo_cancelamento or '').strip()
             update_data['data_cancelamento'] = firestore.SERVER_TIMESTAMP
-        
+
         # Atualiza no Firestore com retry
         execute_with_retry(
             db.collection('chamados').document(chamado_id).update,
             update_data,
             max_retries=3
         )
-        
+
         # Registra histórico se houve mudança
         if status_anterior != novo_status:
             Historico(
@@ -105,7 +107,7 @@ def atualizar_status_chamado(
                     valor_anterior='-',
                     valor_novo=(motivo_cancelamento or '').strip()[:500]
                 ).save()
-        
+
         # Envia notificação ao solicitante em background (não para Cancelado)
         if novo_status in ('Em Atendimento', 'Concluído'):
             try:
@@ -122,14 +124,14 @@ def atualizar_status_chamado(
             except RuntimeError:
                 # Fora de contexto Flask (testes) — notifica de forma síncrona
                 _notificar_solicitante(chamado_id, data_chamado, novo_status)
-            
+
         # Gamificação: apenas para Em Atendimento / Concluído (não para Cancelado)
         if status_anterior != novo_status:
             if novo_status == 'Concluído':
                 GamificationService.avaliar_resolucao_chamado(usuario_id, data_chamado)
             elif novo_status == 'Em Atendimento':
                 GamificationService.avaliar_atendimento_inicial(usuario_id)
-        
+
         try:
             lang = session.get('language', 'en')
         except RuntimeError:
@@ -141,7 +143,7 @@ def atualizar_status_chamado(
             'mensagem': mensagem,
             'novo_status': novo_status
         }
-    
+
     except Exception as e:
         logger.exception("Erro ao atualizar status do chamado %s: %s", chamado_id, e)
         return {'sucesso': False, 'erro': str(e)}

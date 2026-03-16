@@ -1,5 +1,6 @@
 """Serviço de onboarding: persiste progresso e conclusão do tour guiado."""
 import logging
+
 from app.database import db
 
 logger = logging.getLogger(__name__)

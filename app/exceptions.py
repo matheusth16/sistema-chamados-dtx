@@ -13,7 +13,7 @@ class ChamadoError(Exception):
 
 class ChamadoNaoEncontradoError(ChamadoError):
     """Levantada quando um chamado não é encontrado no banco de dados"""
-    
+
     def __init__(self, chamado_id: str):
         self.chamado_id = chamado_id
         super().__init__(f"Chamado {chamado_id} não encontrado")
@@ -21,7 +21,7 @@ class ChamadoNaoEncontradoError(ChamadoError):
 
 class ValidacaoChamadoError(ChamadoError):
     """Levantada quando validação de dados falha"""
-    
+
     def __init__(self, mensagem: str, erros: list = None):
         self.erros = erros or []
         self.mensagem = mensagem
@@ -35,7 +35,7 @@ class UsuarioError(Exception):
 
 class UsuarioNaoEncontradoError(UsuarioError):
     """Levantada quando um usuário não é encontrado"""
-    
+
     def __init__(self, email: str):
         self.email = email
         super().__init__(f"Usuário {email} não encontrado")
@@ -43,14 +43,14 @@ class UsuarioNaoEncontradoError(UsuarioError):
 
 class AutenticacaoError(UsuarioError):
     """Levantada quando falha a autenticação"""
-    
+
     def __init__(self, mensagem: str = "Email ou senha incorretos"):
         super().__init__(mensagem)
 
 
 class PermissaoNegadaError(UsuarioError):
     """Levantada quando usuário não tem permissão"""
-    
+
     def __init__(self, mensagem: str = "Você não tem permissão para esta ação"):
         super().__init__(mensagem)
 
@@ -62,7 +62,7 @@ class FirestoreError(Exception):
 
 class DocumentoNaoEncontradoError(FirestoreError):
     """Levantada quando documento não existe"""
-    
+
     def __init__(self, colecao: str, doc_id: str):
         self.colecao = colecao
         self.doc_id = doc_id
@@ -71,7 +71,7 @@ class DocumentoNaoEncontradoError(FirestoreError):
 
 class ErroTransacaoError(FirestoreError):
     """Levantada quando transação Firestore falha"""
-    
+
     def __init__(self, mensagem: str):
         super().__init__(f"Erro em transação Firestore: {mensagem}")
 
@@ -83,7 +83,7 @@ class UploadError(Exception):
 
 class ArquivoNaoPermitidoError(UploadError):
     """Levantada quando arquivo tem extensão não permitida"""
-    
+
     def __init__(self, extensao: str, permitidas: list):
         self.extensao = extensao
         self.permitidas = permitidas
@@ -95,7 +95,7 @@ class ArquivoNaoPermitidoError(UploadError):
 
 class TamanhoArquivoExcedidoError(UploadError):
     """Levantada quando arquivo excede tamanho máximo"""
-    
+
     def __init__(self, tamanho_mb: float, maximo_mb: float):
         self.tamanho_mb = tamanho_mb
         self.maximo_mb = maximo_mb

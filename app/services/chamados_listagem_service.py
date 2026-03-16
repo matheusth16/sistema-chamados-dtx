@@ -6,8 +6,7 @@ paginação por cursor, contagens por status e fallback quando o índice Firesto
 """
 import logging
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime
-from typing import Any, Dict, List
+from typing import Any
 
 from firebase_admin import firestore
 
@@ -30,7 +29,7 @@ def listar_meus_chamados_fallback(
     itens_por_pagina: int,
     pagina_atual: int,
     rl_codigo: str = "",
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Fallback quando a query com order_by falha por falta de índice:
     busca só por solicitante_id (não exige índice composto), ordena em memória e pagina.
@@ -57,7 +56,7 @@ def listar_meus_chamados_fallback(
         prioridade = data_dict.get('prioridade', 1)
         data = _data_key(d)
         return (prioridade, data is None, -(data.timestamp() if data else 0))
-    
+
     docs.sort(key=_sort_key)
     status_counts = {'Aberto': 0, 'Em Atendimento': 0, 'Concluído': 0, 'Cancelado': 0}
     for d in docs:
@@ -70,7 +69,7 @@ def listar_meus_chamados_fallback(
     inicio = (pagina_atual - 1) * itens_por_pagina
     fim = inicio + itens_por_pagina
     docs_pagina = docs[inicio:fim]
-    chamados: List[Chamado] = []
+    chamados: list[Chamado] = []
     for doc in docs_pagina:
         try:
             data = doc.to_dict()
@@ -116,7 +115,7 @@ def listar_meus_chamados(
     cursor_prev: str = "",
     pagina_atual: int = 1,
     itens_por_pagina: int = 10,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Lista chamados do solicitante com paginação por cursor.
 
@@ -137,7 +136,7 @@ def listar_meus_chamados(
     if rl_codigo:
         base_ref = base_ref.where('rl_codigo', '==', rl_codigo)
 
-    _STATUS = ('Aberto', 'Em Atendimento', 'Concluído', 'Cancelado')
+    _status = ('Aberto', 'Em Atendimento', 'Concluído', 'Cancelado')
 
     def _contar_total():
         return obter_total_por_contagem(q) or 0
@@ -148,9 +147,9 @@ def listar_meus_chamados(
     # 5 aggregation queries independentes → rodam concorrentemente
     with ThreadPoolExecutor(max_workers=5) as ex:
         fut_total = ex.submit(_contar_total)
-        fut_status = [ex.submit(_contar_status, st) for st in _STATUS]
+        fut_status = [ex.submit(_contar_status, st) for st in _status]
         total_chamados = fut_total.result()
-        status_counts = {st: c for st, c in (f.result() for f in fut_status)}
+        status_counts = dict(f.result() for f in fut_status)
 
     total_paginas = max(1, (total_chamados + itens_por_pagina - 1) // itens_por_pagina)
     pagina_atual = max(1, min(pagina_atual, total_paginas))

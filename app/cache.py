@@ -7,10 +7,12 @@ Cache opcional com Redis para relatórios e listas.
 Reduz 30-50% de queries ao Firestore em relatórios e listas pesadas.
 Em produção com Gunicorn/Cloud Run, defina REDIS_URL para cache e rate limit compartilhados.
 """
+import contextlib
+import logging
 import os
 import time
-import logging
-from typing import Any, Callable, Optional
+from collections.abc import Callable
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +44,7 @@ def _get_redis():
         return None
 
 
-def cache_get(key: str) -> Optional[Any]:
+def cache_get(key: str) -> Any | None:
     """Obtém valor do cache. Retorna None se não existir ou estiver expirado."""
     r = _get_redis()
     if r:
@@ -80,10 +82,8 @@ def cache_delete(key: str) -> None:
     """Remove uma chave do cache."""
     r = _get_redis()
     if r:
-        try:
+        with contextlib.suppress(Exception):
             r.delete(key)
-        except Exception:
-            pass
         return
     _memory_cache.pop(key, None)
     _MEMORY_TTL.pop(key, None)

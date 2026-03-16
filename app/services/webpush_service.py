@@ -3,16 +3,18 @@ Web Push: salvar inscrições (subscriptions) e enviar notificações ao navegad
 Requer VAPID_PUBLIC_KEY e VAPID_PRIVATE_KEY no .env (gerar com: python -m vapid --gen).
 """
 
-import logging
 import json
-from typing import Any, Dict, List
+import logging
+from typing import Any
+
 from firebase_admin import firestore
+
 from app.database import db
 
 logger = logging.getLogger(__name__)
 
 
-def salvar_inscricao(usuario_id: str, subscription: Dict[str, Any]) -> bool:
+def salvar_inscricao(usuario_id: str, subscription: dict[str, Any]) -> bool:
     """
     Salva a inscrição (PushSubscription) do navegador para o usuário.
     subscription deve ter: endpoint, keys { p256dh, auth }.
@@ -35,7 +37,7 @@ def salvar_inscricao(usuario_id: str, subscription: Dict[str, Any]) -> bool:
         return False
 
 
-def obter_inscricoes(usuario_id: str) -> List[Dict[str, Any]]:
+def obter_inscricoes(usuario_id: str) -> list[dict[str, Any]]:
     """Retorna lista de subscription info para envio (endpoint + keys)."""
     if not usuario_id:
         return []

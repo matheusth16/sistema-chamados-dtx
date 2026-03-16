@@ -1,20 +1,21 @@
 """Rotas de administração de categorias: setores, gates, impactos. Apenas para admins."""
 import logging
-from flask import render_template, request, redirect, url_for, Response
-from app.i18n import flash_t
-from app.routes import main
-from app.limiter import limiter
+
+from flask import Response, redirect, render_template, request, url_for
+
+from app.cache import cache_delete
 from app.decoradores import requer_perfil
+from app.i18n import flash_t
 from app.models_categorias import (
-    CategoriaSetor,
-    CategoriaGate,
-    CategoriaImpacto,
-    CACHE_KEY_SETORES,
     CACHE_KEY_GATES,
     CACHE_KEY_IMPACTOS,
+    CACHE_KEY_SETORES,
+    CategoriaGate,
+    CategoriaImpacto,
+    CategoriaSetor,
 )
+from app.routes import main
 from app.services.translation_service import adicionar_traducao_customizada
-from app.cache import cache_delete
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +28,7 @@ def admin_categorias() -> Response:
         setores = CategoriaSetor.get_all()
         gates = CategoriaGate.get_all()
         impactos = CategoriaImpacto.get_all()
-        
+
         return render_template(
             'admin_categorias.html',
             setores=setores,
@@ -47,11 +48,11 @@ def criar_setor() -> Response:
     try:
         nome_pt = request.form.get('nome_pt', '').strip()
         descricao_pt = request.form.get('descricao_pt', '').strip()
-        
+
         if not nome_pt:
             flash_t('sector_name_required', 'danger')
             return redirect(url_for('main.admin_categorias'))
-        
+
         # Cria o setor (tradução automática)
         setor = CategoriaSetor(
             nome_pt=nome_pt,
@@ -76,18 +77,18 @@ def criar_gate() -> Response:
     try:
         nome_pt = request.form.get('nome_pt', '').strip()
         descricao_pt = request.form.get('descricao_pt', '').strip()
-        
+
         if not nome_pt:
             flash_t('gate_name_required', 'danger')
             return redirect(url_for('main.admin_categorias'))
-        
+
         # Calcula próxima ordem: pega o maior valor existente + 1
         gates_existentes = CategoriaGate.get_all()
         if gates_existentes:
             proxima_ordem = max(g.ordem for g in gates_existentes) + 1
         else:
             proxima_ordem = 1
-        
+
         # Cria o gate (tradução automática)
         gate = CategoriaGate(
             nome_pt=nome_pt,
@@ -113,11 +114,11 @@ def criar_impacto() -> Response:
     try:
         nome_pt = request.form.get('nome_pt', '').strip()
         descricao_pt = request.form.get('descricao_pt', '').strip()
-        
+
         if not nome_pt:
             flash_t('impact_name_required', 'danger')
             return redirect(url_for('main.admin_categorias'))
-        
+
         # Cria o impacto (tradução automática)
         impacto = CategoriaImpacto(
             nome_pt=nome_pt,
@@ -144,11 +145,11 @@ def editar_setor(setor_id: str) -> Response:
         if not setor:
             flash_t('sector_not_found', 'danger')
             return redirect(url_for('main.admin_categorias'))
-        
+
         setor.nome_pt = request.form.get('nome_pt', setor.nome_pt).strip()
         setor.descricao_pt = request.form.get('descricao_pt', setor.descricao_pt).strip()
         setor.ativo = request.form.get('ativo') == 'on'
-        
+
         setor.save()
         cache_delete(CACHE_KEY_SETORES)
         flash_t('sector_updated_success', 'success', nome=setor.nome_pt)
@@ -188,11 +189,11 @@ def editar_gate(gate_id: str) -> Response:
         if not gate:
             flash_t('gate_not_found', 'danger')
             return redirect(url_for('main.admin_categorias'))
-        
+
         gate.nome_pt = request.form.get('nome_pt', gate.nome_pt).strip()
         gate.descricao_pt = request.form.get('descricao_pt', gate.descricao_pt).strip()
         gate.ativo = request.form.get('ativo') == 'on'
-        
+
         gate.save()
         cache_delete(CACHE_KEY_GATES)
         flash_t('gate_updated_success', 'success', nome=gate.nome_pt)
@@ -232,11 +233,11 @@ def editar_impacto(impacto_id: str) -> Response:
         if not impacto:
             flash_t('impact_not_found', 'danger')
             return redirect(url_for('main.admin_categorias'))
-        
+
         impacto.nome_pt = request.form.get('nome_pt', impacto.nome_pt).strip()
         impacto.descricao_pt = request.form.get('descricao_pt', impacto.descricao_pt).strip()
         impacto.ativo = request.form.get('ativo') == 'on'
-        
+
         impacto.save()
         cache_delete(CACHE_KEY_IMPACTOS)
         flash_t('impact_updated_success', 'success', nome=impacto.nome_pt)

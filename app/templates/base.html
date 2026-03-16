@@ -62,7 +62,7 @@
     {% include "components/onboarding.html" %}
     {% endif %}
 
-    <main class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+    <main class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
       {# Flash messages as floating toasts #} {% if request.endpoint !=
       'main.index' %} {% with messages =
       get_flashed_messages(with_categories=true) %} {% if messages %}

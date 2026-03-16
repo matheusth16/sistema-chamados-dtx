@@ -15,13 +15,13 @@
             <div>
                 <h2 class="text-2xl font-black text-slate-800 tracking-tight">{{ t('my_tickets') }}</h2>
                 <div class="text-sm font-medium text-slate-500 flex items-center gap-2 mt-1.5">
-                    <span class="font-bold text-indigo-700 bg-indigo-50 border border-indigo-100/50 px-2.5 py-0.5 rounded-lg shadow-sm">{{ total_chamados }}</span> 
+                    <span data-testid="total-chamados" class="font-bold text-indigo-700 bg-indigo-50 border border-indigo-100/50 px-2.5 py-0.5 rounded-lg shadow-sm">{{ total_chamados }}</span> 
                     <span>{{ t('track_tickets') }}</span>
                 </div>
             </div>
         </div>
         <div class="flex gap-3 w-full md:w-auto flex-col md:flex-row justify-end relative z-10">
-            <a href="/"
+            <a href="/" data-testid="new-ticket-btn"
                 class="inline-flex items-center px-5 py-2.5 bg-gradient-to-r from-blue-700 to-indigo-800 hover:from-blue-800 hover:to-indigo-900 text-white font-bold rounded-xl shadow-md shadow-indigo-500/20 transition-all hover:scale-[1.02] active:scale-[0.98] justify-center text-sm border border-indigo-600">
                 <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
@@ -113,7 +113,7 @@
     {% include 'components/_filters_bar_meus_chamados.html' with context %}
 
     <!-- Tabela de Chamados -->
-    <div class="bg-white/90 backdrop-blur-md shadow-[0_8px_30px_rgb(0,0,0,0.04)] rounded-2xl overflow-hidden border border-gray-100 p-1 gsap-stagger-container">
+    <div class="bg-white/90 backdrop-blur-md shadow-[0_8px_30px_rgb(0,0,0,0.04)] rounded-2xl overflow-hidden border border-gray-100 p-1 gsap-scroll-reveal">
         {% if chamados %}
         <div class="overflow-x-auto">
             <table class="min-w-full divide-y divide-gray-100/80">
@@ -122,14 +122,14 @@
                         <th class="px-5 py-4 text-left text-[11px] font-black text-slate-500 uppercase tracking-widest sortable hover:bg-slate-100 transition-colors cursor-pointer group" data-column="0" onclick="sortTable(0, 'number')">
                             {{ t('id_ref') }}<span class="sort-icon ml-1 text-slate-300 group-hover:text-indigo-400">↕</span>
                         </th>
-                        <th class="px-5 py-4 text-left text-[11px] font-black text-slate-500 uppercase tracking-widest filterable cursor-pointer hover:bg-slate-100 transition-colors" data-column="1" onclick="showFilterDropdown(1, this)">
+                        <th class="hidden sm:table-cell px-5 py-4 text-left text-[11px] font-black text-slate-500 uppercase tracking-widest filterable cursor-pointer hover:bg-slate-100 transition-colors" data-column="1" onclick="showFilterDropdown(1, this)">
                             {{ t('category') }}
                         </th>
-                        <th class="px-5 py-4 text-left text-[11px] font-black text-slate-500 uppercase tracking-widest filterable cursor-pointer hover:bg-slate-100 transition-colors" data-column="2" onclick="showFilterDropdown(2, this)">
+                        <th class="hidden md:table-cell px-5 py-4 text-left text-[11px] font-black text-slate-500 uppercase tracking-widest filterable cursor-pointer hover:bg-slate-100 transition-colors" data-column="2" onclick="showFilterDropdown(2, this)">
                             {{ t('type_sector') }}
                         </th>
                         <th class="px-5 py-4 text-left text-[11px] font-black text-slate-500 uppercase tracking-widest">{{ t('description') }}</th>
-                        <th class="px-5 py-4 text-left text-[11px] font-black text-slate-500 uppercase tracking-widest filterable cursor-pointer hover:bg-slate-100 transition-colors" data-column="4" onclick="showFilterDropdown(4, this)">{{ t('assigned_to') }}</th>
+                        <th class="hidden md:table-cell px-5 py-4 text-left text-[11px] font-black text-slate-500 uppercase tracking-widest filterable cursor-pointer hover:bg-slate-100 transition-colors" data-column="4" onclick="showFilterDropdown(4, this)">{{ t('assigned_to') }}</th>
                         <th class="px-5 py-4 text-left text-[11px] font-black text-slate-500 uppercase tracking-widest filterable cursor-pointer hover:bg-slate-100 transition-colors" data-column="5" onclick="showFilterDropdown(5, this)">
                             {{ t('status') }}
                         </th>

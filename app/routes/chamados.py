@@ -1,22 +1,23 @@
 """Rotas de criação e listagem de chamados (solicitante)."""
 import logging
-from flask import render_template, request, redirect, url_for, Response, flash
-from app.i18n import flash_t
+
+from flask import Response, flash, redirect, render_template, request, url_for
 from flask_login import current_user
-from app.routes import main
-from app.limiter import limiter
-from app.decoradores import requer_solicitante
+
+from app.cache import get_static_cached
 from app.database import db
-from app.services.pagination import obter_total_por_contagem
-from app.models_categorias import CategoriaSetor, CategoriaImpacto
-from app.services.validators import validar_novo_chamado
+from app.decoradores import requer_solicitante
+from app.i18n import flash_t
+from app.models_categorias import CategoriaImpacto, CategoriaSetor
+from app.routes import main
 from app.services.chamados_criacao_service import criar_chamado
 from app.services.chamados_listagem_service import (
+    _eh_erro_indice_firestore,
     listar_meus_chamados,
     listar_meus_chamados_fallback,
-    _eh_erro_indice_firestore,
 )
-from app.cache import get_static_cached
+from app.services.pagination import obter_total_por_contagem
+from app.services.validators import validar_novo_chamado
 
 logger = logging.getLogger(__name__)
 

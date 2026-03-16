@@ -7,7 +7,6 @@ limite global injusto quando todos compartilham o mesmo sistema.
 """
 import logging
 from datetime import datetime
-from typing import Optional, Tuple
 
 from app.database import db
 
@@ -31,7 +30,7 @@ def _doc_id(user_id: str) -> str:
 
 def verificar_e_incrementar_relatorio(
     user_id: str, limite_diario: int
-) -> Tuple[bool, Optional[str]]:
+) -> tuple[bool, str | None]:
     """
     Verifica se o usuário pode gerar mais uma "atualização de relatório" hoje.
     Se sim, incrementa o contador e retorna (True, None).
@@ -71,7 +70,7 @@ def verificar_e_incrementar_relatorio(
 
 def verificar_e_incrementar_export(
     user_id: str, limite_diario: int
-) -> Tuple[bool, Optional[str]]:
+) -> tuple[bool, str | None]:
     """
     Verifica se o usuário pode gerar mais um export Excel hoje.
     Se sim, incrementa e retorna (True, None). Senão (False, mensagem).

@@ -4,20 +4,23 @@ Serviço de carregamento do dashboard (admin).
 Centraliza a construção do contexto da página admin: chamados com filtros,
 paginação por cursor, listas de responsáveis e gates.
 """
-from typing import Any, Dict, List
+import logging
+from typing import Any
 
+from app.cache import get_static_cached
 from app.database import db
 from app.models import Chamado
-from app.models_usuario import Usuario
 from app.models_categorias import CategoriaGate
-from app.services.filters import aplicar_filtros_dashboard_com_paginacao
-from app.cache import get_static_cached
-from app.services.permissions import usuario_pode_ver_chamado_otimizado
+from app.models_usuario import Usuario
 from app.services.analytics import obter_sla_para_exibicao
+from app.services.filters import aplicar_filtros_dashboard_com_paginacao
+from app.services.permissions import usuario_pode_ver_chamado_otimizado
 from app.utils import extrair_numero_chamado
 
+logger = logging.getLogger(__name__)
 
-def _filtrar_chamados_por_permissao(docs: List[Any], user: Any) -> List[Chamado]:
+
+def _filtrar_chamados_por_permissao(docs: list[Any], user: Any) -> list[Chamado]:
     """Filtra chamados que o usuário pode ver, com cache para evitar N+1 queries."""
     chamados = []
     if user.perfil == 'admin':
@@ -42,7 +45,7 @@ def _filtrar_chamados_por_permissao(docs: List[Any], user: Any) -> List[Chamado]
     return chamados
 
 
-def obter_contexto_admin(user: Any, args: Dict[str, Any], itens_por_pagina: int = 25) -> Dict[str, Any]:
+def obter_contexto_admin(user: Any, args: dict[str, Any], itens_por_pagina: int = 25) -> dict[str, Any]:
     """
     Monta o contexto para renderizar a página do dashboard (admin).
 
@@ -73,6 +76,9 @@ def obter_contexto_admin(user: Any, args: Dict[str, Any], itens_por_pagina: int 
             chamados_ref = chamados_ref.where('area', 'in', areas)
     cursor = (args.get('cursor') or '').strip() or None
     cursor_prev = (args.get('cursor_prev') or '').strip() or None
+    pagina_atual = int(args.get('pagina') or 1)
+    if pagina_atual < 1:
+        pagina_atual = 1
     resultado = aplicar_filtros_dashboard_com_paginacao(
         chamados_ref, args, limite=itens_por_pagina, cursor=cursor, cursor_anterior=cursor_prev
     )
@@ -80,12 +86,14 @@ def obter_contexto_admin(user: Any, args: Dict[str, Any], itens_por_pagina: int 
     chamados = _filtrar_chamados_por_permissao(docs, user)
 
     def _chave(c):
-        concluido = c.status == 'Concluído'
+        concluido = c.status in ('Concluído', 'Cancelado')
         num_id = extrair_numero_chamado(c.numero_chamado)
         if concluido:
             return (True, 0, num_id)
-        # Usa campo prioridade do modelo (0=Projetos, 1=demais)
-        prioridade_cat = getattr(c, 'prioridade', 1)
+        # Projetos Aberto/Em Atendimento sempre no topo
+        # Verifica categoria diretamente (não depende do campo prioridade, que pode não existir em chamados antigos)
+        eh_projetos = c.categoria == 'Projetos' or getattr(c, 'prioridade', 1) == 0
+        prioridade_cat = 0 if eh_projetos else 1
         return (False, prioridade_cat, num_id)
 
     chamados_ordenados = sorted(chamados, key=_chave)
@@ -95,7 +103,7 @@ def obter_contexto_admin(user: Any, args: Dict[str, Any], itens_por_pagina: int 
     _grupo_prio: dict = defaultdict(lambda: 1)
     for c in chamados_ordenados:
         rl = c.rl_codigo or ''
-        if getattr(c, 'prioridade', 1) == 0:
+        if c.categoria == 'Projetos' or getattr(c, 'prioridade', 1) == 0:
             _grupo_prio[rl] = 0
     for c in chamados_ordenados:
         rl = c.rl_codigo or ''
@@ -113,7 +121,7 @@ def obter_contexto_admin(user: Any, args: Dict[str, Any], itens_por_pagina: int 
     )
     return {
         'chamados': chamados_ordenados,
-        'pagina_atual': 1,
+        'pagina_atual': pagina_atual,
         'total_paginas': total_paginas,
         'total_chamados': total_chamados,
         'itens_por_pagina': itens_por_pagina,

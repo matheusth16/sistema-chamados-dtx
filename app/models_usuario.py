@@ -1,7 +1,9 @@
 import logging
 from datetime import datetime
+
 from flask_login import UserMixin
-from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.security import check_password_hash, generate_password_hash
+
 from app.database import db
 from app.firebase_retry import firebase_retry
 
@@ -13,7 +15,7 @@ CACHE_KEY_USUARIOS = 'usuarios_list'
 
 class Usuario(UserMixin):
     """Representação de um usuário do sistema"""
-    
+
     def __init__(self, id: str, email: str, nome: str, perfil: str = 'solicitante', areas: list = None,
                  exp_total: int = 0, exp_semanal: int = 0, level: int = 1, conquistas: list = None,
                  must_change_password: bool = False, password_changed_at=None,
@@ -38,20 +40,20 @@ class Usuario(UserMixin):
         # Onboarding
         self.onboarding_completo = onboarding_completo
         self.onboarding_passo = onboarding_passo
-    
+
     @property
     def area(self):
         """Property de compatibilidade: retorna áreas separadas por vírgula"""
         return ", ".join(self.areas) if self.areas else None
-    
+
     def set_password(self, senha: str):
         """Define a senha com hash"""
         self.senha_hash = generate_password_hash(senha)
-    
+
     def check_password(self, senha: str) -> bool:
         """Verifica se a senha está correta"""
         return check_password_hash(self.senha_hash, senha) if self.senha_hash else False
-    
+
     def to_dict(self):
         """Converte para dicionário para salvar no Firestore"""
         return {
@@ -69,7 +71,7 @@ class Usuario(UserMixin):
             'onboarding_completo': self.onboarding_completo,
             'onboarding_passo': self.onboarding_passo,
         }
-    
+
     @classmethod
     def from_dict(cls, data: dict, id: str = None):
         """Cria um objeto Usuario a partir de um dicionário do Firestore"""
@@ -77,15 +79,15 @@ class Usuario(UserMixin):
         # Migração: se tem area string mas não tem areas array
         if not areas and data.get('area'):
             areas = [data.get('area')]
-            
+
         # Processar password_changed_at
         password_changed_at = data.get('password_changed_at')
         if password_changed_at and isinstance(password_changed_at, str):
             try:
                 password_changed_at = datetime.fromisoformat(password_changed_at)
-            except:
+            except ValueError:
                 password_changed_at = None
-        
+
         usuario = cls(
             id=id,
             email=data.get('email'),
@@ -103,7 +105,7 @@ class Usuario(UserMixin):
         )
         usuario.senha_hash = data.get('senha_hash')
         return usuario
-    
+
     @classmethod
     def get_by_email(cls, email: str):
         """Busca usuário por email"""
@@ -115,7 +117,7 @@ class Usuario(UserMixin):
         except Exception as e:
             logger.exception("Erro ao buscar usuário por email: %s", e)
         return None
-    
+
     @classmethod
     def get_by_id(cls, user_id: str):
         """Busca usuário por ID"""
@@ -127,7 +129,7 @@ class Usuario(UserMixin):
         except Exception as e:
             logger.exception("Erro ao buscar usuário por ID: %s", e)
         return None
-    
+
     @firebase_retry(max_retries=3)
     def save(self):
         """Salva o usuário no Firestore com retry automático"""
@@ -137,46 +139,46 @@ class Usuario(UserMixin):
         except Exception as e:
             logger.exception("Erro ao salvar usuário: %s", e)
             return False
-    
+
     @firebase_retry(max_retries=3)
     def update(self, **kwargs):
         """Atualiza campos específicos do usuário no Firestore com retry automático
-        
+
         Args:
             **kwargs: Campos a atualizar (email, nome, perfil, area, senha)
         """
         try:
             update_data = {}
-            
+
             # Aceita atualizações de campos específicos
             if 'email' in kwargs:
                 self.email = kwargs['email']
                 update_data['email'] = kwargs['email']
-            
+
             if 'nome' in kwargs:
                 self.nome = kwargs['nome']
                 update_data['nome'] = kwargs['nome']
-            
+
             if 'perfil' in kwargs:
                 self.perfil = kwargs['perfil']
                 update_data['perfil'] = kwargs['perfil']
-            
+
             if 'areas' in kwargs:
                 self.areas = kwargs['areas']
                 update_data['areas'] = kwargs['areas']
-            
+
             if 'senha' in kwargs and kwargs['senha']:
                 self.set_password(kwargs['senha'])
                 update_data['senha_hash'] = self.senha_hash
-            
+
             if 'must_change_password' in kwargs:
                 self.must_change_password = kwargs['must_change_password']
                 update_data['must_change_password'] = kwargs['must_change_password']
-            
+
             if 'password_changed_at' in kwargs:
                 self.password_changed_at = kwargs['password_changed_at']
                 update_data['password_changed_at'] = kwargs['password_changed_at'].isoformat() if kwargs['password_changed_at'] else None
-            
+
             if 'onboarding_completo' in kwargs:
                 self.onboarding_completo = kwargs['onboarding_completo']
                 update_data['onboarding_completo'] = kwargs['onboarding_completo']
@@ -199,16 +201,16 @@ class Usuario(UserMixin):
                 if 'conquistas' in g_data:
                     self.conquistas = g_data['conquistas']
                     update_data['conquistas'] = g_data['conquistas']
-            
+
             if update_data:
                 db.collection('usuarios').document(self.id).update(update_data)
                 return True
-            
+
             return False
         except Exception as e:
             logger.exception("Erro ao atualizar usuário: %s", e)
             return False
-    
+
     @firebase_retry(max_retries=3)
     def delete(self):
         """Deleta o usuário do Firestore com retry automático"""
@@ -218,7 +220,7 @@ class Usuario(UserMixin):
         except Exception as e:
             logger.exception("Erro ao deletar usuário: %s", e)
             return False
-    
+
     @classmethod
     def get_all(cls):
         """Retorna lista de todos os usuários"""
@@ -233,21 +235,18 @@ class Usuario(UserMixin):
         except Exception as e:
             logger.exception("Erro ao buscar usuários: %s", e)
             return []
-    
+
     @classmethod
     def email_existe(cls, email: str, id_atual: str = None) -> bool:
         """Verifica se um email já existe (excluindo é um ID específico)
-        
+
         Args:
             email: Email a verificar
             id_atual: ID do usuário atual (para validação de atualização)
         """
         try:
             docs = db.collection('usuarios').where('email', '==', email).stream()
-            for doc in docs:
-                if id_atual is None or doc.id != id_atual:
-                    return True
-            return False
+            return any(id_atual is None or doc.id != id_atual for doc in docs)
         except Exception as e:
             logger.exception("Erro ao verificar email: %s", e)
             return False
@@ -262,7 +261,7 @@ class Usuario(UserMixin):
         """Retorna supervisores de uma área específica (e admins da mesma área, para sugestão de responsável)."""
         try:
             usuarios = []
-            
+
             # Buscar todos os supervisores e filtrar por área em Python
             # (Firestore tem limitações em queries compostas com array_contains)
             docs_sup = db.collection('usuarios').where('perfil', '==', 'supervisor').stream()
@@ -274,7 +273,7 @@ class Usuario(UserMixin):
                 areas_usuario = getattr(usuario, 'areas', None) or []
                 if isinstance(areas_usuario, list) and area in areas_usuario:
                     usuarios.append(usuario)
-            
+
             # Buscar todos os admins e filtrar por área
             docs_admin = db.collection('usuarios').where('perfil', '==', 'admin').stream()
             for doc in docs_admin:
@@ -283,11 +282,11 @@ class Usuario(UserMixin):
                 areas_usuario = getattr(usuario, 'areas', None) or []
                 if isinstance(areas_usuario, list) and area in areas_usuario:
                     usuarios.append(usuario)
-            
+
             return usuarios
         except Exception as e:
             logger.exception("Erro ao buscar supervisores: %s", e)
             return []
-    
+
     def __repr__(self):
         return f'<Usuario {self.email} - {self.perfil}>'

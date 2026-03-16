@@ -7,18 +7,19 @@ Centraliza regras de negócio para criação/edição de chamados:
 - Extensões e validação de anexos (extensão + magic bytes para evitar upload malicioso)
 """
 import re
-from typing import Any, List, Optional, Set, Tuple
+from typing import Any
 
 from flask import current_app
 
+
 # Fallback se config não estiver disponível (ex.: testes)
-def _get_extensoes_permitidas() -> Set[str]:
+def _get_extensoes_permitidas() -> set[str]:
     try:
         return current_app.config.get('EXTENSOES_UPLOAD_PERMITIDAS', set())
     except RuntimeError:
         return {'png', 'jpg', 'jpeg', 'pdf', 'xls', 'xlsx', 'xlsm', 'xlsb', 'xltx', 'xltm', 'csv', 'doc', 'docx', 'docm', 'dotx', 'dotm'}
 
-def get_extensoes_permitidas() -> Set[str]:
+def get_extensoes_permitidas() -> set[str]:
     """Retorna o conjunto de extensões permitidas (para exibição em templates)."""
     return _get_extensoes_permitidas()
 
@@ -50,7 +51,7 @@ def _arquivo_permitido(filename: str) -> bool:
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in _get_extensoes_permitidas()
 
 
-def _arquivo_conteudo_permitido(arquivo: Any) -> Tuple[bool, str]:
+def _arquivo_conteudo_permitido(arquivo: Any) -> tuple[bool, str]:
     """
     Valida o conteúdo do arquivo pelos magic bytes (tipo real).
     Retorna (True, '') se válido; (False, mensagem_erro) se inválido.
@@ -83,8 +84,8 @@ def _arquivo_conteudo_permitido(arquivo: Any) -> Tuple[bool, str]:
 
 def validar_novo_chamado(
     form: Any,
-    arquivo: Optional[Any] = None,
-) -> List[str]:
+    arquivo: Any | None = None,
+) -> list[str]:
     """
     Valida dados do formulário de novo chamado. Blindagem antes de persistir no Firestore.
 
@@ -112,7 +113,7 @@ def validar_novo_chamado(
         erros.append("A descrição do chamado é obrigatória.")
     elif len(descricao) < 3:
         erros.append("A descrição deve ter no mínimo 3 caracteres.")
-    
+
     if not tipo:
         erros.append("É necessário atribuir um setor.")
 

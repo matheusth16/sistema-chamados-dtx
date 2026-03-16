@@ -1,5 +1,4 @@
 import logging
-from datetime import datetime
 
 from firebase_admin import firestore
 

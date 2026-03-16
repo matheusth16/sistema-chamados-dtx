@@ -2,13 +2,15 @@
 Funções utilitárias compartilhadas entre rotas.
 """
 from datetime import datetime
-from typing import Any, Optional
-from flask import current_app, request
+from typing import Any
+
 from firebase_admin import firestore
+from flask import current_app, request
+
 from app.database import db
 
 
-def mask_email_for_log(email: Optional[str]) -> str:
+def mask_email_for_log(email: str | None) -> str:
     """
     Em produção, mascara e-mail em logs (LGPD/segurança).
     Ex.: user@empresa.com -> u***@empresa.com
@@ -41,7 +43,7 @@ def formatar_data_para_excel(val: Any) -> str:
     return '-'
 
 
-def extrair_numero_chamado(numero_str: Optional[str]) -> float:
+def extrair_numero_chamado(numero_str: str | None) -> float:
     """Extrai número de 'CHM-XXXX' para ordenação numérica."""
     if not numero_str:
         return float('inf')
@@ -85,7 +87,7 @@ def get_client_ip() -> str:
     """
     Obtém o endereço IP real do cliente, considerando proxies reversos.
     Verifica os headers X-Forwarded-For (lista de IPs), X-Real-IP e remote_addr.
-    
+
     Returns:
         Endereço IP do cliente
     """
@@ -94,10 +96,10 @@ def get_client_ip() -> str:
         # X-Forwarded-For pode conter múltiplos IPs (client, proxy1, proxy2...)
         # O primeiro é sempre o cliente original
         return request.headers.get('X-Forwarded-For').split(',')[0].strip()
-    
+
     # Verifica X-Real-IP (usado por alguns proxies reversos)
     if request.headers.get('X-Real-IP'):
         return request.headers.get('X-Real-IP')
-    
+
     # Fallback para request.remote_addr (conexão direta)
     return request.remote_addr or 'unknown'

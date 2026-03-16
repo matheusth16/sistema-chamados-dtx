@@ -28,7 +28,7 @@ Usa indexação Firestore para performance, com fallback para filtros em memóri
 # Chamados abertos da última semana
 filtros = {'status': 'Aberto', 'data_inicio': datetime.now() - timedelta(days=7)}
 docs = aplicar_filtros_dashboard_com_paginacao(
-    chamados_query, 
+    chamados_query,
     filtros=filtros,
     pagina=1
 )
@@ -55,15 +55,15 @@ if resultado['tem_proxima']:
 - Cursor vazio ou inválido reinicia do início
 """
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from firebase_admin import firestore
 
 
 def _construir_query_base(
     query_ref: Any,
-    args: Dict[str, Any],
-) -> Tuple[Any, bool, Optional[str], Optional[str], Optional[str]]:
+    args: dict[str, Any],
+) -> tuple[Any, bool, str | None, str | None, str | None]:
     """
     Aplica filtros baseados em índices Firestore (status, gate, responsavel).
     Categoria e search são aplicados depois em memória (ver _aplicar_filtros_em_memoria).
@@ -101,7 +101,7 @@ def _construir_query_base(
     return query_filtrada, categoria_filtrada, categoria, status, gate
 
 
-def construir_query_para_contagem(query_ref: Any, args: Dict[str, Any]) -> Any:
+def construir_query_para_contagem(query_ref: Any, args: dict[str, Any]) -> Any:
     """
     Retorna a query com os mesmos filtros por índice usados no dashboard.
 
@@ -115,24 +115,24 @@ def construir_query_para_contagem(query_ref: Any, args: Dict[str, Any]) -> Any:
 
 
 def _aplicar_filtros_em_memoria(
-    docs: List[Any],
-    status: Optional[str],
-    gate: Optional[str],
-    categoria: Optional[str],
-    search: Optional[str],
-) -> List[Any]:
+    docs: list[Any],
+    status: str | None,
+    gate: str | None,
+    categoria: str | None,
+    search: str | None,
+) -> list[Any]:
     """
     OTIMIZAÇÃO 2: Filtros que não podem usar índices compostos
-    
+
     Nota: Esses filtros são aplicados APÓS buscar o limite de documentos.
     Para manter performance, eles funcionam apenas nos documentos recuperados.
     """
     resultado = docs
-    
+
     # Filtro de categoria (inclui Projetos no topo se necessário)
     if categoria and categoria not in ['', 'Todas']:
         resultado = [d for d in resultado if d.to_dict().get('categoria') == categoria]
-    
+
     # Busca por texto (case-insensitive)
     if search:
         termo = search.lower()
@@ -146,31 +146,31 @@ def _aplicar_filtros_em_memoria(
                 termo in doc.id.lower()
             )
         ]
-    
+
     return resultado
 
 
 def aplicar_filtros_dashboard_com_paginacao(
     query_ref: Any,
-    args: Dict[str, Any],
+    args: dict[str, Any],
     limite: int = 50,
-    cursor: Optional[str] = None,
-    cursor_anterior: Optional[str] = None,
-) -> Dict[str, Any]:
+    cursor: str | None = None,
+    cursor_anterior: str | None = None,
+) -> dict[str, Any]:
     """
     OTIMIZAÇÃO 3: Paginação por cursor (cursor-based pagination)
-    
+
     Ao invés de usar offset, que é ineficiente no Firestore,
     usamos documentos "cursor" para saber por onde começar.
     Ordem fixa: data_abertura DESC (exige índice composto).
-    
+
     Args:
         query_ref: Referência da coleção Firestore
         args: Argumentos da URL (filtros)
         limite: Documentos por página (padrão: 50)
         cursor: ID do último documento da página anterior (para próxima página)
         cursor_anterior: ID do primeiro documento da página atual (para página anterior)
-    
+
     Returns:
         {
             'docs': [DocumentSnapshot, ...],
@@ -234,13 +234,13 @@ def aplicar_filtros_dashboard_com_paginacao(
     }
 
 
-def aplicar_filtros_dashboard(query_ref: Any, args: Dict[str, Any]) -> List[Any]:
+def aplicar_filtros_dashboard(query_ref: Any, args: dict[str, Any]) -> list[Any]:
     """
     OTIMIZAÇÃO 4: Função legada mantida para compatibilidade
-    
+
     Usa paginação com limite padrão de 50 documentos
     Não usa cursor (começa do início sempre)
-    
+
     IMPORTANTE: Para usar cursor-based pagination, use aplicar_filtros_dashboard_com_paginacao()
     """
     resultado = aplicar_filtros_dashboard_com_paginacao(query_ref, args, limite=50, cursor=None)
