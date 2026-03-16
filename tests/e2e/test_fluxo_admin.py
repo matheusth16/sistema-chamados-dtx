@@ -12,22 +12,18 @@ Requer:
 """
 
 import pytest
-from playwright.sync_api import Page, expect
+from playwright.sync_api import Page
 
 
 @pytest.mark.e2e
-def test_admin_acessa_dashboard(
-    logged_in_admin: Page, base_url: str
-) -> None:
+def test_admin_acessa_dashboard(logged_in_admin: Page, base_url: str) -> None:
     """Admin deve aterrissar fora do /login após autenticação."""
     page = logged_in_admin
     assert "/login" not in page.url
 
 
 @pytest.mark.e2e
-def test_admin_acessa_gerenciamento_usuarios(
-    logged_in_admin: Page, base_url: str
-) -> None:
+def test_admin_acessa_gerenciamento_usuarios(logged_in_admin: Page, base_url: str) -> None:
     """Admin deve acessar /admin/usuarios sem redirecionamento."""
     page = logged_in_admin
     page.goto(f"{base_url}/admin/usuarios")
@@ -38,9 +34,7 @@ def test_admin_acessa_gerenciamento_usuarios(
 
 
 @pytest.mark.e2e
-def test_admin_acessa_categorias(
-    logged_in_admin: Page, base_url: str
-) -> None:
+def test_admin_acessa_categorias(logged_in_admin: Page, base_url: str) -> None:
     """Admin deve acessar gerenciamento de categorias."""
     page = logged_in_admin
     page.goto(f"{base_url}/admin/categorias")
@@ -50,9 +44,7 @@ def test_admin_acessa_categorias(
 
 
 @pytest.mark.e2e
-def test_admin_acessa_traducoes(
-    logged_in_admin: Page, base_url: str
-) -> None:
+def test_admin_acessa_traducoes(logged_in_admin: Page, base_url: str) -> None:
     """Admin deve acessar o painel de traduções."""
     page = logged_in_admin
     page.goto(f"{base_url}/admin/traducoes")
@@ -62,9 +54,7 @@ def test_admin_acessa_traducoes(
 
 
 @pytest.mark.e2e
-def test_admin_acessa_relatorios(
-    logged_in_admin: Page, base_url: str
-) -> None:
+def test_admin_acessa_relatorios(logged_in_admin: Page, base_url: str) -> None:
     """Admin deve acessar relatórios."""
     page = logged_in_admin
     page.goto(f"{base_url}/relatorios")

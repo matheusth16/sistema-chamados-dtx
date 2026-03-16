@@ -57,12 +57,7 @@ class GrupoRL:
         if not rl:
             return None
         try:
-            docs = (
-                db.collection("grupos_rl")
-                .where("rl_codigo", "==", rl)
-                .limit(1)
-                .stream()
-            )
+            docs = db.collection("grupos_rl").where("rl_codigo", "==", rl).limit(1).stream()
             for doc in docs:
                 return cls.from_dict(doc.to_dict(), doc.id)
         except Exception as e:
@@ -107,4 +102,3 @@ class GrupoRL:
             # Em caso de erro, não bloqueia o fluxo de criação do chamado;
             # apenas propaga a exceção para tratamento na camada chamadora.
             raise
-

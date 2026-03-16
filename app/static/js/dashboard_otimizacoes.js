@@ -39,7 +39,7 @@ function debugLog() {
 async function atualizarStatusAjax(selectElement) {
     const linha = selectElement.closest('tr');
     const form = selectElement.closest('form');
-    
+
     if (!form) {
         debugLog('❌ Erro: formulário não encontrado');
         mostrarNotificacao(MSGS.error_form_not_found, 'danger');
@@ -160,7 +160,7 @@ async function atualizarStatusAjax(selectElement) {
             }
             mostrarNotificacao(resultado.mensagem, 'success');
             selectElement.dataset.statusAnterior = novoStatus;
-            
+
             // Previne que o formulário seja submetido (importante para modal)
             return false;
         } else {
@@ -402,11 +402,11 @@ style.textContent = `
             transform: translateY(0);
         }
     }
-    
+
     .animate-fade-in {
         animation: fadeIn 0.3s ease-in;
     }
-    
+
     /* Otimizações de GPU */
     tbody tr {
         will-change: background-color;

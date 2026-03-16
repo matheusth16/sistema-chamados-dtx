@@ -217,7 +217,7 @@
         </h2>
         {% if metricas_gerais %}
         <div class="gsap-scroll-reveal-stagger grid grid-cols-2 lg:grid-cols-3 gap-5">
-            
+
             <!-- Card Total -->
             <div class="insight-card gsap-scroll-reveal-item relative overflow-hidden rounded-[1.5rem] min-h-[140px] flex flex-col cursor-default
                 bg-white border border-blue-100/50 shadow-[0_4px_20px_rgb(0,0,0,0.03)] hover:-translate-y-1 transition-all hover:shadow-[0_10px_40px_rgb(0,0,0,0.06)] group">
@@ -295,7 +295,7 @@
             <div class="insight-card gsap-scroll-reveal-item relative overflow-hidden rounded-[1.5rem] min-h-[140px] flex flex-col cursor-default
                 bg-white border border-indigo-100/50 shadow-[0_4px_20px_rgb(0,0,0,0.03)] hover:-translate-y-1 transition-all hover:shadow-[0_10px_40px_rgb(0,0,0,0.06)] group">
                 <div class="absolute bottom-0 left-0 right-0 h-1.5 opacity-80 bg-gradient-to-r from-indigo-500 to-indigo-400 scale-x-0 group-hover:scale-x-100 origin-left transition-transform duration-300"></div>
-                
+
                 <div class="relative z-10 p-6 flex-1 flex flex-col justify-between">
                     <div class="flex justify-between items-start mb-3">
                         <p class="text-slate-500 text-[11px] font-black tracking-widest uppercase truncate mr-2 mt-1">{{ t('resolution_rate') }}</p>
@@ -376,7 +376,7 @@
 
     <!-- Gráficos em linha -->
     <div class="gsap-scroll-reveal grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        
+
         <!-- Gráfico: Distribuição de Chamados por Status -->
         <div class="bg-white/80 p-6 rounded-[1.5rem] shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-gray-100/60 flex flex-col backdrop-blur-sm">
             <h3 class="text-sm font-black text-slate-700 tracking-wide uppercase mb-6">{{ t('distribution_by_status') }}</h3>
@@ -437,12 +437,12 @@
             {{ t('top_3_week') }}
         </h2>
         <p class="text-sm text-gray-500 mb-4">{{ t('top_3_desc') }}</p>
-        
+
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-5 mb-4">
             {% for usuario in ranking_gamificacao %}
             <!-- Card -->
             <div class="gsap-scroll-reveal-item bg-white/80 backdrop-blur-sm rounded-[1.5rem] p-5 shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-slate-100 hover:-translate-y-1 hover:shadow-[0_10px_40px_rgb(0,0,0,0.06)] transition-all duration-300 group flex flex-col items-center text-center relative cursor-default">
-                
+
                 <!-- Medalha -->
                 {% if loop.index == 1 %}
                 <div class="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-gradient-to-br from-yellow-200 to-amber-400 text-yellow-900 rounded-full px-4 py-1 flex items-center gap-1.5 font-black text-[10px] uppercase shadow-lg shadow-amber-400/20 ring-2 ring-white z-10 whitespace-nowrap" title="{{ t('1st_place') }}">
@@ -466,10 +466,10 @@
                 <div class="w-14 h-14 rounded-[1rem] bg-gradient-to-tr from-indigo-50 to-blue-50 flex items-center justify-center text-indigo-600 font-black text-xl mb-3 shadow-inner border border-indigo-100/50 mt-3 group-hover:scale-105 transition-transform duration-300">
                     {{ usuario.nome[0] if usuario.nome else '?' }}
                 </div>
-                
+
                 <!-- Nome -->
                 <h4 class="text-slate-800 font-extrabold text-sm truncate w-full" title="{{ usuario.nome }}">{{ nome_curto(usuario.nome) if usuario.nome else 'Usuário' }}</h4>
-                
+
                 <!-- Status -->
                 <div class="flex items-center gap-2 mt-3 w-full pt-3 border-t border-slate-100 justify-center">
                     <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">
@@ -509,10 +509,10 @@
                    aria-label="{{ t('search_supervisors_placeholder') }}">
             <button type="submit" class="min-h-[44px] rounded-xl bg-indigo-100 text-indigo-700 px-4 py-2.5 text-sm font-bold hover:bg-indigo-200 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-indigo-500">{{ t('filter') if t('filter') != 'filter' else 'Buscar' }}</button>
         </form>
-        
+
         <!-- Tabelas e Gráficos de Perf -->
         <div class="grid grid-cols-1 xl:grid-cols-4 gap-6">
-            
+
             <!-- Tabela de Supervisores -->
             <div class="bg-white/80 backdrop-blur-sm rounded-[1.5rem] shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-gray-100/60 overflow-hidden xl:col-span-3 min-w-0 flex flex-col">
                 <div class="overflow-auto flex-1 min-h-0" style="max-height: 440px;">
@@ -562,7 +562,7 @@
                                     <span class="inline-flex justify-center font-bold text-gray-700 bg-gray-50 border border-gray-200 px-1.5 py-0.5 rounded text-xs">{{ sup.total_chamados }}</span>
                                 </td>
                                 <td class="px-2 py-2 text-center">
-                                    <span class="inline-flex justify-center font-bold text-xs shadow-sm 
+                                    <span class="inline-flex justify-center font-bold text-xs shadow-sm
                                         {% if sup.carga_atual > 10 %}
                                             bg-red-50 text-red-700 border border-red-200
                                         {% elif sup.carga_atual > 5 %}
@@ -667,7 +667,7 @@
                    aria-label="{{ t('search_areas_placeholder') }}">
             <button type="submit" class="min-h-[44px] rounded-xl bg-pink-100 text-pink-700 px-4 py-2.5 text-sm font-bold hover:bg-pink-200 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-pink-500">{{ t('filter') if t('filter') != 'filter' else 'Buscar' }}</button>
         </form>
-        
+
         <div class="grid grid-cols-1 xl:grid-cols-4 gap-6">
             <!-- Tabela de Áreas -->
             <div class="bg-white/80 backdrop-blur-sm rounded-[1.5rem] shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-gray-100/60 overflow-hidden xl:col-span-3 min-w-0 flex flex-col">

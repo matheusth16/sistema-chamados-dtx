@@ -7,6 +7,7 @@ Cache opcional com Redis para relatórios e listas.
 Reduz 30-50% de queries ao Firestore em relatórios e listas pesadas.
 Em produção com Gunicorn/Cloud Run, defina REDIS_URL para cache e rate limit compartilhados.
 """
+
 import contextlib
 import logging
 import os
@@ -30,11 +31,12 @@ def _get_redis():
     global _redis_client
     if _redis_client is not None:
         return _redis_client
-    url = os.getenv('REDIS_URL', '').strip()
+    url = os.getenv("REDIS_URL", "").strip()
     if not url:
         return None
     try:
         import redis
+
         _redis_client = redis.from_url(url, decode_responses=True)
         _redis_client.ping()
         logger.info("Cache Redis conectado")
@@ -50,6 +52,7 @@ def cache_get(key: str) -> Any | None:
     if r:
         try:
             import json
+
             val = r.get(key)
             return json.loads(val) if val else None
         except Exception as e:
@@ -70,6 +73,7 @@ def cache_set(key: str, value: Any, ttl_seconds: int = 300) -> None:
     if r:
         try:
             import json
+
             r.setex(key, ttl_seconds, json.dumps(value, default=str))
         except Exception as e:
             logger.debug("Cache set falhou: %s", e)

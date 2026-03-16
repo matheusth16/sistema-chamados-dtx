@@ -1,8 +1,8 @@
 # Plano de Testes – Sistema de Chamados DTX
 
-**Documento:** Plano e Estratégia de Testes  
-**Projeto:** Sistema de Chamados DTX  
-**Referência:** [ANALISE_REQUISITOS_QA.md](ANALISE_REQUISITOS_QA.md)  
+**Documento:** Plano e Estratégia de Testes
+**Projeto:** Sistema de Chamados DTX
+**Referência:** [ANALISE_REQUISITOS_QA.md](ANALISE_REQUISITOS_QA.md)
 
 ---
 
@@ -55,7 +55,7 @@
 - **Utilitários:** `gerar_numero_chamado`, `utils` diversos.
 - **Exceções:** tipos e mensagens.
 
-**Ferramenta:** pytest.  
+**Ferramenta:** pytest.
 **Dependências:** Mock de Firestore e de funções externas (email, push, etc.).
 
 ### 3.2 Testes de Integração (Rotas)

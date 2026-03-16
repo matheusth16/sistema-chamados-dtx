@@ -8,6 +8,7 @@ e mensagens mais claras ao usuário.
 
 class ChamadoError(Exception):
     """Exceção base para erros relacionados a chamados"""
+
     pass
 
 
@@ -30,6 +31,7 @@ class ValidacaoChamadoError(ChamadoError):
 
 class UsuarioError(Exception):
     """Exceção base para erros de usuário"""
+
     pass
 
 
@@ -57,6 +59,7 @@ class PermissaoNegadaError(UsuarioError):
 
 class FirestoreError(Exception):
     """Exceção base para erros do Firestore"""
+
     pass
 
 
@@ -78,6 +81,7 @@ class ErroTransacaoError(FirestoreError):
 
 class UploadError(Exception):
     """Exceção base para erros de upload"""
+
     pass
 
 
@@ -87,10 +91,7 @@ class ArquivoNaoPermitidoError(UploadError):
     def __init__(self, extensao: str, permitidas: list):
         self.extensao = extensao
         self.permitidas = permitidas
-        super().__init__(
-            f"Extensão .{extensao} não permitida. "
-            f"Permitidas: {', '.join(permitidas)}"
-        )
+        super().__init__(f"Extensão .{extensao} não permitida. Permitidas: {', '.join(permitidas)}")
 
 
 class TamanhoArquivoExcedidoError(UploadError):
@@ -99,6 +100,4 @@ class TamanhoArquivoExcedidoError(UploadError):
     def __init__(self, tamanho_mb: float, maximo_mb: float):
         self.tamanho_mb = tamanho_mb
         self.maximo_mb = maximo_mb
-        super().__init__(
-            f"Arquivo de {tamanho_mb:.2f}MB excede máximo de {maximo_mb}MB"
-        )
+        super().__init__(f"Arquivo de {tamanho_mb:.2f}MB excede máximo de {maximo_mb}MB")

@@ -1,8 +1,8 @@
 # Testes de API – Sistema de Chamados DTX
 
-**Documento:** Validação da comunicação entre frontend e backend (contrato e códigos HTTP)  
-**Projeto:** Sistema de Chamados DTX  
-**Referência:** [API.md](API.md)  
+**Documento:** Validação da comunicação entre frontend e backend (contrato e códigos HTTP)
+**Projeto:** Sistema de Chamados DTX
+**Referência:** [API.md](API.md)
 
 ---
 

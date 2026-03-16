@@ -1,7 +1,7 @@
 # Testes de Regressão – Sistema de Chamados DTX
 
-**Documento:** Garantir que novas funcionalidades ou alterações não quebrem recursos existentes  
-**Projeto:** Sistema de Chamados DTX  
+**Documento:** Garantir que novas funcionalidades ou alterações não quebrem recursos existentes
+**Projeto:** Sistema de Chamados DTX
 
 ---
 

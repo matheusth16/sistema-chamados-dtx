@@ -6,6 +6,7 @@ Firebase Storage (pasta chamados/) e retorna a URL pública.
 Caso contrário: salva em disco local (app/static/uploads) e retorna o nome do arquivo.
 No Cloud Run o disco é efêmero; anexos devem usar Firebase Storage.
 """
+
 import logging
 import os
 from datetime import datetime
@@ -26,21 +27,23 @@ def _upload_firebase_storage(arquivo: Any, nome_final: str) -> str | None:
     """
     try:
         from firebase_admin import storage
+
         bucket = storage.bucket()
     except Exception as e:
         logger.warning(
             "Firebase Storage indisponível (anexo usará disco local): %s - %s",
-            type(e).__name__, e, exc_info=False
+            type(e).__name__,
+            e,
+            exc_info=False,
         )
         return None
 
     try:
         blob = bucket.blob(f"chamados/{nome_final}")
-        if hasattr(arquivo.stream, 'seek'):
+        if hasattr(arquivo.stream, "seek"):
             arquivo.stream.seek(0)
         blob.upload_from_file(
-            arquivo.stream,
-            content_type=arquivo.content_type or 'application/octet-stream'
+            arquivo.stream, content_type=arquivo.content_type or "application/octet-stream"
         )
         blob.make_public()
         url = blob.public_url
@@ -49,7 +52,10 @@ def _upload_firebase_storage(arquivo: Any, nome_final: str) -> str | None:
     except Exception as e:
         logger.warning(
             "Falha ao enviar anexo ao Firebase Storage (%s): %s - %s",
-            nome_final, type(e).__name__, e, exc_info=True
+            nome_final,
+            type(e).__name__,
+            e,
+            exc_info=True,
         )
         return None
 
@@ -66,11 +72,11 @@ def salvar_anexo(arquivo: Any) -> str | None:
     Returns:
         str: URL pública ou nome do arquivo, ou None se não houver arquivo
     """
-    if not arquivo or not arquivo.filename or arquivo.filename.strip() == '':
+    if not arquivo or not arquivo.filename or arquivo.filename.strip() == "":
         return None
 
     if not _arquivo_permitido(arquivo.filename):
-        ext_list = ', '.join(sorted(current_app.config.get('EXTENSOES_UPLOAD_PERMITIDAS', set())))
+        ext_list = ", ".join(sorted(current_app.config.get("EXTENSOES_UPLOAD_PERMITIDAS", set())))
         raise ValueError(f"Formato de arquivo inválido. Permitidos: {ext_list}.")
 
     # Validação por conteúdo (magic bytes) para evitar upload malicioso com extensão falsa
@@ -84,14 +90,14 @@ def salvar_anexo(arquivo: Any) -> str | None:
     nome_final = f"{timestamp}_{nome_seguro}"
 
     # 1) Tenta Firebase Storage primeiro
-    if hasattr(arquivo.stream, 'seek'):
+    if hasattr(arquivo.stream, "seek"):
         arquivo.stream.seek(0)
     url = _upload_firebase_storage(arquivo, nome_final)
     if url:
         return url
 
     # 2) Em produção (ex.: Cloud Run): não usar disco — é efêmero e o anexo some após reinício/outra instância.
-    if current_app.config.get('ENV') == 'production':
+    if current_app.config.get("ENV") == "production":
         logger.error(
             "Firebase Storage falhou em produção. Anexo NÃO foi salvo. "
             "Defina FIREBASE_STORAGE_BUCKET com o nome do bucket do Firebase Console > Storage (ex.: projeto.firebasestorage.app). "
@@ -100,11 +106,11 @@ def salvar_anexo(arquivo: Any) -> str | None:
         return None
 
     # 3) Fallback: armazenamento local apenas em desenvolvimento
-    pasta_upload = current_app.config['UPLOAD_FOLDER']
+    pasta_upload = current_app.config["UPLOAD_FOLDER"]
     if not os.path.exists(pasta_upload):
         os.makedirs(pasta_upload)
     caminho_completo = os.path.join(pasta_upload, nome_final)
-    if hasattr(arquivo.stream, 'seek'):
+    if hasattr(arquivo.stream, "seek"):
         arquivo.stream.seek(0)
     arquivo.save(caminho_completo)
     return nome_final

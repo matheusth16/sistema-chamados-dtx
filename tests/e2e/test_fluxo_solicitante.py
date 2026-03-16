@@ -40,9 +40,7 @@ def test_login_invalido_exibe_erro(page: Page, base_url: str) -> None:
 
 
 @pytest.mark.e2e
-def test_fluxo_completo_solicitante(
-    logged_in_solicitante: Page, base_url: str
-) -> None:
+def test_fluxo_completo_solicitante(logged_in_solicitante: Page, base_url: str) -> None:
     """
     Fluxo: login → abrir chamado → verificar em Meus Chamados.
 
@@ -67,9 +65,7 @@ def test_fluxo_completo_solicitante(
 
 
 @pytest.mark.e2e
-def test_solicitante_nao_acessa_admin(
-    logged_in_solicitante: Page, base_url: str
-) -> None:
+def test_solicitante_nao_acessa_admin(logged_in_solicitante: Page, base_url: str) -> None:
     """Solicitante não deve conseguir acessar rotas de admin."""
     page = logged_in_solicitante
     page.goto(f"{base_url}/admin/usuarios")

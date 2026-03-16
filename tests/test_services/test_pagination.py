@@ -1,5 +1,5 @@
 """Testes do serviço de paginação (cursor-based e agregação count)."""
-import pytest
+
 from unittest.mock import MagicMock
 
 from app.services.pagination import (

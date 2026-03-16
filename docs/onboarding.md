@@ -21,12 +21,12 @@ O fluxo é controlado no backend pelo modelo `Usuario` (`app/models_usuario.py`)
 
 Regras principais:
 
-1. **Usuário autenticado + `onboarding_completo == False`**  
+1. **Usuário autenticado + `onboarding_completo == False`**
    - O template base (`app/templates/base.html`) inclui `components/onboarding.html` e o JS `static/js/onboarding.js`.
    - O overlay/guias são renderizados sobre a UI existente.
-2. **Usuário autenticado + `onboarding_completo == True`**  
+2. **Usuário autenticado + `onboarding_completo == True`**
    - O componente de onboarding não é incluído.
-3. **Usuário não autenticado**  
+3. **Usuário não autenticado**
    - Nunca vê o onboarding.
 
 ---
@@ -165,4 +165,3 @@ No onboarding, isso significa que:
 - Em produção, evite mudar a ordem/quantidade de passos sem atualizar também a lógica de backend que determina o último passo (usado para marcar `onboarding_completo`).
 - Para testes automatizados (`tests/test_routes/test_onboarding.py`), use usuários dedicados a QA, para que o estado de onboarding possa ser manipulado livremente.
 - Sempre que fizer alterações visuais significativas na navbar, dashboard ou fluxo de criação de chamados, avalie se o onboarding precisa ser ajustado para refletir a nova experiência.
-

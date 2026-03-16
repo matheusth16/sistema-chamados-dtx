@@ -10,16 +10,28 @@ from app.firebase_retry import firebase_retry
 logger = logging.getLogger(__name__)
 
 # Chave de cache para lista de usuários (usada em cache_delete nas rotas)
-CACHE_KEY_USUARIOS = 'usuarios_list'
+CACHE_KEY_USUARIOS = "usuarios_list"
 
 
 class Usuario(UserMixin):
     """Representação de um usuário do sistema"""
 
-    def __init__(self, id: str, email: str, nome: str, perfil: str = 'solicitante', areas: list = None,
-                 exp_total: int = 0, exp_semanal: int = 0, level: int = 1, conquistas: list = None,
-                 must_change_password: bool = False, password_changed_at=None,
-                 onboarding_completo: bool = False, onboarding_passo: int = 0):
+    def __init__(
+        self,
+        id: str,
+        email: str,
+        nome: str,
+        perfil: str = "solicitante",
+        areas: list = None,
+        exp_total: int = 0,
+        exp_semanal: int = 0,
+        level: int = 1,
+        conquistas: list = None,
+        must_change_password: bool = False,
+        password_changed_at=None,
+        onboarding_completo: bool = False,
+        onboarding_passo: int = 0,
+    ):
         self.id = id
         self.email = email
         self.nome = nome
@@ -57,31 +69,33 @@ class Usuario(UserMixin):
     def to_dict(self):
         """Converte para dicionário para salvar no Firestore"""
         return {
-            'email': self.email,
-            'nome': self.nome,
-            'perfil': self.perfil,
-            'areas': self.areas,
-            'senha_hash': self.senha_hash,
-            'must_change_password': self.must_change_password,
-            'password_changed_at': self.password_changed_at.isoformat() if self.password_changed_at else None,
-            'exp_total': self.exp_total,
-            'exp_semanal': self.exp_semanal,
-            'level': self.level,
-            'conquistas': self.conquistas,
-            'onboarding_completo': self.onboarding_completo,
-            'onboarding_passo': self.onboarding_passo,
+            "email": self.email,
+            "nome": self.nome,
+            "perfil": self.perfil,
+            "areas": self.areas,
+            "senha_hash": self.senha_hash,
+            "must_change_password": self.must_change_password,
+            "password_changed_at": self.password_changed_at.isoformat()
+            if self.password_changed_at
+            else None,
+            "exp_total": self.exp_total,
+            "exp_semanal": self.exp_semanal,
+            "level": self.level,
+            "conquistas": self.conquistas,
+            "onboarding_completo": self.onboarding_completo,
+            "onboarding_passo": self.onboarding_passo,
         }
 
     @classmethod
     def from_dict(cls, data: dict, id: str = None):
         """Cria um objeto Usuario a partir de um dicionário do Firestore"""
-        areas = data.get('areas', [])
+        areas = data.get("areas", [])
         # Migração: se tem area string mas não tem areas array
-        if not areas and data.get('area'):
-            areas = [data.get('area')]
+        if not areas and data.get("area"):
+            areas = [data.get("area")]
 
         # Processar password_changed_at
-        password_changed_at = data.get('password_changed_at')
+        password_changed_at = data.get("password_changed_at")
         if password_changed_at and isinstance(password_changed_at, str):
             try:
                 password_changed_at = datetime.fromisoformat(password_changed_at)
@@ -90,27 +104,27 @@ class Usuario(UserMixin):
 
         usuario = cls(
             id=id,
-            email=data.get('email'),
-            nome=data.get('nome'),
-            perfil=data.get('perfil', 'solicitante'),
+            email=data.get("email"),
+            nome=data.get("nome"),
+            perfil=data.get("perfil", "solicitante"),
             areas=areas,
-            exp_total=data.get('exp_total', 0),
-            exp_semanal=data.get('exp_semanal', 0),
-            level=data.get('level', 1),
-            conquistas=data.get('conquistas', []),
-            must_change_password=data.get('must_change_password', False),
+            exp_total=data.get("exp_total", 0),
+            exp_semanal=data.get("exp_semanal", 0),
+            level=data.get("level", 1),
+            conquistas=data.get("conquistas", []),
+            must_change_password=data.get("must_change_password", False),
             password_changed_at=password_changed_at,
-            onboarding_completo=data.get('onboarding_completo', False),
-            onboarding_passo=data.get('onboarding_passo', 0),
+            onboarding_completo=data.get("onboarding_completo", False),
+            onboarding_passo=data.get("onboarding_passo", 0),
         )
-        usuario.senha_hash = data.get('senha_hash')
+        usuario.senha_hash = data.get("senha_hash")
         return usuario
 
     @classmethod
     def get_by_email(cls, email: str):
         """Busca usuário por email"""
         try:
-            docs = db.collection('usuarios').where('email', '==', email).stream()
+            docs = db.collection("usuarios").where("email", "==", email).stream()
             for doc in docs:
                 data = doc.to_dict()
                 return cls.from_dict(data, doc.id)
@@ -122,7 +136,7 @@ class Usuario(UserMixin):
     def get_by_id(cls, user_id: str):
         """Busca usuário por ID"""
         try:
-            doc = db.collection('usuarios').document(user_id).get()
+            doc = db.collection("usuarios").document(user_id).get()
             if doc.exists:
                 data = doc.to_dict()
                 return cls.from_dict(data, doc.id)
@@ -134,7 +148,7 @@ class Usuario(UserMixin):
     def save(self):
         """Salva o usuário no Firestore com retry automático"""
         try:
-            db.collection('usuarios').document(self.id).set(self.to_dict())
+            db.collection("usuarios").document(self.id).set(self.to_dict())
             return True
         except Exception as e:
             logger.exception("Erro ao salvar usuário: %s", e)
@@ -151,59 +165,63 @@ class Usuario(UserMixin):
             update_data = {}
 
             # Aceita atualizações de campos específicos
-            if 'email' in kwargs:
-                self.email = kwargs['email']
-                update_data['email'] = kwargs['email']
+            if "email" in kwargs:
+                self.email = kwargs["email"]
+                update_data["email"] = kwargs["email"]
 
-            if 'nome' in kwargs:
-                self.nome = kwargs['nome']
-                update_data['nome'] = kwargs['nome']
+            if "nome" in kwargs:
+                self.nome = kwargs["nome"]
+                update_data["nome"] = kwargs["nome"]
 
-            if 'perfil' in kwargs:
-                self.perfil = kwargs['perfil']
-                update_data['perfil'] = kwargs['perfil']
+            if "perfil" in kwargs:
+                self.perfil = kwargs["perfil"]
+                update_data["perfil"] = kwargs["perfil"]
 
-            if 'areas' in kwargs:
-                self.areas = kwargs['areas']
-                update_data['areas'] = kwargs['areas']
+            if "areas" in kwargs:
+                self.areas = kwargs["areas"]
+                update_data["areas"] = kwargs["areas"]
 
-            if 'senha' in kwargs and kwargs['senha']:
-                self.set_password(kwargs['senha'])
-                update_data['senha_hash'] = self.senha_hash
+            if "senha" in kwargs and kwargs["senha"]:
+                self.set_password(kwargs["senha"])
+                update_data["senha_hash"] = self.senha_hash
 
-            if 'must_change_password' in kwargs:
-                self.must_change_password = kwargs['must_change_password']
-                update_data['must_change_password'] = kwargs['must_change_password']
+            if "must_change_password" in kwargs:
+                self.must_change_password = kwargs["must_change_password"]
+                update_data["must_change_password"] = kwargs["must_change_password"]
 
-            if 'password_changed_at' in kwargs:
-                self.password_changed_at = kwargs['password_changed_at']
-                update_data['password_changed_at'] = kwargs['password_changed_at'].isoformat() if kwargs['password_changed_at'] else None
+            if "password_changed_at" in kwargs:
+                self.password_changed_at = kwargs["password_changed_at"]
+                update_data["password_changed_at"] = (
+                    kwargs["password_changed_at"].isoformat()
+                    if kwargs["password_changed_at"]
+                    else None
+                )
 
-            if 'onboarding_completo' in kwargs:
-                self.onboarding_completo = kwargs['onboarding_completo']
-                update_data['onboarding_completo'] = kwargs['onboarding_completo']
+            if "onboarding_completo" in kwargs:
+                self.onboarding_completo = kwargs["onboarding_completo"]
+                update_data["onboarding_completo"] = kwargs["onboarding_completo"]
 
-            if 'onboarding_passo' in kwargs:
-                self.onboarding_passo = kwargs['onboarding_passo']
-                update_data['onboarding_passo'] = kwargs['onboarding_passo']
+            if "onboarding_passo" in kwargs:
+                self.onboarding_passo = kwargs["onboarding_passo"]
+                update_data["onboarding_passo"] = kwargs["onboarding_passo"]
 
-            if 'gamification' in kwargs:
-                g_data = kwargs['gamification']
-                if 'exp_total' in g_data:
-                    self.exp_total = g_data['exp_total']
-                    update_data['exp_total'] = g_data['exp_total']
-                if 'exp_semanal' in g_data:
-                    self.exp_semanal = g_data['exp_semanal']
-                    update_data['exp_semanal'] = g_data['exp_semanal']
-                if 'level' in g_data:
-                    self.level = g_data['level']
-                    update_data['level'] = g_data['level']
-                if 'conquistas' in g_data:
-                    self.conquistas = g_data['conquistas']
-                    update_data['conquistas'] = g_data['conquistas']
+            if "gamification" in kwargs:
+                g_data = kwargs["gamification"]
+                if "exp_total" in g_data:
+                    self.exp_total = g_data["exp_total"]
+                    update_data["exp_total"] = g_data["exp_total"]
+                if "exp_semanal" in g_data:
+                    self.exp_semanal = g_data["exp_semanal"]
+                    update_data["exp_semanal"] = g_data["exp_semanal"]
+                if "level" in g_data:
+                    self.level = g_data["level"]
+                    update_data["level"] = g_data["level"]
+                if "conquistas" in g_data:
+                    self.conquistas = g_data["conquistas"]
+                    update_data["conquistas"] = g_data["conquistas"]
 
             if update_data:
-                db.collection('usuarios').document(self.id).update(update_data)
+                db.collection("usuarios").document(self.id).update(update_data)
                 return True
 
             return False
@@ -215,7 +233,7 @@ class Usuario(UserMixin):
     def delete(self):
         """Deleta o usuário do Firestore com retry automático"""
         try:
-            db.collection('usuarios').document(self.id).delete()
+            db.collection("usuarios").document(self.id).delete()
             return True
         except Exception as e:
             logger.exception("Erro ao deletar usuário: %s", e)
@@ -225,7 +243,7 @@ class Usuario(UserMixin):
     def get_all(cls):
         """Retorna lista de todos os usuários"""
         try:
-            docs = db.collection('usuarios').order_by('nome').stream()
+            docs = db.collection("usuarios").order_by("nome").stream()
             usuarios = []
             for doc in docs:
                 data = doc.to_dict()
@@ -245,7 +263,7 @@ class Usuario(UserMixin):
             id_atual: ID do usuário atual (para validação de atualização)
         """
         try:
-            docs = db.collection('usuarios').where('email', '==', email).stream()
+            docs = db.collection("usuarios").where("email", "==", email).stream()
             return any(id_atual is None or doc.id != id_atual for doc in docs)
         except Exception as e:
             logger.exception("Erro ao verificar email: %s", e)
@@ -264,22 +282,22 @@ class Usuario(UserMixin):
 
             # Buscar todos os supervisores e filtrar por área em Python
             # (Firestore tem limitações em queries compostas com array_contains)
-            docs_sup = db.collection('usuarios').where('perfil', '==', 'supervisor').stream()
+            docs_sup = db.collection("usuarios").where("perfil", "==", "supervisor").stream()
             for doc in docs_sup:
                 user_dict = doc.to_dict()
                 # Precisamos criar o objeto Usuario primeiro para que from_dict
                 # faça a conversão de 'area' (string) para 'areas' (array)
                 usuario = cls.from_dict(user_dict, doc.id)
-                areas_usuario = getattr(usuario, 'areas', None) or []
+                areas_usuario = getattr(usuario, "areas", None) or []
                 if isinstance(areas_usuario, list) and area in areas_usuario:
                     usuarios.append(usuario)
 
             # Buscar todos os admins e filtrar por área
-            docs_admin = db.collection('usuarios').where('perfil', '==', 'admin').stream()
+            docs_admin = db.collection("usuarios").where("perfil", "==", "admin").stream()
             for doc in docs_admin:
                 user_dict = doc.to_dict()
                 usuario = cls.from_dict(user_dict, doc.id)
-                areas_usuario = getattr(usuario, 'areas', None) or []
+                areas_usuario = getattr(usuario, "areas", None) or []
                 if isinstance(areas_usuario, list) and area in areas_usuario:
                     usuarios.append(usuario)
 
@@ -289,4 +307,4 @@ class Usuario(UserMixin):
             return []
 
     def __repr__(self):
-        return f'<Usuario {self.email} - {self.perfil}>'
+        return f"<Usuario {self.email} - {self.perfil}>"

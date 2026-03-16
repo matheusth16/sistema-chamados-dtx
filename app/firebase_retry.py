@@ -19,21 +19,16 @@ from google.api_core.exceptions import (
 logger = logging.getLogger(__name__)
 
 # Exceções do Firebase que são retentáveis
-RETRYABLE_EXCEPTIONS = (
-    DeadlineExceeded,
-    Unknown,
-    InternalServerError,
-    ServiceUnavailable
-)
+RETRYABLE_EXCEPTIONS = (DeadlineExceeded, Unknown, InternalServerError, ServiceUnavailable)
 
-F = TypeVar('F', bound=Callable[..., Any])
+F = TypeVar("F", bound=Callable[..., Any])
 
 
 def firebase_retry(
     max_retries: int = 3,
     initial_delay: float = 1.0,
     max_delay: float = 32.0,
-    exponential_base: float = 2.0
+    exponential_base: float = 2.0,
 ) -> Callable[[F], F]:
     """
     Decorator para retry automático em operações Firebase com backoff exponencial.
@@ -49,6 +44,7 @@ def firebase_retry(
         def salvar_documento(doc_ref, data):
             doc_ref.set(data)
     """
+
     def decorator(func: F) -> F:
         @wraps(func)
         def wrapper(*args, **kwargs):
@@ -57,7 +53,9 @@ def firebase_retry(
 
             for attempt in range(max_retries):
                 try:
-                    logger.debug(f"Firebase operation '{func.__name__}' - attempt {attempt + 1}/{max_retries}")
+                    logger.debug(
+                        f"Firebase operation '{func.__name__}' - attempt {attempt + 1}/{max_retries}"
+                    )
                     return func(*args, **kwargs)
 
                 except RETRYABLE_EXCEPTIONS as e:
@@ -77,7 +75,9 @@ def firebase_retry(
 
                 except Exception as e:
                     # Exceções não-retentáveis são relançadas imediatamente
-                    logger.error(f"Firebase operation '{func.__name__}' failed with non-retryable error: {e}")
+                    logger.error(
+                        f"Firebase operation '{func.__name__}' failed with non-retryable error: {e}"
+                    )
                     raise
 
             # Se chegou aqui, todos os retries falharam
@@ -90,9 +90,7 @@ def firebase_retry(
 
 
 def firebase_retry_transaction(
-    max_retries: int = 3,
-    initial_delay: float = 0.5,
-    max_delay: float = 10.0
+    max_retries: int = 3, initial_delay: float = 0.5, max_delay: float = 10.0
 ):
     """
     Retry decorator específico para transações Firestore.
@@ -107,16 +105,12 @@ def firebase_retry_transaction(
         max_retries=max_retries,
         initial_delay=initial_delay,
         max_delay=max_delay,
-        exponential_base=2.0
+        exponential_base=2.0,
     )
 
 
 def execute_with_retry(
-    func: Callable,
-    *args,
-    max_retries: int = 3,
-    initial_delay: float = 1.0,
-    **kwargs
+    func: Callable, *args, max_retries: int = 3, initial_delay: float = 1.0, **kwargs
 ) -> Any:
     """
     Executa uma função com retry (alternativa à decorator).

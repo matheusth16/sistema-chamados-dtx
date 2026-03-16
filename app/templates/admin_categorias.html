@@ -255,16 +255,16 @@ function mostrarAba(abaName) {
     document.querySelectorAll('.tab-content').forEach(el => {
         el.classList.add('hidden');
     });
-    
+
     // Remove destaque de todos os botões
     document.querySelectorAll('[id^="btn-"]').forEach(btn => {
         btn.classList.remove('bg-white', 'shadow-sm', 'text-indigo-600', 'ring-1', 'ring-slate-200/50');
         btn.classList.add('text-slate-500', 'hover:text-slate-800', 'hover:bg-white/50');
     });
-    
+
     // Mostra a aba selecionada
     document.getElementById(`aba-${abaName}`).classList.remove('hidden');
-    
+
     // Destaca o botão selecionado
     document.getElementById(`btn-${abaName}`).classList.remove('text-slate-500', 'hover:text-slate-800', 'hover:bg-white/50');
     document.getElementById(`btn-${abaName}`).classList.add('bg-white', 'shadow-sm', 'text-indigo-600', 'ring-1', 'ring-slate-200/50');

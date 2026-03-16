@@ -63,14 +63,11 @@ def _inicializar_firebase_com_retry(max_tentativas: int = 3, delay_inicial: floa
             logger.info(f"Tentativa {tentativa}/{max_tentativas} para inicializar Firebase...")
 
             # Caminho para credentials.json
-            cert_path = os.path.join(
-                os.path.dirname(os.path.dirname(__file__)),
-                'credentials.json'
-            )
+            cert_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "credentials.json")
 
             # Storage bucket: necessário para Firebase Storage (anexos). Sem isso, storage.bucket() falha.
             # Use o nome exato do bucket do Firebase Console > Storage (ex.: projeto.firebasestorage.app ou projeto.appspot.com).
-            bucket_env = os.getenv('FIREBASE_STORAGE_BUCKET', '').strip()
+            bucket_env = os.getenv("FIREBASE_STORAGE_BUCKET", "").strip()
 
             if os.path.exists(cert_path):
                 # Inicializa com arquivo de credenciais (desenvolvimento local)
@@ -78,16 +75,27 @@ def _inicializar_firebase_com_retry(max_tentativas: int = 3, delay_inicial: floa
                 cred = credentials.Certificate(cert_path)
                 # Padrão: novo formato .firebasestorage.app (Firebase Console); legado é .appspot.com
                 storage_bucket = bucket_env or f"{cred.project_id}.firebasestorage.app"
-                firebase_admin.initialize_app(cred, {'storageBucket': storage_bucket})
-                logger.info("✓ Firebase inicializado com credentials.json (arquivo local). Storage bucket: %s", storage_bucket)
+                firebase_admin.initialize_app(cred, {"storageBucket": storage_bucket})
+                logger.info(
+                    "✓ Firebase inicializado com credentials.json (arquivo local). Storage bucket: %s",
+                    storage_bucket,
+                )
             else:
                 # Inicializa com Application Default Credentials (Cloud Run/GCP)
-                logger.info("credentials.json não encontrado. Usando ADC (Application Default Credentials)")
-                proj = os.getenv('GOOGLE_CLOUD_PROJECT', '').strip()
-                storage_bucket = bucket_env or (f"{proj}.firebasestorage.app" if proj else None) or (f"{proj}.appspot.com" if proj else None)
+                logger.info(
+                    "credentials.json não encontrado. Usando ADC (Application Default Credentials)"
+                )
+                proj = os.getenv("GOOGLE_CLOUD_PROJECT", "").strip()
+                storage_bucket = (
+                    bucket_env
+                    or (f"{proj}.firebasestorage.app" if proj else None)
+                    or (f"{proj}.appspot.com" if proj else None)
+                )
                 if storage_bucket:
-                    firebase_admin.initialize_app(options={'storageBucket': storage_bucket})
-                    logger.info("✓ Firebase inicializado com ADC. Storage bucket: %s", storage_bucket)
+                    firebase_admin.initialize_app(options={"storageBucket": storage_bucket})
+                    logger.info(
+                        "✓ Firebase inicializado com ADC. Storage bucket: %s", storage_bucket
+                    )
                 else:
                     firebase_admin.initialize_app()
                     logger.warning(
@@ -131,7 +139,5 @@ try:
     db = firestore.client()
     logger.info("✓ Cliente Firestore obtido com sucesso. Aplicação pronta.")
 except Exception as e:
-    logger.critical(
-        f"✗ Erro ao obter cliente Firestore: {type(e).__name__}: {e}"
-    )
+    logger.critical(f"✗ Erro ao obter cliente Firestore: {type(e).__name__}: {e}")
     raise

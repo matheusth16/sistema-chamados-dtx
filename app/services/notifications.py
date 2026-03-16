@@ -24,8 +24,8 @@ def _config(key: str, default=None):
 
 def _ensure_env_loaded():
     """Carrega .env da raiz do projeto se ainda não estiver no ambiente (fallback quando Flask config não tem MAIL_*)."""
-    root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
-    env_path = os.path.join(root, '.env')
+    root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+    env_path = os.path.join(root, ".env")
     if os.path.isfile(env_path):
         load_dotenv(env_path, override=True)
 
@@ -36,7 +36,7 @@ def _mail_setting(key: str, default=None):
         val = getattr(current_app.config, key, None) if current_app else None
     except RuntimeError:
         val = None
-    if val is not None and (key != 'MAIL_SERVER' or (isinstance(val, str) and val.strip())):
+    if val is not None and (key != "MAIL_SERVER" or (isinstance(val, str) and val.strip())):
         return val
     _ensure_env_loaded()
     return os.getenv(key, default)
@@ -49,46 +49,50 @@ def enviar_email(destinatario: str, assunto: str, corpo_html: str, corpo_texto: 
     Se MAIL_SERVER não estiver configurado, não envia e retorna (False, None).
     Usa Flask config; se MAIL_SERVER estiver vazio, faz fallback para .env (os.getenv).
     """
-    server = (_config('MAIL_SERVER') or os.getenv('MAIL_SERVER') or '').strip()
+    server = (_config("MAIL_SERVER") or os.getenv("MAIL_SERVER") or "").strip()
     if not server:
         _ensure_env_loaded()
-        server = (os.getenv('MAIL_SERVER') or '').strip()
+        server = (os.getenv("MAIL_SERVER") or "").strip()
     if not server or not destinatario or not destinatario.strip():
         if not destinatario or not destinatario.strip():
             logger.warning("Notificação por e-mail ignorada: destinatário vazio")
         return (False, None)
     destinatario = destinatario.strip()
 
-    port = _mail_setting('MAIL_PORT') or 587
+    port = _mail_setting("MAIL_PORT") or 587
     try:
         port = int(port)
     except (TypeError, ValueError):
         port = 587
-    use_tls = _mail_setting('MAIL_USE_TLS')
+    use_tls = _mail_setting("MAIL_USE_TLS")
     if use_tls is None:
         use_tls = True
     else:
-        use_tls = str(use_tls).lower() in ('true', '1', 'yes')
-    from_addr = (_mail_setting('MAIL_DEFAULT_SENDER') or _mail_setting('MAIL_USERNAME') or 'noreply@localhost').strip()
-    user = (_mail_setting('MAIL_USERNAME') or '').strip()
-    password = (_mail_setting('MAIL_PASSWORD') or '').strip()
+        use_tls = str(use_tls).lower() in ("true", "1", "yes")
+    from_addr = (
+        _mail_setting("MAIL_DEFAULT_SENDER")
+        or _mail_setting("MAIL_USERNAME")
+        or "noreply@localhost"
+    ).strip()
+    user = (_mail_setting("MAIL_USERNAME") or "").strip()
+    password = (_mail_setting("MAIL_PASSWORD") or "").strip()
 
     try:
-        msg = MIMEMultipart('alternative')
-        msg['Subject'] = assunto
-        msg['From'] = from_addr
-        msg['To'] = destinatario
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = assunto
+        msg["From"] = from_addr
+        msg["To"] = destinatario
 
         if corpo_texto:
-            msg.attach(MIMEText(corpo_texto, 'plain', 'utf-8'))
-        msg.attach(MIMEText(corpo_html, 'html', 'utf-8'))
+            msg.attach(MIMEText(corpo_texto, "plain", "utf-8"))
+        msg.attach(MIMEText(corpo_html, "html", "utf-8"))
 
         with smtplib.SMTP(server, port) as s:
             if use_tls:
                 s.starttls()
             if user and password:
                 s.login(user, password)
-            s.sendmail(msg['From'], destinatario, msg.as_string())
+            s.sendmail(msg["From"], destinatario, msg.as_string())
         logger.info(f"E-mail enviado para {destinatario}: {assunto[:50]}")
         return (True, None)
     except Exception as e:
@@ -98,37 +102,45 @@ def enviar_email(destinatario: str, assunto: str, corpo_html: str, corpo_texto: 
 
 def _base_url() -> str:
     """URL base da aplicação (para links em e-mails). Usa config, .env ou request."""
-    base = (_config('APP_BASE_URL') or '').strip()
+    base = (_config("APP_BASE_URL") or "").strip()
     if not base:
         _ensure_env_loaded()
-        base = (os.getenv('APP_BASE_URL') or '').strip()
+        base = (os.getenv("APP_BASE_URL") or "").strip()
     if not base:
         try:
-            if request and getattr(request, 'url_root', None):
-                base = request.url_root.rstrip('/')
+            if request and getattr(request, "url_root", None):
+                base = request.url_root.rstrip("/")
         except RuntimeError:
             pass
-    return base.rstrip('/') if base else ''
+    return base.rstrip("/") if base else ""
 
 
 def _link_chamado(chamado_id: str) -> str:
     """URL para visualizar o chamado (histórico)."""
     base = _base_url()
-    return f"{base}/chamado/{chamado_id}/historico" if base else ''
+    return f"{base}/chamado/{chamado_id}/historico" if base else ""
 
 
 def _link_dashboard() -> str:
     """URL do painel (admin/supervisor ou index)."""
     base = _base_url()
-    return f"{base}/admin" if base else ''
+    return f"{base}/admin" if base else ""
 
 
 # ---------- Notificação para APROVADOR (responsável) - Novo chamado ----------
 
-def notificar_aprovador_novo_chamado(chamado_id: str, numero_chamado: str, categoria: str,
-                                     tipo_solicitacao: str, descricao_resumo: str, area: str,
-                                     solicitante_nome: str, responsavel_usuario,
-                                     solicitante_email: str = None) -> None:
+
+def notificar_aprovador_novo_chamado(
+    chamado_id: str,
+    numero_chamado: str,
+    categoria: str,
+    tipo_solicitacao: str,
+    descricao_resumo: str,
+    area: str,
+    solicitante_nome: str,
+    responsavel_usuario,
+    solicitante_email: str = None,
+) -> None:
     """
     Notifica o responsável (aprovador) que um novo chamado foi atribuído a ele.
     Envia e-mail via SMTP.
@@ -136,15 +148,15 @@ def notificar_aprovador_novo_chamado(chamado_id: str, numero_chamado: str, categ
     link = _link_chamado(chamado_id)
     link_dash = _link_dashboard()
 
-    if responsavel_usuario and getattr(responsavel_usuario, 'email', None):
+    if responsavel_usuario and getattr(responsavel_usuario, "email", None):
         # E-mail gatilho para Power Automate / Outlook (Delegated)
         relay_email = (
-            _config('NOTIFY_RELAY_EMAIL')
-            or os.getenv('NOTIFY_RELAY_EMAIL')
-            or 'dtxls.support@dtx.aero'
+            _config("NOTIFY_RELAY_EMAIL")
+            or os.getenv("NOTIFY_RELAY_EMAIL")
+            or "dtxls.support@dtx.aero"
         ).strip()
         assunto = f"CHAMADO_NOVO|{numero_chamado}|{responsavel_usuario.email}"
-        resumo_truncado = descricao_resumo[:500] + ('...' if len(descricao_resumo) > 500 else '')
+        resumo_truncado = descricao_resumo[:500] + ("..." if len(descricao_resumo) > 500 else "")
         solicitante_linha = solicitante_nome
         if solicitante_email and solicitante_email.strip():
             solicitante_linha += f" ({solicitante_email.strip()})"
@@ -168,18 +180,18 @@ def notificar_aprovador_novo_chamado(chamado_id: str, numero_chamado: str, categ
         corpo_html = (
             f'<div style="font-family: Arial, sans-serif; max-width: 560px;">'
             f'<h2 style="color: #2563eb; margin-bottom: 16px;">New ticket assigned</h2>'
-            f'<p>Hello, a new ticket has been assigned to you.</p>'
+            f"<p>Hello, a new ticket has been assigned to you.</p>"
             f'<ul style="background: #f3f4f6; padding: 16px 16px 16px 32px; border-radius: 8px; margin: 16px 0;">'
-            f'<li><strong>Number:</strong> {numero_chamado}</li>'
-            f'<li><strong>Category:</strong> {categoria}</li>'
-            f'<li><strong>Type:</strong> {tipo_solicitacao}</li>'
-            f'<li><strong>Area:</strong> {area}</li>'
-            f'<li><strong>Requester:</strong> {solicitante_linha}</li>'
-            f'</ul>'
+            f"<li><strong>Number:</strong> {numero_chamado}</li>"
+            f"<li><strong>Category:</strong> {categoria}</li>"
+            f"<li><strong>Type:</strong> {tipo_solicitacao}</li>"
+            f"<li><strong>Area:</strong> {area}</li>"
+            f"<li><strong>Requester:</strong> {solicitante_linha}</li>"
+            f"</ul>"
             f'<p style="margin: 12px 0;">{resumo_truncado}</p>'
             f'<p style="margin-top: 20px;">{botoes_html}</p>'
             f'<p style="margin-top: 24px; color: #6b7280; font-size: 12px;"><em>Ticket System - DTX</em></p>'
-            f'</div>'
+            f"</div>"
         )
 
         current_app.logger.info(
@@ -202,10 +214,18 @@ def notificar_aprovador_novo_chamado(chamado_id: str, numero_chamado: str, categ
 
 # ---------- Notificação para supervisores de setores adicionados ao chamado ----------
 
-def notificar_setores_adicionais_chamado(chamado_id: str, numero_chamado: str, setores_novos: list,
-                                         categoria: str, tipo_solicitacao: str, descricao_resumo: str,
-                                         solicitante_nome: str, quem_adicionou_nome: str,
-                                         setores_nomes: str = None) -> None:
+
+def notificar_setores_adicionais_chamado(
+    chamado_id: str,
+    numero_chamado: str,
+    setores_novos: list,
+    categoria: str,
+    tipo_solicitacao: str,
+    descricao_resumo: str,
+    solicitante_nome: str,
+    quem_adicionou_nome: str,
+    setores_nomes: str = None,
+) -> None:
     """
     Notifica todos os supervisores (e admins) dos setores adicionados ao chamado.
     Envia e-mail para cada usuário único (evita duplicata se estiver em mais de um setor).
@@ -219,6 +239,7 @@ def notificar_setores_adicionais_chamado(chamado_id: str, numero_chamado: str, s
     setores_str = setores_nomes or ", ".join(setores_novos)
 
     from app.utils_areas import setor_para_area
+
     usuarios_unicos = {}  # id -> usuario
     for setor in setores_novos:
         areas_busca = [setor]
@@ -230,10 +251,12 @@ def notificar_setores_adicionais_chamado(chamado_id: str, numero_chamado: str, s
                 if u and u.id and u.id not in usuarios_unicos:
                     usuarios_unicos[u.id] = u
 
-    resumo_truncado = (descricao_resumo or '')[:500] + ('...' if len(descricao_resumo or '') > 500 else '')
+    resumo_truncado = (descricao_resumo or "")[:500] + (
+        "..." if len(descricao_resumo or "") > 500 else ""
+    )
 
     for usuario in usuarios_unicos.values():
-        email = getattr(usuario, 'email', None)
+        email = getattr(usuario, "email", None)
         if not email or not str(email).strip():
             continue
         assunto = f"Ticket {numero_chamado}: your department has been included"
@@ -256,30 +279,38 @@ def notificar_setores_adicionais_chamado(chamado_id: str, numero_chamado: str, s
         corpo_html = (
             f'<div style="font-family: Arial, sans-serif; max-width: 560px;">'
             f'<h2 style="color: #2563eb; margin-bottom: 16px;">Ticket: your department has been included</h2>'
-            f'<p>Hello, ticket <strong>{numero_chamado}</strong> had your department included by <strong>{quem_adicionou_nome}</strong>.</p>'
-            f'<p><strong>Departments added:</strong> {setores_str}</p>'
+            f"<p>Hello, ticket <strong>{numero_chamado}</strong> had your department included by <strong>{quem_adicionou_nome}</strong>.</p>"
+            f"<p><strong>Departments added:</strong> {setores_str}</p>"
             f'<ul style="background: #f3f4f6; padding: 16px 16px 16px 32px; border-radius: 8px; margin: 16px 0;">'
-            f'<li><strong>Number:</strong> {numero_chamado}</li>'
-            f'<li><strong>Category:</strong> {categoria}</li>'
-            f'<li><strong>Type:</strong> {tipo_solicitacao}</li>'
-            f'<li><strong>Requester:</strong> {solicitante_nome}</li>'
-            f'</ul>'
+            f"<li><strong>Number:</strong> {numero_chamado}</li>"
+            f"<li><strong>Category:</strong> {categoria}</li>"
+            f"<li><strong>Type:</strong> {tipo_solicitacao}</li>"
+            f"<li><strong>Requester:</strong> {solicitante_nome}</li>"
+            f"</ul>"
             f'<p style="margin: 12px 0;">{resumo_truncado}</p>'
             f'<p style="margin-top: 20px;">{botoes_html}</p>'
             f'<p style="margin-top: 24px; color: #6b7280; font-size: 12px;"><em>Ticket System - DTX</em></p>'
-            f'</div>'
+            f"</div>"
         )
         ok, err = enviar_email(email.strip(), assunto, corpo_html, corpo_texto)
         if ok:
-            logger.info("E-mail setores adicionados enviado para %s (chamado %s)", email, numero_chamado)
+            logger.info(
+                "E-mail setores adicionados enviado para %s (chamado %s)", email, numero_chamado
+            )
         else:
-            logger.warning("Falha ao enviar e-mail setores adicionados para %s: %s", email, err or "verifique MAIL_*")
+            logger.warning(
+                "Falha ao enviar e-mail setores adicionados para %s: %s",
+                email,
+                err or "verifique MAIL_*",
+            )
 
 
 # ---------- Notificação para SOLICITANTE - Decisão (Em Atendimento / Concluído) ----------
 
-def notificar_solicitante_status(chamado_id: str, numero_chamado: str, novo_status: str,
-                                 categoria: str, solicitante_usuario) -> None:
+
+def notificar_solicitante_status(
+    chamado_id: str, numero_chamado: str, novo_status: str, categoria: str, solicitante_usuario
+) -> None:
     """
     Notificação ao solicitante desativada: não envia e-mail.
     Chamado mantido para possível reativação futura.

@@ -4,8 +4,9 @@ Use este script para popular dados de exemplo se o banco estiver vazio.
 
 Uso (a partir da raiz do projeto): python scripts/init_categorias.py
 """
-import sys
+
 import os
+import sys
 
 # Adiciona a raiz do projeto ao path (funciona em qualquer SO)
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -13,7 +14,7 @@ if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 os.chdir(ROOT)
 
-from app.models_categorias import CategoriaSetor, CategoriaGate, CategoriaImpacto
+from app.models_categorias import CategoriaGate, CategoriaImpacto, CategoriaSetor  # noqa: E402
 
 
 def criar_setores_padrao():
@@ -77,7 +78,7 @@ def criar_impactos_padrao():
         print(f"\n✅ {len(impactos_existentes)} impacto(s) já cadastrado(s)")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     print("=" * 60)
     print("INICIALIZAÇÃO DE CATEGORIAS PADRÃO")
     print("=" * 60)

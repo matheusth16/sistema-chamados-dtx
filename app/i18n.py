@@ -10,8 +10,9 @@ from flask import flash
 
 # Cache do dicionário de traduções e caminho do arquivo
 _TRANSLATIONS_CACHE = None
-_TRANSLATIONS_FILE = os.path.join(os.path.dirname(__file__), 'translations.json')
+_TRANSLATIONS_FILE = os.path.join(os.path.dirname(__file__), "translations.json")
 _TRANSLATIONS_MTIME = None
+
 
 def get_translations_dict():
     """Carrega e retorna o dicionário de traduções do arquivo JSON. Recarrega se o arquivo foi alterado."""
@@ -20,7 +21,7 @@ def get_translations_dict():
         mtime = os.path.getmtime(_TRANSLATIONS_FILE) if os.path.isfile(_TRANSLATIONS_FILE) else 0
         if _TRANSLATIONS_CACHE is None or mtime != _TRANSLATIONS_MTIME:
             _TRANSLATIONS_MTIME = mtime
-            with open(_TRANSLATIONS_FILE, encoding='utf-8') as f:
+            with open(_TRANSLATIONS_FILE, encoding="utf-8") as f:
                 _TRANSLATIONS_CACHE = json.load(f)
     except Exception as e:
         print(f"Erro ao carregar traduções: {e}")
@@ -28,11 +29,12 @@ def get_translations_dict():
             _TRANSLATIONS_CACHE = {}
     return _TRANSLATIONS_CACHE
 
+
 def save_translations_dict(new_translations):
     """Salva o dicionário de traduções no arquivo JSON e atualiza o cache."""
     global _TRANSLATIONS_CACHE
     try:
-        with open(_TRANSLATIONS_FILE, 'w', encoding='utf-8') as f:
+        with open(_TRANSLATIONS_FILE, "w", encoding="utf-8") as f:
             json.dump(new_translations, f, indent=4, ensure_ascii=False)
         _TRANSLATIONS_CACHE = new_translations
         return True
@@ -40,47 +42,49 @@ def save_translations_dict(new_translations):
         print(f"Erro ao salvar traduções: {e}")
         return False
 
+
 # Idiomas suportados
 SUPPORTED_LANGUAGES = {
-    'pt_BR': 'Português (Brasil)',
-    'en': 'English',
-    'es': 'Español',
+    "pt_BR": "Português (Brasil)",
+    "en": "English",
+    "es": "Español",
 }
 
 # Mapa de Setores para Chaves de Tradução
 SECTOR_KEYS_MAP = {
-    'Manutencao': 'maintenance',     # Sem acento no banco de dados
-    'Engenharia': 'engineering',
-    'Qualidade': 'quality',
-    'Comercial': 'commercial',
-    'Planejamento': 'planning',
-    'Material': 'indirect_material',  # Abreviado no banco de dados
+    "Manutencao": "maintenance",  # Sem acento no banco de dados
+    "Engenharia": "engineering",
+    "Qualidade": "quality",
+    "Comercial": "commercial",
+    "Planejamento": "planning",
+    "Material": "indirect_material",  # Abreviado no banco de dados
 }
 
 # Mapa de Categorias para Chaves de Tradução
 CATEGORY_KEYS_MAP = {
-    'Projetos': 'projects',
-    'Nao Aplicavel': 'not_applicable',  # Sem acento no banco de dados
+    "Projetos": "projects",
+    "Nao Aplicavel": "not_applicable",  # Sem acento no banco de dados
 }
 
 # Mapa de Status para Chaves de Tradução
 STATUS_KEYS_MAP = {
-    'Aberto': 'option_open',
-    'Em Atendimento': 'option_in_progress',
-    'Concluído': 'option_completed',
-    'Cancelado': 'option_cancelled',
+    "Aberto": "option_open",
+    "Em Atendimento": "option_in_progress",
+    "Concluído": "option_completed",
+    "Cancelado": "option_cancelled",
 }
 
 # Nomes de campos (histórico/auditoria) -> chave de tradução para o rótulo exibido
 FIELD_LABEL_KEYS = {
-    'motivo_cancelamento': 'cancellation_reason',
-    'status': 'status',
-    'responsável': 'assigned_to',
-    'descrição': 'description',
-    'anexo': 'attached_file',
-    'novo anexo': 'new_attachment',
-    'setores adicionais': 'additional_sectors',
+    "motivo_cancelamento": "cancellation_reason",
+    "status": "status",
+    "responsável": "assigned_to",
+    "descrição": "description",
+    "anexo": "attached_file",
+    "novo anexo": "new_attachment",
+    "setores adicionais": "additional_sectors",
 }
+
 
 def get_language_code(lang_param):
     """
@@ -89,9 +93,10 @@ def get_language_code(lang_param):
     """
     if lang_param in SUPPORTED_LANGUAGES:
         return lang_param
-    return 'en'
+    return "en"
 
-def get_translated_sector(sector_name, language='pt_BR'):
+
+def get_translated_sector(sector_name, language="pt_BR"):
     """
     Traduz o nome de um setor usando seu mapeamento de chave.
 
@@ -107,18 +112,19 @@ def get_translated_sector(sector_name, language='pt_BR'):
         return get_translation(translation_key, language)
     return sector_name
 
-def get_translated_sector_list(sector_string, language='pt_BR'):
+
+def get_translated_sector_list(sector_string, language="pt_BR"):
     """
     Traduz uma string de setores separados por vírgula.
     Ex: 'Comercial, Planejamento' → 'Commercial, Planning'
     """
     if not sector_string:
         return sector_string
-    parts = [p.strip() for p in sector_string.split(',')]
-    return ', '.join(get_translated_sector(p, language) for p in parts)
+    parts = [p.strip() for p in sector_string.split(",")]
+    return ", ".join(get_translated_sector(p, language) for p in parts)
 
 
-def get_translated_category(category_name, language='pt_BR'):
+def get_translated_category(category_name, language="pt_BR"):
     """
     Traduz o nome de uma categoria usando seu mapeamento de chave.
 
@@ -134,7 +140,8 @@ def get_translated_category(category_name, language='pt_BR'):
         return get_translation(translation_key, language)
     return category_name
 
-def get_translated_status(status_name, language='pt_BR'):
+
+def get_translated_status(status_name, language="pt_BR"):
     """
     Traduz o nome de um status usando seu mapeamento de chave.
 
@@ -150,7 +157,8 @@ def get_translated_status(status_name, language='pt_BR'):
         return get_translation(translation_key, language)
     return status_name
 
-def get_translated_field_label(field_name, language='pt_BR'):
+
+def get_translated_field_label(field_name, language="pt_BR"):
     """
     Traduz o nome de um campo (ex: motivo_cancelamento) para o rótulo exibido no histórico.
     """
@@ -161,7 +169,8 @@ def get_translated_field_label(field_name, language='pt_BR'):
         return get_translation(key, language)
     return field_name
 
-def get_translation(key, language='pt_BR', **kwargs):
+
+def get_translation(key, language="pt_BR", **kwargs):
     """
     Obtém a tradução de uma chave para um idioma específico.
 
@@ -188,12 +197,13 @@ def get_translation(key, language='pt_BR', **kwargs):
                     pass
             return texto
         # Fallback para pt_BR se o idioma solicitado não tiver a chave
-        if 'pt_BR' in d and d['pt_BR']:
-            return d['pt_BR']
+        if "pt_BR" in d and d["pt_BR"]:
+            return d["pt_BR"]
     # Retorna a chave só se a chave não existir no dicionário
     return key
 
-def flash_t(key, category='message', **kwargs):
+
+def flash_t(key, category="message", **kwargs):
     """
     Enfileira uma mensagem flash para ser traduzida na renderização do template.
 
@@ -204,7 +214,7 @@ def flash_t(key, category='message', **kwargs):
     if not kwargs:
         flash(key, category)
     else:
-        encoded = '_t_:' + key + '|' + '|'.join(f'{k}={v}' for k, v in kwargs.items())
+        encoded = "_t_:" + key + "|" + "|".join(f"{k}={v}" for k, v in kwargs.items())
         flash(encoded, category)
 
 
@@ -213,7 +223,7 @@ def _build_reverse_map():
     translations = get_translations_dict()
     reverse = {}
     for key, langs in translations.items():
-        pt_text = langs.get('pt_BR', '')
+        pt_text = langs.get("pt_BR", "")
         if pt_text:
             reverse[pt_text] = key
     return reverse
@@ -227,13 +237,13 @@ def resolve_flash_message(message, language):
     2. Chave com kwargs: '_t_:key|arg=val'
     3. Texto pt_BR legado: encontra a chave via reverse lookup e traduz
     """
-    if message.startswith('_t_:'):
-        parts = message[4:].split('|')
+    if message.startswith("_t_:"):
+        parts = message[4:].split("|")
         key = parts[0]
         kwargs = {}
         for part in parts[1:]:
-            if '=' in part:
-                k, v = part.split('=', 1)
+            if "=" in part:
+                k, v = part.split("=", 1)
                 kwargs[k] = v
         return get_translation(key, language, **kwargs)
 

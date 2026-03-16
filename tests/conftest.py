@@ -1,10 +1,12 @@
 """Configuração pytest e fixtures compartilhadas."""
+
 import os
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
 
 # Garante que o app seja importável (FLASK_ENV=testing evita exigência de SECRET_KEY de produção)
-os.environ.setdefault('FLASK_ENV', 'testing')
+os.environ.setdefault("FLASK_ENV", "testing")
 
 
 def pytest_configure(config):
@@ -17,10 +19,11 @@ def pytest_configure(config):
 def app():
     """Cria aplicação Flask para testes."""
     from app import create_app
+
     app = create_app()
-    app.config['TESTING'] = True
-    app.config['WTF_CSRF_ENABLED'] = False
-    app.config['SECRET_KEY'] = 'test-secret'
+    app.config["TESTING"] = True
+    app.config["WTF_CSRF_ENABLED"] = False
+    app.config["SECRET_KEY"] = "test-secret"
     return app
 
 
@@ -36,7 +39,7 @@ def runner(app):
     return app.test_cli_runner()
 
 
-def _usuario_mock(uid, email, nome, perfil, area='Geral', areas=None):
+def _usuario_mock(uid, email, nome, perfil, area="Geral", areas=None):
     """Cria um MagicMock de usuário para testes.
     area: string única (usado como u.area e, se areas não for passado, como u.areas = [area]).
     areas: lista de áreas (usado por permissions: supervisor vê só chamados cuja área está em user.areas).
@@ -60,31 +63,41 @@ def _usuario_mock(uid, email, nome, perfil, area='Geral', areas=None):
 @pytest.fixture
 def client_logado_solicitante(client, app):
     """Cliente com usuário solicitante já logado. Use em testes que precisam de sessão ativa."""
-    user = _usuario_mock('sol_1', 'sol@test.com', 'Solicitante Teste', 'solicitante', 'Planejamento')
-    with patch('app.routes.auth.Usuario.get_by_email', return_value=user):
-        with patch('app.models_usuario.Usuario.get_by_id', return_value=user):
-            client.post('/login', data={'email': 'sol@test.com', 'senha': 'ok'}, follow_redirects=False)
-            yield client
+    user = _usuario_mock(
+        "sol_1", "sol@test.com", "Solicitante Teste", "solicitante", "Planejamento"
+    )
+    with (
+        patch("app.routes.auth.Usuario.get_by_email", return_value=user),
+        patch("app.models_usuario.Usuario.get_by_id", return_value=user),
+    ):
+        client.post("/login", data={"email": "sol@test.com", "senha": "ok"}, follow_redirects=False)
+        yield client
 
 
 @pytest.fixture
 def client_logado_supervisor(client, app):
     """Cliente com usuário supervisor já logado."""
-    user = _usuario_mock('sup_1', 'sup@test.com', 'Supervisor Teste', 'supervisor', 'Manutencao')
-    with patch('app.routes.auth.Usuario.get_by_email', return_value=user):
-        with patch('app.models_usuario.Usuario.get_by_id', return_value=user):
-            client.post('/login', data={'email': 'sup@test.com', 'senha': 'ok'}, follow_redirects=False)
-            yield client
+    user = _usuario_mock("sup_1", "sup@test.com", "Supervisor Teste", "supervisor", "Manutencao")
+    with (
+        patch("app.routes.auth.Usuario.get_by_email", return_value=user),
+        patch("app.models_usuario.Usuario.get_by_id", return_value=user),
+    ):
+        client.post("/login", data={"email": "sup@test.com", "senha": "ok"}, follow_redirects=False)
+        yield client
 
 
 @pytest.fixture
 def client_logado_admin(client, app):
     """Cliente com usuário admin já logado."""
-    user = _usuario_mock('admin_1', 'admin@test.com', 'Admin Teste', 'admin', 'Geral')
-    with patch('app.routes.auth.Usuario.get_by_email', return_value=user):
-        with patch('app.models_usuario.Usuario.get_by_id', return_value=user):
-            client.post('/login', data={'email': 'admin@test.com', 'senha': 'ok'}, follow_redirects=False)
-            yield client
+    user = _usuario_mock("admin_1", "admin@test.com", "Admin Teste", "admin", "Geral")
+    with (
+        patch("app.routes.auth.Usuario.get_by_email", return_value=user),
+        patch("app.models_usuario.Usuario.get_by_id", return_value=user),
+    ):
+        client.post(
+            "/login", data={"email": "admin@test.com", "senha": "ok"}, follow_redirects=False
+        )
+        yield client
 
 
 @pytest.fixture
@@ -93,5 +106,5 @@ def mock_firestore():
     Mock do Firestore para testes que não devem acessar o banco real.
     Use: def test_x(mock_firestore): ... (o mock está em app.database.db).
     """
-    with patch('app.database.db', MagicMock()) as mock_db:
+    with patch("app.database.db", MagicMock()) as mock_db:
         yield mock_db

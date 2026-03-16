@@ -181,22 +181,22 @@ firebase deploy --only firestore:indexes --project seu-projeto-id
 
 ### Erro: "FAILED_PRECONDITION" em query
 
-**Causa:** Índice composto faltando  
+**Causa:** Índice composto faltando
 **Solução:** Criar índice no Firebase Console ou via CLI
 
 ### Dashboard carrega lento
 
-**Causa:** Firestore indexando em background  
+**Causa:** Firestore indexando em background
 **Solução:** Esperar 15 minutos após criar índices
 
 ### Erro de conexão com Firebase
 
-**Causa:** `credentials.json` não encontrado  
+**Causa:** `credentials.json` não encontrado
 **Solução:** Adicionar arquivo de credenciais na raiz do projeto
 
 ### Erro ao subir em produção: "SECRET_KEY must be set"
 
-**Causa:** Em `FLASK_ENV=production` a aplicação exige `SECRET_KEY` no ambiente.  
+**Causa:** Em `FLASK_ENV=production` a aplicação exige `SECRET_KEY` no ambiente.
 **Solução:** Defina `SECRET_KEY` com um valor forte (ex: `openssl rand -hex 32`) nas variáveis de ambiente.
 
 ### Dependências

@@ -34,10 +34,7 @@ class PaginadorFirestore:
         self.limite = limite_padrao
 
     def paginar(
-        self,
-        docs: list[Any],
-        pagina: int = 1,
-        cursor_anterior: str | None = None
+        self, docs: list[Any], pagina: int = 1, cursor_anterior: str | None = None
     ) -> dict[str, Any]:
         """
         Pagina uma lista de documentos
@@ -81,15 +78,15 @@ class PaginadorFirestore:
         cursor_proximo = docs_pagina[-1].id if docs_pagina else None
 
         return {
-            'docs': docs_pagina,
-            'cursor_atual': cursor_atual,
-            'cursor_proximo': cursor_proximo,
-            'tem_anterior': tem_anterior,
-            'tem_proximo': tem_proximo,
-            'total_pagina': len(docs_pagina),
-            'limite': self.limite,
-            'indice_inicio': indice_inicio,
-            'indice_fim': indice_fim
+            "docs": docs_pagina,
+            "cursor_atual": cursor_atual,
+            "cursor_proximo": cursor_proximo,
+            "tem_anterior": tem_anterior,
+            "tem_proximo": tem_proximo,
+            "total_pagina": len(docs_pagina),
+            "limite": self.limite,
+            "indice_inicio": indice_inicio,
+            "indice_fim": indice_fim,
         }
 
     def _encontrar_indice_cursor(self, docs: list[Any], cursor_id: str) -> int:
@@ -102,16 +99,18 @@ class PaginadorFirestore:
     def _pagina_vazia(self) -> dict[str, Any]:
         """Returns empty page structure"""
         return {
-            'docs': [],
-            'cursor_atual': None,
-            'cursor_proximo': None,
-            'tem_anterior': False,
-            'tem_proximo': False,
-            'total_pagina': 0,
-            'limite': self.limite
+            "docs": [],
+            "cursor_atual": None,
+            "cursor_proximo": None,
+            "tem_anterior": False,
+            "tem_proximo": False,
+            "total_pagina": 0,
+            "limite": self.limite,
         }
 
-    def resposta_json(self, resultado_paginacao: dict[str, Any], chamados_dict: list[dict]) -> dict[str, Any]:
+    def resposta_json(
+        self, resultado_paginacao: dict[str, Any], chamados_dict: list[dict]
+    ) -> dict[str, Any]:
         """
         Converte resultado de paginação em JSON com chamados formatados
 
@@ -123,16 +122,16 @@ class PaginadorFirestore:
             JSON structure pronto para frontend
         """
         return {
-            'sucesso': True,
-            'chamados': chamados_dict,
-            'paginacao': {
-                'cursor_anterior': resultado_paginacao['cursor_atual'],
-                'cursor_proximo': resultado_paginacao['cursor_proximo'],
-                'tem_anterior': resultado_paginacao['tem_anterior'],
-                'tem_proximo': resultado_paginacao['tem_proximo'],
-                'limite': resultado_paginacao['limite'],
-                'total_pagina_atual': resultado_paginacao['total_pagina']
-            }
+            "sucesso": True,
+            "chamados": chamados_dict,
+            "paginacao": {
+                "cursor_anterior": resultado_paginacao["cursor_atual"],
+                "cursor_proximo": resultado_paginacao["cursor_proximo"],
+                "tem_anterior": resultado_paginacao["tem_anterior"],
+                "tem_proximo": resultado_paginacao["tem_proximo"],
+                "limite": resultado_paginacao["limite"],
+                "total_pagina_atual": resultado_paginacao["total_pagina"],
+            },
         }
 
 
@@ -149,40 +148,37 @@ class OptimizadorQuery:
     # Índices que devem ser criados no Firestore
     INDICES_RECOMENDADOS = [
         {
-            'colecao': 'chamados',
-            'campos': [
-                ('categoria', 'ASCENDING'),
-                ('status', 'DESCENDING'),
-                ('data_abertura', 'DESCENDING')
+            "colecao": "chamados",
+            "campos": [
+                ("categoria", "ASCENDING"),
+                ("status", "DESCENDING"),
+                ("data_abertura", "DESCENDING"),
             ],
-            'descricao': 'Filtro por categoria + status + data'
+            "descricao": "Filtro por categoria + status + data",
         },
         {
-            'colecao': 'chamados',
-            'campos': [
-                ('status', 'ASCENDING'),
-                ('data_abertura', 'DESCENDING')
-            ],
-            'descricao': 'Filtro por status + data'
+            "colecao": "chamados",
+            "campos": [("status", "ASCENDING"), ("data_abertura", "DESCENDING")],
+            "descricao": "Filtro por status + data",
         },
         {
-            'colecao': 'chamados',
-            'campos': [
-                ('categoria', 'ASCENDING'),
-                ('prioridade', 'ASCENDING'),
-                ('data_abertura', 'DESCENDING')
+            "colecao": "chamados",
+            "campos": [
+                ("categoria", "ASCENDING"),
+                ("prioridade", "ASCENDING"),
+                ("data_abertura", "DESCENDING"),
             ],
-            'descricao': 'Filtro por categoria + prioridade'
+            "descricao": "Filtro por categoria + prioridade",
         },
         {
-            'colecao': 'chamados',
-            'campos': [
-                ('gate', 'ASCENDING'),
-                ('status', 'ASCENDING'),
-                ('data_abertura', 'DESCENDING')
+            "colecao": "chamados",
+            "campos": [
+                ("gate", "ASCENDING"),
+                ("status", "ASCENDING"),
+                ("data_abertura", "DESCENDING"),
             ],
-            'descricao': 'Filtro por gate + status'
-        }
+            "descricao": "Filtro por gate + status",
+        },
     ]
 
     @staticmethod
@@ -206,7 +202,7 @@ class OptimizadorQuery:
             script += f"Coleção: {indice['colecao']}\n"
             script += "Campos:\n"
 
-            for campo, direcao in indice['campos']:
+            for campo, direcao in indice["campos"]:
                 script += f"  - {campo}: {direcao}\n"
 
         return script
@@ -219,9 +215,9 @@ class OptimizadorQuery:
         Returns:
             (válido, mensagem)
         """
-        status = filtros.get('status')
-        categoria = filtros.get('categoria')
-        gate = filtros.get('gate')
+        status = filtros.get("status")
+        categoria = filtros.get("categoria")
+        gate = filtros.get("gate")
 
         # Exemplo: categoria + status precisa de índice
         if categoria and status:
@@ -251,9 +247,10 @@ def obter_total_por_contagem(query_ref: Any) -> int | None:
         query sem suporte a count, ou erro de rede).
     """
     import logging
+
     _log = logging.getLogger(__name__)
     try:
-        if not hasattr(query_ref, 'count'):
+        if not hasattr(query_ref, "count"):
             _log.debug("obter_total_por_contagem: query sem método count()")
             return None
         agg = query_ref.count()
@@ -261,15 +258,15 @@ def obter_total_por_contagem(query_ref: Any) -> int | None:
         if result is None:
             return None
         # Firestore Python SDK: get() retorna estrutura onde o count está em result[0][0].value
-        if hasattr(result, '__getitem__') and len(result) > 0:
+        if hasattr(result, "__getitem__") and len(result) > 0:
             row = result[0]
-            if hasattr(row, '__getitem__') and len(row) > 0:
+            if hasattr(row, "__getitem__") and len(row) > 0:
                 cell = row[0]
-                if hasattr(cell, 'value'):
+                if hasattr(cell, "value"):
                     return int(cell.value)
-            if hasattr(row, 'value'):
+            if hasattr(row, "value"):
                 return int(row.value)
-        if hasattr(result, 'value'):
+        if hasattr(result, "value"):
             return int(result.value)
         return None
     except Exception as e:

@@ -1,8 +1,8 @@
 # Análise de Requisitos – Sistema de Chamados DTX
 
-**Documento:** Análise de Requisitos para QA  
-**Projeto:** Sistema de Chamados DTX  
-**Stack:** Python/Flask, Firestore, Firebase Auth  
+**Documento:** Análise de Requisitos para QA
+**Projeto:** Sistema de Chamados DTX
+**Stack:** Python/Flask, Firestore, Firebase Auth
 
 ---
 

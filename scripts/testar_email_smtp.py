@@ -8,17 +8,19 @@ Uso:
 
 Se não informar destinatário, envia para o próprio MAIL_USERNAME.
 """
+
 import os
-import sys
 import smtplib
-from email.mime.text import MIMEText
+import sys
 from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 
 # Carrega .env da raiz do projeto
 _root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 _env = os.path.join(_root, ".env")
 if os.path.isfile(_env):
     from dotenv import load_dotenv
+
     load_dotenv(_env)
 else:
     print("Arquivo .env não encontrado em:", _root)
@@ -71,6 +73,7 @@ def main():
         print("Falha ao enviar e-mail:")
         print(type(e).__name__ + ":", e)
         import traceback
+
         traceback.print_exc()
         sys.exit(1)
 

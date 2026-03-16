@@ -18,10 +18,14 @@ import sys
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Verifica dependências (pip audit) e roda testes (pytest)")
+    parser = argparse.ArgumentParser(
+        description="Verifica dependências (pip audit) e roda testes (pytest)"
+    )
     parser.add_argument("--no-audit", action="store_true", help="Pular pip audit")
     parser.add_argument("--no-tests", action="store_true", help="Pular pytest")
-    parser.add_argument("--cov", action="store_true", help="Rodar pytest com cobertura (pytest-cov)")
+    parser.add_argument(
+        "--cov", action="store_true", help="Rodar pytest com cobertura (pytest-cov)"
+    )
     args = parser.parse_args()
 
     failed = False
@@ -35,8 +39,13 @@ def main():
             capture_output=True,
             text=True,
         )
-        if "unknown command" in (result.stderr or "").lower() or "unknown command" in (result.stdout or "").lower():
-            print("AVISO: pip audit não disponível (pip muito antigo). Atualize com: pip install -U pip\n")
+        if (
+            "unknown command" in (result.stderr or "").lower()
+            or "unknown command" in (result.stdout or "").lower()
+        ):
+            print(
+                "AVISO: pip audit não disponível (pip muito antigo). Atualize com: pip install -U pip\n"
+            )
         elif result.returncode != 0:
             failed = True
             if result.stdout:

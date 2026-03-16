@@ -4,6 +4,7 @@ Serviço de criação de chamados.
 Centraliza a lógica de: validação, upload, atribuição de responsável,
 Grupo RL, persistência e notificações. Usado pela rota de novo chamado.
 """
+
 import logging
 import threading
 from typing import Any
@@ -37,28 +38,28 @@ def _resolver_responsavel(
     Retorna (responsavel_nome, responsavel_id, motivo_atribuicao).
     Usa responsável escolhido no formulário ou atribuição automática.
     """
-    responsavel_id_form = (form.get('responsavel_id') or '').strip()
-    responsavel_nome_form = (form.get('responsavel_nome') or '').strip()
+    responsavel_id_form = (form.get("responsavel_id") or "").strip()
+    responsavel_nome_form = (form.get("responsavel_nome") or "").strip()
     if responsavel_id_form and responsavel_nome_form:
         usuario_escolhido = Usuario.get_by_id(responsavel_id_form)
-        if usuario_escolhido and usuario_escolhido.perfil in ('supervisor', 'admin'):
+        if usuario_escolhido and usuario_escolhido.perfil in ("supervisor", "admin"):
             return (
                 responsavel_nome_form,
                 responsavel_id_form,
                 f"Escolhido pelo solicitante: {responsavel_nome_form}",
             )
-    tipo = form.get('tipo')
-    categoria = form.get('categoria')
-    area_para_atribuicao = setor_para_area(tipo) if tipo else (area_solicitante or 'Geral')
+    tipo = form.get("tipo")
+    categoria = form.get("categoria")
+    area_para_atribuicao = setor_para_area(tipo) if tipo else (area_solicitante or "Geral")
     resultado = atribuidor.atribuir(
         area=area_para_atribuicao,
         categoria=categoria,
-        prioridade=0 if categoria == 'Projetos' else 1,
+        prioridade=0 if categoria == "Projetos" else 1,
     )
-    if resultado['sucesso']:
+    if resultado["sucesso"]:
         return (
-            resultado['supervisor']['nome'],
-            resultado['supervisor']['id'],
+            resultado["supervisor"]["nome"],
+            resultado["supervisor"]["id"],
             f"Atribuído automaticamente a {resultado['supervisor']['nome']}",
         )
     return (
@@ -93,25 +94,27 @@ def criar_chamado(
     """
     import bleach
 
-    categoria = form.get('categoria')
-    rl_codigo = form.get('rl_codigo')
-    tipo = form.get('tipo')
-    descricao = bleach.clean(form.get('descricao') or '', tags=[], strip=True)
-    impacto = form.get('impacto')
-    gate = form.get('gate')
+    categoria = form.get("categoria")
+    rl_codigo = form.get("rl_codigo")
+    tipo = form.get("tipo")
+    descricao = bleach.clean(form.get("descricao") or "", tags=[], strip=True)
+    impacto = form.get("impacto")
+    gate = form.get("gate")
 
     try:
-        caminho_anexo = salvar_anexo(files.get('anexo') if files else None)
+        caminho_anexo = salvar_anexo(files.get("anexo") if files else None)
     except ValueError as e:
         return (None, None, str(e), None)
 
     responsavel, responsavel_id, motivo_atribuicao = _resolver_responsavel(
         form, solicitante_id, solicitante_nome, area_solicitante
     )
-    area_chamado = setor_para_area(tipo) if tipo else (area_solicitante if area_solicitante else 'Geral')
+    area_chamado = (
+        setor_para_area(tipo) if tipo else (area_solicitante if area_solicitante else "Geral")
+    )
 
     grupo_rl_id = None
-    if categoria == 'Projetos' and rl_codigo:
+    if categoria == "Projetos" and rl_codigo:
         try:
             grupo = GrupoRL.get_or_create(
                 rl_codigo=rl_codigo,
@@ -127,7 +130,7 @@ def criar_chamado(
         novo_chamado = Chamado(
             numero_chamado=numero_chamado,
             categoria=categoria,
-            rl_codigo=rl_codigo if categoria == 'Projetos' else None,
+            rl_codigo=rl_codigo if categoria == "Projetos" else None,
             tipo_solicitacao=tipo,
             gate=gate,
             impacto=impacto,
@@ -139,11 +142,11 @@ def criar_chamado(
             solicitante_id=solicitante_id,
             solicitante_nome=solicitante_nome,
             area=area_chamado,
-            status='Aberto',
+            status="Aberto",
             grupo_rl_id=grupo_rl_id,
         )
         doc_ref = execute_with_retry(
-            db.collection('chamados').add,
+            db.collection("chamados").add,
             novo_chamado.to_dict(),
             max_retries=3,
         )
@@ -152,7 +155,7 @@ def criar_chamado(
             chamado_id=chamado_id,
             usuario_id=solicitante_id,
             usuario_nome=solicitante_nome,
-            acao='criacao',
+            acao="criacao",
         ).save()
 
         _app = current_app._get_current_object()
@@ -161,14 +164,16 @@ def criar_chamado(
             """Envia todas as notificações em background para não bloquear o request."""
             with _app.app_context():
                 try:
-                    responsavel_usuario = Usuario.get_by_id(responsavel_id) if responsavel_id else None
+                    responsavel_usuario = (
+                        Usuario.get_by_id(responsavel_id) if responsavel_id else None
+                    )
                     notificar_aprovador_novo_chamado(
                         chamado_id=chamado_id,
                         numero_chamado=numero_chamado,
                         categoria=categoria,
                         tipo_solicitacao=tipo,
-                        descricao_resumo=(descricao or '')[:500],
-                        area=area_solicitante or 'Geral',
+                        descricao_resumo=(descricao or "")[:500],
+                        area=area_solicitante or "Geral",
                         solicitante_nome=solicitante_nome,
                         responsavel_usuario=responsavel_usuario,
                         solicitante_email=solicitante_email,
@@ -180,10 +185,12 @@ def criar_chamado(
                             numero_chamado=numero_chamado,
                             titulo=f"Novo chamado: {numero_chamado}",
                             mensagem=f"{categoria} · Solicitante: {solicitante_nome}",
-                            tipo='novo_chamado',
+                            tipo="novo_chamado",
                         )
-                        base_url = _app.config.get('APP_BASE_URL', '').rstrip('/')
-                        url_chamado = f"{base_url}/chamado/{chamado_id}/historico" if base_url else None
+                        base_url = _app.config.get("APP_BASE_URL", "").rstrip("/")
+                        url_chamado = (
+                            f"{base_url}/chamado/{chamado_id}/historico" if base_url else None
+                        )
                         try:
                             enviar_webpush_usuario(
                                 responsavel_id,

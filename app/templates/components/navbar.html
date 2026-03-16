@@ -14,7 +14,7 @@
                 <!-- Nav Links Desktop -->
                 <div class="hidden md:flex md:items-center md:gap-2">
                     {% if current_user.is_authenticated %}
-                    
+
                     {% macro nav_link(url, icon_path, label_code, is_highlight=False) %}
                     <a href="{{ url }}" class="relative group px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-300 outline-none focus-visible:ring-2 focus-visible:ring-blue-400 flex items-center gap-2 {% if is_highlight %}bg-blue-600/20 text-blue-100 hover:bg-blue-600/40 hover:text-white border border-blue-500/20 hover:border-blue-500/40 hover:shadow-[0_0_15px_rgba(37,99,235,0.3)]{% else %}text-gray-200 hover:bg-white/10 hover:text-white{% endif %}">
                         <svg class="w-4 h-4 shrink-0 transition-transform duration-300 group-hover:scale-110 {% if not is_highlight %}opacity-70 group-hover:opacity-100{% endif %}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -40,7 +40,7 @@
                         {{ nav_link('/admin', 'M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10', 'nav_management') }}
                         {{ nav_link(url_for('main.relatorios'), 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z', 'nav_my_reports') }}
                     {% endif %}
-                    
+
                     {% endif %}
                 </div>
             </div>
@@ -229,16 +229,16 @@
                             <div class="absolute bottom-0 right-0 w-3 h-3 bg-emerald-400 border-2 border-[#0b1b3d] rounded-full shadow-[0_0_8px_rgba(52,211,153,0.6)]"></div>
                         </div>
                     </button>
-                    
+
                     <!-- Dropdown Meu Perfil -->
                     <div class="absolute right-0 mt-3 w-64 bg-white/80 backdrop-blur-3xl text-gray-800 rounded-3xl shadow-[0_20px_60px_-15px_rgba(0,0,0,0.5)] border border-white/40 opacity-0 invisible scale-95 translate-y-3 group-hover:opacity-100 group-hover:visible group-hover:scale-100 group-hover:translate-y-0 transform origin-top-right transition-all duration-300 ease-out z-[220] overflow-hidden">
                         <div class="p-5 border-b border-gray-100/30 bg-gradient-to-b from-white to-white/50 relative">
                             <!-- Glare effect inside dropdown header -->
                             <div class="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/80 to-transparent pointer-events-none"></div>
-                            
+
                             <div class="font-display font-black text-gray-900 text-lg tracking-tight relative z-10">{{ current_user.nome }}</div>
                             <div class="text-xs text-gray-500 mt-1 flex items-center gap-1.5 font-medium relative z-10">
-                                <svg class="w-3.5 h-3.5 shrink-0 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg> 
+                                <svg class="w-3.5 h-3.5 shrink-0 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
                                 {{ current_user.email }}
                             </div>
                             {% if current_user.perfil == 'admin' %}

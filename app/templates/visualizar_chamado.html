@@ -55,7 +55,7 @@
                 </div>
                 <p class="text-gray-500 text-sm font-medium">{{ t('complete_details') if t else 'Detalhes completos da solicitação' }}</p>
             </div>
-            
+
             {% if current_user.perfil in ['admin', 'supervisor'] %}
             <a href="{{ url_for('main.visualizar_historico', chamado_id=chamado.id) }}" class="inline-flex items-center text-sm font-bold text-purple-600 bg-purple-50 hover:bg-purple-100 hover:scale-105 active:scale-95 px-5 py-2.5 rounded-xl transition-all relative z-10 shadow-sm border border-purple-100/50">
                 <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
@@ -67,17 +67,17 @@
         <!-- Body -->
         <div class="p-6 bg-slate-50/50 relative z-10">
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                
+
                 <!-- Coluna Principal (Esquerda) -->
                 <div class="lg:col-span-2 space-y-6">
-                    
+
                     <!-- Descrição -->
                     <div class="bg-white/80 backdrop-blur-sm rounded-[1.5rem] shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-white p-6 transition-all hover:shadow-[0_8px_30px_rgb(0,0,0,0.05)]">
                         <label class="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
                             <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"></path></svg>
                             {{ t('problem_description') if t else 'Descrição do Problema' }}
                         </label>
-                        
+
                         {% if pode_editar %}
                         <textarea id="modal-descricao" form="form-status" name="nova_descricao" rows="4"
                             class="w-full text-slate-700 bg-slate-50/80 p-5 rounded-[1.25rem] border border-slate-200/60 focus:bg-white focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 text-sm font-medium leading-relaxed resize-none overflow-hidden transition-all shadow-inner"
@@ -103,11 +103,11 @@
                             <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path></svg>
                             {% set _af = t('attached_file') %}{{ _af if _af != 'attached_file' else 'Anexos' }}
                         </label>
-                        
+
                         <div class="space-y-4">
                             {% set tem_anexo = false %}
                             {% set anexos_brutos = chamado.anexos if (chamado.anexos and chamado.anexos|length > 0) else ([chamado.anexo] if chamado.anexo and chamado.anexo != 'None' else []) %}
-                            
+
                             {% if anexos_brutos %}
                                 <!-- Garantir que cada anexo só apareça 1x -->
                                 {% set anexos_unicos = [] %}
@@ -122,18 +122,18 @@
                                     <div class="flex flex-col gap-2">
                                         {% for anx in anexos_unicos %}
                                             {% set is_url = anx.startswith('http://') or anx.startswith('https://') %}
-                                            
+
                                             {# Tenta extrair o nome do arquivo da URL #}
                                             {% set nome_limpo = anx %}
                                             {% if '?' in nome_limpo %}{% set nome_limpo = nome_limpo.split('?')[0] %}{% endif %}
                                             {% set nome_limpo = nome_limpo.split('/')[-1] %}
                                             {% set nome_limpo = nome_limpo.split('%2F')[-1] %}
                                             {% set nome_limpo = nome_limpo | replace('%20', ' ') %}
-                                            
+
                                             {% if nome_limpo | length > 45 %}
                                                 {% set nome_limpo = nome_limpo[:25] + '...' + nome_limpo[-12:] %}
                                             {% endif %}
-                                            
+
                                             <a href="{{ anx if is_url else url_for('static', filename='uploads/' + anx) }}" target="_blank"
                                                 class="inline-flex max-w-fit items-center px-4 py-2 border border-indigo-100 shadow-sm text-sm font-medium rounded-xl text-indigo-700 bg-indigo-50/50 hover:bg-indigo-100 hover:border-indigo-300 transition-colors group">
                                                 <svg class="w-5 h-5 mr-2 flex-shrink-0 text-indigo-500 group-hover:text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path></svg>
@@ -172,7 +172,7 @@
 
                 <!-- Barra Lateral (Direita) -->
                 <div class="space-y-6">
-                    
+
                     <!-- Info Abertura -->
                     <div class="bg-gradient-to-b from-indigo-50/80 to-white/80 backdrop-blur-sm p-6 rounded-[1.5rem] shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-indigo-100/50 relative overflow-hidden group">
                         <div class="absolute left-0 top-0 bottom-0 w-1.5 bg-gradient-to-b from-indigo-500 to-indigo-300"></div>
@@ -202,7 +202,7 @@
                             <svg class="w-4 h-4 mr-2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
                             {{ t('ticket_details') if t else 'Detalhes do Chamado' }}
                         </h4>
-                        
+
                         {% if pode_editar %}
                         <form id="form-status" action="{{ url_for('main.editar_chamado_pagina') }}" method="POST" enctype="multipart/form-data" class="space-y-5">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
@@ -211,7 +211,7 @@
                             <div>
                                 <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">{{ t('current_status') if t else 'Status Atual' }}</label>
                                 <div>
-                                    <span class="inline-flex px-3.5 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider shadow-sm border border-gray-100/50 
+                                    <span class="inline-flex px-3.5 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider shadow-sm border border-gray-100/50
                                     {% if chamado.status == 'Concluído' %}bg-emerald-100 text-emerald-800{% elif chamado.status == 'Em Atendimento' %}bg-amber-100 text-amber-800{% elif chamado.status == 'Cancelado' %}bg-rose-100 text-rose-800{% else %}bg-indigo-100 text-indigo-800{% endif %}">
                                         {{ translate_status(chamado.status) if chamado.status else chamado.status }}
                                     </span>
@@ -258,7 +258,7 @@
                             <div class="pt-5 border-t border-slate-100">
                                 <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{{ t('additional_sectors') if t else 'Setores adicionais' }}</label>
                                 <p class="text-[11px] font-medium text-slate-400 mb-4 leading-snug">{{ t('additional_sectors_help') if t else 'Marque os setores a incluir no chamado. Os supervisores desses setores receberão e-mail informando a abertura.' }}</p>
-                                
+
                                 <div class="flex flex-wrap gap-2.5 max-h-48 overflow-y-auto py-1 custom-scrollbar pr-2">
                                     {% for setor in setores %}
                                     <label class="cursor-pointer group">
@@ -305,7 +305,7 @@
                             <div>
                                 <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">{{ t('status') if t else 'Status' }}</label>
                                 <div>
-                                    <span class="inline-flex px-3 py-1.5 rounded-lg text-sm font-bold shadow-sm border border-gray-100 
+                                    <span class="inline-flex px-3 py-1.5 rounded-lg text-sm font-bold shadow-sm border border-gray-100
                                     {% if chamado.status == 'Concluído' %}bg-emerald-100 text-emerald-800{% elif chamado.status == 'Em Atendimento' %}bg-amber-100 text-amber-800{% elif chamado.status == 'Cancelado' %}bg-red-100 text-red-800{% else %}bg-blue-100 text-blue-800{% endif %}">
                                         {{ translate_status(chamado.status) if chamado.status else chamado.status }}
                                     </span>
@@ -352,7 +352,7 @@
                             </div>
                         </div>
                         {% endif %}
-                        
+
                     </div>
                 </div>
             </div>
@@ -373,7 +373,7 @@
     })();
     const inputFile = document.getElementById('modal-input-anexo');
     const nomeArquivoEl = document.getElementById('nome-arquivo-selecionado');
-    
+
     if(inputFile) {
         inputFile.addEventListener('change', function(e) {
             if(e.target.files.length > 0) {

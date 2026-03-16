@@ -21,12 +21,12 @@ Exemplo de .env.test:
 import os
 
 import pytest
-from playwright.sync_api import Page, expect
-
+from playwright.sync_api import Page
 
 # ---------------------------------------------------------------------------
 # Configuração de base_url
 # ---------------------------------------------------------------------------
+
 
 def pytest_configure(config):
     """Registra o marker e2e para evitar warnings."""
@@ -42,6 +42,7 @@ def base_url() -> str:
 # ---------------------------------------------------------------------------
 # Credenciais de teste (de variáveis de ambiente)
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture(scope="session")
 def creds_solicitante() -> dict:
@@ -71,6 +72,7 @@ def creds_admin() -> dict:
 # Configuração do Playwright
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture(scope="session")
 def browser_context_args(browser_context_args):
     """Configuração padrão do contexto de browser para todos os testes E2E."""
@@ -84,6 +86,7 @@ def browser_context_args(browser_context_args):
 # ---------------------------------------------------------------------------
 # Helpers de autenticação
 # ---------------------------------------------------------------------------
+
 
 def _do_login(page: Page, base_url: str, email: str, password: str) -> None:
     """Realiza login na aplicação via UI."""

@@ -132,7 +132,7 @@
                 </button>
               </form>
               {% endif %}
-              
+
               {% if usuario.id != current_user.id %}
               <form method="POST" action="{{ url_for('main.deletar_usuario', usuario_id=usuario.id) }}" onsubmit="return confirm(`{{ t('confirm_delete_user', nome=usuario.nome) }}`)">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>

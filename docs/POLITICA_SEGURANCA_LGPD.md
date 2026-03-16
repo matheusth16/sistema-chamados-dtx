@@ -30,7 +30,7 @@ Este documento descreve as medidas de segurança e o alinhamento do **Sistema de
 
 - **Senhas**: Armazenadas apenas como hash (Werkzeug), nunca em texto claro.
 - **Campos sensíveis (PII)**: O sistema suporta criptografia de campos como o **nome** do usuário no banco, mediante configuração:
-  - Variável de ambiente `ENCRYPTION_KEY`: chave Fernet (base64, 32 bytes).  
+  - Variável de ambiente `ENCRYPTION_KEY`: chave Fernet (base64, 32 bytes).
     Geração: `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`
   - Variável `ENCRYPT_PII_AT_REST=true` para ativar a criptografia do campo nome na coleção de usuários.
 - **Firestore**: Acesso apenas pelo backend (Firebase Admin SDK). Regras do Firestore negam leitura/escrita direta do cliente.

@@ -1,9 +1,9 @@
 # 📋 Guia de Melhorias - Sistema de Chamados DTX
 
 > Documento de referência para implementação de melhorias de qualidade, performance e segurança.
-> 
-> **Data:** 23 de fevereiro de 2026  
-> **Versão:** 1.0  
+>
+> **Data:** 23 de fevereiro de 2026
+> **Versão:** 1.0
 > **Status:** ✅ Pronto para implementação
 
 ---
@@ -270,21 +270,21 @@ E em cada método:
 def atribuir(self, area: str, categoria: str, prioridade: int = 1) -> dict:
     """
     Atribui um chamado a um supervisor disponível.
-    
+
     Args:
         area: Setor/departamento (ex: 'Suporte', 'TI', 'RH')
         categoria: Tipo de chamado (ex: 'Projetos', 'Manutenção')
         prioridade: 0 (crítico), 1 (alto), 2 (médio), 3 (baixo)
-        
+
     Returns:
         dict com chaves:
         - 'sucesso' (bool): Se conseguiu atribuir
         - 'supervisor' (dict): {'id', 'nome', 'email'} do supervisor
         - 'motivo' (str): Razão da atribuição ou mensagem de erro
-        
+
     Raises:
         ValueError: Se area ou categoria inválidas
-        
+
     Exemplos:
         >>> resultado = atribuidor.atribuir('Suporte', 'Manutenção')
         >>> if resultado['sucesso']:
@@ -310,7 +310,7 @@ de chamados, histórico e análises.
 2. **Relatório Completo:**
    - Colunas: ID, Status, Categoria, Setor, Gate, Impacto
    - Formatação: cores, borders, freeze panes
-   
+
 3. **Análise Histórica:**
    - Planilha 1: Resumo por categoria
    - Planilha 2: Detalhe histórico (data abertura → conclusão)
@@ -362,7 +362,7 @@ filtros = {
     'data_inicio': datetime.now() - timedelta(days=7)
 }
 docs = aplicar_filtros_dashboard_com_paginacao(
-    chamados_query, 
+    chamados_query,
     filtros=filtros,
     pagina=1
 )
@@ -442,14 +442,14 @@ logger = logging.getLogger(__name__)
 def _inicializar_firebase_com_retry(max_tentativas: int = 3, delay_inicial: float = 1.0):
     """
     Inicializa Firebase com retry automático e exponential backoff.
-    
+
     Args:
         max_tentativas: Número máximo de tentativas (padrão: 3)
         delay_inicial: Delay inicial em segundos (padrão: 1.0)
-        
+
     Raises:
         Exception: Se todas as tentativas falharem
-        
+
     Exemplos:
         >>> _inicializar_firebase_com_retry(max_tentativas=5)
         # Tenta 5 vezes com delays de 1s, 2s, 4s, 8s, 16s
@@ -462,10 +462,10 @@ def _inicializar_firebase_com_retry(max_tentativas: int = 3, delay_inicial: floa
         except ValueError:
             # Primeira inicialização necessária
             pass
-        
+
         try:
             cert_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'credentials.json')
-            
+
             if os.path.exists(cert_path):
                 cred = credentials.Certificate(cert_path)
                 firebase_admin.initialize_app(cred)
@@ -473,12 +473,12 @@ def _inicializar_firebase_com_retry(max_tentativas: int = 3, delay_inicial: floa
             else:
                 firebase_admin.initialize_app()
                 logger.info("Firebase inicializado com Application Default Credentials")
-            
+
             return  # Sucesso
-            
+
         except Exception as e:
             logger.warning(f"Tentativa {tentativa}/{max_tentativas} falhou: {e}")
-            
+
             if tentativa < max_tentativas:
                 delay = delay_inicial * (2 ** (tentativa - 1))
                 logger.info(f"Aguardando {delay}s antes de tentar novamente...")
@@ -681,41 +681,41 @@ Implementar middleware que valida Origin/Referer:
 def _validar_origin_referer(app):
     """
     Middleware que valida Origin/Referer para POST em paths sensíveis.
-    
+
     Se APP_BASE_URL estiver definida, verifica se a requisição vem
     do mesmo domínio antes de permitir POST em endpoints sensíveis.
     """
-    
+
     @app.before_request
     def check_origin_referer():
         if request.method != 'POST':
             return  # GET, HEAD, etc não precisam de validação
-        
+
         # Obtém URL base configurada
         app_base_url = app.config.get('APP_BASE_URL', '').strip()
         if not app_base_url:
             return  # Se não configurado, skip validação
-        
+
         # Verifica se é path sensível
         if request.path not in _POST_ORIGIN_CHECK_PATHS:
             return  # Path não sensível
-        
+
         # Valida Origin header (moderno)
         origin = request.headers.get('Origin', '').lower()
         if origin:
             base_parsed = urlparse(app_base_url.lower())
             origin_parsed = urlparse(origin)
-            
+
             if origin_parsed.netloc != base_parsed.netloc:
                 logger.warning(f"CSRF: Origin inválida {origin} para {request.path}")
                 return jsonify({'erro': 'Origem inválida'}), 403
-        
+
         # Valida Referer header (fallback)
         referer = request.headers.get('Referer', '').lower()
         if referer and not referer.startswith(app_base_url.lower()):
             logger.warning(f"CSRF: Referer inválida {referer} para {request.path}")
             return jsonify({'erro': 'Referer inválido'}), 403
-        
+
         # Ambos vazios = requisição suspeita
         if not origin and not referer:
             logger.warning(f"CSRF: Sem Origin/Referer em {request.path}")
@@ -727,12 +727,12 @@ def _validar_origin_referer(app):
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
-    
+
     # ... outros inits ...
-    
+
     # Ativa validação Origin/Referer
     _validar_origin_referer(app)
-    
+
     # ... resto do código ...
 ```
 
@@ -774,7 +774,7 @@ curl -X POST http://localhost:5000/api/atualizar-status \
 - [x] **Melhoria #1:** Remover `total_global` da paginação ✅ **Concluído**
   - [x] Paginação já não retorna `total_global`; usa cursor e contagem por página
   - [x] Resposta JSON sem total global; frontend/rotas ajustados
-  
+
 - [ ] **Melhoria #2:** Criar `docs/ENV.md`
   - [ ] Criar arquivo em `docs/ENV.md`
   - [ ] Copiar conteúdo da solução acima
@@ -920,6 +920,5 @@ Para cada melhoria:
 
 ---
 
-**Última atualização:** 23 de fevereiro de 2026  
+**Última atualização:** 23 de fevereiro de 2026
 **Próxima revisão:** 30 dias após implementação
-

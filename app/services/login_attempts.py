@@ -2,6 +2,7 @@
 Serviço de rastreamento de tentativas de login para prevenir força bruta.
 Mantém histórico de tentativas falhas por IP/email.
 """
+
 import logging
 from datetime import datetime
 
@@ -29,7 +30,7 @@ class LoginAttemptTracker:
         Returns:
             Número de tentativas falhas nos últimos ATTEMPT_WINDOW segundos
         """
-        cache_key = f'login_attempt:{identifier}'
+        cache_key = f"login_attempt:{identifier}"
         count = cache_get(cache_key)
         return count if count is not None else 0
 
@@ -44,7 +45,7 @@ class LoginAttemptTracker:
         Returns:
             Novo contador após incremento
         """
-        cache_key = f'login_attempt:{identifier}'
+        cache_key = f"login_attempt:{identifier}"
         count = LoginAttemptTracker.get_attempt_count(identifier)
         new_count = count + 1
 
@@ -64,7 +65,7 @@ class LoginAttemptTracker:
         Returns:
             True se bloqueado, False caso contrário
         """
-        cache_key = f'login_lockout:{identifier}'
+        cache_key = f"login_lockout:{identifier}"
         lockout = cache_get(cache_key)
         return lockout is not None  # Se existir chave de lockout, está bloqueado
 
@@ -76,11 +77,10 @@ class LoginAttemptTracker:
         Args:
             identifier: Chave única (IP ou email)
         """
-        cache_key = f'login_lockout:{identifier}'
+        cache_key = f"login_lockout:{identifier}"
         cache_set(cache_key, True, ttl_seconds=LOCKOUT_DURATION)
         logger.warning(
-            f"Bloqueio de login aplicado para {identifier} "
-            f"por {LOCKOUT_DURATION} segundos"
+            f"Bloqueio de login aplicado para {identifier} por {LOCKOUT_DURATION} segundos"
         )
 
     @staticmethod
@@ -91,12 +91,14 @@ class LoginAttemptTracker:
         Args:
             identifier: Chave única (IP ou email)
         """
-        cache_delete(f'login_attempt:{identifier}')
-        cache_delete(f'login_lockout:{identifier}')
+        cache_delete(f"login_attempt:{identifier}")
+        cache_delete(f"login_lockout:{identifier}")
         logger.info(f"Tentativas de login resetadas para {identifier}")
 
     @staticmethod
-    def log_failed_attempt(email: str, ip_address: str, reason: str = "credenciais inválidas") -> None:
+    def log_failed_attempt(
+        email: str, ip_address: str, reason: str = "credenciais inválidas"
+    ) -> None:
         """
         Registra uma tentativa de login falha com detalhes.
 
@@ -114,7 +116,7 @@ class LoginAttemptTracker:
                 "timestamp": datetime.now().isoformat(),
                 "attempts_for_ip": LoginAttemptTracker.get_attempt_count(ip_address),
                 "attempts_for_email": LoginAttemptTracker.get_attempt_count(email),
-            }
+            },
         )
 
     @staticmethod
@@ -138,5 +140,5 @@ class LoginAttemptTracker:
                 "ip_address": ip_address,
                 "perfil": perfil,
                 "timestamp": datetime.now().isoformat(),
-            }
+            },
         )

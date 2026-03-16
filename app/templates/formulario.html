@@ -2,7 +2,7 @@
 
 {% block content %}
 <div class="max-w-3xl mx-auto">
-    
+
     <div class="bg-white/80 backdrop-blur-sm shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100 rounded-2xl overflow-hidden gsap-stagger-container relative">
         <!-- Glow accent -->
         <div class="absolute -top-24 -right-24 w-48 h-48 bg-blue-500/20 rounded-full blur-[60px] pointer-events-none"></div>
@@ -21,8 +21,8 @@
         {% if messages %}
             <div class="mb-4">
             {% for category, message in messages %}
-            <div class="p-4 rounded-md shadow-sm text-sm font-medium 
-                {% if category == 'danger' %} bg-red-100 text-red-700 border border-red-200 
+            <div class="p-4 rounded-md shadow-sm text-sm font-medium
+                {% if category == 'danger' %} bg-red-100 text-red-700 border border-red-200
                 {% else %} bg-green-100 text-green-700 border border-green-200 {% endif %}">
                 {{ t(message) }}
             </div>
@@ -254,7 +254,7 @@
     function toggleRL(isProject) {
         const divRL = document.getElementById('div_rl');
         const inputRL = document.getElementById('rl_codigo');
-        
+
         if (isProject) {
             divRL.classList.remove('hidden');
             inputRL.setAttribute('required', 'true');
@@ -272,22 +272,22 @@
         const selectResponsavel = document.getElementById('responsavel_select');
         const hiddenId = document.getElementById('responsavel_id');
         const hiddenNome = document.getElementById('responsavel_nome');
-        
+
         hiddenId.value = '';
         hiddenNome.value = '';
         selectResponsavel.innerHTML = '';
         selectResponsavel.classList.add('hidden');
         campoResponsavel.classList.remove('hidden');
         campoResponsavel.classList.remove('bg-yellow-100', 'border-yellow-300', 'bg-red-100', 'border-red-300');
-        
+
         if (!setor) {
             campoResponsavel.value = "{{ t('select_sector') }}";
             return;
         }
-        
+
         campoResponsavel.value = "{{ t('loading_supervisors') }}";
         campoResponsavel.classList.add('opacity-50');
-        
+
         fetch(`/api/supervisores/lista?area=${encodeURIComponent(setor)}`)
             .then(response => {
                 const contentType = (response.headers.get('content-type') || '').toLowerCase();
@@ -386,7 +386,7 @@
         var fileName = e.target.files[0] ? e.target.files[0].name : '';
         var display = document.getElementById('nome_arquivo');
         var displayText = document.getElementById('nome_arquivo_text');
-        
+
         if(fileName) {
             displayText.textContent = fileName;
             display.classList.remove('hidden');

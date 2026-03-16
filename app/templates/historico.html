@@ -2,7 +2,7 @@
 
 {% block content %}
 <div class="space-y-6">
-    
+
     <!-- Header -->
     <div class="flex flex-col md:flex-row justify-between items-start bg-white p-6 rounded-lg shadow-sm border border-gray-100">
         <div>
@@ -53,12 +53,12 @@
             </svg>
             {{ t('changes_timeline') }}
         </h3>
-        
+
         {% if historico %}
             <div class="relative">
                 <!-- Linha vertical contínua da timeline -->
                 <div class="absolute left-6 top-0 bottom-0 w-0.5 bg-gradient-to-b from-blue-500 via-blue-400 to-blue-300"></div>
-                
+
                 <div class="space-y-8">
                     {% for evento in historico %}
                         <div class="relative flex gap-6 group">

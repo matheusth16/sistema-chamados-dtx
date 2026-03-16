@@ -3,7 +3,7 @@
 {% block content %}
 <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 py-12 px-4 sm:px-6 lg:px-8">
     <div class="w-full max-w-md bg-white rounded-lg shadow-xl p-8">
-        
+
         <!-- Header -->
         <div class="text-center mb-8">
             <div class="inline-flex items-center justify-center h-12 w-12 rounded-md bg-yellow-500">
@@ -34,18 +34,18 @@
         <!-- Formulário de Alteração de Senha -->
         <form method="POST" action="{{ url_for('main.alterar_senha_obrigatoria') }}" class="space-y-6">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-            
+
             <!-- Nova Senha -->
             <div>
                 <label for="nova_senha" class="block text-sm font-medium text-gray-700">{{ t('new_password') }}</label>
                 <div class="mt-1 relative">
-                    <input 
-                        id="nova_senha" 
-                        name="nova_senha" 
-                        type="password" 
-                        required 
+                    <input
+                        id="nova_senha"
+                        name="nova_senha"
+                        type="password"
+                        required
                         minlength="6"
-                        class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm h-10 border px-3 pr-10" 
+                        class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm h-10 border px-3 pr-10"
                         placeholder="••••••••">
                     <button type="button" id="toggle-nova_senha" aria-label="{{ t('show_password') }}" title="{{ t('show_password') }}"
                         class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600 focus:outline-none">
@@ -65,13 +65,13 @@
             <div>
                 <label for="confirmar_senha" class="block text-sm font-medium text-gray-700">{{ t('confirm_new_password') }}</label>
                 <div class="mt-1 relative">
-                    <input 
-                        id="confirmar_senha" 
-                        name="confirmar_senha" 
-                        type="password" 
-                        required 
+                    <input
+                        id="confirmar_senha"
+                        name="confirmar_senha"
+                        type="password"
+                        required
                         minlength="6"
-                        class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm h-10 border px-3 pr-10" 
+                        class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm h-10 border px-3 pr-10"
                         placeholder="••••••••">
                     <button type="button" id="toggle-confirmar_senha" aria-label="{{ t('show_password') }}" title="{{ t('show_password') }}"
                         class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600 focus:outline-none">
@@ -137,19 +137,19 @@ setupPasswordToggle('confirmar_senha');
 document.querySelector('form').addEventListener('submit', function(e) {
     const novaSenha = document.getElementById('nova_senha').value;
     const confirmarSenha = document.getElementById('confirmar_senha').value;
-    
+
     if (novaSenha !== confirmarSenha) {
         e.preventDefault();
         alert('{{ t("passwords_must_match") }}');
         return false;
     }
-    
+
     if (novaSenha === '123456') {
         e.preventDefault();
         alert('{{ t("password_cannot_be_default") }}');
         return false;
     }
-    
+
     if (novaSenha.length < 6) {
         e.preventDefault();
         alert('{{ t("password_min_6_chars") }}');

@@ -1,7 +1,7 @@
 # Testes de Usabilidade – Sistema de Chamados DTX
 
-**Documento:** Critérios e testes de usabilidade (facilidade de uso para o usuário final)  
-**Projeto:** Sistema de Chamados DTX  
+**Documento:** Critérios e testes de usabilidade (facilidade de uso para o usuário final)
+**Projeto:** Sistema de Chamados DTX
 
 ---
 

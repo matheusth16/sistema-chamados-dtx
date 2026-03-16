@@ -1,6 +1,6 @@
 /**
  * Sistema de Ordenação e Filtros para Tabelas de Chamados
- * 
+ *
  * Permite ordenar colunas (ID, Data, SLA) e filtrar por valores (Categoria, Status, Setor)
  * com persistência de estado via sessionStorage.
  */
@@ -198,7 +198,7 @@
         // Coleta valores únicos da coluna
         const values = new Set();
         const rows = table.querySelectorAll('tr:not(.rl-header-row)');
-        
+
         rows.forEach(row => {
             const cell = row.cells[columnIndex];
             if (cell) {
@@ -213,7 +213,7 @@
 
         // Cria dropdown
         const dropdown = createFilterDropdown(Array.from(values).sort(), columnIndex);
-        
+
         // Posiciona abaixo do cabeçalho
         const rect = headerElement.getBoundingClientRect();
         dropdown.style.position = 'absolute';
@@ -240,10 +240,10 @@
     function createFilterDropdown(values, columnIndex) {
         const dropdown = document.createElement('div');
         dropdown.className = 'filter-dropdown';
-        
+
         let html = '<div class="filter-dropdown-header">Filtrar</div>';
         html += '<div class="filter-dropdown-options">';
-        
+
         // Opção "Todos"
         html += `<label class="filter-option">
             <input type="radio" name="filter-${columnIndex}" value="" ${!state.filters[columnIndex] ? 'checked' : ''}>
@@ -289,13 +289,13 @@
         if (!table) return;
 
         const rows = table.querySelectorAll('tr:not(.rl-header-row)');
-        
+
         rows.forEach(row => {
             const cell = row.cells[columnIndex];
             if (!cell) return;
 
             let cellText = cell.textContent.trim().replace(/[●○]/g, '').trim();
-            
+
             // Checa todos os filtros ativos
             let showRow = true;
             Object.keys(state.filters).forEach(colIdx => {

@@ -75,28 +75,28 @@ def _construir_query_base(
     Returns:
         Tuple (query_filtrada, categoria_filtrada, categoria, status, gate).
     """
-    status = args.get('status')
-    gate = args.get('gate')
-    categoria = args.get('categoria')
-    responsavel = args.get('responsavel', '').strip()
-    rl_codigo = (args.get('rl_codigo') or '').strip()
+    status = args.get("status")
+    gate = args.get("gate")
+    categoria = args.get("categoria")
+    responsavel = args.get("responsavel", "").strip()
+    rl_codigo = (args.get("rl_codigo") or "").strip()
 
     query_filtrada = query_ref
 
-    if status and status not in ['', 'Todos']:
-        query_filtrada = query_filtrada.where('status', '==', status)
+    if status and status not in ["", "Todos"]:
+        query_filtrada = query_filtrada.where("status", "==", status)
 
-    if gate and gate not in ['', 'Todos']:
-        query_filtrada = query_filtrada.where('gate', '==', gate)
+    if gate and gate not in ["", "Todos"]:
+        query_filtrada = query_filtrada.where("gate", "==", gate)
 
     if responsavel:
-        query_filtrada = query_filtrada.where('responsavel', '==', responsavel)
+        query_filtrada = query_filtrada.where("responsavel", "==", responsavel)
 
     # Filtro direto por código RL (Projetos): permite ver todos os chamados de uma RL específica
     if rl_codigo:
-        query_filtrada = query_filtrada.where('rl_codigo', '==', rl_codigo)
+        query_filtrada = query_filtrada.where("rl_codigo", "==", rl_codigo)
 
-    categoria_filtrada = categoria and categoria not in ['', 'Todas']
+    categoria_filtrada = categoria and categoria not in ["", "Todas"]
 
     return query_filtrada, categoria_filtrada, categoria, status, gate
 
@@ -130,20 +130,21 @@ def _aplicar_filtros_em_memoria(
     resultado = docs
 
     # Filtro de categoria (inclui Projetos no topo se necessário)
-    if categoria and categoria not in ['', 'Todas']:
-        resultado = [d for d in resultado if d.to_dict().get('categoria') == categoria]
+    if categoria and categoria not in ["", "Todas"]:
+        resultado = [d for d in resultado if d.to_dict().get("categoria") == categoria]
 
     # Busca por texto (case-insensitive)
     if search:
         termo = search.lower()
         resultado = [
-            doc for doc in resultado
+            doc
+            for doc in resultado
             if (
-                termo in str(doc.to_dict().get('descricao', '')).lower() or
-                termo in str(doc.to_dict().get('rl_codigo', '')).lower() or
-                termo in str(doc.to_dict().get('responsavel', '')).lower() or
-                termo in str(doc.to_dict().get('numero_chamado', '')).lower() or
-                termo in doc.id.lower()
+                termo in str(doc.to_dict().get("descricao", "")).lower()
+                or termo in str(doc.to_dict().get("rl_codigo", "")).lower()
+                or termo in str(doc.to_dict().get("responsavel", "")).lower()
+                or termo in str(doc.to_dict().get("numero_chamado", "")).lower()
+                or termo in doc.id.lower()
             )
         ]
 
@@ -180,13 +181,13 @@ def aplicar_filtros_dashboard_com_paginacao(
             'tem_anterior': bool
         }
     """
-    query_filtrada, categoria_filtrada, categoria, status, gate = _construir_query_base(query_ref, args)
-    search = args.get('search')
-    # Ordem fixa para cursor-based pagination (exige índice com data_abertura DESC)
-    query_filtrada = query_filtrada.order_by(
-        'data_abertura', direction=firestore.Query.DESCENDING
+    query_filtrada, categoria_filtrada, categoria, status, gate = _construir_query_base(
+        query_ref, args
     )
-    col_ref = getattr(query_ref, 'parent', query_ref)
+    search = args.get("search")
+    # Ordem fixa para cursor-based pagination (exige índice com data_abertura DESC)
+    query_filtrada = query_filtrada.order_by("data_abertura", direction=firestore.Query.DESCENDING)
+    col_ref = getattr(query_ref, "parent", query_ref)
     q = query_filtrada
     if cursor_anterior:
         try:
@@ -212,11 +213,11 @@ def aplicar_filtros_dashboard_com_paginacao(
         primeiro_id = docs_filtrados[0].id if docs_filtrados else None
         ultimo_id = docs_filtrados[-1].id if docs_filtrados else None
         return {
-            'docs': docs_filtrados,
-            'proximo_cursor': ultimo_id,
-            'tem_proxima': True,
-            'cursor_anterior': primeiro_id,
-            'tem_anterior': tem_anterior,
+            "docs": docs_filtrados,
+            "proximo_cursor": ultimo_id,
+            "tem_proxima": True,
+            "cursor_anterior": primeiro_id,
+            "tem_anterior": tem_anterior,
         }
     docs_stream = list(q.limit(limite + 1).stream())
     tem_proxima = len(docs_stream) > limite
@@ -226,11 +227,11 @@ def aplicar_filtros_dashboard_com_paginacao(
     proximo_cursor = docs_filtrados[-1].id if docs_filtrados else None
     primeiro_id = docs_filtrados[0].id if docs_filtrados else None
     return {
-        'docs': docs_filtrados,
-        'proximo_cursor': proximo_cursor,
-        'tem_proxima': tem_proxima and len(docs_filtrados) == limite,
-        'cursor_anterior': primeiro_id,
-        'tem_anterior': bool(cursor),
+        "docs": docs_filtrados,
+        "proximo_cursor": proximo_cursor,
+        "tem_proxima": tem_proxima and len(docs_filtrados) == limite,
+        "cursor_anterior": primeiro_id,
+        "tem_anterior": bool(cursor),
     }
 
 
@@ -244,4 +245,4 @@ def aplicar_filtros_dashboard(query_ref: Any, args: dict[str, Any]) -> list[Any]
     IMPORTANTE: Para usar cursor-based pagination, use aplicar_filtros_dashboard_com_paginacao()
     """
     resultado = aplicar_filtros_dashboard_com_paginacao(query_ref, args, limite=50, cursor=None)
-    return resultado['docs']
+    return resultado["docs"]

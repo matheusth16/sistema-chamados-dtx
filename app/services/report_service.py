@@ -37,6 +37,7 @@ MAX_DOCS = 1000
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _agora_brasilia() -> datetime:
     return datetime.now(BRASILIA)
 
@@ -63,6 +64,7 @@ def _relay_email() -> str:
     """Retorna o e-mail relay (mesmo usado nas notificações de novo chamado)."""
     try:
         from flask import current_app
+
         val = current_app.config.get("NOTIFY_RELAY_EMAIL")
         if val:
             return val.strip()
@@ -75,6 +77,7 @@ def _relay_email() -> str:
 # Busca de chamados
 # ---------------------------------------------------------------------------
 
+
 def buscar_chamados_abertos() -> list[dict[str, Any]]:
     """
     Retorna todos os chamados Abertos / Em Atendimento enriquecidos com SLA.
@@ -82,34 +85,31 @@ def buscar_chamados_abertos() -> list[dict[str, Any]]:
     resultado: list[dict[str, Any]] = []
     for status in ("Aberto", "Em Atendimento"):
         try:
-            docs = (
-                db.collection("chamados")
-                .where("status", "==", status)
-                .limit(MAX_DOCS)
-                .stream()
-            )
+            docs = db.collection("chamados").where("status", "==", status).limit(MAX_DOCS).stream()
             for doc in docs:
                 data = doc.to_dict()
                 if not data:
                     continue
                 chamado = Chamado.from_dict(data, doc.id)
                 sla_info = obter_sla_para_exibicao(chamado) or {}
-                resultado.append({
-                    "id": doc.id,
-                    "numero": chamado.numero_chamado or doc.id,
-                    "categoria": chamado.categoria or "—",
-                    "tipo": chamado.tipo_solicitacao or "—",
-                    "area": chamado.area or "—",
-                    "responsavel": chamado.responsavel or "—",
-                    "responsavel_id": chamado.responsavel_id or "",
-                    "solicitante": chamado.solicitante_nome or "—",
-                    "status": chamado.status,
-                    "data_abertura_fmt": _formatar_data(chamado.data_abertura),
-                    "dias_aberto": _dias_aberto(chamado.data_abertura),
-                    "sla_label": sla_info.get("label", ""),
-                    "atrasado": sla_info.get("label") == "Atrasado",
-                    "sla_dias": chamado.sla_dias,
-                })
+                resultado.append(
+                    {
+                        "id": doc.id,
+                        "numero": chamado.numero_chamado or doc.id,
+                        "categoria": chamado.categoria or "—",
+                        "tipo": chamado.tipo_solicitacao or "—",
+                        "area": chamado.area or "—",
+                        "responsavel": chamado.responsavel or "—",
+                        "responsavel_id": chamado.responsavel_id or "",
+                        "solicitante": chamado.solicitante_nome or "—",
+                        "status": chamado.status,
+                        "data_abertura_fmt": _formatar_data(chamado.data_abertura),
+                        "dias_aberto": _dias_aberto(chamado.data_abertura),
+                        "sla_label": sla_info.get("label", ""),
+                        "atrasado": sla_info.get("label") == "Atrasado",
+                        "sla_dias": chamado.sla_dias,
+                    }
+                )
         except Exception as exc:
             logger.exception("Erro ao buscar chamados status=%s: %s", status, exc)
     return resultado
@@ -118,6 +118,7 @@ def buscar_chamados_abertos() -> list[dict[str, Any]]:
 # ---------------------------------------------------------------------------
 # HTML helpers
 # ---------------------------------------------------------------------------
+
 
 def _tabela_html(chamados: list[dict[str, Any]], link_base: str) -> str:
     """Gera tabela HTML com os chamados."""
@@ -140,12 +141,13 @@ def _tabela_html(chamados: list[dict[str, Any]], link_base: str) -> str:
             cor_sla = "#d97706"
         else:
             cor_sla = "#16a34a"
-        dias_txt = f' ({c.get("sla_dias")}d)' if c.get("sla_dias") else ''
+        dias_txt = f" ({c.get('sla_dias')}d)" if c.get("sla_dias") else ""
         badge = f'<span style="color:{cor_sla};font-weight:600;">{c["sla_label"] or c["status"]}{dias_txt}</span>'
         link = f"{link_base}/chamado/{c['id']}/historico" if link_base else ""
         numero_html = (
             f'<a href="{link}" style="color:#2563eb;text-decoration:none;">{c["numero"]}</a>'
-            if link else c["numero"]
+            if link
+            else c["numero"]
         )
         linhas.append(
             "<tr>"
@@ -159,9 +161,7 @@ def _tabela_html(chamados: list[dict[str, Any]], link_base: str) -> str:
             "</tr>"
         )
     return (
-        '<table style="width:100%;border-collapse:collapse;">'
-        f"{cabecalho}{''.join(linhas)}"
-        "</table>"
+        f'<table style="width:100%;border-collapse:collapse;">{cabecalho}{"".join(linhas)}</table>'
     )
 
 
@@ -192,19 +192,20 @@ def _corpo_supervisor(
     btn = (
         f'<a href="{link_dash}" style="background:#2563eb;color:white;padding:10px 20px;'
         f'text-decoration:none;border-radius:6px;display:inline-block;margin-top:20px;">Open dashboard</a>'
-        if link_dash else ""
+        if link_dash
+        else ""
     )
 
     html = (
         '<div style="font-family:Arial,sans-serif;max-width:760px;">'
         f'<h2 style="color:#111827;">Weekly Report — {data_ref}</h2>'
-        f'<p>Hello, <strong>{nome}</strong>.</p>'
-        f'<p><strong>Total:</strong> {len(chamados)} &nbsp;|&nbsp; '
+        f"<p>Hello, <strong>{nome}</strong>.</p>"
+        f"<p><strong>Total:</strong> {len(chamados)} &nbsp;|&nbsp; "
         f'<span style="color:#dc2626;">Overdue: {len(atrasados)}</span> &nbsp;|&nbsp; '
-        f'Others: {len(outros)}</p>'
-        f'{secoes}{btn}'
+        f"Others: {len(outros)}</p>"
+        f"{secoes}{btn}"
         '<p style="margin-top:24px;color:#9ca3af;font-size:11px;"><em>Ticket System — DTX</em></p>'
-        '</div>'
+        "</div>"
     )
 
     linhas = [
@@ -216,11 +217,15 @@ def _corpo_supervisor(
     if atrasados:
         linhas.append("== OVERDUE ==")
         for c in atrasados:
-            linhas.append(f"  {c['numero']} | {c['categoria']} | {c['solicitante']} | {c['data_abertura_fmt']} ({c['dias_aberto']}d)")
+            linhas.append(
+                f"  {c['numero']} | {c['categoria']} | {c['solicitante']} | {c['data_abertura_fmt']} ({c['dias_aberto']}d)"
+            )
     if outros:
         linhas.append("== OPEN / IN PROGRESS ==")
         for c in outros:
-            linhas.append(f"  {c['numero']} | {c['categoria']} | {c['solicitante']} | {c['data_abertura_fmt']} ({c['dias_aberto']}d)")
+            linhas.append(
+                f"  {c['numero']} | {c['categoria']} | {c['solicitante']} | {c['data_abertura_fmt']} ({c['dias_aberto']}d)"
+            )
 
     return html, "\n".join(linhas)
 
@@ -228,6 +233,7 @@ def _corpo_supervisor(
 # ---------------------------------------------------------------------------
 # Ponto de entrada
 # ---------------------------------------------------------------------------
+
 
 def enviar_relatorio_semanal() -> dict[str, Any]:
     """
@@ -254,13 +260,20 @@ def enviar_relatorio_semanal() -> dict[str, Any]:
 
     logger.info(
         "Relatório semanal: %d abertos, %d atrasados — relay: %s",
-        total_chamados, total_atrasados, relay,
+        total_chamados,
+        total_atrasados,
+        relay,
     )
 
     if not chamados:
         logger.info("Nenhum chamado aberto; relatório semanal não enviado.")
-        return {"enviados": 0, "ignorados": 0, "erros": 0,
-                "total_chamados": 0, "total_atrasados": 0}
+        return {
+            "enviados": 0,
+            "ignorados": 0,
+            "erros": 0,
+            "total_chamados": 0,
+            "total_atrasados": 0,
+        }
 
     grupos: dict[str, list] = defaultdict(list)
     for c in chamados:
@@ -288,10 +301,16 @@ def enviar_relatorio_semanal() -> dict[str, Any]:
         ok, err = enviar_email(relay, assunto, html, texto)
         if ok:
             enviados += 1
-            logger.info("Relatório semanal (relay) enviado para supervisor %s (%d chamados)", email_sup, len(lista))
+            logger.info(
+                "Relatório semanal (relay) enviado para supervisor %s (%d chamados)",
+                email_sup,
+                len(lista),
+            )
         else:
             erros += 1
-            logger.warning("Falha ao enviar relatório (relay) para supervisor %s: %s", email_sup, err)
+            logger.warning(
+                "Falha ao enviar relatório (relay) para supervisor %s: %s", email_sup, err
+            )
 
     _enviar_resumo_admins(chamados, grupos, data_ref, link_dash, link_base, relay)
 
@@ -315,7 +334,8 @@ def _enviar_resumo_admins(
     """Envia resumo consolidado para cada admin via relay."""
     try:
         admins = [
-            u for u in Usuario.get_all()
+            u
+            for u in Usuario.get_all()
             if getattr(u, "perfil", "") == "admin" and getattr(u, "email", None)
         ]
     except Exception as exc:
@@ -347,29 +367,32 @@ def _enviar_resumo_admins(
         '<th style="padding:8px 10px;text-align:left;font-size:12px;">Assignee</th>'
         '<th style="padding:8px 10px;text-align:left;font-size:12px;">Total</th>'
         '<th style="padding:8px 10px;text-align:left;font-size:12px;">Overdue</th>'
-        "</tr>"
-        + "".join(linhas_sup)
-        + "</table>"
+        "</tr>" + "".join(linhas_sup) + "</table>"
     )
 
     btn = (
         f'<a href="{link_dash}" style="background:#2563eb;color:white;padding:10px 20px;'
         f'text-decoration:none;border-radius:6px;display:inline-block;margin-top:20px;">Open dashboard</a>'
-        if link_dash else ""
+        if link_dash
+        else ""
     )
 
     html_admin = (
         '<div style="font-family:Arial,sans-serif;max-width:760px;">'
         f'<h2 style="color:#111827;">Weekly Summary — {data_ref}</h2>'
-        f'<p><strong>Total open:</strong> {len(chamados)} &nbsp;|&nbsp; '
+        f"<p><strong>Total open:</strong> {len(chamados)} &nbsp;|&nbsp; "
         f'<span style="color:#dc2626;"><strong>Overdue:</strong> {len(atrasados)}</span></p>'
         '<h3 style="margin-top:20px;">By assignee</h3>'
-        f'{tabela_sup}'
+        f"{tabela_sup}"
         f'<h3 style="color:#dc2626;margin-top:24px;">Overdue tickets ({len(atrasados)})</h3>'
-        + (_tabela_html(atrasados, link_base) if atrasados else '<p style="color:#6b7280;">None.</p>')
-        + f'{btn}'
+        + (
+            _tabela_html(atrasados, link_base)
+            if atrasados
+            else '<p style="color:#6b7280;">None.</p>'
+        )
+        + f"{btn}"
         '<p style="margin-top:24px;color:#9ca3af;font-size:11px;"><em>Ticket System — DTX</em></p>'
-        '</div>'
+        "</div>"
     )
 
     for admin in admins:

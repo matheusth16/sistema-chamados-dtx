@@ -4,6 +4,7 @@ Serviço de carregamento do dashboard (admin).
 Centraliza a construção do contexto da página admin: chamados com filtros,
 paginação por cursor, listas de responsáveis e gates.
 """
+
 import logging
 from typing import Any
 
@@ -23,7 +24,7 @@ logger = logging.getLogger(__name__)
 def _filtrar_chamados_por_permissao(docs: list[Any], user: Any) -> list[Chamado]:
     """Filtra chamados que o usuário pode ver, com cache para evitar N+1 queries."""
     chamados = []
-    if user.perfil == 'admin':
+    if user.perfil == "admin":
         for doc in docs:
             chamados.append(Chamado.from_dict(doc.to_dict(), doc.id))
         return chamados
@@ -45,7 +46,9 @@ def _filtrar_chamados_por_permissao(docs: list[Any], user: Any) -> list[Chamado]
     return chamados
 
 
-def obter_contexto_admin(user: Any, args: dict[str, Any], itens_por_pagina: int = 25) -> dict[str, Any]:
+def obter_contexto_admin(
+    user: Any, args: dict[str, Any], itens_por_pagina: int = 25
+) -> dict[str, Any]:
     """
     Monta o contexto para renderizar a página do dashboard (admin).
 
@@ -59,40 +62,40 @@ def obter_contexto_admin(user: Any, args: dict[str, Any], itens_por_pagina: int 
         paginação (proximo_cursor, tem_proxima, cursor_anterior, tem_anterior), etc.
     """
     usuarios_gestao = get_static_cached("usuarios_all", Usuario.get_all, ttl_seconds=300)
-    supervisores = [u for u in usuarios_gestao if u.perfil == 'supervisor' and u.nome]
+    supervisores = [u for u in usuarios_gestao if u.perfil == "supervisor" and u.nome]
     # Supervisor vê apenas responsáveis do(s) mesmo(s) setor(es); admin vê todos
-    if user.perfil == 'supervisor' and getattr(user, 'areas', None):
+    if user.perfil == "supervisor" and getattr(user, "areas", None):
         user_areas_set = set(user.areas)
-        supervisores = [u for u in supervisores if user_areas_set & set(getattr(u, 'areas', []))]
+        supervisores = [u for u in supervisores if user_areas_set & set(getattr(u, "areas", []))]
     lista_responsaveis = sorted([u.nome for u in supervisores], key=lambda x: x.upper())
     supervisores_detalhados = sorted(
-        [{'id': u.id, 'nome': u.nome, 'area': u.area} for u in supervisores],
-        key=lambda x: x['nome'].upper(),
+        [{"id": u.id, "nome": u.nome, "area": u.area} for u in supervisores],
+        key=lambda x: x["nome"].upper(),
     )
-    chamados_ref = db.collection('chamados')
-    if user.perfil == 'supervisor' and getattr(user, 'areas', None):
+    chamados_ref = db.collection("chamados")
+    if user.perfil == "supervisor" and getattr(user, "areas", None):
         areas = user.areas[:10]
         if areas:
-            chamados_ref = chamados_ref.where('area', 'in', areas)
-    cursor = (args.get('cursor') or '').strip() or None
-    cursor_prev = (args.get('cursor_prev') or '').strip() or None
-    pagina_atual = int(args.get('pagina') or 1)
+            chamados_ref = chamados_ref.where("area", "in", areas)
+    cursor = (args.get("cursor") or "").strip() or None
+    cursor_prev = (args.get("cursor_prev") or "").strip() or None
+    pagina_atual = int(args.get("pagina") or 1)
     if pagina_atual < 1:
         pagina_atual = 1
     resultado = aplicar_filtros_dashboard_com_paginacao(
         chamados_ref, args, limite=itens_por_pagina, cursor=cursor, cursor_anterior=cursor_prev
     )
-    docs = resultado['docs']
+    docs = resultado["docs"]
     chamados = _filtrar_chamados_por_permissao(docs, user)
 
     def _chave(c):
-        concluido = c.status in ('Concluído', 'Cancelado')
+        concluido = c.status in ("Concluído", "Cancelado")
         num_id = extrair_numero_chamado(c.numero_chamado)
         if concluido:
             return (True, 0, num_id)
         # Projetos Aberto/Em Atendimento sempre no topo
         # Verifica categoria diretamente (não depende do campo prioridade, que pode não existir em chamados antigos)
-        eh_projetos = c.categoria == 'Projetos' or getattr(c, 'prioridade', 1) == 0
+        eh_projetos = c.categoria == "Projetos" or getattr(c, "prioridade", 1) == 0
         prioridade_cat = 0 if eh_projetos else 1
         return (False, prioridade_cat, num_id)
 
@@ -100,13 +103,14 @@ def obter_contexto_admin(user: Any, args: dict[str, Any], itens_por_pagina: int 
 
     # Calcula grupo_key para ordenar grupos Projetos antes dos demais no Jinja groupby
     from collections import defaultdict
+
     _grupo_prio: dict = defaultdict(lambda: 1)
     for c in chamados_ordenados:
-        rl = c.rl_codigo or ''
-        if c.categoria == 'Projetos' or getattr(c, 'prioridade', 1) == 0:
+        rl = c.rl_codigo or ""
+        if c.categoria == "Projetos" or getattr(c, "prioridade", 1) == 0:
             _grupo_prio[rl] = 0
     for c in chamados_ordenados:
-        rl = c.rl_codigo or ''
+        rl = c.rl_codigo or ""
         c.grupo_key = f"{_grupo_prio[rl]}|{rl}"
 
     for c in chamados_ordenados:
@@ -115,23 +119,21 @@ def obter_contexto_admin(user: Any, args: dict[str, Any], itens_por_pagina: int 
     lista_gates = sorted([g.nome_pt for g in gates])
     total_chamados = len(chamados_ordenados)
     total_paginas = (
-        1
-        if not resultado.get('tem_proxima') and not resultado.get('tem_anterior')
-        else None
+        1 if not resultado.get("tem_proxima") and not resultado.get("tem_anterior") else None
     )
     return {
-        'chamados': chamados_ordenados,
-        'pagina_atual': pagina_atual,
-        'total_paginas': total_paginas,
-        'total_chamados': total_chamados,
-        'itens_por_pagina': itens_por_pagina,
-        'lista_responsaveis': lista_responsaveis,
-        'supervisores_detalhados': supervisores_detalhados,
-        'lista_gates': lista_gates,
-        'max': max,
-        'min': min,
-        'proximo_cursor': resultado.get('proximo_cursor'),
-        'tem_proxima': resultado.get('tem_proxima', False),
-        'cursor_anterior': resultado.get('cursor_anterior'),
-        'tem_anterior': resultado.get('tem_anterior', False),
+        "chamados": chamados_ordenados,
+        "pagina_atual": pagina_atual,
+        "total_paginas": total_paginas,
+        "total_chamados": total_chamados,
+        "itens_por_pagina": itens_por_pagina,
+        "lista_responsaveis": lista_responsaveis,
+        "supervisores_detalhados": supervisores_detalhados,
+        "lista_gates": lista_gates,
+        "max": max,
+        "min": min,
+        "proximo_cursor": resultado.get("proximo_cursor"),
+        "tem_proxima": resultado.get("tem_proxima", False),
+        "cursor_anterior": resultado.get("cursor_anterior"),
+        "tem_anterior": resultado.get("tem_anterior", False),
     }

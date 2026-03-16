@@ -1,6 +1,6 @@
 # Variáveis de ambiente
 
-Referência das variáveis de ambiente usadas pelo Sistema de Chamados DTX.  
+Referência das variáveis de ambiente usadas pelo Sistema de Chamados DTX.
 Copie `.env.example` para `.env` e preencha conforme o ambiente (desenvolvimento ou produção).
 
 ---

@@ -63,8 +63,8 @@
         tl.to('#splash-logo', {
             opacity: 1, scale: 1, duration: 0.5, ease: 'back.out(1.7)'
         })
-        .fromTo('#splash-line', 
-            { width: 0 }, 
+        .fromTo('#splash-line',
+            { width: 0 },
             { width: 220, duration: 0.6, ease: 'power2.out' },
             '+=0.15'
         )

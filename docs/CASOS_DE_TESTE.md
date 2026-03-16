@@ -1,8 +1,8 @@
 # Casos de Teste – Sistema de Chamados DTX
 
-**Documento:** Cenários de teste detalhados (passo a passo)  
-**Projeto:** Sistema de Chamados DTX  
-**Referências:** [ANALISE_REQUISITOS_QA.md](ANALISE_REQUISITOS_QA.md), [PLANO_DE_TESTES.md](PLANO_DE_TESTES.md), [API.md](API.md)  
+**Documento:** Cenários de teste detalhados (passo a passo)
+**Projeto:** Sistema de Chamados DTX
+**Referências:** [ANALISE_REQUISITOS_QA.md](ANALISE_REQUISITOS_QA.md), [PLANO_DE_TESTES.md](PLANO_DE_TESTES.md), [API.md](API.md)
 
 ---
 

@@ -25,16 +25,16 @@ def usuario_pode_ver_chamado(user: Usuario, chamado: Any) -> bool:
     Returns:
         True se pode ver, False caso contrário.
     """
-    if user.perfil == 'admin':
+    if user.perfil == "admin":
         return True
 
-    if user.perfil != 'supervisor':
+    if user.perfil != "supervisor":
         return False
 
     # Supervisor vê chamados da sua área ou que ele mesmo abriu (solicitante)
-    if getattr(chamado, 'solicitante_id', None) == user.id:
+    if getattr(chamado, "solicitante_id", None) == user.id:
         return True
-    return chamado.area in getattr(user, 'areas', [])
+    return chamado.area in getattr(user, "areas", [])
 
 
 def usuario_pode_ver_chamado_otimizado(
@@ -47,12 +47,12 @@ def usuario_pode_ver_chamado_otimizado(
     Supervisor vê chamados da sua área ou que ele abriu (solicitante_id).
     cache_usuarios é ignorado nesta regra (mantido por compatibilidade de assinatura).
     """
-    if user.perfil == 'admin':
+    if user.perfil == "admin":
         return True
 
-    if user.perfil != 'supervisor':
+    if user.perfil != "supervisor":
         return False
 
-    if getattr(chamado, 'solicitante_id', None) == user.id:
+    if getattr(chamado, "solicitante_id", None) == user.id:
         return True
-    return chamado.area in getattr(user, 'areas', [])
+    return chamado.area in getattr(user, "areas", [])

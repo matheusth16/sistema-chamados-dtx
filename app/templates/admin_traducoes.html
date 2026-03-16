@@ -62,7 +62,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Busca simples
     const searchInput = document.getElementById('searchInput');
     const rows = document.querySelectorAll('.translation-row');
-    
+
     searchInput.addEventListener('keyup', function(e) {
         const term = e.target.value.toLowerCase();
         rows.forEach(row => {
@@ -84,19 +84,19 @@ document.addEventListener('DOMContentLoaded', function() {
             const ptBR = row.querySelector('input[data-lang="pt_BR"]').value;
             const en = row.querySelector('input[data-lang="en"]').value;
             const es = row.querySelector('input[data-lang="es"]').value;
-            
+
             const originalText = this.innerHTML;
             this.innerHTML = `<span class="opacity-70">{{ t('saving') }}</span>`;
             this.disabled = true;
             this.classList.replace('bg-indigo-600', 'bg-indigo-400');
             this.classList.replace('hover:bg-indigo-500', 'cursor-not-allowed');
-            
+
             const formData = new URLSearchParams();
             formData.append('chave', chave);
             formData.append('pt_BR', ptBR);
             formData.append('en', en);
             formData.append('es', es);
-            
+
             fetch("{{ url_for('main.admin_traducoes') }}", {
                 method: 'POST',
                 headers: {

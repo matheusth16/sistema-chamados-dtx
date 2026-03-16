@@ -5,6 +5,7 @@ from app.models_usuario import Usuario
 
 logger = logging.getLogger(__name__)
 
+
 class GamificationService:
     """
     Serviço centralizado para gerenciar regras de Gamificação (EXP, Levels, Ranking).
@@ -13,16 +14,16 @@ class GamificationService:
     # Tabela de níveis (Baseada na fórmula: proximo_nivel = nivel_atual * 100)
     # ou podemos usar ranges fixos para simplificar
     LEVEL_ZONES = [
-        (1, 0),         # Nível 1: 0 a 99
-        (2, 100),       # Nível 2: 100 a 299
-        (3, 300),       # Nível 3: 300 a 599
-        (4, 600),       # Nível 4: 600 a 999
-        (5, 1000),      # Nível 5: 1000 a 1499
-        (6, 1500),      # Nível 6: 1500 a 2099
-        (7, 2100),      # Nível 7: 2100 a 2799
-        (8, 2800),      # Nível 8: 2800 a 3599
-        (9, 3600),      # Nível 9: 3600 a 4499
-        (10, 4500)      # Nível 10: 4500+ (Master)
+        (1, 0),  # Nível 1: 0 a 99
+        (2, 100),  # Nível 2: 100 a 299
+        (3, 300),  # Nível 3: 300 a 599
+        (4, 600),  # Nível 4: 600 a 999
+        (5, 1000),  # Nível 5: 1000 a 1499
+        (6, 1500),  # Nível 6: 1500 a 2099
+        (7, 2100),  # Nível 7: 2100 a 2799
+        (8, 2800),  # Nível 8: 2800 a 3599
+        (9, 3600),  # Nível 9: 3600 a 4499
+        (10, 4500),  # Nível 10: 4500+ (Master)
     ]
 
     @staticmethod
@@ -61,16 +62,18 @@ class GamificationService:
             # Ex: if novo_level > usuario.level: usuario.conquistas.append(f"Alcançou Nível {novo_level}")
 
             gamification_data = {
-                'exp_total': nova_exp_total,
-                'exp_semanal': nova_exp_semanal,
-                'level': novo_level,
-                'conquistas': usuario.conquistas
+                "exp_total": nova_exp_total,
+                "exp_semanal": nova_exp_semanal,
+                "level": novo_level,
+                "conquistas": usuario.conquistas,
             }
 
             sucesso = usuario.update(gamification=gamification_data)
 
             if sucesso:
-                logger.info(f"Usuário {usuario_id} ganhou {pontos} EXP ({motivo}). Novo nível: {novo_level}.")
+                logger.info(
+                    f"Usuário {usuario_id} ganhou {pontos} EXP ({motivo}). Novo nível: {novo_level}."
+                )
 
             return sucesso
 
@@ -96,7 +99,9 @@ class GamificationService:
             # Como a verificação de "No Prazo" requer que o Chamado tenha campo de prazo ou prioridade,
             # vamos implementar uma versão baseline. Se tiver um campo de atraso a gente adapta depois.
 
-            atrasado = chamado_data.get('atrasado', False) # Supondo que você tem lógica de atraso no sistema
+            atrasado = chamado_data.get(
+                "atrasado", False
+            )  # Supondo que você tem lógica de atraso no sistema
 
             if atrasado:
                 pontos = 15

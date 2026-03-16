@@ -2,7 +2,7 @@
 
 import io
 
-from app.services.excel_export_service import exportador_excel, MAX_EXPORT_CHAMADOS
+from app.services.excel_export_service import MAX_EXPORT_CHAMADOS, exportador_excel
 
 
 def test_max_export_chamados_constante():
@@ -22,24 +22,25 @@ def test_exportar_relatorio_completo_lista_vazia_retorna_bytes():
     assert isinstance(output, io.BytesIO)
     data = output.getvalue()
     assert len(data) > 0
-    assert data[:2] == b'PK'
+    assert data[:2] == b"PK"
 
 
 def test_exportar_relatorio_completo_com_chamado_mock_retorna_bytes():
     """exportar_relatorio_completo com um Chamado real retorna BytesIO sem exceção."""
     from app.models import Chamado
+
     chamado = Chamado(
-        id='c1',
-        numero_chamado='2026-001',
-        categoria='Manutencao',
-        tipo_solicitacao='Corretiva',
-        descricao='Teste',
-        responsavel='João',
-        responsavel_id='u1',
-        solicitante_id='s1',
-        solicitante_nome='Maria',
-        area='Manutencao',
-        status='Aberto',
+        id="c1",
+        numero_chamado="2026-001",
+        categoria="Manutencao",
+        tipo_solicitacao="Corretiva",
+        descricao="Teste",
+        responsavel="João",
+        responsavel_id="u1",
+        solicitante_id="s1",
+        solicitante_nome="Maria",
+        area="Manutencao",
+        status="Aberto",
         prioridade=1,
         rl_codigo=None,
         gate=None,
@@ -51,8 +52,8 @@ def test_exportar_relatorio_completo_com_chamado_mock_retorna_bytes():
     )
     output = exportador_excel.exportar_relatorio_completo(
         chamados=[chamado],
-        metricas_gerais={'total': 1, 'abertos': 1},
-        metricas_supervisores=[{'supervisor_nome': 'João', 'total_chamados': 1}],
+        metricas_gerais={"total": 1, "abertos": 1},
+        metricas_supervisores=[{"supervisor_nome": "João", "total_chamados": 1}],
         filtros_aplicados={},
     )
     assert isinstance(output, io.BytesIO)

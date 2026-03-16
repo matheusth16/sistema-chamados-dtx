@@ -2,6 +2,7 @@
 Modelo para Categorias do Sistema (Setores, Gates, Impactos).
 Cada categoria é traduzida automaticamente para PT, EN e ES.
 """
+
 import logging
 from datetime import datetime
 
@@ -14,57 +15,59 @@ from app.services.translation_service import traduzir_categoria
 logger = logging.getLogger(__name__)
 
 # Chaves de cache para listas de categorias (usadas em cache_delete nas rotas)
-CACHE_KEY_SETORES = 'categorias_setores_list'
-CACHE_KEY_GATES = 'categorias_gates_list'
-CACHE_KEY_IMPACTOS = 'categorias_impactos_list'
+CACHE_KEY_SETORES = "categorias_setores_list"
+CACHE_KEY_GATES = "categorias_gates_list"
+CACHE_KEY_IMPACTOS = "categorias_impactos_list"
 
 
 class CategoriaSetor:
     """Representa um Setor/Departamento do sistema"""
 
-    def __init__(self,
-                 nome_pt: str,
-                 nome_en: str = None,
-                 nome_es: str = None,
-                 descricao_pt: str = None,
-                 descricao_en: str = None,
-                 descricao_es: str = None,
-                 ativo: bool = True,
-                 id: str = None):
+    def __init__(
+        self,
+        nome_pt: str,
+        nome_en: str = None,
+        nome_es: str = None,
+        descricao_pt: str = None,
+        descricao_en: str = None,
+        descricao_es: str = None,
+        ativo: bool = True,
+        id: str = None,
+    ):
         self.id = id
         self.nome_pt = nome_pt
-        self.nome_en = nome_en or traduzir_categoria(nome_pt)['en']
-        self.nome_es = nome_es or traduzir_categoria(nome_pt)['es']
+        self.nome_en = nome_en or traduzir_categoria(nome_pt)["en"]
+        self.nome_es = nome_es or traduzir_categoria(nome_pt)["es"]
         self.descricao_pt = descricao_pt
         self.descricao_en = descricao_en
         self.descricao_es = descricao_es
         self.ativo = ativo
-        self.data_criacao = datetime.now(pytz.timezone('America/Sao_Paulo'))
+        self.data_criacao = datetime.now(pytz.timezone("America/Sao_Paulo"))
 
     def to_dict(self):
         """Converte para dicionário para salvar no Firestore"""
         return {
-            'nome_pt': self.nome_pt,
-            'nome_en': self.nome_en,
-            'nome_es': self.nome_es,
-            'descricao_pt': self.descricao_pt,
-            'descricao_en': self.descricao_en,
-            'descricao_es': self.descricao_es,
-            'ativo': self.ativo,
-            'data_criacao': self.data_criacao,
+            "nome_pt": self.nome_pt,
+            "nome_en": self.nome_en,
+            "nome_es": self.nome_es,
+            "descricao_pt": self.descricao_pt,
+            "descricao_en": self.descricao_en,
+            "descricao_es": self.descricao_es,
+            "ativo": self.ativo,
+            "data_criacao": self.data_criacao,
         }
 
     @classmethod
     def from_dict(cls, data: dict, id: str = None):
         """Cria um objeto CategoriaSetor a partir de um dicionário"""
         return cls(
-            nome_pt=data.get('nome_pt'),
-            nome_en=data.get('nome_en'),
-            nome_es=data.get('nome_es'),
-            descricao_pt=data.get('descricao_pt'),
-            descricao_en=data.get('descricao_en'),
-            descricao_es=data.get('descricao_es'),
-            ativo=data.get('ativo', True),
+            nome_pt=data.get("nome_pt"),
+            nome_en=data.get("nome_en"),
+            nome_es=data.get("nome_es"),
+            descricao_pt=data.get("descricao_pt"),
+            descricao_en=data.get("descricao_en"),
+            descricao_es=data.get("descricao_es"),
+            ativo=data.get("ativo", True),
             id=id,
         )
 
@@ -73,9 +76,9 @@ class CategoriaSetor:
         """Salva o setor no Firestore com retry automático"""
         try:
             if self.id:
-                db.collection('categorias_setores').document(self.id).update(self.to_dict())
+                db.collection("categorias_setores").document(self.id).update(self.to_dict())
             else:
-                self.id = db.collection('categorias_setores').add(self.to_dict())[1].id
+                self.id = db.collection("categorias_setores").add(self.to_dict())[1].id
             logger.info(f"Setor {self.nome_pt} salvo com sucesso")
             return self.id
         except Exception as e:
@@ -86,7 +89,7 @@ class CategoriaSetor:
     def get_all(cls):
         """Retorna todos os setores"""
         try:
-            docs = db.collection('categorias_setores').stream()
+            docs = db.collection("categorias_setores").stream()
             return [cls.from_dict(doc.to_dict(), doc.id) for doc in docs]
         except Exception as e:
             logger.error(f"Erro ao buscar setores: {e}")
@@ -96,7 +99,7 @@ class CategoriaSetor:
     def get_by_id(cls, setor_id: str):
         """Busca um setor pelo ID"""
         try:
-            doc = db.collection('categorias_setores').document(setor_id).get()
+            doc = db.collection("categorias_setores").document(setor_id).get()
             if doc.exists:
                 return cls.from_dict(doc.to_dict(), doc.id)
             return None
@@ -108,53 +111,55 @@ class CategoriaSetor:
 class CategoriaGate:
     """Representa um Gate do sistema"""
 
-    def __init__(self,
-                 nome_pt: str,
-                 nome_en: str = None,
-                 nome_es: str = None,
-                 descricao_pt: str = None,
-                 descricao_en: str = None,
-                 descricao_es: str = None,
-                 ordem: int = 0,
-                 ativo: bool = True,
-                 id: str = None):
+    def __init__(
+        self,
+        nome_pt: str,
+        nome_en: str = None,
+        nome_es: str = None,
+        descricao_pt: str = None,
+        descricao_en: str = None,
+        descricao_es: str = None,
+        ordem: int = 0,
+        ativo: bool = True,
+        id: str = None,
+    ):
         self.id = id
         self.nome_pt = nome_pt
-        self.nome_en = nome_en or traduzir_categoria(nome_pt)['en']
-        self.nome_es = nome_es or traduzir_categoria(nome_pt)['es']
+        self.nome_en = nome_en or traduzir_categoria(nome_pt)["en"]
+        self.nome_es = nome_es or traduzir_categoria(nome_pt)["es"]
         self.descricao_pt = descricao_pt
         self.descricao_en = descricao_en
         self.descricao_es = descricao_es
         self.ordem = ordem
         self.ativo = ativo
-        self.data_criacao = datetime.now(pytz.timezone('America/Sao_Paulo'))
+        self.data_criacao = datetime.now(pytz.timezone("America/Sao_Paulo"))
 
     def to_dict(self):
         """Converte para dicionário para salvar no Firestore"""
         return {
-            'nome_pt': self.nome_pt,
-            'nome_en': self.nome_en,
-            'nome_es': self.nome_es,
-            'descricao_pt': self.descricao_pt,
-            'descricao_en': self.descricao_en,
-            'descricao_es': self.descricao_es,
-            'ordem': self.ordem,
-            'ativo': self.ativo,
-            'data_criacao': self.data_criacao,
+            "nome_pt": self.nome_pt,
+            "nome_en": self.nome_en,
+            "nome_es": self.nome_es,
+            "descricao_pt": self.descricao_pt,
+            "descricao_en": self.descricao_en,
+            "descricao_es": self.descricao_es,
+            "ordem": self.ordem,
+            "ativo": self.ativo,
+            "data_criacao": self.data_criacao,
         }
 
     @classmethod
     def from_dict(cls, data: dict, id: str = None):
         """Cria um objeto CategoriaGate a partir de um dicionário"""
         return cls(
-            nome_pt=data.get('nome_pt'),
-            nome_en=data.get('nome_en'),
-            nome_es=data.get('nome_es'),
-            descricao_pt=data.get('descricao_pt'),
-            descricao_en=data.get('descricao_en'),
-            descricao_es=data.get('descricao_es'),
-            ordem=data.get('ordem', 0),
-            ativo=data.get('ativo', True),
+            nome_pt=data.get("nome_pt"),
+            nome_en=data.get("nome_en"),
+            nome_es=data.get("nome_es"),
+            descricao_pt=data.get("descricao_pt"),
+            descricao_en=data.get("descricao_en"),
+            descricao_es=data.get("descricao_es"),
+            ordem=data.get("ordem", 0),
+            ativo=data.get("ativo", True),
             id=id,
         )
 
@@ -163,9 +168,9 @@ class CategoriaGate:
         """Salva o gate no Firestore com retry automático"""
         try:
             if self.id:
-                db.collection('categorias_gates').document(self.id).update(self.to_dict())
+                db.collection("categorias_gates").document(self.id).update(self.to_dict())
             else:
-                self.id = db.collection('categorias_gates').add(self.to_dict())[1].id
+                self.id = db.collection("categorias_gates").add(self.to_dict())[1].id
             logger.info(f"Gate {self.nome_pt} salvo com sucesso")
             return self.id
         except Exception as e:
@@ -176,7 +181,7 @@ class CategoriaGate:
     def get_all(cls):
         """Retorna todos os gates ordenados por ordem"""
         try:
-            docs = db.collection('categorias_gates').stream()
+            docs = db.collection("categorias_gates").stream()
             gates = [cls.from_dict(doc.to_dict(), doc.id) for doc in docs]
             # Ordena por ordem no Python (evita problema de índice no Firestore)
             return sorted(gates, key=lambda x: x.ordem)
@@ -188,7 +193,7 @@ class CategoriaGate:
     def get_by_id(cls, gate_id: str):
         """Busca um gate pelo ID"""
         try:
-            doc = db.collection('categorias_gates').document(gate_id).get()
+            doc = db.collection("categorias_gates").document(gate_id).get()
             if doc.exists:
                 return cls.from_dict(doc.to_dict(), doc.id)
             return None
@@ -200,57 +205,59 @@ class CategoriaGate:
 class CategoriaImpacto:
     """Representa um Impacto/Severidade do sistema"""
 
-    def __init__(self,
-                 nome_pt: str,
-                 nome_en: str = None,
-                 nome_es: str = None,
-                 descricao_pt: str = None,
-                 descricao_en: str = None,
-                 descricao_es: str = None,
-                 nivel: int = 0,
-                 cor: str = '#gray',
-                 ativo: bool = True,
-                 id: str = None):
+    def __init__(
+        self,
+        nome_pt: str,
+        nome_en: str = None,
+        nome_es: str = None,
+        descricao_pt: str = None,
+        descricao_en: str = None,
+        descricao_es: str = None,
+        nivel: int = 0,
+        cor: str = "#gray",
+        ativo: bool = True,
+        id: str = None,
+    ):
         self.id = id
         self.nome_pt = nome_pt
-        self.nome_en = nome_en or traduzir_categoria(nome_pt)['en']
-        self.nome_es = nome_es or traduzir_categoria(nome_pt)['es']
+        self.nome_en = nome_en or traduzir_categoria(nome_pt)["en"]
+        self.nome_es = nome_es or traduzir_categoria(nome_pt)["es"]
         self.descricao_pt = descricao_pt
         self.descricao_en = descricao_en
         self.descricao_es = descricao_es
         self.nivel = nivel  # Ordem de severidade
         self.cor = cor  # Cor para exibição (ex: #red, #orange, #yellow, #green)
         self.ativo = ativo
-        self.data_criacao = datetime.now(pytz.timezone('America/Sao_Paulo'))
+        self.data_criacao = datetime.now(pytz.timezone("America/Sao_Paulo"))
 
     def to_dict(self):
         """Converte para dicionário para salvar no Firestore"""
         return {
-            'nome_pt': self.nome_pt,
-            'nome_en': self.nome_en,
-            'nome_es': self.nome_es,
-            'descricao_pt': self.descricao_pt,
-            'descricao_en': self.descricao_en,
-            'descricao_es': self.descricao_es,
-            'nivel': self.nivel,
-            'cor': self.cor,
-            'ativo': self.ativo,
-            'data_criacao': self.data_criacao,
+            "nome_pt": self.nome_pt,
+            "nome_en": self.nome_en,
+            "nome_es": self.nome_es,
+            "descricao_pt": self.descricao_pt,
+            "descricao_en": self.descricao_en,
+            "descricao_es": self.descricao_es,
+            "nivel": self.nivel,
+            "cor": self.cor,
+            "ativo": self.ativo,
+            "data_criacao": self.data_criacao,
         }
 
     @classmethod
     def from_dict(cls, data: dict, id: str = None):
         """Cria um objeto CategoriaImpacto a partir de um dicionário"""
         return cls(
-            nome_pt=data.get('nome_pt'),
-            nome_en=data.get('nome_en'),
-            nome_es=data.get('nome_es'),
-            descricao_pt=data.get('descricao_pt'),
-            descricao_en=data.get('descricao_en'),
-            descricao_es=data.get('descricao_es'),
-            nivel=data.get('nivel', 0),
-            cor=data.get('cor', '#gray'),
-            ativo=data.get('ativo', True),
+            nome_pt=data.get("nome_pt"),
+            nome_en=data.get("nome_en"),
+            nome_es=data.get("nome_es"),
+            descricao_pt=data.get("descricao_pt"),
+            descricao_en=data.get("descricao_en"),
+            descricao_es=data.get("descricao_es"),
+            nivel=data.get("nivel", 0),
+            cor=data.get("cor", "#gray"),
+            ativo=data.get("ativo", True),
             id=id,
         )
 
@@ -258,9 +265,9 @@ class CategoriaImpacto:
         """Salva o impacto no Firestore"""
         try:
             if self.id:
-                db.collection('categorias_impactos').document(self.id).update(self.to_dict())
+                db.collection("categorias_impactos").document(self.id).update(self.to_dict())
             else:
-                self.id = db.collection('categorias_impactos').add(self.to_dict())[1].id
+                self.id = db.collection("categorias_impactos").add(self.to_dict())[1].id
             logger.info(f"Impacto {self.nome_pt} salvo com sucesso")
             return self.id
         except Exception as e:
@@ -271,7 +278,7 @@ class CategoriaImpacto:
     def get_all(cls):
         """Retorna todos os impactos ativos"""
         try:
-            docs = db.collection('categorias_impactos').where('ativo', '==', True).stream()
+            docs = db.collection("categorias_impactos").where("ativo", "==", True).stream()
             return [cls.from_dict(doc.to_dict(), doc.id) for doc in docs]
         except Exception as e:
             logger.error(f"Erro ao buscar impactos: {e}")
@@ -281,7 +288,7 @@ class CategoriaImpacto:
     def get_by_id(cls, impacto_id: str):
         """Busca um impacto pelo ID"""
         try:
-            doc = db.collection('categorias_impactos').document(impacto_id).get()
+            doc = db.collection("categorias_impactos").document(impacto_id).get()
             if doc.exists:
                 return cls.from_dict(doc.to_dict(), doc.id)
             return None

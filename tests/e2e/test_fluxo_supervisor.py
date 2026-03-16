@@ -11,16 +11,12 @@ Requer:
     TEST_SUPERVISOR_EMAIL=...  TEST_SUPERVISOR_PASSWORD=...
 """
 
-import re
-
 import pytest
-from playwright.sync_api import Page, expect
+from playwright.sync_api import Page
 
 
 @pytest.mark.e2e
-def test_supervisor_acessa_dashboard(
-    logged_in_supervisor: Page, base_url: str
-) -> None:
+def test_supervisor_acessa_dashboard(logged_in_supervisor: Page, base_url: str) -> None:
     """Supervisor deve atterrir no dashboard após login."""
     page = logged_in_supervisor
     # Após login, deve estar em alguma rota que não seja /login
@@ -28,9 +24,7 @@ def test_supervisor_acessa_dashboard(
 
 
 @pytest.mark.e2e
-def test_supervisor_acessa_relatorios(
-    logged_in_supervisor: Page, base_url: str
-) -> None:
+def test_supervisor_acessa_relatorios(logged_in_supervisor: Page, base_url: str) -> None:
     """Supervisor deve conseguir acessar a página de relatórios."""
     page = logged_in_supervisor
     page.goto(f"{base_url}/relatorios")
@@ -41,9 +35,7 @@ def test_supervisor_acessa_relatorios(
 
 
 @pytest.mark.e2e
-def test_supervisor_nao_acessa_admin_usuarios(
-    logged_in_supervisor: Page, base_url: str
-) -> None:
+def test_supervisor_nao_acessa_admin_usuarios(logged_in_supervisor: Page, base_url: str) -> None:
     """Supervisor não deve ter acesso ao gerenciamento de usuários."""
     page = logged_in_supervisor
     page.goto(f"{base_url}/admin/usuarios")
@@ -55,9 +47,7 @@ def test_supervisor_nao_acessa_admin_usuarios(
 
 
 @pytest.mark.e2e
-def test_supervisor_ve_lista_chamados(
-    logged_in_supervisor: Page, base_url: str
-) -> None:
+def test_supervisor_ve_lista_chamados(logged_in_supervisor: Page, base_url: str) -> None:
     """Supervisor deve ver a lista de chamados ao acessar /chamados."""
     page = logged_in_supervisor
     page.goto(f"{base_url}/chamados")

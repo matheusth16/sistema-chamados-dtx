@@ -28,7 +28,5 @@ class MeusChamadosPage:
 
     def assert_ticket_with_description(self, descricao_prefix: str) -> None:
         """Verifica que alguma linha contém o texto da descrição."""
-        row = self.page.locator(
-            f'[data-testid="ticket-row"]:has-text("{descricao_prefix}")'
-        )
+        row = self.page.locator(f'[data-testid="ticket-row"]:has-text("{descricao_prefix}")')
         expect(row).to_be_visible()

@@ -4,6 +4,7 @@ Serviço de listagem de chamados.
 Centraliza a lógica de listagem para "Meus chamados" (solicitante) com
 paginação por cursor, contagens por status e fallback quando o índice Firestore não existe.
 """
+
 import logging
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any
@@ -19,8 +20,8 @@ logger = logging.getLogger(__name__)
 
 def _eh_erro_indice_firestore(exc: Exception) -> bool:
     """Verifica se a exceção é de índice do Firestore (FAILED_PRECONDITION / index)."""
-    msg = (getattr(exc, 'message', '') or str(exc) or '').lower()
-    return 'failed_precondition' in msg or 'index' in msg or 'requires an index' in msg
+    msg = (getattr(exc, "message", "") or str(exc) or "").lower()
+    return "failed_precondition" in msg or "index" in msg or "requires an index" in msg
 
 
 def listar_meus_chamados_fallback(
@@ -34,33 +35,33 @@ def listar_meus_chamados_fallback(
     Fallback quando a query com order_by falha por falta de índice:
     busca só por solicitante_id (não exige índice composto), ordena em memória e pagina.
     """
-    q = db.collection('chamados').where('solicitante_id', '==', user_id).limit(500)
+    q = db.collection("chamados").where("solicitante_id", "==", user_id).limit(500)
     docs = list(q.stream())
     if status_filtro:
-        docs = [d for d in docs if (d.to_dict() or {}).get('status') == status_filtro]
-    rl_codigo = (rl_codigo or '').strip()
+        docs = [d for d in docs if (d.to_dict() or {}).get("status") == status_filtro]
+    rl_codigo = (rl_codigo or "").strip()
     if rl_codigo:
-        docs = [d for d in docs if (d.to_dict() or {}).get('rl_codigo') == rl_codigo]
+        docs = [d for d in docs if (d.to_dict() or {}).get("rl_codigo") == rl_codigo]
 
     def _data_key(d):
-        data = (d.to_dict() or {}).get('data_abertura')
+        data = (d.to_dict() or {}).get("data_abertura")
         if data is None or data == firestore.SERVER_TIMESTAMP:
             return None
-        if hasattr(data, 'to_pydatetime'):
+        if hasattr(data, "to_pydatetime"):
             return data.to_pydatetime()
         return data
 
     # Ordena por prioridade (0=Projetos primeiro) e depois por data
     def _sort_key(d):
         data_dict = d.to_dict() or {}
-        prioridade = data_dict.get('prioridade', 1)
+        prioridade = data_dict.get("prioridade", 1)
         data = _data_key(d)
         return (prioridade, data is None, -(data.timestamp() if data else 0))
 
     docs.sort(key=_sort_key)
-    status_counts = {'Aberto': 0, 'Em Atendimento': 0, 'Concluído': 0, 'Cancelado': 0}
+    status_counts = {"Aberto": 0, "Em Atendimento": 0, "Concluído": 0, "Cancelado": 0}
     for d in docs:
-        st = (d.to_dict() or {}).get('status', 'Aberto')
+        st = (d.to_dict() or {}).get("status", "Aberto")
         if st in status_counts:
             status_counts[st] += 1
     total_chamados = len(docs)
@@ -87,23 +88,24 @@ def listar_meus_chamados_fallback(
 
     # Calcula grupo_key para ordenar grupos Projetos antes dos demais no Jinja groupby
     from collections import defaultdict
+
     _grupo_prio: dict = defaultdict(lambda: 1)
     for c in chamados:
-        rl = c.rl_codigo or ''
-        if getattr(c, 'prioridade', 1) == 0:
+        rl = c.rl_codigo or ""
+        if getattr(c, "prioridade", 1) == 0:
             _grupo_prio[rl] = 0
     for c in chamados:
-        rl = c.rl_codigo or ''
+        rl = c.rl_codigo or ""
         c.grupo_key = f"{_grupo_prio[rl]}|{rl}"
 
     return {
-        'chamados': chamados,
-        'pagina_atual': pagina_atual,
-        'total_paginas': total_paginas,
-        'total_chamados': total_chamados,
-        'status_counts': status_counts,
-        'cursor_next': cursor_next,
-        'cursor_prev': cursor_prev,
+        "chamados": chamados,
+        "pagina_atual": pagina_atual,
+        "total_paginas": total_paginas,
+        "total_chamados": total_chamados,
+        "status_counts": status_counts,
+        "cursor_next": cursor_next,
+        "cursor_prev": cursor_prev,
     }
 
 
@@ -123,26 +125,26 @@ def listar_meus_chamados(
         Dict com: chamados, pagina_atual, total_paginas, total_chamados,
         status_counts, cursor_next, cursor_prev.
     """
-    rl_codigo = (rl_codigo or '').strip()
-    q = db.collection('chamados').where('solicitante_id', '==', user_id)
+    rl_codigo = (rl_codigo or "").strip()
+    q = db.collection("chamados").where("solicitante_id", "==", user_id)
     if status_filtro:
-        q = q.where('status', '==', status_filtro)
+        q = q.where("status", "==", status_filtro)
     if rl_codigo:
-        q = q.where('rl_codigo', '==', rl_codigo)
+        q = q.where("rl_codigo", "==", rl_codigo)
     # Ordena por prioridade (Projetos=0 primeiro) e depois por data_abertura
-    q = q.order_by('prioridade').order_by('data_abertura', direction=firestore.Query.DESCENDING)
+    q = q.order_by("prioridade").order_by("data_abertura", direction=firestore.Query.DESCENDING)
 
-    base_ref = db.collection('chamados').where('solicitante_id', '==', user_id)
+    base_ref = db.collection("chamados").where("solicitante_id", "==", user_id)
     if rl_codigo:
-        base_ref = base_ref.where('rl_codigo', '==', rl_codigo)
+        base_ref = base_ref.where("rl_codigo", "==", rl_codigo)
 
-    _status = ('Aberto', 'Em Atendimento', 'Concluído', 'Cancelado')
+    _status = ("Aberto", "Em Atendimento", "Concluído", "Cancelado")
 
     def _contar_total():
         return obter_total_por_contagem(q) or 0
 
     def _contar_status(st):
-        return st, obter_total_por_contagem(base_ref.where('status', '==', st)) or 0
+        return st, obter_total_por_contagem(base_ref.where("status", "==", st)) or 0
 
     # 5 aggregation queries independentes → rodam concorrentemente
     with ThreadPoolExecutor(max_workers=5) as ex:
@@ -156,7 +158,7 @@ def listar_meus_chamados(
 
     if cursor:
         try:
-            cursor_doc = db.collection('chamados').document(cursor).get()
+            cursor_doc = db.collection("chamados").document(cursor).get()
             if cursor_doc.exists:
                 q_page = q.start_after(cursor_doc).limit(itens_por_pagina + 1)
             else:
@@ -185,21 +187,22 @@ def listar_meus_chamados(
 
     # Calcula grupo_key para ordenar grupos Projetos antes dos demais no Jinja groupby
     from collections import defaultdict
+
     _grupo_prio: dict = defaultdict(lambda: 1)
     for c in chamados:
-        rl = c.rl_codigo or ''
-        if getattr(c, 'prioridade', 1) == 0:
+        rl = c.rl_codigo or ""
+        if getattr(c, "prioridade", 1) == 0:
             _grupo_prio[rl] = 0
     for c in chamados:
-        rl = c.rl_codigo or ''
+        rl = c.rl_codigo or ""
         c.grupo_key = f"{_grupo_prio[rl]}|{rl}"
 
     return {
-        'chamados': chamados,
-        'pagina_atual': pagina_atual,
-        'total_paginas': total_paginas,
-        'total_chamados': total_chamados,
-        'status_counts': status_counts,
-        'cursor_next': cursor_next,
-        'cursor_prev': cursor_prev,
+        "chamados": chamados,
+        "pagina_atual": pagina_atual,
+        "total_paginas": total_paginas,
+        "total_chamados": total_chamados,
+        "status_counts": status_counts,
+        "cursor_next": cursor_next,
+        "cursor_prev": cursor_prev,
     }

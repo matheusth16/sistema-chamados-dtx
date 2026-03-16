@@ -4,7 +4,7 @@
 <!-- Splash Screen Overlay — rendered at body level to cover the entire page -->
 <div id="splash-screen" class="fixed inset-0 z-[9999] flex items-center justify-center bg-[#0d182e]">
     <div class="text-center">
-        <img id="splash-logo" src="{{ url_for('static', filename='img/logo-full.png') }}" 
+        <img id="splash-logo" src="{{ url_for('static', filename='img/logo-full.png') }}"
              alt="DTX Aerospace" class="h-16 sm:h-20 mx-auto brightness-0 invert opacity-0 scale-75">
         <div id="splash-line" class="h-0.5 bg-gradient-to-r from-transparent via-blue-400 to-transparent mx-auto mt-6 rounded-full" style="width: 0;"></div>
         <p id="splash-text" class="text-blue-300/80 text-sm mt-4 tracking-[0.25em] uppercase opacity-0 font-light">
@@ -17,7 +17,7 @@
 {% block content %}
 <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 py-12 px-4 sm:px-6 lg:px-8">
     <div id="login-card" class="w-full max-w-md bg-white rounded-lg shadow-xl p-8">
-        
+
         <!-- Header -->
         <div class="gsap-login-header text-center mb-8">
             <div class="inline-flex items-center justify-center h-12 w-12 rounded-md bg-blue-600">
@@ -73,10 +73,10 @@
 
             <!-- Remember Me -->
             <div class="flex items-center">
-                <input 
-                    id="remember-me" 
-                    name="remember-me" 
-                    type="checkbox" 
+                <input
+                    id="remember-me"
+                    name="remember-me"
+                    type="checkbox"
                     class="h-4 w-4 rounded border-gray-300 text-indigo-600 shadow-sm focus:border-indigo-400 focus:ring-4 focus:ring-indigo-400/20 cursor-pointer transition-all duration-200">
                 <label for="remember-me" class="ml-2 block text-sm font-medium text-gray-700 cursor-pointer">
                     {{ t('remember_me', default='Manter-me conectado por 30 dias') }}

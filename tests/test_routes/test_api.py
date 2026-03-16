@@ -1,169 +1,181 @@
 """Testes das rotas de API: editar chamado, carregar mais, notificações, push."""
-import pytest
-from unittest.mock import patch, MagicMock
+
+from unittest.mock import MagicMock, patch
 
 
 def test_api_editar_chamado_solicitante_recebe_403(client_logado_solicitante):
     """POST /api/editar-chamado como solicitante retorna 403 Acesso negado."""
     r = client_logado_solicitante.post(
-        '/api/editar-chamado',
-        data={'chamado_id': 'qualquer'},
-        content_type='multipart/form-data',
+        "/api/editar-chamado",
+        data={"chamado_id": "qualquer"},
+        content_type="multipart/form-data",
     )
     assert r.status_code == 403
     data = r.get_json()
-    assert data is not None and data.get('erro') == 'Acesso negado'
+    assert data is not None and data.get("erro") == "Acesso negado"
 
 
 def test_api_editar_chamado_sem_chamado_id_retorna_400(client_logado_supervisor):
     """POST /api/editar-chamado sem chamado_id retorna 400."""
-    with patch('app.routes.api.db') as mock_db:
+    with patch("app.routes.api.db"):
         r = client_logado_supervisor.post(
-            '/api/editar-chamado',
+            "/api/editar-chamado",
             data={},
-            content_type='multipart/form-data',
+            content_type="multipart/form-data",
         )
     assert r.status_code == 400
-    assert r.get_json().get('erro') and 'obrigatório' in r.get_json().get('erro', '').lower()
+    assert r.get_json().get("erro") and "obrigatório" in r.get_json().get("erro", "").lower()
 
 
 def test_api_editar_chamado_chamado_inexistente_retorna_404(client_logado_supervisor):
     """POST /api/editar-chamado com ID inexistente retorna 404."""
     mock_doc = MagicMock()
     mock_doc.exists = False
-    with patch('app.services.edicao_chamado_service.db') as mock_db:
+    with patch("app.services.edicao_chamado_service.db") as mock_db:
         mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
         r = client_logado_supervisor.post(
-            '/api/editar-chamado',
-            data={'chamado_id': 'id_inexistente'},
-            content_type='multipart/form-data',
+            "/api/editar-chamado",
+            data={"chamado_id": "id_inexistente"},
+            content_type="multipart/form-data",
         )
     assert r.status_code == 404
-    assert 'não encontrado' in r.get_json().get('erro', '').lower()
+    assert "não encontrado" in r.get_json().get("erro", "").lower()
 
 
 def test_api_editar_chamado_supervisor_outra_area_retorna_403(client_logado_supervisor):
     """Edge case: supervisor só pode editar chamados da sua área; chamado de outra área retorna 403."""
     from tests.conftest import _usuario_mock
-    supervisor_user = _usuario_mock('sup_1', 'sup@test.com', 'Supervisor Teste', 'supervisor', 'Manutencao')
+
+    supervisor_user = _usuario_mock(
+        "sup_1", "sup@test.com", "Supervisor Teste", "supervisor", "Manutencao"
+    )
     mock_doc = MagicMock()
     mock_doc.exists = True
     mock_doc.to_dict.return_value = {
-        'area': 'TI',
-        'status': 'Aberto',
-        'descricao': 'Desc',
-        'responsavel': 'Alguém',
-        'responsavel_id': 'outro_id',
+        "area": "TI",
+        "status": "Aberto",
+        "descricao": "Desc",
+        "responsavel": "Alguém",
+        "responsavel_id": "outro_id",
     }
+
     def get_by_id_side_effect(uid):
-        if uid == 'sup_1':
+        if uid == "sup_1":
             return supervisor_user
         return None
+
     # O serviço usa app.services.edicao_chamado_service.db, não app.routes.api.db
-    with patch('app.services.edicao_chamado_service.db') as mock_db:
+    with patch("app.services.edicao_chamado_service.db") as mock_db:
         mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
-        with patch('app.services.edicao_chamado_service.Usuario.get_by_id', side_effect=get_by_id_side_effect):
+        with patch(
+            "app.services.edicao_chamado_service.Usuario.get_by_id",
+            side_effect=get_by_id_side_effect,
+        ):
             r = client_logado_supervisor.post(
-                '/api/editar-chamado',
-                data={'chamado_id': 'ch_ti_123'},
-                content_type='multipart/form-data',
+                "/api/editar-chamado",
+                data={"chamado_id": "ch_ti_123"},
+                content_type="multipart/form-data",
             )
     assert r.status_code == 403
     data = r.get_json()
-    assert data is not None and ('sua área' in data.get('erro', '').lower() or 'área' in data.get('erro', '').lower())
+    assert data is not None and (
+        "sua área" in data.get("erro", "").lower() or "área" in data.get("erro", "").lower()
+    )
 
 
 def test_carregar_mais_sem_login_redireciona(client):
     """POST /api/carregar-mais sem login retorna 401, 403 ou 302."""
-    r = client.post('/api/carregar-mais', json={}, content_type='application/json')
+    r = client.post("/api/carregar-mais", json={}, content_type="application/json")
     assert r.status_code in (401, 403, 302)
     if r.status_code == 401:
-        assert r.get_json() and r.get_json().get('requer_login') is True
+        assert r.get_json() and r.get_json().get("requer_login") is True
 
 
 def test_carregar_mais_retorna_estrutura_esperada(client_logado_supervisor):
     """POST /api/carregar-mais retorna sucesso, chamados, cursor_proximo, tem_proxima (ou 403 por Origin)."""
-    with patch('app.routes.api.aplicar_filtros_dashboard_com_paginacao') as mock_filtros:
+    with patch("app.routes.api.aplicar_filtros_dashboard_com_paginacao") as mock_filtros:
         mock_filtros.return_value = {
-            'docs': [],
-            'proximo_cursor': None,
-            'tem_proxima': False,
+            "docs": [],
+            "proximo_cursor": None,
+            "tem_proxima": False,
         }
         r = client_logado_supervisor.post(
-            '/api/carregar-mais',
-            json={'cursor': None, 'limite': 20},
-            content_type='application/json',
-            headers={'Origin': 'http://localhost:5000'},
+            "/api/carregar-mais",
+            json={"cursor": None, "limite": 20},
+            content_type="application/json",
+            headers={"Origin": "http://localhost:5000"},
         )
     assert r.status_code in (200, 403)
     if r.status_code == 200:
         data = r.get_json()
-        assert data.get('sucesso') is True
-        assert 'chamados' in data
-        assert 'cursor_proximo' in data
-        assert 'tem_proxima' in data
+        assert data.get("sucesso") is True
+        assert "chamados" in data
+        assert "cursor_proximo" in data
+        assert "tem_proxima" in data
 
 
 def test_api_notificacoes_listar_sem_login_redireciona(client):
     """GET /api/notificacoes sem login retorna 401, 403 ou 302."""
-    r = client.get('/api/notificacoes')
+    r = client.get("/api/notificacoes")
     assert r.status_code in (401, 403, 302)
     if r.status_code == 401:
-        assert r.get_json() and r.get_json().get('requer_login') is True
+        assert r.get_json() and r.get_json().get("requer_login") is True
 
 
 def test_api_notificacoes_listar_retorna_estrutura(client_logado_solicitante):
     """GET /api/notificacoes retorna notificacoes e total_nao_lidas."""
-    with patch('app.routes.api.listar_para_usuario', return_value=[]), \
-         patch('app.routes.api.contar_nao_lidas', return_value=0):
-        r = client_logado_solicitante.get('/api/notificacoes')
+    with (
+        patch("app.routes.api.listar_para_usuario", return_value=[]),
+        patch("app.routes.api.contar_nao_lidas", return_value=0),
+    ):
+        r = client_logado_solicitante.get("/api/notificacoes")
     assert r.status_code == 200
     data = r.get_json()
-    assert 'notificacoes' in data
-    assert 'total_nao_lidas' in data
+    assert "notificacoes" in data
+    assert "total_nao_lidas" in data
 
 
 def test_api_push_subscribe_sem_subscription_retorna_400(client_logado_solicitante):
     """POST /api/push-subscribe sem subscription válida retorna 400 (ou 403 por Origin)."""
     r = client_logado_solicitante.post(
-        '/api/push-subscribe',
+        "/api/push-subscribe",
         json={},
-        content_type='application/json',
+        content_type="application/json",
     )
     assert r.status_code in (400, 403)
     if r.status_code == 400:
         data = r.get_json()
-        assert data.get('sucesso') is False
-        assert 'erro' in data
+        assert data.get("sucesso") is False
+        assert "erro" in data
 
 
 def test_api_push_subscribe_subscription_sem_endpoint_retorna_400(client_logado_solicitante):
     """POST /api/push-subscribe com subscription sem endpoint retorna 400 (ou 403 por Origin)."""
     r = client_logado_solicitante.post(
-        '/api/push-subscribe',
-        json={'subscription': {'keys': {}}},
-        content_type='application/json',
+        "/api/push-subscribe",
+        json={"subscription": {"keys": {}}},
+        content_type="application/json",
     )
     assert r.status_code in (400, 403)
 
 
 def test_api_push_vapid_public_requer_login(client):
     """GET /api/push-vapid-public sem login retorna 401, 403 ou 302."""
-    r = client.get('/api/push-vapid-public')
+    r = client.get("/api/push-vapid-public")
     assert r.status_code in (401, 403, 302)
     if r.status_code == 401:
-        assert r.get_json() and r.get_json().get('requer_login') is True
+        assert r.get_json() and r.get_json().get("requer_login") is True
 
 
 def test_api_supervisores_disponibilidade_sem_login_retorna_401_json(client):
     """GET /api/supervisores/disponibilidade sem login retorna 401, 403, 302 ou 404."""
-    r = client.get('/api/supervisores/disponibilidade')
+    r = client.get("/api/supervisores/disponibilidade")
     assert r.status_code in (401, 403, 302, 404)
     if r.status_code == 401:
         data = r.get_json()
         assert data is not None
-        assert data.get('sucesso') is False
-        assert 'requer_login' in data or 'erro' in data
+        assert data.get("sucesso") is False
+        assert "requer_login" in data or "erro" in data
 
 
 def test_bulk_status_supervisor_outra_area_retorna_erro_por_chamado(client_logado_supervisor):
@@ -171,93 +183,95 @@ def test_bulk_status_supervisor_outra_area_retorna_erro_por_chamado(client_logad
     # Supervisor do conftest tem areas=['Manutencao']. Doc 1 = mesma área, Doc 2 = outra área.
     doc_manutencao = MagicMock()
     doc_manutencao.exists = True
-    doc_manutencao.to_dict.return_value = {'area': 'Manutencao', 'status': 'Aberto'}
+    doc_manutencao.to_dict.return_value = {"area": "Manutencao", "status": "Aberto"}
     doc_ti = MagicMock()
     doc_ti.exists = True
-    doc_ti.to_dict.return_value = {'area': 'TI', 'status': 'Aberto'}
-    with patch('app.routes.api.db') as mock_db:
+    doc_ti.to_dict.return_value = {"area": "TI", "status": "Aberto"}
+    with patch("app.routes.api.db") as mock_db:
         col = mock_db.collection.return_value
+
         def doc_side_effect(doc_id):
             m = MagicMock()
-            m.get.return_value = doc_manutencao if doc_id == 'ch_manutencao' else doc_ti
+            m.get.return_value = doc_manutencao if doc_id == "ch_manutencao" else doc_ti
             m.update = MagicMock()
             return m
+
         col.document.side_effect = doc_side_effect
-        with patch('app.routes.api.execute_with_retry'):
+        with patch("app.routes.api.execute_with_retry"):
             r = client_logado_supervisor.post(
-                '/api/bulk-status',
-                json={'chamado_ids': ['ch_manutencao', 'ch_ti'], 'novo_status': 'Em Atendimento'},
-                content_type='application/json',
-                headers={'Origin': 'http://localhost:5000'},
+                "/api/bulk-status",
+                json={"chamado_ids": ["ch_manutencao", "ch_ti"], "novo_status": "Em Atendimento"},
+                content_type="application/json",
+                headers={"Origin": "http://localhost:5000"},
             )
     assert r.status_code in (200, 403)
     if r.status_code != 200:
         return
     data = r.get_json()
-    assert data.get('sucesso') is True
-    assert 'erros' in data
-    erros_ids = [e.get('id') for e in data['erros']]
-    assert 'ch_ti' in erros_ids
-    assert data.get('atualizados', 0) >= 0
+    assert data.get("sucesso") is True
+    assert "erros" in data
+    erros_ids = [e.get("id") for e in data["erros"]]
+    assert "ch_ti" in erros_ids
+    assert data.get("atualizados", 0) >= 0
 
 
 def test_api_chamados_paginar_sem_login_retorna_401(client):
     """CT-PAG-01: GET /api/chamados/paginar sem autenticação retorna 401, 403 ou 302."""
-    r = client.get('/api/chamados/paginar')
+    r = client.get("/api/chamados/paginar")
     assert r.status_code in (401, 403, 302)
     if r.status_code == 401:
         data = r.get_json()
-        assert data is not None and data.get('requer_login') is True
+        assert data is not None and data.get("requer_login") is True
 
 
 def test_api_chamado_por_id_solicitante_chamado_de_outro_retorna_403(client_logado_solicitante):
     """CT-ID-01: Solicitante acessando chamado de outro usuário retorna 403 (acesso negado ou sem permissão)."""
     mock_doc = MagicMock()
     mock_doc.exists = True
-    mock_doc.id = 'ch_123'
+    mock_doc.id = "ch_123"
     # solicitante_id diferente do current_user (sol_1) para simular chamado de outro
     mock_doc.to_dict.return_value = {
-        'numero_chamado': 'CHM-0001',
-        'categoria': 'Chamado',
-        'status': 'Aberto',
-        'descricao': 'Desc',
-        'area': 'Planejamento',
-        'solicitante_id': 'outro_usuario_id',
-        'responsavel': 'Alguém',
-        'tipo_solicitacao': 'Manutencao',
+        "numero_chamado": "CHM-0001",
+        "categoria": "Chamado",
+        "status": "Aberto",
+        "descricao": "Desc",
+        "area": "Planejamento",
+        "solicitante_id": "outro_usuario_id",
+        "responsavel": "Alguém",
+        "tipo_solicitacao": "Manutencao",
     }
-    with patch('app.routes.api.db') as mock_db:
+    with patch("app.routes.api.db") as mock_db:
         mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
-        r = client_logado_solicitante.get('/api/chamado/ch_123')
+        r = client_logado_solicitante.get("/api/chamado/ch_123")
     assert r.status_code == 403
     data = r.get_json()
-    assert data is not None and data.get('sucesso') is False
-    erro = (data.get('erro') or '').lower()
-    assert 'acesso negado' in erro or 'negado' in erro or 'permissão' in erro or 'permissao' in erro
+    assert data is not None and data.get("sucesso") is False
+    erro = (data.get("erro") or "").lower()
+    assert "acesso negado" in erro or "negado" in erro or "permissão" in erro or "permissao" in erro
 
 
 def test_api_chamado_por_id_supervisor_sua_area_retorna_200(client_logado_supervisor):
     """CT-ID-02: Supervisor vê chamado da sua área (Manutencao) e retorna 200."""
     mock_doc = MagicMock()
     mock_doc.exists = True
-    mock_doc.id = 'ch_manutencao_1'
+    mock_doc.id = "ch_manutencao_1"
     mock_doc.to_dict.return_value = {
-        'numero_chamado': 'CHM-0002',
-        'categoria': 'Chamado',
-        'status': 'Aberto',
-        'descricao': 'Descrição',
-        'area': 'Manutencao',
-        'solicitante_id': 'sol_1',
-        'responsavel': 'Supervisor Teste',
-        'tipo_solicitacao': 'Manutencao',
+        "numero_chamado": "CHM-0002",
+        "categoria": "Chamado",
+        "status": "Aberto",
+        "descricao": "Descrição",
+        "area": "Manutencao",
+        "solicitante_id": "sol_1",
+        "responsavel": "Supervisor Teste",
+        "tipo_solicitacao": "Manutencao",
     }
-    with patch('app.routes.api.db') as mock_db:
+    with patch("app.routes.api.db") as mock_db:
         mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
-        with patch('app.routes.api.obter_sla_para_exibicao', return_value=None):
-            r = client_logado_supervisor.get('/api/chamado/ch_manutencao_1')
+        with patch("app.routes.api.obter_sla_para_exibicao", return_value=None):
+            r = client_logado_supervisor.get("/api/chamado/ch_manutencao_1")
     assert r.status_code == 200
     data = r.get_json()
-    assert data.get('sucesso') is True
-    assert 'chamado' in data
-    assert data['chamado'].get('numero_chamado') == 'CHM-0002'
-    assert data['chamado'].get('status') == 'Aberto'
+    assert data.get("sucesso") is True
+    assert "chamado" in data
+    assert data["chamado"].get("numero_chamado") == "CHM-0002"
+    assert data["chamado"].get("status") == "Aberto"

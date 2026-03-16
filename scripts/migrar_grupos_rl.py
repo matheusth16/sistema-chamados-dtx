@@ -84,4 +84,3 @@ def migrar_grupos_rl():
 
 if __name__ == "__main__":  # pragma: no cover - execução direta
     migrar_grupos_rl()
-
