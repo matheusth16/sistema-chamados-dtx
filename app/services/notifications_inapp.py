@@ -41,10 +41,12 @@ def criar_notificacao(
                 "data_criacao": firestore.SERVER_TIMESTAMP,
             }
         )
-        logger.debug(f"Notificação in-app criada: usuario={usuario_id}, chamado={numero_chamado}")
+        logger.debug(
+            "Notificação in-app criada: usuario=%s, chamado=%s", usuario_id, numero_chamado
+        )
         return ref[1].id
     except Exception as e:
-        logger.exception(f"Erro ao criar notificação in-app: {e}")
+        logger.exception("Erro ao criar notificação in-app: %s", e)
         return None
 
 
@@ -80,7 +82,7 @@ def listar_para_usuario(
         out.sort(key=lambda x: (x.get("data_criacao") or ""), reverse=True)
         return out[:limite]
     except Exception as e:
-        logger.exception(f"Erro ao listar notificações: {e}")
+        logger.exception("Erro ao listar notificações: %s", e)
         return []
 
 
@@ -98,7 +100,7 @@ def contar_nao_lidas(usuario_id: str) -> int:
         )
         return result[0][0].value
     except Exception as e:
-        logger.exception(f"Erro ao contar notificações: {e}")
+        logger.exception("Erro ao contar notificações: %s", e)
         return 0
 
 
@@ -114,7 +116,7 @@ def marcar_como_lida(notificacao_id: str, usuario_id: str) -> bool:
         ref.update({"lida": True})
         return True
     except Exception as e:
-        logger.exception(f"Erro ao marcar notificação como lida: {e}")
+        logger.exception("Erro ao marcar notificação como lida: %s", e)
         return False
 
 
@@ -138,8 +140,8 @@ def marcar_todas_como_lidas(usuario_id: str) -> int:
             for doc in docs[i : i + 500]:
                 batch.update(doc.reference, {"lida": True})
             batch.commit()
-        logger.debug(f"Notificações marcadas como lidas: usuario={usuario_id}, count={count}")
+        logger.debug("Notificações marcadas como lidas: usuario=%s, count=%s", usuario_id, count)
         return count
     except Exception as e:
-        logger.exception(f"Erro ao marcar todas notificações como lidas: {e}")
+        logger.exception("Erro ao marcar todas notificações como lidas: %s", e)
         return 0

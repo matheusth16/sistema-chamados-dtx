@@ -18,8 +18,12 @@ from app.models_grupo_rl import GrupoRL
 from app.models_historico import Historico
 from app.models_usuario import Usuario
 from app.services.assignment import atribuidor
-from app.services.notifications import notificar_aprovador_novo_chamado
+from app.services.notifications import (
+    notificar_aprovador_novo_chamado,
+    notificar_setores_adicionais_chamado,
+)
 from app.services.notifications_inapp import criar_notificacao
+from app.services.notify_retry import executar_com_retry
 from app.services.upload import salvar_anexo
 from app.services.webpush_service import enviar_webpush_usuario
 from app.utils import gerar_numero_chamado
@@ -100,6 +104,20 @@ def criar_chamado(
     descricao = bleach.clean(form.get("descricao") or "", tags=[], strip=True)
     impacto = form.get("impacto")
     gate = form.get("gate")
+    if hasattr(form, "getlist"):
+        setores_adicionais_lista = [
+            str(s).strip() for s in form.getlist("setores_adicionais") if s and str(s).strip()
+        ]
+    else:
+        setores_adicionais_bruto = form.get("setores_adicionais", [])
+        if isinstance(setores_adicionais_bruto, list):
+            setores_adicionais_lista = [
+                str(s).strip() for s in setores_adicionais_bruto if s and str(s).strip()
+            ]
+        elif setores_adicionais_bruto:
+            setores_adicionais_lista = [str(setores_adicionais_bruto).strip()]
+        else:
+            setores_adicionais_lista = []
 
     try:
         caminho_anexo = salvar_anexo(files.get("anexo") if files else None)
@@ -144,6 +162,7 @@ def criar_chamado(
             area=area_chamado,
             status="Aberto",
             grupo_rl_id=grupo_rl_id,
+            setores_adicionais=setores_adicionais_lista,
         )
         doc_ref = execute_with_retry(
             db.collection("chamados").add,
@@ -162,12 +181,13 @@ def criar_chamado(
 
         def _notificar():
             """Envia todas as notificações em background para não bloquear o request."""
-            with _app.app_context():
-                try:
+            try:
+                with _app.app_context():
                     responsavel_usuario = (
                         Usuario.get_by_id(responsavel_id) if responsavel_id else None
                     )
-                    notificar_aprovador_novo_chamado(
+                    executar_com_retry(
+                        notificar_aprovador_novo_chamado,
                         chamado_id=chamado_id,
                         numero_chamado=numero_chamado,
                         categoria=categoria,
@@ -178,32 +198,45 @@ def criar_chamado(
                         responsavel_usuario=responsavel_usuario,
                         solicitante_email=solicitante_email,
                     )
-                    if responsavel_id:
-                        criar_notificacao(
-                            usuario_id=responsavel_id,
+                    if setores_adicionais_lista:
+                        executar_com_retry(
+                            notificar_setores_adicionais_chamado,
                             chamado_id=chamado_id,
                             numero_chamado=numero_chamado,
-                            titulo=f"Novo chamado: {numero_chamado}",
-                            mensagem=f"{categoria} · Solicitante: {solicitante_nome}",
-                            tipo="novo_chamado",
+                            setores_novos=setores_adicionais_lista,
+                            categoria=categoria,
+                            tipo_solicitacao=tipo,
+                            descricao_resumo=(descricao or "")[:500],
+                            solicitante_nome=solicitante_nome,
+                            quem_adicionou_nome=solicitante_nome,
+                            setores_nomes=", ".join(setores_adicionais_lista),
                         )
-                        base_url = _app.config.get("APP_BASE_URL", "").rstrip("/")
-                        url_chamado = (
-                            f"{base_url}/chamado/{chamado_id}/historico" if base_url else None
-                        )
+                    if responsavel_id:
                         try:
+                            criar_notificacao(
+                                usuario_id=responsavel_id,
+                                chamado_id=chamado_id,
+                                numero_chamado=numero_chamado,
+                                titulo=f"Novo chamado: {numero_chamado}",
+                                mensagem=f"{categoria} · Solicitante: {solicitante_nome}",
+                                tipo="novo_chamado",
+                            )
+                            base_url = _app.config.get("APP_BASE_URL", "").rstrip("/")
+                            url_chamado = (
+                                f"{base_url}/chamado/{chamado_id}/historico" if base_url else None
+                            )
                             enviar_webpush_usuario(
                                 responsavel_id,
                                 titulo=f"Novo chamado: {numero_chamado}",
                                 corpo=f"{categoria} · {solicitante_nome}",
                                 url=url_chamado,
                             )
-                        except Exception as wp_e:
-                            logger.debug("Web Push não enviado: %s", wp_e)
-                except Exception as e:
-                    logger.warning("Notificação ao aprovador não enviada: %s", e)
+                        except Exception as e:
+                            logger.debug("Notificação in-app/Web Push não enviada: %s", e)
+            except Exception as e:
+                logger.exception("Erro na thread de notificações do chamado %s: %s", chamado_id, e)
 
-        threading.Thread(target=_notificar, daemon=True).start()
+        threading.Thread(target=_notificar, daemon=True, name=f"notif-{chamado_id[:8]}").start()
 
         logger.info("Chamado criado: %s (ID: %s)", numero_chamado, chamado_id)
         aviso = motivo_atribuicao if "Aguardando atribuição" in motivo_atribuicao else None

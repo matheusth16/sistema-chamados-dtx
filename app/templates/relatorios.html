@@ -936,7 +936,17 @@ document.addEventListener('DOMContentLoaded', function() {
     const TOP_N_AREAS = 6;
     if (chartAreasEl && dadosAreas.length > 0) {
         // Dados de tradução do backend (t()); |safe seguro pois controlado pelo servidor
-        const sectorTranslations = JSON.parse('{{ {"Manutencao": t("maintenance"), "Engenharia": t("engineering"), "Qualidade": t("quality"), "Comercial": t("commercial"), "Planejamento": t("planning"), "Material": t("indirect_material")}|tojson|safe }}');
+        const sectorTranslations = {
+            {% for setor in (setores or []) %}
+            {{ setor.nome_pt | tojson }}: {{
+                (
+                    setor.nome_en if current_language == 'en'
+                    else (setor.nome_es if current_language == 'es' else setor.nome_pt)
+                )
+                | tojson
+            }},
+            {% endfor %}
+        };
         function trSector(name) { return sectorTranslations[name] || name; }
         const sorted = dadosAreas.slice().sort(function(a, b) { return (b.total_chamados || 0) - (a.total_chamados || 0); });
         const topN = sorted.slice(0, TOP_N_AREAS);

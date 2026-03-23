@@ -22,6 +22,7 @@ from app.services.notifications_inapp import (
     marcar_como_lida,
     marcar_todas_como_lidas,
 )
+from app.services.permission_validation import verificar_permissao_mudanca_status
 from app.services.permissions import usuario_pode_ver_chamado
 from app.services.status_service import atualizar_status_chamado
 from app.services.webpush_service import salvar_inscricao
@@ -65,28 +66,11 @@ def atualizar_status_ajax():
 
         chamado_obj = Chamado.from_dict(doc_chamado.to_dict(), chamado_id)
 
-        if current_user.perfil == "solicitante":
-            if chamado_obj.solicitante_id != current_user.id:
-                return jsonify(
-                    {
-                        "sucesso": False,
-                        "erro": "Acesso negado: Você só pode atualizar seus próprios chamados",
-                    }
-                ), 403
-            if novo_status != "Cancelado":
-                return jsonify(
-                    {
-                        "sucesso": False,
-                        "erro": "Acesso negado: Solicitantes só podem Cancelar chamados",
-                    }
-                ), 403
-        elif current_user.perfil == "supervisor":
-            from app.services.permissions import usuario_pode_ver_chamado
-
-            if not usuario_pode_ver_chamado(current_user, chamado_obj):
-                return jsonify(
-                    {"sucesso": False, "erro": "Acesso negado: Sem permissão ou fora da sua área"}
-                ), 403
+        permitido, erro_perm = verificar_permissao_mudanca_status(
+            current_user, chamado_obj, novo_status
+        )
+        if not permitido:
+            return jsonify({"sucesso": False, "erro": erro_perm}), 403
 
         resultado = atualizar_status_chamado(
             chamado_id=chamado_id,
@@ -247,10 +231,14 @@ def api_notificacoes_listar():
         apenas_nao_lidas = request.args.get("nao_lidas") == "1"
         lista = listar_para_usuario(current_user.id, limite=30, apenas_nao_lidas=apenas_nao_lidas)
         total_nao_lidas = contar_nao_lidas(current_user.id)
-        return jsonify({"notificacoes": lista, "total_nao_lidas": total_nao_lidas}), 200
+        return jsonify(
+            {"sucesso": True, "notificacoes": lista, "total_nao_lidas": total_nao_lidas}
+        ), 200
     except Exception as e:
         logger.exception("Erro ao listar notificações: %s", e)
-        return jsonify({"notificacoes": [], "total_nao_lidas": 0}), 200
+        return jsonify(
+            {"sucesso": False, "erro": ERRO_INTERNO_MSG, "notificacoes": [], "total_nao_lidas": 0}
+        ), 500
 
 
 @main.route("/api/notificacoes/contar", methods=["GET"])

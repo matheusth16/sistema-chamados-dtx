@@ -80,7 +80,7 @@ class LoginAttemptTracker:
         cache_key = f"login_lockout:{identifier}"
         cache_set(cache_key, True, ttl_seconds=LOCKOUT_DURATION)
         logger.warning(
-            f"Bloqueio de login aplicado para {identifier} por {LOCKOUT_DURATION} segundos"
+            "Bloqueio de login aplicado para %s por %s segundos", identifier, LOCKOUT_DURATION
         )
 
     @staticmethod
@@ -93,7 +93,7 @@ class LoginAttemptTracker:
         """
         cache_delete(f"login_attempt:{identifier}")
         cache_delete(f"login_lockout:{identifier}")
-        logger.info(f"Tentativas de login resetadas para {identifier}")
+        logger.info("Tentativas de login resetadas para %s", identifier)
 
     @staticmethod
     def log_failed_attempt(

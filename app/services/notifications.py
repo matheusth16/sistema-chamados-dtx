@@ -8,58 +8,72 @@ Serviço de Notificações: E-mail (SMTP).
 import logging
 import os
 import smtplib
+import time
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from html import escape
 
-from dotenv import load_dotenv
 from flask import current_app, request
+
+from app.services.email_templates import (
+    build_cta_button,
+    build_detail_table,
+    build_email_shell,
+    build_two_ctas,
+)
 
 logger = logging.getLogger(__name__)
 
+PREFIXO_ASSUNTO_CHAMADO_PRAZO_24H = "CHAMADO_PRAZO_24H"
+PREFIXO_ASSUNTO_USUARIO_CADASTRADO = "USUARIO_CADASTRADO"
+PREFIXO_ASSUNTO_CHAMADO_SETOR_ADICIONAL = "CHAMADO_SETOR_ADICIONAL"
+
+
+def _sanitize_pa_field(value: str) -> str:
+    """
+    Remove o caractere '|' de campos usados no assunto do Power Automate.
+
+    O assunto usa o formato PREFIXO|IDENTIFICADOR|EMAIL para roteamento.
+    Se um campo contiver '|', o Power Automate parseia incorretamente o destinatário.
+    """
+    return str(value or "").replace("|", "-")
+
 
 def _config(key: str, default=None):
-    """Lê valor da configuração Flask (ex.: MAIL_SERVER). Retorna default se fora de app context."""
-    return getattr(current_app.config, key, None) if current_app else default
-
-
-def _ensure_env_loaded():
-    """Carrega .env da raiz do projeto se ainda não estiver no ambiente (fallback quando Flask config não tem MAIL_*)."""
-    root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-    env_path = os.path.join(root, ".env")
-    if os.path.isfile(env_path):
-        load_dotenv(env_path, override=True)
+    """Lê valor do Flask config via .get() (suporte correto a dict). Retorna default se fora de app context."""
+    try:
+        return current_app.config.get(key, default)
+    except RuntimeError:
+        return default
 
 
 def _mail_setting(key: str, default=None):
-    """Lê MAIL_* do Flask config; se vazio, carrega .env e usa os.getenv."""
-    try:
-        val = getattr(current_app.config, key, None) if current_app else None
-    except RuntimeError:
-        val = None
-    if val is not None and (key != "MAIL_SERVER" or (isinstance(val, str) and val.strip())):
+    """Lê MAIL_* do Flask config (que já carrega .env via config.py na inicialização).
+    Fallback para os.getenv apenas se executado fora de app context."""
+    val = _config(key)
+    if val is not None and (not isinstance(val, str) or val.strip()):
         return val
-    _ensure_env_loaded()
     return os.getenv(key, default)
+
+
+_SMTP_MAX_TENTATIVAS = 3
+_SMTP_BACKOFF_BASE = 2.0  # segundos: 1s, 2s, 4s
 
 
 def enviar_email(destinatario: str, assunto: str, corpo_html: str, corpo_texto: str = None):
     """
-    Envia e-mail via SMTP (Outlook/Office 365 ou outro).
+    Envia e-mail via SMTP com retry e backoff exponencial (até 3 tentativas).
     Retorna (True, None) se enviado com sucesso, (False, mensagem_erro ou None) caso contrário.
     Se MAIL_SERVER não estiver configurado, não envia e retorna (False, None).
-    Usa Flask config; se MAIL_SERVER estiver vazio, faz fallback para .env (os.getenv).
     """
-    server = (_config("MAIL_SERVER") or os.getenv("MAIL_SERVER") or "").strip()
-    if not server:
-        _ensure_env_loaded()
-        server = (os.getenv("MAIL_SERVER") or "").strip()
+    server = _mail_setting("MAIL_SERVER", "").strip()
     if not server or not destinatario or not destinatario.strip():
         if not destinatario or not destinatario.strip():
             logger.warning("Notificação por e-mail ignorada: destinatário vazio")
         return (False, None)
     destinatario = destinatario.strip()
 
-    port = _mail_setting("MAIL_PORT") or 587
+    port = _mail_setting("MAIL_PORT", 587)
     try:
         port = int(port)
     except (TypeError, ValueError):
@@ -77,35 +91,50 @@ def enviar_email(destinatario: str, assunto: str, corpo_html: str, corpo_texto: 
     user = (_mail_setting("MAIL_USERNAME") or "").strip()
     password = (_mail_setting("MAIL_PASSWORD") or "").strip()
 
-    try:
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = assunto
-        msg["From"] = from_addr
-        msg["To"] = destinatario
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = assunto
+    msg["From"] = from_addr
+    msg["To"] = destinatario
+    if corpo_texto:
+        msg.attach(MIMEText(corpo_texto, "plain", "utf-8"))
+    msg.attach(MIMEText(corpo_html, "html", "utf-8"))
 
-        if corpo_texto:
-            msg.attach(MIMEText(corpo_texto, "plain", "utf-8"))
-        msg.attach(MIMEText(corpo_html, "html", "utf-8"))
-
-        with smtplib.SMTP(server, port) as s:
-            if use_tls:
-                s.starttls()
-            if user and password:
-                s.login(user, password)
-            s.sendmail(msg["From"], destinatario, msg.as_string())
-        logger.info(f"E-mail enviado para {destinatario}: {assunto[:50]}")
-        return (True, None)
-    except Exception as e:
-        logger.exception(f"Falha ao enviar e-mail para {destinatario}: {e}")
-        return (False, str(e))
+    for tentativa in range(_SMTP_MAX_TENTATIVAS):
+        try:
+            with smtplib.SMTP(server, port) as s:
+                if use_tls:
+                    s.starttls()
+                if user and password:
+                    s.login(user, password)
+                s.sendmail(msg["From"], destinatario, msg.as_string())
+            logger.info("E-mail enviado para %s: %s", destinatario, assunto[:50])
+            return (True, None)
+        except Exception as e:
+            if tentativa < _SMTP_MAX_TENTATIVAS - 1:
+                espera = _SMTP_BACKOFF_BASE**tentativa
+                logger.warning(
+                    "Falha ao enviar e-mail para %s (tentativa %d/%d): %s. Retry em %.0fs.",
+                    destinatario,
+                    tentativa + 1,
+                    _SMTP_MAX_TENTATIVAS,
+                    e,
+                    espera,
+                )
+                time.sleep(espera)
+            else:
+                logger.exception(
+                    "Falha ao enviar e-mail para %s após %d tentativas: %s",
+                    destinatario,
+                    _SMTP_MAX_TENTATIVAS,
+                    e,
+                )
+                return (False, str(e))
+    return (False, "Nenhuma tentativa bem-sucedida")
 
 
 def _base_url() -> str:
-    """URL base da aplicação (para links em e-mails). Usa config, .env ou request."""
-    base = (_config("APP_BASE_URL") or "").strip()
-    if not base:
-        _ensure_env_loaded()
-        base = (os.getenv("APP_BASE_URL") or "").strip()
+    """URL base da aplicação (para links em e-mails). Usa Flask config, .env ou request."""
+    base = (_config("APP_BASE_URL") or os.getenv("APP_BASE_URL") or "").strip()
     if not base:
         try:
             if request and getattr(request, "url_root", None):
@@ -125,6 +154,45 @@ def _link_dashboard() -> str:
     """URL do painel (admin/supervisor ou index)."""
     base = _base_url()
     return f"{base}/admin" if base else ""
+
+
+def _relay_email() -> str:
+    """E-mail relay monitorado pelo Power Automate."""
+    return _mail_setting("NOTIFY_RELAY_EMAIL", "dtxls.support@dtx.aero").strip()
+
+
+def _disparar_evento_power_automate(
+    prefixo_assunto: str,
+    identificador: str,
+    email_destino_final: str,
+    corpo_html: str,
+    corpo_texto: str,
+):
+    """
+    Envia evento para o relay do Power Automate usando assunto estruturado.
+    Formato: PREFIXO|IDENTIFICADOR|EMAIL_DESTINO
+    """
+    relay_email = _relay_email()
+    assunto = f"{prefixo_assunto}|{_sanitize_pa_field(identificador)}|{_sanitize_pa_field(email_destino_final)}"
+    current_app.logger.info(
+        "Notificação por e-mail: enviando gatilho '%s' para Power Automate em %s",
+        prefixo_assunto,
+        relay_email,
+    )
+    ok, err = enviar_email(relay_email, assunto, corpo_html, corpo_texto)
+    if ok:
+        current_app.logger.info(
+            "E-mail gatilho (%s) enviado com sucesso para %s",
+            prefixo_assunto,
+            relay_email,
+        )
+    else:
+        current_app.logger.warning(
+            "Falha ao enviar e-mail gatilho (%s) para %s: %s",
+            prefixo_assunto,
+            relay_email,
+            err or "verifique MAIL_* e logs",
+        )
 
 
 # ---------- Notificação para APROVADOR (responsável) - Novo chamado ----------
@@ -150,12 +218,8 @@ def notificar_aprovador_novo_chamado(
 
     if responsavel_usuario and getattr(responsavel_usuario, "email", None):
         # E-mail gatilho para Power Automate / Outlook (Delegated)
-        relay_email = (
-            _config("NOTIFY_RELAY_EMAIL")
-            or os.getenv("NOTIFY_RELAY_EMAIL")
-            or "dtxls.support@dtx.aero"
-        ).strip()
-        assunto = f"CHAMADO_NOVO|{numero_chamado}|{responsavel_usuario.email}"
+        relay_email = _relay_email()
+        assunto = f"CHAMADO_NOVO|{_sanitize_pa_field(numero_chamado)}|{_sanitize_pa_field(responsavel_usuario.email)}"
         resumo_truncado = descricao_resumo[:500] + ("..." if len(descricao_resumo) > 500 else "")
         solicitante_linha = solicitante_nome
         if solicitante_email and solicitante_email.strip():
@@ -167,31 +231,38 @@ def notificar_aprovador_novo_chamado(
             f"Area: {area}\n"
             f"Requester: {solicitante_linha}\n"
             f"Summary: {resumo_truncado}\n\n"
-            "Use the buttons in the email (View ticket / Open dashboard) to access."
+            "Use the buttons in the email to access: View ticket history or View your sector tickets."
         )
-        # Botões curtos no HTML; só exibe se houver link
-        botoes_html = ""
+        detalhes_html = build_detail_table(
+            [
+                ("Number", numero_chamado),
+                ("Category", categoria),
+                ("Type", tipo_solicitacao),
+                ("Area", area),
+                ("Requester", solicitante_linha),
+            ]
+        )
+        summary_html = f'<p style="margin: 12px 0;">{escape(resumo_truncado)}</p>'
+
+        ctas = []
         if link:
-            botoes_html += f'<a href="{link}" style="background: #2563eb; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; margin-right: 8px; display: inline-block;">View ticket</a> '
+            ctas.append(("View ticket history", link, "#2563eb"))
         if link_dash:
-            botoes_html += f'<a href="{link_dash}" style="background: #6b7280; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; display: inline-block;">Open dashboard</a>'
-        if not botoes_html:
-            botoes_html = '<span style="color: #6b7280;">Set APP_BASE_URL to display links.</span>'
-        corpo_html = (
-            f'<div style="font-family: Arial, sans-serif; max-width: 560px;">'
-            f'<h2 style="color: #2563eb; margin-bottom: 16px;">New ticket assigned</h2>'
-            f"<p>Hello, a new ticket has been assigned to you.</p>"
-            f'<ul style="background: #f3f4f6; padding: 16px 16px 16px 32px; border-radius: 8px; margin: 16px 0;">'
-            f"<li><strong>Number:</strong> {numero_chamado}</li>"
-            f"<li><strong>Category:</strong> {categoria}</li>"
-            f"<li><strong>Type:</strong> {tipo_solicitacao}</li>"
-            f"<li><strong>Area:</strong> {area}</li>"
-            f"<li><strong>Requester:</strong> {solicitante_linha}</li>"
-            f"</ul>"
-            f'<p style="margin: 12px 0;">{resumo_truncado}</p>'
-            f'<p style="margin-top: 20px;">{botoes_html}</p>'
-            f'<p style="margin-top: 24px; color: #6b7280; font-size: 12px;"><em>Ticket System - DTX</em></p>'
-            f"</div>"
+            ctas.append(("View your sector tickets", link_dash, "#6b7280"))
+        if ctas:
+            botoes_html = build_two_ctas(ctas)
+        else:
+            botoes_html = '<p style="margin-top:20px;"><span style="color: #6b7280;">Set APP_BASE_URL to display links.</span></p>'
+
+        corpo_html = build_email_shell(
+            header_title="New ticket assigned",
+            header_color="#2563eb",
+            body_html=(
+                "<p>Hello, a new ticket has been assigned to you.</p>"
+                + detalhes_html
+                + summary_html
+                + botoes_html
+            ),
         )
 
         current_app.logger.info(
@@ -213,6 +284,221 @@ def notificar_aprovador_novo_chamado(
 
 
 # ---------- Notificação para supervisores de setores adicionados ao chamado ----------
+
+
+def notificar_responsavel_prazo_24h(
+    chamado_id: str,
+    numero_chamado: str,
+    responsavel_email: str,
+    categoria: str = "",
+    tipo_solicitacao: str = "",
+    area: str = "",
+    solicitante_nome: str = "",
+    descricao_resumo: str = "",
+) -> None:
+    """Dispara evento para Power Automate avisando prazo de 24h ao responsável."""
+    if not responsavel_email or not str(responsavel_email).strip():
+        logger.warning(
+            "Alerta de prazo 24h ignorado para chamado %s: responsável sem e-mail",
+            numero_chamado,
+        )
+        return
+    responsavel_email = responsavel_email.strip()
+    link = _link_chamado(chamado_id)
+    link_dash = _link_dashboard()
+    resumo_truncado = (descricao_resumo or "")[:500] + (
+        "..." if len(descricao_resumo or "") > 500 else ""
+    )
+    corpo_texto = (
+        f"Number: {numero_chamado}\n"
+        "Deadline warning: this ticket is approaching SLA due time (24h remaining).\n"
+        f"Category: {categoria}\n"
+        f"Type: {tipo_solicitacao}\n"
+        f"Area: {area}\n"
+        f"Requester: {solicitante_nome}\n"
+        f"Summary: {resumo_truncado}\n\n"
+        "Use the buttons in the email to access: View ticket history or View your sector tickets."
+    )
+    detalhes_html = build_detail_table(
+        [
+            ("Number", numero_chamado),
+            ("Category", categoria),
+            ("Type", tipo_solicitacao),
+            ("Area", area),
+            ("Requester", solicitante_nome),
+        ]
+    )
+    summary_html = f'<p style="margin: 12px 0;">{escape(resumo_truncado)}</p>'
+
+    ctas = []
+    if link:
+        ctas.append(("View ticket history", link, "#d97706"))
+    if link_dash:
+        ctas.append(("View your sector tickets", link_dash, "#6b7280"))
+    if ctas:
+        botoes_html = build_two_ctas(ctas)
+    else:
+        botoes_html = '<p style="margin-top:20px;"><span style="color: #6b7280;">Set APP_BASE_URL to display links.</span></p>'
+
+    corpo_html = build_email_shell(
+        header_title="Ticket nearing deadline (24h)",
+        header_color="#d97706",
+        body_html=(
+            "<p>Hello, this ticket is approaching its deadline.</p>"
+            + detalhes_html
+            + summary_html
+            + botoes_html
+        ),
+    )
+    _disparar_evento_power_automate(
+        PREFIXO_ASSUNTO_CHAMADO_PRAZO_24H,
+        numero_chamado,
+        responsavel_email,
+        corpo_html,
+        corpo_texto,
+    )
+
+
+def notificar_novo_usuario_cadastrado(
+    usuario_id: str,
+    usuario_email: str,
+    usuario_nome: str = "",
+    perfil: str = "",
+    areas: list | None = None,
+    senha_inicial: str = "",
+) -> None:
+    """Dispara evento para Power Automate avisando o próprio usuário recém-cadastrado."""
+    if not usuario_email or not str(usuario_email).strip():
+        logger.warning("Aviso de novo usuário ignorado: e-mail do usuário vazio")
+        return
+    usuario_email = usuario_email.strip()
+    destino_final = (_config("POWER_AUTOMATE_TEST_DEST_EMAIL") or "").strip() or usuario_email
+    areas_str = ", ".join(areas or [])
+    link_dash = _link_dashboard()
+    corpo_texto = (
+        f"Hello {usuario_nome or 'user'},\n"
+        "A new account has been created with your email in Ticket System - DTX.\n"
+        f"Profile: {perfil}\n"
+        f"Areas: {areas_str or 'N/A'}\n"
+        f"E-mail: {usuario_email}\n"
+        f"Your initial password is: {senha_inicial}\n\n"
+        "If you do not recognize this action, contact support immediately."
+    )
+    detalhes_html = build_detail_table(
+        [
+            ("Profile", perfil or "N/A"),
+            ("Areas", areas_str or "N/A"),
+            ("E-mail", usuario_email),
+            ("Initial password", senha_inicial),
+        ]
+    )
+    acesso_html = ""
+    if link_dash:
+        acesso_html = f'<p style="margin-top: 20px;">{build_cta_button("Open system", link_dash, "#2563eb")}</p>'
+
+    corpo_html = build_email_shell(
+        header_title="New user registration",
+        header_color="#2563eb",
+        body_html=(
+            f"<p>Hello {escape(usuario_nome or 'user')}, a new account has been registered using your email.</p>"
+            + detalhes_html
+            + "<p>If you do not recognize this action, contact support immediately.</p>"
+            + acesso_html
+        ),
+    )
+    _disparar_evento_power_automate(
+        PREFIXO_ASSUNTO_USUARIO_CADASTRADO,
+        usuario_id,
+        destino_final,
+        corpo_html,
+        corpo_texto,
+    )
+
+
+def notificar_responsavel_setor_adicional_power_automate(
+    chamado_id: str,
+    numero_chamado: str,
+    email_responsavel_setor: str,
+    setor_adicional: str,
+    categoria: str = "",
+    tipo_solicitacao: str = "",
+    solicitante_nome: str = "",
+    quem_adicionou_nome: str = "",
+    descricao_resumo: str = "",
+) -> None:
+    """
+    Notifica o responsável de um setor adicional do chamado (via SMTP direto).
+
+    Opção B: não usar assunto estruturado para Power Automate nesse tipo de notificação.
+    """
+    if not email_responsavel_setor or not str(email_responsavel_setor).strip():
+        logger.warning(
+            "Aviso setor adicional ignorado para chamado %s: e-mail do responsável vazio",
+            numero_chamado,
+        )
+        return
+    email_responsavel_setor = email_responsavel_setor.strip()
+    link = _link_chamado(chamado_id)
+    link_dash = _link_dashboard()
+    resumo_truncado = (descricao_resumo or "")[:500] + (
+        "..." if len(descricao_resumo or "") > 500 else ""
+    )
+    corpo_texto = (
+        f"Number: {numero_chamado}\n"
+        f"Additional department included: {setor_adicional}\n"
+        f"Included by: {quem_adicionou_nome}\n"
+        f"Category: {categoria}\n"
+        f"Type: {tipo_solicitacao}\n"
+        f"Requester: {solicitante_nome}\n"
+        f"Summary: {resumo_truncado}\n\n"
+        "Use the buttons in the email to access: View ticket history or View your sector tickets."
+    )
+    detalhes_html = build_detail_table(
+        [
+            ("Number", numero_chamado),
+            ("Department", setor_adicional),
+            ("Included by", quem_adicionou_nome),
+            ("Category", categoria),
+            ("Type", tipo_solicitacao),
+            ("Requester", solicitante_nome),
+        ]
+    )
+    summary_html = f'<p style="margin: 12px 0;">{escape(resumo_truncado)}</p>'
+
+    ctas = []
+    if link:
+        ctas.append(("View ticket history", link, "#2563eb"))
+    if link_dash:
+        ctas.append(("View your sector tickets", link_dash, "#6b7280"))
+    if ctas:
+        botoes_html = build_two_ctas(ctas)
+    else:
+        botoes_html = '<p style="margin-top:20px;"><span style="color: #6b7280;">Set APP_BASE_URL to display links.</span></p>'
+
+    corpo_html = build_email_shell(
+        header_title="Additional department included",
+        header_color="#2563eb",
+        body_html=(
+            "<p>Hello, your department has been included in this ticket.</p>"
+            + detalhes_html
+            + summary_html
+            + botoes_html
+        ),
+    )
+    assunto = f"Ticket {numero_chamado}: your department has been included"
+    ok, err = enviar_email(email_responsavel_setor, assunto, corpo_html, corpo_texto)
+    if ok:
+        logger.info(
+            "E-mail de setor adicional enviado para %s (chamado %s)",
+            email_responsavel_setor,
+            numero_chamado,
+        )
+    else:
+        logger.warning(
+            "Falha ao enviar e-mail de setor adicional para %s: %s",
+            email_responsavel_setor,
+            err or "verifique MAIL_*",
+        )
 
 
 def notificar_setores_adicionais_chamado(
@@ -267,30 +553,39 @@ def notificar_setores_adicionais_chamado(
             f"Category: {categoria}\nType: {tipo_solicitacao}\n"
             f"Requester: {solicitante_nome}\n"
             f"Summary: {resumo_truncado}\n\n"
-            "Use the buttons in the email to access the ticket."
+            "Use the buttons in the email to access the ticket and view the list in your sector."
         )
-        botoes_html = ""
+        detalhes_html = build_detail_table(
+            [
+                ("Number", numero_chamado),
+                ("Category", categoria),
+                ("Type", tipo_solicitacao),
+                ("Requester", solicitante_nome),
+                ("Included by", quem_adicionou_nome),
+                ("Departments added", setores_str),
+            ]
+        )
+        summary_html = f'<p style="margin: 12px 0;">{escape(resumo_truncado)}</p>'
+
+        ctas = []
         if link:
-            botoes_html += f'<a href="{link}" style="background: #2563eb; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; margin-right: 8px; display: inline-block;">View ticket</a> '
+            ctas.append(("View ticket history", link, "#2563eb"))
         if link_dash:
-            botoes_html += f'<a href="{link_dash}" style="background: #6b7280; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; display: inline-block;">Open dashboard</a>'
-        if not botoes_html:
-            botoes_html = '<span style="color: #6b7280;">Set APP_BASE_URL to display links.</span>'
-        corpo_html = (
-            f'<div style="font-family: Arial, sans-serif; max-width: 560px;">'
-            f'<h2 style="color: #2563eb; margin-bottom: 16px;">Ticket: your department has been included</h2>'
-            f"<p>Hello, ticket <strong>{numero_chamado}</strong> had your department included by <strong>{quem_adicionou_nome}</strong>.</p>"
-            f"<p><strong>Departments added:</strong> {setores_str}</p>"
-            f'<ul style="background: #f3f4f6; padding: 16px 16px 16px 32px; border-radius: 8px; margin: 16px 0;">'
-            f"<li><strong>Number:</strong> {numero_chamado}</li>"
-            f"<li><strong>Category:</strong> {categoria}</li>"
-            f"<li><strong>Type:</strong> {tipo_solicitacao}</li>"
-            f"<li><strong>Requester:</strong> {solicitante_nome}</li>"
-            f"</ul>"
-            f'<p style="margin: 12px 0;">{resumo_truncado}</p>'
-            f'<p style="margin-top: 20px;">{botoes_html}</p>'
-            f'<p style="margin-top: 24px; color: #6b7280; font-size: 12px;"><em>Ticket System - DTX</em></p>'
-            f"</div>"
+            ctas.append(("View your sector tickets", link_dash, "#6b7280"))
+        if ctas:
+            botoes_html = build_two_ctas(ctas)
+        else:
+            botoes_html = '<p style="margin-top:20px;"><span style="color: #6b7280;">Set APP_BASE_URL to display links.</span></p>'
+
+        corpo_html = build_email_shell(
+            header_title="Ticket: your department has been included",
+            header_color="#2563eb",
+            body_html=(
+                f"<p>Hello, ticket <strong>{escape(numero_chamado)}</strong> had your department included by <strong>{escape(quem_adicionou_nome)}</strong>.</p>"
+                + detalhes_html
+                + summary_html
+                + botoes_html
+            ),
         )
         ok, err = enviar_email(email.strip(), assunto, corpo_html, corpo_texto)
         if ok:

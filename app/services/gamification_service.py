@@ -72,13 +72,17 @@ class GamificationService:
 
             if sucesso:
                 logger.info(
-                    f"Usuário {usuario_id} ganhou {pontos} EXP ({motivo}). Novo nível: {novo_level}."
+                    "Usuário %s ganhou %s EXP (%s). Novo nível: %s.",
+                    usuario_id,
+                    pontos,
+                    motivo,
+                    novo_level,
                 )
 
             return sucesso
 
         except Exception as e:
-            logger.exception(f"Erro ao adicionar EXP para o usuário {usuario_id}: {e}")
+            logger.exception("Erro ao adicionar EXP para o usuário %s: %s", usuario_id, e)
             return False
 
     @staticmethod
@@ -113,7 +117,7 @@ class GamificationService:
             GamificationService._adicionar_exp(usuario_id, pontos, motivo)
 
         except Exception as e:
-            logger.exception(f"Erro ao avaliar resolução de chamado para Gamificação: {e}")
+            logger.exception("Erro ao avaliar resolução de chamado para Gamificação: %s", e)
 
     @staticmethod
     def avaliar_atendimento_inicial(usuario_id: str) -> None:

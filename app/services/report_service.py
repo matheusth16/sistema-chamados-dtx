@@ -20,12 +20,18 @@ from datetime import UTC, datetime
 from typing import Any
 
 import pytz
+from firebase_admin import firestore as fs_admin
 
 from app.database import db
 from app.models import Chamado
 from app.models_usuario import Usuario
 from app.services.analytics import _to_datetime, obter_sla_para_exibicao
-from app.services.notifications import _base_url, _link_dashboard, enviar_email
+from app.services.notifications import (
+    _base_url,
+    _link_dashboard,
+    enviar_email,
+    notificar_responsavel_prazo_24h,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -108,6 +114,7 @@ def buscar_chamados_abertos() -> list[dict[str, Any]]:
                         "sla_label": sla_info.get("label", ""),
                         "atrasado": sla_info.get("label") == "Atrasado",
                         "sla_dias": chamado.sla_dias,
+                        "alerta_prazo_24h_enviado_em": data.get("alerta_prazo_24h_enviado_em"),
                     }
                 )
         except Exception as exc:
@@ -403,3 +410,70 @@ def _enviar_resumo_admins(
             logger.info("Resumo semanal (relay) enviado para admin %s", email_admin)
         else:
             logger.warning("Falha ao enviar resumo (relay) para admin %s: %s", email_admin, err)
+
+
+def enviar_alertas_prazo_24h() -> dict[str, Any]:
+    """
+    Dispara alerta de prazo (24h) para responsáveis de chamados em risco.
+    Critério: chamados com status Aberto/Em Atendimento cujo SLA está "Em risco".
+    """
+    chamados = buscar_chamados_abertos()
+    elegiveis = [
+        c
+        for c in chamados
+        if c.get("sla_label") == "Em risco" and not c.get("alerta_prazo_24h_enviado_em")
+    ]
+
+    enviados = ignorados = erros = 0
+
+    for c in elegiveis:
+        responsavel_id = c.get("responsavel_id")
+        if not responsavel_id:
+            ignorados += 1
+            continue
+
+        responsavel = Usuario.get_by_id(responsavel_id)
+        email = (getattr(responsavel, "email", None) or "").strip() if responsavel else ""
+        if not email:
+            ignorados += 1
+            continue
+
+        try:
+            notificar_responsavel_prazo_24h(
+                chamado_id=c.get("id", ""),
+                numero_chamado=c.get("numero", ""),
+                responsavel_email=email,
+                categoria=c.get("categoria", ""),
+                tipo_solicitacao=c.get("tipo", ""),
+                area=c.get("area", ""),
+                solicitante_nome=c.get("solicitante", ""),
+                descricao_resumo="",
+            )
+            if c.get("id"):
+                db.collection("chamados").document(c["id"]).update(
+                    {
+                        "alerta_prazo_24h_enviado_em": fs_admin.SERVER_TIMESTAMP,
+                    }
+                )
+            enviados += 1
+        except Exception as exc:
+            erros += 1
+            logger.exception(
+                "Erro ao enviar alerta 24h para chamado %s: %s",
+                c.get("numero", c.get("id", "sem_id")),
+                exc,
+            )
+
+    logger.info(
+        "Alerta 24h executado: elegiveis=%d enviados=%d ignorados=%d erros=%d",
+        len(elegiveis),
+        enviados,
+        ignorados,
+        erros,
+    )
+    return {
+        "elegiveis": len(elegiveis),
+        "enviados": enviados,
+        "ignorados": ignorados,
+        "erros": erros,
+    }

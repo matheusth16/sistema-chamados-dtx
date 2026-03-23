@@ -164,6 +164,7 @@
                 <div>
                     <label for="gate" class="block text-xs font-black text-slate-500 uppercase tracking-widest mb-1">{{ t('gate') }}</label>
                     <select name="gate" id="gate"
+                            required
                             class="mt-1 block w-full pl-3 pr-10 py-2.5 text-base border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 sm:text-sm rounded-xl shadow-sm transition-all bg-white hover:border-slate-300 cursor-pointer">
                         <option value="N/A">{{ t('not_applicable_short') }}</option>
                         <option value="Gate 1">{{ t('gate_1') }}</option>
@@ -179,7 +180,7 @@
                 <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
                     {% for impacto in impactos %}
                     <label class="relative border border-slate-200 rounded-xl p-3 flex items-center cursor-pointer transition-all hover:bg-slate-50 hover:border-slate-300 has-[:checked]:bg-blue-50 has-[:checked]:border-blue-400 has-[:checked]:shadow-sm has-[:checked]:ring-2 has-[:checked]:ring-blue-500/20 group">
-                        <input type="radio" name="impacto" value="{{ impacto.nome_pt }}" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-slate-300">
+                        <input type="radio" name="impacto" value="{{ impacto.nome_pt }}" required class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-slate-300">
                         {% if current_language == 'en' %}{% set imp_display = impacto.nome_en|default(impacto.nome_pt) %}{% elif current_language == 'es' %}{% set imp_display = impacto.nome_es|default(impacto.nome_pt) %}{% else %}{% set imp_display = impacto.nome_pt %}{% endif %}
                         <span class="ml-2.5 text-sm font-bold text-slate-700 group-has-[:checked]:text-blue-800">{{ imp_display }}</span>
                     </label>

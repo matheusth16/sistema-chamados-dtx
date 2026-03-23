@@ -2483,5 +2483,65 @@
     "pt_BR": "h",
     "en": "h",
     "es": "h"
+  },
+  "hr": {
+    "pt_BR": "RH",
+    "en": "HR",
+    "es": "RRHH"
+  },
+  "it": {
+    "pt_BR": "TI",
+    "en": "IT",
+    "es": "TI"
+  },
+  "ppcp": {
+    "pt_BR": "PPCP",
+    "en": "PPCP",
+    "es": "PPCP"
+  },
+  "material_planning": {
+    "pt_BR": "Planejamento Materiais",
+    "en": "Materials Planning",
+    "es": "Planificación de Materiales"
+  },
+  "supplies": {
+    "pt_BR": "Suprimentos",
+    "en": "Supplies",
+    "es": "Suministros"
+  },
+  "logistics": {
+    "pt_BR": "Logística",
+    "en": "Logistics",
+    "es": "Logística"
+  },
+  "facility": {
+    "pt_BR": "Infraestrutura",
+    "en": "Facility",
+    "es": "Instalaciones"
+  },
+  "production_machining": {
+    "pt_BR": "Produção - Usinagem",
+    "en": "Production - Machining",
+    "es": "Producción - Mecanizado"
+  },
+  "production_assembly": {
+    "pt_BR": "Produção - Montagem",
+    "en": "Production - Assembly",
+    "es": "Producción - Montaje"
+  },
+  "production_inspections": {
+    "pt_BR": "Produção - Inspeções",
+    "en": "Production - Inspections",
+    "es": "Producción - Inspecciones"
+  },
+  "production_special_processes": {
+    "pt_BR": "Produção - Processos Especiais",
+    "en": "Production - Special Processes",
+    "es": "Producción - Procesos Especiales"
+  },
+  "procurement": {
+    "pt_BR": "Compras",
+    "en": "Procurement",
+    "es": "Aprovisionamiento"
   }
 }

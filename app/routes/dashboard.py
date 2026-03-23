@@ -32,10 +32,20 @@ from app.services.contadores_uso import (
     verificar_e_incrementar_export,
     verificar_e_incrementar_relatorio,
 )
-from app.services.dashboard_service import _filtrar_chamados_por_permissao, obter_contexto_admin
+from app.services.dashboard_service import (
+    _filtrar_chamados_por_permissao,
+    obter_contexto_admin,
+    ordenar_metricas_areas,
+    ordenar_metricas_supervisores,
+    preparar_metricas_paginadas,
+)
 from app.services.excel_export_service import MAX_EXPORT_CHAMADOS
 from app.services.filters import aplicar_filtros_dashboard_com_paginacao
 from app.services.pagination import OptimizadorQuery
+from app.services.permission_validation import (
+    filtrar_supervisores_por_area,
+    supervisor_pode_alterar_chamado,
+)
 from app.services.permissions import usuario_pode_ver_chamado
 from app.services.status_service import atualizar_status_chamado
 from app.utils import formatar_data_para_excel
@@ -63,7 +73,7 @@ def admin() -> Response:
     if request.method == "POST":
         chamado_id = request.form.get("chamado_id")
         novo_status = request.form.get("novo_status")
-        logger.debug(f"Alterar status: chamado_id={chamado_id}, novo_status={novo_status}")
+        logger.debug("Alterar status: chamado_id=%s, novo_status=%s", chamado_id, novo_status)
         try:
             # Verificação de permissão para supervisores
             if current_user.perfil == "supervisor":
@@ -72,7 +82,7 @@ def admin() -> Response:
                     flash_t("ticket_not_found", "danger")
                     return redirect(url_for("main.admin", **request.args))
                 data_anterior = doc_anterior.to_dict()
-                if data_anterior.get("area") not in current_user.areas:
+                if not supervisor_pode_alterar_chamado(current_user, data_anterior.get("area", "")):
                     flash_t("only_update_tickets_your_area", "danger")
                     return redirect(url_for("main.admin", **request.args))
 
@@ -92,7 +102,7 @@ def admin() -> Response:
                     flash_t("error_updating", "danger")
             return redirect(url_for("main.admin", **request.args))
         except Exception as e:
-            logger.exception(f"Erro ao atualizar chamado {chamado_id}: {str(e)}")
+            logger.exception("Erro ao atualizar chamado %s: %s", chamado_id, e)
             flash_t("error_updating_with_msg", "danger", error=str(e))
             return redirect(url_for("main.admin", **request.args))
 
@@ -101,7 +111,8 @@ def admin() -> Response:
         contexto = obter_contexto_admin(
             current_user, request.args, itens_por_pagina=itens_por_pagina
         )
-        return render_template("dashboard.html", **contexto)
+        setores = [s for s in CategoriaSetor.get_all() if getattr(s, "ativo", True)]
+        return render_template("dashboard.html", **contexto, setores=setores)
     except FailedPrecondition as e:
         msg = str(e).lower()
         if "currently building" in msg or "cannot be used yet" in msg:
@@ -146,15 +157,8 @@ def visualizar_detalhe_chamado(chamado_id: str) -> Response:
         pode_editar = current_user.perfil in ("supervisor", "admin")
         usuarios_gestao = Usuario.get_all()
         supervisores_list = [u for u in usuarios_gestao if u.perfil == "supervisor" and u.nome]
-        if (
-            pode_editar
-            and current_user.perfil == "supervisor"
-            and getattr(current_user, "areas", None)
-        ):
-            user_areas_set = set(current_user.areas)
-            supervisores_list = [
-                u for u in supervisores_list if user_areas_set & set(getattr(u, "areas", []))
-            ]
+        if pode_editar:
+            supervisores_list = filtrar_supervisores_por_area(current_user, supervisores_list)
         supervisores_detalhados = (
             sorted(
                 [{"id": u.id, "nome": u.nome, "area": u.area} for u in supervisores_list],
@@ -253,7 +257,7 @@ def visualizar_historico(chamado_id: str) -> Response:
         historico = Historico.get_by_chamado_id(chamado_id)
         return render_template("historico.html", chamado=chamado, historico=historico)
     except Exception as e:
-        logger.exception(f"Erro ao buscar histórico de {chamado_id}: {str(e)}")
+        logger.exception("Erro ao buscar histórico de %s: %s", chamado_id, e)
         flash_t("error_loading_history", "danger")
         return redirect(url_for("main.admin"))
 
@@ -312,7 +316,7 @@ def exportar() -> Response:
             download_name=f"relatorio_chamados_{ts}.xlsx",
         )
     except Exception as e:
-        logger.exception(f"Erro ao exportar: {str(e)}")
+        logger.exception("Erro ao exportar: %s", e)
         flash_t("error_exporting_data", "danger")
         return redirect(url_for("main.admin"))
 
@@ -371,52 +375,9 @@ def exportar_avancado() -> Response:
             download_name=f"relatorio_completo_{ts}.xlsx",
         )
     except Exception as e:
-        logger.exception(f"Erro ao exportar relatório avançado: {str(e)}")
+        logger.exception("Erro ao exportar relatório avançado: %s", e)
         flash_t("error_exporting_report", "danger")
         return redirect(url_for("main.admin"))
-
-
-def _relatorios_ordenar_supervisores(lista: list[dict], campo: str, asc: bool) -> list[dict]:
-    """Ordena lista de métricas de supervisores por campo (total_chamados, carga_atual, taxa_resolucao_percentual, tempo_medio_resolucao_horas, supervisor_nome, area)."""
-    reverse = not asc
-    if campo == "total":
-        return sorted(lista, key=lambda x: x.get("total_chamados", 0), reverse=reverse)
-    if campo == "carga":
-        return sorted(lista, key=lambda x: x.get("carga_atual", 0), reverse=reverse)
-    if campo == "taxa":
-        return sorted(lista, key=lambda x: x.get("taxa_resolucao_percentual", 0), reverse=reverse)
-    if campo == "tempo":
-        return sorted(lista, key=lambda x: x.get("tempo_medio_resolucao_horas", 0), reverse=reverse)
-    if campo == "nome":
-        return sorted(
-            lista, key=lambda x: (x.get("supervisor_nome") or "").lower(), reverse=reverse
-        )
-    if campo == "area":
-        return sorted(lista, key=lambda x: (x.get("area") or "").lower(), reverse=reverse)
-    if campo == "sla":
-
-        def _sla_key(x):
-            v = x.get("percentual_dentro_sla")
-            return (v is None, -(v or 0))
-
-        return sorted(lista, key=_sla_key, reverse=reverse)
-    return lista
-
-
-def _relatorios_ordenar_areas(lista: list[dict], campo: str, asc: bool) -> list[dict]:
-    """Ordena lista de métricas por área (total_chamados, abertos, taxa_resolucao_percentual, tempo_medio_resolucao_horas, area)."""
-    reverse = not asc
-    if campo == "total":
-        return sorted(lista, key=lambda x: x.get("total_chamados", 0), reverse=reverse)
-    if campo == "abertos":
-        return sorted(lista, key=lambda x: x.get("abertos", 0), reverse=reverse)
-    if campo == "taxa":
-        return sorted(lista, key=lambda x: x.get("taxa_resolucao_percentual", 0), reverse=reverse)
-    if campo == "tempo":
-        return sorted(lista, key=lambda x: x.get("tempo_medio_resolucao_horas", 0), reverse=reverse)
-    if campo == "area":
-        return sorted(lista, key=lambda x: (x.get("area") or "").lower(), reverse=reverse)
-    return lista
 
 
 @main.route("/admin/relatorios")
@@ -454,13 +415,13 @@ def relatorios() -> Response:
 
         itens_por_pagina = max(1, int(getattr(Config, "ITENS_POR_PAGINA", 10)))
 
-        # Supervisores: lista completa para gráficos e para filtrar/ordenar/paginar
-        metricas_supervisores_full = list(relatorio.get("metricas_supervisores") or [])
+        # Supervisores: filtrar, ordenar e paginar via serviço
+        sup_lista_raw = list(relatorio.get("metricas_supervisores") or [])
         busca_sup = (request.args.get("busca_sup") or "").strip().lower()
         if busca_sup:
-            metricas_supervisores_full = [
+            sup_lista_raw = [
                 s
-                for s in metricas_supervisores_full
+                for s in sup_lista_raw
                 if busca_sup in (s.get("supervisor_nome") or "").lower()
                 or busca_sup in (s.get("supervisor_email") or "").lower()
                 or busca_sup in (s.get("area") or "").lower()
@@ -469,44 +430,44 @@ def relatorios() -> Response:
         ordem_sup = (request.args.get("ordem_sup") or "desc").lower()
         if ordem_sup not in ("asc", "desc"):
             ordem_sup = "desc"
-        metricas_supervisores_full = _relatorios_ordenar_supervisores(
-            metricas_supervisores_full, ordenar_sup, ordem_sup == "asc"
+        pag_sup = preparar_metricas_paginadas(
+            sup_lista_raw,
+            ordenar_sup,
+            ordem_sup == "asc",
+            request.args.get("pagina_sup", 1, type=int),
+            itens_por_pagina,
+            ordenar_metricas_supervisores,
         )
-        total_supervisores = len(metricas_supervisores_full)
-        total_paginas_sup = max(1, (total_supervisores + itens_por_pagina - 1) // itens_por_pagina)
-        pagina_sup = request.args.get("pagina_sup", 1, type=int)
-        if pagina_sup < 1:
-            pagina_sup = 1
-        if pagina_sup > total_paginas_sup:
-            pagina_sup = total_paginas_sup
-        inicio_sup = (pagina_sup - 1) * itens_por_pagina
-        metricas_supervisores = metricas_supervisores_full[
-            inicio_sup : inicio_sup + itens_por_pagina
-        ]
+        metricas_supervisores = pag_sup["items"]
+        metricas_supervisores_full = pag_sup["items_full"]
+        pagina_sup = pag_sup["pagina"]
+        total_supervisores = pag_sup["total"]
+        total_paginas_sup = pag_sup["total_paginas"]
 
-        # Áreas: lista completa para gráficos e para filtrar/ordenar/paginar
-        metricas_areas_full = list(relatorio.get("metricas_areas") or [])
+        # Áreas: filtrar, ordenar e paginar via serviço
+        area_lista_raw = list(relatorio.get("metricas_areas") or [])
         busca_area = (request.args.get("busca_area") or "").strip().lower()
         if busca_area:
-            metricas_areas_full = [
-                a for a in metricas_areas_full if busca_area in (a.get("area") or "").lower()
+            area_lista_raw = [
+                a for a in area_lista_raw if busca_area in (a.get("area") or "").lower()
             ]
         ordenar_area = request.args.get("ordenar_area") or "total"
         ordem_area = (request.args.get("ordem_area") or "desc").lower()
         if ordem_area not in ("asc", "desc"):
             ordem_area = "desc"
-        metricas_areas_full = _relatorios_ordenar_areas(
-            metricas_areas_full, ordenar_area, ordem_area == "asc"
+        pag_area = preparar_metricas_paginadas(
+            area_lista_raw,
+            ordenar_area,
+            ordem_area == "asc",
+            request.args.get("pagina_area", 1, type=int),
+            itens_por_pagina,
+            ordenar_metricas_areas,
         )
-        total_areas = len(metricas_areas_full)
-        total_paginas_area = max(1, (total_areas + itens_por_pagina - 1) // itens_por_pagina)
-        pagina_area = request.args.get("pagina_area", 1, type=int)
-        if pagina_area < 1:
-            pagina_area = 1
-        if pagina_area > total_paginas_area:
-            pagina_area = total_paginas_area
-        inicio_area = (pagina_area - 1) * itens_por_pagina
-        metricas_areas = metricas_areas_full[inicio_area : inicio_area + itens_por_pagina]
+        metricas_areas = pag_area["items"]
+        metricas_areas_full = pag_area["items_full"]
+        pagina_area = pag_area["pagina"]
+        total_areas = pag_area["total"]
+        total_paginas_area = pag_area["total_paginas"]
 
         # Ranking Gamificação Top 3 da Semana
         # Aproveitar os usuários puxados do banco ou base no relatorio
@@ -520,6 +481,9 @@ def relatorios() -> Response:
             key=lambda u: u.exp_semanal,
             reverse=True,
         )[:3]
+
+        # Áreas: lista completa (para traduções no front-end)
+        setores = [s for s in CategoriaSetor.get_all() if getattr(s, "ativo", True)]
 
         return render_template(
             "relatorios.html",
@@ -548,11 +512,13 @@ def relatorios() -> Response:
             ordem_area=ordem_area,
             busca_area=request.args.get("busca_area", ""),
             erro_relatorio=erro_relatorio,
+            setores=setores,
         )
     except Exception as e:
         logger.exception("Erro ao gerar relatórios: %s", e)
         try:
             # Tenta exibir a página de relatórios com dados vazios e mensagem de erro
+            setores = [s for s in CategoriaSetor.get_all() if getattr(s, "ativo", True)]
             return render_template(
                 "relatorios.html",
                 relatorio={},
@@ -579,6 +545,7 @@ def relatorios() -> Response:
                 ordem_area="desc",
                 busca_area=request.args.get("busca_area", ""),
                 erro_relatorio=True,
+                setores=setores,
             )
         except Exception as e2:
             logger.exception("Erro ao renderizar página de relatórios (fallback): %s", e2)
@@ -596,6 +563,6 @@ def indices_firestore() -> Response:
         script = OptimizadorQuery.gerar_script_indices()
         return render_template("indices_firestore.html", indices=indices, script=script)
     except Exception as e:
-        logger.exception(f"Erro ao exibir índices: {str(e)}")
+        logger.exception("Erro ao exibir índices: %s", e)
         flash_t("error_loading_index_info", "danger")
         return redirect(url_for("main.admin"))

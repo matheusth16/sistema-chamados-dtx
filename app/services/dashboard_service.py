@@ -15,10 +15,90 @@ from app.models_categorias import CategoriaGate
 from app.models_usuario import Usuario
 from app.services.analytics import obter_sla_para_exibicao
 from app.services.filters import aplicar_filtros_dashboard_com_paginacao
+from app.services.permission_validation import filtrar_supervisores_por_area
 from app.services.permissions import usuario_pode_ver_chamado_otimizado
 from app.utils import extrair_numero_chamado
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Helpers de relatórios: ordenação e paginação de métricas
+# ---------------------------------------------------------------------------
+
+_CAMPOS_SUP = {
+    "total": lambda x: x.get("total_chamados", 0),
+    "carga": lambda x: x.get("carga_atual", 0),
+    "taxa": lambda x: x.get("taxa_resolucao_percentual", 0),
+    "tempo": lambda x: x.get("tempo_medio_resolucao_horas", 0),
+    "nome": lambda x: (x.get("supervisor_nome") or "").lower(),
+    "area": lambda x: (x.get("area") or "").lower(),
+}
+
+_CAMPOS_AREA = {
+    "total": lambda x: x.get("total_chamados", 0),
+    "abertos": lambda x: x.get("abertos", 0),
+    "taxa": lambda x: x.get("taxa_resolucao_percentual", 0),
+    "tempo": lambda x: x.get("tempo_medio_resolucao_horas", 0),
+    "area": lambda x: (x.get("area") or "").lower(),
+}
+
+
+def ordenar_metricas_supervisores(lista: list[dict], campo: str, asc: bool) -> list[dict]:
+    """Ordena métricas de supervisores por campo.
+
+    Campos aceitos: total, carga, taxa, tempo, nome, area, sla.
+    """
+    reverse = not asc
+    if campo == "sla":
+
+        def _sla_key(x):
+            v = x.get("percentual_dentro_sla")
+            return (v is None, -(v or 0))
+
+        return sorted(lista, key=_sla_key, reverse=reverse)
+    key_fn = _CAMPOS_SUP.get(campo)
+    if key_fn:
+        return sorted(lista, key=key_fn, reverse=reverse)
+    return lista
+
+
+def ordenar_metricas_areas(lista: list[dict], campo: str, asc: bool) -> list[dict]:
+    """Ordena métricas de áreas por campo.
+
+    Campos aceitos: total, abertos, taxa, tempo, area.
+    """
+    key_fn = _CAMPOS_AREA.get(campo)
+    if key_fn:
+        return sorted(lista, key=key_fn, reverse=not asc)
+    return lista
+
+
+def preparar_metricas_paginadas(
+    items_full: list[dict],
+    campo_ordenacao: str,
+    ordem_asc: bool,
+    pagina: int,
+    itens_por_pagina: int,
+    ordenar_fn,
+) -> dict:
+    """Aplica ordenação e paginação a uma lista de métricas.
+
+    Returns:
+        dict com items, items_full (ordenado, para gráficos), total,
+        total_paginas e pagina (clampeada).
+    """
+    ordered = ordenar_fn(items_full, campo_ordenacao, ordem_asc)
+    total = len(ordered)
+    total_paginas = max(1, (total + itens_por_pagina - 1) // itens_por_pagina)
+    pagina = max(1, min(pagina, total_paginas))
+    inicio = (pagina - 1) * itens_por_pagina
+    return {
+        "items": ordered[inicio : inicio + itens_por_pagina],
+        "items_full": ordered,
+        "total": total,
+        "total_paginas": total_paginas,
+        "pagina": pagina,
+    }
 
 
 def _filtrar_chamados_por_permissao(docs: list[Any], user: Any) -> list[Chamado]:
@@ -35,11 +115,7 @@ def _filtrar_chamados_por_permissao(docs: list[Any], user: Any) -> list[Chamado]
         chamados_raw.append(c)
         if c.responsavel_id:
             responsavel_ids.add(c.responsavel_id)
-    cache_usuarios = {}
-    for uid in responsavel_ids:
-        u = Usuario.get_by_id(uid)
-        if u:
-            cache_usuarios[uid] = u
+    cache_usuarios = Usuario.get_by_ids(list(responsavel_ids))
     for c in chamados_raw:
         if usuario_pode_ver_chamado_otimizado(user, c, cache_usuarios):
             chamados.append(c)
@@ -64,9 +140,7 @@ def obter_contexto_admin(
     usuarios_gestao = get_static_cached("usuarios_all", Usuario.get_all, ttl_seconds=300)
     supervisores = [u for u in usuarios_gestao if u.perfil == "supervisor" and u.nome]
     # Supervisor vê apenas responsáveis do(s) mesmo(s) setor(es); admin vê todos
-    if user.perfil == "supervisor" and getattr(user, "areas", None):
-        user_areas_set = set(user.areas)
-        supervisores = [u for u in supervisores if user_areas_set & set(getattr(u, "areas", []))]
+    supervisores = filtrar_supervisores_por_area(user, supervisores)
     lista_responsaveis = sorted([u.nome for u in supervisores], key=lambda x: x.upper())
     supervisores_detalhados = sorted(
         [{"id": u.id, "nome": u.nome, "area": u.area} for u in supervisores],

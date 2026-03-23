@@ -173,7 +173,7 @@ def alterar_senha_obrigatoria() -> Response:
                 return redirect(url_for("main.alterar_senha_obrigatoria"))
 
         except Exception as e:
-            logger.exception(f"Erro ao alterar senha: {e}")
+            logger.exception("Erro ao alterar senha: %s", e)
             flash_t("error_updating_password", "danger")
             return redirect(url_for("main.alterar_senha_obrigatoria"))
 

@@ -37,7 +37,7 @@ def admin_categorias() -> Response:
             impactos=impactos,
         )
     except Exception as e:
-        logger.exception(f"Erro ao carregar categorias: {str(e)}")
+        logger.exception("Erro ao carregar categorias: %s", e)
         flash_t("error_loading_categories", "danger")
         return redirect(url_for("main.admin"))
 
@@ -66,7 +66,7 @@ def criar_setor() -> Response:
         flash_t("sector_created_success", "success", nome=nome_pt)
         return redirect(url_for("main.admin_categorias"))
     except Exception as e:
-        logger.exception(f"Erro ao criar setor: {str(e)}")
+        logger.exception("Erro ao criar setor: %s", e)
         flash_t("error_creating_sector", "danger", error=str(e))
         return redirect(url_for("main.admin_categorias"))
 
@@ -103,7 +103,7 @@ def criar_gate() -> Response:
         flash_t("gate_created_success", "success", nome=nome_pt, ordem=proxima_ordem)
         return redirect(url_for("main.admin_categorias"))
     except Exception as e:
-        logger.exception(f"Erro ao criar gate: {str(e)}")
+        logger.exception("Erro ao criar gate: %s", e)
         flash_t("error_creating_gate", "danger", error=str(e))
         return redirect(url_for("main.admin_categorias"))
 
@@ -132,7 +132,7 @@ def criar_impacto() -> Response:
         flash_t("impact_created_success", "success", nome=nome_pt)
         return redirect(url_for("main.admin_categorias"))
     except Exception as e:
-        logger.exception(f"Erro ao criar impacto: {str(e)}")
+        logger.exception("Erro ao criar impacto: %s", e)
         flash_t("error_creating_impact", "danger", error=str(e))
         return redirect(url_for("main.admin_categorias"))
 
@@ -156,7 +156,7 @@ def editar_setor(setor_id: str) -> Response:
         flash_t("sector_updated_success", "success", nome=setor.nome_pt)
         return redirect(url_for("main.admin_categorias"))
     except Exception as e:
-        logger.exception(f"Erro ao editar setor: {str(e)}")
+        logger.exception("Erro ao editar setor: %s", e)
         flash_t("error_editing_sector", "danger", error=str(e))
         return redirect(url_for("main.admin_categorias"))
 
@@ -176,7 +176,7 @@ def excluir_setor(setor_id: str) -> Response:
         flash_t("sector_deleted_success", "success", nome=nome)
         return redirect(url_for("main.admin_categorias"))
     except Exception as e:
-        logger.exception(f"Erro ao excluir setor: {str(e)}")
+        logger.exception("Erro ao excluir setor: %s", e)
         flash_t("error_deleting_sector", "danger", error=str(e))
         return redirect(url_for("main.admin_categorias"))
 
@@ -200,7 +200,7 @@ def editar_gate(gate_id: str) -> Response:
         flash_t("gate_updated_success", "success", nome=gate.nome_pt)
         return redirect(url_for("main.admin_categorias"))
     except Exception as e:
-        logger.exception(f"Erro ao editar gate: {str(e)}")
+        logger.exception("Erro ao editar gate: %s", e)
         flash_t("error_editing_gate", "danger", error=str(e))
         return redirect(url_for("main.admin_categorias"))
 
@@ -220,7 +220,7 @@ def excluir_gate(gate_id: str) -> Response:
         flash_t("gate_deleted_success", "success", nome=nome)
         return redirect(url_for("main.admin_categorias"))
     except Exception as e:
-        logger.exception(f"Erro ao excluir gate: {str(e)}")
+        logger.exception("Erro ao excluir gate: %s", e)
         flash_t("error_deleting_gate", "danger", error=str(e))
         return redirect(url_for("main.admin_categorias"))
 
@@ -244,7 +244,7 @@ def editar_impacto(impacto_id: str) -> Response:
         flash_t("impact_updated_success", "success", nome=impacto.nome_pt)
         return redirect(url_for("main.admin_categorias"))
     except Exception as e:
-        logger.exception(f"Erro ao editar impacto: {str(e)}")
+        logger.exception("Erro ao editar impacto: %s", e)
         flash_t("error_editing_impact", "danger", error=str(e))
         return redirect(url_for("main.admin_categorias"))
 
@@ -264,6 +264,6 @@ def excluir_impacto(impacto_id: str) -> Response:
         flash_t("impact_deleted_success", "success", nome=nome)
         return redirect(url_for("main.admin_categorias"))
     except Exception as e:
-        logger.exception(f"Erro ao excluir impacto: {str(e)}")
+        logger.exception("Erro ao excluir impacto: %s", e)
         flash_t("error_deleting_impact", "danger", error=str(e))
         return redirect(url_for("main.admin_categorias"))

@@ -1,3 +1,4 @@
+import contextlib
 import logging
 import os
 import secrets
@@ -12,6 +13,22 @@ from flask_wtf.csrf import CSRFProtect
 from pythonjsonlogger import jsonlogger
 
 from config import Config
+
+
+class _WindowsSafeRotatingFileHandler(RotatingFileHandler):
+    """RotatingFileHandler que ignora PermissionError durante rollover.
+
+    No Windows em modo debug, o reloader do Flask mantém dois processos com o
+    arquivo de log aberto simultaneamente. O os.rename() dentro de doRollover()
+    falha com WinError 32 quando o processo-pai ainda segura o handle.
+    Capturar o erro mantém o logging funcional e simplesmente pula a rotação
+    quando o arquivo está bloqueado.
+    """
+
+    def doRollover(self) -> None:  # noqa: N802 — sobrescreve método da biblioteca
+        with contextlib.suppress(PermissionError):
+            super().doRollover()
+
 
 # Rotas POST sensíveis que devem validar Origin/Referer quando APP_BASE_URL estiver definido
 _POST_ORIGIN_CHECK_PATHS = frozenset(
@@ -76,6 +93,9 @@ def create_app():
 
     # API de status exige CSRF; o frontend envia o token no header X-CSRFToken (meta csrf-token)
 
+    # Garante que UPLOAD_FOLDER existe e tem permissão de escrita
+    _verificar_upload_folder(app)
+
     # Firebase é inicializado em app/database.py
     # Não há tabelas para criar (Firestore é NoSQL)
 
@@ -102,12 +122,38 @@ def create_app():
                     get_static_cached("categorias_impacto", CategoriaImpacto.get_all)
                     get_static_cached("categorias_gate", CategoriaGate.get_all)
                     get_static_cached("usuarios_all", Usuario.get_all)
-                except Exception:
-                    pass  # warmup é best-effort, nunca deve impedir o startup
+                except Exception as exc:
+                    # warmup é best-effort; logamos para diagnóstico mas nunca
+                    # deixamos impedir o startup da aplicação
+                    logging.getLogger(__name__).debug(
+                        "Warmup de cache falhou (best-effort): %s", exc
+                    )
 
         threading.Thread(target=_warmup, daemon=True).start()
 
     return app
+
+
+def _verificar_upload_folder(app: Flask) -> None:
+    """Garante que UPLOAD_FOLDER existe e tem permissão de escrita.
+
+    Falha rapidamente no startup se o diretório não puder ser criado ou
+    se não tiver permissão de escrita, evitando erros silenciosos em runtime.
+    """
+    upload_folder = app.config.get("UPLOAD_FOLDER")
+    if not upload_folder:
+        return
+    try:
+        os.makedirs(upload_folder, exist_ok=True)
+    except OSError as exc:
+        raise RuntimeError(
+            f"Não foi possível criar UPLOAD_FOLDER '{upload_folder}': {exc}"
+        ) from exc
+    if not os.access(upload_folder, os.W_OK):
+        raise RuntimeError(
+            f"UPLOAD_FOLDER '{upload_folder}' existe mas não tem permissão de escrita."
+        )
+    logging.getLogger(__name__).debug("UPLOAD_FOLDER verificado: %s", upload_folder)
 
 
 def _iniciar_scheduler(app: Flask) -> None:
@@ -126,6 +172,16 @@ def _iniciar_scheduler(app: Flask) -> None:
                 except Exception as exc:
                     app.logger.exception("Erro no job de relatório semanal: %s", exc)
 
+        def _job_alerta_prazo_24h():
+            with app.app_context():
+                try:
+                    from app.services.report_service import enviar_alertas_prazo_24h
+
+                    resultado = enviar_alertas_prazo_24h()
+                    app.logger.info("Alerta de prazo 24h concluído: %s", resultado)
+                except Exception as exc:
+                    app.logger.exception("Erro no job de alerta de prazo 24h: %s", exc)
+
         scheduler = BackgroundScheduler(
             timezone=pytz.timezone("America/Sao_Paulo"),
             job_defaults={"coalesce": True, "max_instances": 1},
@@ -138,8 +194,17 @@ def _iniciar_scheduler(app: Flask) -> None:
             minute=0,
             id="relatorio_semanal",
         )
+        scheduler.add_job(
+            _job_alerta_prazo_24h,
+            trigger="cron",
+            hour=8,
+            minute=0,
+            id="alerta_prazo_24h",
+        )
         scheduler.start()
-        app.logger.info("Scheduler iniciado — relatório semanal toda sexta às 10h (BRT)")
+        app.logger.info(
+            "Scheduler iniciado — relatório semanal sexta 10h e alerta prazo 24h diário 08h (BRT)"
+        )
 
         import atexit
 
@@ -271,7 +336,7 @@ def _configurar_seguranca(app: Flask) -> None:
             base_parsed = urlparse(base_url)
             base_origin = f"{base_parsed.scheme or 'https'}://{base_parsed.netloc}".lower()
         except Exception as e:
-            app.logger.error(f"Erro ao parsear APP_BASE_URL '{base_url}': {e}")
+            app.logger.error("Erro ao parsear APP_BASE_URL '%s': %s", base_url, e)
             return None
 
         # Obtém origin da requisição (tenta Origin header primeiro, depois Referer)
@@ -297,7 +362,7 @@ def _configurar_seguranca(app: Flask) -> None:
             req_parsed = urlparse(origin)
             req_origin = f"{req_parsed.scheme}://{req_parsed.netloc}".lower()
         except Exception as e:
-            app.logger.error(f"Erro ao parsear origin '{origin}': {e}")
+            app.logger.error("Erro ao parsear origin '%s': %s", origin, e)
             req_origin = ""
 
         # Origens aceitas: APP_BASE_URL e, em desenvolvimento, a própria URL do servidor (localhost)
@@ -512,7 +577,7 @@ def _configurar_logging(app: Flask) -> None:
 
     max_bytes = app.config.get("LOG_MAX_BYTES", 2 * 1024 * 1024)
     backup_count = app.config.get("LOG_BACKUP_COUNT", 5)
-    file_handler = RotatingFileHandler(
+    file_handler = _WindowsSafeRotatingFileHandler(
         os.path.join(log_dir, "sistema_chamados.log"),
         maxBytes=max_bytes,
         backupCount=backup_count,

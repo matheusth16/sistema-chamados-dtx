@@ -1,17 +1,30 @@
 """Rotas de gerenciamento de usuários (CRUD). Apenas para admins."""
 
 import logging
+import secrets
+import string
+import threading
+import uuid
 
-from flask import Response, redirect, render_template, request, url_for
+from flask import Response, current_app, redirect, render_template, request, url_for
 from flask_login import current_user
 
 from app.cache import cache_delete
 from app.decoradores import requer_perfil
 from app.i18n import flash_t
+from app.models_categorias import CategoriaSetor
 from app.models_usuario import CACHE_KEY_USUARIOS, Usuario
 from app.routes import main
+from app.services.notifications import notificar_novo_usuario_cadastrado
+from app.services.notify_retry import executar_com_retry
 
 logger = logging.getLogger(__name__)
+
+
+def _gerar_senha_aleatoria(tamanho: int = 10) -> str:
+    """Gera senha aleatória segura com letras maiúsculas, minúsculas e dígitos."""
+    alfabeto = string.ascii_letters + string.digits
+    return "".join(secrets.choice(alfabeto) for _ in range(tamanho))
 
 
 @main.route("/admin/usuarios", methods=["GET", "POST"])
@@ -39,30 +52,47 @@ def gerenciar_usuarios() -> Response:
                 flash_t(e, "danger")
             return redirect(url_for("main.gerenciar_usuarios"))
         try:
+            senha_inicial = _gerar_senha_aleatoria()
             u = Usuario(
-                id=f"user_{email.split('@')[0]}_{hash(email) % 100000}",
+                id=f"user_{uuid.uuid4().hex[:12]}",
                 email=email,
                 nome=nome,
                 perfil=perfil,
                 areas=areas,
-                must_change_password=(perfil in ["solicitante", "supervisor"]),
+                must_change_password=True,
                 password_changed_at=None,
             )
-            u.set_password("123456")  # Senha padrão para todos os novos usuários
+            u.set_password(senha_inicial)
             u.save()
             cache_delete(CACHE_KEY_USUARIOS)
             Usuario.invalidar_cache_supervisores_por_area()
+
+            _app = current_app._get_current_object()
+
+            def _notificar_novo_usuario():
+                with _app.app_context():
+                    executar_com_retry(
+                        notificar_novo_usuario_cadastrado,
+                        usuario_id=u.id,
+                        usuario_email=u.email,
+                        usuario_nome=u.nome,
+                        perfil=u.perfil,
+                        areas=u.areas,
+                        senha_inicial=senha_inicial,
+                    )
+
+            threading.Thread(target=_notificar_novo_usuario, daemon=True).start()
             flash_t("user_created_success", "success", nome=nome)
             return redirect(url_for("main.gerenciar_usuarios"))
         except Exception as e:
-            logger.exception(f"Erro ao criar usuário: {str(e)}")
+            logger.exception("Erro ao criar usuário: %s", e)
             flash_t("error_creating_user", "danger", error=str(e))
             return redirect(url_for("main.gerenciar_usuarios"))
     try:
         usuarios = Usuario.get_all()
         return render_template("usuarios.html", usuarios=usuarios)
     except Exception as e:
-        logger.exception(f"Erro ao listar usuários: {str(e)}")
+        logger.exception("Erro ao listar usuários: %s", e)
         flash_t("error_loading_users", "danger")
         return redirect(url_for("main.admin"))
 
@@ -71,7 +101,8 @@ def gerenciar_usuarios() -> Response:
 @requer_perfil("admin")
 def novo_usuario_form() -> Response:
     """Exibe formulário de criação de usuário."""
-    return render_template("usuario_form.html", usuario=None)
+    setores = [s for s in CategoriaSetor.get_all() if getattr(s, "ativo", True)]
+    return render_template("usuario_form.html", usuario=None, setores=setores)
 
 
 @main.route("/admin/usuarios/<usuario_id>/editar", methods=["GET", "POST"])
@@ -84,7 +115,13 @@ def editar_usuario(usuario_id: str) -> Response:
             flash_t("user_not_found", "danger")
             return redirect(url_for("main.gerenciar_usuarios"))
         if request.method == "GET":
-            return render_template("usuario_form.html", usuario=usuario)
+            setores = [s for s in CategoriaSetor.get_all() if getattr(s, "ativo", True)]
+            setor_names = {s.nome_pt for s in setores}
+            areas_usuario = usuario.areas if getattr(usuario, "areas", None) else []
+            areas_extra = [a for a in areas_usuario if a and a not in setor_names]
+            return render_template(
+                "usuario_form.html", usuario=usuario, setores=setores, areas_extra=areas_extra
+            )
         email = request.form.get("email", "").strip().lower()
         nome = request.form.get("nome", "").strip()
         perfil = request.form.get("perfil", usuario.perfil)
@@ -122,7 +159,7 @@ def editar_usuario(usuario_id: str) -> Response:
         flash_t("user_updated_success", "success", nome=nome)
         return redirect(url_for("main.gerenciar_usuarios"))
     except Exception as e:
-        logger.exception(f"Erro ao editar usuário: {str(e)}")
+        logger.exception("Erro ao editar usuário: %s", e)
         flash_t("error_editing_user", "danger", error=str(e))
         return redirect(url_for("main.gerenciar_usuarios"))
 
@@ -154,7 +191,7 @@ def deletar_usuario(usuario_id: str) -> Response:
         flash_t("user_deleted_success", "success", nome=nome_usuario)
         return redirect(url_for("main.gerenciar_usuarios"))
     except Exception as e:
-        logger.exception(f"Erro ao deletar usuário: {str(e)}")
+        logger.exception("Erro ao deletar usuário: %s", e)
         flash_t("error_deleting_user", "danger", error=str(e))
         return redirect(url_for("main.gerenciar_usuarios"))
 
@@ -162,7 +199,7 @@ def deletar_usuario(usuario_id: str) -> Response:
 @main.route("/admin/usuarios/<usuario_id>/resetar-senha", methods=["POST"])
 @requer_perfil("admin")
 def resetar_senha_usuario(usuario_id: str) -> Response:
-    """Reseta a senha de um usuário para a senha padrão (123456)."""
+    """Reseta a senha de um usuário para uma senha aleatória e notifica por e-mail."""
     try:
         usuario = Usuario.get_by_id(usuario_id)
         if not usuario:
@@ -174,8 +211,9 @@ def resetar_senha_usuario(usuario_id: str) -> Response:
             return redirect(url_for("main.gerenciar_usuarios"))
 
         nome_usuario = usuario.nome
-        usuario.set_password("123456")
-        usuario.update(must_change_password=(usuario.perfil in ["solicitante", "supervisor"]))
+        senha_inicial = _gerar_senha_aleatoria()
+        usuario.set_password(senha_inicial)
+        usuario.update(must_change_password=True)
 
         cache_delete(CACHE_KEY_USUARIOS)
         cache_delete(f"usuario_{usuario_id}")
@@ -185,11 +223,33 @@ def resetar_senha_usuario(usuario_id: str) -> Response:
             usuario.email,
             current_user.email,
         )
+
+        _app = current_app._get_current_object()
+        _u_email = usuario.email
+        _u_nome = usuario.nome
+        _u_perfil = usuario.perfil
+        _u_areas = list(getattr(usuario, "areas", []) or [])
+        _u_id = usuario.id
+
+        def _notificar_reset():
+            with _app.app_context():
+                executar_com_retry(
+                    notificar_novo_usuario_cadastrado,
+                    usuario_id=_u_id,
+                    usuario_email=_u_email,
+                    usuario_nome=_u_nome,
+                    perfil=_u_perfil,
+                    areas=_u_areas,
+                    senha_inicial=senha_inicial,
+                )
+
+        threading.Thread(target=_notificar_reset, daemon=True).start()
+
         flash_t("user_password_reset_success", "success", nome=nome_usuario)
         return redirect(url_for("main.gerenciar_usuarios"))
 
     except Exception as e:
-        logger.exception(f"Erro ao resetar senha do usuário: {str(e)}")
+        logger.exception("Erro ao resetar senha do usuário: %s", e)
         flash_t("error_resetting_password", "danger", error=str(e))
         return redirect(url_for("main.gerenciar_usuarios"))
 
@@ -220,6 +280,6 @@ def resetar_exp_usuario(usuario_id: str) -> Response:
         return redirect(url_for("main.gerenciar_usuarios"))
 
     except Exception as e:
-        logger.exception(f"Erro ao resetar EXP do usuário: {str(e)}")
+        logger.exception("Erro ao resetar EXP do usuário: %s", e)
         flash_t("error_resetting_exp", "danger", error=str(e))
         return redirect(url_for("main.gerenciar_usuarios"))

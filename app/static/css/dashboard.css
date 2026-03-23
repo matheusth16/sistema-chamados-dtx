@@ -1,0 +1,93 @@
+/*
+ * dashboard.css — Estilos do painel administrativo
+ *
+ * Cores mapeadas para o design system Tailwind:
+ *   --dash-accent        #4f46e5  = indigo-600
+ *   --dash-accent-muted  rgba(79, 70, 229, 0.08) = indigo-500/8
+ *   --dash-border        rgba(226, 232, 240, 0.9) = slate-200/90
+ *   --dash-surface       rgba(255,255,255,0.92)   = white/92
+ */
+
+.dashboard-page {
+  --dash-surface: rgb(255 255 255 / 0.92);      /* white/92 */
+  --dash-accent: rgb(79 70 229);                 /* indigo-600 */
+  --dash-accent-muted: rgb(79 70 229 / 0.08);   /* indigo-500/8 */
+  --dash-border: rgb(226 232 240 / 0.9);         /* slate-200/90 */
+  --dash-radius: 1.5rem;
+  --dash-spacing-row: 1rem;
+}
+
+.dashboard-header {
+  background: var(--dash-surface);
+  border-radius: var(--dash-radius);
+  border: 1px solid var(--dash-border);
+  box-shadow: 0 8px 30px rgb(0 0 0 / 0.04), 0 1px 0 rgb(255 255 255 / 0.6) inset;
+}
+
+.dashboard-table-wrap {
+  background: var(--dash-surface);
+  border-radius: var(--dash-radius);
+  border: 1px solid var(--dash-border);
+  box-shadow: 0 8px 30px rgb(0 0 0 / 0.04);
+}
+
+.dashboard-table-wrap thead th {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: rgb(248 250 252 / 0.95);          /* slate-50/95 */
+  backdrop-filter: saturate(180%) blur(8px);
+  border-bottom: 1px solid var(--dash-border);
+  padding: 1rem 1.25rem;
+}
+
+.dashboard-table-wrap tbody tr {
+  transition: background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.dashboard-table-wrap .table-scroll {
+  max-height: min(70vh, 800px);
+  overflow-y: auto;
+  overflow-x: auto;
+}
+
+.dashboard-table-wrap tbody tr:hover {
+  background-color: var(--dash-accent-muted);
+}
+
+.dashboard-empty-state {
+  padding: 3rem 1.5rem;
+  background: linear-gradient(
+    180deg,
+    rgb(248 250 252 / 0.6) 0%,
+    rgb(241 245 249 / 0.4) 100%
+  );
+}
+
+.dashboard-empty-state .empty-icon {
+  width: 5rem;
+  height: 5rem;
+  border-radius: 50%;
+  background: linear-gradient(145deg, rgb(226 232 240) 0%, rgb(203 213 225) 100%); /* slate-200 → slate-300 */
+  box-shadow: inset 0 2px 4px rgb(255 255 255 / 0.8), 0 4px 12px rgb(0 0 0 / 0.06);
+}
+
+.dashboard-pagination a {
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.75rem;
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.dashboard-pagination a:hover {
+  background-color: rgb(241 245 249);   /* slate-100 */
+  color: rgb(15 23 42);                 /* slate-900 */
+}
+
+.dashboard-pagination a:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgb(79 70 229 / 0.25);  /* indigo-600/25 */
+}

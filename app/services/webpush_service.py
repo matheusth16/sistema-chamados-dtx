@@ -32,10 +32,10 @@ def salvar_inscricao(usuario_id: str, subscription: dict[str, Any]) -> bool:
                 "created_at": firestore.SERVER_TIMESTAMP,
             }
         )
-        logger.debug(f"Web Push: inscrição salva para usuario={usuario_id}")
+        logger.debug("Web Push: inscrição salva para usuario=%s", usuario_id)
         return True
     except Exception as e:
-        logger.exception(f"Erro ao salvar inscrição Web Push: {e}")
+        logger.exception("Erro ao salvar inscrição Web Push: %s", e)
         return False
 
 
@@ -59,7 +59,7 @@ def obter_inscricoes(usuario_id: str) -> list[dict[str, Any]]:
             )
         return [o for o in out if o.get("endpoint") and o.get("keys", {}).get("p256dh")]
     except Exception as e:
-        logger.exception(f"Erro ao obter inscrições Web Push: {e}")
+        logger.exception("Erro ao obter inscrições Web Push: %s", e)
         return []
 
 
@@ -87,7 +87,7 @@ def enviar_webpush_usuario(usuario_id: str, titulo: str, corpo: str, url: str = 
 
     subscriptions = obter_inscricoes(usuario_id)
     if not subscriptions:
-        logger.debug(f"Web Push: nenhuma inscrição para usuario={usuario_id}")
+        logger.debug("Web Push: nenhuma inscrição para usuario=%s", usuario_id)
         return 0
 
     payload = json.dumps({"title": titulo, "body": corpo, "url": url or ""})
@@ -102,5 +102,5 @@ def enviar_webpush_usuario(usuario_id: str, titulo: str, corpo: str, url: str = 
             )
             enviados += 1
         except Exception as e:
-            logger.warning(f"Web Push falhou para um dispositivo: {e}")
+            logger.warning("Web Push falhou para um dispositivo: %s", e)
     return enviados

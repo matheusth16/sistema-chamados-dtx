@@ -60,7 +60,7 @@ def _inicializar_firebase_com_retry(max_tentativas: int = 3, delay_inicial: floa
             pass
 
         try:
-            logger.info(f"Tentativa {tentativa}/{max_tentativas} para inicializar Firebase...")
+            logger.info("Tentativa %s/%s para inicializar Firebase...", tentativa, max_tentativas)
 
             # Caminho para credentials.json
             cert_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "credentials.json")
@@ -71,7 +71,7 @@ def _inicializar_firebase_com_retry(max_tentativas: int = 3, delay_inicial: floa
 
             if os.path.exists(cert_path):
                 # Inicializa com arquivo de credenciais (desenvolvimento local)
-                logger.info(f"Carregando credentials.json de: {cert_path}")
+                logger.info("Carregando credentials.json de: %s", cert_path)
                 cred = credentials.Certificate(cert_path)
                 # Padrão: novo formato .firebasestorage.app (Firebase Console); legado é .appspot.com
                 storage_bucket = bucket_env or f"{cred.project_id}.firebasestorage.app"
@@ -107,19 +107,19 @@ def _inicializar_firebase_com_retry(max_tentativas: int = 3, delay_inicial: floa
 
         except Exception as e:
             logger.warning(
-                f"⚠ Tentativa {tentativa}/{max_tentativas} falhou: {type(e).__name__}: {e}"
+                "⚠ Tentativa %s/%s falhou: %s: %s", tentativa, max_tentativas, type(e).__name__, e
             )
 
             if tentativa < max_tentativas:
                 # Calcula delay com exponential backoff: 1s, 2s, 4s, 8s, ...
                 delay = delay_inicial * (2 ** (tentativa - 1))
-                logger.info(f"Aguardando {delay}s antes de tentar novamente...")
+                logger.info("Aguardando %ss antes de tentar novamente...", delay)
                 time.sleep(delay)
             else:
                 # Última tentativa falhou - levanta exceção
                 logger.critical(
-                    f"✗ Todas as {max_tentativas} tentativas falharam. "
-                    f"Firebase não foi inicializado. Verifique credenciais."
+                    "✗ Todas as %s tentativas falharam. Firebase não foi inicializado. Verifique credenciais.",
+                    max_tentativas,
                 )
                 raise
 
@@ -129,8 +129,8 @@ try:
     _inicializar_firebase_com_retry(max_tentativas=3)
 except Exception as e:
     logger.critical(
-        f"✗ Erro crítico: Firebase não foi inicializado. "
-        f"A aplicação não pode funcionar. Detalhes: {e}"
+        "✗ Erro crítico: Firebase não foi inicializado. A aplicação não pode funcionar. Detalhes: %s",
+        e,
     )
     raise
 
@@ -139,5 +139,5 @@ try:
     db = firestore.client()
     logger.info("✓ Cliente Firestore obtido com sucesso. Aplicação pronta.")
 except Exception as e:
-    logger.critical(f"✗ Erro ao obter cliente Firestore: {type(e).__name__}: {e}")
+    logger.critical("✗ Erro ao obter cliente Firestore: %s: %s", type(e).__name__, e)
     raise

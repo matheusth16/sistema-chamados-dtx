@@ -72,15 +72,15 @@ class Historico:
 
             logger = logging.getLogger(__name__)
             hist_dict = self.to_dict()
-            logger.info(f"Salvando histórico: {hist_dict}")
+            logger.info("Salvando histórico: %s", hist_dict)
             doc_ref = db.collection("historico").add(hist_dict)
-            logger.info(f"Histórico salvo com ID: {doc_ref[1].id}")
+            logger.info("Histórico salvo com ID: %s", doc_ref[1].id)
             return True
         except Exception as e:
             import logging
 
             logger = logging.getLogger(__name__)
-            logger.error(f"Erro ao salvar histórico: {e}", exc_info=True)
+            logger.error("Erro ao salvar histórico: %s", e, exc_info=True)
             print(f"Erro ao salvar histórico: {e}")
             return False
 
@@ -91,7 +91,7 @@ class Historico:
             import logging
 
             logger = logging.getLogger(__name__)
-            logger.info(f"Buscando histórico para chamado_id: {chamado_id}")
+            logger.info("Buscando histórico para chamado_id: %s", chamado_id)
 
             # Tenta buscar com ordenação (requer índice)
             try:
@@ -104,27 +104,27 @@ class Historico:
                 historico = []
                 for doc in docs:
                     data = doc.to_dict()
-                    logger.debug(f"Histórico encontrado: {doc.id} - {data}")
+                    logger.debug("Histórico encontrado: %s - %s", doc.id, data)
                     historico.append(cls.from_dict(data, doc.id))
-                logger.info(f"✅ Total de {len(historico)} registros encontrados (com ordenação)")
+                logger.info("✅ Total de %s registros encontrados (com ordenação)", len(historico))
                 return historico
             except Exception as index_error:
                 # Se falhar (índice em construção), busca sem ordenação e ordena manualmente
                 if "index" in str(index_error).lower() or "building" in str(index_error).lower():
                     logger.warning(
-                        f"⚠️ Índice ainda em construção, buscando sem ordenação: {index_error}"
+                        "⚠️ Índice ainda em construção, buscando sem ordenação: %s", index_error
                     )
                     docs = db.collection("historico").where("chamado_id", "==", chamado_id).stream()
                     historico = []
                     for doc in docs:
                         data = doc.to_dict()
-                        logger.debug(f"Histórico encontrado (sem ordem): {doc.id} - {data}")
+                        logger.debug("Histórico encontrado (sem ordem): %s - %s", doc.id, data)
                         historico.append(cls.from_dict(data, doc.id))
 
                     # Ordena manualmente por data_acao (mais recente primeiro)
                     historico.sort(key=lambda h: h.data_acao if h.data_acao else "", reverse=True)
                     logger.info(
-                        f"✅ Total de {len(historico)} registros encontrados (ordenação manual)"
+                        "✅ Total de %s registros encontrados (ordenação manual)", len(historico)
                     )
                     return historico
                 else:
@@ -134,7 +134,7 @@ class Historico:
             import logging
 
             logger = logging.getLogger(__name__)
-            logger.error(f"❌ Erro ao buscar histórico: {e}", exc_info=True)
+            logger.error("❌ Erro ao buscar histórico: %s", e, exc_info=True)
             print(f"Erro ao buscar histórico: {e}")
             return []
 

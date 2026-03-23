@@ -2,6 +2,16 @@ import os
 
 from dotenv import load_dotenv
 
+
+def _to_bool(val, default: bool = False) -> bool:
+    """Converte env var string para bool de forma case-insensitive."""
+    if val is None:
+        return default
+    if isinstance(val, bool):
+        return val
+    return str(val).strip().lower() in ("true", "1", "yes")
+
+
 # 1. Define a "Raiz" do projeto de forma absoluta (C:\Users\Matheus...\sistema_chamados)
 basedir = os.path.abspath(os.path.dirname(__file__))
 
@@ -55,8 +65,8 @@ class Config:
 
     # 7. Session Security
     PERMANENT_SESSION_LIFETIME = 86400  # 24 horas em segundos
-    SESSION_COOKIE_SECURE = (
-        os.getenv("SESSION_COOKIE_SECURE", "True") == "True"
+    SESSION_COOKIE_SECURE = _to_bool(
+        os.getenv("SESSION_COOKIE_SECURE"), default=True
     )  # HTTPS em produção
     SESSION_COOKIE_HTTPONLY = True  # Não acessível via JavaScript
     SESSION_COOKIE_SAMESITE = "Lax"  # Proteção contra CSRF
@@ -99,6 +109,10 @@ class Config:
     MAIL_USERNAME = os.getenv("MAIL_USERNAME", "")
     MAIL_PASSWORD = os.getenv("MAIL_PASSWORD", "")
     MAIL_DEFAULT_SENDER = os.getenv("MAIL_DEFAULT_SENDER", "")
+
+    # Power Automate (modo teste): sobrescreve o destinatário final do evento USUARIO_CADASTRADO
+    # Útil para validar visualmente o fluxo sem depender do e-mail real do usuário criado.
+    POWER_AUTOMATE_TEST_DEST_EMAIL = os.getenv("POWER_AUTOMATE_TEST_DEST_EMAIL", "").strip()
 
     # Web Push (notificações no navegador). Gere chaves com: python gerar_vapid_keys.py
     VAPID_PUBLIC_KEY = os.getenv("VAPID_PUBLIC_KEY", "")

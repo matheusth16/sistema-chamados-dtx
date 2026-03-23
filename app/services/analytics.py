@@ -232,7 +232,7 @@ class AnalisadorChamados:
             }
 
         except Exception as e:
-            logger.exception(f"Erro ao obter métricas gerais: {str(e)}")
+            logger.exception("Erro ao obter métricas gerais: %s", e)
             return {}
 
     # ========== MÉTRICAS POR SUPERVISOR ==========
@@ -340,7 +340,7 @@ class AnalisadorChamados:
             return metricas
 
         except Exception as e:
-            logger.exception(f"Erro ao obter métricas de supervisores: {str(e)}")
+            logger.exception("Erro ao obter métricas de supervisores: %s", e)
             return []
 
     # ========== MÉTRICAS POR ÁREA ==========
@@ -438,7 +438,7 @@ class AnalisadorChamados:
             return metricas
 
         except Exception as e:
-            logger.exception(f"Erro ao obter métricas de áreas: {str(e)}")
+            logger.exception("Erro ao obter métricas de áreas: %s", e)
             return []
 
     # ========== ANÁLISE DE ATRIBUIÇÃO ==========
@@ -533,7 +533,7 @@ class AnalisadorChamados:
             }
 
         except Exception as e:
-            logger.exception(f"Erro ao analisar atribuição: {str(e)}")
+            logger.exception("Erro ao analisar atribuição: %s", e)
             return {}
 
     # ========== INSIGHTS E RECOMENDAÇÕES ==========
@@ -642,7 +642,7 @@ class AnalisadorChamados:
             return insights
 
         except Exception as e:
-            logger.exception(f"Erro ao gerar insights: {str(e)}")
+            logger.exception("Erro ao gerar insights: %s", e)
             return []
 
     # ========== MÉTRICAS DE COMPARAÇÃO (DELTA) ==========
@@ -780,7 +780,7 @@ class AnalisadorChamados:
                 _RELATORIO_CACHE["expires"] = time.time() + _RELATORIO_CACHE_TTL_SEC
             return relatorio
         except Exception as e:
-            logger.exception(f"Erro ao gerar relatório completo: {str(e)}")
+            logger.exception("Erro ao gerar relatório completo: %s", e)
             return {
                 "data_geracao": None,
                 "metricas_gerais": {},

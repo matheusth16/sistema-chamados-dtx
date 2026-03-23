@@ -55,7 +55,7 @@ def admin_traducoes() -> Response:
                 flash_t("error_saving_json", "danger")
 
         except Exception as e:
-            logger.exception(f"Erro ao salvar tradução: {str(e)}")
+            logger.exception("Erro ao salvar tradução: %s", e)
             if (
                 request.headers.get("X-Requested-With") == "XMLHttpRequest"
                 or request.accept_mimetypes.accept_json
@@ -69,6 +69,6 @@ def admin_traducoes() -> Response:
         translations = get_translations_dict()
         return render_template("admin_traducoes.html", translations=translations)
     except Exception as e:
-        logger.exception(f"Erro ao carregar traduções: {str(e)}")
+        logger.exception("Erro ao carregar traduções: %s", e)
         flash_t("error_loading_translations", "danger")
         return redirect(url_for("main.admin"))

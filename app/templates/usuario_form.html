@@ -78,25 +78,31 @@
                     <p class="text-xs text-gray-500 mb-2">{{ t('supervisor_area_help') }}</p>
                     <div class="grid grid-cols-2 gap-2 bg-gray-50 p-3 rounded-md border border-gray-300">
                         {% set areas_usuario = usuario.areas if usuario and usuario.areas else [] %}
-                        <label class="inline-flex items-center"><input type="checkbox" name="areas" value="Manutencao"
-                                class="form-checkbox text-blue-600 rounded" {% if 'Manutencao' in areas_usuario
-                                %}checked{% endif %}> <span class="ml-2 text-sm text-gray-700">{{ t('area_maintenance') }}</span></label>
-                        <label class="inline-flex items-center"><input type="checkbox" name="areas" value="Engenharia"
-                                class="form-checkbox text-blue-600 rounded" {% if 'Engenharia' in areas_usuario
-                                %}checked{% endif %}> <span class="ml-2 text-sm text-gray-700">{{ t('area_engineering') }}</span></label>
-                        <label class="inline-flex items-center"><input type="checkbox" name="areas" value="Qualidade"
-                                class="form-checkbox text-blue-600 rounded" {% if 'Qualidade' in areas_usuario
-                                %}checked{% endif %}> <span class="ml-2 text-sm text-gray-700">{{ t('area_quality') }}</span></label>
-                        <label class="inline-flex items-center"><input type="checkbox" name="areas" value="Comercial"
-                                class="form-checkbox text-blue-600 rounded" {% if 'Comercial' in areas_usuario
-                                %}checked{% endif %}> <span class="ml-2 text-sm text-gray-700">{{ t('area_commercial') }}</span></label>
-                        <label class="inline-flex items-center"><input type="checkbox" name="areas" value="Planejamento"
-                                class="form-checkbox text-blue-600 rounded" {% if 'Planejamento' in areas_usuario
-                                %}checked{% endif %}> <span
-                                class="ml-2 text-sm text-gray-700">{{ t('area_planning') }}</span></label>
-                        <label class="inline-flex items-center"><input type="checkbox" name="areas" value="Material"
-                                class="form-checkbox text-blue-600 rounded" {% if 'Material' in areas_usuario
-                                %}checked{% endif %}> <span class="ml-2 text-sm text-gray-700">{{ t('area_material') }}</span></label>
+                        {% for setor in setores %}
+                        {% set area_value = setor.nome_pt %}
+                        {% if current_language == 'en' %}
+                        {% set area_label = setor.nome_en if setor.nome_en else setor.nome_pt %}
+                        {% elif current_language == 'es' %}
+                        {% set area_label = setor.nome_es if setor.nome_es else setor.nome_pt %}
+                        {% else %}
+                        {% set area_label = setor.nome_pt %}
+                        {% endif %}
+                        <label class="inline-flex items-center">
+                            <input type="checkbox" name="areas" value="{{ area_value }}"
+                                class="form-checkbox text-blue-600 rounded" {% if area_value in areas_usuario %}checked{% endif %}>
+                            <span class="ml-2 text-sm text-gray-700">{{ area_label }}</span>
+                        </label>
+                        {% endfor %}
+
+                        {% if areas_extra %}
+                        {% for area_value in areas_extra %}
+                        <label class="inline-flex items-center">
+                            <input type="checkbox" name="areas" value="{{ area_value }}"
+                                class="form-checkbox text-blue-600 rounded" {% if area_value in areas_usuario %}checked{% endif %}>
+                            <span class="ml-2 text-sm text-gray-700">{{ area_value }}</span>
+                        </label>
+                        {% endfor %}
+                        {% endif %}
                     </div>
                 </div>
 

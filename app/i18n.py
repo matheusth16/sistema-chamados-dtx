@@ -52,12 +52,36 @@ SUPPORTED_LANGUAGES = {
 
 # Mapa de Setores para Chaves de Tradução
 SECTOR_KEYS_MAP = {
+    # --- Setores com nome em português ---
     "Manutencao": "maintenance",  # Sem acento no banco de dados
+    "Manutenção": "maintenance",
     "Engenharia": "engineering",
     "Qualidade": "quality",
     "Comercial": "commercial",
     "Planejamento": "planning",
     "Material": "indirect_material",  # Abreviado no banco de dados
+    "RH": "hr",
+    "TI": "it",
+    "PPCP": "ppcp",
+    "Planejamento Materiais": "material_planning",
+    "Suprimentos": "supplies",
+    "Logistica": "logistics",
+    "Logística": "logistics",
+    "Infraestrutura": "facility",
+    "Produção - Usinagem": "production_machining",
+    "Produção - Montagem": "production_assembly",
+    "Produção - Inspeções": "production_inspections",
+    "Produção - Processos Especiais": "production_special_processes",
+    # --- Setores já cadastrados em inglês no banco ---
+    "Engineering": "engineering",
+    "Quality": "quality",
+    "Commercial": "commercial",
+    "Procurement": "procurement",
+    "IT": "it",
+    "HR": "hr",
+    "Logistics": "logistics",
+    "Facility": "facility",
+    "Supplies": "supplies",
 }
 
 # Mapa de Categorias para Chaves de Tradução

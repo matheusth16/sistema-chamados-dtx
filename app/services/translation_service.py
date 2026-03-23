@@ -10,15 +10,35 @@ logger = logging.getLogger(__name__)
 # Mapeamento de traduções comuns (fallback se API não disponível)
 TRANSLATION_MAP = {
     "pt_BR": {
+        # Setores
         "Manutencao": {"en": "Maintenance", "es": "Mantenimiento"},
         "Manutenção": {"en": "Maintenance", "es": "Mantenimiento"},
         "Engenharia": {"en": "Engineering", "es": "Ingeniería"},
-        "Compras": {"en": "Procurement", "es": "Compras"},
+        "Compras": {"en": "Procurement", "es": "Aprovisionamiento"},
         "Qualidade": {"en": "Quality", "es": "Calidad"},
         "TI": {"en": "IT", "es": "TI"},
         "Administrativo": {"en": "Administrative", "es": "Administrativo"},
         "Recursos Humanos": {"en": "Human Resources", "es": "Recursos Humanos"},
         "Financeiro": {"en": "Finance", "es": "Finanzas"},
+        "PPCP": {"en": "PPCP", "es": "PPCP"},
+        "Commercial": {"en": "Commercial", "es": "Comercial"},
+        "Suprimentos": {"en": "Supplies", "es": "Suministros"},
+        "Planejamento Materiais": {"en": "Material Planning", "es": "Planificación de Materiales"},
+        "Logistica": {"en": "Logistics", "es": "Logística"},
+        "Logística": {"en": "Logistics", "es": "Logística"},
+        "Infraestrutura": {"en": "Facility", "es": "Instalaciones"},
+        "RH": {"en": "HR", "es": "RRHH"},
+        "Produção - Montagem": {"en": "Production - Assembly", "es": "Producción - Montaje"},
+        "Produção - Usinagem": {"en": "Production - Machining", "es": "Producción - Mecanizado"},
+        "Produção - Inspeções": {
+            "en": "Production - Inspections",
+            "es": "Producción - Inspecciones",
+        },
+        "Produção - Processos Especiais": {
+            "en": "Production - Special Processes",
+            "es": "Producción - Procesos Especiales",
+        },
+        "Procurement": {"en": "Procurement", "es": "Aprovisionamiento"},
         # Gates
         "Gate 1": {"en": "Gate 1", "es": "Gate 1"},
         "Gate 2": {"en": "Gate 2", "es": "Gate 2"},
@@ -56,10 +76,10 @@ def traduzir_texto(texto: str, idioma_destino: str = "en") -> str:
             if chave.lower() == texto.lower():
                 return traducoes.get(idioma_destino, texto)
 
-        logger.warning(f"Tradução não encontrada para: {texto}")
+        logger.warning("Tradução não encontrada para: %s", texto)
         return texto
     except Exception as e:
-        logger.error(f"Erro ao traduzir: {e}")
+        logger.error("Erro ao traduzir: %s", e)
         return texto
 
 
@@ -93,4 +113,4 @@ def adicionar_traducao_customizada(texto_pt: str, en: str, es: str) -> None:
         TRANSLATION_MAP["pt_BR"] = {}
 
     TRANSLATION_MAP["pt_BR"][texto_pt] = {"en": en, "es": es}
-    logger.info(f"Tradução customizada adicionada: {texto_pt}")
+    logger.info("Tradução customizada adicionada: %s", texto_pt)

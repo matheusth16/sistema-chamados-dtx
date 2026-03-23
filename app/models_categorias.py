@@ -79,10 +79,10 @@ class CategoriaSetor:
                 db.collection("categorias_setores").document(self.id).update(self.to_dict())
             else:
                 self.id = db.collection("categorias_setores").add(self.to_dict())[1].id
-            logger.info(f"Setor {self.nome_pt} salvo com sucesso")
+            logger.info("Setor %s salvo com sucesso", self.nome_pt)
             return self.id
         except Exception as e:
-            logger.error(f"Erro ao salvar setor: {e}")
+            logger.error("Erro ao salvar setor: %s", e)
             raise
 
     @classmethod
@@ -92,7 +92,7 @@ class CategoriaSetor:
             docs = db.collection("categorias_setores").stream()
             return [cls.from_dict(doc.to_dict(), doc.id) for doc in docs]
         except Exception as e:
-            logger.error(f"Erro ao buscar setores: {e}")
+            logger.error("Erro ao buscar setores: %s", e)
             return []
 
     @classmethod
@@ -104,7 +104,7 @@ class CategoriaSetor:
                 return cls.from_dict(doc.to_dict(), doc.id)
             return None
         except Exception as e:
-            logger.error(f"Erro ao buscar setor: {e}")
+            logger.error("Erro ao buscar setor: %s", e)
             return None
 
 
@@ -171,10 +171,10 @@ class CategoriaGate:
                 db.collection("categorias_gates").document(self.id).update(self.to_dict())
             else:
                 self.id = db.collection("categorias_gates").add(self.to_dict())[1].id
-            logger.info(f"Gate {self.nome_pt} salvo com sucesso")
+            logger.info("Gate %s salvo com sucesso", self.nome_pt)
             return self.id
         except Exception as e:
-            logger.error(f"Erro ao salvar gate: {e}")
+            logger.error("Erro ao salvar gate: %s", e)
             raise
 
     @classmethod
@@ -186,7 +186,7 @@ class CategoriaGate:
             # Ordena por ordem no Python (evita problema de índice no Firestore)
             return sorted(gates, key=lambda x: x.ordem)
         except Exception as e:
-            logger.error(f"Erro ao buscar gates: {e}")
+            logger.error("Erro ao buscar gates: %s", e)
             return []
 
     @classmethod
@@ -198,7 +198,7 @@ class CategoriaGate:
                 return cls.from_dict(doc.to_dict(), doc.id)
             return None
         except Exception as e:
-            logger.error(f"Erro ao buscar gate: {e}")
+            logger.error("Erro ao buscar gate: %s", e)
             return None
 
 
@@ -268,10 +268,10 @@ class CategoriaImpacto:
                 db.collection("categorias_impactos").document(self.id).update(self.to_dict())
             else:
                 self.id = db.collection("categorias_impactos").add(self.to_dict())[1].id
-            logger.info(f"Impacto {self.nome_pt} salvo com sucesso")
+            logger.info("Impacto %s salvo com sucesso", self.nome_pt)
             return self.id
         except Exception as e:
-            logger.error(f"Erro ao salvar impacto: {e}")
+            logger.error("Erro ao salvar impacto: %s", e)
             raise
 
     @classmethod
@@ -281,7 +281,7 @@ class CategoriaImpacto:
             docs = db.collection("categorias_impactos").where("ativo", "==", True).stream()
             return [cls.from_dict(doc.to_dict(), doc.id) for doc in docs]
         except Exception as e:
-            logger.error(f"Erro ao buscar impactos: {e}")
+            logger.error("Erro ao buscar impactos: %s", e)
             return []
 
     @classmethod
@@ -293,5 +293,5 @@ class CategoriaImpacto:
                 return cls.from_dict(doc.to_dict(), doc.id)
             return None
         except Exception as e:
-            logger.error(f"Erro ao buscar impacto: {e}")
+            logger.error("Erro ao buscar impacto: %s", e)
             return None

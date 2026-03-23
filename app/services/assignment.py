@@ -86,14 +86,17 @@ class AtribuidorAutomatico:
         try:
             area = setor_para_area(area) or area
             logger.debug(
-                f"Atribuindo chamado: area={area}, categoria={categoria}, prioridade={prioridade}"
+                "Atribuindo chamado: area=%s, categoria=%s, prioridade=%s",
+                area,
+                categoria,
+                prioridade,
             )
 
             # 1. Busca supervisores da área
             supervisores = Usuario.get_supervisores_por_area(area)
 
             if not supervisores:
-                logger.warning(f"Nenhum supervisor encontrado para área: {area}")
+                logger.warning("Nenhum supervisor encontrado para área: %s", area)
                 return {
                     "sucesso": False,
                     "supervisor": None,
@@ -101,7 +104,7 @@ class AtribuidorAutomatico:
                     "estrategia_usada": self.estrategia,
                 }
 
-            logger.debug(f"Encontrados {len(supervisores)} supervisores para área {area}")
+            logger.debug("Encontrados %s supervisores para área %s", len(supervisores), area)
 
             # 2. Conta chamados abertos por supervisor
             supervisores_com_carga = self._contar_chamados_abertos(supervisores)
@@ -123,7 +126,10 @@ class AtribuidorAutomatico:
                 }
 
             logger.info(
-                f"Chamado atribuído a {supervisor_escolhido['usuario'].nome} ({supervisor_escolhido['usuario'].email}) - {supervisor_escolhido['chamados_abertos']} chamados abertos"
+                "Chamado atribuído a %s (%s) - %s chamados abertos",
+                supervisor_escolhido["usuario"].nome,
+                supervisor_escolhido["usuario"].email,
+                supervisor_escolhido["chamados_abertos"],
             )
 
             return {
@@ -140,7 +146,7 @@ class AtribuidorAutomatico:
             }
 
         except Exception as e:
-            logger.exception(f"Erro ao atribuir chamado: {str(e)}")
+            logger.exception("Erro ao atribuir chamado: %s", e)
             return {
                 "sucesso": False,
                 "supervisor": None,
@@ -176,12 +182,12 @@ class AtribuidorAutomatico:
                         if resp in contagem:
                             contagem[resp] += 1
         except Exception as e:
-            logger.warning(f"Erro ao contar chamados em batch: {e}")
+            logger.warning("Erro ao contar chamados em batch: %s", e)
 
         result = []
         for sup in supervisores:
             count = contagem[sup.nome]
-            logger.debug(f"Supervisor {sup.nome}: {count} chamados abertos")
+            logger.debug("Supervisor %s: %s chamados abertos", sup.nome, count)
             result.append({"usuario": sup, "chamados_abertos": count})
 
         return result
@@ -198,7 +204,9 @@ class AtribuidorAutomatico:
         supervisor_escolhido = min(supervisores_com_carga, key=lambda x: x["chamados_abertos"])
 
         logger.debug(
-            f"Balanceamento: {supervisor_escolhido['usuario'].nome} selecionado ({supervisor_escolhido['chamados_abertos']} chamados)"
+            "Balanceamento: %s selecionado (%s chamados)",
+            supervisor_escolhido["usuario"].nome,
+            supervisor_escolhido["chamados_abertos"],
         )
 
         return supervisor_escolhido
@@ -223,7 +231,9 @@ class AtribuidorAutomatico:
         self.contador_round_robin[area] = (idx + 1) % len(supervisores_com_carga)
 
         logger.debug(
-            f"Round-Robin: {supervisor_escolhido['usuario'].nome} selecionado (índice {idx})"
+            "Round-Robin: %s selecionado (índice %s)",
+            supervisor_escolhido["usuario"].nome,
+            idx,
         )
 
         return supervisor_escolhido
@@ -260,7 +270,7 @@ class AtribuidorAutomatico:
             }
 
         except Exception as e:
-            logger.exception(f"Erro ao obter disponibilidade: {str(e)}")
+            logger.exception("Erro ao obter disponibilidade: %s", e)
             return {
                 "area": area,
                 "total_supervisores": 0,

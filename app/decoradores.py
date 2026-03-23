@@ -42,7 +42,7 @@ def requer_perfil(*perfis_permitidos):
             # Se não está autenticado, redireciona para login
             if not current_user.is_authenticated:
                 logger.warning(
-                    f"Acesso negado: usuário não autenticado tentou acessar {f.__name__}"
+                    "Acesso negado: usuário não autenticado tentou acessar %s", f.__name__
                 )
                 flash_t("login_required_msg", "danger")
                 return redirect(url_for("main.login"))
@@ -58,7 +58,10 @@ def requer_perfil(*perfis_permitidos):
             # Verifica se o perfil do usuário está na lista
             if current_user.perfil not in perfis_lista:
                 logger.warning(
-                    f"Acesso negado: usuário {current_user.email} (perfil {current_user.perfil}) tentou acessar {f.__name__}"
+                    "Acesso negado: usuário %s (perfil %s) tentou acessar %s",
+                    current_user.email,
+                    current_user.perfil,
+                    f.__name__,
                 )
                 flash_t("access_denied_profiles", "danger", profiles=", ".join(perfis_lista))
 
@@ -93,14 +96,16 @@ def requer_supervisor_area(f):
     def funcao_decorada(*args, **kwargs):
         # Se não está autenticado, redireciona para login
         if not current_user.is_authenticated:
-            logger.warning(f"Acesso negado: usuário não autenticado tentou acessar {f.__name__}")
+            logger.warning("Acesso negado: usuário não autenticado tentou acessar %s", f.__name__)
             flash_t("login_required_msg", "danger")
             return redirect(url_for("main.login"))
 
         # Apenas supervisores e admins podem acessar
         if current_user.perfil not in ["supervisor", "admin"]:
             logger.warning(
-                f"Acesso negado: solicitante {current_user.email} tentou acessar {f.__name__}"
+                "Acesso negado: solicitante %s tentou acessar %s",
+                current_user.email,
+                f.__name__,
             )
             flash_t("access_denied_supervisors", "danger")
             return redirect(url_for("main.index"))
@@ -127,14 +132,17 @@ def requer_solicitante(f):
     def funcao_decorada(*args, **kwargs):
         # Se não está autenticado, redireciona para login
         if not current_user.is_authenticated:
-            logger.warning(f"Acesso negado: usuário não autenticado tentou acessar {f.__name__}")
+            logger.warning("Acesso negado: usuário não autenticado tentou acessar %s", f.__name__)
             flash_t("login_required_msg", "danger")
             return redirect(url_for("main.login"))
 
         # Solicitantes, supervisores e admins podem criar e ver seus chamados
         if current_user.perfil not in ("solicitante", "supervisor", "admin"):
             logger.warning(
-                f"Acesso negado: {current_user.perfil} {current_user.email} tentou acessar rota {f.__name__}"
+                "Acesso negado: %s %s tentou acessar rota %s",
+                current_user.perfil,
+                current_user.email,
+                f.__name__,
             )
             flash_t("access_denied_requesters", "danger")
             return redirect(url_for("main.login"))

@@ -240,6 +240,30 @@ class Usuario(UserMixin):
             return False
 
     @classmethod
+    def get_by_ids(cls, ids: list[str]) -> dict[str, "Usuario"]:
+        """
+        Busca múltiplos usuários em um único round-trip via batch read do Firestore.
+
+        Substitui o loop com N chamadas a get_by_id, reduzindo queries N+1.
+
+        Returns:
+            Dict {user_id: Usuario} com apenas os IDs encontrados.
+        """
+        if not ids:
+            return {}
+        try:
+            refs = [db.collection("usuarios").document(uid) for uid in ids]
+            snapshots = db.get_all(refs)
+            result = {}
+            for snap in snapshots:
+                if snap.exists:
+                    result[snap.id] = cls.from_dict(snap.to_dict(), snap.id)
+            return result
+        except Exception as e:
+            logger.exception("Erro ao buscar usuários em lote: %s", e)
+            return {}
+
+    @classmethod
     def get_all(cls):
         """Retorna lista de todos os usuários"""
         try:

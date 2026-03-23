@@ -7,6 +7,8 @@ Centraliza regras de negócio para criação/edição de chamados:
 - Extensões e validação de anexos (extensão + magic bytes para evitar upload malicioso)
 """
 
+import csv
+import io
 import re
 from typing import Any
 
@@ -71,6 +73,34 @@ def _arquivo_permitido(filename: str) -> bool:
     return "." in filename and filename.rsplit(".", 1)[1].lower() in _get_extensoes_permitidas()
 
 
+def _validar_csv(arquivo: Any) -> tuple[bool, str]:
+    """
+    Verifica se o arquivo é um CSV estruturalmente válido tentando fazer o parse.
+    Detecta arquivos corrompidos, binários renomeados como .csv ou CSV vazios.
+    """
+    try:
+        stream = getattr(arquivo, "stream", None)
+        if not stream:
+            return False, "Arquivo CSV sem stream para leitura."
+        if hasattr(stream, "seek"):
+            stream.seek(0)
+        content = stream.read(65536)  # 64 KB é suficiente para validar estrutura
+        if hasattr(stream, "seek"):
+            stream.seek(0)
+        if not content:
+            return False, "Arquivo CSV vazio."
+        text = content.decode("utf-8", errors="replace")
+        reader = csv.reader(io.StringIO(text))
+        next(reader)  # Lê pelo menos a primeira linha; lança StopIteration se vazio
+        return True, ""
+    except StopIteration:
+        return False, "Arquivo CSV vazio ou sem linhas válidas."
+    except csv.Error:
+        return False, "Arquivo CSV inválido ou corrompido."
+    except Exception:
+        return False, "Erro ao validar arquivo CSV."
+
+
 def _arquivo_conteudo_permitido(arquivo: Any) -> tuple[bool, str]:
     """
     Valida o conteúdo do arquivo pelos magic bytes (tipo real).
@@ -80,7 +110,10 @@ def _arquivo_conteudo_permitido(arquivo: Any) -> tuple[bool, str]:
     if not arquivo or not getattr(arquivo, "filename", None) or not arquivo.filename.strip():
         return True, ""
     ext = arquivo.filename.rsplit(".", 1)[-1].lower() if "." in arquivo.filename else ""
-    # CSV e outros sem magic bytes: aceitar por extensão (validação apenas no nome)
+    # CSV: sem magic bytes, mas valida estrutura via parse
+    if ext == "csv":
+        return _validar_csv(arquivo)
+    # Outros formatos sem magic bytes conhecidos: aceitar por extensão
     if ext not in _MAGIC_BYTES:
         return True, ""
     expected_sigs = _MAGIC_BYTES[ext]
@@ -122,6 +155,7 @@ def validar_novo_chamado(
     Regras:
         - Descrição obrigatória, mínimo 3 caracteres.
         - Atribuição ao setor obrigatória.
+        - Gate e impacto obrigatórios.
         - Categoria Projetos exige rl_codigo preenchido (letras, números e caracteres; 1 a 100 caracteres).
         - Anexo: apenas extensões em EXTENSOES_PERMITIDAS (tamanho máximo em config).
     """
@@ -130,7 +164,9 @@ def validar_novo_chamado(
     # 1. Validação Básica de Campos Obrigatórios
     descricao = form.get("descricao", "").strip()
     tipo = form.get("tipo")
-    categoria = form.get("categoria")
+    categoria = (form.get("categoria") or "").strip()
+    gate = (form.get("gate") or "").strip()
+    impacto = (form.get("impacto") or "").strip()
 
     if not descricao:
         erros.append("A descrição do chamado é obrigatória.")
@@ -140,10 +176,19 @@ def validar_novo_chamado(
     if not tipo:
         erros.append("É necessário atribuir um setor.")
 
+    if not categoria:
+        erros.append("A categoria do chamado é obrigatória.")
+
+    if not gate:
+        erros.append("É necessário atribuir um gate.")
+
+    if not impacto:
+        erros.append("O impacto do chamado é obrigatório.")
+
     # 2. Validação Específica da DTX (Regra do RL)
     # Para Projetos: código RL obrigatório — letras, números e caracteres (1 a 100)
     if categoria == "Projetos":
-        rl_codigo = form.get("rl_codigo", "").strip()
+        rl_codigo = (form.get("rl_codigo") or "").strip()
         if not rl_codigo:
             erros.append("Para Projetos, o código RL é obrigatório.")
         elif len(rl_codigo) > 100:
