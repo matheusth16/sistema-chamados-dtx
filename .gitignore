@@ -68,6 +68,7 @@ Thumbs.db
 *.bak
 *.tmp
 .ipynb_checkpoints/
+tmp/
 
 # --- Backup de arquivos não utilizados (análise de código morto) ---
 _backup_nao_utilizados/

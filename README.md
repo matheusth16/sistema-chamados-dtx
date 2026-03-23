@@ -16,7 +16,7 @@
 
 ## 📋 Requisitos
 
-- Python 3.8+
+- Python 3.12+
 - Firebase Account com Firestore
 - pip (gerenciador de pacotes Python)
 
@@ -44,7 +44,11 @@ source .venv/bin/activate
 ### 3. Instale as dependências
 
 ```bash
+# Produção
 pip install -r requirements.txt
+
+# Desenvolvimento (inclui pytest, ruff, bandit, etc.)
+pip install -r requirements-dev.txt
 ```
 
 ### 4. Configure credenciais do Firebase
@@ -218,10 +222,49 @@ O `requirements.txt` usa **versões fixas** (ex.: Flask 3.1.2, firebase-admin 7.
 
 Após alterar versões, atualize o `requirements.txt` com `pip freeze` ou ajuste manualmente as versões pinadas.
 
-### Antes de commitar / checklist rápido
+### Ciclo de qualidade (obrigatório antes de commit)
 
-- **Não commitar:** `__pycache__/`, `*.pyc`, `.coverage`, `logs/`, `.env`, `credentials.json` — o `.gitignore` já os ignora; use sempre caminhos com `/` (ex.: `app/routes/api.py`).
-- **Verificar dependências e testes:** rode `python scripts/verificar_dependencias.py` (executa `pip audit` e `pytest`). Em alterações importantes ou antes de deploy, use `--cov` para conferir cobertura.
+Execute os passos abaixo na ordem. O CI fará o mesmo — falhar localmente é mais rápido que falhar no pipeline.
+
+```bash
+# 1. Lint e formatação automática
+ruff check app/ tests/ --fix
+ruff format app/ tests/
+
+# 2. Análise de segurança estática
+bandit -r app/ -ll
+
+# 3. Testes com relatório de cobertura
+pytest --tb=short -q \
+  --cov=app \
+  --cov-report=term-missing:skip-covered \
+  --cov-fail-under=70
+```
+
+**Gate de cobertura:** mínimo de **70%** (CI rejeita abaixo disso).
+
+Para rodar apenas um módulo ou um arquivo específico:
+```bash
+pytest tests/test_services/test_validators.py -v
+pytest tests/ -k "dashboard" --tb=short
+```
+
+### Artefatos de teste — não versionar
+
+Os arquivos abaixo são gerados automaticamente e já estão no `.gitignore`. **Nunca os adicione ao git:**
+
+| Artefato | O que é |
+|---|---|
+| `.coverage` | Banco de dados de cobertura do pytest-cov |
+| `coverage.xml` | Relatório XML para CI/upload |
+| `htmlcov/` | Relatório HTML de cobertura |
+| `.pytest_cache/` | Cache interno do pytest |
+| `__pycache__/` | Bytecode compilado Python |
+
+Se um desses aparecer em `git status`, rode:
+```bash
+git rm --cached <arquivo>   # remove do rastreamento sem deletar localmente
+```
 
 ## 🤝 Contribuindo
 

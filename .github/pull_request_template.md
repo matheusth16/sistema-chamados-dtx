@@ -11,40 +11,81 @@
 - [ ] Documentação
 - [ ] Infraestrutura / CI
 
-## Checklist
+---
+
+## QA — O que foi testado
+
+> Descreva os cenários cobertos. Marque todos que se aplicam.
+
+### Nível de teste
+- [ ] **Unitário** — serviços/funções isolados com mocks
+- [ ] **Integração** — fluxo completo com client Flask (sem servidor externo)
+- [ ] **E2E** — navegador real contra servidor local
+
+### Evidência de cobertura
+```
+# Cole o resultado de: pytest --cov=app --cov-report=term-missing -q
+# Exemplo esperado: TOTAL  xxx  yyy  70%+
+```
+
+### Rotas críticas impactadas
+> Marque as rotas que foram alteradas **ou** que podem ser afetadas por efeito colateral.
+
+- [ ] `auth` — login, logout, troca de senha, onboarding
+- [ ] `usuarios` — criação, edição, permissões por perfil
+- [ ] `dashboard` — filtros, agregações, relatórios
+- [ ] `api` — contratos JSON (sucesso/erro), paginação
+- [ ] `categorias` / `traducoes` — admin
+
+---
+
+## Checklist de Qualidade
+
+### Regressão
+- [ ] Nenhum teste existente foi quebrado (`pytest --tb=short -q` passa)
+- [ ] Comportamento anterior preservado onde não houve mudança intencional
+- [ ] Casos de borda cobertos (entrada vazia, null, tamanho máximo)
+
+### Cenários negativos
+- [ ] Fluxo de erro testado (ex.: dado inválido, usuário sem permissão)
+- [ ] Respostas de erro retornam `{"sucesso": false, "erro": "..."}` sem expor stack trace
+- [ ] Erros do Firestore tratados (timeout, documento inexistente)
+
+### Autorização e permissões
+- [ ] Rota protegida pelos decoradores corretos (`@requer_solicitante`, `@requer_supervisor_area`, `@requer_admin`)
+- [ ] Testado o acesso negado para perfil inferior ao exigido
+- [ ] Supervisor não acessa dados de área diferente da sua
+
+### i18n e fallback
+- [ ] Novos textos visíveis ao usuário usam `{{ t('chave') }}` (nunca string literal no template)
+- [ ] Chave adicionada em PT-BR, EN e ES (ou marcada com `# TODO i18n`)
+- [ ] Fallback para PT-BR quando tradução ausente não quebra a página
 
 ### Código
-- [ ] O código segue os padrões do projeto (`ruff check app/` passa sem erros)
-- [ ] Não há secrets ou credenciais no diff
-- [ ] Não há `print()` ou `console.log()` de debug esquecidos
-- [ ] Imports organizados e sem F401 não intencionais
+- [ ] `ruff check app/ tests/` passa sem erros
+- [ ] `bandit -r app/ -ll` sem novos findings de severidade média ou alta
+- [ ] Sem `print()` / `console.log()` de debug
+- [ ] Sem secrets ou credenciais no diff
+- [ ] Lógica de negócio em `app/services/`, não nas rotas
 
-### Testes
-- [ ] Testes unitários adicionados/atualizados para as mudanças
-- [ ] `pytest tests/` passa localmente (exceto E2E)
-- [ ] Cobertura não caiu significativamente
-
-### Segurança
-- [ ] `bandit -r app/ -ll` passou sem novos findings de severidade média ou alta
-- [ ] Inputs do usuário são validados/saneados
-- [ ] Sem SQL injection, XSS ou outras vulnerabilidades introduzidas
+### Firestore
+- [ ] Novas queries com índices criados (se necessário)
+- [ ] Sem `db.collection().get()` sem paginação em coleções grandes
+- [ ] Regras de segurança do Firestore atualizadas (se aplicável)
 
 ### Templates / Frontend
 - [ ] Novos elementos interativos têm `data-testid` para E2E
-- [ ] Textos visíveis ao usuário usam `{{ t('chave') }}` (i18n)
 - [ ] Layout responsivo verificado (mobile e desktop)
 
-### Firestore
-- [ ] Novas queries têm índices criados (se necessário)
-- [ ] Regras de segurança do Firestore atualizadas (se aplicável)
+---
 
-## Como testar
+## Como testar manualmente
 
-> Descreva os passos para o revisor testar as mudanças manualmente.
+> Passos para o revisor reproduzir e validar as mudanças.
 
 1. ...
 2. ...
 
 ## Screenshots (se aplicável)
 
-> Adicione capturas de tela para mudanças visuais.
+> Capturas de tela para mudanças visuais (antes / depois).

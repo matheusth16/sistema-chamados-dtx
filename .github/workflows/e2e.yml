@@ -1,0 +1,78 @@
+name: E2E Smoke
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  # Permite trigger manual para rodar contra staging
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: "URL do servidor Flask para testes E2E"
+        required: false
+        default: "http://127.0.0.1:5000"
+
+jobs:
+  e2e-smoke:
+    name: E2E Smoke Tests (Playwright)
+    runs-on: ubuntu-latest
+    # Não bloqueia o pipeline enquanto a suíte E2E está em estabilização
+    continue-on-error: true
+
+    env:
+      FLASK_ENV: testing
+      SECRET_KEY: e2e-test-secret
+      WTF_CSRF_ENABLED: "false"
+      FLASK_TEST_URL: ${{ secrets.FLASK_TEST_URL || '' }}
+      TEST_SOLICITANTE_EMAIL: ${{ secrets.TEST_SOLICITANTE_EMAIL || '' }}
+      TEST_SOLICITANTE_PASSWORD: ${{ secrets.TEST_SOLICITANTE_PASSWORD || '' }}
+      TEST_SUPERVISOR_EMAIL: ${{ secrets.TEST_SUPERVISOR_EMAIL || '' }}
+      TEST_SUPERVISOR_PASSWORD: ${{ secrets.TEST_SUPERVISOR_PASSWORD || '' }}
+      TEST_ADMIN_EMAIL: ${{ secrets.TEST_ADMIN_EMAIL || '' }}
+      TEST_ADMIN_PASSWORD: ${{ secrets.TEST_ADMIN_PASSWORD || '' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configurar Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: requirements-dev.txt
+
+      - name: Instalar dependências Python
+        run: pip install -r requirements-dev.txt
+
+      - name: Instalar browsers Playwright
+        run: playwright install chromium --with-deps
+
+      - name: Verificar disponibilidade do servidor
+        id: check_server
+        run: |
+          URL="${FLASK_TEST_URL:-http://127.0.0.1:5000}"
+          if curl --silent --fail --max-time 5 "$URL/login" > /dev/null 2>&1; then
+            echo "server_available=true" >> $GITHUB_OUTPUT
+          else
+            echo "server_available=false" >> $GITHUB_OUTPUT
+            echo "⚠️ Servidor Flask não disponível em $URL — testes E2E serão skipped."
+          fi
+
+      - name: Rodar suíte smoke E2E
+        run: |
+          pytest tests/e2e -m smoke \
+            --base-url "${FLASK_TEST_URL:-http://127.0.0.1:5000}" \
+            --tb=short -q \
+            --no-header \
+            --ignore=tests/e2e/test_solicitante.py
+        continue-on-error: true
+
+      - name: Subir relatório de traces (falhas)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-traces
+          path: test-results/
+          retention-days: 7
