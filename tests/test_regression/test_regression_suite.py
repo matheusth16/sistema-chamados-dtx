@@ -14,6 +14,12 @@ Garante que novas funcionalidades ou mudanças não quebrem:
 
 from unittest.mock import MagicMock, patch
 
+import pytest
+
+# Aplica @pytest.mark.regression a todos os testes deste módulo automaticamente
+pytestmark = pytest.mark.regression
+
+
 # --- Health / Infra ---
 
 
@@ -113,6 +119,8 @@ def test_regression_criar_chamado_valido_redireciona(client_logado_solicitante):
                 "categoria": "Chamado",
                 "tipo": "Manutencao",
                 "descricao": "Descrição válida com mais de 3 caracteres",
+                "gate": "Gate 1",
+                "impacto": "Qualidade",
             },
             follow_redirects=False,
         )
@@ -136,11 +144,11 @@ def test_regression_atualizar_status_sem_login_401(client):
 
 
 def test_regression_atualizar_status_sem_chamado_id_400(client_logado_supervisor):
-    """Regressão: POST /api/atualizar-status sem chamado_id retorna 400 (ou 403 por Origin)."""
+    """Regressão: POST /api/atualizar-status sem chamado_id retorna 400."""
     r = client_logado_supervisor.post(
         "/api/atualizar-status", json={"novo_status": "Aberto"}, content_type="application/json"
     )
-    assert r.status_code in (400, 403)
+    assert r.status_code == 400
 
 
 def test_regression_bulk_status_solicitante_403(client_logado_solicitante):
@@ -185,20 +193,18 @@ def test_regression_carregar_mais_sem_login_401(client):
 
 
 def test_regression_carregar_mais_com_login_200_estrutura(client_logado_supervisor):
-    """Regressão: POST /api/carregar-mais com login retorna 200 e estrutura (ou 403 por Origin)."""
+    """Regressão: POST /api/carregar-mais com login retorna 200 e estrutura."""
     with patch("app.routes.api.aplicar_filtros_dashboard_com_paginacao") as mock_f:
         mock_f.return_value = {"docs": [], "proximo_cursor": None, "tem_proxima": False}
         r = client_logado_supervisor.post(
             "/api/carregar-mais",
             json={"cursor": None, "limite": 20},
             content_type="application/json",
-            headers={"Origin": "http://localhost:5000"},
         )
-    assert r.status_code in (200, 403)
-    if r.status_code == 200:
-        data = r.get_json()
-        assert data.get("sucesso") is True
-        assert "chamados" in data and "cursor_proximo" in data and "tem_proxima" in data
+    assert r.status_code == 200
+    data = r.get_json()
+    assert data.get("sucesso") is True
+    assert "chamados" in data and "cursor_proximo" in data and "tem_proxima" in data
 
 
 def test_regression_notificacoes_sem_login_401(client):

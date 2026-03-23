@@ -24,6 +24,10 @@ def app():
     app.config["TESTING"] = True
     app.config["WTF_CSRF_ENABLED"] = False
     app.config["SECRET_KEY"] = "test-secret"
+    # Neutraliza o check de Origin/Referer para que testes não dependam do .env local.
+    # Testes de segurança da validação de Origin estão em test_security_origin.py,
+    # onde APP_BASE_URL é definida explicitamente por fixture.
+    app.config["APP_BASE_URL"] = ""
     return app
 
 

@@ -14,7 +14,7 @@ class MeusChamadosPage:
         self.ticket_rows = page.get_by_test_id("ticket-row")
 
     def navigate(self) -> None:
-        self.page.goto(f"{self.base_url}/meus_chamados")
+        self.page.goto(f"{self.base_url}/meus-chamados")
         self.page.wait_for_load_state("networkidle")
 
     def assert_page_visible(self) -> None:

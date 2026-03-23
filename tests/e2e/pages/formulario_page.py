@@ -15,7 +15,7 @@ class FormularioPage:
         self.submit_btn = page.get_by_test_id("submit-btn")
 
     def navigate(self) -> None:
-        self.page.goto(f"{self.base_url}/formulario")
+        self.page.goto(f"{self.base_url}/")
         self.page.wait_for_load_state("networkidle")
 
     def fill_and_submit(self, tipo: str, descricao: str) -> None:

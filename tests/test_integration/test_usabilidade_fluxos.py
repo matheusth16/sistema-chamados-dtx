@@ -127,6 +127,8 @@ def test_usabilidade_criar_chamado_valido_redireciona(client_logado_solicitante)
                 "categoria": "Chamado",
                 "tipo": "Manutencao",
                 "descricao": "Descrição válida com mais de 3 caracteres",
+                "gate": "Gate 1",
+                "impacto": "Qualidade",
             },
             follow_redirects=False,
         )
@@ -170,20 +172,31 @@ def test_usabilidade_carregar_mais_estrutura_consistente(client_logado_superviso
 
 
 def test_usabilidade_atualizar_status_resposta_sucesso_ou_erro_explicito(client_logado_supervisor):
-    """U-STAT-01: Atualização de status retorna sucesso ou erro explícito (200/400/404 ou 403 por Origin)."""
-    with patch("app.routes.api.atualizar_status_chamado") as mock_st:
+    """U-STAT-01: Atualização de status com chamado existente retorna 200 com sucesso."""
+    from unittest.mock import MagicMock
+
+    doc = MagicMock()
+    doc.exists = True
+    doc.to_dict.return_value = {"area": "Manutencao", "status": "Aberto", "solicitante_id": "s1"}
+    chamado_mock = MagicMock()
+    chamado_mock.area = "Manutencao"
+    with (
+        patch("app.routes.api.db") as mock_db,
+        patch("app.routes.api.Chamado") as mock_chamado_cls,
+        patch("app.routes.api.atualizar_status_chamado") as mock_st,
+    ):
+        mock_db.collection.return_value.document.return_value.get.return_value = doc
+        mock_chamado_cls.from_dict.return_value = chamado_mock
         mock_st.return_value = {"sucesso": True, "mensagem": "Ok", "novo_status": "Em Atendimento"}
         r = client_logado_supervisor.post(
             "/api/atualizar-status",
             json={"chamado_id": "ch1", "novo_status": "Em Atendimento"},
             content_type="application/json",
-            headers={"Origin": "http://localhost:5000"},
         )
-    assert r.status_code in (200, 403)
-    if r.status_code == 200:
-        data = r.get_json()
-        assert data.get("sucesso") is True
-        assert "mensagem" in data or "novo_status" in data
+    assert r.status_code == 200
+    data = r.get_json()
+    assert data.get("sucesso") is True
+    assert "mensagem" in data or "novo_status" in data
 
 
 def test_usabilidade_bulk_status_retorna_resumo_atualizados_e_erros(client_logado_supervisor):

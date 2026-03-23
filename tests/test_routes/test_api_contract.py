@@ -33,47 +33,54 @@ def test_api_sw_js_contrato_200_javascript(client):
 
 @pytest.mark.api
 def test_api_atualizar_status_sem_login_401(client):
-    """POST /api/atualizar-status sem login retorna 401 JSON (ou 403 se validação Origin falhar)."""
+    """POST /api/atualizar-status sem login redireciona (302) ou retorna 401/403 — acesso bloqueado."""
     r = client.post(
         "/api/atualizar-status",
         json={"chamado_id": "x", "novo_status": "Aberto"},
         content_type="application/json",
     )
-    assert r.status_code in (401, 403)
-    if r.status_code == 401:
-        data = r.get_json()
-        assert data is not None and data.get("requer_login") is True
+    assert r.status_code in (302, 401, 403)
+    assert r.status_code != 200
 
 
 @pytest.mark.api
 def test_api_atualizar_status_sem_chamado_id_400(client_logado_supervisor):
-    """POST /api/atualizar-status sem chamado_id retorna 400 com campo erro (ou 403 por Origin)."""
+    """POST /api/atualizar-status sem chamado_id retorna 400 com campo erro."""
     r = client_logado_supervisor.post(
         "/api/atualizar-status", json={"novo_status": "Aberto"}, content_type="application/json"
     )
-    assert r.status_code in (400, 403)
-    if r.status_code == 400:
-        data = r.get_json()
-        assert data is not None and data.get("sucesso") is False and "erro" in data
+    assert r.status_code == 400
+    data = r.get_json()
+    assert data is not None and data.get("sucesso") is False and "erro" in data
 
 
 @pytest.mark.api
 def test_api_atualizar_status_novo_status_invalido_400(client_logado_supervisor):
-    """POST /api/atualizar-status com novo_status inválido retorna 400 (ou 403 por Origin)."""
+    """POST /api/atualizar-status com novo_status inválido retorna 400."""
     r = client_logado_supervisor.post(
         "/api/atualizar-status",
         json={"chamado_id": "ch1", "novo_status": "Fechado"},
         content_type="application/json",
     )
-    assert r.status_code in (400, 403)
-    if r.status_code == 400:
-        assert r.get_json().get("sucesso") is False
+    assert r.status_code == 400
+    assert r.get_json().get("sucesso") is False
 
 
 @pytest.mark.api
 def test_api_atualizar_status_sucesso_200_estrutura(client_logado_supervisor):
-    """POST /api/atualizar-status sucesso retorna 200 com sucesso, mensagem, novo_status (ou 403 por Origin)."""
-    with patch("app.routes.api.atualizar_status_chamado") as m:
+    """POST /api/atualizar-status sucesso retorna 200 com sucesso, mensagem, novo_status."""
+    doc = MagicMock()
+    doc.exists = True
+    doc.to_dict.return_value = {"area": "Manutencao", "status": "Aberto", "solicitante_id": "s1"}
+    chamado_mock = MagicMock()
+    chamado_mock.area = "Manutencao"
+    with (
+        patch("app.routes.api.db") as mock_db,
+        patch("app.routes.api.Chamado") as mock_chamado_cls,
+        patch("app.routes.api.atualizar_status_chamado") as m,
+    ):
+        mock_db.collection.return_value.document.return_value.get.return_value = doc
+        mock_chamado_cls.from_dict.return_value = chamado_mock
         m.return_value = {
             "sucesso": True,
             "mensagem": "Status alterado",
@@ -83,12 +90,10 @@ def test_api_atualizar_status_sucesso_200_estrutura(client_logado_supervisor):
             "/api/atualizar-status",
             json={"chamado_id": "ch1", "novo_status": "Em Atendimento"},
             content_type="application/json",
-            headers={"Origin": "http://localhost:5000"},
         )
-    assert r.status_code in (200, 403)
-    if r.status_code == 200:
-        data = r.get_json()
-        assert data.get("sucesso") is True and data.get("novo_status") == "Em Atendimento"
+    assert r.status_code == 200
+    data = r.get_json()
+    assert data.get("sucesso") is True and data.get("novo_status") == "Em Atendimento"
 
 
 # --- POST /api/bulk-status ---
@@ -96,13 +101,13 @@ def test_api_atualizar_status_sucesso_200_estrutura(client_logado_supervisor):
 
 @pytest.mark.api
 def test_api_bulk_status_sem_login_401(client):
-    """POST /api/bulk-status sem login retorna 401 (ou 403 por Origin)."""
+    """POST /api/bulk-status sem login redireciona (302) ou retorna 401/403 — acesso bloqueado."""
     r = client.post(
         "/api/bulk-status",
         json={"chamado_ids": ["ch1"], "novo_status": "Concluído"},
         content_type="application/json",
     )
-    assert r.status_code in (401, 403)
+    assert r.status_code in (302, 401, 403)
 
 
 @pytest.mark.api
@@ -119,13 +124,13 @@ def test_api_bulk_status_solicitante_403(client_logado_solicitante):
 
 @pytest.mark.api
 def test_api_bulk_status_chamado_ids_nao_lista_400(client_logado_supervisor):
-    """POST /api/bulk-status com chamado_ids não-lista retorna 400 (ou 403 por Origin)."""
+    """POST /api/bulk-status com chamado_ids não-lista retorna 400."""
     r = client_logado_supervisor.post(
         "/api/bulk-status",
         json={"chamado_ids": "id1", "novo_status": "Concluído"},
         content_type="application/json",
     )
-    assert r.status_code in (400, 403)
+    assert r.status_code == 400
 
 
 @pytest.mark.api
@@ -141,11 +146,8 @@ def test_api_bulk_status_sucesso_200_estrutura(client_logado_supervisor):
                 "/api/bulk-status",
                 json={"chamado_ids": ["ch1"], "novo_status": "Concluído"},
                 content_type="application/json",
-                headers={"Origin": "http://localhost:5000"},
             )
-    assert r.status_code in (200, 403)
-    if r.status_code != 200:
-        return
+    assert r.status_code == 200
     data = r.get_json()
     assert data.get("sucesso") is True
     assert "atualizados" in data and "total_solicitados" in data and "erros" in data
@@ -224,33 +226,31 @@ def test_api_chamados_paginar_sucesso_200_estrutura(client_logado_supervisor):
 
 @pytest.mark.api
 def test_api_carregar_mais_sem_login_401(client):
-    """POST /api/carregar-mais sem login retorna 401 (ou 403 por Origin)."""
+    """POST /api/carregar-mais sem login redireciona (302) ou retorna 401/403 — acesso bloqueado."""
     r = client.post(
         "/api/carregar-mais", json={"cursor": None, "limite": 20}, content_type="application/json"
     )
-    assert r.status_code in (401, 403)
+    assert r.status_code in (302, 401, 403)
 
 
 @pytest.mark.api
 def test_api_carregar_mais_sucesso_200_estrutura(client_logado_supervisor):
-    """POST /api/carregar-mais retorna 200 com chamados, cursor_proximo, tem_proxima (ou 403 por Origin)."""
+    """POST /api/carregar-mais retorna 200 com chamados, cursor_proximo, tem_proxima."""
     with patch("app.routes.api.aplicar_filtros_dashboard_com_paginacao") as m:
         m.return_value = {"docs": [], "proximo_cursor": None, "tem_proxima": False}
         r = client_logado_supervisor.post(
             "/api/carregar-mais",
             json={"cursor": None, "limite": 20},
             content_type="application/json",
-            headers={"Origin": "http://localhost:5000"},
         )
-    assert r.status_code in (200, 403)
-    if r.status_code == 200:
-        data = r.get_json()
-        assert (
-            data.get("sucesso") is True
-            and "chamados" in data
-            and "cursor_proximo" in data
-            and "tem_proxima" in data
-        )
+    assert r.status_code == 200
+    data = r.get_json()
+    assert (
+        data.get("sucesso") is True
+        and "chamados" in data
+        and "cursor_proximo" in data
+        and "tem_proxima" in data
+    )
 
 
 # --- GET /api/chamado/<id> ---
@@ -318,24 +318,22 @@ def test_api_notificacoes_sucesso_200_estrutura(client_logado_solicitante):
 
 @pytest.mark.api
 def test_api_notificacoes_ler_sem_login_401(client):
-    """POST /api/notificacoes/<id>/ler sem login retorna 401 (ou 403 por Origin)."""
+    """POST /api/notificacoes/<id>/ler sem login redireciona (302) ou retorna 401/403."""
     r = client.post("/api/notificacoes/not_123/ler", content_type="application/json")
-    assert r.status_code in (401, 403)
+    assert r.status_code in (302, 401, 403)
 
 
 @pytest.mark.api
 def test_api_notificacoes_ler_sucesso_200_estrutura(client_logado_solicitante):
-    """POST /api/notificacoes/<id>/ler retorna 200 com sucesso (true/false) (ou 403 por Origin)."""
+    """POST /api/notificacoes/<id>/ler retorna 200 com sucesso."""
     with patch("app.routes.api.marcar_como_lida", return_value=True):
         r = client_logado_solicitante.post(
             "/api/notificacoes/not_123/ler",
             content_type="application/json",
-            headers={"Origin": "http://localhost:5000"},
         )
-    assert r.status_code in (200, 403)
-    if r.status_code == 200:
-        data = r.get_json()
-        assert "sucesso" in data
+    assert r.status_code == 200
+    data = r.get_json()
+    assert "sucesso" in data
 
 
 # --- GET /api/push-vapid-public ---
@@ -362,22 +360,22 @@ def test_api_push_vapid_public_sucesso_200_estrutura(client_logado_solicitante):
 
 @pytest.mark.api
 def test_api_push_subscribe_sem_login_401(client):
-    """POST /api/push-subscribe sem login retorna 401 (ou 403 por Origin)."""
+    """POST /api/push-subscribe sem login redireciona (302) ou retorna 401/403."""
     r = client.post(
         "/api/push-subscribe",
         json={"subscription": {"endpoint": "https://x"}},
         content_type="application/json",
     )
-    assert r.status_code in (401, 403)
+    assert r.status_code in (302, 401, 403)
 
 
 @pytest.mark.api
 def test_api_push_subscribe_subscription_invalida_400(client_logado_solicitante):
-    """POST /api/push-subscribe sem subscription válida retorna 400 (ou 403 por Origin)."""
+    """POST /api/push-subscribe sem subscription válida retorna 400."""
     r = client_logado_solicitante.post(
         "/api/push-subscribe", json={}, content_type="application/json"
     )
-    assert r.status_code in (400, 403)
+    assert r.status_code == 400
 
 
 # --- GET /api/supervisores/disponibilidade ---

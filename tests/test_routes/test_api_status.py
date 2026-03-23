@@ -36,24 +36,34 @@ def test_atualizar_status_sem_chamado_id_retorna_400(client_logado_supervisor):
 
 
 def test_atualizar_status_status_invalido_retorna_400(client_logado_supervisor):
-    """CT-STAT-03: novo_status inválido retorna 400 (ou 403 por Origin)."""
+    """CT-STAT-03: novo_status inválido retorna 400."""
     r = client_logado_supervisor.post(
         "/api/atualizar-status",
-        json={"chamado_id": "ch_123", "novo_status": "Cancelado"},
+        json={"chamado_id": "ch_123", "novo_status": "Fechado"},  # "Fechado" não é status válido
         content_type="application/json",
     )
-    assert r.status_code in (400, 403)
-    if r.status_code == 400:
-        data = r.get_json()
-        assert data is not None and data.get("sucesso") is False
-        assert (
-            "inválido" in data.get("erro", "").lower() or "status" in data.get("erro", "").lower()
-        )
+    assert r.status_code == 400
+    data = r.get_json()
+    assert data is not None and data.get("sucesso") is False
+    assert "inválido" in data.get("erro", "").lower() or "status" in data.get("erro", "").lower()
 
 
 def test_atualizar_status_com_sucesso_retorna_200(client_logado_supervisor):
-    """CT-STAT-01: POST /api/atualizar-status com payload válido retorna 200 (ou 403 por Origin)."""
-    with patch("app.routes.api.atualizar_status_chamado") as mock_atualizar:
+    """CT-STAT-01: POST /api/atualizar-status com payload válido retorna 200."""
+    from unittest.mock import MagicMock
+
+    doc = MagicMock()
+    doc.exists = True
+    doc.to_dict.return_value = {"area": "Manutencao", "status": "Aberto", "solicitante_id": "s1"}
+    chamado_mock = MagicMock()
+    chamado_mock.area = "Manutencao"
+    with (
+        patch("app.routes.api.db") as mock_db,
+        patch("app.routes.api.Chamado") as mock_chamado_cls,
+        patch("app.routes.api.atualizar_status_chamado") as mock_atualizar,
+    ):
+        mock_db.collection.return_value.document.return_value.get.return_value = doc
+        mock_chamado_cls.from_dict.return_value = chamado_mock
         mock_atualizar.return_value = {
             "sucesso": True,
             "mensagem": "Status alterado para Em Atendimento",
@@ -63,13 +73,11 @@ def test_atualizar_status_com_sucesso_retorna_200(client_logado_supervisor):
             "/api/atualizar-status",
             json={"chamado_id": "ch_valido_123", "novo_status": "Em Atendimento"},
             content_type="application/json",
-            headers={"Origin": "http://localhost:5000"},
         )
-    assert r.status_code in (200, 403)
-    if r.status_code == 200:
-        data = r.get_json()
-        assert data.get("sucesso") is True
-        assert data.get("novo_status") == "Em Atendimento"
+    assert r.status_code == 200
+    data = r.get_json()
+    assert data.get("sucesso") is True
+    assert data.get("novo_status") == "Em Atendimento"
 
 
 def test_atualizar_status_chamado_inexistente_retorna_404(client_logado_supervisor):

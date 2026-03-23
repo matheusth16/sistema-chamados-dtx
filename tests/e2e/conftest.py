@@ -19,9 +19,23 @@ Exemplo de .env.test:
 """
 
 import os
+import urllib.error
+import urllib.request
 
 import pytest
 from playwright.sync_api import Page
+
+DEFAULT_TIMEOUT = 10_000  # ms — tempo padrão de espera para assertions E2E
+
+
+@pytest.fixture(scope="session", autouse=True)
+def require_server(base_url: str) -> None:
+    """Auto-skip da suíte inteira quando o servidor Flask não está disponível."""
+    try:
+        urllib.request.urlopen(f"{base_url}/login", timeout=3)
+    except Exception:
+        pytest.skip(f"Servidor Flask não disponível em {base_url} — skipping E2E suite")
+
 
 # ---------------------------------------------------------------------------
 # Configuração de base_url
