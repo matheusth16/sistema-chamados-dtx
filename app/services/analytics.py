@@ -16,6 +16,7 @@ from statistics import mean
 from typing import Any
 
 from firebase_admin import firestore
+from google.cloud.firestore_v1.base_query import FieldFilter
 
 logger = logging.getLogger(__name__)
 
@@ -131,7 +132,7 @@ class AnalisadorChamados:
             chamados_ref = (
                 self.get_db()
                 .collection("chamados")
-                .where("data_abertura", ">=", data_limite)
+                .where(filter=FieldFilter("data_abertura", ">=", data_limite))
                 .limit(MAX_CHAMADOS_ANALYTICS)
             )
             chamados = list(chamados_ref.stream())
@@ -261,7 +262,7 @@ class AnalisadorChamados:
                 chamados_ref = (
                     self.get_db()
                     .collection("chamados")
-                    .where("responsavel_id", "==", sup.id)
+                    .where(filter=FieldFilter("responsavel_id", "==", sup.id))
                     .limit(MAX_CHAMADOS_ANALYTICS)
                 )
                 chamados = list(chamados_ref.stream())
@@ -376,7 +377,7 @@ class AnalisadorChamados:
                 chamados_ref = (
                     self.get_db()
                     .collection("chamados")
-                    .where("area", "==", area)
+                    .where(filter=FieldFilter("area", "==", area))
                     .limit(MAX_CHAMADOS_ANALYTICS)
                 )
                 chamados = list(chamados_ref.stream())
@@ -458,7 +459,7 @@ class AnalisadorChamados:
             chamados_ref = (
                 self.get_db()
                 .collection("chamados")
-                .where("data_abertura", ">=", data_limite)
+                .where(filter=FieldFilter("data_abertura", ">=", data_limite))
                 .limit(MAX_CHAMADOS_ANALYTICS)
             )
             chamados = list(chamados_ref.stream())
@@ -657,8 +658,8 @@ class AnalisadorChamados:
             chamados_ref = (
                 self.get_db()
                 .collection("chamados")
-                .where("data_abertura", ">=", data_inicio)
-                .where("data_abertura", "<", data_fim)
+                .where(filter=FieldFilter("data_abertura", ">=", data_inicio))
+                .where(filter=FieldFilter("data_abertura", "<", data_fim))
                 .limit(MAX_CHAMADOS_ANALYTICS)
             )
             chamados = list(chamados_ref.stream())

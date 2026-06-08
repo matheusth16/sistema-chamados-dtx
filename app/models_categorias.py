@@ -7,6 +7,7 @@ import logging
 from datetime import datetime
 
 import pytz
+from google.cloud.firestore_v1.base_query import FieldFilter
 
 from app.database import db
 from app.firebase_retry import firebase_retry
@@ -89,7 +90,11 @@ class CategoriaSetor:
     def get_all(cls):
         """Retorna todos os setores ativos"""
         try:
-            docs = db.collection("categorias_setores").where("ativo", "==", True).stream()
+            docs = (
+                db.collection("categorias_setores")
+                .where(filter=FieldFilter("ativo", "==", True))
+                .stream()
+            )
             return [cls.from_dict(doc.to_dict(), doc.id) for doc in docs]
         except Exception as e:
             logger.error("Erro ao buscar setores: %s", e)
@@ -278,7 +283,11 @@ class CategoriaImpacto:
     def get_all(cls):
         """Retorna todos os impactos ativos"""
         try:
-            docs = db.collection("categorias_impactos").where("ativo", "==", True).stream()
+            docs = (
+                db.collection("categorias_impactos")
+                .where(filter=FieldFilter("ativo", "==", True))
+                .stream()
+            )
             return [cls.from_dict(doc.to_dict(), doc.id) for doc in docs]
         except Exception as e:
             logger.error("Erro ao buscar impactos: %s", e)

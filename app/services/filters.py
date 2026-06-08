@@ -58,6 +58,7 @@ if resultado['tem_proxima']:
 from typing import Any
 
 from firebase_admin import firestore
+from google.cloud.firestore_v1.base_query import FieldFilter
 
 
 def _construir_query_base(
@@ -84,17 +85,17 @@ def _construir_query_base(
     query_filtrada = query_ref
 
     if status and status not in ["", "Todos"]:
-        query_filtrada = query_filtrada.where("status", "==", status)
+        query_filtrada = query_filtrada.where(filter=FieldFilter("status", "==", status))
 
     if gate and gate not in ["", "Todos"]:
-        query_filtrada = query_filtrada.where("gate", "==", gate)
+        query_filtrada = query_filtrada.where(filter=FieldFilter("gate", "==", gate))
 
     if responsavel:
-        query_filtrada = query_filtrada.where("responsavel", "==", responsavel)
+        query_filtrada = query_filtrada.where(filter=FieldFilter("responsavel", "==", responsavel))
 
     # Filtro direto por código RL (Projetos): permite ver todos os chamados de uma RL específica
     if rl_codigo:
-        query_filtrada = query_filtrada.where("rl_codigo", "==", rl_codigo)
+        query_filtrada = query_filtrada.where(filter=FieldFilter("rl_codigo", "==", rl_codigo))
 
     categoria_filtrada = categoria and categoria not in ["", "Todas"]
 

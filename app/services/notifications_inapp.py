@@ -8,6 +8,7 @@ from datetime import datetime
 from typing import Any
 
 from firebase_admin import firestore
+from google.cloud.firestore_v1.base_query import FieldFilter
 
 from app.database import db
 
@@ -60,9 +61,9 @@ def listar_para_usuario(
     if not usuario_id:
         return []
     try:
-        q = db.collection("notificacoes").where("usuario_id", "==", usuario_id)
+        q = db.collection("notificacoes").where(filter=FieldFilter("usuario_id", "==", usuario_id))
         if apenas_nao_lidas:
-            q = q.where("lida", "==", False)
+            q = q.where(filter=FieldFilter("lida", "==", False))
         docs = q.limit(
             limite * 2
         ).stream()  # busca extra para ordenar em memória (evita índice composto)
@@ -93,8 +94,8 @@ def contar_nao_lidas(usuario_id: str) -> int:
     try:
         result = (
             db.collection("notificacoes")
-            .where("usuario_id", "==", usuario_id)
-            .where("lida", "==", False)
+            .where(filter=FieldFilter("usuario_id", "==", usuario_id))
+            .where(filter=FieldFilter("lida", "==", False))
             .count()
             .get()
         )
@@ -127,8 +128,8 @@ def marcar_todas_como_lidas(usuario_id: str) -> int:
     try:
         docs = list(
             db.collection("notificacoes")
-            .where("usuario_id", "==", usuario_id)
-            .where("lida", "==", False)
+            .where(filter=FieldFilter("usuario_id", "==", usuario_id))
+            .where(filter=FieldFilter("lida", "==", False))
             .stream()
         )
         count = len(docs)

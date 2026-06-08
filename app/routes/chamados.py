@@ -4,6 +4,7 @@ import logging
 
 from flask import Response, flash, redirect, render_template, request, url_for
 from flask_login import current_user
+from google.cloud.firestore_v1.base_query import FieldFilter
 
 from app.cache import get_static_cached
 from app.database import db
@@ -39,8 +40,8 @@ def index() -> Response:
             for st in ("Aberto", "Em Atendimento", "Concluído", "Cancelado"):
                 q = (
                     db.collection("chamados")
-                    .where("solicitante_id", "==", current_user.id)
-                    .where("status", "==", st)
+                    .where(filter=FieldFilter("solicitante_id", "==", current_user.id))
+                    .where(filter=FieldFilter("status", "==", st))
                 )
                 c = obter_total_por_contagem(q)
                 status_counts[st] = c if c is not None else 0

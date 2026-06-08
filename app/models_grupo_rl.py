@@ -1,6 +1,7 @@
 import logging
 
 from firebase_admin import firestore
+from google.cloud.firestore_v1.base_query import FieldFilter
 
 from app.database import db
 
@@ -57,7 +58,12 @@ class GrupoRL:
         if not rl:
             return None
         try:
-            docs = db.collection("grupos_rl").where("rl_codigo", "==", rl).limit(1).stream()
+            docs = (
+                db.collection("grupos_rl")
+                .where(filter=FieldFilter("rl_codigo", "==", rl))
+                .limit(1)
+                .stream()
+            )
             for doc in docs:
                 return cls.from_dict(doc.to_dict(), doc.id)
         except Exception as e:

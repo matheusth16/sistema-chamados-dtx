@@ -66,12 +66,15 @@ def test_contar_chamados_abertos_usa_query_in_unica(mock_db):
     atrib = AtribuidorAutomatico()
     result = atrib._contar_chamados_abertos([sup_a, sup_b])
 
-    # Deve ter chamado .where('responsavel', 'in', ...) apenas uma vez
+    # Deve ter chamado .where(filter=FieldFilter('responsavel', 'in', ...)) apenas uma vez
+    from google.cloud.firestore_v1.base_query import FieldFilter
+
     assert mock_db.collection.return_value.where.call_count == 1
-    where_call = mock_db.collection.return_value.where.call_args
-    assert where_call[0][0] == "responsavel"
-    assert where_call[0][1] == "in"
-    assert set(where_call[0][2]) == {"Ana", "Bruno"}
+    ff = mock_db.collection.return_value.where.call_args.kwargs.get("filter")
+    assert isinstance(ff, FieldFilter)
+    assert ff.field_path == "responsavel"
+    assert ff.op_string == "in"
+    assert set(ff.value) == {"Ana", "Bruno"}
 
     # Contagens corretas
     por_nome = {r["usuario"].nome: r["chamados_abertos"] for r in result}

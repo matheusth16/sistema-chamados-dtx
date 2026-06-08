@@ -2,6 +2,7 @@ from datetime import datetime
 
 import pytz
 from firebase_admin import firestore
+from google.cloud.firestore_v1.base_query import FieldFilter
 
 from app.database import db
 
@@ -97,7 +98,7 @@ class Historico:
             try:
                 docs = (
                     db.collection("historico")
-                    .where("chamado_id", "==", chamado_id)
+                    .where(filter=FieldFilter("chamado_id", "==", chamado_id))
                     .order_by("data_acao", direction=firestore.Query.DESCENDING)
                     .stream()
                 )
@@ -114,7 +115,11 @@ class Historico:
                     logger.warning(
                         "⚠️ Índice ainda em construção, buscando sem ordenação: %s", index_error
                     )
-                    docs = db.collection("historico").where("chamado_id", "==", chamado_id).stream()
+                    docs = (
+                        db.collection("historico")
+                        .where(filter=FieldFilter("chamado_id", "==", chamado_id))
+                        .stream()
+                    )
                     historico = []
                     for doc in docs:
                         data = doc.to_dict()

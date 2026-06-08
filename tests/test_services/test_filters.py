@@ -25,12 +25,18 @@ def test_construir_query_base_sem_filtros_retorna_query_original():
 
 
 def test_construir_query_base_com_status_aplica_where():
-    """Com status nos args, where('status', '==', valor) é chamado."""
+    """Com status nos args, where(filter=FieldFilter('status', '==', valor)) é chamado."""
+    from google.cloud.firestore_v1.base_query import FieldFilter
+
     query_ref = MagicMock()
     query_ref.where.return_value = query_ref
     args = {"status": "Aberto"}
     query_filtrada, _, _, status, _ = _construir_query_base(query_ref, args)
-    query_ref.where.assert_called_with("status", "==", "Aberto")
+    query_ref.where.assert_called_once()
+    ff = query_ref.where.call_args.kwargs.get("filter")
+    assert isinstance(ff, FieldFilter)
+    assert ff.field_path == "status"
+    assert ff.value == "Aberto"
     assert status == "Aberto"
 
 
@@ -45,13 +51,17 @@ def test_construir_query_base_ignora_status_todos():
 
 def test_construir_query_para_contagem_retorna_mesma_query_base():
     """construir_query_para_contagem retorna a mesma query que _construir_query_base (para agregação)."""
+    from google.cloud.firestore_v1.base_query import FieldFilter
+
     query_ref = MagicMock()
     query_ref.where.return_value = query_ref
     args = {"status": "Aberto"}
     q_contagem = construir_query_para_contagem(query_ref, args)
     query_filtrada, _, _, _, _ = _construir_query_base(query_ref, args)
     assert q_contagem is query_filtrada
-    query_ref.where.assert_called_with("status", "==", "Aberto")
+    ff = query_ref.where.call_args.kwargs.get("filter")
+    assert isinstance(ff, FieldFilter)
+    assert ff.field_path == "status"
 
 
 def test_aplicar_filtros_em_memoria_filtra_por_categoria():

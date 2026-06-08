@@ -7,7 +7,7 @@ limite global injusto quando todos compartilham o mesmo sistema.
 """
 
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
 
 from app.database import db
 
@@ -25,7 +25,7 @@ CAMPO_EXPORT = "export_excel_geracoes"
 
 def _doc_id(user_id: str) -> str:
     """ID do documento: user_id + data YYYY-MM-DD."""
-    hoje = datetime.utcnow().strftime("%Y-%m-%d")
+    hoje = datetime.now(UTC).strftime("%Y-%m-%d")
     return f"{user_id}_{hoje}"
 
 
@@ -56,7 +56,7 @@ def verificar_e_incrementar_relatorio(user_id: str, limite_diario: int) -> tuple
             doc_ref.set(
                 {
                     "user_id": user_id,
-                    "data": datetime.utcnow().strftime("%Y-%m-%d"),
+                    "data": datetime.now(UTC).strftime("%Y-%m-%d"),
                     CAMPO_RELATORIO: 1,
                 },
                 merge=True,
@@ -93,7 +93,7 @@ def verificar_e_incrementar_export(user_id: str, limite_diario: int) -> tuple[bo
             doc_ref.set(
                 {
                     "user_id": user_id,
-                    "data": datetime.utcnow().strftime("%Y-%m-%d"),
+                    "data": datetime.now(UTC).strftime("%Y-%m-%d"),
                     CAMPO_EXPORT: 1,
                 },
                 merge=True,

@@ -10,7 +10,7 @@ from urllib.parse import urlparse
 from flask import Flask, g, jsonify, request, session
 from flask_login import LoginManager
 from flask_wtf.csrf import CSRFProtect
-from pythonjsonlogger import jsonlogger
+from pythonjsonlogger import json as jsonlogger
 
 from config import Config
 

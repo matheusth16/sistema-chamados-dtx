@@ -2,6 +2,7 @@ import logging
 from datetime import datetime
 
 from flask_login import UserMixin
+from google.cloud.firestore_v1.base_query import FieldFilter
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from app.database import db
@@ -124,7 +125,9 @@ class Usuario(UserMixin):
     def get_by_email(cls, email: str):
         """Busca usuário por email"""
         try:
-            docs = db.collection("usuarios").where("email", "==", email).stream()
+            docs = (
+                db.collection("usuarios").where(filter=FieldFilter("email", "==", email)).stream()
+            )
             for doc in docs:
                 data = doc.to_dict()
                 return cls.from_dict(data, doc.id)
@@ -287,7 +290,9 @@ class Usuario(UserMixin):
             id_atual: ID do usuário atual (para validação de atualização)
         """
         try:
-            docs = db.collection("usuarios").where("email", "==", email).stream()
+            docs = (
+                db.collection("usuarios").where(filter=FieldFilter("email", "==", email)).stream()
+            )
             return any(id_atual is None or doc.id != id_atual for doc in docs)
         except Exception as e:
             logger.exception("Erro ao verificar email: %s", e)
@@ -306,7 +311,11 @@ class Usuario(UserMixin):
 
             # Buscar todos os supervisores e filtrar por área em Python
             # (Firestore tem limitações em queries compostas com array_contains)
-            docs_sup = db.collection("usuarios").where("perfil", "==", "supervisor").stream()
+            docs_sup = (
+                db.collection("usuarios")
+                .where(filter=FieldFilter("perfil", "==", "supervisor"))
+                .stream()
+            )
             for doc in docs_sup:
                 user_dict = doc.to_dict()
                 # Precisamos criar o objeto Usuario primeiro para que from_dict
@@ -317,7 +326,11 @@ class Usuario(UserMixin):
                     usuarios.append(usuario)
 
             # Buscar todos os admins e filtrar por área
-            docs_admin = db.collection("usuarios").where("perfil", "==", "admin").stream()
+            docs_admin = (
+                db.collection("usuarios")
+                .where(filter=FieldFilter("perfil", "==", "admin"))
+                .stream()
+            )
             for doc in docs_admin:
                 user_dict = doc.to_dict()
                 usuario = cls.from_dict(user_dict, doc.id)

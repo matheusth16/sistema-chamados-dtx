@@ -21,6 +21,7 @@ from typing import Any
 
 import pytz
 from firebase_admin import firestore as fs_admin
+from google.cloud.firestore_v1.base_query import FieldFilter
 
 from app.database import db
 from app.models import Chamado
@@ -91,7 +92,12 @@ def buscar_chamados_abertos() -> list[dict[str, Any]]:
     resultado: list[dict[str, Any]] = []
     for status in ("Aberto", "Em Atendimento"):
         try:
-            docs = db.collection("chamados").where("status", "==", status).limit(MAX_DOCS).stream()
+            docs = (
+                db.collection("chamados")
+                .where(filter=FieldFilter("status", "==", status))
+                .limit(MAX_DOCS)
+                .stream()
+            )
             for doc in docs:
                 data = doc.to_dict()
                 if not data:

@@ -10,6 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 from firebase_admin import firestore
+from google.cloud.firestore_v1.base_query import FieldFilter
 
 from app.database import db
 from app.models import Chamado
@@ -35,7 +36,11 @@ def listar_meus_chamados_fallback(
     Fallback quando a query com order_by falha por falta de índice:
     busca só por solicitante_id (não exige índice composto), ordena em memória e pagina.
     """
-    q = db.collection("chamados").where("solicitante_id", "==", user_id).limit(500)
+    q = (
+        db.collection("chamados")
+        .where(filter=FieldFilter("solicitante_id", "==", user_id))
+        .limit(500)
+    )
     docs = list(q.stream())
     if status_filtro:
         docs = [d for d in docs if (d.to_dict() or {}).get("status") == status_filtro]
@@ -126,17 +131,17 @@ def listar_meus_chamados(
         status_counts, cursor_next, cursor_prev.
     """
     rl_codigo = (rl_codigo or "").strip()
-    q = db.collection("chamados").where("solicitante_id", "==", user_id)
+    q = db.collection("chamados").where(filter=FieldFilter("solicitante_id", "==", user_id))
     if status_filtro:
-        q = q.where("status", "==", status_filtro)
+        q = q.where(filter=FieldFilter("status", "==", status_filtro))
     if rl_codigo:
-        q = q.where("rl_codigo", "==", rl_codigo)
+        q = q.where(filter=FieldFilter("rl_codigo", "==", rl_codigo))
     # Ordena por prioridade (Projetos=0 primeiro) e depois por data_abertura
     q = q.order_by("prioridade").order_by("data_abertura", direction=firestore.Query.DESCENDING)
 
-    base_ref = db.collection("chamados").where("solicitante_id", "==", user_id)
+    base_ref = db.collection("chamados").where(filter=FieldFilter("solicitante_id", "==", user_id))
     if rl_codigo:
-        base_ref = base_ref.where("rl_codigo", "==", rl_codigo)
+        base_ref = base_ref.where(filter=FieldFilter("rl_codigo", "==", rl_codigo))
 
     _status = ("Aberto", "Em Atendimento", "Concluído", "Cancelado")
 
@@ -144,7 +149,9 @@ def listar_meus_chamados(
         return obter_total_por_contagem(q) or 0
 
     def _contar_status(st):
-        return st, obter_total_por_contagem(base_ref.where("status", "==", st)) or 0
+        return st, obter_total_por_contagem(
+            base_ref.where(filter=FieldFilter("status", "==", st))
+        ) or 0
 
     # 5 aggregation queries independentes → rodam concorrentemente
     with ThreadPoolExecutor(max_workers=5) as ex:

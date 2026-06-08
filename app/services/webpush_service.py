@@ -8,6 +8,7 @@ import logging
 from typing import Any
 
 from firebase_admin import firestore
+from google.cloud.firestore_v1.base_query import FieldFilter
 
 from app.database import db
 
@@ -44,7 +45,11 @@ def obter_inscricoes(usuario_id: str) -> list[dict[str, Any]]:
     if not usuario_id:
         return []
     try:
-        docs = db.collection("push_subscriptions").where("usuario_id", "==", usuario_id).stream()
+        docs = (
+            db.collection("push_subscriptions")
+            .where(filter=FieldFilter("usuario_id", "==", usuario_id))
+            .stream()
+        )
         out = []
         for doc in docs:
             d = doc.to_dict()

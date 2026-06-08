@@ -13,6 +13,8 @@ Uso:
 
 import logging
 
+from google.cloud.firestore_v1.base_query import FieldFilter
+
 from app.database import db
 from app.models_usuario import Usuario
 from app.utils_areas import setor_para_area
@@ -174,7 +176,11 @@ class AtribuidorAutomatico:
             _chunk = 30
             for i in range(0, len(nomes), _chunk):
                 chunk = nomes[i : i + _chunk]
-                docs = db.collection("chamados").where("responsavel", "in", chunk).stream()
+                docs = (
+                    db.collection("chamados")
+                    .where(filter=FieldFilter("responsavel", "in", chunk))
+                    .stream()
+                )
                 for doc in docs:
                     d = doc.to_dict()
                     if d.get("status") != "Concluído":

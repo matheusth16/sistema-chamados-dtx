@@ -8,6 +8,8 @@ paginação por cursor, listas de responsáveis e gates.
 import logging
 from typing import Any
 
+from google.cloud.firestore_v1.base_query import FieldFilter
+
 from app.cache import get_static_cached
 from app.database import db
 from app.models import Chamado
@@ -150,7 +152,7 @@ def obter_contexto_admin(
     if user.perfil == "supervisor" and getattr(user, "areas", None):
         areas = user.areas[:10]
         if areas:
-            chamados_ref = chamados_ref.where("area", "in", areas)
+            chamados_ref = chamados_ref.where(filter=FieldFilter("area", "in", areas))
     cursor = (args.get("cursor") or "").strip() or None
     cursor_prev = (args.get("cursor_prev") or "").strip() or None
     pagina_atual = int(args.get("pagina") or 1)
