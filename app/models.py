@@ -35,6 +35,7 @@ class Chamado:
         data_cancelamento=None,
         grupo_rl_id: str = None,
         sla_dias: int = None,
+        confirmacao_solicitante: str = None,
         id: str = None,
     ):
         self.id = id
@@ -48,6 +49,9 @@ class Chamado:
         self.rl_codigo = rl_codigo
         self.grupo_rl_id = grupo_rl_id  # Referência ao grupo lógico de RL (coleção grupos_rl)
         self.sla_dias = sla_dias  # SLA personalizado em dias (None = padrão por categoria)
+        self.confirmacao_solicitante = (
+            confirmacao_solicitante  # None | "pendente" | "confirmado" | "reaberto"
+        )
         # Prioridade centralizada: Projetos = 0, demais = informado ou 1
         self.prioridade = (
             0 if categoria == "Projetos" else (prioridade if prioridade is not None else 1)
@@ -140,6 +144,7 @@ class Chamado:
             "data_cancelamento": self.data_cancelamento,
             "grupo_rl_id": self.grupo_rl_id,
             "sla_dias": self.sla_dias,
+            "confirmacao_solicitante": self.confirmacao_solicitante,
         }
 
     @classmethod
@@ -184,6 +189,7 @@ class Chamado:
             data_cancelamento=data.get("data_cancelamento"),
             grupo_rl_id=data.get("grupo_rl_id"),
             sla_dias=data.get("sla_dias"),
+            confirmacao_solicitante=data.get("confirmacao_solicitante"),
         )
 
     def __repr__(self):

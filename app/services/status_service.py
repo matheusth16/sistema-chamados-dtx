@@ -75,6 +75,7 @@ def atualizar_status_chamado(
         update_data = {"status": novo_status}
         if novo_status == "Concluído":
             update_data["data_conclusao"] = firestore.SERVER_TIMESTAMP
+            update_data["confirmacao_solicitante"] = "pendente"
         elif novo_status == "Cancelado":
             update_data["motivo_cancelamento"] = (motivo_cancelamento or "").strip()
             update_data["data_cancelamento"] = firestore.SERVER_TIMESTAMP

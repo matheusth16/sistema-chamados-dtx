@@ -480,6 +480,63 @@ def api_onboarding_pular():
         return jsonify({"sucesso": False, "erro": ERRO_INTERNO_MSG}), 500
 
 
+@main.route("/api/chamado/<chamado_id>/confirmar-resolucao", methods=["POST"])
+@login_required
+def api_confirmar_resolucao(chamado_id: str):
+    """Solicitante confirma ou rejeita a resolução de um chamado Concluído."""
+
+    if current_user.perfil != "solicitante":
+        return jsonify({"sucesso": False, "erro": "Acesso negado"}), 403
+
+    dados = request.get_json(silent=True) or {}
+    acao = dados.get("acao", "")
+    motivo = (dados.get("motivo") or "").strip()
+
+    if acao not in ("confirmar", "reabrir"):
+        return jsonify({"sucesso": False, "erro": "Ação inválida"}), 400
+
+    if acao == "reabrir" and not motivo:
+        return jsonify({"sucesso": False, "erro": "Informe o motivo para reabrir o chamado"}), 400
+
+    try:
+        doc = db.collection("chamados").document(chamado_id).get()
+        if not doc.exists:
+            return jsonify({"sucesso": False, "erro": "Chamado não encontrado"}), 404
+
+        data = doc.to_dict()
+
+        if data.get("solicitante_id") != current_user.id:
+            return jsonify({"sucesso": False, "erro": "Acesso negado"}), 403
+
+        if data.get("confirmacao_solicitante") != "pendente":
+            return jsonify({"sucesso": False, "erro": "Chamado não aguarda confirmação"}), 400
+
+        if acao == "confirmar":
+            db.collection("chamados").document(chamado_id).update(
+                {"confirmacao_solicitante": "confirmado"}
+            )
+        else:
+            db.collection("chamados").document(chamado_id).update(
+                {"status": "Aberto", "confirmacao_solicitante": "reaberto", "data_conclusao": None}
+            )
+            Historico(
+                chamado_id=chamado_id,
+                usuario_id=current_user.id,
+                usuario_nome=current_user.nome,
+                acao="reabertura",
+                campo_alterado="status",
+                valor_anterior="Concluído",
+                valor_novo="Aberto",
+                detalhes=motivo[:500],
+            ).save()
+
+        return jsonify({"sucesso": True}), 200
+
+    except Exception as e:
+        logger.exception("Erro ao confirmar resolução do chamado %s: %s", chamado_id, e)
+        return jsonify({"sucesso": False, "erro": ERRO_INTERNO_MSG}), 500
+
+
 @main.route("/api/supervisores/lista", methods=["GET"])
 @login_required
 def api_lista_supervisores():

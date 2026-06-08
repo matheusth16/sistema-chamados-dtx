@@ -350,6 +350,38 @@
                                 <p class="text-[10px] text-indigo-700 font-black uppercase tracking-widest">{{ t('responsible_for_ticket') if t else 'Contato' }}</p>
                                 <p class="text-indigo-950 font-bold text-sm mt-1 bg-white inline-block px-3 py-1 rounded-lg border border-indigo-100 mt-2">{{ chamado.responsavel or (t('responsible_team') if t else 'Equipe Responsável') }}</p>
                             </div>
+
+                            {% if current_user.perfil == 'solicitante' and chamado.confirmacao_solicitante == 'pendente' %}
+                            <div id="bloco-confirmacao" class="mt-6 bg-amber-50 border border-amber-200 rounded-2xl p-5 shadow-sm">
+                                <p class="text-[10px] font-black text-amber-600 uppercase tracking-widest mb-1">{{ t('awaiting_confirmation') if t else 'Aguardando sua confirmação' }}</p>
+                                <p class="text-sm font-medium text-slate-700 mb-4">{{ t('confirm_resolution_message') if t else 'O atendimento foi concluído. Confirme se o problema foi resolvido.' }}</p>
+
+                                <div class="flex flex-col gap-3">
+                                    <button onclick="confirmarResolucao('confirmar')"
+                                        class="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm transition-all active:scale-95 shadow">
+                                        ✅ {{ t('confirm_resolved_btn') if t else 'Sim, problema resolvido' }}
+                                    </button>
+                                    <button onclick="document.getElementById('form-reabrir').classList.toggle('hidden')"
+                                        class="w-full py-2.5 rounded-xl bg-rose-100 hover:bg-rose-200 text-rose-700 font-bold text-sm transition-all active:scale-95 border border-rose-200">
+                                        ❌ {{ t('reopen_ticket_btn') if t else 'Não, reabrir chamado' }}
+                                    </button>
+                                </div>
+
+                                <div id="form-reabrir" class="hidden mt-4">
+                                    <label class="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">
+                                        {{ t('reopen_reason_label') if t else 'O que ainda precisa ser resolvido?' }} <span class="text-rose-500">*</span>
+                                    </label>
+                                    <textarea id="motivo-reabrir" rows="3" maxlength="500"
+                                        placeholder="{{ t('reopen_reason_placeholder') if t else 'Descreva o que ficou pendente...' }}"
+                                        class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-300 resize-none"></textarea>
+                                    <button onclick="confirmarResolucao('reabrir')"
+                                        class="mt-2 w-full py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-sm transition-all active:scale-95 shadow">
+                                        {{ t('reopen_ticket_btn') if t else 'Reabrir chamado' }}
+                                    </button>
+                                </div>
+                            </div>
+                            {% endif %}
+
                         </div>
                         {% endif %}
 
@@ -388,6 +420,32 @@
             }
         });
     }
+</script>
+{% endif %}
+
+{% if current_user.perfil == 'solicitante' and chamado.confirmacao_solicitante == 'pendente' %}
+<script>
+function confirmarResolucao(acao) {
+    var motivo = '';
+    if (acao === 'reabrir') {
+        motivo = (document.getElementById('motivo-reabrir').value || '').trim();
+        if (!motivo) {
+            document.getElementById('motivo-reabrir').focus();
+            return;
+        }
+    }
+    fetch('/api/chamado/{{ chamado.id }}/confirmar-resolucao', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content },
+        body: JSON.stringify({ acao: acao, motivo: motivo })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.sucesso) { window.location.reload(); }
+        else { alert(data.erro || 'Erro ao processar solicitação.'); }
+    })
+    .catch(function() { alert('Erro de conexão. Tente novamente.'); });
+}
 </script>
 {% endif %}
 {% endblock %}

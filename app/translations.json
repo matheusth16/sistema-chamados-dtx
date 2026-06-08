@@ -2543,5 +2543,50 @@
     "pt_BR": "Compras",
     "en": "Procurement",
     "es": "Aprovisionamiento"
+  },
+  "confirm_resolution_title": {
+    "pt_BR": "Este chamado foi resolvido?",
+    "en": "Was this ticket resolved?",
+    "es": "¿Este ticket fue resuelto?"
+  },
+  "confirm_resolution_message": {
+    "pt_BR": "O atendimento foi concluído. Confirme se o problema foi resolvido.",
+    "en": "The service has been completed. Please confirm if the issue was resolved.",
+    "es": "El servicio ha sido completado. Confirme si el problema fue resuelto."
+  },
+  "confirm_resolved_btn": {
+    "pt_BR": "Sim, problema resolvido",
+    "en": "Yes, issue resolved",
+    "es": "Sí, problema resuelto"
+  },
+  "reopen_ticket_btn": {
+    "pt_BR": "Não, reabrir chamado",
+    "en": "No, reopen ticket",
+    "es": "No, reabrir ticket"
+  },
+  "reopen_reason_label": {
+    "pt_BR": "O que ainda precisa ser resolvido?",
+    "en": "What still needs to be resolved?",
+    "es": "¿Qué aún necesita resolverse?"
+  },
+  "reopen_reason_placeholder": {
+    "pt_BR": "Descreva o que ficou pendente...",
+    "en": "Describe what is still pending...",
+    "es": "Describa lo que aún está pendiente..."
+  },
+  "resolution_confirmed": {
+    "pt_BR": "Chamado encerrado. Obrigado pela confirmação!",
+    "en": "Ticket closed. Thank you for confirming!",
+    "es": "Ticket cerrado. ¡Gracias por confirmar!"
+  },
+  "ticket_reopened": {
+    "pt_BR": "Chamado reaberto. A equipe será notificada.",
+    "en": "Ticket reopened. The team will be notified.",
+    "es": "Ticket reabierto. Se notificará al equipo."
+  },
+  "awaiting_confirmation": {
+    "pt_BR": "Aguardando sua confirmação",
+    "en": "Awaiting your confirmation",
+    "es": "Esperando su confirmación"
   }
 }
