@@ -87,9 +87,9 @@ class CategoriaSetor:
 
     @classmethod
     def get_all(cls):
-        """Retorna todos os setores"""
+        """Retorna todos os setores ativos"""
         try:
-            docs = db.collection("categorias_setores").stream()
+            docs = db.collection("categorias_setores").where("ativo", "==", True).stream()
             return [cls.from_dict(doc.to_dict(), doc.id) for doc in docs]
         except Exception as e:
             logger.error("Erro ao buscar setores: %s", e)

@@ -101,7 +101,7 @@ def test_setor_get_all_retorna_lista():
         patch("app.models_categorias.traduzir_categoria", return_value={"en": "IT", "es": "TI"}),
         patch("app.models_categorias.db") as mock_db,
     ):
-        mock_db.collection.return_value.stream.return_value = [doc]
+        mock_db.collection.return_value.where.return_value.stream.return_value = [doc]
         result = CategoriaSetor.get_all()
 
     assert len(result) == 1
