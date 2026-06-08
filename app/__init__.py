@@ -267,6 +267,9 @@ def _configurar_seguranca(app: Flask) -> None:
         """Adiciona headers de segurança a todas as respostas."""
         response.headers["X-Content-Type-Options"] = "nosniff"  # Impede MIME sniffing
         response.headers["X-Frame-Options"] = "SAMEORIGIN"  # Proteção contra clickjacking
+        response.headers["Referrer-Policy"] = (
+            "strict-origin-when-cross-origin"  # Não vaza path em Referer cross-origin
+        )
         # Permissions-Policy: desabilita APIs do browser não usadas (câmera, microfone, geolocalização)
         response.headers["Permissions-Policy"] = (
             "camera=(), microphone=(), geolocation=(), payment=()"

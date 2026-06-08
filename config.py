@@ -61,7 +61,7 @@ class Config:
 
     # 6. Segurança CSRF
     WTF_CSRF_ENABLED = True
-    WTF_CSRF_TIME_LIMIT = None  # Sem limite de tempo para tokens CSRF
+    WTF_CSRF_TIME_LIMIT = 7200  # Tokens CSRF expiram em 2 horas
 
     # 7. Session Security
     PERMANENT_SESSION_LIFETIME = 86400  # 24 horas em segundos

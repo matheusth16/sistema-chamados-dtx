@@ -138,17 +138,16 @@ def alterar_senha_obrigatoria() -> Response:
             flash_t("all_fields_required", "danger")
             return redirect(url_for("main.alterar_senha_obrigatoria"))
 
-        if len(nova_senha) < 6:
-            flash_t("password_min_6_chars", "danger")
+        if len(nova_senha) < 8:
+            flash_t("password_min_8_chars", "danger")
+            return redirect(url_for("main.alterar_senha_obrigatoria"))
+
+        if not any(c.isalpha() for c in nova_senha) or not any(c.isdigit() for c in nova_senha):
+            flash_t("password_must_have_letter_and_digit", "danger")
             return redirect(url_for("main.alterar_senha_obrigatoria"))
 
         if nova_senha != confirmar_senha:
             flash_t("passwords_must_match", "danger")
-            return redirect(url_for("main.alterar_senha_obrigatoria"))
-
-        # Verificar se a nova senha é diferente da senha padrão
-        if nova_senha == "123456":
-            flash_t("password_cannot_be_default", "danger")
             return redirect(url_for("main.alterar_senha_obrigatoria"))
 
         # Atualizar senha

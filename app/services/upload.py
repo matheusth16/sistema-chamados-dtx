@@ -17,6 +17,26 @@ from werkzeug.utils import secure_filename
 
 from app.services.validators import _arquivo_conteudo_permitido, _arquivo_permitido
 
+# MIME types derivados da extensão validada (não confia no Content-Type do cliente)
+_EXT_TO_MIME = {
+    "png": "image/png",
+    "jpg": "image/jpeg",
+    "jpeg": "image/jpeg",
+    "pdf": "application/pdf",
+    "xls": "application/vnd.ms-excel",
+    "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "xlsm": "application/vnd.ms-excel.sheet.macroEnabled.12",
+    "xlsb": "application/vnd.ms-excel.sheet.binary.macroEnabled.12",
+    "xltx": "application/vnd.openxmlformats-officedocument.spreadsheetml.template",
+    "xltm": "application/vnd.ms-excel.template.macroEnabled.12",
+    "csv": "text/csv",
+    "doc": "application/msword",
+    "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "docm": "application/vnd.ms-word.document.macroEnabled.12",
+    "dotx": "application/vnd.openxmlformats-officedocument.wordprocessingml.template",
+    "dotm": "application/vnd.ms-word.template.macroEnabled.12",
+}
+
 logger = logging.getLogger(__name__)
 
 
@@ -42,9 +62,9 @@ def _upload_firebase_storage(arquivo: Any, nome_final: str) -> str | None:
         blob = bucket.blob(f"chamados/{nome_final}")
         if hasattr(arquivo.stream, "seek"):
             arquivo.stream.seek(0)
-        blob.upload_from_file(
-            arquivo.stream, content_type=arquivo.content_type or "application/octet-stream"
-        )
+        ext = arquivo.filename.rsplit(".", 1)[-1].lower() if "." in arquivo.filename else ""
+        safe_content_type = _EXT_TO_MIME.get(ext, "application/octet-stream")
+        blob.upload_from_file(arquivo.stream, content_type=safe_content_type)
         blob.make_public()
         url = blob.public_url
         logger.info("Anexo enviado ao Firebase Storage: %s", nome_final)
