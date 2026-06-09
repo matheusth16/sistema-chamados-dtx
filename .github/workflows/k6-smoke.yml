@@ -1,0 +1,52 @@
+name: k6 Smoke Test
+
+on:
+  # Trigger manual (dispatch) — rodar antes do go-live ou após deploy
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: "URL base do serviço (ex.: https://sistema-chamados-xxx-uc.a.run.app)"
+        required: true
+        type: string
+      test_type:
+        description: "Tipo de teste"
+        required: true
+        default: smoke
+        type: choice
+        options:
+          - smoke
+          - stress
+
+jobs:
+  k6-test:
+    name: ${{ inputs.test_type }} test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup k6
+        uses: grafana/k6-action@v0.3.1
+
+      - name: Run smoke test
+        if: inputs.test_type == 'smoke'
+        run: |
+          k6 run \
+            -e BASE_URL=${{ inputs.base_url }} \
+            --out json=k6-results.json \
+            scripts/k6/smoke.js
+
+      - name: Run stress test
+        if: inputs.test_type == 'stress'
+        run: |
+          k6 run \
+            -e BASE_URL=${{ inputs.base_url }} \
+            --out json=k6-results.json \
+            scripts/k6/stress.js
+
+      - name: Upload k6 results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: k6-results-${{ inputs.test_type }}-${{ github.run_id }}
+          path: k6-results.json
+          retention-days: 7
