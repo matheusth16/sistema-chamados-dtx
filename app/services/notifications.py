@@ -1,5 +1,5 @@
 """
-Serviço de Notificações: E-mail (SMTP).
+Serviço de Notificações: E-mail (SendGrid HTTP API com fallback SMTP).
 
 - Aprovador (responsável): notificado na criação do chamado (e-mail).
 - Solicitante: notificado quando o status muda para Em Atendimento ou Concluído (e-mail; atualmente desativado).
@@ -60,18 +60,88 @@ _SMTP_MAX_TENTATIVAS = 3
 _SMTP_BACKOFF_BASE = 2.0  # segundos: 1s, 2s, 4s
 
 
+def _enviar_via_sendgrid(
+    destinatario: str,
+    assunto: str,
+    corpo_html: str,
+    corpo_texto: str | None,
+    from_addr: str,
+) -> tuple:
+    """Envia e-mail via SendGrid HTTP API (v3). Não usa SMTP — nunca bloqueado por cloud."""
+    import urllib.request
+
+    api_key = os.getenv("SENDGRID_API_KEY", "").strip()
+    if not api_key:
+        return (False, "SENDGRID_API_KEY não configurado")
+
+    import json
+
+    content = []
+    if corpo_texto:
+        content.append({"type": "text/plain", "value": corpo_texto})
+    content.append({"type": "text/html", "value": corpo_html})
+
+    payload = json.dumps(
+        {
+            "personalizations": [{"to": [{"email": destinatario}]}],
+            "from": {"email": from_addr},
+            "subject": assunto,
+            "content": content,
+        }
+    ).encode("utf-8")
+
+    req = urllib.request.Request(
+        "https://api.sendgrid.com/v3/mail/send",
+        data=payload,
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:  # nosec B310 — URL é constante HTTPS
+            if resp.status == 202:
+                logger.info("E-mail enviado via SendGrid para %s: %s", destinatario, assunto[:50])
+                return (True, None)
+            err = f"SendGrid status inesperado: {resp.status}"
+            logger.warning(err)
+            return (False, err)
+    except urllib.error.HTTPError as e:
+        body = e.read().decode("utf-8", errors="replace")[:200]
+        err = f"SendGrid HTTP {e.code}: {body}"
+        logger.warning("Falha SendGrid para %s: %s", destinatario, err)
+        return (False, err)
+    except Exception as e:
+        logger.exception("Falha ao enviar via SendGrid para %s: %s", destinatario, e)
+        return (False, str(e))
+
+
 def enviar_email(destinatario: str, assunto: str, corpo_html: str, corpo_texto: str = None):
     """
-    Envia e-mail via SMTP com retry e backoff exponencial (até 3 tentativas).
-    Retorna (True, None) se enviado com sucesso, (False, mensagem_erro ou None) caso contrário.
-    Se MAIL_SERVER não estiver configurado, não envia e retorna (False, None).
+    Envia e-mail. Tenta SendGrid (HTTP API) se SENDGRID_API_KEY estiver configurado;
+    caso contrário, usa SMTP como fallback.
+    Retorna (True, None) em sucesso ou (False, erro) em falha.
     """
-    server = _mail_setting("MAIL_SERVER", "").strip()
-    if not server or not destinatario or not destinatario.strip():
-        if not destinatario or not destinatario.strip():
-            logger.warning("Notificação por e-mail ignorada: destinatário vazio")
+    if not destinatario or not destinatario.strip():
+        logger.warning("Notificação por e-mail ignorada: destinatário vazio")
         return (False, None)
     destinatario = destinatario.strip()
+
+    from_addr = (
+        _mail_setting("MAIL_DEFAULT_SENDER")
+        or _mail_setting("MAIL_USERNAME")
+        or "noreply@localhost"
+    ).strip()
+
+    # Preferência: SendGrid HTTP API (não bloqueado por provedores cloud)
+    if os.getenv("SENDGRID_API_KEY", "").strip():
+        return _enviar_via_sendgrid(destinatario, assunto, corpo_html, corpo_texto, from_addr)
+
+    # Fallback: SMTP (útil em desenvolvimento local)
+    server = _mail_setting("MAIL_SERVER", "").strip()
+    if not server:
+        return (False, None)
 
     port = _mail_setting("MAIL_PORT", 587)
     try:
@@ -83,11 +153,6 @@ def enviar_email(destinatario: str, assunto: str, corpo_html: str, corpo_texto: 
         use_tls = True
     else:
         use_tls = str(use_tls).lower() in ("true", "1", "yes")
-    from_addr = (
-        _mail_setting("MAIL_DEFAULT_SENDER")
-        or _mail_setting("MAIL_USERNAME")
-        or "noreply@localhost"
-    ).strip()
     user = (_mail_setting("MAIL_USERNAME") or "").strip()
     password = (_mail_setting("MAIL_PASSWORD") or "").strip()
 
@@ -107,7 +172,7 @@ def enviar_email(destinatario: str, assunto: str, corpo_html: str, corpo_texto: 
                 if user and password:
                     s.login(user, password)
                 s.sendmail(msg["From"], destinatario, msg.as_string())
-            logger.info("E-mail enviado para %s: %s", destinatario, assunto[:50])
+            logger.info("E-mail enviado via SMTP para %s: %s", destinatario, assunto[:50])
             return (True, None)
         except Exception as e:
             if tentativa < _SMTP_MAX_TENTATIVAS - 1:
