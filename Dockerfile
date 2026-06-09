@@ -42,13 +42,4 @@ USER appuser
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:${PORT}/health')" || exit 1
 
-CMD exec gunicorn \
-    --bind "0.0.0.0:${PORT}" \
-    --workers 1 \
-    --threads 8 \
-    --worker-class gthread \
-    --worker-tmp-dir /dev/shm \
-    --timeout 120 \
-    --access-logfile - \
-    --error-logfile - \
-    run:app
+CMD ["/bin/sh", "-c", "exec gunicorn --bind 0.0.0.0:${PORT:-8080} --workers 1 --threads 8 --worker-class gthread --worker-tmp-dir /dev/shm --timeout 120 --access-logfile - --error-logfile - run:app"]
