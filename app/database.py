@@ -67,11 +67,6 @@ def _inicializar_firebase_com_retry(max_tentativas: int = 3, delay_inicial: floa
 
             # 1. Variável de ambiente com JSON das credenciais (Railway/produção sem GCP)
             creds_json_env = os.getenv("GOOGLE_CREDENTIALS_JSON", "").strip()
-            logger.info(
-                "DEBUG CREDS: GOOGLE_CREDENTIALS_JSON presente=%s tamanho=%d",
-                bool(creds_json_env),
-                len(creds_json_env),
-            )
 
             # 2. Arquivo local (desenvolvimento)
             cert_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "credentials.json")

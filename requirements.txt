@@ -20,6 +20,9 @@ pandas==2.3.3
 # --- Web Push Notifications ---
 pywebpush==2.0.0
 
+# --- Scheduler ---
+APScheduler==3.10.4
+
 # --- Utilities ---
 bleach==6.2.0
 python-dotenv==1.0.1
