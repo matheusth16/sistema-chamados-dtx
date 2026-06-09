@@ -1,17 +1,71 @@
+# Controle de versão
 .git
 .gitignore
+.gcloudignore
+
+# Ambientes virtuais
 .venv/
 venv/
 env/
+
+# Python compilado
 __pycache__/
 *.pyc
 *.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Banco local e uploads
 *.db
-.DS_Store
-.vscode/
+instance/
+app/static/uploads/*
+!app/static/uploads/.gitkeep
+
+# Segredos (NUNCA no build context)
 .env
+.env.*
 credentials.json
+*.pem
+*.key
+
+# Testes (não vão para produção)
+tests/
+coverage.xml
+htmlcov/
+.coverage
+
+# Ferramentas de desenvolvimento
+requirements-dev.txt
+ruff.toml
+.pre-commit-config.yaml
+pytest.ini
+
+# CI/CD e documentação
+.github/
+*.md
+!README.md
+
+# Scripts locais
+scripts/
+
+# Node
+node_modules/
+package-lock.json
+
+# Logs e temporários
+logs/
+*.log
+.DS_Store
+Thumbs.db
+
+# Firebase (emulador local)
 .firebaserc
 firebase.json
-instance/
-logs/
+firebase-debug.log
+firestore-debug.log
+
+# IDE
+.vscode/
+.idea/

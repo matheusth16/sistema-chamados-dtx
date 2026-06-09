@@ -1,35 +1,49 @@
-FROM python:3.12-slim
+# syntax=docker/dockerfile:1.4
+# Multi-stage: builder compila pacotes com gcc; runtime não carrega ferramentas de build
 
-WORKDIR /app
+# ── Stage 1: builder ──────────────────────────────────────────────────────────
+FROM python:3.12-slim AS builder
 
-# Instalar dependências de sistema
+WORKDIR /build
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     && rm -rf /var/lib/apt/lists/*
 
-# Copiar e instalar dependências Python (camada cacheável separada do código)
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
 
-# Copiar código da aplicação
-COPY . .
+# Cache do pip entre builds (BuildKit) — rebuild só quando requirements.txt muda
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --prefix=/install --no-warn-script-location -r requirements.txt
 
-# Variáveis de ambiente
+# ── Stage 2: runtime ─────────────────────────────────────────────────────────
+FROM python:3.12-slim AS runtime
+
+# Usuário não-root com UID/GID fixos (reproduzível entre builds)
+RUN groupadd --gid 1001 appgroup \
+    && useradd --uid 1001 --gid 1001 --no-create-home --shell /bin/false appuser
+
+WORKDIR /app
+
+# Copiar pacotes compilados do builder (sem gcc)
+COPY --from=builder /install /usr/local
+
+# Copiar código com ownership já correto (evita chown -R)
+COPY --chown=appuser:appgroup . .
+
 ENV FLASK_APP=run.py
 ENV PYTHONUNBUFFERED=1
 ENV PORT=8080
+# Evita .pyc desnecessários em produção
+ENV PYTHONDONTWRITEBYTECODE=1
 
-# Usuário não-root para produção
-RUN useradd --no-create-home --shell /bin/false appuser \
-    && chown -R appuser:appuser /app
 USER appuser
 
-# Healthcheck para Cloud Run (hit /health a cada 30s, timeout 5s)
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:${PORT}/health')" || exit 1
 
 CMD exec gunicorn \
-    --bind 0.0.0.0:${PORT} \
+    --bind "0.0.0.0:${PORT}" \
     --workers 1 \
     --threads 8 \
     --worker-class gthread \

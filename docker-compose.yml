@@ -1,0 +1,31 @@
+# Docker Compose — desenvolvimento local
+# Uso: docker compose up --build
+#
+# Requisito: credentials.json na raiz (conta de serviço Firebase)
+# Variáveis de ambiente: copie .env.example -> .env e preencha
+
+services:
+  web:
+    build:
+      context: .
+      target: runtime
+    ports:
+      - "5000:8080"
+    environment:
+      - FLASK_ENV=development
+      - PYTHONUNBUFFERED=1
+    env_file:
+      - .env
+    volumes:
+      # Hot-reload do código sem rebuild (apenas em dev)
+      - ./app:/app/app:ro
+      - ./run.py:/app/run.py:ro
+      # Credenciais Firebase (não vão para a imagem)
+      - ./credentials.json:/app/credentials.json:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped
