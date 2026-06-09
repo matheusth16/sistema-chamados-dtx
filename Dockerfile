@@ -34,12 +34,13 @@ COPY --chown=appuser:appgroup . .
 ENV FLASK_APP=run.py
 ENV PYTHONUNBUFFERED=1
 ENV PORT=8080
-# Evita .pyc desnecessários em produção
 ENV PYTHONDONTWRITEBYTECODE=1
+
+RUN chmod +x start.sh
 
 USER appuser
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:${PORT}/health')" || exit 1
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')" || exit 1
 
-CMD ["/bin/sh", "-c", "exec gunicorn --bind 0.0.0.0:${PORT:-8080} --workers 1 --threads 8 --worker-class gthread --worker-tmp-dir /dev/shm --timeout 120 --access-logfile - --error-logfile - run:app"]
+CMD ["./start.sh"]
