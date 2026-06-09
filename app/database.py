@@ -11,6 +11,7 @@ Em Cloud Run, usa Application Default Credentials (ADC) automaticamente.
 Em desenvolvimento local, busca credentials.json na raiz do projeto.
 """
 
+import json
 import logging
 import os
 import time
@@ -62,18 +63,25 @@ def _inicializar_firebase_com_retry(max_tentativas: int = 3, delay_inicial: floa
         try:
             logger.info("Tentativa %s/%s para inicializar Firebase...", tentativa, max_tentativas)
 
-            # Caminho para credentials.json
-            cert_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "credentials.json")
-
-            # Storage bucket: necessário para Firebase Storage (anexos). Sem isso, storage.bucket() falha.
-            # Use o nome exato do bucket do Firebase Console > Storage (ex.: projeto.firebasestorage.app ou projeto.appspot.com).
             bucket_env = os.getenv("FIREBASE_STORAGE_BUCKET", "").strip()
 
-            if os.path.exists(cert_path):
-                # Inicializa com arquivo de credenciais (desenvolvimento local)
+            # 1. Variável de ambiente com JSON das credenciais (Railway/produção sem GCP)
+            creds_json_env = os.getenv("GOOGLE_CREDENTIALS_JSON", "").strip()
+
+            # 2. Arquivo local (desenvolvimento)
+            cert_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "credentials.json")
+
+            if creds_json_env:
+                logger.info("Carregando credenciais via GOOGLE_CREDENTIALS_JSON (env var)")
+                cred = credentials.Certificate(json.loads(creds_json_env))
+                storage_bucket = bucket_env or f"{cred.project_id}.firebasestorage.app"
+                firebase_admin.initialize_app(cred, {"storageBucket": storage_bucket})
+                logger.info(
+                    "✓ Firebase inicializado via env var. Storage bucket: %s", storage_bucket
+                )
+            elif os.path.exists(cert_path):
                 logger.info("Carregando credentials.json de: %s", cert_path)
                 cred = credentials.Certificate(cert_path)
-                # Padrão: novo formato .firebasestorage.app (Firebase Console); legado é .appspot.com
                 storage_bucket = bucket_env or f"{cred.project_id}.firebasestorage.app"
                 firebase_admin.initialize_app(cred, {"storageBucket": storage_bucket})
                 logger.info(
@@ -81,7 +89,7 @@ def _inicializar_firebase_com_retry(max_tentativas: int = 3, delay_inicial: floa
                     storage_bucket,
                 )
             else:
-                # Inicializa com Application Default Credentials (Cloud Run/GCP)
+                # Application Default Credentials (GCP nativo)
                 logger.info(
                     "credentials.json não encontrado. Usando ADC (Application Default Credentials)"
                 )
@@ -99,8 +107,7 @@ def _inicializar_firebase_com_retry(max_tentativas: int = 3, delay_inicial: floa
                 else:
                     firebase_admin.initialize_app()
                     logger.warning(
-                        "✓ Firebase inicializado com ADC. FIREBASE_STORAGE_BUCKET não definido: anexos em produção falharão. "
-                        "Defina FIREBASE_STORAGE_BUCKET com o valor do Firebase Console > Storage (ex.: projeto.firebasestorage.app)."
+                        "✓ Firebase inicializado com ADC. FIREBASE_STORAGE_BUCKET não definido: anexos falharão."
                     )
 
             return  # Sucesso - sai da função
