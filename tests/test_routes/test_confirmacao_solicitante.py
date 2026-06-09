@@ -130,3 +130,21 @@ def test_acao_invalida_retorna_400(client_logado_solicitante):
             content_type="application/json",
         )
     assert r.status_code == 400
+
+
+def test_chamado_nao_concluido_nao_permite_confirmacao(client_logado_solicitante):
+    """Regressão: status != 'Concluído' com confirmacao_solicitante='pendente' deve retornar 400.
+
+    Garante que a guarda de status no endpoint impede que um chamado em 'Em Atendimento'
+    com flag residual seja confirmado indevidamente.
+    """
+    doc = _doc_chamado(status="Em Atendimento", confirmacao="pendente")
+    with patch("app.routes.api.db") as mock_db:
+        mock_db.collection.return_value.document.return_value.get.return_value = doc
+        r = client_logado_solicitante.post(
+            "/api/chamado/ch_123/confirmar-resolucao",
+            json={"acao": "confirmar"},
+            content_type="application/json",
+        )
+    assert r.status_code == 400
+    assert r.get_json()["sucesso"] is False

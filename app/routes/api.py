@@ -508,7 +508,7 @@ def api_confirmar_resolucao(chamado_id: str):
         if data.get("solicitante_id") != current_user.id:
             return jsonify({"sucesso": False, "erro": "Acesso negado"}), 403
 
-        if data.get("confirmacao_solicitante") != "pendente":
+        if data.get("status") != "Concluído" or data.get("confirmacao_solicitante") != "pendente":
             return jsonify({"sucesso": False, "erro": "Chamado não aguarda confirmação"}), 400
 
         if acao == "confirmar":

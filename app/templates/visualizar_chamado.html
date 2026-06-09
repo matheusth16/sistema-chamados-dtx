@@ -351,7 +351,7 @@
                                 <p class="text-indigo-950 font-bold text-sm mt-1 bg-white inline-block px-3 py-1 rounded-lg border border-indigo-100 mt-2">{{ chamado.responsavel or (t('responsible_team') if t else 'Equipe Responsável') }}</p>
                             </div>
 
-                            {% if current_user.perfil == 'solicitante' and chamado.confirmacao_solicitante == 'pendente' %}
+                            {% if current_user.perfil == 'solicitante' and chamado.status == 'Concluído' and chamado.confirmacao_solicitante == 'pendente' %}
                             <div id="bloco-confirmacao" class="mt-6 bg-amber-50 border border-amber-200 rounded-2xl p-5 shadow-sm">
                                 <p class="text-[10px] font-black text-amber-600 uppercase tracking-widest mb-1">{{ t('awaiting_confirmation') if t else 'Aguardando sua confirmação' }}</p>
                                 <p class="text-sm font-medium text-slate-700 mb-4">{{ t('confirm_resolution_message') if t else 'O atendimento foi concluído. Confirme se o problema foi resolvido.' }}</p>
@@ -423,7 +423,7 @@
 </script>
 {% endif %}
 
-{% if current_user.perfil == 'solicitante' and chamado.confirmacao_solicitante == 'pendente' %}
+{% if current_user.perfil == 'solicitante' and chamado.status == 'Concluído' and chamado.confirmacao_solicitante == 'pendente' %}
 <script nonce="{{ csp_nonce }}">
 function confirmarResolucao(acao) {
     var motivo = '';

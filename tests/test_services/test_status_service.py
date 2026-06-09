@@ -152,6 +152,33 @@ def test_atualizar_em_atendimento_chama_gamificacao_inicial():
     mock_gamif.avaliar_atendimento_inicial.assert_called_once_with("u1")
 
 
+def test_saindo_de_concluido_reseta_confirmacao_solicitante():
+    """Regressão: transição de 'Concluído' para outro status limpa confirmacao_solicitante=None.
+
+    Evita que flag residual 'pendente' mostre bloco de confirmação ao solicitante
+    mesmo após o supervisor ter reaberto o chamado manualmente.
+    """
+    with (
+        patch("app.services.status_service.execute_with_retry") as mock_retry,
+        patch("app.services.status_service.Historico"),
+        patch("app.services.status_service.GamificationService"),
+    ):
+        atualizar_status_chamado(
+            chamado_id="ch1",
+            novo_status="Em Atendimento",
+            usuario_id="u1",
+            usuario_nome="Test",
+            data_chamado={
+                "status": "Concluído",
+                "confirmacao_solicitante": "pendente",
+                "solicitante_id": "s1",
+            },
+        )
+
+    update_payload = mock_retry.call_args[0][1]
+    assert update_payload.get("confirmacao_solicitante") is None
+
+
 def test_atualizar_status_excecao_retorna_falso():
     """Exceção durante execute_with_retry retorna sucesso=False."""
     with patch(
