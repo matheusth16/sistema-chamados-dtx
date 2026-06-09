@@ -32,10 +32,21 @@ app/static/uploads/*
 .DS_Store
 Thumbs.db
 
-# Scripts de diagnóstico/teste locais (opcional: descomente se quiser build menor)
-# check_deployment.py
-# full_diagnostic.py
-# diagnose_build.py
-# test_cloud_run.py
-# verify_cloud_build.py
-# teste_*.py
+# Testes (não precisam ir para o build de produção)
+tests/
+.pytest_cache/
+coverage.xml
+htmlcov/
+
+# Scripts de diagnóstico e dev (não são parte da app)
+scripts/
+
+# CI/CD e ferramentas de dev
+.github/
+.pre-commit-config.yaml
+ruff.toml
+requirements-dev.txt
+
+# Documentação local
+*.md
+!README.md
