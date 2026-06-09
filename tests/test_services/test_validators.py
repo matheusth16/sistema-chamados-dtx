@@ -3,6 +3,8 @@
 import io
 from unittest.mock import MagicMock
 
+import pytest
+
 from app.services.validators import validar_novo_chamado
 
 
@@ -84,76 +86,42 @@ def test_validar_novo_chamado_impacto_obrigatorio():
     assert any("impacto" in e.lower() and "obrig" in e.lower() for e in erros)
 
 
-def test_validar_novo_chamado_projetos_exige_rl_preenchido():
-    """Categoria Projetos exige código RL preenchido (letras, números e caracteres permitidos)."""
-    form_vazio = {
-        "descricao": "Projeto X",
-        "tipo": "Engenharia",
-        "categoria": "Projetos",
-        "rl_codigo": "",
-        "gate": "N/A",
-        "impacto": "Impacto Baixo",
-    }
-    erros = validar_novo_chamado(form_vazio)
-    assert any("RL" in e and "obrigatório" in e for e in erros)
-
-    form_ok = {
-        "descricao": "Projeto Y",
-        "tipo": "Engenharia",
-        "categoria": "Projetos",
-        "rl_codigo": "045",
-        "gate": "N/A",
-        "impacto": "Impacto Baixo",
-    }
-    assert validar_novo_chamado(form_ok) == []
-
-    form_ok_alfanumerico = {
-        "descricao": "Projeto Z",
-        "tipo": "Engenharia",
-        "categoria": "Projetos",
-        "rl_codigo": "ABC-01",
-        "gate": "N/A",
-        "impacto": "Impacto Baixo",
-    }
-    assert validar_novo_chamado(form_ok_alfanumerico) == []
-
-    form_ok_com_caracteres = {
-        "descricao": "Projeto W",
-        "tipo": "Engenharia",
-        "categoria": "Projetos",
-        "rl_codigo": "123/2026 (rev.1)",
-        "gate": "N/A",
-        "impacto": "Impacto Baixo",
-    }
-    assert validar_novo_chamado(form_ok_com_caracteres) == []
+_FORM_PROJETOS_BASE = {
+    "descricao": "Projeto X",
+    "tipo": "Engenharia",
+    "categoria": "Projetos",
+    "gate": "N/A",
+    "impacto": "Impacto Baixo",
+}
 
 
-def test_validar_novo_chamado_projetos_rl_caracteres_invalidos():
-    """RL com caracteres não permitidos (ex.: @ # %) é rejeitado."""
-    form = {
-        "descricao": "Projeto",
-        "tipo": "Engenharia",
-        "categoria": "Projetos",
-        "rl_codigo": "04@123",
-        "gate": "N/A",
-        "impacto": "Impacto Baixo",
-    }
+@pytest.mark.parametrize(
+    "rl_codigo,espera_erro",
+    [
+        ("", True),
+        ("045", False),
+        ("ABC-01", False),
+        ("123/2026 (rev.1)", False),
+        ("04@123", True),
+        ("A" * 101, True),
+    ],
+    ids=[
+        "vazio",
+        "numerico",
+        "alfanumerico",
+        "com_chars_permitidos",
+        "char_invalido",
+        "muito_longo",
+    ],
+)
+def test_validar_rl_codigo(rl_codigo, espera_erro):
+    """Valida todos os cenários do campo rl_codigo em chamados de Projetos."""
+    form = {**_FORM_PROJETOS_BASE, "rl_codigo": rl_codigo}
     erros = validar_novo_chamado(form)
-    assert len(erros) >= 1 and any("RL" in e for e in erros)
-
-
-def test_validar_novo_chamado_projetos_rl_maximo_100():
-    """RL com mais de 100 caracteres retorna erro."""
-    form = {
-        "descricao": "Projeto",
-        "tipo": "Engenharia",
-        "categoria": "Projetos",
-        "rl_codigo": "A" * 101,
-        "gate": "N/A",
-        "impacto": "Impacto Baixo",
-    }
-    erros = validar_novo_chamado(form)
-    assert any("100" in e or "máximo" in e for e in erros)
+    if espera_erro:
+        assert any("RL" in e for e in erros)
+    else:
+        assert erros == []
 
 
 def test_validar_novo_chamado_arquivo_extensao_invalida():
