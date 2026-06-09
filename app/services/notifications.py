@@ -60,38 +60,33 @@ _SMTP_MAX_TENTATIVAS = 3
 _SMTP_BACKOFF_BASE = 2.0  # segundos: 1s, 2s, 4s
 
 
-def _enviar_via_sendgrid(
+def _enviar_via_resend(
     destinatario: str,
     assunto: str,
     corpo_html: str,
     corpo_texto: str | None,
     from_addr: str,
 ) -> tuple:
-    """Envia e-mail via SendGrid HTTP API (v3). Não usa SMTP — nunca bloqueado por cloud."""
+    """Envia e-mail via Resend HTTP API. Não usa SMTP — nunca bloqueado por cloud."""
+    import json
     import urllib.request
 
-    api_key = os.getenv("SENDGRID_API_KEY", "").strip()
+    api_key = os.getenv("RESEND_API_KEY", "").strip()
     if not api_key:
-        return (False, "SENDGRID_API_KEY não configurado")
-
-    import json
-
-    content = []
-    if corpo_texto:
-        content.append({"type": "text/plain", "value": corpo_texto})
-    content.append({"type": "text/html", "value": corpo_html})
+        return (False, "RESEND_API_KEY não configurado")
 
     payload = json.dumps(
         {
-            "personalizations": [{"to": [{"email": destinatario}]}],
-            "from": {"email": from_addr},
+            "from": from_addr,
+            "to": [destinatario],
             "subject": assunto,
-            "content": content,
+            "html": corpo_html,
+            **({"text": corpo_texto} if corpo_texto else {}),
         }
     ).encode("utf-8")
 
     req = urllib.request.Request(
-        "https://api.sendgrid.com/v3/mail/send",
+        "https://api.resend.com/emails",
         data=payload,
         headers={
             "Authorization": f"Bearer {api_key}",
@@ -101,19 +96,19 @@ def _enviar_via_sendgrid(
     )
     try:
         with urllib.request.urlopen(req, timeout=10) as resp:  # nosec B310 — URL é constante HTTPS
-            if resp.status == 202:
-                logger.info("E-mail enviado via SendGrid para %s: %s", destinatario, assunto[:50])
+            if resp.status in (200, 201):
+                logger.info("E-mail enviado via Resend para %s: %s", destinatario, assunto[:50])
                 return (True, None)
-            err = f"SendGrid status inesperado: {resp.status}"
+            err = f"Resend status inesperado: {resp.status}"
             logger.warning(err)
             return (False, err)
     except urllib.error.HTTPError as e:
         body = e.read().decode("utf-8", errors="replace")[:200]
-        err = f"SendGrid HTTP {e.code}: {body}"
-        logger.warning("Falha SendGrid para %s: %s", destinatario, err)
+        err = f"Resend HTTP {e.code}: {body}"
+        logger.warning("Falha Resend para %s: %s", destinatario, err)
         return (False, err)
     except Exception as e:
-        logger.exception("Falha ao enviar via SendGrid para %s: %s", destinatario, e)
+        logger.exception("Falha ao enviar via Resend para %s: %s", destinatario, e)
         return (False, str(e))
 
 
@@ -134,9 +129,9 @@ def enviar_email(destinatario: str, assunto: str, corpo_html: str, corpo_texto: 
         or "noreply@localhost"
     ).strip()
 
-    # Preferência: SendGrid HTTP API (não bloqueado por provedores cloud)
-    if os.getenv("SENDGRID_API_KEY", "").strip():
-        return _enviar_via_sendgrid(destinatario, assunto, corpo_html, corpo_texto, from_addr)
+    # Preferência: Resend HTTP API (não bloqueado por provedores cloud)
+    if os.getenv("RESEND_API_KEY", "").strip():
+        return _enviar_via_resend(destinatario, assunto, corpo_html, corpo_texto, from_addr)
 
     # Fallback: SMTP (útil em desenvolvimento local)
     server = _mail_setting("MAIL_SERVER", "").strip()
