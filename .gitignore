@@ -76,3 +76,8 @@ _backup_nao_utilizados/
 # --- Ferramentas de IA / Editor ---
 .claude/
 .cursor/
+
+# --- Arquivos locais de trabalho (não versionados) ---
+*.docx
+foto/
+confirmacao-solicitante.md
