@@ -1,5 +1,5 @@
 """
-Serviço de Notificações: E-mail (SendGrid HTTP API com fallback SMTP).
+Serviço de Notificações: E-mail (Brevo HTTP API com fallback SMTP).
 
 - Aprovador (responsável): notificado na criação do chamado (e-mail).
 - Solicitante: notificado quando o status muda para Em Atendimento ou Concluído (e-mail; atualmente desativado).
@@ -60,36 +60,37 @@ _SMTP_MAX_TENTATIVAS = 3
 _SMTP_BACKOFF_BASE = 2.0  # segundos: 1s, 2s, 4s
 
 
-def _enviar_via_resend(
+def _enviar_via_brevo(
     destinatario: str,
     assunto: str,
     corpo_html: str,
     corpo_texto: str | None,
     from_addr: str,
+    from_nome: str = "DTX Aerospace",
 ) -> tuple:
-    """Envia e-mail via Resend HTTP API. Não usa SMTP — nunca bloqueado por cloud."""
+    """Envia e-mail via Brevo HTTP API. Não usa SMTP — nunca bloqueado por cloud."""
     import json
     import urllib.request
 
-    api_key = os.getenv("RESEND_API_KEY", "").strip()
+    api_key = os.getenv("BREVO_API_KEY", "").strip()
     if not api_key:
-        return (False, "RESEND_API_KEY não configurado")
+        return (False, "BREVO_API_KEY não configurado")
 
     payload = json.dumps(
         {
-            "from": from_addr,
-            "to": [destinatario],
+            "sender": {"name": from_nome, "email": from_addr},
+            "to": [{"email": destinatario}],
             "subject": assunto,
-            "html": corpo_html,
-            **({"text": corpo_texto} if corpo_texto else {}),
+            "htmlContent": corpo_html,
+            **({"textContent": corpo_texto} if corpo_texto else {}),
         }
     ).encode("utf-8")
 
     req = urllib.request.Request(
-        "https://api.resend.com/emails",
+        "https://api.brevo.com/v3/smtp/email",
         data=payload,
         headers={
-            "Authorization": f"Bearer {api_key}",
+            "api-key": api_key,
             "Content-Type": "application/json",
         },
         method="POST",
@@ -97,18 +98,18 @@ def _enviar_via_resend(
     try:
         with urllib.request.urlopen(req, timeout=10) as resp:  # nosec B310 — URL é constante HTTPS
             if resp.status in (200, 201):
-                logger.info("E-mail enviado via Resend para %s: %s", destinatario, assunto[:50])
+                logger.info("E-mail enviado via Brevo para %s: %s", destinatario, assunto[:50])
                 return (True, None)
-            err = f"Resend status inesperado: {resp.status}"
+            err = f"Brevo status inesperado: {resp.status}"
             logger.warning(err)
             return (False, err)
     except urllib.error.HTTPError as e:
         body = e.read().decode("utf-8", errors="replace")[:200]
-        err = f"Resend HTTP {e.code}: {body}"
-        logger.warning("Falha Resend para %s: %s", destinatario, err)
+        err = f"Brevo HTTP {e.code}: {body}"
+        logger.warning("Falha Brevo para %s: %s", destinatario, err)
         return (False, err)
     except Exception as e:
-        logger.exception("Falha ao enviar via Resend para %s: %s", destinatario, e)
+        logger.exception("Falha ao enviar via Brevo para %s: %s", destinatario, e)
         return (False, str(e))
 
 
@@ -129,9 +130,9 @@ def enviar_email(destinatario: str, assunto: str, corpo_html: str, corpo_texto: 
         or "noreply@localhost"
     ).strip()
 
-    # Preferência: Resend HTTP API (não bloqueado por provedores cloud)
-    if os.getenv("RESEND_API_KEY", "").strip():
-        return _enviar_via_resend(destinatario, assunto, corpo_html, corpo_texto, from_addr)
+    # Preferência: Brevo HTTP API (não bloqueado por provedores cloud)
+    if os.getenv("BREVO_API_KEY", "").strip():
+        return _enviar_via_brevo(destinatario, assunto, corpo_html, corpo_texto, from_addr)
 
     # Fallback: SMTP (útil em desenvolvimento local)
     server = _mail_setting("MAIL_SERVER", "").strip()
