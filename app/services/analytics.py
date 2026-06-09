@@ -238,52 +238,55 @@ class AnalisadorChamados:
 
     # ========== MÉTRICAS POR SUPERVISOR ==========
 
-    def obter_metricas_supervisores(self) -> list[dict[str, Any]]:
-        """Retorna métricas de desempenho de cada supervisor
+    def obter_metricas_supervisores(
+        self, chamados_pre_carregados: list | None = None
+    ) -> list[dict[str, Any]]:
+        """Retorna métricas de desempenho de cada supervisor.
 
-        Incluindo:
-        - Nome e email
-        - Chamados atribuídos
-        - Abertos e concluídos
-        - Taxa de resolução
-        - Tempo médio de resolução
-        - Carga atual
+        Quando chamados_pre_carregados é fornecido (lista de to_dict() já materializados),
+        nenhuma query adicional ao Firestore é feita — elimina o N+1 anterior que fazia
+        1 query por supervisor. O chamador (obter_relatorio_completo) reutiliza a mesma
+        carga de chamados entre todas as métricas.
         """
         try:
             from app.models_usuario import Usuario
 
             supervisores = Usuario.get_all()
-            # Apenas supervisores (admin do sistema não entra nas métricas de atendimento)
             supervisores_ativos = [u for u in supervisores if u.perfil == "supervisor"]
 
+            # Única query quando nenhum dado pré-carregado for fornecido
+            if chamados_pre_carregados is None:
+                docs = list(
+                    self.get_db().collection("chamados").limit(MAX_CHAMADOS_ANALYTICS).stream()
+                )
+                todos_chamados = [doc.to_dict() for doc in docs]
+            else:
+                todos_chamados = chamados_pre_carregados
+
+            # Agrupar por responsavel_id em Python — zero queries adicionais
+            chamados_por_sup: dict[str, list] = defaultdict(list)
+            for c in todos_chamados:
+                resp_id = c.get("responsavel_id")
+                if resp_id:
+                    chamados_por_sup[resp_id].append(c)
+
             metricas = []
-
             for sup in supervisores_ativos:
-                chamados_ref = (
-                    self.get_db()
-                    .collection("chamados")
-                    .where(filter=FieldFilter("responsavel_id", "==", sup.id))
-                    .limit(MAX_CHAMADOS_ANALYTICS)
-                )
-                chamados = list(chamados_ref.stream())
+                chamados = chamados_por_sup.get(sup.id, [])
                 total = len(chamados)
-                abertos = sum(1 for doc in chamados if doc.to_dict().get("status") == "Aberto")
-                concluidos = sum(
-                    1 for doc in chamados if doc.to_dict().get("status") == "Concluído"
-                )
-                em_andamento = sum(
-                    1 for doc in chamados if doc.to_dict().get("status") == "Em Atendimento"
-                )
+                abertos = sum(1 for c in chamados if c.get("status") == "Aberto")
+                concluidos = sum(1 for c in chamados if c.get("status") == "Concluído")
+                em_andamento = sum(1 for c in chamados if c.get("status") == "Em Atendimento")
 
-                # Taxa de resolução
                 taxa_resolucao = (concluidos / total * 100) if total > 0 else 0
 
-                # Tempo médio de resolução e SLA (mesma iteração, zero query extra)
                 tempos_resolucao = []
                 dentro_sla = 0
                 fora_sla = 0
-                for doc in chamados:
-                    chamado = doc.to_dict()
+                categorias: dict[str, int] = {}
+                for chamado in chamados:
+                    cat = chamado.get("categoria") or "Indefinido"
+                    categorias[cat] = categorias.get(cat, 0) + 1
                     if chamado.get("status") == "Concluído" and chamado.get("data_conclusao"):
                         data_abertura = chamado.get("data_abertura")
                         data_conclusao = chamado.get("data_conclusao")
@@ -291,8 +294,7 @@ class AnalisadorChamados:
                         dt_ab = _to_datetime(data_abertura)
                         dt_con = _to_datetime(data_conclusao)
                         if dt_ab and dt_con:
-                            tempo = (dt_con - dt_ab).total_seconds() / 3600
-                            tempos_resolucao.append(tempo)
+                            tempos_resolucao.append((dt_con - dt_ab).total_seconds() / 3600)
                         d = _dentro_sla(
                             data_abertura, data_conclusao, categoria, chamado.get("sla_dias")
                         )
@@ -307,16 +309,6 @@ class AnalisadorChamados:
                     round((dentro_sla / total_sla * 100), 2) if total_sla > 0 else None
                 )
 
-                # Distribuição por categoria
-                categorias = {}
-                for doc in chamados:
-                    chamado = doc.to_dict()
-                    cat = chamado.get("categoria", "Indefinido")
-                    categorias[cat] = categorias.get(cat, 0) + 1
-
-                # Carga atual (chamados não concluídos)
-                carga_atual = abertos + em_andamento
-
                 metricas.append(
                     {
                         "supervisor_id": sup.id,
@@ -327,7 +319,7 @@ class AnalisadorChamados:
                         "abertos": abertos,
                         "em_andamento": em_andamento,
                         "concluidos": concluidos,
-                        "carga_atual": carga_atual,
+                        "carga_atual": abertos + em_andamento,
                         "taxa_resolucao_percentual": round(taxa_resolucao, 2),
                         "tempo_medio_resolucao_horas": round(tempo_medio, 2),
                         "percentual_dentro_sla": percentual_dentro_sla,
@@ -335,9 +327,7 @@ class AnalisadorChamados:
                     }
                 )
 
-            # Ordenar por carga (decrescente)
             metricas.sort(key=lambda x: x["carga_atual"], reverse=True)
-
             return metricas
 
         except Exception as e:
@@ -346,21 +336,19 @@ class AnalisadorChamados:
 
     # ========== MÉTRICAS POR ÁREA ==========
 
-    def obter_metricas_areas(self) -> list[dict[str, Any]]:
-        """Retorna métricas de desempenho por área
+    def obter_metricas_areas(
+        self, chamados_pre_carregados: list | None = None
+    ) -> list[dict[str, Any]]:
+        """Retorna métricas de desempenho por área.
 
-        Incluindo:
-        - Chamados por área
-        - Taxa de resolução
-        - Supervisores alocados
-        - Performance média da área
+        Quando chamados_pre_carregados é fornecido, nenhuma query adicional ao Firestore
+        é feita — elimina o N+1 anterior que fazia 1 query por área.
         """
         try:
-            # Um único passe nos usuários: áreas únicas + contagem de supervisores por área
-            # (considera 'areas' array e legado 'area' string, igual ao modelo Usuario)
+            # Passe único nos usuários para mapear áreas e supervisores
             usuarios_ref = self.get_db().collection("usuarios").stream()
-            areas_uniques = set()
-            area_to_supervisor_ids = defaultdict(set)
+            areas_uniques: set[str] = set()
+            area_to_supervisor_ids: dict[str, set] = defaultdict(set)
             for doc in usuarios_ref:
                 usuario = doc.to_dict()
                 if usuario.get("perfil") != "supervisor":
@@ -371,40 +359,40 @@ class AnalisadorChamados:
                 for a in areas_list:
                     areas_uniques.add(a)
                     area_to_supervisor_ids[a].add(doc.id)
+
+            # Única query de chamados quando nenhum dado pré-carregado for fornecido
+            if chamados_pre_carregados is None:
+                docs = list(
+                    self.get_db().collection("chamados").limit(MAX_CHAMADOS_ANALYTICS).stream()
+                )
+                todos_chamados = [doc.to_dict() for doc in docs]
+            else:
+                todos_chamados = chamados_pre_carregados
+
+            # Agrupar por área em Python — zero queries adicionais
+            chamados_por_area: dict[str, list] = defaultdict(list)
+            for c in todos_chamados:
+                if area := c.get("area"):
+                    chamados_por_area[area].append(c)
+
             metricas = []
-
             for area in sorted(areas_uniques):
-                chamados_ref = (
-                    self.get_db()
-                    .collection("chamados")
-                    .where(filter=FieldFilter("area", "==", area))
-                    .limit(MAX_CHAMADOS_ANALYTICS)
-                )
-                chamados = list(chamados_ref.stream())
+                chamados = chamados_por_area.get(area, [])
                 total = len(chamados)
-                abertos = sum(1 for doc in chamados if doc.to_dict().get("status") == "Aberto")
-                concluidos = sum(
-                    1 for doc in chamados if doc.to_dict().get("status") == "Concluído"
-                )
+                abertos = sum(1 for c in chamados if c.get("status") == "Aberto")
+                concluidos = sum(1 for c in chamados if c.get("status") == "Concluído")
 
-                # Taxa de resolução
                 taxa_resolucao = (concluidos / total * 100) if total > 0 else 0
-
-                # Supervisores alocados à área (já contados no passe único, suporta 'areas' e 'area')
                 num_supervisores = len(area_to_supervisor_ids.get(area, set()))
 
-                # Análise de atribuição automática vs manual
                 atribuidos_auto = sum(
                     1
-                    for doc in chamados
-                    if "Atribuído automaticamente" in doc.to_dict().get("motivo_atribuicao", "")
+                    for c in chamados
+                    if "Atribuído automaticamente" in (c.get("motivo_atribuicao") or "")
                 )
-                atribuidos_manual = total - atribuidos_auto
 
-                # Tempo médio de resolução (horas) para concluídos da área
                 tempos_resolucao = []
-                for doc in chamados:
-                    c = doc.to_dict()
+                for c in chamados:
                     if (
                         c.get("status") == "Concluído"
                         and c.get("data_conclusao")
@@ -429,7 +417,7 @@ class AnalisadorChamados:
                         if num_supervisores > 0
                         else 0,
                         "atribuidos_automaticamente": atribuidos_auto,
-                        "atribuidos_manualmente": atribuidos_manual,
+                        "atribuidos_manualmente": total - atribuidos_auto,
                         "taxa_automacao_percentual": round(atribuidos_auto / total * 100, 2)
                         if total > 0
                         else 0,
@@ -755,8 +743,18 @@ class AnalisadorChamados:
             metricas_gerais = self.obter_metricas_gerais(dias=30)
             metricas_periodo_anterior = self.obter_metricas_periodo_anterior()
             metricas_delta = self._calcular_deltas(metricas_gerais, metricas_periodo_anterior)
-            metricas_supervisores = self.obter_metricas_supervisores()
-            metricas_areas = self.obter_metricas_areas()
+
+            # Carrega todos os chamados UMA vez e reutiliza em supervisores + áreas,
+            # eliminando as N+M queries adicionais do padrão anterior.
+            docs_todos = list(
+                self.get_db().collection("chamados").limit(MAX_CHAMADOS_ANALYTICS).stream()
+            )
+            chamados_cache = [doc.to_dict() for doc in docs_todos]
+
+            metricas_supervisores = self.obter_metricas_supervisores(
+                chamados_pre_carregados=chamados_cache
+            )
+            metricas_areas = self.obter_metricas_areas(chamados_pre_carregados=chamados_cache)
             insights = self.obter_insights(
                 metricas_supervisores=metricas_supervisores,
                 metricas_areas=metricas_areas,

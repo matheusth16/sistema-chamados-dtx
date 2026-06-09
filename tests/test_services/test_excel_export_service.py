@@ -2,7 +2,9 @@
 
 import io
 
-from app.services.excel_export_service import MAX_EXPORT_CHAMADOS, exportador_excel
+import pytest
+
+from app.services.excel_export_service import MAX_EXPORT_CHAMADOS, _safe_cell, exportador_excel
 
 
 def test_max_export_chamados_constante():
@@ -58,3 +60,36 @@ def test_exportar_relatorio_completo_com_chamado_mock_retorna_bytes():
     )
     assert isinstance(output, io.BytesIO)
     assert len(output.getvalue()) > 0
+
+
+# ── Testes de segurança: formula injection ────────────────────────────────────
+
+
+@pytest.mark.parametrize(
+    "valor_entrada,esperado_prefixo",
+    [
+        ('=HYPERLINK("evil.com","click")', "'"),
+        ("+1", "'"),
+        ("-DROP TABLE", "'"),
+        ("@SUM(A1:A10)", "'"),
+        ("\tDATA", "'"),
+        ("\rNEWLINE", "'"),
+    ],
+    ids=["igual", "mais", "menos", "arroba", "tab", "cr"],
+)
+def test_safe_cell_neutraliza_formula(valor_entrada, esperado_prefixo):
+    """_safe_cell deve prefixar com ' strings que iniciam com char de fórmula."""
+    resultado = _safe_cell(valor_entrada)
+    assert isinstance(resultado, str)
+    assert resultado.startswith(esperado_prefixo)
+    assert valor_entrada in resultado
+
+
+@pytest.mark.parametrize(
+    "valor_seguro",
+    ["texto normal", "2026-001", "Concluído", 42, None, 3.14, ""],
+    ids=["texto", "numero_chamado", "status", "int", "none", "float", "vazio"],
+)
+def test_safe_cell_nao_altera_valores_seguros(valor_seguro):
+    """_safe_cell não deve modificar valores que não iniciam com char de fórmula."""
+    assert _safe_cell(valor_seguro) == valor_seguro

@@ -21,10 +21,22 @@ from app.services.notify_retry import executar_com_retry
 logger = logging.getLogger(__name__)
 
 
-def _gerar_senha_aleatoria(tamanho: int = 10) -> str:
-    """Gera senha aleatória segura com letras maiúsculas, minúsculas e dígitos."""
-    alfabeto = string.ascii_letters + string.digits
-    return "".join(secrets.choice(alfabeto) for _ in range(tamanho))
+def _gerar_senha_aleatoria(tamanho: int = 12) -> str:
+    """Gera senha aleatória segura com maiúsculas, minúsculas, dígitos e símbolos.
+    Garante ao menos 1 char de cada classe para satisfazer políticas de complexidade."""
+    especiais = "!@#$%&*"
+    alfabeto = string.ascii_letters + string.digits + especiais
+    # Posições fixas garantem representação mínima de cada classe
+    obrigatorios = [
+        secrets.choice(string.ascii_uppercase),
+        secrets.choice(string.ascii_lowercase),
+        secrets.choice(string.digits),
+        secrets.choice(especiais),
+    ]
+    restante = [secrets.choice(alfabeto) for _ in range(tamanho - 4)]
+    senha = obrigatorios + restante
+    secrets.SystemRandom().shuffle(senha)
+    return "".join(senha)
 
 
 @main.route("/admin/usuarios", methods=["GET", "POST"])
@@ -54,7 +66,7 @@ def gerenciar_usuarios() -> Response:
         try:
             senha_inicial = _gerar_senha_aleatoria()
             u = Usuario(
-                id=f"user_{uuid.uuid4().hex[:12]}",
+                id=f"user_{uuid.uuid4().hex}",
                 email=email,
                 nome=nome,
                 perfil=perfil,

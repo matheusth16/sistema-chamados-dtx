@@ -1,5 +1,6 @@
 """Testes das rotas de administração de usuários (/admin/usuarios). Requer perfil admin."""
 
+import re
 from unittest.mock import patch
 
 
@@ -113,7 +114,7 @@ def test_admin_cria_usuario_chama_notificacao_novo_usuario(client_logado_admin):
     assert kwargs["perfil"] == "solicitante"
     assert "senha_inicial" in kwargs
     assert kwargs["senha_inicial"] != "123456"
-    assert len(kwargs["senha_inicial"]) == 10
+    assert len(kwargs["senha_inicial"]) >= 12
 
 
 # ── Validação de criação ───────────────────────────────────────────────────────
@@ -394,3 +395,88 @@ def test_resetar_exp_usuario_nao_encontrado(client_logado_admin):
     ):
         r = client_logado_admin.post("/admin/usuarios/nao/reset-exp", follow_redirects=False)
     assert r.status_code == 302
+
+
+# ── Testes de segurança: senha e ID ──────────────────────────────────────────
+
+
+def test_gerar_senha_aleatoria_tamanho_minimo():
+    """Senha gerada deve ter ao menos 12 chars."""
+    from app.routes.usuarios import _gerar_senha_aleatoria
+
+    for _ in range(20):
+        senha = _gerar_senha_aleatoria()
+        assert len(senha) >= 12, f"Senha muito curta: {len(senha)} chars"
+
+
+def test_gerar_senha_aleatoria_complexidade():
+    """Senha gerada deve conter maiúscula, minúscula, dígito e símbolo especial."""
+    from app.routes.usuarios import _gerar_senha_aleatoria
+
+    especiais = set("!@#$%&*")
+    for _ in range(50):
+        senha = _gerar_senha_aleatoria()
+        assert any(c.isupper() for c in senha), "Falta maiúscula"
+        assert any(c.islower() for c in senha), "Falta minúscula"
+        assert any(c.isdigit() for c in senha), "Falta dígito"
+        assert any(c in especiais for c in senha), "Falta símbolo especial"
+
+
+def test_gerar_senha_aleatoria_nao_tem_chars_invalidos():
+    """Senha não deve conter espaço nem barras (que causam problemas em logs/URLs)."""
+    from app.routes.usuarios import _gerar_senha_aleatoria
+
+    for _ in range(30):
+        senha = _gerar_senha_aleatoria()
+        assert " " not in senha
+        assert "/" not in senha
+        assert "\\" not in senha
+
+
+def test_criar_usuario_id_usa_uuid_completo(client_logado_admin):
+    """ID gerado no POST /criar deve usar uuid4 completo (32 hex chars após 'user_')."""
+
+    ids_capturados = []
+
+    class _FakeUsuario:
+        email = "novo@dtx.aero"
+        nome = "Novo Usuario"
+        perfil = "solicitante"
+        areas = []
+        id = None
+
+        def set_password(self, _): ...
+
+        def save(self):
+            pass
+
+    def _fake_constructor(**kw):
+        u = _FakeUsuario()
+        u.id = kw.get("id", "")
+        ids_capturados.append(u.id)
+        return u
+
+    with (
+        patch("app.routes.usuarios.Usuario.email_existe", return_value=False),
+        patch("app.routes.usuarios.Usuario", side_effect=_fake_constructor),
+        patch("app.routes.usuarios.cache_delete"),
+        patch("app.routes.usuarios.Usuario.invalidar_cache_supervisores_por_area"),
+        patch("app.routes.usuarios.threading.Thread"),
+    ):
+        client_logado_admin.post(
+            "/admin/usuarios",
+            data={
+                "acao": "criar",
+                "email": "novo@dtx.aero",
+                "nome": "Novo Usuario",
+                "perfil": "solicitante",
+            },
+            follow_redirects=False,
+        )
+
+    if ids_capturados:
+        uid = ids_capturados[0]
+        assert uid.startswith("user_"), f"Prefixo inesperado: {uid}"
+        hex_part = uid[len("user_") :]
+        assert len(hex_part) == 32, f"UUID truncado — esperado 32 chars, obtido {len(hex_part)}"
+        assert re.fullmatch(r"[0-9a-f]{32}", hex_part), f"Hex inválido: {hex_part}"

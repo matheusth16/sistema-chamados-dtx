@@ -68,6 +68,18 @@ logger = logging.getLogger(__name__)
 # Manter controle para não estourar cota sem necessidade.
 MAX_EXPORT_CHAMADOS = 100
 
+# Chars que iniciam fórmulas em Excel/LibreOffice — prefixar com ' para neutralizar
+_FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
+
+
+def _safe_cell(value: Any) -> Any:
+    """Previne Excel formula injection em valores de células.
+    Strings que iniciam com char de fórmula recebem aspas simples como prefixo,
+    que o Excel interpreta como literal de texto (não executa a fórmula)."""
+    if isinstance(value, str) and value.startswith(_FORMULA_PREFIXES):
+        return "'" + value
+    return value
+
 
 @dataclass
 class ConfiguradorExcel:
@@ -296,7 +308,7 @@ class ExportadorExcelAvancado:
             ]
 
             for col_num, valor in enumerate(dados_linha, 1):
-                cell = ws.cell(row=numero_linha, column=col_num, value=valor)
+                cell = ws.cell(row=numero_linha, column=col_num, value=_safe_cell(valor))
                 cell.font = self.config.FONTE_NORMAL
                 cell.alignment = self.config.ALINHAMENTO_LEFT
                 cell.border = self.config.BORDA_PADRAO
@@ -360,7 +372,7 @@ class ExportadorExcelAvancado:
             ]
 
             for col_num, valor in enumerate(dados_linha, 1):
-                cell = ws.cell(row=numero_linha, column=col_num, value=valor)
+                cell = ws.cell(row=numero_linha, column=col_num, value=_safe_cell(valor))
                 cell.font = self.config.FONTE_NORMAL
                 cell.border = self.config.BORDA_PADRAO
 
