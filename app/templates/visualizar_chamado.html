@@ -121,9 +121,10 @@
                                     {% set tem_anexo = true %}
                                     <div class="flex flex-col gap-2">
                                         {% for anx in anexos_unicos %}
+                                            {% set is_r2 = anx.startswith('r2:') %}
                                             {% set is_url = anx.startswith('http://') or anx.startswith('https://') %}
 
-                                            {# Tenta extrair o nome do arquivo da URL #}
+                                            {# Tenta extrair o nome do arquivo da URL ou chave #}
                                             {% set nome_limpo = anx %}
                                             {% if '?' in nome_limpo %}{% set nome_limpo = nome_limpo.split('?')[0] %}{% endif %}
                                             {% set nome_limpo = nome_limpo.split('/')[-1] %}
@@ -134,7 +135,15 @@
                                                 {% set nome_limpo = nome_limpo[:25] + '...' + nome_limpo[-12:] %}
                                             {% endif %}
 
-                                            <a href="{{ anx if is_url else url_for('static', filename='uploads/' + anx) }}" target="_blank"
+                                            {% if is_r2 %}
+                                                {% set href_anexo = url_for('main.download_anexo', chamado_id=chamado.id, chave=anx) %}
+                                            {% elif is_url %}
+                                                {% set href_anexo = anx %}
+                                            {% else %}
+                                                {% set href_anexo = url_for('static', filename='uploads/' + anx) %}
+                                            {% endif %}
+
+                                            <a href="{{ href_anexo }}" target="_blank"
                                                 class="inline-flex max-w-fit items-center px-4 py-2 border border-indigo-100 shadow-sm text-sm font-medium rounded-xl text-indigo-700 bg-indigo-50/50 hover:bg-indigo-100 hover:border-indigo-300 transition-colors group">
                                                 <svg class="w-5 h-5 mr-2 flex-shrink-0 text-indigo-500 group-hover:text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path></svg>
                                                 <span class="truncate">{{ nome_limpo }}</span>

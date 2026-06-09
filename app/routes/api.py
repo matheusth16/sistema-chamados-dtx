@@ -4,7 +4,7 @@ import logging
 import os
 
 from firebase_admin import firestore
-from flask import current_app, jsonify, request, send_from_directory
+from flask import abort, current_app, jsonify, redirect, request, send_from_directory
 from flask_login import current_user, login_required
 
 from app.database import db
@@ -38,6 +38,42 @@ ERRO_INTERNO_MSG = "Erro interno. Tente novamente."
 def health():
     """Health check para load balancer e monitoramento. Retorna 200 quando a aplicação está no ar."""
     return jsonify({"status": "ok"}), 200
+
+
+@main.route("/api/download-anexo", methods=["GET"])
+@login_required
+def download_anexo():
+    """Gera URL pré-assinada temporária (1h) para download de anexo privado no R2."""
+    from app.services.upload import gerar_url_presignada
+
+    chamado_id = request.args.get("chamado_id", "").strip()
+    chave = request.args.get("chave", "").strip()
+
+    if not chamado_id or not chave or not chave.startswith("r2:"):
+        abort(400)
+
+    doc = db.collection("chamados").document(chamado_id).get()
+    if not doc.exists:
+        abort(404)
+
+    dados = doc.to_dict() or {}
+    todos_anexos = list(dados.get("anexos") or [])
+    if dados.get("anexo"):
+        todos_anexos.append(dados["anexo"])
+
+    if chave not in todos_anexos:
+        abort(403)
+
+    chamado = Chamado.from_dict(dados, chamado_id)
+    if not usuario_pode_ver_chamado(current_user, chamado):
+        abort(403)
+
+    url = gerar_url_presignada(chave)
+    if not url:
+        logger.error("Falha ao gerar URL pré-assinada para chave %s", chave)
+        abort(503)
+
+    return redirect(url)
 
 
 @main.route("/api/atualizar-status", methods=["POST"])

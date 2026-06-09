@@ -3,7 +3,7 @@
 from io import BytesIO
 from unittest.mock import MagicMock, patch
 
-from app.services.upload import salvar_anexo
+from app.services.upload import gerar_url_presignada, salvar_anexo
 
 
 def test_salvar_anexo_sem_arquivo_retorna_none():
@@ -28,10 +28,10 @@ def test_salvar_anexo_r2_tem_prioridade(app):
         patch("app.services.upload._upload_firebase_storage") as mock_firebase,
         patch("app.services.upload.current_app", app),
     ):
-        mock_r2.return_value = "https://pub-xxx.r2.dev/chamados/20260101_doc.pdf"
+        mock_r2.return_value = "r2:chamados/20260101_doc.pdf"
         result = salvar_anexo(fake_file)
 
-    assert result == "https://pub-xxx.r2.dev/chamados/20260101_doc.pdf"
+    assert result == "r2:chamados/20260101_doc.pdf"
     mock_firebase.assert_not_called()
 
 
@@ -71,6 +71,29 @@ def test_salvar_anexo_ambos_falham_producao_retorna_none(app):
         result = salvar_anexo(fake_file)
 
     assert result is None
+
+
+def test_gerar_url_presignada_retorna_url(app):
+    """gerar_url_presignada gera URL temporária para chave r2:."""
+    with patch("app.services.upload._get_r2_client") as mock_client:
+        mock_s3 = MagicMock()
+        mock_s3.generate_presigned_url.return_value = (
+            "https://r2.cloudflarestorage.com/signed?X-Amz=abc"
+        )
+        mock_client.return_value = (mock_s3, "meu-bucket", "acc123")
+        url = gerar_url_presignada("r2:chamados/20260101_doc.pdf")
+    assert url == "https://r2.cloudflarestorage.com/signed?X-Amz=abc"
+    mock_s3.generate_presigned_url.assert_called_once_with(
+        "get_object",
+        Params={"Bucket": "meu-bucket", "Key": "chamados/20260101_doc.pdf"},
+        ExpiresIn=3600,
+    )
+
+
+def test_gerar_url_presignada_rejeita_chave_sem_prefixo():
+    """gerar_url_presignada retorna None para chave sem prefixo r2:."""
+    assert gerar_url_presignada("chamados/20260101_doc.pdf") is None
+    assert gerar_url_presignada("https://storage.googleapis.com/x") is None
 
 
 def test_salvar_anexo_ambos_falham_dev_salva_local(app):

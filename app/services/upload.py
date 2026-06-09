@@ -40,36 +40,44 @@ _EXT_TO_MIME = {
 logger = logging.getLogger(__name__)
 
 
-def _upload_r2(arquivo: Any, nome_final: str) -> str | None:
-    """
-    Envia o arquivo para Cloudflare R2 (API S3-compatível).
-    Retorna a URL pública ou None se R2 não estiver configurado ou em caso de falha.
-    """
+def _get_r2_client():
+    """Retorna cliente boto3 para R2, ou None se credenciais não configuradas."""
     account_id = os.getenv("R2_ACCOUNT_ID", "").strip()
     access_key = os.getenv("R2_ACCESS_KEY_ID", "").strip()
     secret_key = os.getenv("R2_SECRET_ACCESS_KEY", "").strip()
-    bucket = os.getenv("R2_BUCKET_NAME", "").strip()
-    public_url = os.getenv("R2_PUBLIC_URL", "").strip().rstrip("/")
 
-    if not all([account_id, access_key, secret_key, bucket]):
-        return None
+    if not all([account_id, access_key, secret_key]):
+        return None, None, None
 
     try:
         import boto3
         from botocore.client import Config as BotocoreConfig
     except ImportError:
         logger.warning("boto3 não instalado; R2 indisponível")
+        return None, None, None
+
+    s3 = boto3.client(
+        "s3",
+        endpoint_url=f"https://{account_id}.r2.cloudflarestorage.com",
+        aws_access_key_id=access_key,
+        aws_secret_access_key=secret_key,
+        config=BotocoreConfig(signature_version="s3v4"),
+        region_name="auto",
+    )
+    bucket = os.getenv("R2_BUCKET_NAME", "").strip()
+    return s3, bucket, account_id
+
+
+def _upload_r2(arquivo: Any, nome_final: str) -> str | None:
+    """
+    Envia o arquivo para Cloudflare R2 (bucket privado).
+    Retorna 'r2:chamados/<nome_final>' para acesso via URL pré-assinada, ou None em falha.
+    """
+    s3, bucket, _ = _get_r2_client()
+    if not s3 or not bucket:
         return None
 
     try:
-        s3 = boto3.client(
-            "s3",
-            endpoint_url=f"https://{account_id}.r2.cloudflarestorage.com",
-            aws_access_key_id=access_key,
-            aws_secret_access_key=secret_key,
-            config=BotocoreConfig(signature_version="s3v4"),
-            region_name="auto",
-        )
         ext = arquivo.filename.rsplit(".", 1)[-1].lower() if "." in arquivo.filename else ""
         content_type = _EXT_TO_MIME.get(ext, "application/octet-stream")
         key = f"chamados/{nome_final}"
@@ -81,13 +89,8 @@ def _upload_r2(arquivo: Any, nome_final: str) -> str | None:
             key,
             ExtraArgs={"ContentType": content_type},
         )
-        url = (
-            f"{public_url}/{key}"
-            if public_url
-            else f"https://{account_id}.r2.cloudflarestorage.com/{bucket}/{key}"
-        )
         logger.info("Anexo enviado ao R2: %s", nome_final)
-        return url
+        return f"r2:{key}"
     except Exception as e:
         logger.warning(
             "Falha ao enviar para R2 (%s): %s - %s",
@@ -96,6 +99,30 @@ def _upload_r2(arquivo: Any, nome_final: str) -> str | None:
             e,
             exc_info=True,
         )
+        return None
+
+
+def gerar_url_presignada(chave_r2: str, expiracao_segundos: int = 3600) -> str | None:
+    """
+    Gera URL temporária para download de arquivo privado no R2.
+    chave_r2 deve ter formato 'r2:chamados/nome.pdf'.
+    """
+    if not chave_r2.startswith("r2:"):
+        return None
+    key = chave_r2[3:]
+
+    s3, bucket, _ = _get_r2_client()
+    if not s3 or not bucket:
+        return None
+
+    try:
+        return s3.generate_presigned_url(
+            "get_object",
+            Params={"Bucket": bucket, "Key": key},
+            ExpiresIn=expiracao_segundos,
+        )
+    except Exception as e:
+        logger.warning("Falha ao gerar URL pré-assinada (%s): %s - %s", key, type(e).__name__, e)
         return None
 
 
