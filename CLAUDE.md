@@ -52,12 +52,32 @@ bash skills/Essencial/git-pushing/scripts/smart_commit.sh "tipo: descrição"
 ```
 
 ## Conventional commits
+
+Formato: `tipo(escopo): assunto` — escopo é opcional.
+
+```
+tipo(escopo): Assunto em imperativo, máx 70 chars
+
+Corpo opcional: explica O QUE e POR QUÊ, não o como.
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+```
+
+Tipos:
 - `feat:` nova funcionalidade
 - `fix:` correção de bug
+- `security:` hardening / correção de segurança
 - `test:` adição/correção de testes
 - `refactor:` refatoração sem mudança de comportamento
+- `perf:` melhoria de performance
 - `chore:` tarefas de manutenção (deps, config, CI)
 - `docs:` documentação
+- `style:` formatação sem mudança de lógica
+
+Regras do assunto:
+- Imperativo presente: "Add feature" não "Added feature"
+- Primeira letra maiúscula, sem ponto final
+- Máximo 70 caracteres
 
 ## Estrutura de arquivos-chave
 ```
