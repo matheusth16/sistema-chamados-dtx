@@ -1,4 +1,3 @@
-# syntax=docker/dockerfile:1.4
 # Multi-stage: builder compila pacotes com gcc; runtime não carrega ferramentas de build
 
 # ── Stage 1: builder ──────────────────────────────────────────────────────────
@@ -12,9 +11,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY requirements.txt .
 
-# Cache do pip entre builds (BuildKit) — rebuild só quando requirements.txt muda
-RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install --prefix=/install --no-warn-script-location -r requirements.txt
+RUN pip install --prefix=/install --no-warn-script-location -r requirements.txt
 
 # ── Stage 2: runtime ─────────────────────────────────────────────────────────
 FROM python:3.12-slim AS runtime
