@@ -28,6 +28,8 @@ COPY --from=builder /install /usr/local
 # Copiar código com ownership já correto (evita chown -R)
 COPY --chown=appuser:appgroup . .
 
+RUN mkdir -p /app/logs && chown -R appuser:appgroup /app
+
 ENV FLASK_APP=run.py
 ENV PYTHONUNBUFFERED=1
 ENV PORT=8080
