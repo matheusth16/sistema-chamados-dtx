@@ -114,6 +114,13 @@ class Config:
     # Útil para validar visualmente o fluxo sem depender do e-mail real do usuário criado.
     POWER_AUTOMATE_TEST_DEST_EMAIL = os.getenv("POWER_AUTOMATE_TEST_DEST_EMAIL", "").strip()
 
+    # Cloudflare R2 (armazenamento de arquivos/anexos)
+    R2_ACCOUNT_ID = os.getenv("R2_ACCOUNT_ID", "").strip()
+    R2_ACCESS_KEY_ID = os.getenv("R2_ACCESS_KEY_ID", "").strip()
+    R2_SECRET_ACCESS_KEY = os.getenv("R2_SECRET_ACCESS_KEY", "").strip()
+    R2_BUCKET_NAME = os.getenv("R2_BUCKET_NAME", "").strip()
+    R2_PUBLIC_URL = os.getenv("R2_PUBLIC_URL", "").strip()
+
     # Web Push (notificações no navegador). Gere chaves com: python gerar_vapid_keys.py
     VAPID_PUBLIC_KEY = os.getenv("VAPID_PUBLIC_KEY", "")
     VAPID_PRIVATE_KEY = os.getenv("VAPID_PRIVATE_KEY", "")

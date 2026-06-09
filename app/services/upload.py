@@ -1,10 +1,10 @@
 """
 Serviço de upload de anexos.
 
-Em produção (e quando o Firebase Storage está disponível): envia o arquivo para
-Firebase Storage (pasta chamados/) e retorna a URL pública.
-Caso contrário: salva em disco local (app/static/uploads) e retorna o nome do arquivo.
-No Cloud Run o disco é efêmero; anexos devem usar Firebase Storage.
+Prioridade em produção:
+  1. Cloudflare R2 (quando R2_ACCOUNT_ID et al. estão configurados)
+  2. Firebase Storage (fallback)
+  3. Disco local (apenas em desenvolvimento)
 """
 
 import logging
@@ -38,6 +38,65 @@ _EXT_TO_MIME = {
 }
 
 logger = logging.getLogger(__name__)
+
+
+def _upload_r2(arquivo: Any, nome_final: str) -> str | None:
+    """
+    Envia o arquivo para Cloudflare R2 (API S3-compatível).
+    Retorna a URL pública ou None se R2 não estiver configurado ou em caso de falha.
+    """
+    account_id = os.getenv("R2_ACCOUNT_ID", "").strip()
+    access_key = os.getenv("R2_ACCESS_KEY_ID", "").strip()
+    secret_key = os.getenv("R2_SECRET_ACCESS_KEY", "").strip()
+    bucket = os.getenv("R2_BUCKET_NAME", "").strip()
+    public_url = os.getenv("R2_PUBLIC_URL", "").strip().rstrip("/")
+
+    if not all([account_id, access_key, secret_key, bucket]):
+        return None
+
+    try:
+        import boto3
+        from botocore.client import Config as BotocoreConfig
+    except ImportError:
+        logger.warning("boto3 não instalado; R2 indisponível")
+        return None
+
+    try:
+        s3 = boto3.client(
+            "s3",
+            endpoint_url=f"https://{account_id}.r2.cloudflarestorage.com",
+            aws_access_key_id=access_key,
+            aws_secret_access_key=secret_key,
+            config=BotocoreConfig(signature_version="s3v4"),
+            region_name="auto",
+        )
+        ext = arquivo.filename.rsplit(".", 1)[-1].lower() if "." in arquivo.filename else ""
+        content_type = _EXT_TO_MIME.get(ext, "application/octet-stream")
+        key = f"chamados/{nome_final}"
+        if hasattr(arquivo.stream, "seek"):
+            arquivo.stream.seek(0)
+        s3.upload_fileobj(
+            arquivo.stream,
+            bucket,
+            key,
+            ExtraArgs={"ContentType": content_type},
+        )
+        url = (
+            f"{public_url}/{key}"
+            if public_url
+            else f"https://{account_id}.r2.cloudflarestorage.com/{bucket}/{key}"
+        )
+        logger.info("Anexo enviado ao R2: %s", nome_final)
+        return url
+    except Exception as e:
+        logger.warning(
+            "Falha ao enviar para R2 (%s): %s - %s",
+            nome_final,
+            type(e).__name__,
+            e,
+            exc_info=True,
+        )
+        return None
 
 
 def _upload_firebase_storage(arquivo: Any, nome_final: str) -> str | None:
@@ -109,23 +168,30 @@ def salvar_anexo(arquivo: Any) -> str | None:
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     nome_final = f"{timestamp}_{nome_seguro}"
 
-    # 1) Tenta Firebase Storage primeiro
+    # 1) Tenta Cloudflare R2 (preferencial em produção)
+    if hasattr(arquivo.stream, "seek"):
+        arquivo.stream.seek(0)
+    url = _upload_r2(arquivo, nome_final)
+    if url:
+        return url
+
+    # 2) Fallback: Firebase Storage
     if hasattr(arquivo.stream, "seek"):
         arquivo.stream.seek(0)
     url = _upload_firebase_storage(arquivo, nome_final)
     if url:
         return url
 
-    # 2) Em produção (ex.: Cloud Run): não usar disco — é efêmero e o anexo some após reinício/outra instância.
+    # 3) Em produção sem nenhum storage configurado: não salvar em disco (efêmero no Railway)
     if current_app.config.get("ENV") == "production":
         logger.error(
-            "Firebase Storage falhou em produção. Anexo NÃO foi salvo. "
-            "Defina FIREBASE_STORAGE_BUCKET com o nome do bucket do Firebase Console > Storage (ex.: projeto.firebasestorage.app). "
-            "Garanta que a conta de serviço do Cloud Run tenha permissão Storage Object Admin no bucket."
+            "R2 e Firebase Storage falharam em produção. Anexo NÃO foi salvo. "
+            "Configure R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, "
+            "R2_BUCKET_NAME e R2_PUBLIC_URL nas variáveis de ambiente do Railway."
         )
         return None
 
-    # 3) Fallback: armazenamento local apenas em desenvolvimento
+    # 4) Fallback: armazenamento local apenas em desenvolvimento
     pasta_upload = current_app.config["UPLOAD_FOLDER"]
     if not os.path.exists(pasta_upload):
         os.makedirs(pasta_upload)

@@ -20,6 +20,9 @@ pandas==2.3.3
 # --- Web Push Notifications ---
 pywebpush==2.0.0
 
+# --- Cloudflare R2 (file storage, S3-compatible) ---
+boto3==1.38.24
+
 # --- Scheduler ---
 APScheduler==3.10.4
 
