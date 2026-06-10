@@ -218,8 +218,9 @@ def _iniciar_scheduler(app: Flask) -> None:
 
 
 def _configurar_metricas_performance(app: Flask) -> None:
-    """Registra tempo de resposta por rota em log (path, status, duração em ms) para análise de gargalos."""
+    """Registra tempo de resposta por rota e emite alertas em erros 5xx."""
     logger_perf = logging.getLogger("app.performance")
+    logger_error = logging.getLogger("app.errors")
 
     @app.before_request
     def _iniciar_tempo():
@@ -236,6 +237,18 @@ def _configurar_metricas_performance(app: Flask) -> None:
                 response.status_code,
                 duracao_ms,
             )
+            # Loga erros 5xx com contexto adicional para facilitar diagnóstico
+            if response.status_code >= 500:
+                logger_error.error(
+                    "http_error status=%s path=%s method=%s duration_ms=%.2f "
+                    "user_agent=%s remote_addr=%s",
+                    response.status_code,
+                    request.path,
+                    request.method,
+                    duracao_ms,
+                    request.headers.get("User-Agent", ""),
+                    request.remote_addr,
+                )
         return response
 
 

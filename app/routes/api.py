@@ -36,8 +36,58 @@ ERRO_INTERNO_MSG = "Erro interno. Tente novamente."
 
 @main.route("/health", methods=["GET"])
 def health():
-    """Health check para load balancer e monitoramento. Retorna 200 quando a aplicação está no ar."""
-    return jsonify({"status": "ok"}), 200
+    """Health check para Railway e monitoramento externo.
+
+    Modo raso (padrão): apenas confirma que a app está no ar — rápido, sem I/O.
+    Modo deep (?deep=1): verifica conectividade com Firestore — para UptimeRobot/BetterUptime.
+
+    Returns:
+        200 {"status": "ok"}        — tudo saudável
+        503 {"status": "degraded"}  — alguma dependência falhou (apenas no modo deep)
+    """
+    import time
+
+    shallow = request.args.get("deep") not in ("1", "true")
+
+    if shallow:
+        return jsonify({"status": "ok"}), 200
+
+    # checks críticos: impactam overall; checks opcionais: apenas informativos
+    critical_checks: dict[str, str] = {}
+    optional_checks: dict[str, str] = {}
+    start = time.perf_counter()
+
+    # Firestore: dependência crítica — sem ela a app não funciona
+    try:
+        db.collection("__health__").limit(1).get()
+        critical_checks["firestore"] = "ok"
+    except Exception as exc:
+        critical_checks["firestore"] = f"error:{type(exc).__name__}"
+        logger.error("health_check firestore falhou: %s", exc)
+
+    # Redis / cache em memória — opcional, degrada performance mas não bloqueia
+    try:
+        from app.cache import cache
+
+        cache.set("__health__", "1", timeout=10)
+        optional_checks["cache"] = "ok"
+    except Exception as exc:
+        optional_checks["cache"] = f"degraded:{type(exc).__name__}"
+
+    duration_ms = round((time.perf_counter() - start) * 1000, 1)
+    all_critical_ok = all(v == "ok" for v in critical_checks.values())
+    overall = "ok" if all_critical_ok else "degraded"
+    status_code = 200 if all_critical_ok else 503
+    checks = {**critical_checks, **optional_checks}
+
+    payload = {
+        "status": overall,
+        "checks": checks,
+        "duration_ms": duration_ms,
+        "version": os.environ.get("RAILWAY_GIT_COMMIT_SHA", "dev")[:7],
+    }
+    logger.info("health_check status=%s duration_ms=%.1f checks=%s", overall, duration_ms, checks)
+    return jsonify(payload), status_code
 
 
 @main.route("/api/download-anexo", methods=["GET"])
