@@ -20,7 +20,7 @@ def test_solicitante_login_create_ticket(page: Page):
     # Wait, testing in production database or development? It connects to Firebase.
     # Let's just print a message that script is ready to run and assert page titles.
 
-    expect(page).to_have_title(re.compile("Login | Sistema de Chamados"))
+    expect(page).to_have_title(re.compile("DTX Digital Andon"))
 
     print("Se a tela de login carregou perfeitamente, o E2E inicial está conectado!")
     # O restante do fluxo seria adaptado com credenciais de teste configuradas no .env

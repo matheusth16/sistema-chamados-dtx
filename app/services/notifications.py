@@ -438,7 +438,7 @@ def notificar_novo_usuario_cadastrado(
     link_dash = _link_dashboard()
     corpo_texto = (
         f"Hello {usuario_nome or 'user'},\n"
-        "A new account has been created with your email in Ticket System - DTX.\n"
+        "A new account has been created with your email in DTX Digital Andon.\n"
         f"Profile: {perfil}\n"
         f"Areas: {areas_str or 'N/A'}\n"
         f"E-mail: {usuario_email}\n"

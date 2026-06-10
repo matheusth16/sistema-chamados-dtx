@@ -1,5 +1,5 @@
 """
-Entry point da aplicação Sistema de Chamados.
+Entry point da aplicação DTX Digital Andon.
 
 Configura ambiente e inicia servidor Flask com segurança.
 Debug é ativado apenas em desenvolvimento via variável de ambiente.
@@ -31,7 +31,7 @@ if __name__ == "__main__":
     logger.setLevel(log_level)
 
     print(f"\n{'=' * 60}")
-    print("Sistema de Chamados - DTX Aerospace")
+    print("DTX Digital Andon - DTX Aerospace")
     print(f"{'=' * 60}")
     print(f"Ambiente: {'DESENVOLVIMENTO' if debug_mode else 'PRODUÇÃO'}")
     print(f"Host: {host}:{port}")

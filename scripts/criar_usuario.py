@@ -24,7 +24,7 @@ def limpar_tela():
 def exibir_menu():
     """Exibe o menu principal"""
     print("\n" + "=" * 60)
-    print("  🔐 CRIAR NOVO USUÁRIO - Sistema de Chamados DTX Aerospace")
+    print("  🔐 CRIAR NOVO USUÁRIO - DTX Digital Andon")
     print("=" * 60)
 
 
@@ -266,7 +266,7 @@ def menu_principal():
         limpar_tela()
 
         print("\n" + "=" * 60)
-        print("  🔐 GERENCIAR USUÁRIOS - Sistema de Chamados")
+        print("  🔐 GERENCIAR USUÁRIOS - DTX Digital Andon")
         print("=" * 60)
         print("\n  1️⃣  Criar novo usuário (Modo Interativo)")
         print("  2️⃣  Criar novo usuário (Modo Rápido)")
