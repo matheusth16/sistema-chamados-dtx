@@ -14,6 +14,9 @@ Requer:
 import pytest
 from playwright.sync_api import Page
 
+from tests.e2e.conftest import DEFAULT_TIMEOUT
+from tests.e2e.pages.dashboard_page import DashboardPage
+
 
 @pytest.mark.e2e
 def test_admin_acessa_dashboard(logged_in_admin: Page, base_url: str) -> None:
@@ -61,3 +64,38 @@ def test_admin_acessa_relatorios(logged_in_admin: Page, base_url: str) -> None:
     page.wait_for_load_state("networkidle")
 
     assert "/login" not in page.url
+
+
+@pytest.mark.e2e
+def test_admin_dashboard_container_visivel(logged_in_admin: Page, base_url: str) -> None:
+    """Admin acessa /admin e vê o container principal do dashboard (data-testid)."""
+    page = logged_in_admin
+    dashboard = DashboardPage(page, base_url)
+    dashboard.navigate()
+    dashboard.assert_dashboard_visible()
+
+
+@pytest.mark.e2e
+def test_admin_pagina_usuarios_tem_conteudo(logged_in_admin: Page, base_url: str) -> None:
+    """Admin acessa /admin/usuarios e vê a página com conteúdo renderizado."""
+    page = logged_in_admin
+    page.goto(f"{base_url}/admin/usuarios")
+    page.wait_for_load_state("networkidle", timeout=DEFAULT_TIMEOUT)
+
+    assert "/login" not in page.url
+    assert "/admin/usuarios" in page.url
+
+    body_text = page.locator("body").inner_text()
+    assert len(body_text.strip()) > 0, "Página /admin/usuarios não deve estar em branco"
+
+
+@pytest.mark.e2e
+def test_admin_pagina_categorias_tem_conteudo(logged_in_admin: Page, base_url: str) -> None:
+    """Admin acessa /admin/categorias e vê a página com conteúdo."""
+    page = logged_in_admin
+    page.goto(f"{base_url}/admin/categorias")
+    page.wait_for_load_state("networkidle", timeout=DEFAULT_TIMEOUT)
+
+    assert "/login" not in page.url
+    body_text = page.locator("body").inner_text()
+    assert len(body_text.strip()) > 0, "Página /admin/categorias não deve estar em branco"

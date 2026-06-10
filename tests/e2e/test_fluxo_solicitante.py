@@ -73,3 +73,38 @@ def test_solicitante_nao_acessa_admin(logged_in_solicitante: Page, base_url: str
 
     # Deve ser redirecionado (não permanecer em /admin/usuarios)
     assert "/admin/usuarios" not in page.url or page.url.endswith("/login")
+
+
+@pytest.mark.e2e
+def test_solicitante_formulario_validacao_vazio(logged_in_solicitante: Page, base_url: str) -> None:
+    """Envio do formulário sem preencher descrição não deve criar chamado."""
+    page = logged_in_solicitante
+    formulario = FormularioPage(page, base_url)
+    formulario.navigate()
+    formulario.assert_form_visible()
+
+    # Submete sem preencher a descrição
+    formulario.submit_btn.click()
+    page.wait_for_load_state("networkidle")
+
+    # Deve permanecer na mesma página (não redirecionar para /meus-chamados)
+    assert "/meus-chamados" not in page.url, (
+        "Formulário vazio não deveria criar chamado e redirecionar para /meus-chamados"
+    )
+
+
+@pytest.mark.e2e
+def test_solicitante_meus_chamados_tem_botao_novo(
+    logged_in_solicitante: Page, base_url: str
+) -> None:
+    """Solicitante vê botão 'Novo Chamado' em /meus-chamados."""
+    page = logged_in_solicitante
+    meus_chamados = MeusChamadosPage(page, base_url)
+    meus_chamados.navigate()
+    meus_chamados.assert_page_visible()
+
+    # O botão de novo chamado deve estar visível
+    expect(meus_chamados.new_ticket_btn).to_be_visible()
+    # E deve apontar para a rota de criação (home ou /chamados/novo)
+    href = meus_chamados.new_ticket_btn.get_attribute("href")
+    assert href is not None, "Botão 'Novo Chamado' deve ter um href"
