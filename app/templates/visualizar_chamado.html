@@ -73,8 +73,8 @@
 
                     <!-- Descrição -->
                     <div class="bg-white/80 backdrop-blur-sm rounded-[1.5rem] shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-white p-6 transition-all hover:shadow-[0_8px_30px_rgb(0,0,0,0.05)]">
-                        <label class="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
-                            <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"></path></svg>
+                        <label for="modal-descricao" class="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                            <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"></path></svg>
                             {{ t('problem_description') if t else 'Descrição do Problema' }}
                         </label>
 
@@ -226,7 +226,7 @@
                                     </span>
                                 </div>
 
-                                <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mt-5 mb-2">{{ t('change_status_to') if t else 'Alterar Status Para' }}</label>
+                                <label for="select-novo-status" class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mt-5 mb-2">{{ t('change_status_to') if t else 'Alterar Status Para' }}</label>
                                 <div class="relative">
                                     <select name="novo_status" id="select-novo-status"
                                         class="appearance-none block w-full bg-slate-50/80 border border-slate-200 text-sm font-semibold text-slate-700 rounded-xl focus:ring-indigo-400 focus:border-indigo-400 transition-all py-3 px-4 focus:bg-white shadow-inner focus:ring-4 hover:border-slate-300">
@@ -248,9 +248,9 @@
                             </div>
 
                             <div class="pt-1">
-                                <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">{{ t('responsible') if t else 'Responsável' }}</label>
+                                <label for="select-responsavel" class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">{{ t('responsible') if t else 'Responsável' }}</label>
                                 <div class="relative">
-                                    <select name="novo_responsavel_id"
+                                    <select name="novo_responsavel_id" id="select-responsavel"
                                         class="appearance-none block w-full bg-slate-50/80 border border-slate-200 text-sm font-semibold text-slate-700 rounded-xl focus:ring-indigo-400 focus:border-indigo-400 transition-all py-3 px-4 focus:bg-white shadow-inner focus:ring-4 hover:border-slate-300">
                                         <option value="">{{ t('no_change') if t else 'Sem alteração' }} ({{ t('current_label') if t else 'Atual' }}: {{ chamado.responsavel or '—' }})</option>
                                         {% for sup in supervisores_detalhados %}
@@ -287,14 +287,14 @@
 
                             <!-- SLA Personalizado -->
                             <div class="pt-5 border-t border-slate-100">
-                                <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 flex items-center">
+                                <label for="input-sla-dias" class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 flex items-center">
                                     {{ t('sla_custom_label') if t else 'SLA Personalizado (dias)' }}
                                     {% if chamado.sla_dias %}
                                     <span class="ml-2 px-2 py-0.5 rounded-full text-[9px] font-black bg-amber-100 text-amber-800 uppercase tracking-wider shadow-sm ring-1 ring-amber-200/50">{{ t('sla_custom_badge') if t else 'Ativo' }}</span>
                                     {% endif %}
                                 </label>
                                 <p class="text-[11px] font-medium text-slate-400 mb-3">{{ t('sla_custom_help') if t else 'Deixe em branco para manter. Digite 0 para voltar ao padrão.' }}</p>
-                                <input type="number" name="sla_dias" form="form-status" min="0" max="365"
+                                <input type="number" id="input-sla-dias" name="sla_dias" form="form-status" min="0" max="365"
                                     value="{{ chamado.sla_dias if chamado.sla_dias is not none else '' }}"
                                     placeholder="{{ chamado.sla_dias if chamado.sla_dias else (t('sla_default_placeholder') if t else 'Padrão') }}"
                                     class="block w-full bg-slate-50/80 border border-slate-200 font-semibold text-sm text-slate-700 rounded-xl focus:ring-4 focus:ring-amber-100 focus:border-amber-400 transition-all py-3 px-4 focus:bg-white shadow-inner hover:border-slate-300">

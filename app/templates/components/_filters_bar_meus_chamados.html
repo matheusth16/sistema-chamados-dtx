@@ -2,10 +2,11 @@
 <form method="GET" action="{{ url_for('main.meus_chamados') }}" class="mt-4">
     <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col sm:flex-row gap-4 items-end">
         <div class="flex-1 max-w-xs">
-            <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">
+            <label for="filtro-rl-codigo" class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">
                 {{ t('rl_short') }}
             </label>
             <input type="text"
+                   id="filtro-rl-codigo"
                    name="rl_codigo"
                    value="{{ rl_codigo or request.args.get('rl_codigo', '') }}"
                    placeholder="{{ t('rl_code_example') if t else 'Ex.: 045' }}"

@@ -301,12 +301,17 @@ def exportar() -> Response:
                     "Descrição": c.descricao,
                 }
             )
-        import pandas as pd  # lazy: evita carregar numpy/pyarrow na inicialização
+        from openpyxl import Workbook
 
-        df = pd.DataFrame(dados)
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Chamados"
+        if dados:
+            ws.append(list(dados[0].keys()))
+            for row in dados:
+                ws.append(list(row.values()))
         output = io.BytesIO()
-        with pd.ExcelWriter(output, engine="openpyxl") as writer:
-            df.to_excel(writer, index=False, sheet_name="Chamados")
+        wb.save(output)
         output.seek(0)
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
         return send_file(

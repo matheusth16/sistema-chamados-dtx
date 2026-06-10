@@ -64,7 +64,10 @@ class Config:
     WTF_CSRF_TIME_LIMIT = 7200  # Tokens CSRF expiram em 2 horas
 
     # 7. Session Security
-    PERMANENT_SESSION_LIFETIME = 86400  # 24 horas em segundos
+    # PERMANENT_SESSION_LIFETIME só tem efeito se session.permanent=True for definido.
+    # No fluxo atual isso nunca acontece: sessões expiram pelo checar_inatividade (900s)
+    # em app/__init__.py, ou pelo cookie de "lembrar" (REMEMBER_COOKIE_DURATION, 30 dias).
+    PERMANENT_SESSION_LIFETIME = 86400  # 24 horas — reservado para uso futuro
     SESSION_COOKIE_SECURE = _to_bool(
         os.getenv("SESSION_COOKIE_SECURE"), default=True
     )  # HTTPS em produção

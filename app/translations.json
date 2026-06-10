@@ -9,6 +9,11 @@
     "en": "No tickets found",
     "es": "No se encontraron tickets"
   },
+  "no_tickets": {
+    "pt_BR": "Nenhum chamado por aqui",
+    "en": "No tickets here",
+    "es": "No hay tickets aquí"
+  },
   "previous": {
     "pt_BR": "Anterior",
     "en": "Previous",
@@ -413,6 +418,16 @@
     "pt_BR": "Solicitante Identificado",
     "en": "Identified Requester",
     "es": "Solicitante Identificado"
+  },
+  "pagination": {
+    "pt_BR": "Paginação",
+    "en": "Pagination",
+    "es": "Paginación"
+  },
+  "select_ticket": {
+    "pt_BR": "Selecionar chamado",
+    "en": "Select ticket",
+    "es": "Seleccionar ticket"
   },
   "showing": {
     "pt_BR": "Mostrando",
@@ -1243,6 +1258,11 @@
     "pt_BR": "Inativo",
     "en": "Inactive",
     "es": "Inactivo"
+  },
+  "active": {
+    "pt_BR": "Ativo",
+    "en": "Active",
+    "es": "Activo"
   },
   "edit": {
     "pt_BR": "Editar",
