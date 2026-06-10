@@ -299,7 +299,8 @@ def _configurar_seguranca(app: Flask) -> None:
                 "img-src 'self' data: https: blob:; "
                 "font-src 'self' https://cdn.jsdelivr.net https://fonts.gstatic.com; "
                 "connect-src 'self'; "
-                "frame-ancestors 'self';"
+                "frame-ancestors 'self'; "
+                "report-uri /api/csp-report;"
             ).format(nonce=nonce)
             response.headers["Content-Security-Policy"] = csp
         return response

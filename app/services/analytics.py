@@ -23,6 +23,9 @@ logger = logging.getLogger(__name__)
 # Cache em memória (fallback quando Redis não está configurado)
 _RELATORIO_CACHE: dict[str, Any] = {}
 _RELATORIO_CACHE_TTL_SEC = 300  # 5 minutos
+# TTL para queries analíticas individuais — curto o suficiente para manter dados
+# razoavelmente frescos, longo o suficiente para não re-escanear 2000 docs por minuto.
+_ANALYTICS_QUERY_TTL_SEC = 60  # 1 minuto
 
 # Limite máximo de documentos em queries de analytics (evita estourar cota Firestore no plano Spark)
 MAX_CHAMADOS_ANALYTICS = 2000
@@ -126,6 +129,15 @@ class AnalisadorChamados:
         - Taxa de resolução
         - Tempo médio de resolução
         """
+        cache_key = f"analytics_metricas_gerais_{dias}"
+        try:
+            from app.cache import cache_get, cache_set
+
+            cached = cache_get(cache_key)
+            if cached is not None:
+                return cached
+        except Exception:
+            pass
         try:
             data_limite = datetime.now() - timedelta(days=dias)
 
@@ -216,7 +228,7 @@ class AnalisadorChamados:
                 "em_risco": em_risco_count,
             }
 
-            return {
+            resultado = {
                 "periodo_dias": dias,
                 "total_chamados": total,
                 "abertos": abertos,
@@ -231,6 +243,13 @@ class AnalisadorChamados:
                 "distribuicao_categoria": categorias,
                 "resumo_sla": resumo_sla,
             }
+            try:
+                from app.cache import cache_set
+
+                cache_set(cache_key, resultado, _ANALYTICS_QUERY_TTL_SEC)
+            except Exception:
+                pass
+            return resultado
 
         except Exception as e:
             logger.exception("Erro ao obter métricas gerais: %s", e)
@@ -638,6 +657,15 @@ class AnalisadorChamados:
 
     def obter_metricas_periodo_anterior(self) -> dict[str, Any]:
         """Métricas do período 30-60 dias atrás para calcular deltas comparativos."""
+        cache_key = "analytics_periodo_anterior"
+        try:
+            from app.cache import cache_get, cache_set
+
+            cached = cache_get(cache_key)
+            if cached is not None:
+                return cached
+        except Exception:
+            pass
         try:
             agora = datetime.now()
             data_inicio = agora - timedelta(days=60)
@@ -686,12 +714,19 @@ class AnalisadorChamados:
                 else None
             )
 
-            return {
+            resultado = {
                 "total_chamados": total,
                 "taxa_resolucao_percentual": round(taxa_resolucao, 2),
                 "percentual_dentro_sla": percentual_dentro_sla,
                 "tempo_medio_resolucao_horas": round(tempo_medio, 2),
             }
+            try:
+                from app.cache import cache_set
+
+                cache_set(cache_key, resultado, _ANALYTICS_QUERY_TTL_SEC)
+            except Exception:
+                pass
+            return resultado
         except Exception as e:
             logger.exception("Erro ao obter métricas do período anterior: %s", e)
             return {}

@@ -7,6 +7,7 @@ from flask import Response, redirect, render_template, request, session, url_for
 from flask_login import current_user, login_required, login_user, logout_user
 
 from app.i18n import flash_t
+from app.limiter import limiter
 from app.models_usuario import Usuario
 from app.routes import main
 from app.services.login_attempts import LOCKOUT_DURATION, MAX_LOGIN_ATTEMPTS, LoginAttemptTracker
@@ -16,6 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 @main.route("/login", methods=["GET", "POST"])
+@limiter.limit("10 per minute", methods=["POST"])
 def login() -> Response:
     """GET: formulário de login. POST: valida credenciais e cria sessão."""
     # Remove last_activity de sessão antiga para evitar "desconectado por inatividade"

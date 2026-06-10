@@ -275,3 +275,25 @@ def test_api_chamado_por_id_supervisor_sua_area_retorna_200(client_logado_superv
     assert "chamado" in data
     assert data["chamado"].get("numero_chamado") == "CHM-0002"
     assert data["chamado"].get("status") == "Aberto"
+
+
+# ── CSP report ────────────────────────────────────────────────────────────────
+
+
+def test_csp_report_retorna_204(client):
+    """POST /api/csp-report deve retornar 204 sem autenticação."""
+    payload = {
+        "csp-report": {
+            "blocked-uri": "https://evil.example.com/script.js",
+            "violated-directive": "script-src 'self'",
+            "document-uri": "https://app.example.com/chamados",
+        }
+    }
+    r = client.post("/api/csp-report", json=payload, content_type="application/json")
+    assert r.status_code == 204
+
+
+def test_csp_report_corpo_vazio_retorna_204(client):
+    """POST /api/csp-report com corpo vazio deve retornar 204 (não quebra)."""
+    r = client.post("/api/csp-report", data="", content_type="application/json")
+    assert r.status_code == 204

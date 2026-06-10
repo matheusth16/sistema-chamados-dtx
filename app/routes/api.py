@@ -656,3 +656,20 @@ def api_lista_supervisores():
                 "erro": ERRO_INTERNO_MSG,
             }
         ), 200
+
+
+_csp_logger = logging.getLogger("app.csp")
+
+
+@main.route("/api/csp-report", methods=["POST"])
+def csp_report():
+    """Recebe relatórios de violação CSP enviados pelo browser (sem autenticação, sem CSRF)."""
+    body = request.get_json(silent=True, force=True) or {}
+    report = body.get("csp-report", body)
+    _csp_logger.warning(
+        "CSP violation: blocked-uri=%s violated-directive=%s document-uri=%s",
+        report.get("blocked-uri", ""),
+        report.get("violated-directive", ""),
+        report.get("document-uri", ""),
+    )
+    return "", 204
