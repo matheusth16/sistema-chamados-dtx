@@ -46,7 +46,7 @@
       pt_BR: [
         {
           icone: '👋',
-          titulo: 'Bem-vindo ao Sistema de Chamados!',
+          titulo: 'Bem-vindo ao DTX Digital Andon.',
           descricao: 'Olá, {nome}! Este é o sistema de chamados da DTX Aerospace. ' +
                      'Vamos te guiar pelos primeiros passos em menos de um minuto.',
         },

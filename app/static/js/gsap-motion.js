@@ -1,5 +1,5 @@
 /**
- * GSAP Motion - Animações suaves no Sistema de Chamados DTX
+ * GSAP Motion - Animações suaves no DTX Digital Andon
  *
  * Plugins: ScrollTrigger (reveal ao rolar), ScrollToPlugin (scroll suave).
  *

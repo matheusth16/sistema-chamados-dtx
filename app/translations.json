@@ -500,9 +500,9 @@
     "es": "Definido automáticamente por el sistema."
   },
   "login_title": {
-    "pt_BR": "Sistema de Chamados",
-    "en": "Ticket System",
-    "es": "Sistema de Tickets"
+    "pt_BR": "DTX Digital Andon",
+    "en": "DTX Digital Andon",
+    "es": "DTX Digital Andon"
   },
   "remember_me": {
     "pt_BR": "Manter-me conectado por 30 dias",
@@ -800,9 +800,9 @@
     "es": "DTX Aerospace. Todos los derechos reservados."
   },
   "footer_system_name": {
-    "pt_BR": "Sistema de Planejamento Interno",
-    "en": "Internal Planning System",
-    "es": "Sistema de Planificación Interna"
+    "pt_BR": "DTX Digital Andon System",
+    "en": "DTX Digital Andon System",
+    "es": "DTX Digital Andon System"
   },
   "level_label": {
     "pt_BR": "Nível",

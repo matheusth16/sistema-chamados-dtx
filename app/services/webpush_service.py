@@ -103,7 +103,7 @@ def enviar_webpush_usuario(usuario_id: str, titulo: str, corpo: str, url: str = 
                 subscription_info=sub,
                 data=payload,
                 vapid_private_key=vapid_private,
-                vapid_claims={"sub": "mailto:noreply@sistema-chamados.local"},
+                vapid_claims={"sub": "mailto:noreply@dtx-andon.local"},
             )
             enviados += 1
         except Exception as e:

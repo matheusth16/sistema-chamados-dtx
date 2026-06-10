@@ -1,6 +1,6 @@
-/* Service Worker: Web Push - Sistema de Chamados */
+/* Service Worker: Web Push - DTX Digital Andon */
 self.addEventListener('push', function(event) {
-    var data = { title: 'Sistema de Chamados', body: '', url: '' };
+    var data = { title: 'DTX Andon', body: '', url: '' };
     if (event.data) {
         try {
             var payload = event.data.json();
