@@ -45,8 +45,8 @@ class Config:
 
     # 4. Paginação
     ITENS_POR_PAGINA = 10
-    # Dashboard admin: itens por página na listagem (500 = efetivamente sem paginação)
-    ITENS_POR_PAGINA_DASHBOARD = 500
+    # Dashboard: docs por página com cursor-based pagination (Firestore lê limit+1 docs)
+    ITENS_POR_PAGINA_DASHBOARD = 50
 
     # 5. Rate Limiting (limite de requisições por janela de tempo)
     # Em desenvolvimento: desativado para melhor UX

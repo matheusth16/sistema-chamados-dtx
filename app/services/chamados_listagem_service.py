@@ -16,6 +16,10 @@ from app.database import db
 from app.models import Chamado
 from app.services.pagination import obter_total_por_contagem
 
+# Limite máximo de docs no fallback (sem índice composto). Um solicitante raramente
+# terá mais chamados que isso; evita ler a coleção inteira caso o índice seja removido.
+_FALLBACK_LIMIT = 200
+
 logger = logging.getLogger(__name__)
 
 
@@ -39,7 +43,7 @@ def listar_meus_chamados_fallback(
     q = (
         db.collection("chamados")
         .where(filter=FieldFilter("solicitante_id", "==", user_id))
-        .limit(500)
+        .limit(_FALLBACK_LIMIT)
     )
     docs = list(q.stream())
     if status_filtro:

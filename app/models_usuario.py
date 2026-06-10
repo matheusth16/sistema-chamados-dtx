@@ -305,39 +305,22 @@ class Usuario(UserMixin):
 
     @classmethod
     def get_supervisores_por_area(cls, area: str):
-        """Retorna supervisores de uma área específica (e admins da mesma área, para sugestão de responsável)."""
+        """Retorna supervisores e admins de uma área específica.
+
+        Usa array_contains no campo areas[] (1 query vs 2 full-scans anteriores).
+        O índice single-field em areas[] é criado automaticamente pelo Firestore.
+        """
         try:
             usuarios = []
-
-            # Buscar todos os supervisores e filtrar por área em Python
-            # (Firestore tem limitações em queries compostas com array_contains)
-            docs_sup = (
+            docs = (
                 db.collection("usuarios")
-                .where(filter=FieldFilter("perfil", "==", "supervisor"))
+                .where(filter=FieldFilter("areas", "array_contains", area))
                 .stream()
             )
-            for doc in docs_sup:
-                user_dict = doc.to_dict()
-                # Precisamos criar o objeto Usuario primeiro para que from_dict
-                # faça a conversão de 'area' (string) para 'areas' (array)
-                usuario = cls.from_dict(user_dict, doc.id)
-                areas_usuario = getattr(usuario, "areas", None) or []
-                if isinstance(areas_usuario, list) and area in areas_usuario:
+            for doc in docs:
+                usuario = cls.from_dict(doc.to_dict(), doc.id)
+                if usuario.perfil in ("supervisor", "admin"):
                     usuarios.append(usuario)
-
-            # Buscar todos os admins e filtrar por área
-            docs_admin = (
-                db.collection("usuarios")
-                .where(filter=FieldFilter("perfil", "==", "admin"))
-                .stream()
-            )
-            for doc in docs_admin:
-                user_dict = doc.to_dict()
-                usuario = cls.from_dict(user_dict, doc.id)
-                areas_usuario = getattr(usuario, "areas", None) or []
-                if isinstance(areas_usuario, list) and area in areas_usuario:
-                    usuarios.append(usuario)
-
             return usuarios
         except Exception as e:
             logger.exception("Erro ao buscar supervisores: %s", e)

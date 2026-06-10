@@ -344,36 +344,59 @@ def test_email_existe_retorna_false_quando_firestore_falha():
 
 
 def test_get_supervisores_por_area_filtra_por_area():
-    """get_supervisores_por_area retorna apenas supervisores da área solicitada."""
+    """get_supervisores_por_area retorna apenas supervisores/admins (não solicitantes)."""
     from app.models_usuario import Usuario
 
-    doc_certo = MagicMock()
-    doc_certo.id = "sup1"
-    doc_certo.to_dict.return_value = {
+    doc_sup = MagicMock()
+    doc_sup.id = "sup1"
+    doc_sup.to_dict.return_value = {
         "email": "sup1@dtx.aero",
         "nome": "Sup Um",
         "perfil": "supervisor",
         "areas": ["Manutencao"],
     }
 
-    doc_errado = MagicMock()
-    doc_errado.id = "sup2"
-    doc_errado.to_dict.return_value = {
-        "email": "sup2@dtx.aero",
-        "nome": "Sup Dois",
-        "perfil": "supervisor",
-        "areas": ["Qualidade"],
+    # Solicitante na mesma área — deve ser filtrado em Python
+    doc_sol = MagicMock()
+    doc_sol.id = "sol1"
+    doc_sol.to_dict.return_value = {
+        "email": "sol@dtx.aero",
+        "nome": "Sol Um",
+        "perfil": "solicitante",
+        "areas": ["Manutencao"],
     }
 
+    # Nova implementação: 1 query array_contains, Firestore já filtrou por area
     with patch("app.models_usuario.db") as mock_db:
-        mock_db.collection.return_value.where.return_value.stream.side_effect = [
-            [doc_certo, doc_errado],  # supervisores
-            [],  # admins
+        mock_db.collection.return_value.where.return_value.stream.return_value = [
+            doc_sup,
+            doc_sol,
         ]
         result = Usuario.get_supervisores_por_area("Manutencao")
 
     assert len(result) == 1
     assert result[0].id == "sup1"
+
+
+def test_get_supervisores_por_area_inclui_admins():
+    """get_supervisores_por_area inclui admins além de supervisores."""
+    from app.models_usuario import Usuario
+
+    doc_admin = MagicMock()
+    doc_admin.id = "adm1"
+    doc_admin.to_dict.return_value = {
+        "email": "adm@dtx.aero",
+        "nome": "Admin Um",
+        "perfil": "admin",
+        "areas": ["Manutencao"],
+    }
+
+    with patch("app.models_usuario.db") as mock_db:
+        mock_db.collection.return_value.where.return_value.stream.return_value = [doc_admin]
+        result = Usuario.get_supervisores_por_area("Manutencao")
+
+    assert len(result) == 1
+    assert result[0].perfil == "admin"
 
 
 def test_get_supervisores_por_area_retorna_vazio_quando_firestore_falha():
