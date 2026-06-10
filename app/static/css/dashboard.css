@@ -91,3 +91,9 @@
   outline: none;
   box-shadow: 0 0 0 3px rgb(79 70 229 / 0.25);  /* indigo-600/25 */
 }
+
+/* Flash de sucesso em linha de tabela — green-100 */
+.dtx-row-flash {
+  background-color: rgb(220 252 231) !important;  /* green-100 */
+  transition: background-color 0.8s ease-out;
+}

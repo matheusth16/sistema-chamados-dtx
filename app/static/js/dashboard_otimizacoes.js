@@ -207,9 +207,9 @@ function atualizarLinhaStatus(linha, novoStatus) {
     spanStatus.textContent = novoStatus;
 
     // Animação visual de sucesso
-    linha.style.backgroundColor = '#dcfce7'; // Fundo verde claro
+    linha.classList.add('dtx-row-flash');
     setTimeout(() => {
-        linha.style.backgroundColor = '';
+        linha.classList.remove('dtx-row-flash');
     }, 1000);
 }
 
