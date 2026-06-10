@@ -80,8 +80,8 @@
       en: [
         {
           icone: '👋',
-          titulo: 'Welcome to the Ticket System!',
-          descricao: 'Hello, {nome}! This is the DTX Aerospace ticket system. ' +
+          titulo: 'Welcome to DTX Digital Andon.',
+          descricao: 'Hello, {nome}! This is DTX Digital Andon by DTX Aerospace. ' +
                      'We\'ll guide you through the first steps in less than a minute.',
         },
         {
@@ -114,8 +114,8 @@
       es: [
         {
           icone: '👋',
-          titulo: '¡Bienvenido al Sistema de Tickets!',
-          descricao: '¡Hola, {nome}! Este es el sistema de tickets de DTX Aerospace. ' +
+          titulo: 'Bienvenido a DTX Digital Andon.',
+          descricao: '¡Hola, {nome}! Este es DTX Digital Andon de DTX Aerospace. ' +
                      'Te guiaremos a través de los primeros pasos en menos de un minuto.',
         },
         {
