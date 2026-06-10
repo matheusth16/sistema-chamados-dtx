@@ -149,3 +149,21 @@ def test_meus_chamados_excecao_generica_redireciona(client_logado_solicitante):
     ):
         r = client_logado_solicitante.get("/meus-chamados", follow_redirects=False)
     assert r.status_code == 302
+
+
+def test_gamificacao_visivel_para_solicitante(client_logado_solicitante):
+    """Sprint 4 B1: bloco de gamificação no dropdown da navbar deve aparecer para solicitante."""
+    with patch("app.routes.chamados.listar_meus_chamados") as mock_listar:
+        mock_listar.return_value = {
+            "chamados": [],
+            "pagina_atual": 1,
+            "total_paginas": 1,
+            "total_chamados": 0,
+            "status_counts": {"Aberto": 0, "Em Atendimento": 0, "Concluído": 0, "Cancelado": 0},
+            "cursor_next": None,
+            "cursor_prev": None,
+        }
+        r = client_logado_solicitante.get("/meus-chamados", follow_redirects=False)
+    assert r.status_code == 200
+    # Bloco de gamificação deve estar presente (from-amber-400 é CSS exclusivo do bloco XP)
+    assert b"from-amber-400" in r.data

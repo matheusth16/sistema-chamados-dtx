@@ -9,6 +9,10 @@ Variáveis de ambiente esperadas (para testes que fazem login):
     TEST_SUPERVISOR_EMAIL   / TEST_SUPERVISOR_PASSWORD
     TEST_ADMIN_EMAIL        / TEST_ADMIN_PASSWORD
 
+Modo stub para CI (sem servidor externo):
+    FLASK_E2E_STUB=1 pytest tests/e2e -m smoke
+    (também ativa quando CI=true e FLASK_TEST_URL não estiver definido)
+
 Exemplo de .env.test:
     TEST_SOLICITANTE_EMAIL=sol@dtx.com
     TEST_SOLICITANTE_PASSWORD=senha123
@@ -19,8 +23,10 @@ Exemplo de .env.test:
 """
 
 import os
+import threading
 import urllib.error
 import urllib.request
+from collections.abc import Generator
 
 import pytest
 from playwright.sync_api import Page
@@ -28,13 +34,54 @@ from playwright.sync_api import Page
 DEFAULT_TIMEOUT = 10_000  # ms — tempo padrão de espera para assertions E2E
 
 
-@pytest.fixture(scope="session", autouse=True)
-def require_server(base_url: str) -> None:
-    """Auto-skip da suíte inteira quando o servidor Flask não está disponível."""
-    try:
-        urllib.request.urlopen(f"{base_url}/login", timeout=3)
-    except Exception:
-        pytest.skip(f"Servidor Flask não disponível em {base_url} — skipping E2E suite")
+# ---------------------------------------------------------------------------
+# Stub server para CI (sem Firebase real, sem servidor externo)
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture(scope="session")
+def _stub_server() -> Generator[str | None, None, None]:
+    """Inicia Flask em background para CI quando nenhum servidor externo está disponível.
+
+    Ativado quando FLASK_E2E_STUB=1 ou CI=true e FLASK_TEST_URL não está definido.
+    Retorna a URL base do servidor stub, ou None se o modo stub não estiver ativo.
+
+    Smoke tests que não precisam de login (SMOKE-01, 02, 03) funcionam com o stub
+    pois o Flask trata /login e o redirect de rotas protegidas sem acessar Firestore.
+    Chamadas a Firestore que ocorrerem no stub são capturadas silenciosamente (try/except
+    nos services retornam None) — o comportamento de "credenciais inválidas" é preservado.
+    """
+    ci_mode = (
+        os.environ.get("CI") == "true" or os.environ.get("FLASK_E2E_STUB") == "1"
+    ) and not os.environ.get("FLASK_TEST_URL")
+
+    if not ci_mode:
+        yield None
+        return
+
+    from werkzeug.serving import make_server
+
+    from app import create_app
+
+    stub = create_app()
+    stub.config["TESTING"] = True
+    stub.config["WTF_CSRF_ENABLED"] = False
+    stub.config["SECRET_KEY"] = "test-stub-e2e-secret"
+    stub.config["APP_BASE_URL"] = ""
+    # Desativa rate limiting no stub para que SMOKE-02 (login inválido) não bloqueie
+    stub.config["RATELIMIT_ENABLED"] = False
+
+    # Porta 0 = OS escolhe uma porta livre (sem race condition)
+    server = make_server("127.0.0.1", 0, stub)
+    port = server.socket.getsockname()[1]
+    url = f"http://127.0.0.1:{port}"
+
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+
+    yield url
+
+    server.shutdown()
 
 
 # ---------------------------------------------------------------------------
@@ -48,9 +95,26 @@ def pytest_configure(config):
 
 
 @pytest.fixture(scope="session")
-def base_url() -> str:
-    """URL base do servidor Flask. Pode ser sobrescrita via --base-url ou FLASK_TEST_URL."""
+def base_url(_stub_server: str | None) -> str:
+    """URL base do servidor Flask.
+
+    Prioridade:
+    1. URL do stub server (quando FLASK_E2E_STUB=1 ou CI=true)
+    2. FLASK_TEST_URL env var
+    3. Padrão: http://127.0.0.1:5000
+    """
+    if _stub_server:
+        return _stub_server
     return os.environ.get("FLASK_TEST_URL", "http://127.0.0.1:5000")
+
+
+@pytest.fixture(scope="session", autouse=True)
+def require_server(base_url: str) -> None:
+    """Auto-skip da suíte inteira quando o servidor Flask não está disponível."""
+    try:
+        urllib.request.urlopen(f"{base_url}/login", timeout=3)
+    except Exception:
+        pytest.skip(f"Servidor Flask não disponível em {base_url} — skipping E2E suite")
 
 
 # ---------------------------------------------------------------------------

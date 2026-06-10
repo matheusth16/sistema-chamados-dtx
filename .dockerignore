@@ -52,7 +52,6 @@ scripts/
 
 # Node
 node_modules/
-package-lock.json
 
 # Logs e temporários
 logs/

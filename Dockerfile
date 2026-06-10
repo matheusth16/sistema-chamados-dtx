@@ -1,4 +1,15 @@
-# Multi-stage: builder compila pacotes com gcc; runtime não carrega ferramentas de build
+# Multi-stage: css-builder gera Tailwind purgado; builder compila pacotes Python; runtime é mínimo
+
+# ── Stage 0: css-builder ─────────────────────────────────────────────────────
+FROM node:20-slim AS css-builder
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci --include=dev
+COPY tailwind.config.js ./
+COPY app/templates/ ./app/templates/
+COPY app/static/js/ ./app/static/js/
+COPY app/static/css/input.css ./app/static/css/input.css
+RUN npm run build:css
 
 # ── Stage 1: builder ──────────────────────────────────────────────────────────
 FROM python:3.12-slim AS builder
@@ -27,6 +38,9 @@ COPY --from=builder /install /usr/local
 
 # Copiar código com ownership já correto (evita chown -R)
 COPY --chown=appuser:appgroup . .
+
+# CSS gerado no css-builder substitui o arquivo commitado no repositório
+COPY --from=css-builder --chown=appuser:appgroup /app/app/static/css/tailwind.min.css ./app/static/css/tailwind.min.css
 
 RUN mkdir -p /app/logs && chown -R appuser:appgroup /app
 
