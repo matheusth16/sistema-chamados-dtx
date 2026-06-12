@@ -2,13 +2,99 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── CSS custom properties ── espelham os tokens Tailwind ──────────────────── */
 @layer base {
-  body {
-    font-family: "Inter", sans-serif;
+  :root {
+    /* DTX Blue */
+    --color-dtx-50:  #EEF4FF;
+    --color-dtx-100: #D9E7FF;
+    --color-dtx-200: #B3CEFF;
+    --color-dtx-300: #7DAEFF;
+    --color-dtx-400: #4A8AE8;
+    --color-dtx-500: #2E6ACC;
+    --color-dtx-600: #1e4a8c;
+    --color-dtx-700: #163A70;
+    --color-dtx-800: #0F2B54;
+    --color-dtx-900: #091D38;
+
+    /* Superfícies */
+    --color-surface-canvas: #FBFBFA;
+    --color-surface-base:   #FFFFFF;
+    --color-surface-raised: #F5F5F4;
+    --color-surface-border: #EAEAEA;
+    --color-surface-muted:  #D1D5DB;
+
+    /* Status */
+    --color-status-open-bg:          #FEF3C7;
+    --color-status-open-text:        #92400E;
+    --color-status-open-border:      #FDE68A;
+    --color-status-active-bg:        #EFF6FF;
+    --color-status-active-text:      #1D4ED8;
+    --color-status-active-border:    #BFDBFE;
+    --color-status-done-bg:          #ECFDF5;
+    --color-status-done-text:        #065F46;
+    --color-status-done-border:      #A7F3D0;
+    --color-status-cancelled-bg:     #FFF1F2;
+    --color-status-cancelled-text:   #9F1239;
+    --color-status-cancelled-border: #FECDD3;
+    --color-status-pending-bg:       #F8FAFC;
+    --color-status-pending-text:     #475569;
+    --color-status-pending-border:   #E2E8F0;
   }
 
+  /* Light-only — sem dark mode */
+  html {
+    color-scheme: light;
+  }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background-color: var(--color-surface-canvas);
+    color: #111827;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Focus ring consistente — DTX Blue, sem outline padrão do browser */
   *:focus-visible {
-    outline: none;
-    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+    outline: 2px solid var(--color-dtx-600);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  /* Tipografia display para headings */
+  h1, h2, h3 {
+    font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+  }
+}
+
+/* ── Componentes globais reutilizáveis ─────────────────────────────────────── */
+@layer components {
+  /* Divisor padrão */
+  .dtx-divider {
+    @apply border-t border-surface-border;
+  }
+
+  /* Card base: fundo branco, borda sutil, sombra mínima */
+  .dtx-card {
+    @apply bg-surface-base rounded-dtx-md border border-surface-border shadow-dtx-sm;
+  }
+
+  /* Label de formulário */
+  .dtx-label {
+    @apply block text-sm font-medium text-gray-700 mb-1;
+  }
+
+  /* Input de formulário */
+  .dtx-input {
+    @apply block w-full rounded-dtx-md border border-surface-muted bg-white px-3 py-2 text-sm
+           text-gray-900 placeholder:text-gray-400
+           focus-visible:border-dtx-600 focus-visible:ring-0
+           disabled:bg-surface-raised disabled:text-gray-400;
+  }
+
+  /* Select de formulário */
+  .dtx-select {
+    @apply dtx-input appearance-none pr-8;
   }
 }

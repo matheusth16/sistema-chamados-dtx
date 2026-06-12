@@ -1,0 +1,76 @@
+{#
+  _btn.html
+  Botao unificado — primary / secondary / danger / ghost / icon-only.
+
+  Uso basico:
+    {% from 'components/_btn.html' import btn %}
+    {{ btn("Salvar") }}
+    {{ btn("Cancelar", variant="secondary") }}
+    {{ btn("Excluir", variant="danger") }}
+
+  Como link:
+    {{ btn("Novo chamado", href=url_for('main.formulario')) }}
+
+  Icon-only (requer aria_label):
+    {% call btn(variant="secondary", icon_only=true, aria_label="Fechar") %}
+      <svg .../>
+    {% endcall %}
+
+  Com icone + texto:
+    {% call btn("Exportar") %}
+      <svg class="h-4 w-4" .../>
+    {% endcall %}
+
+  variant:  primary | secondary | danger | ghost
+  size:     sm | md (padrao md)
+  type:     button | submit | reset
+#}
+{% macro btn(label="", variant="primary", type="button", href="",
+             icon_only=false, aria_label="", extra_class="",
+             disabled=false, size="md") %}
+
+{%- set base = "inline-flex items-center justify-center gap-2 font-medium
+                transition-colors select-none
+                focus-visible:outline-2 focus-visible:outline-offset-2
+                focus-visible:outline-dtx-600
+                disabled:opacity-50 disabled:pointer-events-none" | trim -%}
+
+{%- if size == "sm" -%}
+  {%- set sz = "h-8 px-3 text-xs rounded-dtx-sm" if not icon_only else "h-8 w-8 rounded-dtx-sm" -%}
+{%- else -%}
+  {%- set sz = "h-9 px-4 text-sm rounded-dtx-md" if not icon_only else "h-9 w-9 rounded-dtx-md" -%}
+{%- endif -%}
+
+{%- if variant == "secondary" -%}
+  {%- set vc = "bg-white text-gray-700 border border-surface-muted
+                hover:bg-surface-raised active:bg-gray-100" | trim -%}
+{%- elif variant == "danger" -%}
+  {%- set vc = "bg-white text-rose-600 border border-rose-200
+                hover:bg-rose-50 active:bg-rose-100" | trim -%}
+{%- elif variant == "ghost" -%}
+  {%- set vc = "text-gray-600 hover:bg-surface-raised
+                hover:text-gray-900 active:bg-gray-100" | trim -%}
+{%- else %}{# primary #}
+  {%- set vc = "bg-dtx-600 text-white hover:bg-dtx-700 active:bg-dtx-800" | trim -%}
+{%- endif -%}
+
+{%- set all_cls = [base, sz, vc, extra_class] | join(" ") | trim -%}
+{%- set a_label = aria_label if aria_label else (label if icon_only else "") -%}
+
+{%- if href %}
+<a href="{{ href }}"
+   class="{{ all_cls }}"
+   {%- if a_label %} aria-label="{{ a_label }}"{% endif %}>
+  {%- if caller is defined %}{{ caller() }}{% endif %}
+  {%- if not icon_only and label %}<span>{{ label }}</span>{% endif %}
+</a>
+{%- else %}
+<button type="{{ type }}"
+        class="{{ all_cls }}"
+        {%- if a_label %} aria-label="{{ a_label }}"{% endif %}
+        {%- if disabled %} disabled{% endif %}>
+  {%- if caller is defined %}{{ caller() }}{% endif %}
+  {%- if not icon_only and label %}<span>{{ label }}</span>{% endif %}
+</button>
+{%- endif %}
+{% endmacro %}

@@ -1,0 +1,55 @@
+{#
+  _status_badge.html
+  Macro unica para status de chamado E perfil de usuario.
+
+  Uso: {% from 'components/_status_badge.html' import status_badge %}
+       {{ status_badge("Aberto") }}
+       {{ status_badge("Em Atendimento") }}
+       {{ status_badge("Concluido") }}
+       {{ status_badge("Cancelado") }}
+       {{ status_badge("admin") }}
+       {{ status_badge("supervisor") }}
+       {{ status_badge("solicitante") }}
+
+  size: sm (padrao) | md
+#}
+{% macro status_badge(status, size="sm") %}
+{%- set s = status | lower | replace(" ", "_") | replace("í", "i") | replace("ú", "u") -%}
+
+{%- if s in ("aberto",) -%}
+  {%- set cls = "bg-status-open-bg text-status-open border-status-open-border" -%}
+  {%- set label = "Aberto" -%}
+{%- elif s in ("em_atendimento", "em atendimento") -%}
+  {%- set cls = "bg-status-active-bg text-status-active border-status-active-border" -%}
+  {%- set label = "Em Atendimento" -%}
+{%- elif s in ("concluido", "concluído") -%}
+  {%- set cls = "bg-status-done-bg text-status-done border-status-done-border" -%}
+  {%- set label = "Concluido" -%}
+{%- elif s in ("cancelado",) -%}
+  {%- set cls = "bg-status-cancelled-bg text-status-cancelled border-status-cancelled-border" -%}
+  {%- set label = "Cancelado" -%}
+{%- elif s == "admin" -%}
+  {%- set cls = "bg-dtx-50 text-dtx-700 border-dtx-200" -%}
+  {%- set label = "Admin" -%}
+{%- elif s == "supervisor" -%}
+  {%- set cls = "bg-violet-50 text-violet-800 border-violet-200" -%}
+  {%- set label = "Supervisor" -%}
+{%- elif s == "solicitante" -%}
+  {%- set cls = "bg-gray-100 text-gray-700 border-gray-200" -%}
+  {%- set label = "Solicitante" -%}
+{%- else -%}
+  {%- set cls = "bg-status-pending-bg text-status-pending border-status-pending-border" -%}
+  {%- set label = status -%}
+{%- endif -%}
+
+{%- if size == "md" -%}
+  {%- set size_cls = "px-2.5 py-1 text-xs" -%}
+{%- else -%}
+  {%- set size_cls = "px-2 py-0.5 text-xs" -%}
+{%- endif -%}
+
+<span class="inline-flex items-center rounded border font-medium {{ size_cls }} {{ cls }}"
+      aria-label="{{ label }}">
+  {{- label -}}
+</span>
+{%- endmacro %}

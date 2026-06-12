@@ -1,0 +1,80 @@
+{#
+  _empty_state.html
+  Estado vazio para listas, relatorios e tabelas.
+
+  Uso: {% from 'components/_empty_state.html' import empty_state %}
+       {{ empty_state(
+            title="Nenhum chamado encontrado",
+            description="Ajuste os filtros ou crie um novo chamado.",
+            action_label="Novo chamado",
+            action_url=url_for('main.formulario')
+          ) }}
+
+  icon: "inbox" (padrao) | "chart" | "search" | "users" | "check"
+#}
+{% macro empty_state(title, description="", action_label="", action_url="#", icon="inbox") %}
+<div class="flex flex-col items-center justify-center py-16 px-4 text-center">
+
+  {# Icone SVG por contexto — sem emojis #}
+  <div class="mx-auto mb-4 flex h-12 w-12 items-center justify-center
+               rounded-dtx-md bg-surface-raised">
+    {%- if icon == "chart" %}
+    <svg class="h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24"
+         stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+      <path stroke-linecap="round" stroke-linejoin="round"
+            d="M3 13.5V19a1 1 0 001 1h16a1 1 0 001-1v-5.5M3 13.5l4-4
+               4 2 4-6 4 4M3 13.5h18"/>
+    </svg>
+    {%- elif icon == "search" %}
+    <svg class="h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24"
+         stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+      <path stroke-linecap="round" stroke-linejoin="round"
+            d="M21 21l-4.35-4.35M17 11A6 6 0 115 11a6 6 0 0112 0z"/>
+    </svg>
+    {%- elif icon == "users" %}
+    <svg class="h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24"
+         stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+      <path stroke-linecap="round" stroke-linejoin="round"
+            d="M17 20h5v-1a4 4 0 00-5-3.87M9 20H4v-1a4 4 0
+               015-3.87M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0
+               11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
+    </svg>
+    {%- elif icon == "check" %}
+    <svg class="h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24"
+         stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+      <path stroke-linecap="round" stroke-linejoin="round"
+            d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+    </svg>
+    {%- else %}{# inbox (default) #}
+    <svg class="h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24"
+         stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+      <path stroke-linecap="round" stroke-linejoin="round"
+            d="M2.25 13.5h3.86a2.25 2.25 0 012.012 1.244l.256.512a2.25
+               2.25 0 002.013 1.244h3.218a2.25 2.25 0 002.013-1.244l.256-.512a2.25
+               2.25 0 012.013-1.244h3.859m-19.5.338V18a2.25 2.25 0
+               002.25 2.25h15A2.25 2.25 0 0021.75 18v-4.162c0-.224-.034-.447-.1-.661L19.24
+               5.338a2.25 2.25 0 00-2.15-1.588H6.911a2.25 2.25 0
+               00-2.15 1.588L2.35 13.177a2.25 2.25 0 00-.1.661z"/>
+    </svg>
+    {%- endif %}
+  </div>
+
+  <h3 class="text-sm font-semibold text-gray-900">{{ title }}</h3>
+
+  {%- if description %}
+  <p class="mt-1 text-sm text-gray-500 max-w-sm">{{ description }}</p>
+  {%- endif %}
+
+  {%- if action_label %}
+  <div class="mt-5">
+    <a href="{{ action_url }}"
+       class="inline-flex items-center gap-2 rounded-dtx-md bg-dtx-600 px-4 h-9
+              text-sm font-medium text-white hover:bg-dtx-700 transition-colors
+              focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-dtx-600">
+      {{- action_label -}}
+    </a>
+  </div>
+  {%- endif %}
+
+</div>
+{% endmacro %}

@@ -1,0 +1,33 @@
+{#
+  _stat_card.html
+  Uso: {% from 'components/_stat_card.html' import stat_card %}
+       {{ stat_card("Total", total, variant="default") }}
+       {{ stat_card("Abertos", abertos, variant="open") }}
+
+  variant: default | open | active | done | cancelled
+#}
+{% macro stat_card(label, value, sublabel="", variant="default") %}
+{%- if variant == "open" -%}
+  {%- set accent = "border-l-4 border-l-amber-400" -%}
+  {%- set value_color = "text-amber-700" -%}
+{%- elif variant == "active" -%}
+  {%- set accent = "border-l-4 border-l-blue-500" -%}
+  {%- set value_color = "text-blue-700" -%}
+{%- elif variant == "done" -%}
+  {%- set accent = "border-l-4 border-l-emerald-500" -%}
+  {%- set value_color = "text-emerald-700" -%}
+{%- elif variant == "cancelled" -%}
+  {%- set accent = "border-l-4 border-l-rose-500" -%}
+  {%- set value_color = "text-rose-700" -%}
+{%- else -%}
+  {%- set accent = "" -%}
+  {%- set value_color = "text-gray-900" -%}
+{%- endif -%}
+<div class="bg-surface-base rounded-dtx-md border border-surface-border shadow-dtx-sm {{ accent }} p-4 min-w-0">
+  <p class="text-xs font-medium text-gray-500 uppercase tracking-wide truncate">{{ label }}</p>
+  <p class="mt-1 text-2xl font-semibold tabular-nums {{ value_color }}">{{ value }}</p>
+  {%- if sublabel %}
+  <p class="mt-1 text-xs text-gray-400">{{ sublabel }}</p>
+  {%- endif %}
+</div>
+{% endmacro %}
