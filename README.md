@@ -11,7 +11,7 @@
 - **Atualização em Tempo Real**: Status atualiza sem recarregar a página
 - **Dashboard Completo**: Visualização, filtros, histórico de alterações e bulk status
 - **Autenticação Segura**: Login com Flask-Login e perfis (solicitante, supervisor, admin)
-- **Upload de Anexos**: Suporte a PDFs, imagens e outros formatos
+- **Upload de Anexos**: Suporte a PDFs, imagens e outros formatos — armazenamento em Cloudflare R2 (privado, URLs pré-assinadas) com fallback para Firebase Storage
 - **Internacionalização (i18n)**: Suporte a PT-BR, EN e ES com painel de administração de textos
 - **Onboarding Interativo**: Tour guiado por perfil ao primeiro acesso (5–7 passos)
 - **Notificações**: E-mail, Web Push e notificações in-app com retry automático
@@ -186,11 +186,11 @@ O projeto usa **GitHub Actions** com dois workflows:
 Roda a cada push/PR na `main`:
 
 ```
-Ruff lint → Ruff format → Bandit SAST → pip-audit → Pytest (cobertura ≥ 70%)
+Ruff lint → Ruff format → Bandit SAST → pip-audit → Pytest (cobertura ≥ 80%)
 ```
 
-### E2E (`e2e.yml`) — não bloqueante
-Roda em paralelo. Requer servidor Flask acessível (configurável via `workflow_dispatch`):
+### E2E (`e2e.yml`) — bloqueante (SMOKE-01/02/03)
+Roda em paralelo com stub server embutido (`FLASK_E2E_STUB=1`). SMOKE-01/02/03 bloqueiam merge; testes que exigem credenciais externas fazem `pytest.skip` automaticamente:
 
 ```
 Playwright Chromium → 14 smoke tests (login, dashboard, controle de acesso)
@@ -212,10 +212,10 @@ bandit -r app/ -ll
 pytest --tb=short -q \
   --cov=app \
   --cov-report=term-missing:skip-covered \
-  --cov-fail-under=70
+  --cov-fail-under=80
 ```
 
-**Gate de cobertura:** mínimo de **70%** — CI rejeita abaixo disso.
+**Gate de cobertura:** mínimo de **80%** — CI rejeita abaixo disso.
 
 ### Rodar testes específicos
 
@@ -368,8 +368,8 @@ Este projeto é propriedade da DTX Aerospace.
 - [x] PWA / notificações Web Push
 - [x] Onboarding interativo por perfil
 - [x] Gamificação para técnicos
-- [x] Suite de testes com cobertura ≥ 70% + E2E smoke
-- [x] CI/CD com GitHub Actions (lint, SAST, cobertura, E2E)
+- [x] Suite de testes com cobertura ≥ 80% + E2E smoke bloqueante
+- [x] CI/CD com GitHub Actions (lint, SAST, cobertura, E2E bloqueante)
 - [x] Retry automático para notificações (backoff exponencial)
 - [ ] Cache local com IndexedDB (uso offline)
 - [ ] Notificações em tempo real (WebSocket)
