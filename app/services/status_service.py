@@ -159,5 +159,16 @@ def _notificar_solicitante(chamado_id: str, data_chamado: dict, novo_status: str
             categoria=data_chamado.get("categoria") or "Chamado",
             solicitante_usuario=solicitante,
         )
+        if sid:
+            from app.services.webpush_service import enviar_webpush_usuario
+
+            base_url = current_app.config.get("APP_BASE_URL", "").rstrip("/")
+            url_chamado = f"{base_url}/chamado/{chamado_id}/historico" if base_url else None
+            enviar_webpush_usuario(
+                sid,
+                titulo=f"Chamado {data_chamado.get('numero_chamado') or 'N/A'}: {novo_status}",
+                corpo=data_chamado.get("categoria") or "",
+                url=url_chamado,
+            )
     except Exception as e:
         logger.warning("Notificação ao solicitante não enviada: %s", e)

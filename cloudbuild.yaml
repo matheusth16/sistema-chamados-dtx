@@ -65,7 +65,7 @@ steps:
     id: deploy
     waitFor: [push]
 
-  # 4. Smoke test — verifica se o serviço responde após o deploy
+  # 4. Smoke test shallow — verifica se o serviço responde após o deploy
   - name: "gcr.io/google.com/cloudsdktool/cloud-sdk"
     entrypoint: bash
     args:
@@ -75,14 +75,38 @@ steps:
           --region=${_REGION} --format='value(status.url)')
         echo "URL do serviço: $${SERVICE_URL}"
         HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$${SERVICE_URL}/health")
-        echo "Health check: $${HTTP_CODE}"
+        echo "Health check shallow: $${HTTP_CODE}"
         if [ "$${HTTP_CODE}" != "200" ]; then
           echo "FALHA: health check retornou $${HTTP_CODE}"
           exit 1
         fi
-        echo "Deploy verificado com sucesso."
+        echo "Shallow health check OK."
     id: smoke-test
     waitFor: [deploy]
+
+  # 5. Deep health check — verifica conectividade com Firestore e cache
+  - name: "gcr.io/google.com/cloudsdktool/cloud-sdk"
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        SERVICE_URL=$(gcloud run services describe ${_SERVICE} \
+          --region=${_REGION} --format='value(status.url)')
+        echo "Deep health check: $${SERVICE_URL}/health?deep=1"
+        RESPONSE=$(curl -s --max-time 15 "$${SERVICE_URL}/health?deep=1")
+        echo "Resposta: $${RESPONSE}"
+        # Falha se status for degraded ou unavailable
+        if echo "$${RESPONSE}" | grep -q '"status": "unavailable"'; then
+          echo "FALHA: serviço indisponível após deploy"
+          exit 1
+        fi
+        if echo "$${RESPONSE}" | grep -q '"status": "degraded"'; then
+          echo "AVISO: serviço degradado — Firestore ou cache com problema"
+          # Não bloqueia deploy (pode ser transiente) — emite aviso
+        fi
+        echo "Deep health check concluído."
+    id: deep-health-check
+    waitFor: [smoke-test]
 
 images:
   - "${_IMAGE}:${SHORT_SHA}"

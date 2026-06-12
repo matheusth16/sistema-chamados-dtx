@@ -22,6 +22,7 @@ from google.api_core.exceptions import FailedPrecondition
 from app.database import db
 from app.decoradores import requer_perfil, requer_supervisor_area
 from app.i18n import flash_t, get_translation
+from app.limiter import limiter
 from app.models import Chamado
 from app.models_categorias import CategoriaSetor
 from app.models_historico import Historico
@@ -264,6 +265,7 @@ def visualizar_historico(chamado_id: str) -> Response:
 
 @main.route("/exportar")
 @requer_supervisor_area
+@limiter.limit("10 per hour")
 def exportar() -> Response:
     """Exporta chamados filtrados para Excel (até MAX_EXPORT_CHAMADOS)."""
     limite_export = getattr(Config, "EXPORT_EXCEL_MAX_POR_USUARIO_POR_DIA", 0) or 0
@@ -328,6 +330,7 @@ def exportar() -> Response:
 
 @main.route("/exportar-avancado")
 @requer_supervisor_area
+@limiter.limit("5 per hour")
 def exportar_avancado() -> Response:
     """Exporta relatório completo em Excel com múltiplas abas (até MAX_EXPORT_CHAMADOS)."""
     limite_export = getattr(Config, "EXPORT_EXCEL_MAX_POR_USUARIO_POR_DIA", 0) or 0

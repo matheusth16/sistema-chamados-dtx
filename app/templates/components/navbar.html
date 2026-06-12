@@ -46,8 +46,8 @@
             </div>
 
             <div class="flex items-center gap-3 sm:gap-5">
-                <!-- Hamburger Menu for Admin/Supervisor (mobile) -->
-                {% if current_user.is_authenticated and current_user.perfil in ['admin', 'supervisor'] %}
+                <!-- Hamburger Menu (mobile) -->
+                {% if current_user.is_authenticated %}
                 <div class="relative group" id="nav-hamburger-wrap">
                     <button type="button" id="btn-hamburger" aria-label="Abrir menu" aria-expanded="false"
                         class="p-2.5 rounded-xl text-gray-200 hover:text-white hover:bg-white/10 transition-all duration-300 inline-flex items-center justify-center outline-none focus-visible:ring-2 focus-visible:ring-blue-400 border border-transparent hover:border-white/10 group-data-[open=true]:bg-white/10 group-data-[open=true]:text-white group-data-[open=true]:border-white/10 group-data-[open=true]:shadow-inner">
@@ -122,7 +122,7 @@
                 {% endif %}
 
                 <!-- Sino de Notificações -->
-                {% if current_user.is_authenticated and current_user.perfil in ['supervisor', 'admin'] %}
+                {% if current_user.is_authenticated %}
                 <div class="relative" id="nav-notificacoes">
                     <button type="button" id="btn-sino" class="relative p-2.5 rounded-xl text-gray-200 hover:text-white hover:bg-white/10 transition-all duration-300 inline-flex items-center justify-center outline-none focus-visible:ring-2 focus-visible:ring-blue-400 border border-transparent hover:border-white/10 group group-data-[open=true]:bg-white/10 group-data-[open=true]:text-white group-data-[open=true]:shadow-inner"
                         aria-label="Notificações" aria-expanded="false" aria-haspopup="true">
@@ -152,7 +152,7 @@
                             </div>
                         </div>
                         <div id="sino-footer" class="p-3 border-t border-gray-100/80 text-center shrink-0 bg-gray-50/50 rounded-b-2xl">
-                            <a href="{{ url_for('main.admin') }}" class="inline-flex items-center justify-center w-full px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 hover:text-blue-600 transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500">{{ t('view_full_panel') }}</a>
+                            <a href="{{ url_for('main.meus_chamados') if current_user.perfil == 'solicitante' else url_for('main.admin') }}" class="inline-flex items-center justify-center w-full px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 hover:text-blue-600 transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500">{{ t('view_full_panel') }}</a>
                         </div>
                     </div>
                 </div>
@@ -162,7 +162,7 @@
 
                 <!-- Seletor de Idioma -->
                 <div class="relative group">
-                    <button class="relative p-2 sm:p-2.5 rounded-xl text-gray-200 hover:text-white hover:bg-white/10 transition-all duration-300 inline-flex items-center justify-center outline-none focus-visible:ring-2 focus-visible:ring-blue-400 border border-transparent hover:border-white/10 shadow-sm">
+                    <button class="relative p-2 sm:p-2.5 rounded-xl text-gray-200 hover:text-white hover:bg-white/10 transition-all duration-300 inline-flex items-center justify-center outline-none focus-visible:ring-2 focus-visible:ring-blue-400 border border-transparent hover:border-white/10 shadow-sm" aria-label="{{ t('select_language') }}">
                         <div class="flex items-center gap-1.5 font-bold text-xs sm:text-sm tracking-wide">
                             <svg class="w-4 h-4 opacity-70 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -253,31 +253,6 @@
                             {% endif %}
                         </div>
 
-                        <!-- Gamificação no Dropdown -->
-                        {% if current_user.level is defined %}
-                        <div class="px-5 py-4 bg-gradient-to-br from-orange-50/80 to-amber-50/40 border-b border-gray-100/30">
-                            <div class="flex items-center justify-between mb-2">
-                                <div class="flex items-center gap-2">
-                                    <div class="w-6 h-6 rounded-[8px] bg-gradient-to-br from-amber-400 to-orange-500 shadow-md shadow-orange-500/30 flex items-center justify-center text-white ring-2 ring-white/50">
-                                        <svg class="w-3.5 h-3.5 drop-shadow-sm" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
-                                    </div>
-                                    <span class="font-display text-[11px] font-black text-orange-900 tracking-wider uppercase">{% set _ll = t('level_label') %}{{ _ll if _ll != 'level_label' else 'Nível' }} {{ current_user.level }}</span>
-                                </div>
-                                <div class="text-[10px] font-black text-orange-600 bg-orange-100 shadow-sm border border-orange-200/50 px-2 py-0.5 rounded-md">{{ current_user.exp_semanal }} XP <span class="hidden sm:inline">{% set _xw = t('xp_weekly') %}{{ _xw if _xw != 'xp_weekly' else 'Weekly XP' }}</span></div>
-                            </div>
-                            <div class="w-full bg-orange-100/80 rounded-full h-1.5 overflow-hidden shadow-inner border border-orange-200/50">
-                                {% set exp_next_level = current_user.level * 100 %}
-                                {% set exp_progress = (current_user.exp_total % 100) %}
-                                <div class="bg-gradient-to-r from-amber-400 to-orange-500 h-full rounded-full relative" style="width: {{ exp_progress }}%;">
-                                    <div class="absolute inset-0 bg-white/20"></div>
-                                </div>
-                            </div>
-                            <div class="text-[9px] text-orange-700/70 font-bold uppercase tracking-widest text-right mt-2 flex justify-between">
-                                <span>{% set _pg = t('progress_global') %}{{ _pg if _pg != 'progress_global' else 'Progresso global' }}</span>
-                                <span>{{ current_user.exp_total }} XP Total</span>
-                            </div>
-                        </div>
-                        {% endif %}
 
                         <div class="p-2 bg-gray-50/30">
                             <a href="{{ url_for('main.logout') }}" class="flex items-center gap-3 px-3 py-2.5 text-sm font-black tracking-wide text-red-600 hover:text-red-700 hover:bg-red-50 rounded-xl transition-all group border border-transparent hover:border-red-100">

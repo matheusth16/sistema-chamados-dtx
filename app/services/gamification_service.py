@@ -47,6 +47,28 @@ class GamificationService:
         return current_exp
 
     @staticmethod
+    def _verificar_novas_conquistas(
+        conquistas_atuais: list,
+        motivo: str,
+        novo_level: int,
+        nova_exp_total: int,
+    ) -> list:
+        """Retorna IDs das conquistas recém-desbloqueadas."""
+        novas = []
+        for level_req, badge_id in [(3, "nivel_3"), (5, "nivel_5"), (10, "nivel_10")]:
+            if novo_level >= level_req and badge_id not in conquistas_atuais:
+                novas.append(badge_id)
+        if "Concluído" in motivo and "primeira_resolucao" not in conquistas_atuais:
+            novas.append("primeira_resolucao")
+        if (
+            nova_exp_total >= 250
+            and "Concluído" in motivo
+            and "cinco_resolucoes" not in conquistas_atuais
+        ):
+            novas.append("cinco_resolucoes")
+        return novas
+
+    @staticmethod
     def _adicionar_exp(usuario_id: str, pontos: int, motivo: str) -> bool:
         """Método interno para adicionar EXP a um usuário e checar level up."""
         try:
@@ -58,14 +80,19 @@ class GamificationService:
             nova_exp_semanal = usuario.exp_semanal + pontos
             novo_level = GamificationService.get_level_for_exp(nova_exp_total)
 
-            # TODO: Podemos aqui adicionar lógicas de "Conquistas" pro array usuario.conquistas
-            # Ex: if novo_level > usuario.level: usuario.conquistas.append(f"Alcançou Nível {novo_level}")
+            novas_conquistas = GamificationService._verificar_novas_conquistas(
+                conquistas_atuais=list(usuario.conquistas or []),
+                motivo=motivo,
+                novo_level=novo_level,
+                nova_exp_total=nova_exp_total,
+            )
+            conquistas_atualizadas = list(usuario.conquistas or []) + novas_conquistas
 
             gamification_data = {
                 "exp_total": nova_exp_total,
                 "exp_semanal": nova_exp_semanal,
                 "level": novo_level,
-                "conquistas": usuario.conquistas,
+                "conquistas": conquistas_atualizadas,
             }
 
             sucesso = usuario.update(gamification=gamification_data)
@@ -78,6 +105,10 @@ class GamificationService:
                     motivo,
                     novo_level,
                 )
+                if novas_conquistas:
+                    logger.info(
+                        "Usuário %s desbloqueou conquistas: %s", usuario_id, novas_conquistas
+                    )
 
             return sucesso
 

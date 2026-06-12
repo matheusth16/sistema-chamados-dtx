@@ -90,6 +90,20 @@ def sla_vencido(chamado_id: str) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Eventos de notificações push
+# ---------------------------------------------------------------------------
+
+
+def webpush_falha(user_id: str, motivo: str = "") -> None:
+    log_evento("webpush_falha", user_id=user_id, motivo=motivo or "unknown")
+
+
+def login_lockout(email_hash: str = "") -> None:
+    """Emite evento quando um usuário é bloqueado por excesso de tentativas de login."""
+    log_evento("login_lockout", email_hash=email_hash or "redacted")
+
+
+# ---------------------------------------------------------------------------
 # Decorador de performance para serviços críticos
 # ---------------------------------------------------------------------------
 

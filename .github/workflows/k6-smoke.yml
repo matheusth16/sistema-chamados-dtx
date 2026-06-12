@@ -1,6 +1,9 @@
 name: k6 Smoke Test
 
 on:
+  # Smoke semanal automatizado — toda segunda-feira às 08h BRT (11h UTC)
+  schedule:
+    - cron: "0 11 * * 1"
   # Trigger manual (dispatch) — rodar antes do go-live ou após deploy
   workflow_dispatch:
     inputs:
@@ -19,19 +22,31 @@ on:
 
 jobs:
   k6-test:
-    name: ${{ inputs.test_type }} test
+    # schedule não tem inputs — usa smoke por padrão
+    name: ${{ inputs.test_type || 'smoke' }} test
     runs-on: ubuntu-latest
+    env:
+      # dispatch manual: usa inputs.base_url; schedule: usa secret PRODUCTION_URL
+      BASE_URL: ${{ inputs.base_url || secrets.PRODUCTION_URL || '' }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: Verificar URL configurada
+        run: |
+          if [ -z "$BASE_URL" ]; then
+            echo "⚠️ BASE_URL não configurada — defina PRODUCTION_URL nos secrets do repositório ou passe base_url no dispatch."
+            exit 1
+          fi
+          echo "Testando: $BASE_URL"
 
       - name: Setup k6
         uses: grafana/k6-action@v0.3.1
 
       - name: Run smoke test
-        if: inputs.test_type == 'smoke'
+        if: ${{ inputs.test_type != 'stress' }}
         run: |
           k6 run \
-            -e BASE_URL=${{ inputs.base_url }} \
+            -e BASE_URL=$BASE_URL \
             --out json=k6-results.json \
             scripts/k6/smoke.js
 
@@ -39,7 +54,7 @@ jobs:
         if: inputs.test_type == 'stress'
         run: |
           k6 run \
-            -e BASE_URL=${{ inputs.base_url }} \
+            -e BASE_URL=$BASE_URL \
             --out json=k6-results.json \
             scripts/k6/stress.js
 
@@ -47,6 +62,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: k6-results-${{ inputs.test_type }}-${{ github.run_id }}
+          name: k6-results-${{ inputs.test_type || 'smoke' }}-${{ github.run_id }}
           path: k6-results.json
           retention-days: 7

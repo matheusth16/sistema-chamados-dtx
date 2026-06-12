@@ -667,8 +667,62 @@ def notificar_setores_adicionais_chamado(
 def notificar_solicitante_status(
     chamado_id: str, numero_chamado: str, novo_status: str, categoria: str, solicitante_usuario
 ) -> None:
-    """
-    Notificação ao solicitante desativada: não envia e-mail.
-    Chamado mantido para possível reativação futura.
-    """
-    pass
+    """Notifica o solicitante por e-mail sobre mudança de status (opt-in via NOTIFY_SOLICITANTE_EMAIL)."""
+    if not _config("NOTIFY_SOLICITANTE_EMAIL"):
+        return
+
+    if not solicitante_usuario:
+        return
+
+    email = getattr(solicitante_usuario, "email", None) or ""
+    if not email.strip():
+        return
+
+    nome = getattr(solicitante_usuario, "nome", None) or "Solicitante"
+    link = _link_chamado(chamado_id)
+
+    if novo_status == "Concluído":
+        assunto = f"Chamado {escape(numero_chamado)} concluído"
+        header_title = f"Chamado {escape(numero_chamado)}: Concluído"
+        header_color = "#059669"
+        msg_status = "seu chamado foi <strong>concluído</strong>"
+    else:
+        assunto = f"Chamado {escape(numero_chamado)} em atendimento"
+        header_title = f"Chamado {escape(numero_chamado)}: Em Atendimento"
+        header_color = "#2563eb"
+        msg_status = "seu chamado está <strong>em atendimento</strong>"
+
+    detalhes_html = build_detail_table(
+        [("Chamado", numero_chamado), ("Categoria", categoria), ("Status", novo_status)]
+    )
+    botoes_html = (
+        build_cta_button("Ver chamado", link, "#2563eb")
+        if link
+        else '<p style="color:#6b7280;">Acesse o sistema para acompanhar.</p>'
+    )
+
+    corpo_html = build_email_shell(
+        header_title=header_title,
+        header_color=header_color,
+        body_html=(
+            f"<p>Olá, <strong>{escape(nome)}</strong>! Informamos que {msg_status}.</p>"
+            + detalhes_html
+            + f'<p style="margin-top:20px;">{botoes_html}</p>'
+        ),
+    )
+
+    corpo_texto = (
+        f"Olá, {nome}!\n\n"
+        f"Chamado: {numero_chamado}\nCategoria: {categoria}\nStatus: {novo_status}"
+        + (f"\n\nVer chamado: {link}" if link else "")
+    )
+
+    ok, err = enviar_email(email.strip(), assunto, corpo_html, corpo_texto)
+    if ok:
+        logger.info(
+            "E-mail de status (%s) enviado para %s (chamado %s)", novo_status, email, numero_chamado
+        )
+    else:
+        logger.warning(
+            "Falha ao enviar e-mail de status para %s: %s", email, err or "verifique MAIL_*"
+        )

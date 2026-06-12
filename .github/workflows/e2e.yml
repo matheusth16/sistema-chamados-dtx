@@ -17,13 +17,15 @@ jobs:
   e2e-smoke:
     name: E2E Smoke Tests (Playwright)
     runs-on: ubuntu-latest
-    # Não bloqueia o pipeline enquanto a suíte E2E está em estabilização
-    continue-on-error: true
+    # Smoke-01/02/03 bloqueiam o merge; testes que exigem credenciais fazem pytest.skip automaticamente.
 
     env:
       FLASK_ENV: testing
       SECRET_KEY: e2e-test-secret
       WTF_CSRF_ENABLED: "false"
+      # FLASK_E2E_STUB=1 ativa o servidor Flask local em thread (sem Firestore real).
+      # SMOKE-01/02/03 passam com o stub; SMOKE-04+ fazem pytest.skip por falta de credenciais.
+      FLASK_E2E_STUB: "1"
       FLASK_TEST_URL: ${{ secrets.FLASK_TEST_URL || '' }}
       TEST_SOLICITANTE_EMAIL: ${{ secrets.TEST_SOLICITANTE_EMAIL || '' }}
       TEST_SOLICITANTE_PASSWORD: ${{ secrets.TEST_SOLICITANTE_PASSWORD || '' }}
@@ -49,17 +51,6 @@ jobs:
       - name: Instalar browsers Playwright
         run: playwright install chromium --with-deps
 
-      - name: Verificar disponibilidade do servidor
-        id: check_server
-        run: |
-          URL="${FLASK_TEST_URL:-http://127.0.0.1:5000}"
-          if curl --silent --fail --max-time 5 "$URL/login" > /dev/null 2>&1; then
-            echo "server_available=true" >> $GITHUB_OUTPUT
-          else
-            echo "server_available=false" >> $GITHUB_OUTPUT
-            echo "⚠️ Servidor Flask não disponível em $URL — testes E2E serão skipped."
-          fi
-
       - name: Rodar suíte smoke E2E
         run: |
           pytest tests/e2e -m smoke \
@@ -67,7 +58,6 @@ jobs:
             --tb=short -q \
             --no-header \
             --ignore=tests/e2e/test_solicitante.py
-        continue-on-error: true
 
       - name: Subir relatório de traces (falhas)
         if: failure()

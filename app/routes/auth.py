@@ -49,12 +49,26 @@ def login() -> Response:
             flash_t(
                 "login_temporarily_blocked",
                 "danger",
-                duration=LOCKOUT_DURATION // 60,  # Converte para minutos
+                duration=LOCKOUT_DURATION // 60,
             )
             logger.warning(
                 "Tentativa de login em IP bloqueado: %s (email: %s)",
                 client_ip,
                 mask_email_for_log(email),
+            )
+            return redirect(url_for("main.login"))
+
+        # Verifica se o email está bloqueado (lockout por credencial)
+        if LoginAttemptTracker.is_locked_out(email):
+            flash_t(
+                "login_temporarily_blocked",
+                "danger",
+                duration=LOCKOUT_DURATION // 60,
+            )
+            logger.warning(
+                "Tentativa de login em email bloqueado: %s (IP: %s)",
+                mask_email_for_log(email),
+                client_ip,
             )
             return redirect(url_for("main.login"))
 
@@ -85,22 +99,32 @@ def login() -> Response:
                 return redirect(url_for("main.index"))
             return redirect(url_for("main.admin"))
 
-        # Login falhou: incrementa tentativas
+        # Login falhou: incrementa tentativas por IP e por email
         attempts = LoginAttemptTracker.increment_attempt(client_ip)
+        attempts_email = LoginAttemptTracker.increment_attempt(email)
         LoginAttemptTracker.log_failed_attempt(email, client_ip, "credenciais inválidas")
 
-        # Verifica se excedeu o limite de tentativas
+        # Aplica lockout por IP se limite atingido
         if attempts >= MAX_LOGIN_ATTEMPTS:
             LoginAttemptTracker.apply_lockout(client_ip)
+            logger.error(
+                "Bloqueio por IP ativado após %d tentativas falhas: %s",
+                attempts,
+                client_ip,
+            )
+        # Aplica lockout por email se limite atingido
+        if attempts_email >= MAX_LOGIN_ATTEMPTS:
+            LoginAttemptTracker.apply_lockout(email)
+            logger.error(
+                "Bloqueio por email ativado após %d tentativas falhas: %s",
+                attempts_email,
+                mask_email_for_log(email),
+            )
+        if attempts >= MAX_LOGIN_ATTEMPTS or attempts_email >= MAX_LOGIN_ATTEMPTS:
             flash_t(
                 "too_many_login_attempts",
                 "danger",
-                duration=LOCKOUT_DURATION // 60,  # Converte para minutos
-            )
-            logger.error(
-                "Bloqueio ativado após %d tentativas falhas do IP %s",
-                attempts,
-                client_ip,
+                duration=LOCKOUT_DURATION // 60,
             )
             return redirect(url_for("main.login"))
 

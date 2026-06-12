@@ -79,3 +79,29 @@ class TestUsuarioPodeVerChamadoOtimizado:
         admin = _usuario_mock("admin", areas=[])
         chamado = _chamado_mock(area="Qualquer")
         assert usuario_pode_ver_chamado_otimizado(admin, chamado, cache_usuarios={}) is True
+
+    def test_solicitante_retorna_false(self):
+        """Solicitante retorna False na versão otimizada."""
+        sol = _usuario_mock("solicitante", areas=["TI"])
+        chamado = _chamado_mock(area="TI")
+        assert usuario_pode_ver_chamado_otimizado(sol, chamado) is False
+
+    def test_supervisor_solicitante_do_chamado_retorna_true(self):
+        """Supervisor que abriu o chamado (solicitante_id == user.id) pode ver."""
+        sup = _usuario_mock("supervisor", areas=[])
+        sup.id = "sup_id_123"
+        chamado = MagicMock()
+        chamado.area = "OutraArea"
+        chamado.solicitante_id = "sup_id_123"
+        assert usuario_pode_ver_chamado_otimizado(sup, chamado) is True
+
+
+class TestPermissoesAdicionais:
+    def test_supervisor_pode_ver_chamado_que_abriu(self):
+        """Supervisor que abriu o chamado (solicitante_id == user.id) pode ver — versão base."""
+        sup = _usuario_mock("supervisor", areas=[])
+        sup.id = "sup42"
+        chamado = MagicMock()
+        chamado.area = "OutraArea"
+        chamado.solicitante_id = "sup42"
+        assert usuario_pode_ver_chamado(sup, chamado) is True

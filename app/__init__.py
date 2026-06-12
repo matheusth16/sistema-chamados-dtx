@@ -37,6 +37,8 @@ _POST_ORIGIN_CHECK_PATHS = frozenset(
         "/api/bulk-status",
         "/api/push-subscribe",
         "/api/carregar-mais",
+        "/api/editar-chamado",
+        "/api/notificacoes/ler-todas",
     }
 )
 
@@ -337,8 +339,10 @@ def _configurar_seguranca(app: Flask) -> None:
 
         # Verifica se a rota é crítica (precisa validação)
         path = request.path
-        eh_rota_critica = path in _POST_ORIGIN_CHECK_PATHS or (
-            path.startswith("/api/notificacoes/") and path.endswith("/ler")
+        eh_rota_critica = (
+            path in _POST_ORIGIN_CHECK_PATHS
+            or (path.startswith("/api/notificacoes/") and path.endswith("/ler"))
+            or path.startswith("/api/onboarding/")
         )
 
         if not eh_rota_critica:

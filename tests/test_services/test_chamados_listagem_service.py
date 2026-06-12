@@ -195,6 +195,8 @@ def test_listar_meus_chamados_sem_docs_retorna_vazio():
     with (
         patch("app.services.chamados_listagem_service.db") as mock_db,
         patch("app.services.chamados_listagem_service.obter_total_por_contagem", return_value=0),
+        patch("app.cache.cache_get", return_value=None),
+        patch("app.cache.cache_set"),
     ):
         mock_q = MagicMock()
         mock_db.collection.return_value.where.return_value = mock_q
@@ -218,6 +220,8 @@ def test_listar_meus_chamados_com_docs_retorna_lista():
         patch("app.services.chamados_listagem_service.db") as mock_db,
         patch("app.services.chamados_listagem_service.obter_total_por_contagem", return_value=1),
         patch("app.services.chamados_listagem_service.Chamado") as mock_chamado_cls,
+        patch("app.cache.cache_get", return_value=None),
+        patch("app.cache.cache_set"),
     ):
         mock_q = MagicMock()
         mock_db.collection.return_value.where.return_value = mock_q
@@ -239,6 +243,8 @@ def test_listar_meus_chamados_cursor_invalido_usa_limite_simples():
     with (
         patch("app.services.chamados_listagem_service.db") as mock_db,
         patch("app.services.chamados_listagem_service.obter_total_por_contagem", return_value=0),
+        patch("app.cache.cache_get", return_value=None),
+        patch("app.cache.cache_set"),
     ):
         mock_q = MagicMock()
         mock_db.collection.return_value.where.return_value = mock_q
@@ -257,6 +263,40 @@ def test_listar_meus_chamados_cursor_invalido_usa_limite_simples():
     assert result["chamados"] == []
 
 
+def test_listar_meus_chamados_status_counts_cache_hit_evita_queries_extras():
+    """Quando cache de status_counts está quente, as 4 queries de aggregation por status não rodam."""
+    from app.services.chamados_listagem_service import listar_meus_chamados
+
+    cached_counts = {"Aberto": 3, "Em Atendimento": 1, "Concluído": 5, "Cancelado": 0}
+    mock_count = MagicMock(return_value=0)
+    mock_q = MagicMock()
+    mock_q.where.return_value = mock_q
+    mock_q.order_by.return_value = mock_q
+    mock_q.limit.return_value = mock_q
+    mock_q.stream.return_value = []
+
+    def cache_get_side(key):
+        if "status_counts" in (key or ""):
+            return cached_counts
+        return None
+
+    with (
+        patch("app.services.chamados_listagem_service.db") as mock_db,
+        patch("app.services.chamados_listagem_service.obter_total_por_contagem", mock_count),
+        patch("app.cache.cache_get", side_effect=cache_get_side),
+        patch("app.cache.cache_set"),
+    ):
+        mock_db.collection.return_value.where.return_value = mock_q
+        result = listar_meus_chamados("u1", status_filtro="")
+
+    # Cache hit: as 4 queries por status NÃO devem ser executadas
+    assert mock_count.call_count <= 1, (
+        f"Com cache quente, obter_total_por_contagem chamado {mock_count.call_count}x; "
+        "esperado ≤1 (status_counts vem do cache)"
+    )
+    assert result["status_counts"] == cached_counts
+
+
 def test_listar_meus_chamados_tem_proxima_pagina():
     """listar_meus_chamados retorna cursor_next quando há doc extra (n+1)."""
     from app.services.chamados_listagem_service import listar_meus_chamados
@@ -267,6 +307,8 @@ def test_listar_meus_chamados_tem_proxima_pagina():
         patch("app.services.chamados_listagem_service.db") as mock_db,
         patch("app.services.chamados_listagem_service.obter_total_por_contagem", return_value=11),
         patch("app.services.chamados_listagem_service.Chamado") as mock_chamado_cls,
+        patch("app.cache.cache_get", return_value=None),
+        patch("app.cache.cache_set"),
     ):
         mock_q = MagicMock()
         mock_db.collection.return_value.where.return_value = mock_q

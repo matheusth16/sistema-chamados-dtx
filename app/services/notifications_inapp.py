@@ -11,8 +11,73 @@ from firebase_admin import firestore
 from google.cloud.firestore_v1.base_query import FieldFilter
 
 from app.database import db
+from app.i18n import get_translated_category, get_translation
 
 logger = logging.getLogger(__name__)
+
+
+def _parse_legacy_novo_chamado(titulo: str, mensagem: str) -> tuple[str, str, str]:
+    """
+    Extrai (numero, categoria, solicitante) de notificações antigas sem metadados
+    estruturados, a partir do texto pré-renderizado em português.
+    Retorna strings vazias se o parse não for possível.
+    """
+    numero = ""
+    if titulo.startswith("Novo chamado:"):
+        numero = titulo.split(":", 1)[1].strip()
+    categoria = ""
+    solicitante = ""
+    for sep in (" · Solicitante: ", " · Requester: ", " · Solicitante: "):
+        if sep in mensagem:
+            categoria, solicitante = mensagem.split(sep, 1)
+            categoria = categoria.strip()
+            solicitante = solicitante.strip()
+            break
+    return numero, categoria, solicitante
+
+
+def localizar_notificacao(doc: dict, language: str = "en") -> dict:
+    """
+    Retorna uma cópia do doc com titulo/mensagem traduzidos para o idioma dado.
+    Funciona tanto para notificações novas (com categoria/solicitante_nome no doc)
+    quanto para notificações legadas (parse do texto PT como fallback).
+    Tipos diferentes de novo_chamado são retornados sem alteração.
+    """
+    out = dict(doc)
+    if doc.get("tipo") != "novo_chamado":
+        return out
+
+    numero = doc.get("numero_chamado") or ""
+    categoria_raw = doc.get("categoria") or ""
+    solicitante = doc.get("solicitante_nome") or ""
+
+    if not categoria_raw or not solicitante:
+        n, c, s = _parse_legacy_novo_chamado(doc.get("titulo", ""), doc.get("mensagem", ""))
+        numero = numero or n
+        categoria_raw = categoria_raw or c
+        solicitante = solicitante or s
+
+    cat = get_translated_category(categoria_raw, language)
+    out["titulo"] = get_translation("notification_new_ticket_title", language, numero=numero)
+    out["mensagem"] = get_translation(
+        "notification_new_ticket_message", language, categoria=cat, solicitante=solicitante
+    )
+    return out
+
+
+def texto_notificacao_novo_chamado(
+    numero: str, categoria_raw: str, solicitante_nome: str, language: str = "en"
+) -> tuple[str, str]:
+    """
+    Retorna (titulo, mensagem) traduzidos para o idioma dado.
+    Usado na criação do chamado para garantir que o texto salvo reflita o idioma padrão.
+    """
+    cat = get_translated_category(categoria_raw, language)
+    titulo = get_translation("notification_new_ticket_title", language, numero=numero)
+    mensagem = get_translation(
+        "notification_new_ticket_message", language, categoria=cat, solicitante=solicitante_nome
+    )
+    return titulo, mensagem
 
 
 def criar_notificacao(
@@ -22,26 +87,33 @@ def criar_notificacao(
     titulo: str,
     mensagem: str,
     tipo: str = "novo_chamado",
+    categoria: str = "",
+    solicitante_nome: str = "",
 ) -> str | None:
     """
     Cria uma notificação in-app para o usuário (ex.: aprovador quando recebe novo chamado).
     Retorna o id do documento criado ou None em caso de erro.
+    Os campos opcionais categoria/solicitante_nome são metadados estruturados que permitem
+    traduzir a notificação na leitura para qualquer idioma.
     """
     if not usuario_id or not chamado_id:
         return None
     try:
-        ref = db.collection("notificacoes").add(
-            {
-                "usuario_id": usuario_id,
-                "chamado_id": chamado_id,
-                "numero_chamado": numero_chamado,
-                "titulo": titulo,
-                "mensagem": mensagem,
-                "tipo": tipo,
-                "lida": False,
-                "data_criacao": firestore.SERVER_TIMESTAMP,
-            }
-        )
+        payload: dict[str, Any] = {
+            "usuario_id": usuario_id,
+            "chamado_id": chamado_id,
+            "numero_chamado": numero_chamado,
+            "titulo": titulo,
+            "mensagem": mensagem,
+            "tipo": tipo,
+            "lida": False,
+            "data_criacao": firestore.SERVER_TIMESTAMP,
+        }
+        if categoria:
+            payload["categoria"] = categoria
+        if solicitante_nome:
+            payload["solicitante_nome"] = solicitante_nome
+        ref = db.collection("notificacoes").add(payload)
         logger.debug(
             "Notificação in-app criada: usuario=%s, chamado=%s", usuario_id, numero_chamado
         )
@@ -51,12 +123,40 @@ def criar_notificacao(
         return None
 
 
+def _serializar_doc(doc: Any) -> dict[str, Any]:
+    """Serializa um documento Firestore de notificação para dict JSON-safe."""
+    d = doc.to_dict()
+    d["id"] = doc.id
+    ts = d.get("data_criacao")
+    if hasattr(ts, "to_pydatetime"):
+        d["data_criacao"] = ts.to_pydatetime().isoformat()
+    elif isinstance(ts, datetime):
+        d["data_criacao"] = ts.isoformat()
+    else:
+        d["data_criacao"] = str(ts) if ts else None
+    return d
+
+
+def _ts_sort_key(doc: Any) -> float:
+    """Chave de ordenação por data_criacao para sort em memória (fallback)."""
+    ts = doc.to_dict().get("data_criacao")
+    try:
+        return ts.timestamp() if ts and hasattr(ts, "timestamp") else 0.0
+    except Exception:
+        return 0.0
+
+
 def listar_para_usuario(
-    usuario_id: str, limite: int = 30, apenas_nao_lidas: bool = False
+    usuario_id: str,
+    limite: int = 30,
+    apenas_nao_lidas: bool = False,
+    language: str | None = None,
 ) -> list[dict[str, Any]]:
     """
     Lista notificações do usuário, mais recentes primeiro.
+    Se o índice Firestore não estiver deployado, usa fallback com sort em memória.
     Retorna lista de dicts com id, chamado_id, numero_chamado, titulo, mensagem, lida, data_criacao.
+    Quando language é fornecido, aplica localização dinâmica ao titulo/mensagem de cada notificação.
     """
     if not usuario_id:
         return []
@@ -64,24 +164,31 @@ def listar_para_usuario(
         q = db.collection("notificacoes").where(filter=FieldFilter("usuario_id", "==", usuario_id))
         if apenas_nao_lidas:
             q = q.where(filter=FieldFilter("lida", "==", False))
-        docs = q.limit(
-            limite * 2
-        ).stream()  # busca extra para ordenar em memória (evita índice composto)
-        out = []
-        for doc in docs:
-            d = doc.to_dict()
-            d["id"] = doc.id
-            # Serializar data para JSON
-            ts = d.get("data_criacao")
-            if hasattr(ts, "to_pydatetime"):
-                d["data_criacao"] = ts.to_pydatetime().isoformat()
-            elif isinstance(ts, datetime):
-                d["data_criacao"] = ts.isoformat()
-            else:
-                d["data_criacao"] = str(ts) if ts else None
-            out.append(d)
-        out.sort(key=lambda x: (x.get("data_criacao") or ""), reverse=True)
-        return out[:limite]
+
+        try:
+            raw_docs = list(
+                q.order_by("data_criacao", direction=firestore.Query.DESCENDING)
+                .limit(limite)
+                .stream()
+            )
+        except Exception as e_order:
+            # Índice composto não deployado ou indisponível: usa fallback sem order_by.
+            # Solução definitiva: firebase deploy --only firestore:indexes
+            logger.warning(
+                "listar_para_usuario: order_by falhou (%s: %s). "
+                "Usando fallback sem índice (sort em memória). "
+                "Execute: firebase deploy --only firestore:indexes",
+                type(e_order).__name__,
+                str(e_order)[:120],
+            )
+            raw_docs = list(q.limit(limite + 20).stream())
+            raw_docs.sort(key=_ts_sort_key, reverse=True)
+            raw_docs = raw_docs[:limite]
+
+        result = [_serializar_doc(doc) for doc in raw_docs]
+        if language:
+            result = [localizar_notificacao(d, language) for d in result]
+        return result
     except Exception as e:
         logger.exception("Erro ao listar notificações: %s", e)
         return []

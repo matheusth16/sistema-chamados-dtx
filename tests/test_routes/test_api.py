@@ -135,6 +135,36 @@ def test_api_notificacoes_listar_retorna_estrutura(client_logado_solicitante):
     assert "total_nao_lidas" in data
 
 
+def test_api_notificacoes_listar_sinaliza_lista_degradada(client_logado_solicitante):
+    """Quando count>0 e list vazia, API expõe lista_degradada=True."""
+    with (
+        patch("app.routes.api.listar_para_usuario", return_value=[]),
+        patch("app.routes.api.contar_nao_lidas", return_value=1),
+    ):
+        r = client_logado_solicitante.get("/api/notificacoes")
+    assert r.status_code == 200
+    data = r.get_json()
+    assert data["sucesso"] is True
+    assert data["total_nao_lidas"] == 1
+    assert data["notificacoes"] == []
+    assert data["lista_degradada"] is True
+
+
+def test_api_notificacoes_listar_lista_degradada_false_quando_consistente(
+    client_logado_solicitante,
+):
+    """Quando list tem itens, lista_degradada deve ser False."""
+    notif = {"id": "abc", "titulo": "Teste", "mensagem": "msg", "lida": False}
+    with (
+        patch("app.routes.api.listar_para_usuario", return_value=[notif]),
+        patch("app.routes.api.contar_nao_lidas", return_value=1),
+    ):
+        r = client_logado_solicitante.get("/api/notificacoes")
+    assert r.status_code == 200
+    data = r.get_json()
+    assert data["lista_degradada"] is False
+
+
 def test_api_push_subscribe_sem_subscription_retorna_400(client_logado_solicitante):
     """POST /api/push-subscribe sem subscription válida retorna 400 (ou 403 por Origin)."""
     r = client_logado_solicitante.post(
@@ -297,3 +327,49 @@ def test_csp_report_corpo_vazio_retorna_204(client):
     """POST /api/csp-report com corpo vazio deve retornar 204 (não quebra)."""
     r = client.post("/api/csp-report", data="", content_type="application/json")
     assert r.status_code == 204
+
+
+# ── i18n notificações ─────────────────────────────────────────────────────────
+
+
+def test_api_notificacoes_listar_traduz_titulo_quando_lang_en(client_logado_supervisor):
+    """GET /api/notificacoes com session language=en deve retornar titulo traduzido."""
+    notif_raw = {
+        "id": "n1",
+        "tipo": "novo_chamado",
+        "numero_chamado": "CHM-0006",
+        "categoria": "Nao Aplicavel",
+        "solicitante_nome": "Matheus Costa",
+        "chamado_id": "ch1",
+        "lida": False,
+        "data_criacao": "2026-06-01T10:00:00",
+        "titulo": "Novo chamado: CHM-0006",
+        "mensagem": "Nao Aplicavel · Solicitante: Matheus Costa",
+    }
+    with (
+        patch("app.routes.api.listar_para_usuario") as mock_listar,
+        patch("app.routes.api.contar_nao_lidas", return_value=1),
+    ):
+        mock_listar.return_value = [notif_raw]
+        with client_logado_supervisor.session_transaction() as sess:
+            sess["language"] = "en"
+        resp = client_logado_supervisor.get("/api/notificacoes")
+
+    assert resp.status_code == 200
+    mock_listar.assert_called_once()
+    _, kwargs = mock_listar.call_args
+    assert kwargs.get("language") == "en"
+
+
+def test_api_notificacoes_listar_passa_lang_pt_quando_session_pt(client_logado_supervisor):
+    """GET /api/notificacoes com session language=pt_BR deve chamar listar com language=pt_BR."""
+    with (
+        patch("app.routes.api.listar_para_usuario", return_value=[]) as mock_listar,
+        patch("app.routes.api.contar_nao_lidas", return_value=0),
+    ):
+        with client_logado_supervisor.session_transaction() as sess:
+            sess["language"] = "pt_BR"
+        client_logado_supervisor.get("/api/notificacoes")
+
+    _, kwargs = mock_listar.call_args
+    assert kwargs.get("language") == "pt_BR"

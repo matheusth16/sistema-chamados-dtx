@@ -2429,6 +2429,11 @@
     "en": "No notifications",
     "es": "Sin notificaciones"
   },
+  "notifications_load_error": {
+    "pt_BR": "Erro ao carregar notificações. Tente novamente.",
+    "en": "Error loading notifications. Please try again.",
+    "es": "Error al cargar notificaciones. Inténtalo de nuevo."
+  },
   "time_now": {
     "pt_BR": "Agora",
     "en": "Just now",
@@ -2493,6 +2498,11 @@
     "pt_BR": "Receber avisos de novos chamados no navegador?",
     "en": "Receive notifications for new tickets in your browser?",
     "es": "¿Recibir avisos de nuevos tickets en el navegador?"
+  },
+  "webpush_ativado": {
+    "pt_BR": "Notificações ativadas!",
+    "en": "Notifications enabled!",
+    "es": "¡Notificaciones activadas!"
   },
   "notifications": {
     "pt_BR": "Notificações",
@@ -2618,5 +2628,30 @@
     "pt_BR": "Aguardando sua confirmação",
     "en": "Awaiting your confirmation",
     "es": "Esperando su confirmación"
+  },
+  "skip_to_main_content": {
+    "pt_BR": "Ir para o conteúdo principal",
+    "en": "Skip to main content",
+    "es": "Ir al contenido principal"
+  },
+  "close_notification": {
+    "pt_BR": "Fechar notificação",
+    "en": "Close notification",
+    "es": "Cerrar notificación"
+  },
+  "select_language": {
+    "pt_BR": "Selecionar idioma",
+    "en": "Select language",
+    "es": "Seleccionar idioma"
+  },
+  "notification_new_ticket_title": {
+    "pt_BR": "Novo chamado: {numero}",
+    "en": "New ticket: {numero}",
+    "es": "Nuevo ticket: {numero}"
+  },
+  "notification_new_ticket_message": {
+    "pt_BR": "{categoria} · Solicitante: {solicitante}",
+    "en": "{categoria} · Requester: {solicitante}",
+    "es": "{categoria} · Solicitante: {solicitante}"
   }
 }

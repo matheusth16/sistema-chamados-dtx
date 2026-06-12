@@ -211,15 +211,24 @@ def criar_chamado(
                             quem_adicionou_nome=solicitante_nome,
                             setores_nomes=", ".join(setores_adicionais_lista),
                         )
-                    if responsavel_id:
+                    if responsavel_id and responsavel_id != solicitante_id:
                         try:
+                            from app.services.notifications_inapp import (
+                                texto_notificacao_novo_chamado,
+                            )
+
+                            titulo_notif, mensagem_notif = texto_notificacao_novo_chamado(
+                                numero_chamado, categoria or "", solicitante_nome, language="en"
+                            )
                             criar_notificacao(
                                 usuario_id=responsavel_id,
                                 chamado_id=chamado_id,
                                 numero_chamado=numero_chamado,
-                                titulo=f"Novo chamado: {numero_chamado}",
-                                mensagem=f"{categoria} · Solicitante: {solicitante_nome}",
+                                titulo=titulo_notif,
+                                mensagem=mensagem_notif,
                                 tipo="novo_chamado",
+                                categoria=categoria or "",
+                                solicitante_nome=solicitante_nome,
                             )
                             base_url = _app.config.get("APP_BASE_URL", "").rstrip("/")
                             url_chamado = (
@@ -227,7 +236,7 @@ def criar_chamado(
                             )
                             enviar_webpush_usuario(
                                 responsavel_id,
-                                titulo=f"Novo chamado: {numero_chamado}",
+                                titulo=titulo_notif,
                                 corpo=f"{categoria} · {solicitante_nome}",
                                 url=url_chamado,
                             )

@@ -170,3 +170,113 @@ def test_criar_chamado_com_setores_adicionais_dispara_notificacao_setores(app):
     kwargs = mock_notif_setores.call_args.kwargs
     assert kwargs["numero_chamado"] == "2026-200"
     assert kwargs["setores_novos"] == ["Engenharia", "Material"]
+
+
+def test_criar_chamado_nao_notifica_inapp_quando_responsavel_e_solicitante(app):
+    """Quando responsavel_id == solicitante_id, criar_notificacao não deve ser chamado."""
+    form = {
+        "categoria": "Manutencao",
+        "tipo": "Manutencao",
+        "descricao": "Chamado criado pelo próprio responsável.",
+        "rl_codigo": "",
+        "impacto": "",
+        "gate": "",
+    }
+    files = MagicMock()
+    files.get.return_value = None
+
+    with (
+        patch("app.services.chamados_criacao_service.salvar_anexo", return_value=None),
+        patch(
+            "app.services.chamados_criacao_service.gerar_numero_chamado", return_value="2026-555"
+        ),
+        patch("app.services.chamados_criacao_service.atribuidor") as mock_atr,
+        patch("app.services.chamados_criacao_service.execute_with_retry") as mock_retry,
+        patch("app.services.chamados_criacao_service.Historico"),
+        patch("app.services.chamados_criacao_service.criar_notificacao") as mock_criar_notif,
+        patch("app.services.chamados_criacao_service.enviar_webpush_usuario") as mock_webpush,
+        patch("app.services.chamados_criacao_service.threading.Thread", side_effect=_FakeThread),
+    ):
+        # Atribuição fallback: responsavel retorna o próprio solicitante
+        mock_atr.atribuir.return_value = {
+            "sucesso": True,
+            "supervisor": {"id": "sol_auto", "nome": "Auto Solicitante"},
+            "motivo": "",
+        }
+        mock_ref = MagicMock()
+        mock_ref.id = "chamado_id_555"
+        mock_retry.return_value = (None, mock_ref)
+
+        with app.app_context():
+            chamado_id, numero, erro, _ = criar_chamado(
+                form=form,
+                files=files,
+                solicitante_id="sol_auto",
+                solicitante_nome="Auto Solicitante",
+                area_solicitante="Manutencao",
+                solicitante_email="auto@test.com",
+            )
+
+    assert erro is None
+    assert chamado_id == "chamado_id_555"
+    # Responsável == solicitante → sem notificação in-app nem web push
+    mock_criar_notif.assert_not_called()
+    mock_webpush.assert_not_called()
+
+
+def test_criar_chamado_persiste_categoria_e_solicitante_nome_na_notificacao(app):
+    """criar_notificacao deve receber categoria e solicitante_nome para i18n na leitura."""
+    form = {
+        "categoria": "Nao Aplicavel",
+        "tipo": "Manutencao",
+        "descricao": "Descrição de teste para metadados i18n.",
+        "rl_codigo": "",
+        "impacto": "",
+        "gate": "",
+    }
+    files = MagicMock()
+    files.get.return_value = None
+    responsavel_usuario = MagicMock()
+    responsavel_usuario.email = "resp@dtx.aero"
+
+    with (
+        patch("app.services.chamados_criacao_service.salvar_anexo", return_value=None),
+        patch(
+            "app.services.chamados_criacao_service.gerar_numero_chamado", return_value="CHM-0006"
+        ),
+        patch("app.services.chamados_criacao_service.atribuidor") as mock_atr,
+        patch("app.services.chamados_criacao_service.execute_with_retry") as mock_retry,
+        patch("app.services.chamados_criacao_service.Historico"),
+        patch(
+            "app.services.chamados_criacao_service.Usuario.get_by_id",
+            return_value=responsavel_usuario,
+        ),
+        patch("app.services.chamados_criacao_service.notificar_aprovador_novo_chamado"),
+        patch("app.services.chamados_criacao_service.criar_notificacao") as mock_criar_notif,
+        patch("app.services.chamados_criacao_service.enviar_webpush_usuario"),
+        patch("app.services.chamados_criacao_service.threading.Thread", side_effect=_FakeThread),
+    ):
+        mock_atr.atribuir.return_value = {
+            "sucesso": True,
+            "supervisor": {"id": "sup_meta", "nome": "Supervisor Meta"},
+            "motivo": "",
+        }
+        mock_ref = MagicMock()
+        mock_ref.id = "chamado_meta_01"
+        mock_retry.return_value = (None, mock_ref)
+
+        with app.app_context():
+            chamado_id, numero, erro, _ = criar_chamado(
+                form=form,
+                files=files,
+                solicitante_id="sol_meta",
+                solicitante_nome="Solicitante Teste",
+                area_solicitante="Manutencao",
+                solicitante_email="sol@test.com",
+            )
+
+    assert erro is None
+    mock_criar_notif.assert_called_once()
+    kwargs = mock_criar_notif.call_args.kwargs
+    assert kwargs.get("categoria") == "Nao Aplicavel"
+    assert kwargs.get("solicitante_nome") == "Solicitante Teste"

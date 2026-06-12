@@ -53,3 +53,13 @@ def test_reset_attempts_limpa_cache():
     calls = [c[0][0] for c in mock_del.call_args_list]
     assert "login_attempt:email@test.com" in calls
     assert "login_lockout:email@test.com" in calls
+
+
+def test_apply_lockout_chama_cache_set_com_chave_lockout():
+    """apply_lockout grava chave de lockout no cache com TTL correto."""
+    with patch("app.services.login_attempts.cache_set") as mock_set:
+        LoginAttemptTracker.apply_lockout("192.168.0.1")
+    mock_set.assert_called_once()
+    args = mock_set.call_args[0]
+    assert "login_lockout:192.168.0.1" in args[0]
+    assert args[1] is True

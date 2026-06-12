@@ -21,6 +21,9 @@ from app.utils_areas import setor_para_area
 
 logger = logging.getLogger(__name__)
 
+# Limite máximo de chamados varridos por chunk de supervisor (evita scan ilimitado)
+MAX_CHAMADOS_ATRIB = 500
+
 
 class AtribuidorAutomatico:
     """Gerencia atribuição automática inteligente de chamados"""
@@ -179,11 +182,12 @@ class AtribuidorAutomatico:
                 docs = (
                     db.collection("chamados")
                     .where(filter=FieldFilter("responsavel", "in", chunk))
+                    .limit(MAX_CHAMADOS_ATRIB)
                     .stream()
                 )
                 for doc in docs:
                     d = doc.to_dict()
-                    if d.get("status") != "Concluído":
+                    if d.get("status") not in ("Concluído", "Cancelado"):
                         resp = d.get("responsavel")
                         if resp in contagem:
                             contagem[resp] += 1

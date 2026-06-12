@@ -174,6 +174,102 @@ def test_notificar_aprovador_assunto_sem_pipe_injection(app):
     assert "INJETADO" not in assunto.split("|")[2]
 
 
+# ── notificar_solicitante_status (C1) ─────────────────────────────────────────
+
+
+def test_notificar_solicitante_status_desativado_nao_envia(app):
+    """Com NOTIFY_SOLICITANTE_EMAIL=False, nenhum e-mail é enviado."""
+    from unittest.mock import MagicMock
+
+    from app.services.notifications import notificar_solicitante_status
+
+    solicitante = MagicMock()
+    solicitante.email = "user@test.com"
+    with (
+        app.app_context(),
+        patch("app.services.notifications.enviar_email") as mock_send,
+    ):
+        app.config["NOTIFY_SOLICITANTE_EMAIL"] = False
+        notificar_solicitante_status("ch1", "CH-001", "Concluído", "TI", solicitante)
+    mock_send.assert_not_called()
+
+
+def test_notificar_solicitante_status_sem_usuario_nao_envia(app):
+    """Com usuario=None, nenhum e-mail é enviado."""
+    from app.services.notifications import notificar_solicitante_status
+
+    with (
+        app.app_context(),
+        patch("app.services.notifications.enviar_email") as mock_send,
+    ):
+        app.config["NOTIFY_SOLICITANTE_EMAIL"] = True
+        notificar_solicitante_status("ch1", "CH-001", "Concluído", "TI", None)
+    mock_send.assert_not_called()
+
+
+def test_notificar_solicitante_status_sem_email_nao_envia(app):
+    """Com email vazio no usuário, nenhum e-mail é enviado."""
+    from unittest.mock import MagicMock
+
+    from app.services.notifications import notificar_solicitante_status
+
+    solicitante = MagicMock()
+    solicitante.email = ""
+    with (
+        app.app_context(),
+        patch("app.services.notifications.enviar_email") as mock_send,
+    ):
+        app.config["NOTIFY_SOLICITANTE_EMAIL"] = True
+        notificar_solicitante_status("ch1", "CH-001", "Concluído", "TI", solicitante)
+    mock_send.assert_not_called()
+
+
+def test_notificar_solicitante_status_concluido_envia_email(app):
+    """Com flag ativa e usuário com e-mail, envia e-mail para status Concluído."""
+    from unittest.mock import MagicMock
+
+    from app.services.notifications import notificar_solicitante_status
+
+    solicitante = MagicMock()
+    solicitante.email = "sol@test.com"
+    solicitante.nome = "Solicitante Teste"
+    with (
+        app.app_context(),
+        patch("app.services.notifications.enviar_email", return_value=(True, None)) as mock_send,
+    ):
+        app.config["NOTIFY_SOLICITANTE_EMAIL"] = True
+        app.config["APP_BASE_URL"] = "https://example.test"
+        notificar_solicitante_status("ch1", "CH-001", "Concluído", "Manutenção", solicitante)
+    mock_send.assert_called_once()
+    dest, assunto, corpo_html, _txt = mock_send.call_args[0]
+    assert dest == "sol@test.com"
+    assert "CH-001" in assunto
+    assert "CH-001" in corpo_html
+    assert "Concluído" in corpo_html or "conclu" in corpo_html.lower()
+
+
+def test_notificar_solicitante_status_em_atendimento_envia_email(app):
+    """Com flag ativa, envia e-mail para status Em Atendimento."""
+    from unittest.mock import MagicMock
+
+    from app.services.notifications import notificar_solicitante_status
+
+    solicitante = MagicMock()
+    solicitante.email = "sol2@test.com"
+    solicitante.nome = "Outro Solicitante"
+    with (
+        app.app_context(),
+        patch("app.services.notifications.enviar_email", return_value=(True, None)) as mock_send,
+    ):
+        app.config["NOTIFY_SOLICITANTE_EMAIL"] = True
+        app.config["APP_BASE_URL"] = "https://example.test"
+        notificar_solicitante_status("ch2", "CH-002", "Em Atendimento", "Projetos", solicitante)
+    mock_send.assert_called_once()
+    dest, assunto, _html, _txt = mock_send.call_args[0]
+    assert dest == "sol2@test.com"
+    assert "CH-002" in assunto
+
+
 def test_notificar_aprovador_novo_chamado_html_em_ingles(app):
     """notificar_aprovador_novo_chamado gera HTML em inglês com botões CTA."""
     from app.services.notifications import notificar_aprovador_novo_chamado

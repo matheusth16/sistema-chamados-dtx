@@ -2,7 +2,6 @@
  * Dashboard Otimizado - Melhorias de Performance
  * 1. Atualizar status via AJAX (sem recarregar)
  * 2. Busca com debounce (esperar usuário parar de digitar)
- * 3. Virtualização de linhas (renderizar apenas o visível)
  */
 
 const DEBUG = Boolean(window.DTX_DEBUG) || (
@@ -280,60 +279,16 @@ function configurarDebounceNaBusca() {
 }
 
 // ============================================================================
-// 3. VIRTUALIZAÇÃO COM INTERSECTION OBSERVER
+// 3. OTIMIZAÇÃO DE TABELA
 // ============================================================================
 
 /**
- * Implementa virtualização de linhas (renderiza apenas as visíveis)
- * Melhora performance com muitas linhas
- */
-function configurarVirtualizacao() {
-    const tabela = document.querySelector('table tbody');
-    if (!tabela) return;
-
-    const linhas = tabela.querySelectorAll('tr');
-    if (linhas.length < 50) {
-        // Virtualização não necessária para poucas linhas
-        return;
-    }
-
-    // Cria um Intersection Observer para carregar linhas sob demanda
-    const observador = new IntersectionObserver((entradas) => {
-        entradas.forEach((entrada) => {
-            if (entrada.isIntersecting) {
-                const linha = entrada.target;
-                // A linha já está renderizada, agora está visível
-                linha.style.opacity = '1';
-            }
-        });
-    }, {
-        root: null,
-        rootMargin: '100px', // Carrega 100px antes de ficar visível
-        threshold: 0
-    });
-
-    // Observa todas as linhas
-    linhas.forEach((linha, index) => {
-        observador.observe(linha);
-        // Renderiza as primeiras 20 linhas normalmente
-        if (index >= 20) {
-            linha.style.opacity = '0';
-            linha.style.pointerEvents = 'none';
-        }
-    });
-}
-
-/**
- * Otimiza a renderização da tabela com lazy loading
- * Carrega apenas as linhas que estão no viewport
+ * Aplica CSS containment na tabela para isolar reflows
  */
 function otimizarRenderizacaoTabela() {
     const tabela = document.querySelector('table');
     if (!tabela) return;
-
-    // Define o container como scroll container otimizado
-    tabela.style.willChange = 'contents';
-    tabela.style.contain = 'layout style paint';
+    tabela.style.contain = 'layout style';
 }
 
 // ============================================================================
@@ -343,9 +298,6 @@ function otimizarRenderizacaoTabela() {
 document.addEventListener('DOMContentLoaded', () => {
     // Configura debounce na busca
     configurarDebounceNaBusca();
-
-    // Configura virtualização se houver muitas linhas
-    configurarVirtualizacao();
 
     // Otimiza renderização
     otimizarRenderizacaoTabela();
@@ -383,7 +335,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    debugLog('✓ Dashboard otimizado: AJAX status (tabela + modal), Debounce busca, Virtualização ativados');
+    debugLog('✓ Dashboard otimizado: AJAX status (tabela + modal), Debounce busca ativados');
 });
 
 // ============================================================================
@@ -405,12 +357,6 @@ style.textContent = `
 
     .animate-fade-in {
         animation: fadeIn 0.3s ease-in;
-    }
-
-    /* Otimizações de GPU */
-    tbody tr {
-        will-change: background-color;
-        transform: translateZ(0);
     }
 `;
 document.head.appendChild(style);

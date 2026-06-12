@@ -61,19 +61,18 @@
         });
 
         tl.to('#splash-logo', {
-            opacity: 1, scale: 1, duration: 0.5, ease: 'back.out(1.7)'
+            opacity: 1, scale: 1, duration: 0.25, ease: 'back.out(1.7)'
         })
         .fromTo('#splash-line',
             { width: 0 },
-            { width: 220, duration: 0.6, ease: 'power2.out' },
-            '+=0.15'
+            { width: 220, duration: 0.25, ease: 'power2.out' },
+            '+=0.05'
         )
         .to('#splash-text', {
-            opacity: 1, duration: 0.4, ease: 'power1.out'
-        }, '-=0.25')
-        .to({}, { duration: 0.7 })  // pausa para impacto visual
+            opacity: 1, duration: 0.2, ease: 'power1.out'
+        }, '-=0.1')
         .to(splash, {
-            opacity: 0, y: -50, duration: 0.4, ease: 'power2.in'
+            opacity: 0, y: -40, duration: 0.2, ease: 'power2.in'
         });
     }
 
@@ -81,10 +80,15 @@
      * Inicializa animações na carga da página
      */
     function init() {
-        // Conteúdo principal: entrada bem visível (fade + desliza de baixo)
-        if (main && !main.classList.contains('gsap-no-motion')) {
-            gsap.fromTo(main, { opacity: 0, y: 36 }, { opacity: 1, y: 0, duration: 0.65, ease: 'power2.out', overwrite: 'auto' });
+        var prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (prefersReduced) {
+            var splashEl = document.getElementById('splash-screen');
+            if (splashEl) splashEl.remove();
+            return;
         }
+
+        // Conteúdo principal: sem fade global (evita pisca branco pós-carga).
+        // Animações individuais via .gsap-animate / .gsap-stagger nos elementos específicos.
 
         // Flash messages
         if (flash) {

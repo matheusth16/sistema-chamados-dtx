@@ -142,6 +142,51 @@ No painel Railway → Settings → Observability → Log Drain:
 
 ---
 
+## Alertas específicos — eventos de `app.metrics`
+
+O módulo `app/services/metrics.py` emite eventos estruturados via logger `app.metrics`.
+Filtre esses padrões no Railway log drain ou Cloud Logging para criar alertas.
+
+| Evento | Filtro no log | Alerta |
+|--------|--------------|--------|
+| Erro HTTP 5xx | `http_error` | Imediato — 1 ocorrência em 5 min |
+| Lockout de login | `login_lockout` | Alerta se > 5/hora (brute-force) |
+| Falha Web Push | `webpush_falha` | Alerta se > 20% das entregas falharem |
+| SLA vencido | `sla_vencido` | Informativo — sem alerta automático |
+| Job agendado ausente | (ausência de linha) | Ver SLO-05 |
+
+### Configurar alertas no Railway (Log Drain → Logtail)
+
+```bash
+# Criar alerta no Logtail para 5xx
+# Filtro: event=http_error
+# Condição: qualquer ocorrência → e-mail imediato
+
+# Criar alerta para lockout excessivo
+# Filtro: event=login_lockout
+# Condição: count > 5 em janela 60 min → e-mail
+
+# Criar alerta para falhas Web Push
+# Filtro: event=webpush_falha
+# Condição: count > 10 em janela 60 min → e-mail
+```
+
+### Emitir evento de lockout no auth
+
+Em `app/routes/auth.py`, após bloquear usuário:
+```python
+from app.services.metrics import login_lockout
+login_lockout()  # não inclui email para não persistir PII em logs
+```
+
+Em `app/services/webpush_service.py`, após falha de entrega push:
+```python
+from app.services.metrics import webpush_falha
+webpush_falha(user_id=user_id, motivo=str(e)[:80])
+```
+
+---
+
 ## Revisão e Ajuste
 
 Revisar SLOs a cada 3 meses ou após mudança significativa no volume de uso.

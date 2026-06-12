@@ -236,3 +236,253 @@ def test_index_sem_login_redireciona_para_login(client):
     r = client.get("/", follow_redirects=False)
     assert r.status_code == 302
     assert "login" in r.location
+
+
+# ── Lockout por email (A2) ─────────────────────────────────────────────────────
+
+
+def test_login_email_bloqueado_redireciona_sem_verificar_senha(client):
+    """Login com email bloqueado redireciona para /login sem chamar get_by_email."""
+    with (
+        patch(
+            "app.routes.auth.LoginAttemptTracker.is_locked_out",
+            side_effect=lambda x: x == "locked@test.com",
+        ),
+        patch("app.routes.auth.Usuario.get_by_email") as mock_get,
+    ):
+        r = client.post(
+            "/login",
+            data={"email": "locked@test.com", "senha": "qualquer"},
+            follow_redirects=False,
+        )
+
+    assert r.status_code == 302
+    assert "/login" in (r.location or "")
+    mock_get.assert_not_called()
+
+
+def test_login_falha_incrementa_tentativas_para_email(client):
+    """Falha de login deve incrementar contador de tentativas para o email além do IP."""
+    with (
+        patch("app.routes.auth.Usuario.get_by_email", return_value=None),
+        patch("app.routes.auth.LoginAttemptTracker.is_locked_out", return_value=False),
+        patch("app.routes.auth.LoginAttemptTracker.increment_attempt", return_value=1) as mock_inc,
+        patch("app.routes.auth.LoginAttemptTracker.log_failed_attempt"),
+    ):
+        client.post(
+            "/login",
+            data={"email": "usuario@test.com", "senha": "errada"},
+            follow_redirects=False,
+        )
+
+    args_chamados = [call.args[0] for call in mock_inc.call_args_list]
+    assert "usuario@test.com" in args_chamados, "increment_attempt deve ser chamado com o email"
+
+
+def test_login_falha_aplica_lockout_para_email_apos_max_tentativas(client):
+    """Após MAX_LOGIN_ATTEMPTS falhas, lockout é aplicado para email e IP."""
+    from app.services.login_attempts import MAX_LOGIN_ATTEMPTS
+
+    with (
+        patch("app.routes.auth.Usuario.get_by_email", return_value=None),
+        patch("app.routes.auth.LoginAttemptTracker.is_locked_out", return_value=False),
+        patch(
+            "app.routes.auth.LoginAttemptTracker.increment_attempt",
+            return_value=MAX_LOGIN_ATTEMPTS,
+        ),
+        patch("app.routes.auth.LoginAttemptTracker.apply_lockout") as mock_lockout,
+        patch("app.routes.auth.LoginAttemptTracker.log_failed_attempt"),
+    ):
+        client.post(
+            "/login",
+            data={"email": "usuario@test.com", "senha": "errada"},
+            follow_redirects=False,
+        )
+
+    lockout_ids = [call.args[0] for call in mock_lockout.call_args_list]
+    assert "usuario@test.com" in lockout_ids, "apply_lockout deve ser chamado para o email"
+
+
+def test_login_ip_bloqueado_redireciona_sem_verificar_senha(client):
+    """Login com IP bloqueado redireciona para /login sem chamar get_by_email."""
+    with (
+        patch(
+            "app.routes.auth.LoginAttemptTracker.is_locked_out",
+            side_effect=lambda x: not x.count("@"),  # IPs não têm '@', emails têm
+        ),
+        patch("app.routes.auth.Usuario.get_by_email") as mock_get,
+    ):
+        r = client.post(
+            "/login",
+            data={"email": "usuario@test.com", "senha": "qualquer"},
+            follow_redirects=False,
+        )
+
+    assert r.status_code == 302
+    assert "/login" in (r.location or "")
+    mock_get.assert_not_called()
+
+
+def test_alterar_senha_sem_must_change_redireciona_supervisor(client, app):
+    """Supervisor que já trocou senha é redirecionado para /admin ao acessar alterar-senha."""
+    usuario = MagicMock()
+    usuario.id = "sup1"
+    usuario.email = "sup@test.com"
+    usuario.nome = "Supervisor"
+    usuario.perfil = "supervisor"
+    usuario.must_change_password = False
+    usuario.get_id = lambda: "sup1"
+    usuario.is_authenticated = True
+    usuario.is_active = True
+    usuario.is_anonymous = False
+    usuario.check_password = MagicMock(return_value=True)
+
+    with (
+        patch("app.routes.auth.Usuario.get_by_email", return_value=usuario),
+        patch("app.models_usuario.Usuario.get_by_id", return_value=usuario),
+    ):
+        client.post("/login", data={"email": "sup@test.com", "senha": "ok"}, follow_redirects=False)
+        r = client.get("/alterar-senha-obrigatoria", follow_redirects=False)
+
+    assert r.status_code == 302
+    assert "admin" in (r.location or "")
+
+
+def test_alterar_senha_sem_letra_redireciona(client, app):
+    """POST /alterar-senha-obrigatoria com senha só com dígitos (sem letras) redireciona com erro."""
+    usuario = _create_client_must_change_password(client, app)
+    with (
+        patch("app.routes.auth.Usuario.get_by_email", return_value=usuario),
+        patch("app.models_usuario.Usuario.get_by_id", return_value=usuario),
+    ):
+        client.post(
+            "/login", data={"email": "change@test.com", "senha": "ok"}, follow_redirects=False
+        )
+        r = client.post(
+            "/alterar-senha-obrigatoria",
+            data={"nova_senha": "12345678", "confirmar_senha": "12345678"},
+            follow_redirects=False,
+        )
+    assert r.status_code == 302
+
+
+def test_alterar_senha_sucesso_supervisor_redireciona_para_admin(client, app):
+    """Supervisor com senha válida é redirecionado para /admin após trocar senha."""
+    usuario = MagicMock()
+    usuario.id = "sup2"
+    usuario.email = "sup2@test.com"
+    usuario.nome = "Supervisor Dois"
+    usuario.perfil = "supervisor"
+    usuario.must_change_password = True
+    usuario.get_id = lambda: "sup2"
+    usuario.is_authenticated = True
+    usuario.is_active = True
+    usuario.is_anonymous = False
+    usuario.check_password = MagicMock(return_value=True)
+    usuario.update = MagicMock(return_value=True)
+
+    with (
+        patch("app.routes.auth.Usuario.get_by_email", return_value=usuario),
+        patch("app.models_usuario.Usuario.get_by_id", return_value=usuario),
+    ):
+        client.post(
+            "/login", data={"email": "sup2@test.com", "senha": "ok"}, follow_redirects=False
+        )
+        r = client.post(
+            "/alterar-senha-obrigatoria",
+            data={"nova_senha": "NovaSenha2026!", "confirmar_senha": "NovaSenha2026!"},
+            follow_redirects=False,
+        )
+    assert r.status_code == 302
+    assert "admin" in (r.location or "")
+
+
+def test_alterar_senha_solicitante_sem_must_change_redireciona_para_index(client, app):
+    """Solicitante que já trocou senha é redirecionado para / ao acessar alterar-senha."""
+    usuario = MagicMock()
+    usuario.id = "sol10"
+    usuario.email = "sol10@test.com"
+    usuario.nome = "Solicitante Pronto"
+    usuario.perfil = "solicitante"
+    usuario.must_change_password = False
+    usuario.get_id = lambda: "sol10"
+    usuario.is_authenticated = True
+    usuario.is_active = True
+    usuario.is_anonymous = False
+    usuario.check_password = MagicMock(return_value=True)
+
+    with (
+        patch("app.routes.auth.Usuario.get_by_email", return_value=usuario),
+        patch("app.models_usuario.Usuario.get_by_id", return_value=usuario),
+    ):
+        client.post(
+            "/login", data={"email": "sol10@test.com", "senha": "ok"}, follow_redirects=False
+        )
+        r = client.get("/alterar-senha-obrigatoria", follow_redirects=False)
+
+    assert r.status_code == 302
+    assert r.location == "/" or "index" in (r.location or "") or r.location.endswith("/")
+
+
+def test_alterar_senha_update_retorna_false_redireciona(client, app):
+    """Quando current_user.update() retorna False, redireciona com erro."""
+    usuario = MagicMock()
+    usuario.id = "sup_false"
+    usuario.email = "sup_false@test.com"
+    usuario.nome = "Supervisor False Update"
+    usuario.perfil = "supervisor"
+    usuario.must_change_password = True
+    usuario.get_id = lambda: "sup_false"
+    usuario.is_authenticated = True
+    usuario.is_active = True
+    usuario.is_anonymous = False
+    usuario.check_password = MagicMock(return_value=True)
+    usuario.update = MagicMock(return_value=False)
+
+    with (
+        patch("app.routes.auth.Usuario.get_by_email", return_value=usuario),
+        patch("app.models_usuario.Usuario.get_by_id", return_value=usuario),
+    ):
+        client.post(
+            "/login",
+            data={"email": "sup_false@test.com", "senha": "ok"},
+            follow_redirects=False,
+        )
+        r = client.post(
+            "/alterar-senha-obrigatoria",
+            data={"nova_senha": "NovaSenha2026!", "confirmar_senha": "NovaSenha2026!"},
+            follow_redirects=False,
+        )
+    assert r.status_code == 302
+    assert "alterar-senha" in (r.location or "")
+
+
+def test_alterar_senha_excecao_no_update_redireciona(client, app):
+    """Exceção em current_user.update redireciona de volta para alterar-senha."""
+    usuario = MagicMock()
+    usuario.id = "sup3"
+    usuario.email = "sup3@test.com"
+    usuario.nome = "Supervisor Três"
+    usuario.perfil = "supervisor"
+    usuario.must_change_password = True
+    usuario.get_id = lambda: "sup3"
+    usuario.is_authenticated = True
+    usuario.is_active = True
+    usuario.is_anonymous = False
+    usuario.check_password = MagicMock(return_value=True)
+    usuario.update = MagicMock(side_effect=Exception("Firestore error"))
+
+    with (
+        patch("app.routes.auth.Usuario.get_by_email", return_value=usuario),
+        patch("app.models_usuario.Usuario.get_by_id", return_value=usuario),
+    ):
+        client.post(
+            "/login", data={"email": "sup3@test.com", "senha": "ok"}, follow_redirects=False
+        )
+        r = client.post(
+            "/alterar-senha-obrigatoria",
+            data={"nova_senha": "NovaSenha2026!", "confirmar_senha": "NovaSenha2026!"},
+            follow_redirects=False,
+        )
+    assert r.status_code == 302
+    assert "alterar-senha" in (r.location or "")

@@ -1,7 +1,7 @@
 """
 Testes unitários do serviço de notificações in-app (notifications_inapp.py).
 Cobre: criar_notificacao, listar_para_usuario, contar_nao_lidas,
-marcar_como_lida, marcar_todas_como_lidas.
+marcar_como_lida, marcar_todas_como_lidas, localizar_notificacao.
 """
 
 from datetime import datetime
@@ -48,8 +48,22 @@ def test_criar_notificacao_retorna_none_quando_firestore_falha():
 
 
 def test_listar_para_usuario_retorna_docs_ordenados_por_data():
-    """listar_para_usuario retorna lista de dicts com campo data_criacao serializado."""
+    """listar_para_usuario retorna lista de dicts com data_criacao serializado, mais recente primeiro."""
     from app.services.notifications_inapp import listar_para_usuario
+
+    # doc2 mais recente — Firestore retorna em DESC por data_criacao
+    doc2 = MagicMock()
+    doc2.id = "n2"
+    doc2.to_dict.return_value = {
+        "usuario_id": "u1",
+        "chamado_id": "ch2",
+        "numero_chamado": "CHM-002",
+        "titulo": "Notif 2",
+        "mensagem": "Mensagem 2",
+        "tipo": "novo_chamado",
+        "lida": False,
+        "data_criacao": datetime(2026, 3, 21, 10, 0, 0),
+    }
 
     doc1 = MagicMock()
     doc1.id = "n1"
@@ -64,27 +78,16 @@ def test_listar_para_usuario_retorna_docs_ordenados_por_data():
         "data_criacao": datetime(2026, 3, 20, 10, 0, 0),
     }
 
-    doc2 = MagicMock()
-    doc2.id = "n2"
-    doc2.to_dict.return_value = {
-        "usuario_id": "u1",
-        "chamado_id": "ch2",
-        "numero_chamado": "CHM-002",
-        "titulo": "Notif 2",
-        "mensagem": "Mensagem 2",
-        "tipo": "novo_chamado",
-        "lida": False,
-        "data_criacao": datetime(2026, 3, 21, 10, 0, 0),
-    }
-
     with patch("app.services.notifications_inapp.db") as mock_db:
         mock_query = MagicMock()
         mock_db.collection.return_value.where.return_value = mock_query
-        mock_query.limit.return_value.stream.return_value = [doc1, doc2]
+        # Suporta encadeamento: .where(...).order_by(...).limit(...).stream()
+        mock_query.order_by.return_value = mock_query
+        mock_query.limit.return_value.stream.return_value = [doc2, doc1]
         result = listar_para_usuario("u1")
 
     assert len(result) == 2
-    # Mais recente primeiro
+    # Mais recente primeiro (Firestore retorna na ordem correta via order_by DESC)
     assert result[0]["id"] == "n2"
     assert result[1]["id"] == "n1"
 
@@ -97,12 +100,29 @@ def test_listar_para_usuario_apenas_nao_lidas():
         mock_query = MagicMock()
         mock_db.collection.return_value.where.return_value = mock_query
         mock_query.where.return_value = mock_query
+        mock_query.order_by.return_value = mock_query
         mock_query.limit.return_value.stream.return_value = []
         listar_para_usuario("u1", apenas_nao_lidas=True)
 
     # Verifica que .where foi chamado duas vezes (usuario_id + lida==False)
     assert mock_db.collection.return_value.where.call_count >= 1
     assert mock_query.where.call_count >= 1
+
+
+def test_listar_para_usuario_usa_order_by_data_criacao_desc():
+    """listar_para_usuario deve usar order_by(data_criacao DESC) na query Firestore, não sort em memória."""
+    from app.services.notifications_inapp import listar_para_usuario
+
+    with patch("app.services.notifications_inapp.db") as mock_db:
+        mock_query = MagicMock()
+        mock_db.collection.return_value.where.return_value = mock_query
+        mock_query.order_by.return_value = mock_query
+        mock_query.limit.return_value.stream.return_value = []
+        listar_para_usuario("u1")
+
+    assert mock_query.order_by.called, "listar_para_usuario deve chamar order_by"
+    order_by_args = mock_query.order_by.call_args_list[0].args
+    assert order_by_args[0] == "data_criacao", "order_by deve ser por data_criacao"
 
 
 def test_listar_para_usuario_retorna_vazio_quando_firestore_falha():
@@ -136,6 +156,7 @@ def test_listar_para_usuario_serializa_data_isoformat():
     with patch("app.services.notifications_inapp.db") as mock_db:
         mock_query = MagicMock()
         mock_db.collection.return_value.where.return_value = mock_query
+        mock_query.order_by.return_value = mock_query
         mock_query.limit.return_value.stream.return_value = [doc]
         result = listar_para_usuario("u1")
 
@@ -284,3 +305,213 @@ def test_marcar_todas_como_lidas_retorna_zero_quando_firestore_falha():
         result = marcar_todas_como_lidas("u1")
 
     assert result == 0
+
+
+def test_listar_serializa_timestamp_com_to_pydatetime():
+    """listar_para_usuario serializa timestamp com .to_pydatetime() via branch ISO (linha 75)."""
+    from app.services.notifications_inapp import listar_para_usuario
+
+    ts = MagicMock()
+    ts.to_pydatetime.return_value = datetime(2026, 6, 1, 10, 0, 0)
+
+    doc = MagicMock()
+    doc.id = "n_ts"
+    doc.to_dict.return_value = {
+        "usuario_id": "u1",
+        "chamado_id": "ch1",
+        "numero_chamado": "CHM-001",
+        "titulo": "T",
+        "mensagem": "M",
+        "tipo": "novo",
+        "lida": False,
+        "data_criacao": ts,
+    }
+
+    with patch("app.services.notifications_inapp.db") as mock_db:
+        mock_query = MagicMock()
+        mock_db.collection.return_value.where.return_value = mock_query
+        mock_query.order_by.return_value = mock_query
+        mock_query.limit.return_value.stream.return_value = [doc]
+        result = listar_para_usuario("u1")
+
+    assert "2026" in result[0]["data_criacao"]
+
+
+def test_listar_serializa_timestamp_fallback_str():
+    """listar_para_usuario usa str(ts) como fallback quando ts não é datetime nem tem to_pydatetime."""
+    from app.services.notifications_inapp import listar_para_usuario
+
+    class OpaqueTsObj:
+        def __repr__(self):
+            return "ts-opaque"
+
+    doc = MagicMock()
+    doc.id = "n_fallback"
+    doc.to_dict.return_value = {
+        "usuario_id": "u1",
+        "chamado_id": "ch1",
+        "numero_chamado": "CHM-001",
+        "titulo": "T",
+        "mensagem": "M",
+        "tipo": "novo",
+        "lida": False,
+        "data_criacao": OpaqueTsObj(),
+    }
+
+    with patch("app.services.notifications_inapp.db") as mock_db:
+        mock_query = MagicMock()
+        mock_db.collection.return_value.where.return_value = mock_query
+        mock_query.order_by.return_value = mock_query
+        mock_query.limit.return_value.stream.return_value = [doc]
+        result = listar_para_usuario("u1")
+
+    assert result[0]["data_criacao"] is not None
+
+
+def test_marcar_como_lida_sem_ids_retorna_false():
+    """marcar_como_lida retorna False quando notificacao_id ou usuario_id é vazio."""
+    from app.services.notifications_inapp import marcar_como_lida
+
+    assert marcar_como_lida("", "u1") is False
+    assert marcar_como_lida("n1", "") is False
+
+
+def test_marcar_todas_sem_usuario_id_retorna_zero():
+    """marcar_todas_como_lidas retorna 0 quando usuario_id é vazio."""
+    from app.services.notifications_inapp import marcar_todas_como_lidas
+
+    assert marcar_todas_como_lidas("") == 0
+
+
+# ── fallback quando índice Firestore ausente ───────────────────────────────────
+
+
+def test_listar_para_usuario_fallback_sem_order_by_quando_indice_falha():
+    """Se order_by falhar (ex.: índice não deployado), usa fallback sem order_by e sort em memória."""
+    from app.services.notifications_inapp import listar_para_usuario
+
+    doc1 = MagicMock()
+    doc1.id = "n1"
+    doc1.to_dict.return_value = {
+        "usuario_id": "u1",
+        "chamado_id": "ch1",
+        "numero_chamado": "CHM-001",
+        "titulo": "T1",
+        "mensagem": "M1",
+        "tipo": "novo_chamado",
+        "lida": False,
+        "data_criacao": datetime(2026, 1, 1, 8, 0, 0),
+    }
+    doc2 = MagicMock()
+    doc2.id = "n2"
+    doc2.to_dict.return_value = {
+        "usuario_id": "u1",
+        "chamado_id": "ch2",
+        "numero_chamado": "CHM-002",
+        "titulo": "T2",
+        "mensagem": "M2",
+        "tipo": "novo_chamado",
+        "lida": False,
+        "data_criacao": datetime(2026, 1, 2, 10, 0, 0),  # mais recente
+    }
+
+    with patch("app.services.notifications_inapp.db") as mock_db:
+        mock_query = MagicMock()
+        mock_db.collection.return_value.where.return_value = mock_query
+        # order_by chain levanta exceção (índice não deployado)
+        mock_query.order_by.return_value.limit.return_value.stream.side_effect = Exception(
+            "9 FAILED_PRECONDITION: The query requires an index"
+        )
+        # Fallback: query sem order_by retorna os 2 docs (ordem aleatória)
+        mock_query.limit.return_value.stream.return_value = [doc1, doc2]
+
+        result = listar_para_usuario("u1")
+
+    assert len(result) == 2
+    # doc2 (mais recente: 2026-01-02) deve vir primeiro após sort em memória
+    assert result[0]["id"] == "n2"
+    assert result[1]["id"] == "n1"
+
+
+def test_listar_para_usuario_fallback_retorna_vazio_se_ambas_queries_falham():
+    """Se tanto order_by quanto fallback falharem, retorna [] sem propagar exceção."""
+    from app.services.notifications_inapp import listar_para_usuario
+
+    with patch("app.services.notifications_inapp.db") as mock_db:
+        mock_query = MagicMock()
+        mock_db.collection.return_value.where.return_value = mock_query
+        mock_query.order_by.return_value.limit.return_value.stream.side_effect = Exception(
+            "index error"
+        )
+        mock_query.limit.return_value.stream.side_effect = Exception("network error")
+
+        result = listar_para_usuario("u1")
+
+    assert result == []
+
+
+# ── localizar_notificacao ──────────────────────────────────────────────────────
+
+
+def test_localizar_notificacao_novo_chamado_em_ingles():
+    """Notificação com metadados completos deve ser traduzida para EN."""
+    from app.services.notifications_inapp import localizar_notificacao
+
+    doc = {
+        "tipo": "novo_chamado",
+        "numero_chamado": "CHM-0006",
+        "categoria": "Nao Aplicavel",
+        "solicitante_nome": "Matheus Costa",
+        "titulo": "Novo chamado: CHM-0006",
+        "mensagem": "Nao Aplicavel · Solicitante: Matheus Costa",
+    }
+    out = localizar_notificacao(doc, "en")
+    assert out["titulo"] == "New ticket: CHM-0006"
+    assert out["mensagem"] == "Not Applicable · Requester: Matheus Costa"
+
+
+def test_localizar_notificacao_novo_chamado_em_pt():
+    """Notificação com metadados completos em PT deve manter strings PT."""
+    from app.services.notifications_inapp import localizar_notificacao
+
+    doc = {
+        "tipo": "novo_chamado",
+        "numero_chamado": "CHM-0006",
+        "categoria": "Nao Aplicavel",
+        "solicitante_nome": "Matheus Costa",
+        "titulo": "Novo chamado: CHM-0006",
+        "mensagem": "Nao Aplicavel · Solicitante: Matheus Costa",
+    }
+    out = localizar_notificacao(doc, "pt_BR")
+    assert out["titulo"] == "Novo chamado: CHM-0006"
+    assert "Solicitante: Matheus Costa" in out["mensagem"]
+
+
+def test_localizar_notificacao_legacy_sem_metadados():
+    """Notificações antigas sem campos categoria/solicitante_nome devem usar fallback parser."""
+    from app.services.notifications_inapp import localizar_notificacao
+
+    doc = {
+        "tipo": "novo_chamado",
+        "numero_chamado": "CHM-0005",
+        "titulo": "Novo chamado: CHM-0005",
+        "mensagem": "Nao Aplicavel · Solicitante: Matheus Costa",
+    }
+    out = localizar_notificacao(doc, "en")
+    assert "New ticket" in out["titulo"]
+    assert "Requester" in out["mensagem"]
+    assert "Not Applicable" in out["mensagem"]
+
+
+def test_localizar_notificacao_tipo_desconhecido_nao_altera():
+    """Tipos que não sejam novo_chamado devem retornar doc sem modificações."""
+    from app.services.notifications_inapp import localizar_notificacao
+
+    doc = {
+        "tipo": "outro_tipo",
+        "titulo": "Algum título",
+        "mensagem": "Alguma mensagem",
+    }
+    out = localizar_notificacao(doc, "en")
+    assert out["titulo"] == "Algum título"
+    assert out["mensagem"] == "Alguma mensagem"

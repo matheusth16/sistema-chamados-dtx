@@ -97,7 +97,10 @@ def _construir_query_base(
     if rl_codigo:
         query_filtrada = query_filtrada.where(filter=FieldFilter("rl_codigo", "==", rl_codigo))
 
+    # categoria movida para query Firestore — evita filtro pós-.limit() que descarta docs válidos
     categoria_filtrada = categoria and categoria not in ["", "Todas"]
+    if categoria_filtrada:
+        query_filtrada = query_filtrada.where(filter=FieldFilter("categoria", "==", categoria))
 
     return query_filtrada, categoria_filtrada, categoria, status, gate
 
@@ -123,18 +126,15 @@ def _aplicar_filtros_em_memoria(
     search: str | None,
 ) -> list[Any]:
     """
-    OTIMIZAÇÃO 2: Filtros que não podem usar índices compostos
+    Filtros aplicados em memória pós-query.
 
-    Nota: Esses filtros são aplicados APÓS buscar o limite de documentos.
-    Para manter performance, eles funcionam apenas nos documentos recuperados.
+    - categoria, status, gate: já aplicados na query Firestore por _construir_query_base;
+      passados aqui apenas por compatibilidade de assinatura, sem reprocessamento.
+    - search: substring match não tem suporte nativo em Firestore; aplicado em memória.
     """
     resultado = docs
 
-    # Filtro de categoria (inclui Projetos no topo se necessário)
-    if categoria and categoria not in ["", "Todas"]:
-        resultado = [d for d in resultado if d.to_dict().get("categoria") == categoria]
-
-    # Busca por texto (case-insensitive)
+    # Busca por texto (case-insensitive) — único filtro genuinamente em memória
     if search:
         termo = search.lower()
         resultado = [

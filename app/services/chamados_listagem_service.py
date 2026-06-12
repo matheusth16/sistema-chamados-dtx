@@ -149,20 +149,43 @@ def listar_meus_chamados(
 
     _status = ("Aberto", "Em Atendimento", "Concluído", "Cancelado")
 
-    def _contar_total():
-        return obter_total_por_contagem(q) or 0
+    # Cache status_counts por (user_id, rl_codigo) — evita 4 aggregation queries por request
+    _status_cache_key = f"status_counts:{user_id}:{rl_codigo}"
+    try:
+        from app.cache import cache_get
 
-    def _contar_status(st):
-        return st, obter_total_por_contagem(
-            base_ref.where(filter=FieldFilter("status", "==", st))
-        ) or 0
+        status_counts = cache_get(_status_cache_key)
+    except Exception:
+        status_counts = None
 
-    # 5 aggregation queries independentes → rodam concorrentemente
-    with ThreadPoolExecutor(max_workers=5) as ex:
-        fut_total = ex.submit(_contar_total)
-        fut_status = [ex.submit(_contar_status, st) for st in _status]
-        total_chamados = fut_total.result()
-        status_counts = dict(f.result() for f in fut_status)
+    if status_counts is not None:
+        # Deriva total a partir do cache — elimina a 5ª query (contar_total) também
+        total_chamados = (
+            status_counts.get(status_filtro, 0) if status_filtro else sum(status_counts.values())
+        )
+    else:
+
+        def _contar_total():
+            return obter_total_por_contagem(q) or 0
+
+        def _contar_status(st):
+            return st, obter_total_por_contagem(
+                base_ref.where(filter=FieldFilter("status", "==", st))
+            ) or 0
+
+        # 5 aggregation queries independentes → rodam concorrentemente
+        with ThreadPoolExecutor(max_workers=5) as ex:
+            fut_total = ex.submit(_contar_total)
+            fut_status = [ex.submit(_contar_status, st) for st in _status]
+            total_chamados = fut_total.result()
+            status_counts = dict(f.result() for f in fut_status)
+
+        try:
+            from app.cache import cache_set
+
+            cache_set(_status_cache_key, status_counts, 45)
+        except Exception:
+            pass
 
     total_paginas = max(1, (total_chamados + itens_por_pagina - 1) // itens_por_pagina)
     pagina_atual = max(1, min(pagina_atual, total_paginas))

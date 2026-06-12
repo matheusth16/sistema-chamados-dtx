@@ -52,7 +52,7 @@ jobs:
             --cov=app \
             --cov-report=term-missing:skip-covered \
             --cov-report=xml:coverage.xml \
-            --cov-fail-under=70
+            --cov-fail-under=80
 
       - name: Upload relatório de cobertura
         if: always()

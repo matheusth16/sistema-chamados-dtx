@@ -728,8 +728,8 @@
 
 </div>
 
-<!-- Chart.js Library -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<!-- Chart.js Library (versão fixada) -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.9/dist/chart.umd.min.js"></script>
 
 <!-- Dados JSON para os gráficos (listas completas para Top 3 / Top N).
      Segurança: |safe é seguro aqui pois os dados vêm exclusivamente do backend (métricas/traduções), nunca de input do usuário. -->
@@ -754,8 +754,10 @@ document.addEventListener('DOMContentLoaded', function() {
         } catch (e) { return fallback; }
     }
     const dadosGerais = parseJson('dados-gerais', {});
-    const dadosSupervisores = Array.isArray(parseJson('dados-supervisores', null)) ? parseJson('dados-supervisores', []) : [];
-    const dadosAreas = Array.isArray(parseJson('dados-areas', null)) ? parseJson('dados-areas', []) : [];
+    const _rawSupervisores = parseJson('dados-supervisores', []);
+    const dadosSupervisores = Array.isArray(_rawSupervisores) ? _rawSupervisores : [];
+    const _rawAreas = parseJson('dados-areas', []);
+    const dadosAreas = Array.isArray(_rawAreas) ? _rawAreas : [];
 
     // Gráfico: Distribuição por Status
     if (document.getElementById('chartStatus')) {

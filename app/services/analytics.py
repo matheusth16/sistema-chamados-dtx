@@ -120,62 +120,62 @@ class AnalisadorChamados:
 
     # ========== MÉTRICAS GERAIS ==========
 
-    def obter_metricas_gerais(self, dias: int = 30) -> dict[str, Any]:
+    def obter_metricas_gerais(
+        self, dias: int = 30, chamados_pre_carregados: list | None = None
+    ) -> dict[str, Any]:
         """Retorna métricas gerais dos últimos N dias (até MAX_CHAMADOS_ANALYTICS docs).
 
-        Incluindo:
-        - Total de chamados
-        - Abertos vs Concluídos
-        - Taxa de resolução
-        - Tempo médio de resolução
+        Se chamados_pre_carregados for fornecido (lista de dicts já materializados),
+        filtra por data em Python — nenhuma query ao Firestore é feita.
         """
         cache_key = f"analytics_metricas_gerais_{dias}"
-        try:
-            from app.cache import cache_get, cache_set
+        if chamados_pre_carregados is None:
+            try:
+                from app.cache import cache_get
 
-            cached = cache_get(cache_key)
-            if cached is not None:
-                return cached
-        except Exception:
-            pass
+                cached = cache_get(cache_key)
+                if cached is not None:
+                    return cached
+            except Exception:
+                pass
         try:
             data_limite = datetime.now() - timedelta(days=dias)
 
-            chamados_ref = (
-                self.get_db()
-                .collection("chamados")
-                .where(filter=FieldFilter("data_abertura", ">=", data_limite))
-                .limit(MAX_CHAMADOS_ANALYTICS)
-            )
-            chamados = list(chamados_ref.stream())
+            if chamados_pre_carregados is not None:
+                todos_chamados = [
+                    c
+                    for c in chamados_pre_carregados
+                    if (_to_datetime(c.get("data_abertura")) or datetime.min) >= data_limite
+                ]
+            else:
+                chamados_ref = (
+                    self.get_db()
+                    .collection("chamados")
+                    .where(filter=FieldFilter("data_abertura", ">=", data_limite))
+                    .limit(MAX_CHAMADOS_ANALYTICS)
+                )
+                todos_chamados = [doc.to_dict() for doc in chamados_ref.stream()]
 
-            total = len(chamados)
-            abertos = sum(1 for doc in chamados if doc.to_dict().get("status") == "Aberto")
-            concluidos = sum(1 for doc in chamados if doc.to_dict().get("status") == "Concluído")
-            em_andamento = sum(
-                1 for doc in chamados if doc.to_dict().get("status") == "Em Atendimento"
-            )
+            total = len(todos_chamados)
+            abertos = sum(1 for c in todos_chamados if c.get("status") == "Aberto")
+            concluidos = sum(1 for c in todos_chamados if c.get("status") == "Concluído")
+            em_andamento = sum(1 for c in todos_chamados if c.get("status") == "Em Atendimento")
 
-            # Taxa de resolução
             taxa_resolucao = (concluidos / total * 100) if total > 0 else 0
 
-            # Tempo médio de resolução e SLA (apenas concluídos; mesma iteração, zero query extra)
             tempos_resolucao = []
             concluidos_dentro_sla = 0
             concluidos_fora_sla = 0
-            for doc in chamados:
-                chamado = doc.to_dict()
+            for chamado in todos_chamados:
                 if chamado.get("status") == "Concluído" and chamado.get("data_conclusao"):
                     data_abertura = chamado.get("data_abertura")
                     data_conclusao = chamado.get("data_conclusao")
                     categoria = chamado.get("categoria") or ""
-                    # Tempo em horas
                     dt_ab = _to_datetime(data_abertura)
                     dt_con = _to_datetime(data_conclusao)
                     if dt_ab and dt_con:
                         tempo = (dt_con - dt_ab).total_seconds() / 3600
                         tempos_resolucao.append(tempo)
-                    # SLA (usa sla_dias personalizado se existir)
                     sla_dias_raw = chamado.get("sla_dias")
                     dentro = _dentro_sla(data_abertura, data_conclusao, categoria, sla_dias_raw)
                     if dentro is True:
@@ -191,21 +191,18 @@ class AnalisadorChamados:
                 else None
             )
 
-            # Contagem por prioridade e por categoria
             prioridades = {}
             categorias = {}
             em_risco_count = 0
             atrasado_abertos = 0
             um_dia = timedelta(days=1)
 
-            for doc in chamados:
-                chamado = doc.to_dict()
+            for chamado in todos_chamados:
                 prio = chamado.get("prioridade", "Indefinido")
                 prioridades[prio] = prioridades.get(prio, 0) + 1
                 cat = chamado.get("categoria") or "Indefinido"
                 categorias[cat] = categorias.get(cat, 0) + 1
 
-                # SLA para abertos/em atendimento: em risco (vence em <= 1 dia) ou atrasado
                 if chamado.get("status") not in ("Concluído",):
                     data_abertura = chamado.get("data_abertura")
                     categoria = chamado.get("categoria") or ""
@@ -243,12 +240,13 @@ class AnalisadorChamados:
                 "distribuicao_categoria": categorias,
                 "resumo_sla": resumo_sla,
             }
-            try:
-                from app.cache import cache_set
+            if chamados_pre_carregados is None:
+                try:
+                    from app.cache import cache_set
 
-                cache_set(cache_key, resultado, _ANALYTICS_QUERY_TTL_SEC)
-            except Exception:
-                pass
+                    cache_set(cache_key, resultado, _ANALYTICS_QUERY_TTL_SEC)
+                except Exception:
+                    pass
             return resultado
 
         except Exception as e:
@@ -364,14 +362,17 @@ class AnalisadorChamados:
         é feita — elimina o N+1 anterior que fazia 1 query por área.
         """
         try:
-            # Passe único nos usuários para mapear áreas e supervisores
-            usuarios_ref = self.get_db().collection("usuarios").stream()
+            # Filtra supervisores diretamente no Firestore — evita varrer toda a coleção
+            usuarios_ref = (
+                self.get_db()
+                .collection("usuarios")
+                .where(filter=FieldFilter("perfil", "==", "supervisor"))
+                .stream()
+            )
             areas_uniques: set[str] = set()
             area_to_supervisor_ids: dict[str, set] = defaultdict(set)
             for doc in usuarios_ref:
                 usuario = doc.to_dict()
-                if usuario.get("perfil") != "supervisor":
-                    continue
                 areas_list = usuario.get("areas") or []
                 if not areas_list and usuario.get("area"):
                     areas_list = [usuario.get("area")]
@@ -655,40 +656,56 @@ class AnalisadorChamados:
 
     # ========== MÉTRICAS DE COMPARAÇÃO (DELTA) ==========
 
-    def obter_metricas_periodo_anterior(self) -> dict[str, Any]:
-        """Métricas do período 30-60 dias atrás para calcular deltas comparativos."""
-        cache_key = "analytics_periodo_anterior"
-        try:
-            from app.cache import cache_get, cache_set
+    def obter_metricas_periodo_anterior(
+        self, chamados_pre_carregados: list | None = None
+    ) -> dict[str, Any]:
+        """Métricas do período 30-60 dias atrás para calcular deltas comparativos.
 
-            cached = cache_get(cache_key)
-            if cached is not None:
-                return cached
-        except Exception:
-            pass
+        Se chamados_pre_carregados for fornecido, filtra por data em Python —
+        nenhuma query ao Firestore é feita.
+        """
+        cache_key = "analytics_periodo_anterior"
+        if chamados_pre_carregados is None:
+            try:
+                from app.cache import cache_get
+
+                cached = cache_get(cache_key)
+                if cached is not None:
+                    return cached
+            except Exception:
+                pass
         try:
             agora = datetime.now()
             data_inicio = agora - timedelta(days=60)
             data_fim = agora - timedelta(days=30)
 
-            chamados_ref = (
-                self.get_db()
-                .collection("chamados")
-                .where(filter=FieldFilter("data_abertura", ">=", data_inicio))
-                .where(filter=FieldFilter("data_abertura", "<", data_fim))
-                .limit(MAX_CHAMADOS_ANALYTICS)
-            )
-            chamados = list(chamados_ref.stream())
+            if chamados_pre_carregados is not None:
+                todos_chamados = [
+                    c
+                    for c in chamados_pre_carregados
+                    if (
+                        (_to_datetime(c.get("data_abertura")) or datetime.min) >= data_inicio
+                        and (_to_datetime(c.get("data_abertura")) or datetime.min) < data_fim
+                    )
+                ]
+            else:
+                chamados_ref = (
+                    self.get_db()
+                    .collection("chamados")
+                    .where(filter=FieldFilter("data_abertura", ">=", data_inicio))
+                    .where(filter=FieldFilter("data_abertura", "<", data_fim))
+                    .limit(MAX_CHAMADOS_ANALYTICS)
+                )
+                todos_chamados = [doc.to_dict() for doc in chamados_ref.stream()]
 
-            total = len(chamados)
-            concluidos = sum(1 for doc in chamados if doc.to_dict().get("status") == "Concluído")
+            total = len(todos_chamados)
+            concluidos = sum(1 for c in todos_chamados if c.get("status") == "Concluído")
             taxa_resolucao = (concluidos / total * 100) if total > 0 else 0
 
             tempos_resolucao = []
             concluidos_dentro_sla = 0
             concluidos_fora_sla = 0
-            for doc in chamados:
-                chamado = doc.to_dict()
+            for chamado in todos_chamados:
                 if chamado.get("status") == "Concluído" and chamado.get("data_conclusao"):
                     dt_ab = _to_datetime(chamado.get("data_abertura"))
                     dt_con = _to_datetime(chamado.get("data_conclusao"))
@@ -720,12 +737,13 @@ class AnalisadorChamados:
                 "percentual_dentro_sla": percentual_dentro_sla,
                 "tempo_medio_resolucao_horas": round(tempo_medio, 2),
             }
-            try:
-                from app.cache import cache_set
+            if chamados_pre_carregados is None:
+                try:
+                    from app.cache import cache_set
 
-                cache_set(cache_key, resultado, _ANALYTICS_QUERY_TTL_SEC)
-            except Exception:
-                pass
+                    cache_set(cache_key, resultado, _ANALYTICS_QUERY_TTL_SEC)
+                except Exception:
+                    pass
             return resultado
         except Exception as e:
             logger.exception("Erro ao obter métricas do período anterior: %s", e)
@@ -749,6 +767,33 @@ class AnalisadorChamados:
             else:
                 deltas[f"{campo}_delta"] = None
         return deltas
+
+    # ========== CARGA UNIFICADA DE CHAMADOS ==========
+
+    def _carregar_chamados_analytics(self) -> list[dict[str, Any]]:
+        """Carrega todos os chamados do Firestore com cache (TTL: _RELATORIO_CACHE_TTL_SEC).
+
+        Centraliza a única query a 'chamados' para que obter_relatorio_completo possa
+        distribuir o mesmo conjunto de dados para todas as funções de métricas.
+        """
+        cache_key = "analytics_todos_chamados"
+        try:
+            from app.cache import cache_get
+
+            cached = cache_get(cache_key)
+            if cached is not None:
+                return cached
+        except Exception:
+            pass
+        docs = list(self.get_db().collection("chamados").limit(MAX_CHAMADOS_ANALYTICS).stream())
+        chamados = [doc.to_dict() for doc in docs]
+        try:
+            from app.cache import cache_set
+
+            cache_set(cache_key, chamados, _RELATORIO_CACHE_TTL_SEC)
+        except Exception:
+            pass
+        return chamados
 
     # ========== RELATÓRIOS DETALHADOS ==========
 
@@ -775,16 +820,17 @@ class AnalisadorChamados:
                     logger.debug("Relatório servido do cache em memória")
                     return _RELATORIO_CACHE["data"]
 
-            metricas_gerais = self.obter_metricas_gerais(dias=30)
-            metricas_periodo_anterior = self.obter_metricas_periodo_anterior()
-            metricas_delta = self._calcular_deltas(metricas_gerais, metricas_periodo_anterior)
+            # Carrega todos os chamados UMA vez (com cache Redis/memória) e distribui
+            # para todas as funções de métricas — elimina múltiplas queries a 'chamados'.
+            chamados_cache = self._carregar_chamados_analytics()
 
-            # Carrega todos os chamados UMA vez e reutiliza em supervisores + áreas,
-            # eliminando as N+M queries adicionais do padrão anterior.
-            docs_todos = list(
-                self.get_db().collection("chamados").limit(MAX_CHAMADOS_ANALYTICS).stream()
+            metricas_gerais = self.obter_metricas_gerais(
+                dias=30, chamados_pre_carregados=chamados_cache
             )
-            chamados_cache = [doc.to_dict() for doc in docs_todos]
+            metricas_periodo_anterior = self.obter_metricas_periodo_anterior(
+                chamados_pre_carregados=chamados_cache
+            )
+            metricas_delta = self._calcular_deltas(metricas_gerais, metricas_periodo_anterior)
 
             metricas_supervisores = self.obter_metricas_supervisores(
                 chamados_pre_carregados=chamados_cache

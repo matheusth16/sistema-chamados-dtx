@@ -28,11 +28,9 @@ Este documento descreve as medidas de segurança e o alinhamento do **Sistema de
 
 ### 3.1 Criptografia em repouso
 
-- **Senhas**: Armazenadas apenas como hash (Werkzeug), nunca em texto claro.
-- **Campos sensíveis (PII)**: O sistema suporta criptografia de campos como o **nome** do usuário no banco, mediante configuração:
-  - Variável de ambiente `ENCRYPTION_KEY`: chave Fernet (base64, 32 bytes).
-    Geração: `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`
-  - Variável `ENCRYPT_PII_AT_REST=true` para ativar a criptografia do campo nome na coleção de usuários.
+- **Senhas**: Armazenadas apenas como hash (Werkzeug/bcrypt), nunca em texto claro.
+- **Campos de dados pessoais (PII)**: Nome, e-mail e demais campos cadastrais são armazenados **sem criptografia adicional** no Firestore. A proteção reside no controle de acesso (Firestore rules + Firebase Admin SDK somente no backend) e no HTTPS em trânsito.
+  > **Roadmap**: a implementação de criptografia Fernet em repouso para o campo `nome` está prevista (`ENCRYPTION_KEY` / `ENCRYPT_PII_AT_REST` no `.env.example`) e será adicionada em versão futura com script de migração de dados existentes.
 - **Firestore**: Acesso apenas pelo backend (Firebase Admin SDK). Regras do Firestore negam leitura/escrita direta do cliente.
 
 ### 3.2 Criptografia em trânsito
@@ -103,7 +101,7 @@ A organização deve indicar um **Encarregado de Dados (DPO)** e divulgar canal 
 
 | Medida                    | Onde está no código / config                              |
 |---------------------------|------------------------------------------------------------|
-| Criptografia (Fernet)     | `app/services/crypto.py`, `config.py` (ENCRYPTION_KEY, ENCRYPT_PII_AT_REST) |
+| Criptografia (Fernet)     | **Não implementado** — previsto em roadmap; vars reservadas em `config.py` (ENCRYPTION_KEY, ENCRYPT_PII_AT_REST) |
 | Hash de senha             | `app/models_usuario.py` (Werkzeug)                         |
 | Cookies e HSTS            | `config.py` (session), `app/__init__.py` (headers)          |
 | CSP e Permissions-Policy  | `app/__init__.py` (headers em produção)                     |
@@ -113,11 +111,4 @@ A organização deve indicar um **Encarregado de Dados (DPO)** e divulgar canal 
 | Mascaramento de PII em logs | `app/utils.py` (mask_email_for_log), `app/routes/auth.py` |
 | Firestore (somente backend) | `firestore.rules`, `app/database.py`                     |
 
-Para ativar criptografia de PII em repouso, configure no `.env`:
-
-```env
-ENCRYPTION_KEY=<chave_base64_fernet>
-ENCRYPT_PII_AT_REST=true
-```
-
-**Importante**: A chave `ENCRYPTION_KEY` é sensível. Mantenha-a em repositório seguro (variáveis de ambiente ou cofre de segredos) e nunca a inclua no controle de versão.
+A criptografia Fernet de PII em repouso **ainda não está implementada** no código. As variáveis `ENCRYPTION_KEY` e `ENCRYPT_PII_AT_REST` estão reservadas em `config.py` e `.env.example` para uso futuro. Quando implementada, exigirá script de migração dos dados existentes no Firestore.

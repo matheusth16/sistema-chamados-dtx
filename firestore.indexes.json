@@ -5,6 +5,14 @@
       "queryScope": "COLLECTION",
       "fields": [
         {"fieldPath": "categoria", "order": "ASCENDING"},
+        {"fieldPath": "data_abertura", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "chamados",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "categoria", "order": "ASCENDING"},
         {"fieldPath": "status", "order": "DESCENDING"},
         {"fieldPath": "data_abertura", "order": "DESCENDING"}
       ]
@@ -49,6 +57,23 @@
       "fields": [
         {"fieldPath": "usuario_id", "order": "ASCENDING"},
         {"fieldPath": "lida", "order": "ASCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "notificacoes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "usuario_id", "order": "ASCENDING"},
+        {"fieldPath": "data_criacao", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "notificacoes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "usuario_id", "order": "ASCENDING"},
+        {"fieldPath": "lida", "order": "ASCENDING"},
+        {"fieldPath": "data_criacao", "order": "DESCENDING"}
       ]
     },
     {

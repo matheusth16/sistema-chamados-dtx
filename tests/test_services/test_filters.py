@@ -64,8 +64,8 @@ def test_construir_query_para_contagem_retorna_mesma_query_base():
     assert ff.field_path == "status"
 
 
-def test_aplicar_filtros_em_memoria_filtra_por_categoria():
-    """Filtro em memória por categoria retorna apenas docs da categoria."""
+def test_aplicar_filtros_em_memoria_categoria_nao_filtra_em_memoria():
+    """categoria é filtrada pelo Firestore; _aplicar_filtros_em_memoria não refiltra por ela."""
     doc_a = MagicMock()
     doc_a.to_dict.return_value = {"categoria": "Projetos", "descricao": "x"}
     doc_a.id = "a"
@@ -73,9 +73,10 @@ def test_aplicar_filtros_em_memoria_filtra_por_categoria():
     doc_b.to_dict.return_value = {"categoria": "Manutencao", "descricao": "y"}
     doc_b.id = "b"
     docs = [doc_a, doc_b]
+    # O Firestore já filtrou por categoria antes de chamar esta função;
+    # o parâmetro categoria é ignorado em memória — todos os docs passam.
     resultado = _aplicar_filtros_em_memoria(docs, None, None, "Projetos", None)
-    assert len(resultado) == 1
-    assert resultado[0].to_dict().get("categoria") == "Projetos"
+    assert len(resultado) == 2
 
 
 def test_aplicar_filtros_em_memoria_busca_por_texto():
@@ -142,6 +143,40 @@ def test_aplicar_filtros_dashboard_com_paginacao_tem_proxima():
     assert resultado["tem_proxima"] is True
 
 
+def test_construir_query_base_com_categoria_aplica_where_firestore():
+    """categoria deve ser aplicada via .where() no Firestore, não só em memória após .limit()."""
+
+    query_ref = MagicMock()
+    query_ref.where.return_value = query_ref
+    args = {"categoria": "Projetos"}
+    _construir_query_base(query_ref, args)
+
+    ff_calls = [c.kwargs.get("filter") for c in query_ref.where.call_args_list]
+    categoria_ff = next(
+        (ff for ff in ff_calls if getattr(ff, "field_path", None) == "categoria"), None
+    )
+    assert categoria_ff is not None, (
+        "categoria deve ser aplicada na query Firestore para evitar filtro pós-limit"
+    )
+    assert categoria_ff.value == "Projetos"
+
+
+def test_construir_query_base_ignora_categoria_todas():
+    """categoria 'Todas' ou vazia não aplica filtro de categoria na query."""
+    query_ref = MagicMock()
+    query_ref.where.return_value = query_ref
+    for args in [{"categoria": "Todas"}, {"categoria": ""}]:
+        query_ref.where.reset_mock()
+        _construir_query_base(query_ref, args)
+        ff_calls = [c.kwargs.get("filter") for c in query_ref.where.call_args_list]
+        categoria_ff = next(
+            (ff for ff in ff_calls if getattr(ff, "field_path", None) == "categoria"), None
+        )
+        assert categoria_ff is None, (
+            f"'{args['categoria']}' não deve filtrar categoria no Firestore"
+        )
+
+
 def test_aplicar_filtros_dashboard_retorna_lista():
     """aplicar_filtros_dashboard (legado) retorna lista de docs."""
     query_ref = MagicMock()
@@ -152,3 +187,126 @@ def test_aplicar_filtros_dashboard_retorna_lista():
     docs = aplicar_filtros_dashboard(query_ref, {})
     assert isinstance(docs, list)
     assert docs == []
+
+
+def test_aplicar_filtros_com_cursor_start_after():
+    """Paginação avançada com cursor deve chamar start_after no doc cursor."""
+    doc1 = MagicMock()
+    doc1.id = "id_cursor"
+    doc1.to_dict.return_value = {"categoria": "TI", "status": "Aberto", "gate": None}
+
+    cursor_doc = MagicMock()
+    cursor_doc.exists = True
+
+    query_ref = MagicMock()
+    query_ref.where.return_value = query_ref
+    query_ref.order_by.return_value = query_ref
+    query_ref.start_after.return_value = query_ref
+    query_ref.limit.return_value = query_ref
+    query_ref.stream.return_value = [doc1]
+    query_ref.parent = query_ref
+    query_ref.document.return_value.get.return_value = cursor_doc
+
+    resultado = aplicar_filtros_dashboard_com_paginacao(
+        query_ref, {}, limite=10, cursor="id_cursor"
+    )
+    assert "docs" in resultado
+    query_ref.start_after.assert_called_once_with(cursor_doc)
+
+
+def test_aplicar_filtros_cursor_anterior_tem_anterior_true():
+    """cursor_anterior com mais docs que limite define tem_anterior=True e trunca a lista."""
+    doc1 = MagicMock()
+    doc1.id = "id1"
+    doc1.to_dict.return_value = {"categoria": "TI", "status": "Aberto", "gate": None}
+    doc2 = MagicMock()
+    doc2.id = "id2"
+    doc2.to_dict.return_value = {"categoria": "TI", "status": "Aberto", "gate": None}
+
+    cursor_doc = MagicMock()
+    cursor_doc.exists = True
+
+    query_ref = MagicMock()
+    query_ref.where.return_value = query_ref
+    query_ref.order_by.return_value = query_ref
+    query_ref.end_before.return_value = query_ref
+    query_ref.limit.return_value = query_ref
+    # Stream retorna 2 docs; limite=1 → tem_anterior=True, trunca para 1
+    query_ref.stream.return_value = [doc1, doc2]
+    query_ref.parent = query_ref
+    query_ref.document.return_value.get.return_value = cursor_doc
+
+    resultado = aplicar_filtros_dashboard_com_paginacao(
+        query_ref, {}, limite=1, cursor_anterior="id1"
+    )
+    assert resultado["tem_anterior"] is True
+    assert len(resultado["docs"]) == 1
+
+
+def test_construir_query_base_com_gate_aplica_where():
+    """Com gate nos args, where(filter=FieldFilter('gate', ...)) é chamado."""
+
+    query_ref = MagicMock()
+    query_ref.where.return_value = query_ref
+    args = {"gate": "G1"}
+    _construir_query_base(query_ref, args)
+    ff_calls = [c.kwargs.get("filter") for c in query_ref.where.call_args_list]
+    gate_ff = next((ff for ff in ff_calls if getattr(ff, "field_path", None) == "gate"), None)
+    assert gate_ff is not None
+    assert gate_ff.value == "G1"
+
+
+def test_construir_query_base_com_responsavel_aplica_where():
+    """Com responsavel nos args, where(filter=FieldFilter('responsavel', ...)) é chamado."""
+
+    query_ref = MagicMock()
+    query_ref.where.return_value = query_ref
+    args = {"responsavel": "Ana"}
+    _construir_query_base(query_ref, args)
+    ff_calls = [c.kwargs.get("filter") for c in query_ref.where.call_args_list]
+    resp_ff = next(
+        (ff for ff in ff_calls if getattr(ff, "field_path", None) == "responsavel"), None
+    )
+    assert resp_ff is not None
+    assert resp_ff.value == "Ana"
+
+
+def test_construir_query_base_com_rl_codigo_aplica_where():
+    """Com rl_codigo nos args, where(filter=FieldFilter('rl_codigo', ...)) é chamado."""
+
+    query_ref = MagicMock()
+    query_ref.where.return_value = query_ref
+    args = {"rl_codigo": "RL-001"}
+    _construir_query_base(query_ref, args)
+    ff_calls = [c.kwargs.get("filter") for c in query_ref.where.call_args_list]
+    rl_ff = next((ff for ff in ff_calls if getattr(ff, "field_path", None) == "rl_codigo"), None)
+    assert rl_ff is not None
+    assert rl_ff.value == "RL-001"
+
+
+def test_aplicar_filtros_dashboard_com_paginacao_cursor_anterior():
+    """cursor_anterior faz paginação reversa (end_before) e reverte a ordem."""
+    doc1 = MagicMock()
+    doc1.id = "id_first"
+    doc1.to_dict.return_value = {"categoria": "TI", "status": "Aberto", "gate": None}
+    doc2 = MagicMock()
+    doc2.id = "id_second"
+    doc2.to_dict.return_value = {"categoria": "TI", "status": "Aberto", "gate": None}
+
+    cursor_doc = MagicMock()
+    cursor_doc.exists = True
+
+    query_ref = MagicMock()
+    query_ref.where.return_value = query_ref
+    query_ref.order_by.return_value = query_ref
+    query_ref.end_before.return_value = query_ref
+    query_ref.limit.return_value = query_ref
+    query_ref.stream.return_value = [doc1, doc2]
+    query_ref.parent = query_ref
+    query_ref.document.return_value.get.return_value = cursor_doc
+
+    resultado = aplicar_filtros_dashboard_com_paginacao(
+        query_ref, {}, limite=10, cursor_anterior="id_first"
+    )
+    assert "docs" in resultado
+    assert "tem_anterior" in resultado

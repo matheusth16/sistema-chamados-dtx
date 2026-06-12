@@ -4,11 +4,12 @@ import logging
 import os
 
 from firebase_admin import firestore
-from flask import abort, current_app, jsonify, redirect, request, send_from_directory
+from flask import abort, current_app, jsonify, redirect, request, send_from_directory, session
 from flask_login import current_user, login_required
 
 from app.database import db
 from app.firebase_retry import execute_with_retry
+from app.limiter import limiter
 from app.models import Chamado
 from app.models_historico import Historico
 from app.models_usuario import Usuario
@@ -128,6 +129,7 @@ def download_anexo():
 
 @main.route("/api/atualizar-status", methods=["POST"])
 @login_required
+@limiter.limit("30 per minute", methods=["POST"])
 def atualizar_status_ajax():
     """Atualiza status do chamado via JSON. Requer CSRF; o frontend deve enviar o token no header X-CSRFToken (ex.: valor da meta tag csrf-token)."""
     try:
@@ -239,6 +241,7 @@ def api_editar_chamado():
 
 @main.route("/api/bulk-status", methods=["POST"])
 @login_required
+@limiter.limit("10 per minute", methods=["POST"])
 def bulk_atualizar_status():
     """Atualiza status de múltiplos chamados em lote. Apenas supervisor/admin."""
     if current_user.perfil not in ("supervisor", "admin"):
@@ -312,13 +315,22 @@ def bulk_atualizar_status():
 @main.route("/api/notificacoes", methods=["GET"])
 @login_required
 def api_notificacoes_listar():
-    """Lista notificações do usuário (sino)."""
+    """Lista notificações do usuário (sino), traduzidas para o idioma da sessão."""
     try:
         apenas_nao_lidas = request.args.get("nao_lidas") == "1"
-        lista = listar_para_usuario(current_user.id, limite=30, apenas_nao_lidas=apenas_nao_lidas)
+        lang = session.get("language", "en")
+        lista = listar_para_usuario(
+            current_user.id, limite=30, apenas_nao_lidas=apenas_nao_lidas, language=lang
+        )
         total_nao_lidas = contar_nao_lidas(current_user.id)
+        lista_degradada = total_nao_lidas > 0 and len(lista) == 0
         return jsonify(
-            {"sucesso": True, "notificacoes": lista, "total_nao_lidas": total_nao_lidas}
+            {
+                "sucesso": True,
+                "notificacoes": lista,
+                "total_nao_lidas": total_nao_lidas,
+                "lista_degradada": lista_degradada,
+            }
         ), 200
     except Exception as e:
         logger.exception("Erro ao listar notificações: %s", e)
@@ -381,6 +393,7 @@ def api_push_vapid_public():
 
 @main.route("/api/push-subscribe", methods=["POST"])
 @login_required
+@limiter.limit("5 per minute", methods=["POST"])
 def api_push_subscribe():
     """Salva inscrição Web Push do navegador."""
     try:
@@ -662,6 +675,7 @@ _csp_logger = logging.getLogger("app.csp")
 
 
 @main.route("/api/csp-report", methods=["POST"])
+@limiter.limit("20 per minute", methods=["POST"])
 def csp_report():
     """Recebe relatórios de violação CSP enviados pelo browser (sem autenticação, sem CSRF)."""
     body = request.get_json(silent=True, force=True) or {}

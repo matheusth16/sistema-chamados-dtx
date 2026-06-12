@@ -24,10 +24,30 @@ def salvar_inscricao(usuario_id: str, subscription: dict[str, Any]) -> bool:
         return False
     try:
         keys = subscription.get("keys") or {}
+        endpoint = subscription["endpoint"]
+        # Deduplicação: se o endpoint já existe para o usuário, atualiza em vez de duplicar.
+        existing = list(
+            db.collection("push_subscriptions")
+            .where(filter=FieldFilter("usuario_id", "==", usuario_id))
+            .where(filter=FieldFilter("endpoint", "==", endpoint))
+            .limit(1)
+            .stream()
+        )
+        if existing:
+            existing[0].reference.set(
+                {
+                    "p256dh": keys.get("p256dh"),
+                    "auth": keys.get("auth"),
+                    "updated_at": firestore.SERVER_TIMESTAMP,
+                },
+                merge=True,
+            )
+            logger.debug("Web Push: inscrição atualizada para usuario=%s", usuario_id)
+            return True
         db.collection("push_subscriptions").add(
             {
                 "usuario_id": usuario_id,
-                "endpoint": subscription["endpoint"],
+                "endpoint": endpoint,
                 "p256dh": keys.get("p256dh"),
                 "auth": keys.get("auth"),
                 "created_at": firestore.SERVER_TIMESTAMP,
@@ -55,6 +75,7 @@ def obter_inscricoes(usuario_id: str) -> list[dict[str, Any]]:
             d = doc.to_dict()
             out.append(
                 {
+                    "doc_id": doc.id,
                     "endpoint": d.get("endpoint"),
                     "keys": {
                         "p256dh": d.get("p256dh"),
@@ -68,6 +89,17 @@ def obter_inscricoes(usuario_id: str) -> list[dict[str, Any]]:
         return []
 
 
+def _deletar_subscricao(doc_id: str) -> None:
+    """Remove uma inscrição expirada/revogada do Firestore."""
+    if not doc_id:
+        return
+    try:
+        db.collection("push_subscriptions").document(doc_id).delete()
+        logger.debug("Web Push: inscrição expirada removida doc=%s", doc_id)
+    except Exception as exc:
+        logger.warning("Erro ao remover subscription expirada: %s", exc)
+
+
 def enviar_webpush_usuario(usuario_id: str, titulo: str, corpo: str, url: str = None) -> int:
     """
     Envia notificação Web Push para todas as inscrições do usuário.
@@ -76,7 +108,7 @@ def enviar_webpush_usuario(usuario_id: str, titulo: str, corpo: str, url: str = 
     from flask import current_app
 
     try:
-        vapid_private = getattr(current_app.config, "VAPID_PRIVATE_KEY", None) or ""
+        vapid_private = current_app.config.get("VAPID_PRIVATE_KEY") or ""
         if not vapid_private:
             logger.debug("Web Push: VAPID_PRIVATE_KEY não configurada, ignorando.")
             return 0
@@ -98,14 +130,22 @@ def enviar_webpush_usuario(usuario_id: str, titulo: str, corpo: str, url: str = 
     payload = json.dumps({"title": titulo, "body": corpo, "url": url or ""})
     enviados = 0
     for sub in subscriptions:
+        # pywebpush exige subscription_info com apenas endpoint + keys.
+        subscription_info = {"endpoint": sub["endpoint"], "keys": sub["keys"]}
         try:
             pywebpush.webpush(
-                subscription_info=sub,
+                subscription_info=subscription_info,
                 data=payload,
                 vapid_private_key=vapid_private,
                 vapid_claims={"sub": "mailto:noreply@dtx-andon.local"},
             )
             enviados += 1
+        except pywebpush.WebPushException as e:
+            response = getattr(e, "response", None)
+            status_code = getattr(response, "status_code", None)
+            if status_code in (404, 410):
+                _deletar_subscricao(sub.get("doc_id"))
+            logger.warning("Web Push falhou para um dispositivo: %s", e)
         except Exception as e:
             logger.warning("Web Push falhou para um dispositivo: %s", e)
     return enviados

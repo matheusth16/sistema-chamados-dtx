@@ -65,6 +65,9 @@ O envio de e-mail usa **SMTP**. Configure as variáveis abaixo.
 
 Se `MAIL_SERVER` estiver vazio, o envio por e-mail fica desabilitado.
 
+| `NOTIFY_SOLICITANTE_EMAIL` | Ativa e-mail ao solicitante em mudança de status para *Em Atendimento* ou *Concluído*. Requer `MAIL_SERVER` configurado. | `false` | `true` |
+| `POWER_AUTOMATE_TEST_DEST_EMAIL` | Sobrescreve destinatário do evento `USUARIO_CADASTRADO` — para testar fluxo Power Automate sem enviar ao usuário real. | (vazio) | `dev@empresa.com` |
+
 **Office 365 / Outlook:** use `MAIL_SERVER=smtp.office365.com`, `MAIL_PORT=587`, `MAIL_USE_TLS=true`. O administrador do tenant pode precisar habilitar "Authenticated SMTP" na caixa de correio (Manage email apps). Com MFA, use senha de app.
 
 ---
@@ -80,12 +83,35 @@ Se ambas estiverem vazias, a inscrição/Web Push fica desabilitada.
 
 ---
 
-## Criptografia de PII em repouso (LGPD)
+## Criptografia de PII em repouso (LGPD — roadmap)
+
+> **Atenção:** as variáveis abaixo estão reservadas, mas a funcionalidade **não está implementada** ainda. Defini-las não tem efeito no comportamento atual da aplicação.
 
 | Variável               | Descrição | Padrão | Exemplo |
 |------------------------|-----------|--------|---------|
-| `ENCRYPTION_KEY`       | Chave Fernet (base64, 32 bytes) para criptografia de campos sensíveis. Gere com: `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`. Deve ser mantida em cofre de segredos; nunca versionada. | (vazio) | (string base64) |
-| `ENCRYPT_PII_AT_REST`  | Se `true`, ativa criptografia do campo nome na coleção de usuários (requer `ENCRYPTION_KEY` configurada). | `false` | `true` |
+| `ENCRYPTION_KEY`       | Chave Fernet (base64, 32 bytes) para criptografia futura do campo `nome` em Firestore. Quando implementada, exigirá migração dos dados existentes. | (vazio) | (string base64) |
+| `ENCRYPT_PII_AT_REST`  | Quando `true` e `ENCRYPTION_KEY` definida, ativará a criptografia. Sem efeito até implementação. | `false` | `true` |
+
+---
+
+## Armazenamento de Anexos — Cloudflare R2 (alternativo ao Firebase Storage)
+
+| Variável | Descrição | Padrão |
+|----------|-----------|--------|
+| `R2_ACCOUNT_ID` | ID da conta Cloudflare. | (vazio) |
+| `R2_ACCESS_KEY_ID` | Access Key ID do R2. | (vazio) |
+| `R2_SECRET_ACCESS_KEY` | Secret Access Key do R2. **Mantenha secreta.** | (vazio) |
+| `R2_BUCKET_NAME` | Nome do bucket R2. | (vazio) |
+| `R2_PUBLIC_URL` | URL pública do bucket (se acesso público habilitado). | (vazio) |
+
+---
+
+## Limites de uso por usuário
+
+| Variável | Descrição | Padrão |
+|----------|-----------|--------|
+| `RELATORIO_MAX_POR_USUARIO_POR_DIA` | Máximo de relatórios gerados por usuário por dia. `0` = sem limite. | `0` |
+| `EXPORT_EXCEL_MAX_POR_USUARIO_POR_DIA` | Máximo de exportações Excel por usuário por dia. `0` = sem limite. | `0` |
 
 ---
 

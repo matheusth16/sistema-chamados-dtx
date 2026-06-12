@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="pt-br">
+<html lang="{{ session.get('lang', 'pt-br').replace('_', '-').lower() }}">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -22,18 +22,6 @@
       rel="stylesheet"
       href="{{ url_for('static', filename='css/tailwind.min.css') }}"
     />
-    <script
-      src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js?t=1"
-      crossorigin="anonymous"
-    ></script>
-    <script
-      src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js?t=1"
-      crossorigin="anonymous"
-    ></script>
-    <script
-      src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollToPlugin.min.js?t=1"
-      crossorigin="anonymous"
-    ></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
@@ -52,6 +40,7 @@
     class="bg-white text-gray-800"
     data-debug="{% if config.DEBUG %}true{% endif %}"
   >
+    <a href="#main-content" class="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-[9999] focus:px-4 focus:py-2 focus:bg-white focus:text-blue-700 focus:rounded-lg focus:shadow-lg focus:font-semibold">{{ t('skip_to_main_content') }}</a>
     <script nonce="{{ csp_nonce }}">
       // Define flag de debug para JS: apenas em desenvolvimento (evita console.log em produção)
       window.DTX_DEBUG = document.body.getAttribute("data-debug") === "true";
@@ -63,7 +52,7 @@
     {% include "components/onboarding.html" %}
     {% endif %}
 
-    <main class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+    <main id="main-content" class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
       {# Flash messages as floating toasts #} {% if request.endpoint !=
       'main.index' %} {% with messages =
       get_flashed_messages(with_categories=true) %} {% if messages %}
@@ -86,6 +75,7 @@
             type="button"
             class="shrink-0 text-current opacity-60 hover:opacity-100 transition-opacity focus:outline-none"
             onclick="this.closest('.flash-toast').style.display = 'none'"
+            aria-label="{{ t('close_notification') }}"
           >
             <svg
               class="h-4 w-4"
@@ -132,6 +122,10 @@
       </div>
     </footer>
 
+    <!-- GSAP: carregado no final do body para não bloquear renderização -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js?t=1" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js?t=1" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollToPlugin.min.js?t=1" crossorigin="anonymous"></script>
     <!-- GSAP Motion: animações de entrada (conteúdo, flash, elementos com .gsap-animate) -->
     <script src="{{ url_for('static', filename='js/gsap-motion.js') }}"></script>
     <script nonce="{{ csp_nonce }}">
@@ -142,12 +136,12 @@
         time_yesterday: "{{ t('time_yesterday') }}",
         time_days_ago: "{{ t('time_days_ago') }}",
         notifications_empty: "{{ t('notifications_empty') }}",
+        notifications_load_error: "{{ t('notifications_load_error') }}",
         locale: "{{ {'pt_BR': 'pt-BR', 'en': 'en-US', 'es': 'es-ES'}.get(current_language, 'en-US') }}"
       };
     </script>
 
-    {% if current_user.is_authenticated and current_user.perfil in
-    ['supervisor', 'admin'] %}
+    {% if current_user.is_authenticated %}
     <script nonce="{{ csp_nonce }}">
       (function () {
         var btn = document.getElementById("btn-sino");
@@ -229,16 +223,31 @@
             credentials: "same-origin",
           })
             .then(function (r) {
+              if (!r.ok) return Promise.reject(new Error("http_" + r.status));
               return r.json();
             })
             .then(function (data) {
+              if (!data.sucesso) {
+                lista.innerHTML =
+                  '<div class="p-3 text-sm text-red-500 text-center">' +
+                  window.DTX_i18n.notifications_load_error +
+                  '</div>';
+                return;
+              }
               var total =
                 data.total_nao_lidas !== undefined ? data.total_nao_lidas : 0;
               atualizarBadge(total);
               var notifs = data.notificacoes || [];
               if (notifs.length === 0) {
-                lista.innerHTML =
-                  '<div class="p-3 text-sm text-gray-500 text-center">' + window.DTX_i18n.notifications_empty + '</div>';
+                if (data.lista_degradada) {
+                  lista.innerHTML =
+                    '<div class="p-3 text-sm text-yellow-600 text-center">' +
+                    window.DTX_i18n.notifications_load_error +
+                    ' <button class="underline ml-1" onclick="carregarNotificacoes()">&#8635;</button></div>';
+                } else {
+                  lista.innerHTML =
+                    '<div class="p-3 text-sm text-gray-500 text-center">' + window.DTX_i18n.notifications_empty + '</div>';
+                }
                 return;
               }
               var csrf =
@@ -258,6 +267,8 @@
                     lidaClass +
                     ' notif-item" data-id="' +
                     (n.id || "") +
+                    '" data-url="' +
+                    urlChamado +
                     '">' +
                     '<div class="font-semibold text-gray-800 text-sm">' +
                     (n.titulo || "") +
@@ -275,8 +286,11 @@
                 })
                 .join("");
               lista.querySelectorAll(".notif-item").forEach(function (el) {
-                el.addEventListener("click", function () {
+                el.addEventListener("click", function (e) {
+                  e.preventDefault();
                   var id = el.getAttribute("data-id");
+                  var url = el.getAttribute("data-url") || el.getAttribute("href");
+                  var doNav = function () { if (url) window.location.href = url; };
                   if (id) {
                     fetch(
                       '{{ url_for("main.api_notificacoes_marcar_lida", notificacao_id="__ID__") }}'.replace(
@@ -291,14 +305,18 @@
                           "Content-Type": "application/json",
                         },
                       },
-                    ).then(function () {});
+                    ).then(doNav, doNav);
+                  } else {
+                    doNav();
                   }
                 });
               });
             })
             .catch(function () {
               lista.innerHTML =
-                '<div class="p-3 text-sm text-gray-500 text-center">Erro ao carregar</div>';
+                '<div class="p-3 text-sm text-red-500 text-center">' +
+                window.DTX_i18n.notifications_load_error +
+                '</div>';
             });
         }
 
@@ -360,8 +378,8 @@
         }
 
         carregarNotificacoes();
-        var _POLL_MS = 120000; // 2 minutos
-        var _DEBOUNCE_MS = 30000; // ignora visibilitychange se polou há < 30s
+        var _POLL_MS = 300000; // 5 minutos (reduz reads Firestore em ~60%)
+        var _DEBOUNCE_MS = 60000; // ignora visibilitychange se polou há < 60s
         setInterval(function () {
           if (document.visibilityState === "visible") atualizarSóBadge();
         }, _POLL_MS);
@@ -373,26 +391,34 @@
         });
       })();
     </script>
+    {% endif %}
+
+    {# Web Push: disponível para todos os usuários autenticados #}
+    {% if current_user.is_authenticated %}
     <!-- Web Push: registrar SW; banner para pedir permissão e inscrever no clique -->
     <div
       id="webpush-banner"
-      class="hidden fixed top-16 left-1/2 -translate-x-1/2 z-50 bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg text-sm flex items-center gap-3 max-w-md"
+      role="region"
+      aria-label="{{ t('webpush_banner_text') }}"
+      class="hidden fixed bottom-4 left-4 right-4 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 z-[190] bg-blue-600 text-white px-4 py-3 rounded-xl shadow-2xl border border-blue-500/30 text-sm flex flex-col sm:flex-row sm:items-center gap-3 max-w-md sm:w-full"
     >
-      <span>{{ t('webpush_banner_text') }}</span>
-      <button
-        type="button"
-        id="webpush-ativar"
-        class="px-3 py-1 bg-white text-blue-600 font-semibold rounded hover:bg-blue-50"
-      >
-        {{ t('enable') }}
-      </button>
-      <button
-        type="button"
-        id="webpush-dispensar"
-        class="px-2 py-1 text-blue-100 hover:text-white"
-      >
-        {{ t('not_now') }}
-      </button>
+      <span class="flex-1">{{ t('webpush_banner_text') }}</span>
+      <div class="flex items-center gap-2 shrink-0">
+        <button
+          type="button"
+          id="webpush-ativar"
+          class="px-3 py-1 bg-white text-blue-600 font-semibold rounded hover:bg-blue-50 outline-none focus-visible:ring-2 focus-visible:ring-white"
+        >
+          {{ t('enable') }}
+        </button>
+        <button
+          type="button"
+          id="webpush-dispensar"
+          class="px-2 py-1 text-blue-100 hover:text-white outline-none focus-visible:ring-2 focus-visible:ring-white rounded"
+        >
+          {{ t('not_now') }}
+        </button>
+      </div>
     </div>
     <script nonce="{{ csp_nonce }}">
       (function () {
@@ -403,6 +429,16 @@
         function csrfHeader() {
           var m = document.querySelector('meta[name="csrf-token"]');
           return m && m.content ? { "X-CSRFToken": m.content } : {};
+        }
+        function mostrarToastSucesso() {
+          var toast = document.createElement("div");
+          toast.className =
+            "fixed bottom-24 left-1/2 -translate-x-1/2 z-[190] bg-green-600 text-white px-4 py-2 rounded-lg shadow-lg text-sm";
+          toast.textContent = "{{ t('webpush_ativado') }}";
+          document.body.appendChild(toast);
+          setTimeout(function () {
+            toast.remove();
+          }, 3000);
         }
         function inscrever() {
           if (!vapidPublicKey) return Promise.resolve();
@@ -455,7 +491,7 @@
               return;
             }
             if (Notification.permission === "denied") return;
-            if (sessionStorage.getItem(BANNER_KEY)) return;
+            if (localStorage.getItem(BANNER_KEY)) return;
             var banner = document.getElementById("webpush-banner");
             var btnAtivar = document.getElementById("webpush-ativar");
             var btnDispensar = document.getElementById("webpush-dispensar");
@@ -474,6 +510,7 @@
                     inscrever()
                       .then(function () {
                         if (banner) banner.classList.add("hidden");
+                        mostrarToastSucesso();
                       })
                       .catch(function () {
                         btnAtivar.disabled = false;
@@ -488,7 +525,7 @@
             if (btnDispensar)
               btnDispensar.addEventListener("click", function () {
                 if (banner) banner.classList.add("hidden");
-                sessionStorage.setItem(BANNER_KEY, "1");
+                localStorage.setItem(BANNER_KEY, "1");
               });
           })
           .catch(function () {});

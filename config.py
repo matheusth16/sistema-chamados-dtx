@@ -69,8 +69,8 @@ class Config:
     # em app/__init__.py, ou pelo cookie de "lembrar" (REMEMBER_COOKIE_DURATION, 30 dias).
     PERMANENT_SESSION_LIFETIME = 86400  # 24 horas — reservado para uso futuro
     SESSION_COOKIE_SECURE = _to_bool(
-        os.getenv("SESSION_COOKIE_SECURE"), default=True
-    )  # HTTPS em produção
+        os.getenv("SESSION_COOKIE_SECURE"), default=(_env == "production")
+    )  # True em produção (HTTPS), False em desenvolvimento/teste
     SESSION_COOKIE_HTTPONLY = True  # Não acessível via JavaScript
     SESSION_COOKIE_SAMESITE = "Lax"  # Proteção contra CSRF
     REMEMBER_COOKIE_DURATION = 2592000  # 30 dias em segundos (Flask-Login padrão é 31 dias)
@@ -127,6 +127,9 @@ class Config:
     # Web Push (notificações no navegador). Gere chaves com: python gerar_vapid_keys.py
     VAPID_PUBLIC_KEY = os.getenv("VAPID_PUBLIC_KEY", "")
     VAPID_PRIVATE_KEY = os.getenv("VAPID_PRIVATE_KEY", "")
+
+    # Notificação e-mail ao solicitante em mudança de status (opt-in)
+    NOTIFY_SOLICITANTE_EMAIL = _to_bool(os.getenv("NOTIFY_SOLICITANTE_EMAIL"), default=False)
 
     # Criptografia de PII em repouso (LGPD). Gere chave: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
     ENCRYPTION_KEY = os.getenv("ENCRYPTION_KEY", "").strip()
