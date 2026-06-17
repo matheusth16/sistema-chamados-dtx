@@ -1,17 +1,17 @@
 """
-Serviço de Notificações: E-mail via Microsoft Graph API (client credentials).
+Notification Service: E-mail via Microsoft Graph API (client credentials).
 
-- Aprovador (responsável): notificado na criação do chamado.
-- Solicitante: notificado em mudança de status (Em Atendimento / Concluído).
-- Responsável: alerta de prazo 24h.
-- Setores adicionais: supervisor do setor é notificado quando setor é adicionado.
-- Novo usuário: recebe credenciais por e-mail ao ser cadastrado.
+- Approver (responsible): notified when a new ticket is created.
+- Requester: notified on status change (In Progress / Completed).
+- Responsible: 24h deadline alert.
+- Additional departments: supervisor notified when department is added.
+- New user: receives credentials by e-mail on registration.
 
-Variáveis de ambiente obrigatórias:
-  GRAPH_TENANT_ID     — Directory (tenant) ID do Azure AD
+Required environment variables:
+  GRAPH_TENANT_ID     — Azure AD Directory (tenant) ID
   GRAPH_CLIENT_ID     — Application (client) ID
   GRAPH_CLIENT_SECRET — Client secret value
-  GRAPH_SENDER_EMAIL  — Caixa de envio (ex: dtxls.support@dtx.aero)
+  GRAPH_SENDER_EMAIL  — Sender mailbox (e.g. dtxls.support@dtx.aero)
 """
 
 import logging
@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 
 
 def _config(key: str, default=None):
-    """Lê valor do Flask config. Retorna default se fora de app context."""
+    """Read value from Flask config. Returns default if outside app context."""
     try:
         return current_app.config.get(key, default)
     except RuntimeError:
@@ -48,7 +48,7 @@ def _enviar_via_graph(
     corpo_texto: str | None,
     from_addr: str,
 ) -> tuple:
-    """Envia e-mail via Microsoft Graph API (client credentials)."""
+    """Send e-mail via Microsoft Graph API (client credentials)."""
     import json
 
     tenant_id = os.getenv("GRAPH_TENANT_ID", "").strip()
@@ -59,8 +59,8 @@ def _enviar_via_graph(
     if not all([tenant_id, client_id, client_secret, sender_email]):
         return (
             False,
-            "Configuração incompleta: defina GRAPH_TENANT_ID, GRAPH_CLIENT_ID, "
-            "GRAPH_CLIENT_SECRET e GRAPH_SENDER_EMAIL",
+            "Incomplete configuration: set GRAPH_TENANT_ID, GRAPH_CLIENT_ID, "
+            "GRAPH_CLIENT_SECRET and GRAPH_SENDER_EMAIL",
         )
 
     token_url = f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token"
@@ -79,17 +79,17 @@ def _enviar_via_graph(
             token_resp = json.loads(resp.read().decode("utf-8"))
             access_token = token_resp.get("access_token")
             if not access_token:
-                err = f"Token não obtido: {list(token_resp.keys())}"
+                err = f"Token not obtained: {list(token_resp.keys())}"
                 logger.warning(err)
                 return (False, err)
     except urllib.error.HTTPError as e:
         body = e.read().decode("utf-8", errors="replace")[:300]
         err = f"Graph token HTTP {e.code}: {body}"
-        logger.warning("Falha ao obter token Graph: %s", err)
+        logger.warning("Failed to obtain Graph token: %s", err)
         return (False, err)
     except Exception as e:
-        logger.exception("Falha ao obter token Graph para %s: %s", destinatario, e)
-        return (False, f"Falha ao obter token OAuth2: {e}")
+        logger.exception("Failed to obtain Graph token for %s: %s", destinatario, e)
+        return (False, f"OAuth2 token failure: {e}")
 
     payload = json.dumps(
         {
@@ -115,25 +115,25 @@ def _enviar_via_graph(
     try:
         with urllib.request.urlopen(req_send, timeout=15) as resp:  # nosec B310
             if resp.status == 202:
-                logger.info("E-mail enviado via Graph para %s: %s", destinatario, assunto[:60])
+                logger.info("E-mail sent via Graph to %s: %s", destinatario, assunto[:60])
                 return (True, None)
-            err = f"Graph sendMail status inesperado: {resp.status}"
+            err = f"Graph sendMail unexpected status: {resp.status}"
             logger.warning(err)
             return (False, err)
     except urllib.error.HTTPError as e:
         body = e.read().decode("utf-8", errors="replace")[:300]
         err = f"Graph sendMail HTTP {e.code}: {body}"
-        logger.warning("Falha Graph sendMail para %s: %s", destinatario, err)
+        logger.warning("Graph sendMail failed for %s: %s", destinatario, err)
         return (False, err)
     except Exception as e:
-        logger.exception("Falha ao enviar via Graph para %s: %s", destinatario, e)
+        logger.exception("Failed to send via Graph to %s: %s", destinatario, e)
         return (False, str(e))
 
 
 def enviar_email(destinatario: str, assunto: str, corpo_html: str, corpo_texto: str = None):
-    """Envia e-mail via Microsoft Graph API. Retorna (True, None) ou (False, erro)."""
+    """Send e-mail via Microsoft Graph API. Returns (True, None) or (False, error)."""
     if not destinatario or not destinatario.strip():
-        logger.warning("Notificação ignorada: destinatário vazio")
+        logger.warning("Notification skipped: empty recipient")
         return (False, None)
     from_addr = os.getenv("GRAPH_SENDER_EMAIL", "").strip() or "noreply@localhost"
     return _enviar_via_graph(destinatario.strip(), assunto, corpo_html, corpo_texto, from_addr)
@@ -161,7 +161,7 @@ def _link_dashboard() -> str:
 
 
 # ---------------------------------------------------------------------------
-# Novo chamado — notifica responsável (supervisor)
+# New ticket — notify responsible (supervisor)
 # ---------------------------------------------------------------------------
 
 
@@ -176,9 +176,9 @@ def notificar_aprovador_novo_chamado(
     responsavel_usuario,
     solicitante_email: str = None,
 ) -> None:
-    """Notifica o responsável que um novo chamado foi atribuído a ele."""
+    """Notify the responsible that a new ticket has been assigned to them."""
     if not responsavel_usuario or not getattr(responsavel_usuario, "email", None):
-        logger.debug("Aprovador sem e-mail; notificação não enviada")
+        logger.debug("Approver has no e-mail; notification not sent")
         return
 
     email_dest = responsavel_usuario.email.strip()
@@ -189,52 +189,52 @@ def notificar_aprovador_novo_chamado(
     if solicitante_email and solicitante_email.strip():
         solicitante_linha += f" ({solicitante_email.strip()})"
 
-    assunto = f"Novo chamado atribuído: {numero_chamado}"
+    assunto = f"New ticket assigned: {numero_chamado}"
 
     detalhes_html = build_detail_table(
         [
-            ("Número", numero_chamado),
-            ("Categoria", categoria),
-            ("Tipo", tipo_solicitacao),
-            ("Área", area),
-            ("Solicitante", solicitante_linha),
+            ("Number", numero_chamado),
+            ("Category", categoria),
+            ("Type", tipo_solicitacao),
+            ("Area", area),
+            ("Requester", solicitante_linha),
         ]
     )
     summary_html = f'<p style="margin: 12px 0;">{escape(resumo_truncado)}</p>'
 
     ctas = []
     if link:
-        ctas.append(("Ver histórico do chamado", link, "#2563eb"))
+        ctas.append(("View ticket history", link, "#2563eb"))
     if link_dash:
-        ctas.append(("Ver chamados do setor", link_dash, "#6b7280"))
+        ctas.append(("View sector tickets", link_dash, "#6b7280"))
     botoes_html = build_two_ctas(ctas) if ctas else ""
 
     corpo_html = build_email_shell(
-        header_title="Novo chamado atribuído",
+        header_title="New ticket assigned",
         header_color="#2563eb",
         body_html=(
-            "<p>Olá, um novo chamado foi atribuído a você.</p>"
+            "<p>Hello, a new ticket has been assigned to you.</p>"
             + detalhes_html
             + summary_html
             + botoes_html
         ),
     )
     corpo_texto = (
-        f"Número: {numero_chamado}\n"
-        f"Categoria: {categoria}\nTipo: {tipo_solicitacao}\n"
-        f"Área: {area}\nSolicitante: {solicitante_linha}\n"
-        f"Resumo: {resumo_truncado}"
+        f"Number: {numero_chamado}\n"
+        f"Category: {categoria}\nType: {tipo_solicitacao}\n"
+        f"Area: {area}\nRequester: {solicitante_linha}\n"
+        f"Summary: {resumo_truncado}"
     )
 
     ok, err = enviar_email(email_dest, assunto, corpo_html, corpo_texto)
     if ok:
-        logger.info("Notificação de novo chamado enviada para %s", email_dest)
+        logger.info("New ticket notification sent to %s", email_dest)
     else:
-        logger.warning("Falha ao notificar aprovador %s: %s", email_dest, err)
+        logger.warning("Failed to notify approver %s: %s", email_dest, err)
 
 
 # ---------------------------------------------------------------------------
-# Alerta de prazo 24h — notifica responsável
+# 24h deadline alert — notify responsible
 # ---------------------------------------------------------------------------
 
 
@@ -248,9 +248,9 @@ def notificar_responsavel_prazo_24h(
     solicitante_nome: str = "",
     descricao_resumo: str = "",
 ) -> None:
-    """Avisa o responsável que o chamado está prestes a vencer o SLA (24h)."""
+    """Warn the responsible that the ticket is about to breach its SLA (24h)."""
     if not responsavel_email or not str(responsavel_email).strip():
-        logger.warning("Alerta 24h ignorado para %s: responsável sem e-mail", numero_chamado)
+        logger.warning("24h alert skipped for %s: responsible has no e-mail", numero_chamado)
         return
 
     email_dest = responsavel_email.strip()
@@ -259,15 +259,15 @@ def notificar_responsavel_prazo_24h(
     resumo_truncado = (descricao_resumo or "")[:500] + (
         "..." if len(descricao_resumo or "") > 500 else ""
     )
-    assunto = f"Chamado {numero_chamado}: prazo se encerrando em 24h"
+    assunto = f"Ticket {numero_chamado}: deadline in 24h"
 
     detalhes_html = build_detail_table(
         [
-            ("Número", numero_chamado),
-            ("Categoria", categoria),
-            ("Tipo", tipo_solicitacao),
-            ("Área", area),
-            ("Solicitante", solicitante_nome),
+            ("Number", numero_chamado),
+            ("Category", categoria),
+            ("Type", tipo_solicitacao),
+            ("Area", area),
+            ("Requester", solicitante_nome),
         ]
     )
     summary_html = (
@@ -276,37 +276,37 @@ def notificar_responsavel_prazo_24h(
 
     ctas = []
     if link:
-        ctas.append(("Ver histórico do chamado", link, "#d97706"))
+        ctas.append(("View ticket history", link, "#d97706"))
     if link_dash:
-        ctas.append(("Ver chamados do setor", link_dash, "#6b7280"))
+        ctas.append(("View sector tickets", link_dash, "#6b7280"))
     botoes_html = build_two_ctas(ctas) if ctas else ""
 
     corpo_html = build_email_shell(
-        header_title="Chamado próximo do vencimento (24h)",
+        header_title="Ticket nearing deadline (24h)",
         header_color="#d97706",
         body_html=(
-            "<p>Olá, este chamado está próximo de vencer o prazo de atendimento.</p>"
+            "<p>Hello, this ticket is approaching its SLA deadline (24h remaining).</p>"
             + detalhes_html
             + summary_html
             + botoes_html
         ),
     )
     corpo_texto = (
-        f"Número: {numero_chamado}\n"
-        "Aviso: este chamado está prestes a vencer o SLA (24h restantes).\n"
-        f"Categoria: {categoria}\nTipo: {tipo_solicitacao}\n"
-        f"Área: {area}\nSolicitante: {solicitante_nome}"
+        f"Number: {numero_chamado}\n"
+        "Warning: this ticket is about to breach its SLA (24h remaining).\n"
+        f"Category: {categoria}\nType: {tipo_solicitacao}\n"
+        f"Area: {area}\nRequester: {solicitante_nome}"
     )
 
     ok, err = enviar_email(email_dest, assunto, corpo_html, corpo_texto)
     if ok:
-        logger.info("Alerta 24h enviado para %s (chamado %s)", email_dest, numero_chamado)
+        logger.info("24h alert sent to %s (ticket %s)", email_dest, numero_chamado)
     else:
-        logger.warning("Falha ao enviar alerta 24h para %s: %s", email_dest, err)
+        logger.warning("Failed to send 24h alert to %s: %s", email_dest, err)
 
 
 # ---------------------------------------------------------------------------
-# Novo usuário cadastrado — envia credenciais
+# New user registered — send credentials
 # ---------------------------------------------------------------------------
 
 
@@ -318,60 +318,60 @@ def notificar_novo_usuario_cadastrado(
     areas: list | None = None,
     senha_inicial: str = "",
 ) -> None:
-    """Envia e-mail de boas-vindas com credenciais ao usuário recém-cadastrado."""
+    """Send a welcome e-mail with credentials to a newly registered user."""
     if not usuario_email or not str(usuario_email).strip():
-        logger.warning("Aviso de novo usuário ignorado: e-mail vazio")
+        logger.warning("New user notification skipped: empty e-mail")
         return
 
     email_dest = usuario_email.strip()
     areas_str = ", ".join(areas or [])
     link_dash = _link_dashboard()
-    assunto = "Bem-vindo ao DTX Digital Andon — suas credenciais de acesso"
+    assunto = "Welcome to DTX Digital Andon — your access credentials"
 
     detalhes_html = build_detail_table(
         [
-            ("Perfil", perfil or "N/A"),
-            ("Áreas", areas_str or "N/A"),
+            ("Role", perfil or "N/A"),
+            ("Areas", areas_str or "N/A"),
             ("E-mail", email_dest),
-            ("Senha inicial", senha_inicial),
+            ("Initial password", senha_inicial),
         ]
     )
     acesso_html = (
-        f'<p style="margin-top: 20px;">{build_cta_button("Acessar o sistema", link_dash, "#2563eb")}</p>'
+        f'<p style="margin-top: 20px;">{build_cta_button("Open system", link_dash, "#2563eb")}</p>'
         if link_dash
         else ""
     )
 
     corpo_html = build_email_shell(
-        header_title="Novo cadastro — DTX Digital Andon",
+        header_title="New account — DTX Digital Andon",
         header_color="#2563eb",
         body_html=(
-            f"<p>Olá, <strong>{escape(usuario_nome or 'usuário')}</strong>! "
-            "Um acesso foi criado para você no DTX Digital Andon.</p>"
+            f"<p>Hello, <strong>{escape(usuario_nome or 'user')}</strong>! "
+            "An account has been created for you in DTX Digital Andon.</p>"
             + detalhes_html
-            + "<p>Você será solicitado a trocar a senha no primeiro acesso.</p>"
-            + "<p>Se não reconhecer este cadastro, entre em contato com o suporte imediatamente.</p>"
+            + "<p>You will be asked to change your password on first login.</p>"
+            + "<p>If you do not recognize this account, contact support immediately.</p>"
             + acesso_html
         ),
     )
     corpo_texto = (
-        f"Olá {usuario_nome or 'usuário'},\n\n"
-        "Um acesso foi criado para você no DTX Digital Andon.\n"
-        f"Perfil: {perfil}\nÁreas: {areas_str or 'N/A'}\n"
-        f"E-mail: {email_dest}\nSenha inicial: {senha_inicial}\n\n"
-        "Você será solicitado a trocar a senha no primeiro acesso.\n"
-        "Se não reconhecer este cadastro, entre em contato com o suporte."
+        f"Hello {usuario_nome or 'user'},\n\n"
+        "An account has been created for you in DTX Digital Andon.\n"
+        f"Role: {perfil}\nAreas: {areas_str or 'N/A'}\n"
+        f"E-mail: {email_dest}\nInitial password: {senha_inicial}\n\n"
+        "You will be asked to change your password on first login.\n"
+        "If you do not recognize this account, contact support immediately."
     )
 
     ok, err = enviar_email(email_dest, assunto, corpo_html, corpo_texto)
     if ok:
-        logger.info("E-mail de cadastro enviado para %s", email_dest)
+        logger.info("Registration e-mail sent to %s", email_dest)
     else:
-        logger.warning("Falha ao enviar e-mail de cadastro para %s: %s", email_dest, err)
+        logger.warning("Failed to send registration e-mail to %s: %s", email_dest, err)
 
 
 # ---------------------------------------------------------------------------
-# Setor adicional incluído no chamado — notifica supervisor do setor
+# Additional department included in ticket — notify department supervisor
 # ---------------------------------------------------------------------------
 
 
@@ -386,9 +386,9 @@ def notificar_responsavel_setor_adicional(
     quem_adicionou_nome: str = "",
     descricao_resumo: str = "",
 ) -> None:
-    """Notifica o responsável de um setor adicional incluído no chamado."""
+    """Notify the responsible of an additional department included in the ticket."""
     if not email_responsavel_setor or not str(email_responsavel_setor).strip():
-        logger.warning("Aviso setor adicional ignorado para %s: e-mail vazio", numero_chamado)
+        logger.warning("Additional dept notification skipped for %s: empty e-mail", numero_chamado)
         return
 
     email_dest = email_responsavel_setor.strip()
@@ -397,16 +397,16 @@ def notificar_responsavel_setor_adicional(
     resumo_truncado = (descricao_resumo or "")[:500] + (
         "..." if len(descricao_resumo or "") > 500 else ""
     )
-    assunto = f"Chamado {numero_chamado}: seu setor foi incluído"
+    assunto = f"Ticket {numero_chamado}: your department has been included"
 
     detalhes_html = build_detail_table(
         [
-            ("Número", numero_chamado),
-            ("Setor", setor_adicional),
-            ("Incluído por", quem_adicionou_nome),
-            ("Categoria", categoria),
-            ("Tipo", tipo_solicitacao),
-            ("Solicitante", solicitante_nome),
+            ("Number", numero_chamado),
+            ("Department", setor_adicional),
+            ("Added by", quem_adicionou_nome),
+            ("Category", categoria),
+            ("Type", tipo_solicitacao),
+            ("Requester", solicitante_nome),
         ]
     )
     summary_html = (
@@ -415,34 +415,34 @@ def notificar_responsavel_setor_adicional(
 
     ctas = []
     if link:
-        ctas.append(("Ver histórico do chamado", link, "#2563eb"))
+        ctas.append(("View ticket history", link, "#2563eb"))
     if link_dash:
-        ctas.append(("Ver chamados do setor", link_dash, "#6b7280"))
+        ctas.append(("View sector tickets", link_dash, "#6b7280"))
     botoes_html = build_two_ctas(ctas) if ctas else ""
 
     corpo_html = build_email_shell(
-        header_title="Seu setor foi incluído em um chamado",
+        header_title="Your department has been included in a ticket",
         header_color="#2563eb",
         body_html=(
-            "<p>Olá, seu setor foi incluído neste chamado.</p>"
+            "<p>Hello, your department has been included in this ticket.</p>"
             + detalhes_html
             + summary_html
             + botoes_html
         ),
     )
     corpo_texto = (
-        f"Número: {numero_chamado}\nSetor: {setor_adicional}\n"
-        f"Incluído por: {quem_adicionou_nome}\nCategoria: {categoria}\n"
-        f"Tipo: {tipo_solicitacao}\nSolicitante: {solicitante_nome}"
+        f"Number: {numero_chamado}\nDepartment: {setor_adicional}\n"
+        f"Added by: {quem_adicionou_nome}\nCategory: {categoria}\n"
+        f"Type: {tipo_solicitacao}\nRequester: {solicitante_nome}"
     )
 
     ok, err = enviar_email(email_dest, assunto, corpo_html, corpo_texto)
     if ok:
         logger.info(
-            "Notif. setor adicional enviada para %s (chamado %s)", email_dest, numero_chamado
+            "Additional dept notification sent to %s (ticket %s)", email_dest, numero_chamado
         )
     else:
-        logger.warning("Falha ao notificar setor adicional %s: %s", email_dest, err)
+        logger.warning("Failed to notify additional dept %s: %s", email_dest, err)
 
 
 def notificar_setores_adicionais_chamado(
@@ -456,7 +456,7 @@ def notificar_setores_adicionais_chamado(
     quem_adicionou_nome: str,
     setores_nomes: str = None,
 ) -> None:
-    """Notifica todos os supervisores dos setores adicionados ao chamado."""
+    """Notify all supervisors of departments added to the ticket."""
     if not setores_novos:
         return
 
@@ -486,15 +486,15 @@ def notificar_setores_adicionais_chamado(
         if not email or not str(email).strip():
             continue
 
-        assunto = f"Chamado {numero_chamado}: seu setor foi incluído"
+        assunto = f"Ticket {numero_chamado}: your department has been included"
         detalhes_html = build_detail_table(
             [
-                ("Número", numero_chamado),
-                ("Categoria", categoria),
-                ("Tipo", tipo_solicitacao),
-                ("Solicitante", solicitante_nome),
-                ("Incluído por", quem_adicionou_nome),
-                ("Setores adicionados", setores_str),
+                ("Number", numero_chamado),
+                ("Category", categoria),
+                ("Type", tipo_solicitacao),
+                ("Requester", solicitante_nome),
+                ("Added by", quem_adicionou_nome),
+                ("Departments added", setores_str),
             ]
         )
         summary_html = (
@@ -503,38 +503,36 @@ def notificar_setores_adicionais_chamado(
 
         ctas = []
         if link:
-            ctas.append(("Ver histórico do chamado", link, "#2563eb"))
+            ctas.append(("View ticket history", link, "#2563eb"))
         if link_dash:
-            ctas.append(("Ver chamados do setor", link_dash, "#6b7280"))
+            ctas.append(("View sector tickets", link_dash, "#6b7280"))
         botoes_html = build_two_ctas(ctas) if ctas else ""
 
         corpo_html = build_email_shell(
-            header_title="Chamado: seu setor foi incluído",
+            header_title="Ticket: your department has been included",
             header_color="#2563eb",
             body_html=(
-                f"<p>Olá, o chamado <strong>{escape(numero_chamado)}</strong> "
-                f"teve seu setor incluído por <strong>{escape(quem_adicionou_nome)}</strong>.</p>"
+                f"<p>Hello, ticket <strong>{escape(numero_chamado)}</strong> "
+                f"included your department, added by <strong>{escape(quem_adicionou_nome)}</strong>.</p>"
                 + detalhes_html
                 + summary_html
                 + botoes_html
             ),
         )
         corpo_texto = (
-            f"Número: {numero_chamado}\nSolicitante: {solicitante_nome}\n"
-            f"Incluído por: {quem_adicionou_nome}\nSetores: {setores_str}"
+            f"Number: {numero_chamado}\nRequester: {solicitante_nome}\n"
+            f"Added by: {quem_adicionou_nome}\nDepartments: {setores_str}"
         )
 
         ok, err = enviar_email(email.strip(), assunto, corpo_html, corpo_texto)
         if ok:
-            logger.info(
-                "Notif. setores adicionados enviada para %s (chamado %s)", email, numero_chamado
-            )
+            logger.info("Dept added notification sent to %s (ticket %s)", email, numero_chamado)
         else:
-            logger.warning("Falha ao notificar setores adicionados para %s: %s", email, err)
+            logger.warning("Failed to notify dept added to %s: %s", email, err)
 
 
 # ---------------------------------------------------------------------------
-# Mudança de status — notifica solicitante
+# Status change — notify requester
 # ---------------------------------------------------------------------------
 
 
@@ -545,7 +543,7 @@ def notificar_solicitante_status(
     categoria: str,
     solicitante_usuario,
 ) -> None:
-    """Notifica o solicitante sobre mudança de status (Em Atendimento / Concluído)."""
+    """Notify the requester about a status change (In Progress / Completed)."""
     if not solicitante_usuario:
         return
 
@@ -553,48 +551,46 @@ def notificar_solicitante_status(
     if not email:
         return
 
-    nome = getattr(solicitante_usuario, "nome", None) or "Solicitante"
+    nome = getattr(solicitante_usuario, "nome", None) or "Requester"
     link = _link_chamado(chamado_id)
 
     if novo_status == "Concluído":
-        assunto = f"Chamado {numero_chamado}: concluído"
-        header_title = f"Chamado {numero_chamado}: Concluído"
+        assunto = f"Ticket {numero_chamado}: completed"
+        header_title = f"Ticket {numero_chamado}: Completed"
         header_color = "#059669"
-        msg_status = "seu chamado foi <strong>concluído</strong>"
+        msg_status = "your ticket has been <strong>completed</strong>"
     else:
-        assunto = f"Chamado {numero_chamado}: em atendimento"
-        header_title = f"Chamado {numero_chamado}: Em Atendimento"
+        assunto = f"Ticket {numero_chamado}: in progress"
+        header_title = f"Ticket {numero_chamado}: In Progress"
         header_color = "#2563eb"
-        msg_status = "seu chamado está <strong>em atendimento</strong>"
+        msg_status = "your ticket is <strong>in progress</strong>"
 
     detalhes_html = build_detail_table(
-        [("Chamado", numero_chamado), ("Categoria", categoria), ("Status", novo_status)]
+        [("Ticket", numero_chamado), ("Category", categoria), ("Status", novo_status)]
     )
     botoes_html = (
-        f'<p style="margin-top:20px;">{build_cta_button("Ver chamado", link, "#2563eb")}</p>'
+        f'<p style="margin-top:20px;">{build_cta_button("View ticket", link, "#2563eb")}</p>'
         if link
-        else '<p style="color:#6b7280;">Acesse o sistema para acompanhar.</p>'
+        else '<p style="color:#6b7280;">Log in to the system to track your ticket.</p>'
     )
 
     corpo_html = build_email_shell(
         header_title=header_title,
         header_color=header_color,
         body_html=(
-            f"<p>Olá, <strong>{escape(nome)}</strong>! Informamos que {msg_status}.</p>"
+            f"<p>Hello, <strong>{escape(nome)}</strong>! We are letting you know that {msg_status}.</p>"
             + detalhes_html
             + botoes_html
         ),
     )
     corpo_texto = (
-        f"Olá, {nome}!\n\n"
-        f"Chamado: {numero_chamado}\nCategoria: {categoria}\nStatus: {novo_status}"
-        + (f"\n\nVer chamado: {link}" if link else "")
+        f"Hello, {nome}!\n\n"
+        f"Ticket: {numero_chamado}\nCategory: {categoria}\nStatus: {novo_status}"
+        + (f"\n\nView ticket: {link}" if link else "")
     )
 
     ok, err = enviar_email(email, assunto, corpo_html, corpo_texto)
     if ok:
-        logger.info(
-            "E-mail de status (%s) enviado para %s (chamado %s)", novo_status, email, numero_chamado
-        )
+        logger.info("Status e-mail (%s) sent to %s (ticket %s)", novo_status, email, numero_chamado)
     else:
-        logger.warning("Falha ao enviar e-mail de status para %s: %s", email, err)
+        logger.warning("Failed to send status e-mail to %s: %s", email, err)

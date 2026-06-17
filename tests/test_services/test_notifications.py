@@ -59,8 +59,8 @@ def test_notificar_novo_usuario_cadastrado_envia_direto(app):
     assert mock_enviar.called
     destinatario, assunto, corpo_html, _corpo_texto = mock_enviar.call_args[0]
     assert destinatario == "novo.usuario@dtx.aero"
-    assert assunto == "Bem-vindo ao DTX Digital Andon — suas credenciais de acesso"
-    assert "Perfil" in corpo_html or "perfil" in corpo_html.lower()
+    assert assunto == "Welcome to DTX Digital Andon — your access credentials"
+    assert "Role" in corpo_html or "Initial password" in corpo_html
     assert "SenhaTest99" in corpo_html
     assert "123456" not in corpo_html
 
@@ -89,9 +89,9 @@ def test_notificar_responsavel_prazo_24h_envia_direto(app):
     assert mock_enviar.called
     destinatario, assunto, corpo_html, _corpo_texto = mock_enviar.call_args[0]
     assert destinatario == "resp@dtx.aero"
-    assert assunto == "Chamado 2026-100: prazo se encerrando em 24h"
+    assert assunto == "Ticket 2026-100: deadline in 24h"
     assert "2026-100" in corpo_html
-    assert "vencer" in corpo_html.lower() or "prazo" in corpo_html.lower()
+    assert "deadline" in corpo_html.lower() or "24h" in corpo_html.lower()
 
 
 def test_notificar_responsavel_setor_adicional_envia_direto(app):
@@ -119,7 +119,7 @@ def test_notificar_responsavel_setor_adicional_envia_direto(app):
     assert mock_enviar.called
     destinatario, assunto, corpo_html, _corpo_texto = mock_enviar.call_args[0]
     assert destinatario == "setor@dtx.aero"
-    assert assunto == "Chamado 2026-101: seu setor foi incluído"
+    assert assunto == "Ticket 2026-101: your department has been included"
     assert "2026-101" in corpo_html
     assert "Engenharia" in corpo_html
 
@@ -149,7 +149,7 @@ def test_notificar_aprovador_envia_direto_ao_responsavel(app):
 
     destinatario, assunto, _html, _txt = mock_enviar.call_args[0]
     assert destinatario == "resp@dtx.aero"
-    assert assunto == "Novo chamado atribuído: 2026-103"
+    assert assunto == "New ticket assigned: 2026-103"
 
 
 # ── notificar_solicitante_status (C1) ─────────────────────────────────────────
@@ -223,8 +223,9 @@ def test_notificar_solicitante_status_concluido_envia_email(app):
     dest, assunto, corpo_html, _txt = mock_send.call_args[0]
     assert dest == "sol@test.com"
     assert "CH-001" in assunto
+    assert "completed" in assunto.lower()
     assert "CH-001" in corpo_html
-    assert "Concluído" in corpo_html or "conclu" in corpo_html.lower()
+    assert "completed" in corpo_html.lower()
 
 
 def test_notificar_solicitante_status_em_atendimento_envia_email(app):
@@ -440,7 +441,7 @@ def test_notificar_aprovador_novo_chamado_html_com_ctas(app):
     assert mock_enviar.called
     destinatario, assunto, corpo_html, _corpo_texto = mock_enviar.call_args[0]
     assert destinatario == "resp@dtx.aero"
-    assert assunto == "Novo chamado atribuído: 2026-102"
+    assert assunto == "New ticket assigned: 2026-102"
     assert "2026-102" in corpo_html
-    assert "Ver histórico do chamado" in corpo_html
-    assert "Ver chamados do setor" in corpo_html
+    assert "View ticket history" in corpo_html
+    assert "View sector tickets" in corpo_html
