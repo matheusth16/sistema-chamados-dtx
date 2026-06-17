@@ -67,27 +67,34 @@ def _same_origin(referrer: str) -> bool:
         return False
 
 
-@main.route("/admin", methods=["GET", "POST"])
-@requer_supervisor_area
-def admin() -> Response:
-    """GET: dashboard com chamados. POST: alteração de status."""
+def _dashboard_endpoint() -> str:
+    """Retorna o endpoint de dashboard correto para o perfil atual."""
+    if current_user.perfil == "supervisor":
+        return "main.painel"
+    return "main.admin"
+
+
+def _redirect_dashboard(**kwargs) -> Response:
+    return redirect(url_for(_dashboard_endpoint(), **kwargs))
+
+
+def _render_dashboard() -> Response:
+    """Lógica compartilhada de dashboard — chamada por admin() e painel()."""
     if request.method == "POST":
         chamado_id = request.form.get("chamado_id")
         novo_status = request.form.get("novo_status")
         logger.debug("Alterar status: chamado_id=%s, novo_status=%s", chamado_id, novo_status)
         try:
-            # Verificação de permissão para supervisores
             if current_user.perfil == "supervisor":
                 doc_anterior = db.collection("chamados").document(chamado_id).get()
                 if not doc_anterior.exists:
                     flash_t("ticket_not_found", "danger")
-                    return redirect(url_for("main.admin", **request.args))
+                    return _redirect_dashboard(**request.args)
                 data_anterior = doc_anterior.to_dict()
                 if not supervisor_pode_alterar_chamado(current_user, data_anterior.get("area", "")):
                     flash_t("only_update_tickets_your_area", "danger")
-                    return redirect(url_for("main.admin", **request.args))
+                    return _redirect_dashboard(**request.args)
 
-            # Delega ao serviço centralizado de status
             resultado = atualizar_status_chamado(
                 chamado_id=chamado_id,
                 novo_status=novo_status,
@@ -101,11 +108,11 @@ def admin() -> Response:
                     flash(resultado["erro"], "danger")
                 else:
                     flash_t("error_updating", "danger")
-            return redirect(url_for("main.admin", **request.args))
+            return _redirect_dashboard(**request.args)
         except Exception as e:
             logger.exception("Erro ao atualizar chamado %s: %s", chamado_id, e)
             flash_t("error_updating_with_msg", "danger", error=str(e))
-            return redirect(url_for("main.admin", **request.args))
+            return _redirect_dashboard(**request.args)
 
     itens_por_pagina = Config.ITENS_POR_PAGINA_DASHBOARD
     try:
@@ -122,6 +129,24 @@ def admin() -> Response:
         raise
 
 
+@main.route("/admin", methods=["GET", "POST"])
+@requer_supervisor_area
+def admin() -> Response:
+    """Dashboard principal para admin. Supervisores são redirecionados a /painel."""
+    if current_user.perfil == "supervisor":
+        return redirect(url_for("main.painel", **request.args))
+    return _render_dashboard()
+
+
+@main.route("/painel", methods=["GET", "POST"])
+@requer_supervisor_area
+def painel() -> Response:
+    """Dashboard para supervisores. Admins são redirecionados a /admin."""
+    if current_user.perfil in ("admin", "admin_global"):
+        return redirect(url_for("main.admin", **request.args))
+    return _render_dashboard()
+
+
 @main.route("/chamado/<chamado_id>")
 @login_required
 def visualizar_detalhe_chamado(chamado_id: str) -> Response:
@@ -131,11 +156,9 @@ def visualizar_detalhe_chamado(chamado_id: str) -> Response:
         if not doc_chamado.exists:
             flash_t("ticket_not_found", "danger")
             return redirect(
-                url_for(
-                    "main.admin"
-                    if current_user.perfil in ("supervisor", "admin")
-                    else "main.meus_chamados"
-                )
+                url_for(_dashboard_endpoint())
+                if current_user.perfil in ("supervisor", "admin")
+                else url_for("main.meus_chamados")
             )
         chamado = Chamado.from_dict(doc_chamado.to_dict(), chamado_id)
         if current_user.perfil == "solicitante":
@@ -145,12 +168,12 @@ def visualizar_detalhe_chamado(chamado_id: str) -> Response:
         else:
             if not usuario_pode_ver_chamado(current_user, chamado):
                 flash_t("only_view_history_your_area", "danger")
-                return redirect(url_for("main.admin"))
+                return _redirect_dashboard()
         voltar_url = (
             request.referrer
             if request.referrer and _same_origin(request.referrer)
             else (
-                url_for("main.admin")
+                url_for(_dashboard_endpoint())
                 if current_user.perfil in ("supervisor", "admin")
                 else url_for("main.meus_chamados")
             )
@@ -181,11 +204,9 @@ def visualizar_detalhe_chamado(chamado_id: str) -> Response:
         logger.exception("Erro ao exibir chamado %s: %s", chamado_id, e)
         flash_t("ticket_not_found", "danger")
         return redirect(
-            url_for(
-                "main.admin"
-                if current_user.perfil in ("supervisor", "admin")
-                else "main.meus_chamados"
-            )
+            url_for(_dashboard_endpoint())
+            if current_user.perfil in ("supervisor", "admin")
+            else url_for("main.meus_chamados")
         )
 
 
@@ -200,17 +221,17 @@ def editar_chamado_pagina() -> Response:
     chamado_id = request.form.get("chamado_id")
     if not chamado_id:
         flash_t("ticket_not_found", "danger")
-        return redirect(url_for("main.admin"))
+        return _redirect_dashboard()
 
     doc_chamado = db.collection("chamados").document(chamado_id).get()
     if not doc_chamado.exists:
         flash_t("ticket_not_found", "danger")
-        return redirect(url_for("main.admin"))
+        return _redirect_dashboard()
 
     chamado = Chamado.from_dict(doc_chamado.to_dict(), chamado_id)
     if not usuario_pode_ver_chamado(current_user, chamado):
         flash_t("only_view_history_your_area", "danger")
-        return redirect(url_for("main.admin"))
+        return _redirect_dashboard()
 
     from app.services.edicao_chamado_service import processar_edicao_chamado
 
@@ -250,17 +271,17 @@ def visualizar_historico(chamado_id: str) -> Response:
         doc_chamado = db.collection("chamados").document(chamado_id).get()
         if not doc_chamado.exists:
             flash_t("ticket_not_found", "danger")
-            return redirect(url_for("main.admin"))
+            return _redirect_dashboard()
         chamado = Chamado.from_dict(doc_chamado.to_dict(), chamado_id)
         if not usuario_pode_ver_chamado(current_user, chamado):
             flash_t("only_view_history_your_area", "danger")
-            return redirect(url_for("main.admin"))
+            return _redirect_dashboard()
         historico = Historico.get_by_chamado_id(chamado_id)
         return render_template("historico.html", chamado=chamado, historico=historico)
     except Exception as e:
         logger.exception("Erro ao buscar histórico de %s: %s", chamado_id, e)
         flash_t("error_loading_history", "danger")
-        return redirect(url_for("main.admin"))
+        return _redirect_dashboard()
 
 
 @main.route("/exportar")
@@ -275,7 +296,7 @@ def exportar() -> Response:
             if msg:
                 flash(msg, "warning")
             flash_t("error_exporting_data", "danger")
-            return redirect(url_for("main.admin"))
+            return _redirect_dashboard()
     try:
         chamados_ref = db.collection("chamados")
         resultado = aplicar_filtros_dashboard_com_paginacao(
@@ -325,7 +346,7 @@ def exportar() -> Response:
     except Exception as e:
         logger.exception("Erro ao exportar: %s", e)
         flash_t("error_exporting_data", "danger")
-        return redirect(url_for("main.admin"))
+        return _redirect_dashboard()
 
 
 @main.route("/exportar-avancado")
@@ -340,7 +361,7 @@ def exportar_avancado() -> Response:
             if msg:
                 flash(msg, "warning")
             flash_t("error_exporting_report", "danger")
-            return redirect(url_for("main.admin"))
+            return _redirect_dashboard()
     try:
         from app.services.excel_export_service import exportador_excel
 
@@ -385,7 +406,7 @@ def exportar_avancado() -> Response:
     except Exception as e:
         logger.exception("Erro ao exportar relatório avançado: %s", e)
         flash_t("error_exporting_report", "danger")
-        return redirect(url_for("main.admin"))
+        return _redirect_dashboard()
 
 
 @main.route("/admin/relatorios")
@@ -558,7 +579,7 @@ def relatorios() -> Response:
         except Exception as e2:
             logger.exception("Erro ao renderizar página de relatórios (fallback): %s", e2)
             flash_t("error_generating_reports", "danger")
-            return redirect(url_for("main.admin"))
+            return _redirect_dashboard()
 
 
 @main.route("/admin/indices-firestore")
@@ -573,4 +594,4 @@ def indices_firestore() -> Response:
     except Exception as e:
         logger.exception("Erro ao exibir índices: %s", e)
         flash_t("error_loading_index_info", "danger")
-        return redirect(url_for("main.admin"))
+        return _redirect_dashboard()

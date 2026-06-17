@@ -22,7 +22,7 @@ def test_usabilidade_nao_logado_acessa_rota_protegida_redireciona_para_login(cli
 
 
 def test_usabilidade_login_sucesso_redireciona_por_perfil(client):
-    """U-AUTH-02: Após login, redirecionamento correto: solicitante → /, supervisor/admin → /admin."""
+    """U-AUTH-02: Após login, redirecionamento correto: solicitante → /, supervisor → /painel, admin → /admin."""
     usuario_sol = MagicMock()
     usuario_sol.id = "sol_1"
     usuario_sol.perfil = "solicitante"
@@ -56,7 +56,7 @@ def test_usabilidade_login_sucesso_redireciona_por_perfil(client):
             "/login", data={"email": "sup@test.com", "senha": "ok"}, follow_redirects=False
         )
     assert r2.status_code == 302
-    assert "admin" in r2.location
+    assert "painel" in r2.location
 
 
 def test_usabilidade_login_credenciais_invalidas_permanece_em_login_com_feedback(client):
@@ -119,15 +119,19 @@ def test_usabilidade_formulario_invalido_retorna_erros_na_pagina(client_logado_s
 
 def test_usabilidade_criar_chamado_valido_redireciona(client_logado_solicitante):
     """U-CHAM-02: Após criar chamado com sucesso, usuário é redirecionado."""
-    with patch("app.routes.chamados.criar_chamado") as mock_criar:
+    with (
+        patch("app.routes.chamados.criar_chamado") as mock_criar,
+        patch("app.services.gates_service.CategoriaGate") as mock_gate_cls,
+    ):
         mock_criar.return_value = ("doc_123", "CHM-0001", None, None)
+        mock_gate_cls.get_all_ativos.return_value = []
         r = client_logado_solicitante.post(
             "/",
             data={
                 "categoria": "Chamado",
                 "tipo": "Manutencao",
                 "descricao": "Descrição válida com mais de 3 caracteres",
-                "gate": "Gate 1",
+                "gate": "Gate 1 - Desmontagem",
                 "impacto": "Qualidade",
             },
             follow_redirects=False,

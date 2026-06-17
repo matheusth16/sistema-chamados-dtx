@@ -33,6 +33,8 @@ def login() -> Response:
         )
         if current_user.perfil == "solicitante":
             return redirect(url_for("main.index"))
+        if current_user.perfil == "supervisor":
+            return redirect(url_for("main.painel"))
         return redirect(url_for("main.admin"))
 
     if request.method == "POST":
@@ -97,6 +99,8 @@ def login() -> Response:
             flash_t("welcome_user", "success", nome=usuario.nome)
             if usuario.perfil == "solicitante":
                 return redirect(url_for("main.index"))
+            if usuario.perfil == "supervisor":
+                return redirect(url_for("main.painel"))
             return redirect(url_for("main.admin"))
 
         # Login falhou: incrementa tentativas por IP e por email
@@ -153,6 +157,8 @@ def alterar_senha_obrigatoria() -> Response:
     if not current_user.must_change_password or current_user.perfil == "admin":
         if current_user.perfil == "solicitante":
             return redirect(url_for("main.index"))
+        if current_user.perfil == "supervisor":
+            return redirect(url_for("main.painel"))
         return redirect(url_for("main.admin"))
 
     if request.method == "POST":
@@ -192,6 +198,8 @@ def alterar_senha_obrigatoria() -> Response:
                 # Redirecionar para o dashboard apropriado
                 if current_user.perfil == "solicitante":
                     return redirect(url_for("main.index"))
+                if current_user.perfil == "supervisor":
+                    return redirect(url_for("main.painel"))
                 return redirect(url_for("main.admin"))
             else:
                 flash_t("error_updating_password", "danger")

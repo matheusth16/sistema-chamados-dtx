@@ -64,8 +64,8 @@ def test_regression_login_solicitante_redireciona_para_raiz(client):
     assert r.location.endswith("/") or (r.location and "/" in r.location)
 
 
-def test_regression_login_supervisor_redireciona_para_admin(client):
-    """Regressão: Login como supervisor redireciona para /admin."""
+def test_regression_login_supervisor_redireciona_para_painel(client):
+    """Regressão: Login como supervisor redireciona para /painel."""
     usuario = MagicMock()
     usuario.id = "sup_1"
     usuario.perfil = "supervisor"
@@ -78,7 +78,7 @@ def test_regression_login_supervisor_redireciona_para_admin(client):
             "/login", data={"email": "sup@test.com", "senha": "ok"}, follow_redirects=False
         )
     assert r.status_code == 302
-    assert "admin" in r.location
+    assert "painel" in r.location
 
 
 def test_regression_logout_redireciona_para_login(client_logado_solicitante):
@@ -111,15 +111,19 @@ def test_regression_criar_chamado_sem_login_redireciona(client):
 
 def test_regression_criar_chamado_valido_redireciona(client_logado_solicitante):
     """Regressão: POST / com dados válidos (mock) redireciona após sucesso."""
-    with patch("app.routes.chamados.criar_chamado") as mock_criar:
+    with (
+        patch("app.routes.chamados.criar_chamado") as mock_criar,
+        patch("app.services.gates_service.CategoriaGate") as mock_gate_cls,
+    ):
         mock_criar.return_value = ("doc_1", "CHM-0001", None, None)
+        mock_gate_cls.get_all_ativos.return_value = []
         r = client_logado_solicitante.post(
             "/",
             data={
                 "categoria": "Chamado",
                 "tipo": "Manutencao",
                 "descricao": "Descrição válida com mais de 3 caracteres",
-                "gate": "Gate 1",
+                "gate": "Gate 1 - Desmontagem",
                 "impacto": "Qualidade",
             },
             follow_redirects=False,
@@ -284,7 +288,9 @@ def test_regression_validacao_arquivo_extensao_invalida():
 
     arquivo = MagicMock()
     arquivo.filename = "arquivo.exe"
-    erros = validar_novo_chamado({"descricao": "Ok", "tipo": "X", "categoria": "Chamado"}, arquivo)
+    erros = validar_novo_chamado(
+        {"descricao": "Ok", "tipo": "X", "categoria": "Chamado"}, [arquivo]
+    )
     assert any(
         "formato" in e.lower() or "inválido" in e.lower() or "arquivo" in e.lower() for e in erros
     )

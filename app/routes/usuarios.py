@@ -106,7 +106,7 @@ def gerenciar_usuarios() -> Response:
     except Exception as e:
         logger.exception("Erro ao listar usuários: %s", e)
         flash_t("error_loading_users", "danger")
-        return redirect(url_for("main.admin"))
+        return redirect(url_for("main.admin"))  # lista de usuários é exclusiva do admin
 
 
 @main.route("/admin/usuarios/novo", methods=["GET"])

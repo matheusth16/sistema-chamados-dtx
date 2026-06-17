@@ -18,8 +18,15 @@ def test_admin_com_solicitante_nao_acessa(client_logado_solicitante):
         assert "/admin" not in (r.location or "")
 
 
-def test_admin_com_supervisor_retorna_200(client_logado_supervisor):
-    """GET /admin com supervisor retorna 200 e página do dashboard (mock contexto)."""
+def test_admin_com_supervisor_redireciona_para_painel(client_logado_supervisor):
+    """GET /admin com supervisor redireciona para /painel."""
+    r = client_logado_supervisor.get("/admin", follow_redirects=False)
+    assert r.status_code == 302
+    assert "painel" in (r.location or "")
+
+
+def test_painel_com_supervisor_retorna_200(client_logado_supervisor):
+    """GET /painel com supervisor retorna 200 e página do dashboard (mock contexto)."""
     with patch("app.routes.dashboard.obter_contexto_admin") as mock_ctx:
         mock_ctx.return_value = {
             "chamados": [],
@@ -31,7 +38,7 @@ def test_admin_com_supervisor_retorna_200(client_logado_supervisor):
             "proximo_cursor": None,
             "cursor_anterior": None,
         }
-        r = client_logado_supervisor.get("/admin", follow_redirects=False)
+        r = client_logado_supervisor.get("/painel", follow_redirects=False)
     assert r.status_code == 200
     mock_ctx.assert_called_once()
 
@@ -287,7 +294,7 @@ def test_visualizar_chamado_supervisor_sem_permissao_redireciona(client_logado_s
         with patch("app.routes.dashboard.usuario_pode_ver_chamado", return_value=False):
             r = client_logado_supervisor.get("/chamado/ch1", follow_redirects=False)
     assert r.status_code == 302
-    assert "/admin" in (r.location or "")
+    assert "/painel" in (r.location or "")
 
 
 def test_visualizar_chamado_solicitante_proprio_retorna_200(client_logado_solicitante):

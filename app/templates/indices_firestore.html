@@ -1,210 +1,205 @@
 {% extends "base.html" %}
+{% from 'components/_page_header.html' import page_header %}
+{% from 'components/_btn.html' import btn %}
 
 {% block content %}
-<div class="container mt-5">
-    <div class="row">
-        <div class="col-md-12">
-            <h1>⚡ Índices Firestore - Status e Implementação</h1>
+<div class="space-y-8 max-w-5xl mx-auto">
 
-            <div class="alert alert-info mt-4">
-                <h5>📊 Resumen de Otimizações Implementadas</h5>
-                <ul>
-                    <li><strong>✅ Paginação por Cursor:</strong> Busca apenas 50 documentos por requisição</li>
-                    <li><strong>✅ Carregar Mais:</strong> Botão para carregar próximos registros sem reload</li>
-                    <li><strong>✅ Status AJAX:</strong> Atualiza status sem recarregar a página inteira</li>
-                    <li><strong>⏳ Índices Firestore:</strong> Faltam criar para máxima performance</li>
-                </ul>
-            </div>
+  {% call page_header("Índices Firestore — Status e Implementação") %}
+    {{ btn("Voltar ao dashboard", variant="secondary", href=url_for(dashboard_endpoint)) }}
+  {% endcall %}
 
-            <h2 class="mt-5">📋 Índices Recomendados</h2>
+  <!-- Resumo das otimizações -->
+  <div class="bg-blue-50 border border-blue-200 rounded-dtx-lg p-5">
+    <h2 class="text-sm font-semibold text-blue-900 mb-3">Resumo das Otimizações Implementadas</h2>
+    <ul class="space-y-1.5 text-sm text-blue-800">
+      <li><strong>Paginação por Cursor:</strong> Busca apenas 50 documentos por requisição</li>
+      <li><strong>Carregar Mais:</strong> Botão para carregar próximos registros sem reload</li>
+      <li><strong>Status AJAX:</strong> Atualiza status sem recarregar a página inteira</li>
+      <li class="text-blue-700"><strong>Índices Firestore:</strong> Faltam criar para máxima performance</li>
+    </ul>
+  </div>
 
-            <table class="table table-striped table-hover">
-                <thead class="table-dark">
-                    <tr>
-                        <th>#</th>
-                        <th>Descrição</th>
-                        <th>Campos</th>
-                        <th>Uso</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for indice in indices %}
-                    <tr>
-                        <td><strong>{{ loop.index }}</strong></td>
-                        <td>{{ indice.descricao }}</td>
-                        <td>
-                            <small>
-                                {% for campo, ordem in indice.campos %}
-                                    <code>{{ campo }}</code> <span class="badge bg-secondary">{{ ordem }}</span><br>
-                                {% endfor %}
-                            </small>
-                        </td>
-                        <td>
-                            {% if loop.index == 1 %}
-                                Filtrar por categoria + status
-                            {% elif loop.index == 2 %}
-                                Filtrar por status apenas
-                            {% elif loop.index == 3 %}
-                                Filtrar por categoria + prioridade
-                            {% else %}
-                                Filtrar por gate + status
-                            {% endif %}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-
-            <h2 class="mt-5">🚀 Como Criar os Índices</h2>
-
-            <div class="row">
-                <div class="col-md-6">
-                    <div class="card">
-                        <div class="card-header bg-primary text-white">
-                            <h5>Opção 1: Firebase Console (Recomendado)</h5>
-                        </div>
-                        <div class="card-body">
-                            <ol>
-                                <li>Vá para: <a href="https://console.firebase.google.com" target="_blank">Firebase Console</a></li>
-                                <li>Firestore Database → <strong>Índices</strong></li>
-                                <li>Clique em <strong>Create Index</strong></li>
-                                <li>Preencha com os dados da tabela acima</li>
-                                <li>Espere ~5 minutos por índice</li>
-                            </ol>
-                            <hr>
-                            <p><strong>⏱️ Tempo total:</strong> ~20 minutos para 4 índices</p>
-                        </div>
-                    </div>
+  <!-- Tabela de índices recomendados -->
+  <div>
+    <h2 class="text-lg font-semibold text-gray-900 mb-4">Índices Recomendados</h2>
+    <div class="bg-surface-base border border-surface-border rounded-dtx-lg shadow-dtx-sm overflow-hidden">
+      <table class="min-w-full divide-y divide-surface-border">
+        <thead class="bg-surface-raised">
+          <tr>
+            <th class="px-5 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">#</th>
+            <th class="px-5 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Descrição</th>
+            <th class="px-5 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Campos</th>
+            <th class="px-5 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Uso</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-surface-border">
+          {% for indice in indices %}
+          <tr class="hover:bg-surface-raised transition-colors">
+            <td class="px-5 py-4 whitespace-nowrap">
+              <span class="bg-slate-100 text-slate-700 rounded-dtx-sm px-2 py-0.5 text-xs font-bold">{{ loop.index }}</span>
+            </td>
+            <td class="px-5 py-4 text-sm text-gray-700 font-medium">{{ indice.descricao }}</td>
+            <td class="px-5 py-4">
+              <div class="space-y-1">
+                {% for campo, ordem in indice.campos %}
+                <div class="flex items-center gap-2">
+                  <code class="bg-surface-raised px-1.5 py-0.5 rounded text-xs font-mono text-gray-700">{{ campo }}</code>
+                  <span class="bg-slate-100 text-slate-600 rounded-dtx-sm px-1.5 py-0.5 text-[10px] font-semibold">{{ ordem }}</span>
                 </div>
+                {% endfor %}
+              </div>
+            </td>
+            <td class="px-5 py-4 text-sm text-gray-600">
+              {% if loop.index == 1 %}Filtrar por categoria + status
+              {% elif loop.index == 2 %}Filtrar por status apenas
+              {% elif loop.index == 3 %}Filtrar por categoria + prioridade
+              {% else %}Filtrar por gate + status
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
 
-                <div class="col-md-6">
-                    <div class="card">
-                        <div class="card-header bg-success text-white">
-                            <h5>Opção 2: Firebase CLI (Mais rápido)</h5>
-                        </div>
-                        <div class="card-body">
-                            <ol>
-                                <li>Abra Terminal na pasta do projeto</li>
-                                <li>
-                                    <code>firebase deploy --only firestore:indexes --project seu-projeto-id</code>
-                                </li>
-                                <li>Espere concluir (~1-2 minutos)</li>
-                                <li>Pronto! Todos os índices criados de uma vez</li>
-                            </ol>
-                            <hr>
-                            <p><strong>⏱️ Tempo total:</strong> ~10 minutos</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
+  <!-- Como criar os índices -->
+  <div>
+    <h2 class="text-lg font-semibold text-gray-900 mb-4">Como Criar os Índices</h2>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div class="bg-surface-base border border-surface-border rounded-dtx-lg shadow-dtx-sm overflow-hidden">
+        <div class="bg-dtx-600 text-white px-5 py-3">
+          <h3 class="text-sm font-semibold">Opção 1: Firebase Console (Recomendado)</h3>
+        </div>
+        <div class="p-5">
+          <ol class="space-y-2 text-sm text-gray-700 list-decimal list-inside">
+            <li>Vá para: <a href="https://console.firebase.google.com" target="_blank" rel="noopener noreferrer" class="text-dtx-600 hover:text-dtx-700 underline">Firebase Console</a></li>
+            <li>Firestore Database &rarr; <strong>Índices</strong></li>
+            <li>Clique em <strong>Create Index</strong></li>
+            <li>Preencha com os dados da tabela acima</li>
+            <li>Espere ~5 minutos por índice</li>
+          </ol>
+          <hr class="my-4 border-surface-border">
+          <p class="text-sm text-gray-600"><strong>Tempo total:</strong> ~20 minutos para 4 índices</p>
+        </div>
+      </div>
 
-            <h2 class="mt-5">📁 Arquivo firestore.indexes.json</h2>
+      <div class="bg-surface-base border border-surface-border rounded-dtx-lg shadow-dtx-sm overflow-hidden">
+        <div class="bg-dtx-600 text-white px-5 py-3">
+          <h3 class="text-sm font-semibold">Opção 2: Firebase CLI (Mais rápido)</h3>
+        </div>
+        <div class="p-5">
+          <ol class="space-y-2 text-sm text-gray-700 list-decimal list-inside">
+            <li>Abra o Terminal na pasta do projeto</li>
+            <li><code class="bg-surface-raised px-1.5 py-0.5 rounded text-xs font-mono">firebase deploy --only firestore:indexes --project seu-projeto-id</code></li>
+            <li>Espere concluir (~1–2 minutos)</li>
+            <li>Pronto! Todos os índices criados de uma vez</li>
+          </ol>
+          <hr class="my-4 border-surface-border">
+          <p class="text-sm text-gray-600"><strong>Tempo total:</strong> ~10 minutos</p>
+        </div>
+      </div>
+    </div>
+  </div>
 
-            <div class="card">
-                <div class="card-header">
-                    <strong>Localização:</strong> <code>firestore.indexes.json</code> (raiz do projeto)
-                </div>
-                <div class="card-body">
-                    <p><strong>✅ Status:</strong> Arquivo já criado! Pronto para deploy.</p>
-                    <pre><code>{{ script }}</code></pre>
-                </div>
-            </div>
+  <!-- Arquivo firestore.indexes.json -->
+  <div>
+    <h2 class="text-lg font-semibold text-gray-900 mb-4">Arquivo firestore.indexes.json</h2>
+    <div class="bg-surface-base border border-surface-border rounded-dtx-lg shadow-dtx-sm overflow-hidden">
+      <div class="px-5 py-3 border-b border-surface-border bg-surface-raised">
+        <p class="text-sm text-gray-700"><strong>Localização:</strong> <code class="bg-surface-raised px-1.5 py-0.5 rounded text-sm font-mono">firestore.indexes.json</code> (raiz do projeto)</p>
+      </div>
+      <div class="p-5">
+        <p class="text-sm text-gray-600 mb-4"><strong>Status:</strong> Arquivo já criado. Pronto para deploy.</p>
+        <pre class="bg-surface-raised border border-surface-border rounded-dtx-md p-4 overflow-x-auto text-xs font-mono text-gray-700"><code>{{ script }}</code></pre>
+      </div>
+    </div>
+  </div>
 
-            <h2 class="mt-5">📊 Impacto de Performance</h2>
+  <!-- Impacto de performance -->
+  <div>
+    <h2 class="text-lg font-semibold text-gray-900 mb-4">Impacto de Performance</h2>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div class="bg-surface-base border border-rose-200 rounded-dtx-lg shadow-dtx-sm overflow-hidden">
+        <div class="px-5 py-3 border-b border-rose-200 bg-rose-50">
+          <h3 class="text-sm font-semibold text-rose-800">Sem Índices</h3>
+        </div>
+        <div class="p-5">
+          <ul class="space-y-2 text-sm text-gray-700">
+            <li>Query com 3 filtros: <strong>2–5 segundos</strong></li>
+            <li>Leitura de documentos: <strong>1000+ ops</strong></li>
+            <li>Custo Firestore: <strong>Alto</strong></li>
+            <li>Experiência do usuário: <strong>Lenta</strong></li>
+          </ul>
+        </div>
+      </div>
 
-            <div class="row mt-4">
-                <div class="col-md-6">
-                    <div class="card bg-light">
-                        <div class="card-header bg-danger text-white">
-                            <h5>❌ Sem Índices</h5>
-                        </div>
-                        <div class="card-body">
-                            <ul>
-                                <li>Query com 3 filtros: <strong>2-5 segundos</strong></li>
-                                <li>Leitura de documentos: <strong>1000+ ops</strong></li>
-                                <li>Custo Firestore: <strong>Alto</strong></li>
-                                <li>Experiência do usuário: <strong>Lenta</strong> ⏳</li>
-                            </ul>
-                        </div>
-                    </div>
-                </div>
+      <div class="bg-surface-base border border-emerald-200 rounded-dtx-lg shadow-dtx-sm overflow-hidden">
+        <div class="px-5 py-3 border-b border-emerald-200 bg-emerald-50">
+          <h3 class="text-sm font-semibold text-emerald-800">Com Índices</h3>
+        </div>
+        <div class="p-5">
+          <ul class="space-y-2 text-sm text-gray-700">
+            <li>Query com 3 filtros: <strong>50–200ms</strong></li>
+            <li>Leitura de documentos: <strong>50–100 ops</strong></li>
+            <li>Custo Firestore: <strong>10x menor</strong></li>
+            <li>Experiência do usuário: <strong>Rápida</strong></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
 
-                <div class="col-md-6">
-                    <div class="card bg-light">
-                        <div class="card-header bg-success text-white">
-                            <h5>✅ Com Índices</h5>
-                        </div>
-                        <div class="card-body">
-                            <ul>
-                                <li>Query com 3 filtros: <strong>50-200ms</strong></li>
-                                <li>Leitura de documentos: <strong>50-100 ops</strong></li>
-                                <li>Custo Firestore: <strong>10x menor</strong></li>
-                                <li>Experiência do usuário: <strong>Rápida</strong> ⚡</li>
-                            </ul>
-                        </div>
-                    </div>
-                </div>
-            </div>
+  <!-- Checklist de implementação -->
+  <div>
+    <h2 class="text-lg font-semibold text-gray-900 mb-4">Checklist de Implementação</h2>
+    <div class="bg-surface-base border border-surface-border rounded-dtx-lg shadow-dtx-sm p-5">
+      <div class="space-y-3">
+        <div class="flex items-center gap-3">
+          <input type="checkbox" id="check1" class="rounded border-gray-300 text-dtx-600 focus:ring-dtx-500 w-4 h-4">
+          <label for="check1" class="text-sm text-gray-700">Criar <code class="bg-surface-raised px-1.5 py-0.5 rounded text-xs font-mono">firestore.indexes.json</code> (já feito)</label>
+        </div>
+        <div class="flex items-center gap-3">
+          <input type="checkbox" id="check2" class="rounded border-gray-300 text-dtx-600 focus:ring-dtx-500 w-4 h-4">
+          <label for="check2" class="text-sm text-gray-700">Deploy índices via Firebase Console ou CLI</label>
+        </div>
+        <div class="flex items-center gap-3">
+          <input type="checkbox" id="check3" class="rounded border-gray-300 text-dtx-600 focus:ring-dtx-500 w-4 h-4">
+          <label for="check3" class="text-sm text-gray-700">Esperar ~15 minutos para índices ficarem "Ready"</label>
+        </div>
+        <div class="flex items-center gap-3">
+          <input type="checkbox" id="check4" class="rounded border-gray-300 text-dtx-600 focus:ring-dtx-500 w-4 h-4">
+          <label for="check4" class="text-sm text-gray-700">Testar paginação em /admin</label>
+        </div>
+        <div class="flex items-center gap-3">
+          <input type="checkbox" id="check5" class="rounded border-gray-300 text-dtx-600 focus:ring-dtx-500 w-4 h-4">
+          <label for="check5" class="text-sm text-gray-700">Monitorar performance no Firestore Console</label>
+        </div>
+      </div>
+    </div>
+  </div>
 
-            <h2 class="mt-5">✅ Checklist de Implementação</h2>
+  <!-- APIs Otimizadas -->
+  <div>
+    <h2 class="text-lg font-semibold text-gray-900 mb-4">APIs Otimizadas Disponíveis</h2>
+    <div class="space-y-4">
 
-            <div class="card">
-                <div class="card-body">
-                    <form>
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="check1">
-                            <label class="form-check-label" for="check1">
-                                ☑️ Criar <code>firestore.indexes.json</code> (já feito!)
-                            </label>
-                        </div>
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="check2">
-                            <label class="form-check-label" for="check2">
-                                ☑️ Deploy índices via Firebase Console ou CLI
-                            </label>
-                        </div>
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="check3">
-                            <label class="form-check-label" for="check3">
-                                ☑️ Esperar ~15 minutos para índices ficarem "Ready"
-                            </label>
-                        </div>
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="check4">
-                            <label class="form-check-label" for="check4">
-                                ☑️ Testar paginação em /admin
-                            </label>
-                        </div>
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="check5">
-                            <label class="form-check-label" for="check5">
-                                ☑️ Monitorar performance no Firestore Console
-                            </label>
-                        </div>
-                    </form>
-                </div>
-            </div>
-
-            <h2 class="mt-5">🔧 APIs Otimizadas Disponíveis</h2>
-
-            <div class="card mt-4">
-                <div class="card-header bg-dark text-white">
-                    <h5>1. GET /api/chamados/paginar</h5>
-                </div>
-                <div class="card-body">
-                    <p><strong>Descrição:</strong> Paginação com cursor - busca apenas 50 documentos</p>
-                    <p><strong>Query params:</strong></p>
-                    <pre><code>
-cursor=abc123         # ID do último documento (opcional)
+      <div class="bg-surface-base border border-surface-border rounded-dtx-lg shadow-dtx-sm overflow-hidden">
+        <div class="px-5 py-3 border-b border-surface-border bg-surface-raised">
+          <h3 class="text-sm font-semibold text-gray-800">1. GET /api/chamados/paginar</h3>
+        </div>
+        <div class="p-5 space-y-3">
+          <p class="text-sm text-gray-700"><strong>Descrição:</strong> Paginação com cursor — busca apenas 50 documentos</p>
+          <p class="text-sm font-medium text-gray-600">Query params:</p>
+          <pre class="bg-surface-raised border border-surface-border rounded-dtx-md p-4 overflow-x-auto text-xs font-mono text-gray-700"><code>cursor=abc123         # ID do último documento (opcional)
 limite=50             # Documentos por página (padrão: 50, máx: 100)
 status=Aberto         # Filtrar por status
 categoria=Projetos    # Filtrar por categoria
 gate=G1               # Filtrar por gate
-search=termo          # Busca full-text
-                    </code></pre>
-                    <p><strong>Response:</strong></p>
-                    <pre><code>
-{
+search=termo          # Busca full-text</code></pre>
+          <p class="text-sm font-medium text-gray-600">Response:</p>
+          <pre class="bg-surface-raised border border-surface-border rounded-dtx-md p-4 overflow-x-auto text-xs font-mono text-gray-700"><code>{
   "sucesso": true,
   "chamados": [...],
   "paginacao": {
@@ -213,90 +208,65 @@ search=termo          # Busca full-text
     "total_pagina": 50,
     "limite": 50
   }
-}
-                    </code></pre>
-                </div>
-            </div>
+}</code></pre>
+        </div>
+      </div>
 
-            <div class="card mt-3">
-                <div class="card-header bg-dark text-white">
-                    <h5>2. POST /api/carregar-mais</h5>
-                </div>
-                <div class="card-body">
-                    <p><strong>Descrição:</strong> Carregar mais registros (infinite scroll)</p>
-                    <p><strong>Body (JSON):</strong></p>
-                    <pre><code>
-{
+      <div class="bg-surface-base border border-surface-border rounded-dtx-lg shadow-dtx-sm overflow-hidden">
+        <div class="px-5 py-3 border-b border-surface-border bg-surface-raised">
+          <h3 class="text-sm font-semibold text-gray-800">2. POST /api/carregar-mais</h3>
+        </div>
+        <div class="p-5 space-y-3">
+          <p class="text-sm text-gray-700"><strong>Descrição:</strong> Carregar mais registros (infinite scroll)</p>
+          <p class="text-sm font-medium text-gray-600">Body (JSON):</p>
+          <pre class="bg-surface-raised border border-surface-border rounded-dtx-md p-4 overflow-x-auto text-xs font-mono text-gray-700"><code>{
   "cursor": "abc123",
   "limite": 20
-}
-                    </code></pre>
-                    <p><strong>Response:</strong></p>
-                    <pre><code>
-{
+}</code></pre>
+          <p class="text-sm font-medium text-gray-600">Response:</p>
+          <pre class="bg-surface-raised border border-surface-border rounded-dtx-md p-4 overflow-x-auto text-xs font-mono text-gray-700"><code>{
   "sucesso": true,
   "chamados": [...],
   "cursor_proximo": "xyz789",
   "tem_proxima": true
-}
-                    </code></pre>
-                </div>
-            </div>
+}</code></pre>
+        </div>
+      </div>
 
-            <div class="card mt-3">
-                <div class="card-header bg-dark text-white">
-                    <h5>3. POST /api/atualizar-status</h5>
-                </div>
-                <div class="card-body">
-                    <p><strong>Descrição:</strong> Atualizar status sem recarregar a página</p>
-                    <p><strong>Body (JSON):</strong></p>
-                    <pre><code>
-{
+      <div class="bg-surface-base border border-surface-border rounded-dtx-lg shadow-dtx-sm overflow-hidden">
+        <div class="px-5 py-3 border-b border-surface-border bg-surface-raised">
+          <h3 class="text-sm font-semibold text-gray-800">3. POST /api/atualizar-status</h3>
+        </div>
+        <div class="p-5 space-y-3">
+          <p class="text-sm text-gray-700"><strong>Descrição:</strong> Atualizar status sem recarregar a página</p>
+          <p class="text-sm font-medium text-gray-600">Body (JSON):</p>
+          <pre class="bg-surface-raised border border-surface-border rounded-dtx-md p-4 overflow-x-auto text-xs font-mono text-gray-700"><code>{
   "chamado_id": "abc123",
   "novo_status": "Concluído"
-}
-                    </code></pre>
-                    <p><strong>Response:</strong></p>
-                    <pre><code>
-{
+}</code></pre>
+          <p class="text-sm font-medium text-gray-600">Response:</p>
+          <pre class="bg-surface-raised border border-surface-border rounded-dtx-md p-4 overflow-x-auto text-xs font-mono text-gray-700"><code>{
   "sucesso": true,
   "mensagem": "Status alterado para Concluído",
   "novo_status": "Concluído"
-}
-                    </code></pre>
-                </div>
-            </div>
-
-            <h2 class="mt-5">📚 Referências</h2>
-
-            <ul>
-                <li><a href="https://firebase.google.com/docs/firestore/query-data/indexing" target="_blank">Firestore Indexes Documentation</a></li>
-                <li><a href="https://firebase.google.com/docs/firestore/query-data/query-cursors" target="_blank">Query Cursors Guide</a></li>
-                <li><a href="https://firebase.google.com/docs/firestore/best-practices" target="_blank">Firestore Best Practices</a></li>
-            </ul>
-
+}</code></pre>
         </div>
+      </div>
+
     </div>
+  </div>
+
+  <!-- Referências -->
+  <div>
+    <h2 class="text-lg font-semibold text-gray-900 mb-4">Referências</h2>
+    <div class="bg-surface-base border border-surface-border rounded-dtx-lg shadow-dtx-sm p-5">
+      <ul class="space-y-2">
+        <li><a href="https://firebase.google.com/docs/firestore/query-data/indexing" target="_blank" rel="noopener noreferrer" class="text-dtx-600 hover:text-dtx-700 text-sm underline">Firestore Indexes Documentation</a></li>
+        <li><a href="https://firebase.google.com/docs/firestore/query-data/query-cursors" target="_blank" rel="noopener noreferrer" class="text-dtx-600 hover:text-dtx-700 text-sm underline">Query Cursors Guide</a></li>
+        <li><a href="https://firebase.google.com/docs/firestore/best-practices" target="_blank" rel="noopener noreferrer" class="text-dtx-600 hover:text-dtx-700 text-sm underline">Firestore Best Practices</a></li>
+      </ul>
+    </div>
+  </div>
+
 </div>
-
-<style nonce="{{ csp_nonce }}">
-    code {
-        background-color: #f5f5f5;
-        padding: 2px 6px;
-        border-radius: 3px;
-        font-size: 0.9em;
-    }
-
-    pre {
-        background-color: #f8f9fa;
-        border: 1px solid #ddd;
-        border-radius: 4px;
-        padding: 15px;
-        overflow-x: auto;
-    }
-
-    .table-hover tbody tr:hover {
-        background-color: #f5f5f5;
-    }
-</style>
 {% endblock %}

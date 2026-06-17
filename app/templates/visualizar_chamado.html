@@ -5,7 +5,7 @@
 <div class="max-w-5xl mx-auto space-y-3 -mt-2">
     <!-- Voltar: avisa a aba Gestão para atualizar o chamado, fecha a aba (ou redireciona se o navegador bloquear). -->
     <div>
-        <a href="{{ voltar_url | default(url_for('main.admin')) }}" id="btn-voltar-detalhes" data-chamado-id="{{ chamado.id }}" class="inline-flex items-center text-sm font-medium text-gray-500 hover:text-dtx-600 transition-colors bg-white px-3 py-1.5 rounded-dtx-md shadow-dtx-sm border border-surface-border">
+        <a href="{{ voltar_url | default(url_for(dashboard_endpoint)) }}" id="btn-voltar-detalhes" data-chamado-id="{{ chamado.id }}" class="inline-flex items-center text-sm font-medium text-gray-500 hover:text-dtx-600 transition-colors bg-white px-3 py-1.5 rounded-dtx-md shadow-dtx-sm border border-surface-border">
             <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
             {{ t('back') if t else 'Voltar' }}
         </a>

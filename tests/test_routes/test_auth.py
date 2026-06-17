@@ -324,7 +324,7 @@ def test_login_ip_bloqueado_redireciona_sem_verificar_senha(client):
 
 
 def test_alterar_senha_sem_must_change_redireciona_supervisor(client, app):
-    """Supervisor que já trocou senha é redirecionado para /admin ao acessar alterar-senha."""
+    """Supervisor que já trocou senha é redirecionado para /painel ao acessar alterar-senha."""
     usuario = MagicMock()
     usuario.id = "sup1"
     usuario.email = "sup@test.com"
@@ -345,7 +345,7 @@ def test_alterar_senha_sem_must_change_redireciona_supervisor(client, app):
         r = client.get("/alterar-senha-obrigatoria", follow_redirects=False)
 
     assert r.status_code == 302
-    assert "admin" in (r.location or "")
+    assert "painel" in (r.location or "")
 
 
 def test_alterar_senha_sem_letra_redireciona(client, app):
@@ -366,8 +366,8 @@ def test_alterar_senha_sem_letra_redireciona(client, app):
     assert r.status_code == 302
 
 
-def test_alterar_senha_sucesso_supervisor_redireciona_para_admin(client, app):
-    """Supervisor com senha válida é redirecionado para /admin após trocar senha."""
+def test_alterar_senha_sucesso_supervisor_redireciona_para_painel(client, app):
+    """Supervisor com senha válida é redirecionado para /painel após trocar senha."""
     usuario = MagicMock()
     usuario.id = "sup2"
     usuario.email = "sup2@test.com"
@@ -394,7 +394,7 @@ def test_alterar_senha_sucesso_supervisor_redireciona_para_admin(client, app):
             follow_redirects=False,
         )
     assert r.status_code == 302
-    assert "admin" in (r.location or "")
+    assert "painel" in (r.location or "")
 
 
 def test_alterar_senha_solicitante_sem_must_change_redireciona_para_index(client, app):

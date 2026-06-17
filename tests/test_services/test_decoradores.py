@@ -48,7 +48,7 @@ def test_requer_perfil_bloqueia_perfil_errado_solicitante(app):
     assert resp.status_code == 302
 
 
-def test_requer_perfil_supervisor_sem_acesso_vai_para_admin_page(app):
+def test_requer_perfil_supervisor_sem_acesso_vai_para_painel(app):
     from app.decoradores import requer_perfil
 
     @requer_perfil("admin")
@@ -62,7 +62,7 @@ def test_requer_perfil_supervisor_sem_acesso_vai_para_admin_page(app):
     ):
         resp = rota()
     assert resp.status_code == 302
-    assert "admin" in resp.location
+    assert "painel" in resp.location
 
 
 def test_requer_perfil_permite_perfil_correto(app):

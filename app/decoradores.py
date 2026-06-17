@@ -68,8 +68,9 @@ def requer_perfil(*perfis_permitidos):
                 # Redireciona para a página apropriada conforme o perfil
                 if current_user.perfil == "solicitante":
                     return redirect(url_for("main.index"))
-                else:
-                    return redirect(url_for("main.admin"))
+                if current_user.perfil == "supervisor":
+                    return redirect(url_for("main.painel"))
+                return redirect(url_for("main.admin"))
 
             # Perfil autorizado, executa a função
             return f(*args, **kwargs)

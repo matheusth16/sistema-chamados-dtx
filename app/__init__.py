@@ -7,7 +7,7 @@ from datetime import UTC
 from logging.handlers import RotatingFileHandler
 from urllib.parse import urlparse
 
-from flask import Flask, g, jsonify, request, session
+from flask import Flask, g, jsonify, redirect, request, session
 from flask_login import LoginManager
 from flask_wtf.csrf import CSRFProtect
 from pythonjsonlogger import json as jsonlogger
@@ -268,6 +268,22 @@ def _configurar_seguranca(app: Flask) -> None:
     from flask import current_app
 
     @app.before_request
+    def _forcar_https():
+        """Redireciona HTTP → HTTPS em produção, independente de plataforma.
+
+        Verifica X-Forwarded-Proto além de request.is_secure porque proxies
+        reversos (nginx, load balancers) terminam TLS e repassam HTTP
+        internamente — request.is_secure seria sempre False nesses casos.
+        """
+        if current_app.config.get("ENV") != "production":
+            return None
+        is_https = request.is_secure or request.headers.get("X-Forwarded-Proto") == "https"
+        if not is_https:
+            url = request.url.replace("http://", "https://", 1)
+            return redirect(url, code=301)
+        return None
+
+    @app.before_request
     def _gerar_csp_nonce():
         """Gera nonce por requisição para CSP (permite remover 'unsafe-inline')."""
         g.csp_nonce = secrets.token_urlsafe(16)
@@ -289,7 +305,8 @@ def _configurar_seguranca(app: Flask) -> None:
         response.headers["Permissions-Policy"] = (
             "camera=(), microphone=(), geolocation=(), payment=()"
         )
-        if request.is_secure and current_app.config.get("ENV") == "production":
+        is_https = request.is_secure or request.headers.get("X-Forwarded-Proto") == "https"
+        if is_https and current_app.config.get("ENV") == "production":
             # HSTS força HTTPS em conexões futuras (31536000 = 1 ano)
             response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
             # CSP em produção: nonce para scripts/estilos inline (sem 'unsafe-inline')
@@ -414,6 +431,7 @@ def _configurar_i18n(app: Flask) -> None:
     from app.i18n import (
         get_translated_category,
         get_translated_field_label,
+        get_translated_gate,
         get_translated_sector,
         get_translated_sector_list,
         get_translated_status,
@@ -458,6 +476,11 @@ def _configurar_i18n(app: Flask) -> None:
             lang = session.get("language", "en")
             return get_translated_sector_list(sector_string, lang)
 
+        def translate_gate(gate_value):
+            """Traduz o valor canônico de um gate (ex: 'Gate 1 - Desmontagem') no template"""
+            lang = session.get("language", "en")
+            return get_translated_gate(gate_value, lang)
+
         def translate_category(category_name):
             """Traduz o nome de uma categoria no template"""
             lang = session.get("language", "en")
@@ -488,6 +511,7 @@ def _configurar_i18n(app: Flask) -> None:
             "t": t,
             "translate_sector": translate_sector,
             "translate_sector_list": translate_sector_list,
+            "translate_gate": translate_gate,
             "translate_category": translate_category,
             "translate_status": translate_status,
             "nome_curto": nome_curto,
@@ -501,11 +525,27 @@ def _configurar_i18n(app: Flask) -> None:
             "accept_anexo": accept_anexo,
         }
 
+    @app.context_processor
+    def inject_dashboard_vars():
+        """Injeta endpoint de dashboard correto para o perfil do usuário atual."""
+        from flask_login import current_user
+
+        if current_user.is_authenticated and current_user.perfil == "supervisor":
+            endpoint = "main.painel"
+        else:
+            endpoint = "main.admin"
+        return {"dashboard_endpoint": endpoint}
+
     # Registra funções as Jinja filters (para usar com o pipe |)
     @app.template_filter("translate_sector")
     def filter_translate_sector(sector_name):
         lang = session.get("language", "en")
         return get_translated_sector(sector_name, lang)
+
+    @app.template_filter("translate_gate")
+    def filter_translate_gate(gate_value):
+        lang = session.get("language", "en")
+        return get_translated_gate(gate_value, lang)
 
     @app.template_filter("translate_category")
     def filter_translate_category(category_name):

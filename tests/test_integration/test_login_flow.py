@@ -22,7 +22,7 @@ def test_login_post_credenciais_invalidas_volta_para_login(client):
 
 
 def test_login_post_sucesso_redireciona_conforme_perfil(client):
-    """POST /login com credenciais válidas redireciona (solicitante -> /, supervisor/admin -> /admin)."""
+    """POST /login com credenciais válidas redireciona (solicitante -> /, supervisor -> /painel, admin -> /admin)."""
     usuario = MagicMock()
     usuario.id = "user_1"
     usuario.email = "sol@test.com"
@@ -48,7 +48,7 @@ def test_login_post_sucesso_redireciona_conforme_perfil(client):
             "/login", data={"email": "sup@test.com", "senha": "ok"}, follow_redirects=False
         )
     assert r2.status_code == 302
-    assert "admin" in r2.location
+    assert "painel" in r2.location
 
 
 def test_acesso_admin_sem_login_redireciona_para_login(client):

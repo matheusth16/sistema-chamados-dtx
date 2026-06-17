@@ -1,165 +1,133 @@
-{% extends "base.html" %} {% block content %}
+{% extends "base.html" %}
+{% from 'components/_page_header.html' import page_header %}
+{% from 'components/_status_badge.html' import status_badge with context %}
+
+{% block content %}
 <div class="space-y-6">
-  <!-- Header com Botão de Novo Usuário -->
-  <div class="flex flex-col md:flex-row justify-between items-center bg-white/80 backdrop-blur-md p-6 rounded-[2rem] shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-white gap-4 relative overflow-hidden">
-    <div class="absolute top-0 left-0 -ml-20 -mt-20 w-64 h-64 rounded-full bg-gradient-to-br from-indigo-100 to-purple-100 blur-[80px] opacity-60 pointer-events-none"></div>
-    <div class="relative z-10">
-      <h2 class="text-2xl font-black text-slate-800">{{ t('manage_users') }}</h2>
-      <p class="text-sm font-medium text-slate-500 mt-1">
-        <span class="font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-lg">{{ usuarios|length }}</span>
-        {{ t('users_registered_in_system') }}
-      </p>
-    </div>
-    <div class="flex gap-3 w-full md:w-auto flex-col md:flex-row relative z-10">
-      <a
-        href="{{ url_for('main.novo_usuario_form') }}"
-        class="inline-flex items-center px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 hover:shadow-[0_4px_15px_rgb(79,70,229,0.3)] focus:ring-4 focus:ring-indigo-100 active:scale-[0.98] transition-all text-white font-bold text-sm rounded-xl justify-center"
-      >
-        <svg
-          class="w-5 h-5 mr-2"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M12 4v16m8-8H4"
-          />
-        </svg>
-        {{ t('new_user') }}
-      </a>
-      <a
-        href="{{ url_for('main.admin') }}"
-        class="inline-flex items-center px-4 py-2.5 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-slate-900 focus:ring-4 focus:ring-slate-100 active:scale-[0.98] transition-all font-bold text-sm rounded-xl shadow-sm justify-center"
-      >
-        <svg
-          class="w-5 h-5 mr-2"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M10 19l-7-7m0 0l7-7m-7 7h18"
-          />
-        </svg>
-        {{ t('back') }}
-      </a>
-    </div>
-  </div>
+
+  {% call page_header(t('manage_users')) %}
+    <a href="{{ url_for('main.novo_usuario_form') }}"
+       class="inline-flex items-center gap-2 h-9 px-4 text-sm font-medium rounded-dtx-md bg-dtx-600 text-white hover:bg-dtx-700 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-dtx-600">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+      </svg>
+      {{ t('new_user') }}
+    </a>
+    <a href="{{ url_for(dashboard_endpoint) }}"
+       class="inline-flex items-center gap-2 h-9 px-4 text-sm font-medium rounded-dtx-md bg-white text-gray-700 border border-surface-muted hover:bg-surface-raised transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-dtx-600">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+      </svg>
+      {{ t('back') }}
+    </a>
+  {% endcall %}
+
+  <p class="text-sm font-medium text-slate-500 -mt-4 mb-2">
+    <span class="font-bold text-dtx-700 bg-dtx-50 px-2 py-0.5 rounded-dtx-sm border border-dtx-100">{{ usuarios|length }}</span>
+    {{ t('users_registered_in_system') }}
+  </p>
 
   <!-- Tabela de Usuários -->
-  <div class="bg-white/80 backdrop-blur-md shadow-[0_4px_20px_rgb(0,0,0,0.03)] rounded-[1.5rem] overflow-hidden border border-white">
+  <div class="bg-surface-base border border-surface-border rounded-dtx-lg shadow-dtx-sm overflow-hidden">
     <div class="overflow-x-auto max-w-full custom-scrollbar">
-      <table class="min-w-full divide-y divide-slate-100">
-        <thead class="bg-slate-50/80 backdrop-blur-md">
+      <table class="min-w-full divide-y divide-surface-border">
+        <thead class="bg-surface-raised">
           <tr>
-          <th class="px-6 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">
-            {{ t('email') }}
-          </th>
-          <th class="px-6 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">
-            {{ t('name') }}
-          </th>
-          <th class="px-6 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">
-            {{ t('profile') }}
-          </th>
-          <th class="px-6 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">
-            {{ t('area_sector') }}
-          </th>
-          <th class="px-6 py-4 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">
-            {{ t('actions') }}
-          </th>
-        </tr>
-      </thead>
-      <tbody class="divide-y divide-slate-100/50">
-        {% if usuarios %} {% for usuario in usuarios %}
-        <tr class="hover:bg-slate-50/80 transition-colors">
-          <td class="px-6 py-4 whitespace-nowrap">
-            <span class="text-sm text-slate-600 font-medium font-mono bg-slate-50 px-2 py-1 rounded-md">{{ usuario.email }}</span>
-          </td>
-          <td class="px-6 py-4 whitespace-nowrap">
-            <span class="text-sm font-bold text-slate-700">{{ usuario.nome }}</span>
-          </td>
-          <td class="px-6 py-4 whitespace-nowrap">
-            {% if usuario.perfil == 'admin' %}
-            <span class="inline-flex items-center px-3 py-1 rounded-xl text-[10px] uppercase tracking-wider font-black bg-red-100 text-red-800 border border-red-200/50">
-              <span class="w-1.5 h-1.5 mr-2 bg-red-500 rounded-full animate-pulse"></span>
-              {{ t('admin') }}
-            </span>
-            {% elif usuario.perfil == 'supervisor' %}
-            <span class="inline-flex items-center px-3 py-1 rounded-xl text-[10px] uppercase tracking-wider font-black bg-purple-100 text-purple-800 border border-purple-200/50">
-              <span class="w-1.5 h-1.5 mr-2 bg-purple-500 rounded-full group-hover:scale-125 transition-transform"></span>
-              {{ t('supervisor') }}
-            </span>
-            {% else %}
-            <span class="inline-flex items-center px-3 py-1 rounded-xl text-[10px] uppercase tracking-wider font-black bg-blue-100 text-blue-800 border border-blue-200/50">
-              <span class="w-1.5 h-1.5 mr-2 bg-blue-500 rounded-full"></span>
-              {{ t('requester') }}
-            </span>
-            {% endif %}
-          </td>
-          <td class="px-6 py-4 whitespace-nowrap">
-            <span class="text-sm font-medium text-slate-500">
-              {{ translate_sector_list(usuario.area) if usuario.area else '-' }}
-            </span>
-          </td>
-          <td class="px-6 py-4 whitespace-nowrap text-sm text-right align-middle">
-            <div class="flex gap-2 justify-end">
-              <!-- Reset XP Button -->
-              {% if current_user.perfil == 'admin' %}
-              <form method="POST" action="{{ url_for('main.resetar_exp_usuario', usuario_id=usuario.id) }}" onsubmit="return confirm(`{{ t('confirm_reset_exp', nome=usuario.nome) }}`)">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                <button type="submit" class="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-lg text-xs font-bold transition-colors border border-amber-200/50" title="{{ t('reset_exp_btn_title') }}">
-                  {{ t('reset_exp_btn') }}
-                </button>
-              </form>
-              {% endif %}
+            <th class="px-6 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">
+              {{ t('email') }}
+            </th>
+            <th class="px-6 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">
+              {{ t('name') }}
+            </th>
+            <th class="px-6 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">
+              {{ t('profile') }}
+            </th>
+            <th class="px-6 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">
+              {{ t('area_sector') }}
+            </th>
+            <th class="px-6 py-4 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">
+              {{ t('actions') }}
+            </th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-surface-border">
+          {% if usuarios %}
+          {% for usuario in usuarios %}
+          <tr class="hover:bg-surface-raised transition-colors">
+            <td class="px-6 py-4 whitespace-nowrap">
+              <span class="text-sm text-slate-600 font-medium font-mono bg-slate-50 px-2 py-1 rounded-dtx-sm">{{ usuario.email }}</span>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap">
+              <span class="text-sm font-bold text-slate-700">{{ usuario.nome }}</span>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap">
+              {{ status_badge(usuario.perfil) }}
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap">
+              <span class="text-sm font-medium text-slate-500">
+                {{ translate_sector_list(usuario.area) if usuario.area else '-' }}
+              </span>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-right align-middle">
+              <div class="flex gap-2 justify-end">
+                {% if current_user.perfil == 'admin' %}
+                <form method="POST" action="{{ url_for('main.resetar_exp_usuario', usuario_id=usuario.id) }}" onsubmit="return confirm(`{{ t('confirm_reset_exp', nome=usuario.nome) }}`)">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                  <button type="submit"
+                          class="inline-flex items-center h-8 px-3 text-xs font-bold rounded-dtx-sm bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 transition-colors"
+                          title="{{ t('reset_exp_btn_title') }}">
+                    {{ t('reset_exp_btn') }}
+                  </button>
+                </form>
+                {% endif %}
 
-              <a href="{{ url_for('main.editar_usuario', usuario_id=usuario.id) }}" class="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-bold transition-colors border border-indigo-200/50">
-                {{ t('edit') }}
-              </a>
+                <a href="{{ url_for('main.editar_usuario', usuario_id=usuario.id) }}"
+                   class="inline-flex items-center h-8 px-3 text-xs font-bold rounded-dtx-sm bg-dtx-50 hover:bg-dtx-100 text-dtx-700 border border-dtx-100 transition-colors">
+                  {{ t('edit') }}
+                </a>
 
-              <!-- Reset Password Button -->
-              {% if usuario.id != current_user.id %}
-              <form method="POST" action="{{ url_for('main.resetar_senha_usuario', usuario_id=usuario.id) }}" onsubmit="return confirm(`{{ t('confirm_reset_password', nome=usuario.nome) }}`)">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                <button type="submit" class="px-3 py-1.5 bg-orange-50 hover:bg-orange-100 text-orange-700 rounded-lg text-xs font-bold transition-colors border border-orange-200/50" title="{{ t('reset_password_btn_title') }}">
-                  {{ t('reset_password_btn') }}
-                </button>
-              </form>
-              {% endif %}
+                {% if usuario.id != current_user.id %}
+                <form method="POST" action="{{ url_for('main.resetar_senha_usuario', usuario_id=usuario.id) }}" onsubmit="return confirm(`{{ t('confirm_reset_password', nome=usuario.nome) }}`)">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                  <button type="submit"
+                          class="inline-flex items-center h-8 px-3 text-xs font-bold rounded-dtx-sm bg-orange-50 hover:bg-orange-100 text-orange-700 border border-orange-200 transition-colors"
+                          title="{{ t('reset_password_btn_title') }}">
+                    {{ t('reset_password_btn') }}
+                  </button>
+                </form>
+                {% endif %}
 
-              {% if usuario.id != current_user.id %}
-              <form method="POST" action="{{ url_for('main.deletar_usuario', usuario_id=usuario.id) }}" onsubmit="return confirm(`{{ t('confirm_delete_user', nome=usuario.nome) }}`)">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                <button type="submit" class="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-700 rounded-lg text-xs font-bold transition-colors border border-red-200/50">
+                {% if usuario.id != current_user.id %}
+                <form method="POST" action="{{ url_for('main.deletar_usuario', usuario_id=usuario.id) }}" onsubmit="return confirm(`{{ t('confirm_delete_user', nome=usuario.nome) }}`)">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                  <button type="submit"
+                          class="inline-flex items-center h-8 px-3 text-xs font-bold rounded-dtx-sm bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 transition-colors">
+                    {{ t('delete') }}
+                  </button>
+                </form>
+                {% else %}
+                <button type="button" disabled
+                        class="inline-flex items-center h-8 px-3 text-xs font-bold rounded-dtx-sm bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed"
+                        title="{{ t('cannot_delete_yourself') }}">
                   {{ t('delete') }}
                 </button>
-              </form>
-              {% else %}
-              <button type="button" disabled class="px-3 py-1.5 bg-slate-100 text-slate-400 rounded-lg text-xs font-bold cursor-not-allowed border border-slate-200/50" title="{{ t('cannot_delete_yourself') }}">
-                {{ t('delete') }}
-              </button>
-              {% endif %}
-            </div>
-          </td>
-        </tr>
-        {% endfor %} {% else %}
-        <tr>
-          <td colspan="5" class="px-6 py-16 text-center text-slate-500">
-            <p class="text-sm font-medium">
-              {{ t('no_users_registered') }}
-              <a href="{{ url_for('main.novo_usuario_form') }}" class="text-indigo-600 hover:text-indigo-700 hover:underline font-bold transition-colors ml-1">{{ t('create_now') }}</a>
-            </p>
-          </td>
-        </tr>
-        {% endif %}
-      </tbody>
-    </table>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+          {% else %}
+          <tr>
+            <td colspan="5" class="px-6 py-16 text-center text-slate-500">
+              <p class="text-sm font-medium">
+                {{ t('no_users_registered') }}
+                <a href="{{ url_for('main.novo_usuario_form') }}" class="text-dtx-600 hover:text-dtx-700 font-bold transition-colors ml-1">{{ t('create_now') }}</a>
+              </p>
+            </td>
+          </tr>
+          {% endif %}
+        </tbody>
+      </table>
     </div>
   </div>
 </div>
