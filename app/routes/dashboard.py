@@ -214,7 +214,7 @@ def visualizar_detalhe_chamado(chamado_id: str) -> Response:
 @login_required
 def editar_chamado_pagina() -> Response:
     """Processa o formulário de edição da página de detalhes do chamado (status, responsável, descrição, anexo)."""
-    if current_user.perfil not in ("supervisor", "admin"):
+    if not current_user.is_supervisor_or_above:
         flash_t("only_supervisor_can_edit", "danger")
         return redirect(url_for("main.index"))
 

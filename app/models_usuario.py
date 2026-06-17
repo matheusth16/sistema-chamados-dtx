@@ -36,7 +36,7 @@ class Usuario(UserMixin):
         self.id = id
         self.email = email
         self.nome = nome
-        self.perfil = perfil  # 'solicitante', 'supervisor' ou 'admin'
+        self.perfil = perfil  # 'solicitante', 'supervisor', 'admin' ou 'admin_global'
         self.areas = areas or []  # Lista de setores/departamentos
         self.senha_hash = None
 
@@ -53,6 +53,14 @@ class Usuario(UserMixin):
         # Onboarding
         self.onboarding_completo = onboarding_completo
         self.onboarding_passo = onboarding_passo
+
+    @property
+    def is_admin_or_above(self) -> bool:
+        return self.perfil in ("admin", "admin_global")
+
+    @property
+    def is_supervisor_or_above(self) -> bool:
+        return self.perfil in ("supervisor", "admin", "admin_global")
 
     @property
     def area(self):
@@ -85,6 +93,19 @@ class Usuario(UserMixin):
             "conquistas": self.conquistas,
             "onboarding_completo": self.onboarding_completo,
             "onboarding_passo": self.onboarding_passo,
+        }
+
+    def to_public_dict(self) -> dict:
+        """Serialização segura para respostas HTTP — sem senha_hash."""
+        return {
+            "id": self.id,
+            "email": self.email,
+            "nome": self.nome,
+            "perfil": self.perfil,
+            "areas": self.areas,
+            "exp_total": self.exp_total,
+            "level": self.level,
+            "onboarding_completo": self.onboarding_completo,
         }
 
     @classmethod

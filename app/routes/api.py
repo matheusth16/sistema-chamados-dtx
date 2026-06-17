@@ -38,7 +38,7 @@ ERRO_INTERNO_MSG = "Erro interno. Tente novamente."
 
 @main.route("/health", methods=["GET"])
 def health():
-    """Health check para Railway e monitoramento externo.
+    """Health check para monitoramento externo.
 
     Modo raso (padrão): apenas confirma que a app está no ar — rápido, sem I/O.
     Modo deep (?deep=1): verifica conectividade com Firestore — para UptimeRobot/BetterUptime.
@@ -185,7 +185,7 @@ def atualizar_status_ajax():
 @login_required
 def api_editar_chamado():
     """Edita chamado de forma completa via FormData (incluindo arquivo, status, responsavel, descricao). Apenas supervisor/admin."""
-    if current_user.perfil not in ("supervisor", "admin"):
+    if not current_user.is_supervisor_or_above:
         return jsonify({"sucesso": False, "erro": "Acesso negado"}), 403
 
     try:
@@ -244,7 +244,7 @@ def api_editar_chamado():
 @limiter.limit("10 per minute", methods=["POST"])
 def bulk_atualizar_status():
     """Atualiza status de múltiplos chamados em lote. Apenas supervisor/admin."""
-    if current_user.perfil not in ("supervisor", "admin"):
+    if not current_user.is_supervisor_or_above:
         return jsonify({"sucesso": False, "erro": "Acesso negado"}), 403
     try:
         dados = request.get_json()

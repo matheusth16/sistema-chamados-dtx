@@ -29,6 +29,96 @@
     "en": "Gate 1",
     "es": "Gate 1"
   },
+  "gate_1_desmontagem": {
+    "pt_BR": "Gate 1 - Desmontagem",
+    "en": "Gate 1 - Disassembly",
+    "es": "Gate 1 - Desmontaje"
+  },
+  "gate_1_limpeza": {
+    "pt_BR": "Gate 1 - Limpeza",
+    "en": "Gate 1 - Cleaning",
+    "es": "Gate 1 - Limpieza"
+  },
+  "gate_1_remocao_tinta": {
+    "pt_BR": "Gate 1 - Remoção de Tinta",
+    "en": "Gate 1 - Paint Removal",
+    "es": "Gate 1 - Remoción de Pintura"
+  },
+  "gate_1_reconciliacao": {
+    "pt_BR": "Gate 1 - Reconciliação",
+    "en": "Gate 1 - Reconciliation",
+    "es": "Gate 1 - Reconciliación"
+  },
+  "gate_2_forno": {
+    "pt_BR": "Gate 2 - Forno",
+    "en": "Gate 2 - Oven",
+    "es": "Gate 2 - Horno"
+  },
+  "gate_2_fpi": {
+    "pt_BR": "Gate 2 - FPI",
+    "en": "Gate 2 - FPI",
+    "es": "Gate 2 - FPI"
+  },
+  "gate_2_mpi": {
+    "pt_BR": "Gate 2 - MPI",
+    "en": "Gate 2 - MPI",
+    "es": "Gate 2 - MPI"
+  },
+  "gate_2_inspecao": {
+    "pt_BR": "Gate 2 - Inspeção",
+    "en": "Gate 2 - Inspection",
+    "es": "Gate 2 - Inspección"
+  },
+  "gate_3_galvanoplastia": {
+    "pt_BR": "Gate 3 - Galvanoplastia",
+    "en": "Gate 3 - Electroplating",
+    "es": "Gate 3 - Galvanoplastia"
+  },
+  "gate_3_usinagem": {
+    "pt_BR": "Gate 3 - Usinagem",
+    "en": "Gate 3 - Machining",
+    "es": "Gate 3 - Mecanizado"
+  },
+  "gate_3_bucha": {
+    "pt_BR": "Gate 3 - Bucha",
+    "en": "Gate 3 - Bushing",
+    "es": "Gate 3 - Buje"
+  },
+  "gate_3_pintura": {
+    "pt_BR": "Gate 3 - Pintura",
+    "en": "Gate 3 - Painting",
+    "es": "Gate 3 - Pintura"
+  },
+  "gate_4_inspecao_partes": {
+    "pt_BR": "Gate 4 - Inspeção de Partes",
+    "en": "Gate 4 - Parts Inspection",
+    "es": "Gate 4 - Inspección de Partes"
+  },
+  "gate_4_montagem": {
+    "pt_BR": "Gate 4 - Montagem",
+    "en": "Gate 4 - Assembly",
+    "es": "Gate 4 - Montaje"
+  },
+  "gate_4_testes": {
+    "pt_BR": "Gate 4 - Testes",
+    "en": "Gate 4 - Tests",
+    "es": "Gate 4 - Pruebas"
+  },
+  "gate_4_inspecao_final": {
+    "pt_BR": "Gate 4 - Inspeção Final",
+    "en": "Gate 4 - Final Inspection",
+    "es": "Gate 4 - Inspección Final"
+  },
+  "gate_step_required": {
+    "pt_BR": "Selecione a sub-etapa do gate",
+    "en": "Select the gate sub-step",
+    "es": "Seleccione la sub-etapa del gate"
+  },
+  "select_gate_step": {
+    "pt_BR": "Selecione a etapa...",
+    "en": "Select step...",
+    "es": "Seleccione la etapa..."
+  },
   "attached_file": {
     "pt_BR": "Arquivo Anexado",
     "en": "Attached File",
@@ -235,14 +325,34 @@
     "es": "Formatos permitidos:"
   },
   "file_types_short": {
-    "pt_BR": "Imagens, PDF, Excel e Word. Máx. 10MB",
-    "en": "Images, PDF, Excel and Word. Max 10MB",
-    "es": "Imágenes, PDF, Excel y Word. Máx. 10MB"
+    "pt_BR": "Imagens, PDF, Excel e Word. Máx. 10 MB por arquivo",
+    "en": "Images, PDF, Excel and Word. Max 10 MB per file",
+    "es": "Imágenes, PDF, Excel y Word. Máx. 10 MB por archivo"
   },
   "file_max_size": {
     "pt_BR": "Máx. 10MB",
     "en": "Max 10MB",
     "es": "Máx. 10MB"
+  },
+  "attachments_selected": {
+    "pt_BR": "{count} arquivo(s) selecionado(s)",
+    "en": "{count} file(s) selected",
+    "es": "{count} archivo(s) seleccionado(s)"
+  },
+  "remove_attachment": {
+    "pt_BR": "Remover",
+    "en": "Remove",
+    "es": "Quitar"
+  },
+  "remove_attachment_aria": {
+    "pt_BR": "Remover anexo {filename}",
+    "en": "Remove attachment {filename}",
+    "es": "Quitar adjunto {filename}"
+  },
+  "file_too_large": {
+    "pt_BR": "Cada arquivo deve ter no máximo 10 MB",
+    "en": "Each file must be at most 10 MB",
+    "es": "Cada archivo debe tener como máximo 10 MB"
   },
   "request_category": {
     "pt_BR": "Categoria da Solicitação",
@@ -799,11 +909,6 @@
     "en": "Categories",
     "es": "Categorías"
   },
-  "nav_translations": {
-    "pt_BR": "Traduções",
-    "en": "Translations",
-    "es": "Traducciones"
-  },
   "nav_logout": {
     "pt_BR": "Sair",
     "en": "Logout",
@@ -1230,9 +1335,9 @@
     "es": "ej.: Mantenimiento"
   },
   "auto_translated_note": {
-    "pt_BR": "⭐ Será traduzido automaticamente para Inglês e Espanhol",
-    "en": "⭐ Will be automatically translated to English and Spanish",
-    "es": "⭐ Será traducido automáticamente al Inglés y Español"
+    "pt_BR": "Será traduzido automaticamente para Inglês e Espanhol",
+    "en": "Will be automatically translated to English and Spanish",
+    "es": "Será traducido automáticamente al Inglés y Español"
   },
   "description_optional": {
     "pt_BR": "Descrição (opcional)",
@@ -1295,9 +1400,9 @@
     "es": "ej.: Validación de requisitos"
   },
   "order_auto_assigned_note": {
-    "pt_BR": "📌 A ordem será atribuída automaticamente (próximo número sequencial)",
-    "en": "📌 Order will be automatically assigned (next sequential number)",
-    "es": "📌 El orden será asignado automáticamente (siguiente número secuencial)"
+    "pt_BR": "A ordem será atribuída automaticamente (próximo número sequencial)",
+    "en": "Order will be automatically assigned (next sequential number)",
+    "es": "El orden será asignado automáticamente (siguiente número secuencial)"
   },
   "add_gate": {
     "pt_BR": "Adicionar Gate",
@@ -1505,9 +1610,9 @@
     "es": "Complete los datos del nuevo usuario"
   },
   "email_required": {
-    "pt_BR": "📧 Email *",
-    "en": "📧 Email *",
-    "es": "📧 Correo electrónico *"
+    "pt_BR": "Email *",
+    "en": "Email *",
+    "es": "Correo electrónico *"
   },
   "ex_email": {
     "pt_BR": "usuario@dtx.com",
@@ -1515,9 +1620,9 @@
     "es": "usuario@dtx.com"
   },
   "full_name_required": {
-    "pt_BR": "👤 Nome Completo *",
-    "en": "👤 Full Name *",
-    "es": "👤 Nombre Completo *"
+    "pt_BR": "Nome Completo *",
+    "en": "Full Name *",
+    "es": "Nombre Completo *"
   },
   "ex_name": {
     "pt_BR": "João da Silva",
@@ -1525,9 +1630,9 @@
     "es": "Juan Pérez"
   },
   "profile_required": {
-    "pt_BR": "👥 Perfil *",
-    "en": "👥 Profile *",
-    "es": "👥 Perfil *"
+    "pt_BR": "Perfil *",
+    "en": "Profile *",
+    "es": "Perfil *"
   },
   "requester_creates_tickets": {
     "pt_BR": "Solicitante (Cria chamados)",
@@ -1545,9 +1650,9 @@
     "es": "Admin (Acceso total)"
   },
   "areas_sectors_select_one_or_more": {
-    "pt_BR": "🏢 Áreas/Setores (Selecione um ou mais) *",
-    "en": "🏢 Areas/Sectors (Select one or more) *",
-    "es": "🏢 Áreas/Sectores (Seleccione uno o más) *"
+    "pt_BR": "Áreas/Setores (Selecione um ou mais) *",
+    "en": "Areas/Sectors (Select one or more) *",
+    "es": "Áreas/Sectores (Seleccione uno o más) *"
   },
   "area_maintenance": {
     "pt_BR": "Manutenção",
@@ -1580,9 +1685,9 @@
     "es": "Material"
   },
   "new_password_leave_blank": {
-    "pt_BR": "🔑 Nova Senha (deixe em branco para manter)",
-    "en": "🔑 New Password (leave blank to keep)",
-    "es": "🔑 Nueva Contraseña (dejar en blanco para mantener)"
+    "pt_BR": "Nova Senha (deixe em branco para manter)",
+    "en": "New Password (leave blank to keep)",
+    "es": "Nueva Contraseña (dejar en blanco para mantener)"
   },
   "leave_blank_to_keep_current": {
     "pt_BR": "Deixe vazio para manter a senha atual",
@@ -1590,9 +1695,9 @@
     "es": "Dejar vacío para mantener la contraseña actual"
   },
   "password_required": {
-    "pt_BR": "🔑 Senha *",
-    "en": "🔑 Password *",
-    "es": "🔑 Contraseña *"
+    "pt_BR": "Senha *",
+    "en": "Password *",
+    "es": "Contraseña *"
   },
   "minimum_6_chars": {
     "pt_BR": "Mínimo 6 caracteres",
@@ -1843,31 +1948,6 @@
     "pt_BR": "Erro ao carregar seus chamados.",
     "en": "Error loading your tickets.",
     "es": "Error al cargar tus tickets."
-  },
-  "trans_key_not_provided": {
-    "pt_BR": "Chave de tradução não informada.",
-    "en": "Translation key not provided.",
-    "es": "Clave de traducción no proporcionada."
-  },
-  "translation_saved_success": {
-    "pt_BR": "Tradução para \"{chave}\" salva com sucesso.",
-    "en": "Translation for \"{chave}\" saved successfully.",
-    "es": "Traducción para \"{chave}\" guardada con éxito."
-  },
-  "error_saving_json": {
-    "pt_BR": "Erro ao salvar o arquivo json.",
-    "en": "Error saving JSON file.",
-    "es": "Error al guardar el archivo JSON."
-  },
-  "error_saving_with_msg": {
-    "pt_BR": "Erro ao salvar: {error}",
-    "en": "Error saving: {error}",
-    "es": "Error al guardar: {error}"
-  },
-  "error_loading_translations": {
-    "pt_BR": "Erro ao carregar lista de traduções.",
-    "en": "Error loading translations list.",
-    "es": "Error al cargar la lista de traducciones."
   },
   "invalid_email": {
     "pt_BR": "Email inválido",
@@ -2340,19 +2420,19 @@
     "es": "Si necesita restablecer la contraseña de un usuario existente, use el botón \"Restablecer Contraseña\" en la lista de usuarios."
   },
   "insight_badge_warning": {
-    "pt_BR": "⚠ Alerta",
-    "en": "⚠ Warning",
-    "es": "⚠ Alerta"
+    "pt_BR": "Alerta",
+    "en": "Warning",
+    "es": "Alerta"
   },
   "insight_badge_ok": {
-    "pt_BR": "✓ OK",
-    "en": "✓ OK",
-    "es": "✓ OK"
+    "pt_BR": "OK",
+    "en": "OK",
+    "es": "OK"
   },
   "insight_badge_info": {
-    "pt_BR": "ℹ Info",
-    "en": "ℹ Info",
-    "es": "ℹ Info"
+    "pt_BR": "Info",
+    "en": "Info",
+    "es": "Info"
   },
   "current_label": {
     "pt_BR": "Atual",
@@ -2423,6 +2503,16 @@
     "pt_BR": "Acesso negado. Essa página é para solicitantes, supervisores e administradores.",
     "en": "Access denied. This page is for requesters, supervisors, and administrators.",
     "es": "Acceso denegado. Esta página es para solicitantes, supervisores y administradores."
+  },
+  "access_denied_create_admin": {
+    "pt_BR": "Apenas o Admin Global pode criar ou promover usuários para o perfil Administrador.",
+    "en": "Only Admin Global can create or promote users to the Administrator role.",
+    "es": "Solo el Admin Global puede crear o promover usuarios al perfil Administrador."
+  },
+  "nav_admin_global": {
+    "pt_BR": "Painel Global",
+    "en": "Global Panel",
+    "es": "Panel Global"
   },
   "notifications_empty": {
     "pt_BR": "Nenhuma notificação",
@@ -2535,9 +2625,9 @@
     "es": "TI"
   },
   "ppcp": {
-    "pt_BR": "PPCP",
-    "en": "PPCP",
-    "es": "PPCP"
+    "pt_BR": "Planejamento de Produção",
+    "en": "Production Planning",
+    "es": "Planificación de Producción"
   },
   "material_planning": {
     "pt_BR": "Planejamento Materiais",
@@ -2653,5 +2743,80 @@
     "pt_BR": "{categoria} · Solicitante: {solicitante}",
     "en": "{categoria} · Requester: {solicitante}",
     "es": "{categoria} · Solicitante: {solicitante}"
+  },
+  "edit_sector": {
+    "pt_BR": "Editar Setor",
+    "en": "Edit Sector",
+    "es": "Editar Sector"
+  },
+  "edit_gate": {
+    "pt_BR": "Editar Gate",
+    "en": "Edit Gate",
+    "es": "Editar Gate"
+  },
+  "edit_impact": {
+    "pt_BR": "Editar Impacto",
+    "en": "Edit Impact",
+    "es": "Editar Impacto"
+  },
+  "close_modal": {
+    "pt_BR": "Fechar",
+    "en": "Close",
+    "es": "Cerrar"
+  },
+  "gate_parent_label": {
+    "pt_BR": "Gate Pai",
+    "en": "Parent Gate",
+    "es": "Gate Padre"
+  },
+  "gate_step_label": {
+    "pt_BR": "Sub-Etapa",
+    "en": "Sub-Step",
+    "es": "Sub-Etapa"
+  },
+  "gate_step_input_placeholder": {
+    "pt_BR": "Ex: Desmontagem",
+    "en": "Ex: Disassembly",
+    "es": "Ej: Desmontaje"
+  },
+  "gate_pai_invalido": {
+    "pt_BR": "Gate pai inválido. Use Gate 1, 2, 3 ou 4.",
+    "en": "Invalid parent gate. Use Gate 1, 2, 3 or 4.",
+    "es": "Gate padre inválido. Use Gate 1, 2, 3 o 4."
+  },
+  "active_label": {
+    "pt_BR": "Ativo",
+    "en": "Active",
+    "es": "Activo"
+  },
+  "edit_sector_title": {
+    "pt_BR": "Editar Setor",
+    "en": "Edit Sector",
+    "es": "Editar Sector"
+  },
+  "edit_gate_title": {
+    "pt_BR": "Editar Gate",
+    "en": "Edit Gate",
+    "es": "Editar Gate"
+  },
+  "edit_impact_title": {
+    "pt_BR": "Editar Impacto",
+    "en": "Edit Impact",
+    "es": "Editar Impacto"
+  },
+  "new_gate_substep": {
+    "pt_BR": "Nova Sub-Etapa de Gate",
+    "en": "New Gate Sub-Step",
+    "es": "Nueva Sub-Etapa de Gate"
+  },
+  "select_gate_parent": {
+    "pt_BR": "Selecione o gate pai...",
+    "en": "Select parent gate...",
+    "es": "Seleccione el gate padre..."
+  },
+  "gate_substep_note": {
+    "pt_BR": "O nome completo será gerado automaticamente (ex: Gate 1 - Desmontagem)",
+    "en": "The full name will be generated automatically (e.g. Gate 1 - Disassembly)",
+    "es": "El nombre completo se generará automáticamente (ej: Gate 1 - Desmontaje)"
   }
 }

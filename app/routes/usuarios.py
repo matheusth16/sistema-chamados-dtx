@@ -59,6 +59,9 @@ def gerenciar_usuarios() -> Response:
             erros.append("invalid_profile")
         if perfil == "supervisor" and not areas:
             erros.append("area_required_for_supervisor")
+        # Sub-admins não podem criar outros admins — apenas admin_global pode
+        if perfil == "admin" and current_user.perfil != "admin_global":
+            erros.append("access_denied_create_admin")
         if erros:
             for e in erros:
                 flash_t(e, "danger")
@@ -150,6 +153,9 @@ def editar_usuario(usuario_id: str) -> Response:
             erros.append("invalid_profile")
         if perfil == "supervisor" and not areas:
             erros.append("area_required_for_supervisor")
+        # Sub-admins não podem promover para admin — apenas admin_global pode
+        if perfil == "admin" and current_user.perfil != "admin_global":
+            erros.append("access_denied_create_admin")
         if erros:
             for e in erros:
                 flash_t(e, "danger")

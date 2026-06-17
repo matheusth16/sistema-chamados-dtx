@@ -92,6 +92,8 @@ def _create_client_must_change_password(client, app):
     usuario.is_anonymous = False
     usuario.check_password = MagicMock(return_value=True)
     usuario.update = MagicMock(return_value=True)
+    usuario.is_admin_or_above = False
+    usuario.is_supervisor_or_above = False
     return usuario
 
 
@@ -438,6 +440,7 @@ def test_alterar_senha_update_retorna_false_redireciona(client, app):
     usuario.is_anonymous = False
     usuario.check_password = MagicMock(return_value=True)
     usuario.update = MagicMock(return_value=False)
+    usuario.is_admin_or_above = False
 
     with (
         patch("app.routes.auth.Usuario.get_by_email", return_value=usuario),
@@ -471,6 +474,7 @@ def test_alterar_senha_excecao_no_update_redireciona(client, app):
     usuario.is_anonymous = False
     usuario.check_password = MagicMock(return_value=True)
     usuario.update = MagicMock(side_effect=Exception("Firestore error"))
+    usuario.is_admin_or_above = False
 
     with (
         patch("app.routes.auth.Usuario.get_by_email", return_value=usuario),

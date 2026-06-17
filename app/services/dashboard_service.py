@@ -106,7 +106,7 @@ def preparar_metricas_paginadas(
 def _filtrar_chamados_por_permissao(docs: list[Any], user: Any) -> list[Chamado]:
     """Filtra chamados que o usuário pode ver, com cache para evitar N+1 queries."""
     chamados = []
-    if user.perfil == "admin":
+    if user.is_admin_or_above:
         for doc in docs:
             chamados.append(Chamado.from_dict(doc.to_dict(), doc.id))
         return chamados

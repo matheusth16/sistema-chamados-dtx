@@ -253,6 +253,7 @@ def test_regression_supervisor_so_ve_sua_area():
     supervisor = MagicMock()
     supervisor.perfil = "supervisor"
     supervisor.areas = ["Manutencao"]
+    supervisor.is_admin_or_above = False
     chamado_ok = MagicMock()
     chamado_ok.area = "Manutencao"
     chamado_outro = MagicMock()

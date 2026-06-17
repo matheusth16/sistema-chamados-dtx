@@ -55,6 +55,10 @@ def requer_perfil(*perfis_permitidos):
                 else:
                     perfis_lista.append(perfil)
 
+            # admin_global herda tudo que admin tem
+            if "admin" in perfis_lista and "admin_global" not in perfis_lista:
+                perfis_lista.append("admin_global")
+
             # Verifica se o perfil do usuário está na lista
             if current_user.perfil not in perfis_lista:
                 logger.warning(
@@ -102,7 +106,7 @@ def requer_supervisor_area(f):
             return redirect(url_for("main.login"))
 
         # Apenas supervisores e admins podem acessar
-        if current_user.perfil not in ["supervisor", "admin"]:
+        if current_user.perfil not in ["supervisor", "admin", "admin_global"]:
             logger.warning(
                 "Acesso negado: solicitante %s tentou acessar %s",
                 current_user.email,
@@ -112,7 +116,7 @@ def requer_supervisor_area(f):
             return redirect(url_for("main.index"))
 
         # Se é supervisor, registra a área dele para uso posterior
-        if current_user.perfil == "supervisor":
+        if current_user.perfil in ("supervisor",):
             current_app.logger.debug(
                 f"Supervisor {current_user.email} acessando {f.__name__} (Área: {current_user.area})"
             )
@@ -138,7 +142,7 @@ def requer_solicitante(f):
             return redirect(url_for("main.login"))
 
         # Solicitantes, supervisores e admins podem criar e ver seus chamados
-        if current_user.perfil not in ("solicitante", "supervisor", "admin"):
+        if current_user.perfil not in ("solicitante", "supervisor", "admin", "admin_global"):
             logger.warning(
                 "Acesso negado: %s %s tentou acessar rota %s",
                 current_user.perfil,

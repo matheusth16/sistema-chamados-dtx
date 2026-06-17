@@ -25,7 +25,7 @@ def usuario_pode_ver_chamado(user: Usuario, chamado: Any) -> bool:
     Returns:
         True se pode ver, False caso contrário.
     """
-    if user.perfil == "admin":
+    if user.is_admin_or_above:
         return True
 
     if user.perfil != "supervisor":
@@ -47,7 +47,7 @@ def usuario_pode_ver_chamado_otimizado(
     Supervisor vê chamados da sua área ou que ele abriu (solicitante_id).
     cache_usuarios é ignorado nesta regra (mantido por compatibilidade de assinatura).
     """
-    if user.perfil == "admin":
+    if user.is_admin_or_above:
         return True
 
     if user.perfil != "supervisor":

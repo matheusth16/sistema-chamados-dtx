@@ -21,7 +21,7 @@ def supervisor_pode_alterar_chamado(usuario: Any, chamado_area: str) -> bool:
     Returns:
         True se pode alterar, False caso contrário.
     """
-    if usuario.perfil == "admin":
+    if usuario.is_admin_or_above:
         return True
     if usuario.perfil != "supervisor":
         return False

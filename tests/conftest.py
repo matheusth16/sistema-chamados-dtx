@@ -61,6 +61,8 @@ def _usuario_mock(uid, email, nome, perfil, area="Geral", areas=None):
     u.get_id = lambda: str(uid)
     # Para testes que assumem acesso após login (dashboard, API): sem obrigação de trocar senha
     u.must_change_password = False
+    u.is_admin_or_above = perfil in ("admin", "admin_global")
+    u.is_supervisor_or_above = perfil in ("supervisor", "admin", "admin_global")
     return u
 
 
@@ -101,6 +103,18 @@ def client_logado_admin(client, app):
         client.post(
             "/login", data={"email": "admin@test.com", "senha": "ok"}, follow_redirects=False
         )
+        yield client
+
+
+@pytest.fixture
+def client_logado_admin_global(client, app):
+    """Cliente com usuário admin_global já logado."""
+    user = _usuario_mock("ag_1", "ag@test.com", "Admin Global Teste", "admin_global", "Geral")
+    with (
+        patch("app.routes.auth.Usuario.get_by_email", return_value=user),
+        patch("app.models_usuario.Usuario.get_by_id", return_value=user),
+    ):
+        client.post("/login", data={"email": "ag@test.com", "senha": "ok"}, follow_redirects=False)
         yield client
 
 

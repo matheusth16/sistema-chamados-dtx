@@ -30,12 +30,14 @@ def test_supervisor_pode_alterar_chamado_supervisor_area_errada():
     sup = MagicMock()
     sup.perfil = "supervisor"
     sup.areas = ["Manutencao"]
+    sup.is_admin_or_above = False
     assert supervisor_pode_alterar_chamado(sup, "TI") is False
 
 
 def test_supervisor_pode_alterar_chamado_solicitante_nunca_pode():
     sol = MagicMock()
     sol.perfil = "solicitante"
+    sol.is_admin_or_above = False
     assert supervisor_pode_alterar_chamado(sol, "Manutencao") is False
 
 

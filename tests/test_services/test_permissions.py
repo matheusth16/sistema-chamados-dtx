@@ -16,6 +16,8 @@ def _usuario_mock(perfil, areas=None):
     u = MagicMock()
     u.perfil = perfil
     u.areas = areas or []
+    u.is_admin_or_above = perfil in ("admin", "admin_global")
+    u.is_supervisor_or_above = perfil in ("supervisor", "admin", "admin_global")
     return u
 
 

@@ -126,6 +126,7 @@ def test_filtrar_chamados_por_permissao_supervisor_filtra_por_area():
     user = MagicMock()
     user.perfil = "supervisor"
     user.areas = ["Manutencao"]
+    user.is_admin_or_above = False
 
     doc1 = MagicMock()
     doc1.id = "d1"
@@ -157,6 +158,7 @@ def test_filtrar_chamados_usa_batch_fetch_nao_n_mais_1():
     user = MagicMock()
     user.perfil = "supervisor"
     user.areas = ["Manutencao"]
+    user.is_admin_or_above = False
 
     def _doc(num, resp_id):
         d = MagicMock()
