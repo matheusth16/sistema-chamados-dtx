@@ -224,7 +224,7 @@ def editar_chamado_pagina() -> Response:
         nova_descricao=request.form.get("nova_descricao", ""),
         novo_responsavel_id=(request.form.get("novo_responsavel_id") or "").strip(),
         novo_sla_str=(request.form.get("sla_dias") or "").strip(),
-        arquivo_anexo=request.files.get("anexo"),
+        arquivos_novos=request.files.getlist("anexos_novos"),
         setores_adicionais_lista=setores_adicionais_form,
     )
 

@@ -21,7 +21,7 @@ load_dotenv(os.path.join(basedir, ".env"))
 # Em produção, exige SECRET_KEY forte (não usar o valor de desenvolvimento)
 _dev_secret = "dev-secret-key-change-in-production"
 _secret = os.getenv("SECRET_KEY") or _dev_secret
-_env = (os.getenv("FLASK_ENV") or os.getenv("ENV") or "development").lower()
+_env = (os.getenv("FLASK_ENV") or os.getenv("ENV") or "production").lower()
 if _env == "production" and (not os.getenv("SECRET_KEY") or _secret == _dev_secret):
     raise ValueError(
         "Em produção, defina SECRET_KEY no ambiente com um valor forte e único. "
@@ -39,9 +39,13 @@ class Config:
     # 2. Caminho ABSOLUTO para a pasta de uploads (Evita erros no Windows/OneDrive)
     UPLOAD_FOLDER = os.path.join(basedir, "app", "static", "uploads")
 
-    # 3. Segurança: Limita o tamanho do arquivo a 10MB
-    # Se passar disso, o sistema rejeita automaticamente.
-    MAX_CONTENT_LENGTH = 10 * 1024 * 1024
+    # 3. Limites de upload
+    # MAX_ANEXO_BYTES: regra de negócio — cada arquivo individualmente pode ter até 10 MB.
+    # MAX_CONTENT_LENGTH: guardrail de infraestrutura — teto total do request HTTP.
+    #   Sem limite de quantidade de arquivos por chamado, então usamos 500 MB como teto.
+    #   A validação real (10 MB/arquivo) fica em validators.py._validar_tamanho.
+    MAX_ANEXO_BYTES = 10 * 1024 * 1024
+    MAX_CONTENT_LENGTH = int(os.getenv("MAX_UPLOAD_REQUEST_BYTES", str(500 * 1024 * 1024)))
 
     # 4. Paginação
     ITENS_POR_PAGINA = 10
@@ -106,12 +110,15 @@ class Config:
 
     # Notificações (URL base para links em e-mail/Web Push)
     APP_BASE_URL = os.getenv("APP_BASE_URL", "")
-    MAIL_SERVER = os.getenv("MAIL_SERVER", "")
-    MAIL_PORT = int(os.getenv("MAIL_PORT", "587"))
-    MAIL_USE_TLS = os.getenv("MAIL_USE_TLS", "true").lower() in ("true", "1", "yes")
-    MAIL_USERNAME = os.getenv("MAIL_USERNAME", "")
-    MAIL_PASSWORD = os.getenv("MAIL_PASSWORD", "")
-    MAIL_DEFAULT_SENDER = os.getenv("MAIL_DEFAULT_SENDER", "")
+
+    # Microsoft Graph API (envio de e-mail via client credentials)
+    GRAPH_TENANT_ID = os.getenv("GRAPH_TENANT_ID", "").strip()
+    GRAPH_CLIENT_ID = os.getenv("GRAPH_CLIENT_ID", "").strip()
+    GRAPH_CLIENT_SECRET = os.getenv("GRAPH_CLIENT_SECRET", "").strip()
+    GRAPH_SENDER_EMAIL = os.getenv("GRAPH_SENDER_EMAIL", "").strip()
+
+    # Relay monitorado pelo Power Automate (caixa de entrada que dispara os flows)
+    NOTIFY_RELAY_EMAIL = os.getenv("NOTIFY_RELAY_EMAIL", "dtxls.support@dtx.aero").strip()
 
     # Power Automate (modo teste): sobrescreve o destinatário final do evento USUARIO_CADASTRADO
     # Útil para validar visualmente o fluxo sem depender do e-mail real do usuário criado.
@@ -130,6 +137,10 @@ class Config:
 
     # Notificação e-mail ao solicitante em mudança de status (opt-in)
     NOTIFY_SOLICITANTE_EMAIL = _to_bool(os.getenv("NOTIFY_SOLICITANTE_EMAIL"), default=False)
+
+    # MyMemory Translation API (opcional — aumenta limite de 5k para 10k chars/dia)
+    # Cadastre em mymemory.translated.net e defina MYMEMORY_EMAIL no Railway
+    MYMEMORY_EMAIL = os.getenv("MYMEMORY_EMAIL", "").strip()
 
     # Criptografia de PII em repouso (LGPD). Gere chave: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
     ENCRYPTION_KEY = os.getenv("ENCRYPTION_KEY", "").strip()

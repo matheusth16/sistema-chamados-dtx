@@ -1,16 +1,22 @@
 """
-Serviço de Notificações: E-mail (Brevo HTTP API com fallback SMTP).
+Serviço de Notificações: E-mail via Microsoft Graph API (client credentials).
 
-- Aprovador (responsável): notificado na criação do chamado (e-mail).
-- Solicitante: notificado quando o status muda para Em Atendimento ou Concluído (e-mail; atualmente desativado).
+- Aprovador (responsável): notificado na criação do chamado.
+- Solicitante: notificado em mudança de status (opt-in via NOTIFY_SOLICITANTE_EMAIL).
+- Power Automate: relay via assunto estruturado (PREFIXO|ID|EMAIL).
+
+Variáveis de ambiente obrigatórias:
+  GRAPH_TENANT_ID     — Directory (tenant) ID do Azure AD
+  GRAPH_CLIENT_ID     — Application (client) ID
+  GRAPH_CLIENT_SECRET — Client secret value
+  GRAPH_SENDER_EMAIL  — Caixa de envio (ex: dtxls.support@dtx.aero)
 """
 
 import logging
 import os
-import smtplib
-import time
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
+import urllib.error
+import urllib.parse
+import urllib.request
 from html import escape
 
 from flask import current_app, request
@@ -47,76 +53,106 @@ def _config(key: str, default=None):
         return default
 
 
-def _mail_setting(key: str, default=None):
-    """Lê MAIL_* do Flask config (que já carrega .env via config.py na inicialização).
-    Fallback para os.getenv apenas se executado fora de app context."""
-    val = _config(key)
-    if val is not None and (not isinstance(val, str) or val.strip()):
-        return val
-    return os.getenv(key, default)
-
-
-_SMTP_MAX_TENTATIVAS = 3
-_SMTP_BACKOFF_BASE = 2.0  # segundos: 1s, 2s, 4s
-
-
-def _enviar_via_brevo(
+def _enviar_via_graph(
     destinatario: str,
     assunto: str,
     corpo_html: str,
     corpo_texto: str | None,
     from_addr: str,
-    from_nome: str = "DTX Aerospace",
 ) -> tuple:
-    """Envia e-mail via Brevo HTTP API. Não usa SMTP — nunca bloqueado por cloud."""
+    """
+    Envia e-mail via Microsoft Graph API usando client credentials (sem SMTP).
+
+    Fluxo:
+    1. POST /oauth2/v2.0/token → obtém access_token
+    2. POST /v1.0/users/{sender}/sendMail → envia mensagem
+    """
     import json
-    import urllib.request
 
-    api_key = os.getenv("BREVO_API_KEY", "").strip()
-    if not api_key:
-        return (False, "BREVO_API_KEY não configurado")
+    tenant_id = os.getenv("GRAPH_TENANT_ID", "").strip()
+    client_id = os.getenv("GRAPH_CLIENT_ID", "").strip()
+    client_secret = os.getenv("GRAPH_CLIENT_SECRET", "").strip()
+    sender_email = os.getenv("GRAPH_SENDER_EMAIL", "").strip() or from_addr.strip()
 
-    payload = json.dumps(
+    if not all([tenant_id, client_id, client_secret, sender_email]):
+        return (
+            False,
+            "Configuração incompleta: defina GRAPH_TENANT_ID, GRAPH_CLIENT_ID, "
+            "GRAPH_CLIENT_SECRET e GRAPH_SENDER_EMAIL",
+        )
+
+    # 1. Obter token OAuth2 (client credentials)
+    token_url = f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token"
+    token_data = urllib.parse.urlencode(
         {
-            "sender": {"name": from_nome, "email": from_addr},
-            "to": [{"email": destinatario}],
-            "subject": assunto,
-            "htmlContent": corpo_html,
-            **({"textContent": corpo_texto} if corpo_texto else {}),
+            "grant_type": "client_credentials",
+            "client_id": client_id,
+            "client_secret": client_secret,
+            "scope": "https://graph.microsoft.com/.default",
         }
     ).encode("utf-8")
 
-    req = urllib.request.Request(
-        "https://api.brevo.com/v3/smtp/email",
+    try:
+        req_token = urllib.request.Request(token_url, data=token_data, method="POST")
+        with urllib.request.urlopen(req_token, timeout=10) as resp:  # nosec B310 — URL constante HTTPS
+            token_resp = json.loads(resp.read().decode("utf-8"))
+            access_token = token_resp.get("access_token")
+            if not access_token:
+                err = f"Token não obtido da resposta Graph: {list(token_resp.keys())}"
+                logger.warning(err)
+                return (False, err)
+    except urllib.error.HTTPError as e:
+        body = e.read().decode("utf-8", errors="replace")[:300]
+        err = f"Graph token HTTP {e.code}: {body}"
+        logger.warning("Falha ao obter token Graph: %s", err)
+        return (False, err)
+    except Exception as e:
+        logger.exception("Falha ao obter token Graph para %s: %s", destinatario, e)
+        return (False, f"Falha ao obter token OAuth2: {e}")
+
+    # 2. Enviar e-mail via Graph sendMail
+    payload = json.dumps(
+        {
+            "message": {
+                "subject": assunto,
+                "body": {"contentType": "HTML", "content": corpo_html},
+                "toRecipients": [{"emailAddress": {"address": destinatario}}],
+            },
+            "saveToSentItems": False,
+        }
+    ).encode("utf-8")
+
+    send_url = f"https://graph.microsoft.com/v1.0/users/{urllib.parse.quote(sender_email)}/sendMail"
+    req_send = urllib.request.Request(
+        send_url,
         data=payload,
         headers={
-            "api-key": api_key,
+            "Authorization": f"Bearer {access_token}",
             "Content-Type": "application/json",
         },
         method="POST",
     )
     try:
-        with urllib.request.urlopen(req, timeout=10) as resp:  # nosec B310 — URL é constante HTTPS
-            if resp.status in (200, 201):
-                logger.info("E-mail enviado via Brevo para %s: %s", destinatario, assunto[:50])
+        with urllib.request.urlopen(req_send, timeout=15) as resp:  # nosec B310
+            if resp.status == 202:
+                logger.info("E-mail enviado via Graph para %s: %s", destinatario, assunto[:50])
                 return (True, None)
-            err = f"Brevo status inesperado: {resp.status}"
+            err = f"Graph sendMail status inesperado: {resp.status}"
             logger.warning(err)
             return (False, err)
     except urllib.error.HTTPError as e:
-        body = e.read().decode("utf-8", errors="replace")[:200]
-        err = f"Brevo HTTP {e.code}: {body}"
-        logger.warning("Falha Brevo para %s: %s", destinatario, err)
+        body = e.read().decode("utf-8", errors="replace")[:300]
+        err = f"Graph sendMail HTTP {e.code}: {body}"
+        logger.warning("Falha Graph sendMail para %s: %s", destinatario, err)
         return (False, err)
     except Exception as e:
-        logger.exception("Falha ao enviar via Brevo para %s: %s", destinatario, e)
+        logger.exception("Falha ao enviar via Graph para %s: %s", destinatario, e)
         return (False, str(e))
 
 
 def enviar_email(destinatario: str, assunto: str, corpo_html: str, corpo_texto: str = None):
     """
-    Envia e-mail. Tenta SendGrid (HTTP API) se SENDGRID_API_KEY estiver configurado;
-    caso contrário, usa SMTP como fallback.
+    Envia e-mail via Microsoft Graph API.
     Retorna (True, None) em sucesso ou (False, erro) em falha.
     """
     if not destinatario or not destinatario.strip():
@@ -124,73 +160,9 @@ def enviar_email(destinatario: str, assunto: str, corpo_html: str, corpo_texto: 
         return (False, None)
     destinatario = destinatario.strip()
 
-    from_addr = (
-        _mail_setting("MAIL_DEFAULT_SENDER")
-        or _mail_setting("MAIL_USERNAME")
-        or "noreply@localhost"
-    ).strip()
+    from_addr = os.getenv("GRAPH_SENDER_EMAIL", "").strip() or "noreply@localhost"
 
-    # Preferência: Brevo HTTP API (não bloqueado por provedores cloud)
-    if os.getenv("BREVO_API_KEY", "").strip():
-        return _enviar_via_brevo(destinatario, assunto, corpo_html, corpo_texto, from_addr)
-
-    # Fallback: SMTP (útil em desenvolvimento local)
-    server = _mail_setting("MAIL_SERVER", "").strip()
-    if not server:
-        return (False, None)
-
-    port = _mail_setting("MAIL_PORT", 587)
-    try:
-        port = int(port)
-    except (TypeError, ValueError):
-        port = 587
-    use_tls = _mail_setting("MAIL_USE_TLS")
-    if use_tls is None:
-        use_tls = True
-    else:
-        use_tls = str(use_tls).lower() in ("true", "1", "yes")
-    user = (_mail_setting("MAIL_USERNAME") or "").strip()
-    password = (_mail_setting("MAIL_PASSWORD") or "").strip()
-
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = assunto
-    msg["From"] = from_addr
-    msg["To"] = destinatario
-    if corpo_texto:
-        msg.attach(MIMEText(corpo_texto, "plain", "utf-8"))
-    msg.attach(MIMEText(corpo_html, "html", "utf-8"))
-
-    for tentativa in range(_SMTP_MAX_TENTATIVAS):
-        try:
-            with smtplib.SMTP(server, port) as s:
-                if use_tls:
-                    s.starttls()
-                if user and password:
-                    s.login(user, password)
-                s.sendmail(msg["From"], destinatario, msg.as_string())
-            logger.info("E-mail enviado via SMTP para %s: %s", destinatario, assunto[:50])
-            return (True, None)
-        except Exception as e:
-            if tentativa < _SMTP_MAX_TENTATIVAS - 1:
-                espera = _SMTP_BACKOFF_BASE**tentativa
-                logger.warning(
-                    "Falha ao enviar e-mail para %s (tentativa %d/%d): %s. Retry em %.0fs.",
-                    destinatario,
-                    tentativa + 1,
-                    _SMTP_MAX_TENTATIVAS,
-                    e,
-                    espera,
-                )
-                time.sleep(espera)
-            else:
-                logger.exception(
-                    "Falha ao enviar e-mail para %s após %d tentativas: %s",
-                    destinatario,
-                    _SMTP_MAX_TENTATIVAS,
-                    e,
-                )
-                return (False, str(e))
-    return (False, "Nenhuma tentativa bem-sucedida")
+    return _enviar_via_graph(destinatario, assunto, corpo_html, corpo_texto, from_addr)
 
 
 def _base_url() -> str:
@@ -219,7 +191,9 @@ def _link_dashboard() -> str:
 
 def _relay_email() -> str:
     """E-mail relay monitorado pelo Power Automate."""
-    return _mail_setting("NOTIFY_RELAY_EMAIL", "dtxls.support@dtx.aero").strip()
+    return (
+        _config("NOTIFY_RELAY_EMAIL") or os.getenv("NOTIFY_RELAY_EMAIL", "dtxls.support@dtx.aero")
+    ).strip()
 
 
 def _disparar_evento_power_automate(

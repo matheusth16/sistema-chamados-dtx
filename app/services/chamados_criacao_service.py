@@ -44,7 +44,8 @@ def _resolver_responsavel(
     """
     responsavel_id_form = (form.get("responsavel_id") or "").strip()
     responsavel_nome_form = (form.get("responsavel_nome") or "").strip()
-    if responsavel_id_form and responsavel_nome_form:
+    # Bloqueia self-assignment: solicitante não pode ser o próprio responsável
+    if responsavel_id_form and responsavel_nome_form and responsavel_id_form != solicitante_id:
         usuario_escolhido = Usuario.get_by_id(responsavel_id_form)
         if usuario_escolhido and usuario_escolhido.perfil in ("supervisor", "admin"):
             return (
@@ -119,10 +120,16 @@ def criar_chamado(
         else:
             setores_adicionais_lista = []
 
-    try:
-        caminho_anexo = salvar_anexo(files.get("anexo") if files else None)
-    except ValueError as e:
-        return (None, None, str(e), None)
+    caminhos_anexos: list[str] = []
+    for arq in files.getlist("anexo") if files else []:
+        if not arq or not getattr(arq, "filename", ""):
+            continue
+        try:
+            caminho = salvar_anexo(arq)
+            if caminho:
+                caminhos_anexos.append(caminho)
+        except ValueError as e:
+            return (None, None, str(e), None)
 
     responsavel, responsavel_id, motivo_atribuicao = _resolver_responsavel(
         form, solicitante_id, solicitante_nome, area_solicitante
@@ -153,7 +160,8 @@ def criar_chamado(
             gate=gate,
             impacto=impacto,
             descricao=descricao,
-            anexo=caminho_anexo,
+            anexo=caminhos_anexos[0] if caminhos_anexos else None,
+            anexos=caminhos_anexos,
             responsavel=responsavel,
             responsavel_id=responsavel_id,
             motivo_atribuicao=motivo_atribuicao,

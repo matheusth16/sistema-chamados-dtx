@@ -53,7 +53,7 @@ def test_processar_edicao_sem_chamado_id_retorna_erro(app):
             nova_descricao="",
             novo_responsavel_id="",
             novo_sla_str="",
-            arquivo_anexo=None,
+            arquivos_novos=[],
             setores_adicionais_lista=[],
         )
     assert result["sucesso"] is False
@@ -80,7 +80,7 @@ def test_processar_edicao_chamado_nao_encontrado_retorna_404(app):
             nova_descricao="",
             novo_responsavel_id="",
             novo_sla_str="",
-            arquivo_anexo=None,
+            arquivos_novos=[],
             setores_adicionais_lista=[],
         )
     assert result["sucesso"] is False
@@ -110,7 +110,7 @@ def test_processar_edicao_supervisor_sem_permissao_retorna_403(app):
             nova_descricao="",
             novo_responsavel_id="",
             novo_sla_str="",
-            arquivo_anexo=None,
+            arquivos_novos=[],
             setores_adicionais_lista=[],
         )
     assert result["sucesso"] is False
@@ -142,7 +142,7 @@ def test_processar_edicao_sem_alteracoes_retorna_sucesso(app):
             nova_descricao="",
             novo_responsavel_id="",
             novo_sla_str="",
-            arquivo_anexo=None,
+            arquivos_novos=[],
             setores_adicionais_lista=[],
         )
     assert result["sucesso"] is True
@@ -177,7 +177,7 @@ def test_processar_edicao_muda_status_com_sucesso(app):
             nova_descricao="",
             novo_responsavel_id="",
             novo_sla_str="",
-            arquivo_anexo=None,
+            arquivos_novos=[],
             setores_adicionais_lista=[],
         )
     assert result["sucesso"] is True
@@ -206,7 +206,7 @@ def test_processar_edicao_cancelamento_sem_motivo_retorna_erro(app):
             nova_descricao="",
             novo_responsavel_id="",
             novo_sla_str="",
-            arquivo_anexo=None,
+            arquivos_novos=[],
             setores_adicionais_lista=[],
         )
     assert result["sucesso"] is False
@@ -242,7 +242,7 @@ def test_processar_edicao_cancelamento_com_motivo_chama_status(app):
             nova_descricao="",
             novo_responsavel_id="",
             novo_sla_str="",
-            arquivo_anexo=None,
+            arquivos_novos=[],
             setores_adicionais_lista=[],
         )
     assert result["sucesso"] is True
@@ -275,7 +275,7 @@ def test_processar_edicao_sla_invalido_retorna_erro(app):
             nova_descricao="",
             novo_responsavel_id="",
             novo_sla_str="999",
-            arquivo_anexo=None,
+            arquivos_novos=[],
             setores_adicionais_lista=[],
         )
     assert result["sucesso"] is False
@@ -308,7 +308,7 @@ def test_processar_edicao_sla_zero_reseta_para_padrao(app):
             nova_descricao="",
             novo_responsavel_id="",
             novo_sla_str="0",
-            arquivo_anexo=None,
+            arquivos_novos=[],
             setores_adicionais_lista=[],
         )
     assert result["sucesso"] is True
@@ -341,7 +341,7 @@ def test_processar_edicao_nova_descricao_diferente_salva(app):
             nova_descricao="Nova descrição completamente diferente",
             novo_responsavel_id="",
             novo_sla_str="",
-            arquivo_anexo=None,
+            arquivos_novos=[],
             setores_adicionais_lista=[],
         )
     assert result["sucesso"] is True
@@ -384,7 +384,7 @@ def test_processar_edicao_novo_responsavel_atualiza_dados(app):
             nova_descricao="",
             novo_responsavel_id="resp2",
             novo_sla_str="",
-            arquivo_anexo=None,
+            arquivos_novos=[],
             setores_adicionais_lista=[],
         )
     assert result["sucesso"] is True
@@ -421,8 +421,196 @@ def test_processar_edicao_setores_adicionais_dispara_notificacao(app):
             nova_descricao="",
             novo_responsavel_id="",
             novo_sla_str="",
-            arquivo_anexo=None,
+            arquivos_novos=[],
             setores_adicionais_lista=["Elétrica"],
         )
     assert result["sucesso"] is True
     assert mock_threading.Thread.call_count >= 1
+
+
+# ── Multi-anexo em edição (TDD RED → GREEN) ───────────────────────────────────
+
+
+def _arq(nome: str):
+    f = MagicMock()
+    f.filename = nome
+    return f
+
+
+def _base_patches(mock_db, mock_chamado_cls, doc=None):
+    """Configura mocks de DB/Chamado comuns nos testes de anexo."""
+    d = doc or _make_doc()
+    mock_db.collection.return_value.document.return_value.get.return_value = d
+    mock_db.batch.return_value = MagicMock()
+    mock_chamado_cls.from_dict.return_value = MagicMock()
+
+
+def test_edicao_aceita_arquivos_novos_como_lista(app):
+    """
+    RED: processar_edicao_chamado deve aceitar 'arquivos_novos' (list) no lugar de
+    'arquivo_anexo'. Dois arquivos enviados → ambos salvos e adicionados ao chamado.
+    """
+    from app.services.edicao_chamado_service import processar_edicao_chamado
+
+    u = _make_usuario()
+    a1, a2 = _arq("relatorio.pdf"), _arq("foto.png")
+
+    with (
+        app.app_context(),
+        patch("app.services.edicao_chamado_service.db") as mock_db,
+        patch("app.services.edicao_chamado_service.Chamado") as mock_chamado_cls,
+        patch(
+            "app.services.edicao_chamado_service.salvar_anexo",
+            side_effect=["r2:relatorio.pdf", "r2:foto.png"],
+        ) as mock_salvar,
+        patch("app.services.edicao_chamado_service.execute_with_retry") as mock_retry,
+    ):
+        _base_patches(mock_db, mock_chamado_cls)
+        result = processar_edicao_chamado(
+            usuario_atual=u,
+            chamado_id="ch1",
+            novo_status="",
+            motivo_cancelamento="",
+            nova_descricao="",
+            novo_responsavel_id="",
+            novo_sla_str="",
+            arquivos_novos=[a1, a2],
+            setores_adicionais_lista=[],
+        )
+
+    assert result["sucesso"] is True
+    assert mock_salvar.call_count == 2
+    update_data = mock_retry.call_args[0][1]
+    assert "r2:relatorio.pdf" in update_data.get("anexos", [])
+    assert "r2:foto.png" in update_data.get("anexos", [])
+
+
+def test_edicao_lista_vazia_nao_altera_anexos(app):
+    """
+    arquivos_novos=[] não deve modificar a lista de anexos existente.
+    """
+    from app.services.edicao_chamado_service import processar_edicao_chamado
+
+    u = _make_usuario()
+
+    with (
+        app.app_context(),
+        patch("app.services.edicao_chamado_service.db") as mock_db,
+        patch("app.services.edicao_chamado_service.Chamado") as mock_chamado_cls,
+        patch("app.services.edicao_chamado_service.salvar_anexo") as mock_salvar,
+    ):
+        _base_patches(mock_db, mock_chamado_cls)
+        result = processar_edicao_chamado(
+            usuario_atual=u,
+            chamado_id="ch1",
+            novo_status="",
+            motivo_cancelamento="",
+            nova_descricao="",
+            novo_responsavel_id="",
+            novo_sla_str="",
+            arquivos_novos=[],
+            setores_adicionais_lista=[],
+        )
+
+    assert result["sucesso"] is True
+    mock_salvar.assert_not_called()
+
+
+def test_edicao_falha_em_um_arquivo_retorna_erro_sem_persistir(app):
+    """
+    Se salvar_anexo levantar ValueError em qualquer arquivo da lista,
+    retorna erro e não persiste o chamado (execute_with_retry não chamado).
+    """
+    from app.services.edicao_chamado_service import processar_edicao_chamado
+
+    u = _make_usuario()
+    a1, a2 = _arq("bom.pdf"), _arq("mal.exe")
+
+    with (
+        app.app_context(),
+        patch("app.services.edicao_chamado_service.db") as mock_db,
+        patch("app.services.edicao_chamado_service.Chamado") as mock_chamado_cls,
+        patch(
+            "app.services.edicao_chamado_service.salvar_anexo",
+            side_effect=["r2:bom.pdf", ValueError("Extensão não permitida")],
+        ),
+        patch("app.services.edicao_chamado_service.execute_with_retry") as mock_retry,
+    ):
+        _base_patches(mock_db, mock_chamado_cls)
+        result = processar_edicao_chamado(
+            usuario_atual=u,
+            chamado_id="ch1",
+            novo_status="",
+            motivo_cancelamento="",
+            nova_descricao="",
+            novo_responsavel_id="",
+            novo_sla_str="",
+            arquivos_novos=[a1, a2],
+            setores_adicionais_lista=[],
+        )
+
+    assert result["sucesso"] is False
+    assert (
+        "extensão" in result.get("erro", "").lower()
+        or "permitida" in result.get("erro", "").lower()
+    )
+    mock_retry.assert_not_called()
+
+
+def test_edicao_historico_criado_por_arquivo_adicionado(app):
+    """
+    Para cada arquivo salvo com sucesso, deve haver um registro no histórico
+    com campo_alterado='novo anexo'.
+    """
+    from app.services.edicao_chamado_service import processar_edicao_chamado
+
+    u = _make_usuario()
+    a1, a2 = _arq("doc1.pdf"), _arq("doc2.xlsx")
+
+    class _FakeHistorico:
+        def __init__(self, **kwargs):
+            self._kwargs = kwargs
+
+        def to_dict(self):
+            return self._kwargs
+
+    batch_mock = MagicMock()
+
+    with (
+        app.app_context(),
+        patch("app.services.edicao_chamado_service.db") as mock_db,
+        patch("app.services.edicao_chamado_service.Chamado") as mock_chamado_cls,
+        patch(
+            "app.services.edicao_chamado_service.salvar_anexo",
+            side_effect=["r2:doc1.pdf", "r2:doc2.xlsx"],
+        ),
+        patch("app.services.edicao_chamado_service.Historico", side_effect=_FakeHistorico),
+        patch("app.services.edicao_chamado_service.execute_with_retry"),
+    ):
+        _base_patches(mock_db, mock_chamado_cls)
+        mock_db.batch.return_value = batch_mock
+        mock_db.collection.return_value.document.return_value = MagicMock()
+
+        result = processar_edicao_chamado(
+            usuario_atual=u,
+            chamado_id="ch1",
+            novo_status="",
+            motivo_cancelamento="",
+            nova_descricao="",
+            novo_responsavel_id="",
+            novo_sla_str="",
+            arquivos_novos=[a1, a2],
+            setores_adicionais_lista=[],
+        )
+
+    assert result["sucesso"] is True
+    # batch.set deve ser chamado pelo menos 2x (um por arquivo)
+    historico_calls = list(batch_mock.set.call_args_list)
+    anexo_entries = [
+        c
+        for c in historico_calls
+        if c.args
+        and isinstance(c.args[1], dict)
+        and c.args[1].get("campo_alterado") == "novo anexo"
+    ]
+    assert len(anexo_entries) == 2

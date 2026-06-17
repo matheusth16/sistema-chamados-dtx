@@ -26,7 +26,7 @@ def processar_edicao_chamado(
     nova_descricao: str,
     novo_responsavel_id: str,
     novo_sla_str: str,
-    arquivo_anexo,
+    arquivos_novos: list,
     setores_adicionais_lista: list,
 ) -> dict:
     """
@@ -178,40 +178,42 @@ def processar_edicao_chamado(
                     )
                 )
 
-        # 5. Anexo
-        if arquivo_anexo and arquivo_anexo.filename:
-            try:
-                caminho_anexo = salvar_anexo(arquivo_anexo)
-            except ValueError as e:
-                return {"sucesso": False, "erro": str(e)}
+        # 5. Anexos (suporta múltiplos arquivos)
+        arquivos_validos = [a for a in (arquivos_novos or []) if getattr(a, "filename", "")]
+        if arquivos_validos:
+            anexos_existentes = list(data_chamado.get("anexos") or [])
+            anexo_principal = data_chamado.get("anexo")
+            if anexo_principal and anexo_principal not in anexos_existentes:
+                anexos_existentes.insert(0, anexo_principal)
 
-            if caminho_anexo is None and current_app.config.get("ENV") == "production":
-                mensagens.append(_t("file_save_error_production"))
-            elif caminho_anexo:
-                anexos_existentes = data_chamado.get("anexos", [])
-                anexo_principal = data_chamado.get("anexo")
+            for arq in arquivos_validos:
+                try:
+                    caminho_anexo = salvar_anexo(arq)
+                except ValueError as e:
+                    return {"sucesso": False, "erro": str(e)}
 
-                if anexo_principal and anexo_principal not in anexos_existentes:
-                    anexos_existentes.insert(0, anexo_principal)
+                if caminho_anexo is None and current_app.config.get("ENV") == "production":
+                    mensagens.append(_t("file_save_error_production"))
+                    continue
 
-                anexos_existentes.append(caminho_anexo)
-                update_data["anexos"] = anexos_existentes
-
-                if not anexo_principal:
-                    update_data["anexo"] = caminho_anexo
-
-                historico_pendente.append(
-                    Historico(
-                        chamado_id=chamado_id,
-                        usuario_id=usuario_atual.id,
-                        usuario_nome=usuario_atual.nome,
-                        acao="alteracao_dados",
-                        campo_alterado="novo anexo",
-                        valor_anterior="-",
-                        valor_novo=caminho_anexo,
-                        detalhe=arquivo_anexo.filename,
+                if caminho_anexo:
+                    anexos_existentes.append(caminho_anexo)
+                    historico_pendente.append(
+                        Historico(
+                            chamado_id=chamado_id,
+                            usuario_id=usuario_atual.id,
+                            usuario_nome=usuario_atual.nome,
+                            acao="alteracao_dados",
+                            campo_alterado="novo anexo",
+                            valor_anterior="-",
+                            valor_novo=caminho_anexo,
+                            detalhe=arq.filename,
+                        )
                     )
-                )
+
+            update_data["anexos"] = anexos_existentes
+            if not anexo_principal and anexos_existentes:
+                update_data["anexo"] = anexos_existentes[0]
 
         # 6. Setores adicionais
         setores_atuais = data_chamado.get("setores_adicionais") or []

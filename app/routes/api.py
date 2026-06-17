@@ -6,6 +6,7 @@ import os
 from firebase_admin import firestore
 from flask import abort, current_app, jsonify, redirect, request, send_from_directory, session
 from flask_login import current_user, login_required
+from google.cloud.firestore_v1.base_query import FieldFilter
 
 from app.database import db
 from app.firebase_retry import execute_with_retry
@@ -85,7 +86,6 @@ def health():
         "status": overall,
         "checks": checks,
         "duration_ms": duration_ms,
-        "version": os.environ.get("RAILWAY_GIT_COMMIT_SHA", "dev")[:7],
     }
     logger.info("health_check status=%s duration_ms=%.1f checks=%s", overall, duration_ms, checks)
     return jsonify(payload), status_code
@@ -197,7 +197,7 @@ def api_editar_chamado():
             motivo_cancelamento = str(motivo_cancelamento).strip()
         nova_descricao = request.form.get("nova_descricao")
         novo_responsavel_id = request.form.get("novo_responsavel_id")
-        arquivo_anexo = request.files.get("anexo")
+        arquivos_novos = request.files.getlist("anexos_novos")
 
         if not chamado_id:
             return jsonify({"sucesso": False, "erro": "ID do chamado é obrigatório"}), 400
@@ -218,7 +218,7 @@ def api_editar_chamado():
             nova_descricao=nova_descricao,
             novo_responsavel_id=novo_responsavel_id,
             novo_sla_str=(request.form.get("sla_dias") or "").strip(),
-            arquivo_anexo=arquivo_anexo,
+            arquivos_novos=arquivos_novos,
             setores_adicionais_lista=setores_adicionais_form,
         )
 
@@ -443,6 +443,15 @@ def api_chamado_por_id(chamado_id: str):
         return jsonify({"sucesso": False, "erro": ERRO_INTERNO_MSG}), 500
 
 
+def _aplicar_filtro_perfil(ref, user):
+    """Restringe a query de chamados ao escopo do perfil — evita IDOR por omissão de filtro."""
+    if user.perfil == "solicitante":
+        return ref.where(filter=FieldFilter("solicitante_id", "==", user.id))
+    if user.perfil == "supervisor" and getattr(user, "areas", None):
+        return ref.where(filter=FieldFilter("area", "in", list(user.areas)[:30]))
+    return ref  # admin: sem restrição
+
+
 @main.route("/api/chamados/paginar", methods=["GET"])
 @login_required
 def api_chamados_paginar():
@@ -452,7 +461,7 @@ def api_chamados_paginar():
         cursor = request.args.get("cursor")
         if limite < 1 or limite > 100:
             limite = 50
-        chamados_ref = db.collection("chamados")
+        chamados_ref = _aplicar_filtro_perfil(db.collection("chamados"), current_user)
         resultado = aplicar_filtros_dashboard_com_paginacao(
             chamados_ref, request.args, limite=limite, cursor=cursor
         )
@@ -502,7 +511,7 @@ def carregar_mais():
         dados = request.get_json() or {}
         cursor = dados.get("cursor")
         limite = min(dados.get("limite", 20), 50)
-        chamados_ref = db.collection("chamados")
+        chamados_ref = _aplicar_filtro_perfil(db.collection("chamados"), current_user)
         resultado = aplicar_filtros_dashboard_com_paginacao(
             chamados_ref, request.args, limite=limite, cursor=cursor
         )
@@ -651,6 +660,7 @@ def api_lista_supervisores():
                 "email": u.email,
             }
             for u in supervisores
+            if u.id != current_user.id
         ]
         return jsonify(
             {

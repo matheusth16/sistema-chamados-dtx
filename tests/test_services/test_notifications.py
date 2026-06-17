@@ -270,6 +270,170 @@ def test_notificar_solicitante_status_em_atendimento_envia_email(app):
     assert "CH-002" in assunto
 
 
+# ── Graph API (TDD RED → GREEN) ───────────────────────────────────────────────
+
+
+def _make_urlopen_graph(token="tok_abc", send_status=202):
+    """
+    Cria um mock de urllib.request.urlopen que retorna:
+    - 1ª chamada (token): JSON com access_token
+    - 2ª chamada (sendMail): resposta com status send_status
+    """
+    import json
+    from unittest.mock import MagicMock
+
+    token_body = json.dumps({"access_token": token}).encode()
+    token_resp = MagicMock()
+    token_resp.__enter__ = lambda s: s
+    token_resp.__exit__ = MagicMock(return_value=False)
+    token_resp.read.return_value = token_body
+    token_resp.status = 200
+
+    send_resp = MagicMock()
+    send_resp.__enter__ = lambda s: s
+    send_resp.__exit__ = MagicMock(return_value=False)
+    send_resp.read.return_value = b""
+    send_resp.status = send_status
+
+    mock_urlopen = MagicMock(side_effect=[token_resp, send_resp])
+    return mock_urlopen
+
+
+def test_enviar_via_graph_sucesso():
+    """
+    RED: _enviar_via_graph com config completa e Graph retornando 202 → (True, None).
+    """
+    from app.services.notifications import _enviar_via_graph
+
+    env = {
+        "GRAPH_TENANT_ID": "tenant-id",
+        "GRAPH_CLIENT_ID": "client-id",
+        "GRAPH_CLIENT_SECRET": "secret-value",
+        "GRAPH_SENDER_EMAIL": "noreply@dtx.aero",
+    }
+    mock_urlopen = _make_urlopen_graph(send_status=202)
+    with (
+        patch.dict("os.environ", env),
+        patch("urllib.request.urlopen", mock_urlopen),
+    ):
+        from app.services.notifications import _enviar_via_graph
+
+        ok, err = _enviar_via_graph(
+            "dest@test.com", "Assunto", "<p>HTML</p>", "Texto", "noreply@dtx.aero"
+        )
+    assert ok is True
+    assert err is None
+    assert mock_urlopen.call_count == 2  # token + sendMail
+
+
+def test_enviar_via_graph_sem_config_retorna_false():
+    """
+    RED: _enviar_via_graph sem GRAPH_* vars → (False, mensagem de erro).
+    """
+
+    # Garantir que não há vars de Graph no ambiente
+    env_limpo = {
+        k: ""
+        for k in ["GRAPH_TENANT_ID", "GRAPH_CLIENT_ID", "GRAPH_CLIENT_SECRET", "GRAPH_SENDER_EMAIL"]
+    }
+    with patch.dict("os.environ", env_limpo):
+        from app.services.notifications import _enviar_via_graph
+
+        ok, err = _enviar_via_graph("dest@test.com", "Assunto", "<p>H</p>", None, "x@y.com")
+    assert ok is False
+    assert err is not None
+
+
+def test_enviar_via_graph_falha_token_retorna_false():
+    """
+    RED: quando a chamada de token falha (exceção), _enviar_via_graph retorna (False, err).
+    """
+    import urllib.error
+
+    env = {
+        "GRAPH_TENANT_ID": "tid",
+        "GRAPH_CLIENT_ID": "cid",
+        "GRAPH_CLIENT_SECRET": "sec",
+        "GRAPH_SENDER_EMAIL": "x@dtx.aero",
+    }
+    with (
+        patch.dict("os.environ", env),
+        patch("urllib.request.urlopen", side_effect=urllib.error.URLError("timeout")),
+    ):
+        from app.services.notifications import _enviar_via_graph
+
+        ok, err = _enviar_via_graph("dest@test.com", "Assunto", "<p>H</p>", None, "x@dtx.aero")
+    assert ok is False
+    assert err is not None
+
+
+def test_enviar_via_graph_falha_send_retorna_false():
+    """
+    RED: token obtido mas sendMail falha (HTTP 403) → (False, err com código HTTP).
+    """
+    import io
+    import json
+    import urllib.error
+    from unittest.mock import MagicMock
+
+    token_body = json.dumps({"access_token": "tok"}).encode()
+    token_resp = MagicMock()
+    token_resp.__enter__ = lambda s: s
+    token_resp.__exit__ = MagicMock(return_value=False)
+    token_resp.read.return_value = token_body
+    token_resp.status = 200
+
+    env = {
+        "GRAPH_TENANT_ID": "tid",
+        "GRAPH_CLIENT_ID": "cid",
+        "GRAPH_CLIENT_SECRET": "sec",
+        "GRAPH_SENDER_EMAIL": "x@dtx.aero",
+    }
+    http_err = urllib.error.HTTPError(
+        url="https://graph...", code=403, msg="Forbidden", hdrs={}, fp=io.BytesIO(b"Forbidden")
+    )
+    with (
+        patch.dict("os.environ", env),
+        patch("urllib.request.urlopen", side_effect=[token_resp, http_err]),
+    ):
+        from app.services.notifications import _enviar_via_graph
+
+        ok, err = _enviar_via_graph("dest@test.com", "Assunto", "<p>H</p>", None, "x@dtx.aero")
+    assert ok is False
+    assert "403" in str(err)
+
+
+def test_enviar_email_usa_graph_quando_configurado(app):
+    """
+    RED: enviar_email() deve chamar _enviar_via_graph quando GRAPH_* vars presentes,
+    sem tentar Brevo nem SMTP.
+    """
+    from app.services.notifications import enviar_email
+
+    env = {
+        "GRAPH_TENANT_ID": "tid",
+        "GRAPH_CLIENT_ID": "cid",
+        "GRAPH_CLIENT_SECRET": "sec",
+        "GRAPH_SENDER_EMAIL": "noreply@dtx.aero",
+        "BREVO_API_KEY": "",
+        "MAIL_SERVER": "",
+    }
+    with (
+        app.app_context(),
+        patch.dict("os.environ", env),
+        patch(
+            "app.services.notifications._enviar_via_graph", return_value=(True, None)
+        ) as mock_graph,
+    ):
+        ok, err = enviar_email("dest@test.com", "Assunto", "<p>HTML</p>", "Texto")
+
+    assert ok is True
+    mock_graph.assert_called_once()
+    args = mock_graph.call_args[0]
+    assert args[0] == "dest@test.com"
+    assert args[1] == "Assunto"
+
+
 def test_notificar_aprovador_novo_chamado_html_em_ingles(app):
     """notificar_aprovador_novo_chamado gera HTML em inglês com botões CTA."""
     from app.services.notifications import notificar_aprovador_novo_chamado
