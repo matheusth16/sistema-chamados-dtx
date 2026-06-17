@@ -2,21 +2,14 @@
 Serviço de Relatórios Semanais.
 
 Toda sexta-feira às 10h (BRT) o APScheduler chama `enviar_relatorio_semanal()`.
-A função busca chamados abertos/atrasados e envia e-mails para a caixa relay
-(NOTIFY_RELAY_EMAIL) com assunto estruturado:
-
-  REPORT_SEMANAL|{data}|{email_supervisor}
-  REPORT_SEMANAL_ADMIN|{data}|{email_admin}
-
-O Power Automate já observa essa caixa. Basta adicionar uma condição para
-tratar subjects que começam com "REPORT_SEMANAL" e encaminhar o corpo HTML
-ao endereço extraído do subject (3º segmento após "|").
+A função busca chamados abertos/atrasados e envia e-mails diretamente para
+cada supervisor e admin via Microsoft Graph API.
 """
 
 import logging
-import os
 from collections import defaultdict
 from datetime import UTC, datetime
+from html import escape
 from typing import Any
 
 import pytz
@@ -65,19 +58,6 @@ def _dias_aberto(ts: Any) -> int:
     if dt.tzinfo is None:
         dt = pytz.utc.localize(dt)
     return max(0, (datetime.now(UTC) - dt).days)
-
-
-def _relay_email() -> str:
-    """Retorna o e-mail relay (mesmo usado nas notificações de novo chamado)."""
-    try:
-        from flask import current_app
-
-        val = current_app.config.get("NOTIFY_RELAY_EMAIL")
-        if val:
-            return val.strip()
-    except RuntimeError:
-        pass
-    return (os.getenv("NOTIFY_RELAY_EMAIL") or "dtxls.support@dtx.aero").strip()
 
 
 # ---------------------------------------------------------------------------
@@ -165,10 +145,10 @@ def _tabela_html(chamados: list[dict[str, Any]], link_base: str) -> str:
         linhas.append(
             "<tr>"
             f'<td style="padding:6px 10px;border-bottom:1px solid #e5e7eb;font-size:12px;">{numero_html}</td>'
-            f'<td style="padding:6px 10px;border-bottom:1px solid #e5e7eb;font-size:12px;">{c["categoria"]}</td>'
-            f'<td style="padding:6px 10px;border-bottom:1px solid #e5e7eb;font-size:12px;">{c["tipo"]}</td>'
-            f'<td style="padding:6px 10px;border-bottom:1px solid #e5e7eb;font-size:12px;">{c["solicitante"]}</td>'
-            f'<td style="padding:6px 10px;border-bottom:1px solid #e5e7eb;font-size:12px;">{c["data_abertura_fmt"]}</td>'
+            f'<td style="padding:6px 10px;border-bottom:1px solid #e5e7eb;font-size:12px;">{escape(str(c["categoria"]))}</td>'
+            f'<td style="padding:6px 10px;border-bottom:1px solid #e5e7eb;font-size:12px;">{escape(str(c["tipo"]))}</td>'
+            f'<td style="padding:6px 10px;border-bottom:1px solid #e5e7eb;font-size:12px;">{escape(str(c["solicitante"]))}</td>'
+            f'<td style="padding:6px 10px;border-bottom:1px solid #e5e7eb;font-size:12px;">{escape(str(c["data_abertura_fmt"]))}</td>'
             f'<td style="padding:6px 10px;border-bottom:1px solid #e5e7eb;font-size:12px;">{c["dias_aberto"]}d</td>'
             f'<td style="padding:6px 10px;border-bottom:1px solid #e5e7eb;font-size:12px;">{badge}</td>'
             "</tr>"
@@ -265,17 +245,15 @@ def enviar_relatorio_semanal() -> dict[str, Any]:
     data_ref = _agora_brasilia().strftime("%d/%m/%Y")
     link_base = _base_url()
     link_dash = _link_dashboard()
-    relay = _relay_email()
 
     chamados = buscar_chamados_abertos()
     total_chamados = len(chamados)
     total_atrasados = sum(1 for c in chamados if c["atrasado"])
 
     logger.info(
-        "Relatório semanal: %d abertos, %d atrasados — relay: %s",
+        "Relatório semanal: %d abertos, %d atrasados",
         total_chamados,
         total_atrasados,
-        relay,
     )
 
     if not chamados:
@@ -307,25 +285,22 @@ def enviar_relatorio_semanal() -> dict[str, Any]:
 
         email_sup = supervisor.email.strip()
         nome = supervisor.nome or email_sup
-        # Assunto estruturado: Power Automate extrai email_sup do 3º segmento
-        assunto = f"REPORT_SEMANAL|{data_ref}|{email_sup}"
+        assunto = f"Resumo semanal de chamados — {data_ref}"
 
         html, texto = _corpo_supervisor(nome, lista, link_dash, link_base, data_ref)
-        ok, err = enviar_email(relay, assunto, html, texto)
+        ok, err = enviar_email(email_sup, assunto, html, texto)
         if ok:
             enviados += 1
             logger.info(
-                "Relatório semanal (relay) enviado para supervisor %s (%d chamados)",
+                "Relatório semanal enviado para supervisor %s (%d chamados)",
                 email_sup,
                 len(lista),
             )
         else:
             erros += 1
-            logger.warning(
-                "Falha ao enviar relatório (relay) para supervisor %s: %s", email_sup, err
-            )
+            logger.warning("Falha ao enviar relatório para supervisor %s: %s", email_sup, err)
 
-    _enviar_resumo_admins(chamados, grupos, data_ref, link_dash, link_base, relay)
+    _enviar_resumo_admins(chamados, grupos, data_ref, link_dash, link_base)
 
     return {
         "enviados": enviados,
@@ -342,9 +317,8 @@ def _enviar_resumo_admins(
     data_ref: str,
     link_dash: str,
     link_base: str,
-    relay: str,
 ) -> None:
-    """Envia resumo consolidado para cada admin via relay."""
+    """Envia resumo consolidado para cada admin diretamente."""
     try:
         admins = [
             u
@@ -410,12 +384,12 @@ def _enviar_resumo_admins(
 
     for admin in admins:
         email_admin = admin.email.strip()
-        assunto = f"REPORT_SEMANAL_ADMIN|{data_ref}|{email_admin}"
-        ok, err = enviar_email(relay, assunto, html_admin)
+        assunto = f"Resumo semanal consolidado — {data_ref}"
+        ok, err = enviar_email(email_admin, assunto, html_admin)
         if ok:
-            logger.info("Resumo semanal (relay) enviado para admin %s", email_admin)
+            logger.info("Resumo semanal enviado para admin %s", email_admin)
         else:
-            logger.warning("Falha ao enviar resumo (relay) para admin %s: %s", email_admin, err)
+            logger.warning("Falha ao enviar resumo para admin %s: %s", email_admin, err)
 
 
 def enviar_alertas_prazo_24h() -> dict[str, Any]:

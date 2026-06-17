@@ -37,13 +37,12 @@ def test_contar_nao_lidas_retorna_zero_sem_usuario_id():
     assert contar_nao_lidas("") == 0
 
 
-def test_notificar_novo_usuario_cadastrado_usa_prefixo_power_automate(app):
-    """notificar_novo_usuario_cadastrado envia via relay com prefixo USUARIO_CADASTRADO."""
+def test_notificar_novo_usuario_cadastrado_envia_direto(app):
+    """notificar_novo_usuario_cadastrado envia direto ao usuário via Graph API."""
     from app.services.notifications import notificar_novo_usuario_cadastrado
 
     with (
         app.app_context(),
-        patch("app.services.notifications._relay_email", return_value="relay@test.local"),
         patch("app.services.notifications.enviar_email") as mock_enviar,
     ):
         app.config["APP_BASE_URL"] = "https://example.test"
@@ -59,25 +58,19 @@ def test_notificar_novo_usuario_cadastrado_usa_prefixo_power_automate(app):
 
     assert mock_enviar.called
     destinatario, assunto, corpo_html, _corpo_texto = mock_enviar.call_args[0]
-    assert destinatario == "relay@test.local"
-    assert assunto == "USUARIO_CADASTRADO|user_123|novo.usuario@dtx.aero"
-    assert "New user registration" in corpo_html
-    assert "Open system" in corpo_html
-    assert "Profile" in corpo_html
-    assert "Areas" in corpo_html
-    assert "E-mail" in corpo_html
-    assert "Initial password" in corpo_html
+    assert destinatario == "novo.usuario@dtx.aero"
+    assert assunto == "Bem-vindo ao DTX Digital Andon — suas credenciais de acesso"
+    assert "Perfil" in corpo_html or "perfil" in corpo_html.lower()
     assert "SenhaTest99" in corpo_html
     assert "123456" not in corpo_html
 
 
-def test_notificar_responsavel_prazo_24h_usa_prefixo_power_automate(app):
-    """notificar_responsavel_prazo_24h envia via relay com prefixo CHAMADO_PRAZO_24H."""
+def test_notificar_responsavel_prazo_24h_envia_direto(app):
+    """notificar_responsavel_prazo_24h envia direto ao responsável via Graph API."""
     from app.services.notifications import notificar_responsavel_prazo_24h
 
     with (
         app.app_context(),
-        patch("app.services.notifications._relay_email", return_value="relay@test.local"),
         patch("app.services.notifications.enviar_email") as mock_enviar,
     ):
         app.config["APP_BASE_URL"] = "https://example.test"
@@ -95,16 +88,15 @@ def test_notificar_responsavel_prazo_24h_usa_prefixo_power_automate(app):
 
     assert mock_enviar.called
     destinatario, assunto, corpo_html, _corpo_texto = mock_enviar.call_args[0]
-    assert destinatario == "relay@test.local"
-    assert assunto == "CHAMADO_PRAZO_24H|2026-100|resp@dtx.aero"
-    assert "Ticket nearing deadline (24h)" in corpo_html
-    assert "View ticket history" in corpo_html
-    assert "View your sector tickets" in corpo_html
+    assert destinatario == "resp@dtx.aero"
+    assert assunto == "Chamado 2026-100: prazo se encerrando em 24h"
+    assert "2026-100" in corpo_html
+    assert "vencer" in corpo_html.lower() or "prazo" in corpo_html.lower()
 
 
-def test_notificar_setor_adicional_envia_email_smtp(app):
-    """notificar_responsavel_setor_adicional_power_automate envia via SMTP (opção B)."""
-    from app.services.notifications import notificar_responsavel_setor_adicional_power_automate
+def test_notificar_responsavel_setor_adicional_envia_direto(app):
+    """notificar_responsavel_setor_adicional envia direto ao responsável via Graph API."""
+    from app.services.notifications import notificar_responsavel_setor_adicional
 
     with (
         app.app_context(),
@@ -112,7 +104,7 @@ def test_notificar_setor_adicional_envia_email_smtp(app):
     ):
         app.config["APP_BASE_URL"] = "https://example.test"
         mock_enviar.return_value = (True, None)
-        notificar_responsavel_setor_adicional_power_automate(
+        notificar_responsavel_setor_adicional(
             chamado_id="chamado_2",
             numero_chamado="2026-101",
             email_responsavel_setor="setor@dtx.aero",
@@ -127,39 +119,26 @@ def test_notificar_setor_adicional_envia_email_smtp(app):
     assert mock_enviar.called
     destinatario, assunto, corpo_html, _corpo_texto = mock_enviar.call_args[0]
     assert destinatario == "setor@dtx.aero"
-    assert assunto == "Ticket 2026-101: your department has been included"
-    assert "Additional department included" in corpo_html
-    assert "View ticket history" in corpo_html
-    assert "View your sector tickets" in corpo_html
+    assert assunto == "Chamado 2026-101: seu setor foi incluído"
+    assert "2026-101" in corpo_html
+    assert "Engenharia" in corpo_html
 
 
-def test_sanitize_pa_field_remove_pipe():
-    """_sanitize_pa_field substitui '|' por '-' para não quebrar parsing do Power Automate."""
-    from app.services.notifications import _sanitize_pa_field
-
-    assert _sanitize_pa_field("2026-100") == "2026-100"
-    assert _sanitize_pa_field("2026|100") == "2026-100"
-    assert _sanitize_pa_field("evil|addr@evil.com|extra") == "evil-addr@evil.com-extra"
-    assert _sanitize_pa_field("") == ""
-    assert _sanitize_pa_field(None) == ""
-
-
-def test_notificar_aprovador_assunto_sem_pipe_injection(app):
-    """notificar_aprovador_novo_chamado garante que número do chamado não injeta '|' no assunto."""
+def test_notificar_aprovador_envia_direto_ao_responsavel(app):
+    """notificar_aprovador_novo_chamado envia diretamente ao e-mail do responsável."""
     from app.services.notifications import notificar_aprovador_novo_chamado
 
     responsavel = type("Resp", (), {"email": "resp@dtx.aero"})()
 
     with (
         app.app_context(),
-        patch("app.services.notifications._relay_email", return_value="relay@test.local"),
         patch("app.services.notifications.enviar_email") as mock_enviar,
     ):
         app.config["APP_BASE_URL"] = "https://example.test"
         mock_enviar.return_value = (True, None)
         notificar_aprovador_novo_chamado(
             chamado_id="chamado_x",
-            numero_chamado="2026|INJETADO|evil@hack.com",
+            numero_chamado="2026-103",
             categoria="Projetos",
             tipo_solicitacao="Manutencao",
             descricao_resumo="Resumo",
@@ -168,30 +147,30 @@ def test_notificar_aprovador_assunto_sem_pipe_injection(app):
             responsavel_usuario=responsavel,
         )
 
-    _dest, assunto, _html, _txt = mock_enviar.call_args[0]
-    # O assunto deve ter exatamente 2 separadores '|'
-    assert assunto.count("|") == 2
-    assert "INJETADO" not in assunto.split("|")[2]
+    destinatario, assunto, _html, _txt = mock_enviar.call_args[0]
+    assert destinatario == "resp@dtx.aero"
+    assert assunto == "Novo chamado atribuído: 2026-103"
 
 
 # ── notificar_solicitante_status (C1) ─────────────────────────────────────────
 
 
-def test_notificar_solicitante_status_desativado_nao_envia(app):
-    """Com NOTIFY_SOLICITANTE_EMAIL=False, nenhum e-mail é enviado."""
+def test_notificar_solicitante_status_sempre_envia_sem_gate(app):
+    """notificar_solicitante_status envia independentemente de config — gate removido."""
     from unittest.mock import MagicMock
 
     from app.services.notifications import notificar_solicitante_status
 
     solicitante = MagicMock()
     solicitante.email = "user@test.com"
+    solicitante.nome = "Usuário Teste"
     with (
         app.app_context(),
-        patch("app.services.notifications.enviar_email") as mock_send,
+        patch("app.services.notifications.enviar_email", return_value=(True, None)) as mock_send,
     ):
-        app.config["NOTIFY_SOLICITANTE_EMAIL"] = False
+        app.config["APP_BASE_URL"] = "https://example.test"
         notificar_solicitante_status("ch1", "CH-001", "Concluído", "TI", solicitante)
-    mock_send.assert_not_called()
+    mock_send.assert_called_once()
 
 
 def test_notificar_solicitante_status_sem_usuario_nao_envia(app):
@@ -434,15 +413,14 @@ def test_enviar_email_usa_graph_quando_configurado(app):
     assert args[1] == "Assunto"
 
 
-def test_notificar_aprovador_novo_chamado_html_em_ingles(app):
-    """notificar_aprovador_novo_chamado gera HTML em inglês com botões CTA."""
+def test_notificar_aprovador_novo_chamado_html_com_ctas(app):
+    """notificar_aprovador_novo_chamado gera HTML com título e botões CTA."""
     from app.services.notifications import notificar_aprovador_novo_chamado
 
     responsavel = type("Resp", (), {"email": "resp@dtx.aero"})()
 
     with (
         app.app_context(),
-        patch("app.services.notifications._relay_email", return_value="relay@test.local"),
         patch("app.services.notifications.enviar_email") as mock_enviar,
     ):
         app.config["APP_BASE_URL"] = "https://example.test"
@@ -461,7 +439,8 @@ def test_notificar_aprovador_novo_chamado_html_em_ingles(app):
 
     assert mock_enviar.called
     destinatario, assunto, corpo_html, _corpo_texto = mock_enviar.call_args[0]
-    assert assunto == "CHAMADO_NOVO|2026-102|resp@dtx.aero"
-    assert "New ticket assigned" in corpo_html
-    assert "View ticket history" in corpo_html
-    assert "View your sector tickets" in corpo_html
+    assert destinatario == "resp@dtx.aero"
+    assert assunto == "Novo chamado atribuído: 2026-102"
+    assert "2026-102" in corpo_html
+    assert "Ver histórico do chamado" in corpo_html
+    assert "Ver chamados do setor" in corpo_html

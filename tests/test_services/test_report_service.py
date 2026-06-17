@@ -177,7 +177,7 @@ def test_enviar_relatorio_semanal_sem_chamados_retorna_zeros(app):
 
 
 def test_enviar_relatorio_semanal_envia_para_supervisor(app):
-    """Com chamados atribuídos, envia e-mail para o relay."""
+    """Com chamados atribuídos, envia e-mail diretamente para o supervisor."""
     from app.services.report_service import enviar_relatorio_semanal
 
     chamados = [
@@ -206,7 +206,6 @@ def test_enviar_relatorio_semanal_envia_para_supervisor(app):
         patch("app.services.report_service.buscar_chamados_abertos", return_value=chamados),
         patch("app.services.report_service.Usuario.get_by_id", return_value=supervisor),
         patch("app.services.report_service.Usuario.get_all", return_value=[]),
-        patch("app.services.report_service._relay_email", return_value="relay@test.local"),
         patch("app.services.report_service.enviar_email", return_value=(True, None)) as mock_send,
     ):
         resultado = enviar_relatorio_semanal()
@@ -214,6 +213,8 @@ def test_enviar_relatorio_semanal_envia_para_supervisor(app):
     assert resultado["enviados"] == 1
     assert resultado["total_chamados"] == 1
     assert mock_send.called
+    destinatario = mock_send.call_args[0][0]
+    assert destinatario == "sup@test.com"
 
 
 def test_enviar_relatorio_semanal_ignora_sem_responsavel(app):
@@ -244,7 +245,6 @@ def test_enviar_relatorio_semanal_ignora_sem_responsavel(app):
         app.app_context(),
         patch("app.services.report_service.buscar_chamados_abertos", return_value=chamados),
         patch("app.services.report_service.Usuario.get_all", return_value=[]),
-        patch("app.services.report_service._relay_email", return_value="relay@test.local"),
         patch("app.services.report_service.enviar_email", return_value=(True, None)) as mock_send,
     ):
         resultado = enviar_relatorio_semanal()
@@ -254,7 +254,7 @@ def test_enviar_relatorio_semanal_ignora_sem_responsavel(app):
 
 
 def test_enviar_relatorio_semanal_envia_para_admin(app):
-    """Admins recebem resumo consolidado via relay."""
+    """Admins recebem resumo consolidado diretamente via Graph API."""
     from app.services.report_service import enviar_relatorio_semanal
 
     chamados = [
@@ -284,10 +284,12 @@ def test_enviar_relatorio_semanal_envia_para_admin(app):
         patch("app.services.report_service.buscar_chamados_abertos", return_value=chamados),
         patch("app.services.report_service.Usuario.get_by_id", return_value=supervisor),
         patch("app.services.report_service.Usuario.get_all", return_value=[admin]),
-        patch("app.services.report_service._relay_email", return_value="relay@test.local"),
         patch("app.services.report_service.enviar_email", return_value=(True, None)) as mock_send,
     ):
         resultado = enviar_relatorio_semanal()
 
     assert resultado["total_atrasados"] == 1
     assert mock_send.call_count >= 2
+    destinos = [call[0][0] for call in mock_send.call_args_list]
+    assert "sup2@test.com" in destinos
+    assert "admin@test.com" in destinos
