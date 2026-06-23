@@ -302,3 +302,83 @@ def test_notificar_solicitante_excecao_nao_propaga(app):
         ),
     ):
         _notificar_solicitante("ch1", {"solicitante_id": "s1"}, "Concluído")
+
+
+# ── F-63: Validação de transição de status ─────────────────────────────────────
+
+
+def test_atualizar_status_transicao_invalida_concluido_para_aberto():
+    """F-63: Concluído → Aberto é transição inválida — retorna sucesso=False."""
+    resultado = atualizar_status_chamado(
+        chamado_id="ch1",
+        novo_status="Aberto",
+        usuario_id="u1",
+        usuario_nome="Test",
+        data_chamado={"status": "Concluído"},
+    )
+    assert resultado["sucesso"] is False
+    assert (
+        "transição" in resultado.get("erro", "").lower()
+        or "inválid" in resultado.get("erro", "").lower()
+    )
+
+
+def test_atualizar_status_mesmo_status_nao_rejeita_transicao():
+    """F-63: Transição de um status para ele mesmo deve ser permitida."""
+    with (
+        patch("app.services.status_service.execute_with_retry"),
+        patch("app.services.status_service.Historico"),
+        patch("app.services.status_service._notificar_solicitante"),
+        patch("app.services.status_service.GamificationService"),
+    ):
+        resultado = atualizar_status_chamado(
+            chamado_id="ch1",
+            novo_status="Concluído",
+            usuario_id="u1",
+            usuario_nome="Test",
+            data_chamado={"status": "Concluído", "solicitante_id": "s1"},
+        )
+    assert resultado["sucesso"] is True
+
+
+def test_atualizar_status_sem_status_anterior_nao_rejeita():
+    """F-63: Sem status_anterior (campo ausente), transição não é bloqueada."""
+    with (
+        patch("app.services.status_service.execute_with_retry"),
+        patch("app.services.status_service.Historico"),
+        patch("app.services.status_service._notificar_solicitante"),
+        patch("app.services.status_service.GamificationService"),
+    ):
+        resultado = atualizar_status_chamado(
+            chamado_id="ch1",
+            novo_status="Em Atendimento",
+            usuario_id="u1",
+            usuario_nome="Test",
+            data_chamado={"solicitante_id": "s1"},
+        )
+    assert resultado["sucesso"] is True
+
+
+def test_transicoes_validas_permite_fluxo_normal():
+    """F-63: Aberto → Em Atendimento → Concluído deve ser permitido."""
+    for status_ant, status_novo in [
+        ("Aberto", "Em Atendimento"),
+        ("Em Atendimento", "Concluído"),
+        ("Concluído", "Em Atendimento"),
+        ("Aberto", "Cancelado"),
+    ]:
+        with (
+            patch("app.services.status_service.execute_with_retry"),
+            patch("app.services.status_service.Historico"),
+            patch("app.services.status_service._notificar_solicitante"),
+            patch("app.services.status_service.GamificationService"),
+        ):
+            r = atualizar_status_chamado(
+                chamado_id="ch1",
+                novo_status=status_novo,
+                usuario_id="u1",
+                usuario_nome="Test",
+                data_chamado={"status": status_ant, "solicitante_id": "s1"},
+                motivo_cancelamento="motivo" if status_novo == "Cancelado" else None,
+            )
+        assert r["sucesso"] is True, f"Transição {status_ant} → {status_novo} deveria ser permitida"

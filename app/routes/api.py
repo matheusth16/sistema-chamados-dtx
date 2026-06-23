@@ -1,5 +1,6 @@
 """Rotas de API (JSON) e service worker: status, notificações, push, paginação, disponibilidade."""
 
+import hmac
 import logging
 import os
 
@@ -8,6 +9,7 @@ from flask import abort, current_app, jsonify, redirect, request, send_from_dire
 from flask_login import current_user, login_required
 from google.cloud.firestore_v1.base_query import FieldFilter
 
+from app.cache import cache_set
 from app.database import db
 from app.firebase_retry import execute_with_retry
 from app.limiter import limiter
@@ -36,6 +38,18 @@ logger = logging.getLogger(__name__)
 ERRO_INTERNO_MSG = "Erro interno. Tente novamente."
 
 
+def _obter_health_token_request() -> str:
+    """Lê token de autenticação do health check.
+
+    Canal primário: header X-Health-Token (não aparece em access logs).
+    Canal deprecado: query string ?token= (compat UptimeRobot legado — migrar para header).
+    """
+    header = request.headers.get("X-Health-Token", "").strip()
+    if header:
+        return header
+    return request.args.get("token", "").strip()
+
+
 @main.route("/health", methods=["GET"])
 def health():
     """Health check para monitoramento externo.
@@ -43,8 +57,16 @@ def health():
     Modo raso (padrão): apenas confirma que a app está no ar — rápido, sem I/O.
     Modo deep (?deep=1): verifica conectividade com Firestore — para UptimeRobot/BetterUptime.
 
+    Autenticação (quando HEALTH_SECRET estiver configurado):
+      Canal primário  : header X-Health-Token: <secret>  ← não aparece em access logs
+      Canal deprecado : query string ?token=<secret>     ← migrar para header
+
+    Configuração de monitoramento:
+      curl -H "X-Health-Token: $HEALTH_SECRET" "https://host/health?deep=1"
+
     Returns:
         200 {"status": "ok"}        — tudo saudável
+        401                         — token ausente ou inválido (modo deep com HEALTH_SECRET)
         503 {"status": "degraded"}  — alguma dependência falhou (apenas no modo deep)
     """
     import time
@@ -53,6 +75,14 @@ def health():
 
     if shallow:
         return jsonify({"status": "ok"}), 200
+
+    # Modo deep expõe quais dependências estão configuradas; proteger com token
+    # quando HEALTH_SECRET estiver definido (recomendado em produção).
+    secret = os.getenv("HEALTH_SECRET", "").strip()
+    if secret:
+        provided = _obter_health_token_request()
+        if not provided or not hmac.compare_digest(provided, secret):
+            abort(401)
 
     # checks críticos: impactam overall; checks opcionais: apenas informativos
     critical_checks: dict[str, str] = {}
@@ -69,9 +99,7 @@ def health():
 
     # Redis / cache em memória — opcional, degrada performance mas não bloqueia
     try:
-        from app.cache import cache
-
-        cache.set("__health__", "1", timeout=10)
+        cache_set("__health__", "1", ttl_seconds=10)
         optional_checks["cache"] = "ok"
     except Exception as exc:
         optional_checks["cache"] = f"degraded:{type(exc).__name__}"
@@ -175,7 +203,9 @@ def atualizar_status_ajax():
         else:
             return jsonify(
                 {"sucesso": False, "erro": resultado.get("erro", "Erro desconhecido")}
-            ), 404 if resultado.get("erro") == "Chamado não encontrado" else 500
+            ), resultado.get(
+                "codigo", 404 if resultado.get("erro") == "Chamado não encontrado" else 500
+            )
     except Exception as e:
         logger.exception("Erro em atualizar_status_ajax: %s", e)
         return jsonify({"sucesso": False, "erro": ERRO_INTERNO_MSG}), 500
@@ -298,7 +328,7 @@ def bulk_atualizar_status():
                 atualizados += 1
             except Exception as e:
                 logger.warning("Bulk status: falha em %s: %s", chamado_id, e)
-                erros.append({"id": chamado_id, "erro": str(e)})
+                erros.append({"id": chamado_id, "erro": "Erro ao processar chamado"})
         return jsonify(
             {
                 "sucesso": True,
@@ -360,7 +390,7 @@ def api_notificacoes_marcar_lida(notificacao_id):
         return jsonify({"sucesso": ok}), 200
     except Exception as e:
         logger.exception("Erro ao marcar notificação: %s", e)
-        return jsonify({"sucesso": False}), 500
+        return jsonify({"sucesso": False, "erro": ERRO_INTERNO_MSG}), 500
 
 
 @main.route("/api/notificacoes/ler-todas", methods=["POST"])
@@ -372,7 +402,7 @@ def api_notificacoes_ler_todas():
         return jsonify({"sucesso": True, "atualizadas": count}), 200
     except Exception as e:
         logger.exception("Erro ao marcar todas notificações: %s", e)
-        return jsonify({"sucesso": False}), 500
+        return jsonify({"sucesso": False, "erro": ERRO_INTERNO_MSG}), 500
 
 
 @main.route("/sw.js")
@@ -405,7 +435,7 @@ def api_push_subscribe():
         return jsonify({"sucesso": ok}), 200
     except Exception as e:
         logger.exception("Erro ao salvar inscrição push: %s", e)
-        return jsonify({"sucesso": False}), 500
+        return jsonify({"sucesso": False, "erro": ERRO_INTERNO_MSG}), 500
 
 
 @main.route("/api/chamado/<chamado_id>", methods=["GET"])
@@ -417,12 +447,8 @@ def api_chamado_por_id(chamado_id: str):
         if not doc_chamado.exists:
             return jsonify({"sucesso": False, "erro": "Chamado não encontrado"}), 404
         chamado = Chamado.from_dict(doc_chamado.to_dict(), chamado_id)
-        if current_user.perfil == "solicitante":
-            if chamado.solicitante_id != current_user.id:
-                return jsonify({"sucesso": False, "erro": "Sem permissão"}), 403
-        else:
-            if not usuario_pode_ver_chamado(current_user, chamado):
-                return jsonify({"sucesso": False, "erro": "Sem permissão"}), 403
+        if not usuario_pode_ver_chamado(current_user, chamado):
+            return jsonify({"sucesso": False, "erro": "Sem permissão"}), 403
         sla_info = obter_sla_para_exibicao(chamado)
         chamado_dict = {
             "id": chamado_id,
@@ -444,12 +470,19 @@ def api_chamado_por_id(chamado_id: str):
 
 
 def _aplicar_filtro_perfil(ref, user):
-    """Restringe a query de chamados ao escopo do perfil — evita IDOR por omissão de filtro."""
+    """Restringe a query de chamados ao escopo do perfil — evita IDOR por omissão de filtro.
+
+    Retorna None quando o supervisor não tem áreas configuradas:
+    callers devem tratar None como lista vazia (não chamar aplicar_filtros).
+    """
     if user.perfil == "solicitante":
         return ref.where(filter=FieldFilter("solicitante_id", "==", user.id))
-    if user.perfil == "supervisor" and getattr(user, "areas", None):
-        return ref.where(filter=FieldFilter("area", "in", list(user.areas)[:30]))
-    return ref  # admin: sem restrição
+    if user.perfil == "supervisor":
+        areas = list(getattr(user, "areas", None) or [])
+        if not areas:
+            return None  # Supervisor sem áreas não deve ver nenhum chamado
+        return ref.where(filter=FieldFilter("area", "in", areas[:30]))
+    return ref  # admin/admin_global: sem restrição
 
 
 @main.route("/api/chamados/paginar", methods=["GET"])
@@ -462,6 +495,19 @@ def api_chamados_paginar():
         if limite < 1 or limite > 100:
             limite = 50
         chamados_ref = _aplicar_filtro_perfil(db.collection("chamados"), current_user)
+        if chamados_ref is None:
+            return jsonify(
+                {
+                    "sucesso": True,
+                    "chamados": [],
+                    "paginacao": {
+                        "cursor_proximo": None,
+                        "tem_proxima": False,
+                        "total_pagina": 0,
+                        "limite": limite,
+                    },
+                }
+            ), 200
         resultado = aplicar_filtros_dashboard_com_paginacao(
             chamados_ref, request.args, limite=limite, cursor=cursor
         )
@@ -512,6 +558,15 @@ def carregar_mais():
         cursor = dados.get("cursor")
         limite = min(dados.get("limite", 20), 50)
         chamados_ref = _aplicar_filtro_perfil(db.collection("chamados"), current_user)
+        if chamados_ref is None:
+            return jsonify(
+                {
+                    "sucesso": True,
+                    "chamados": [],
+                    "cursor_proximo": None,
+                    "tem_proxima": False,
+                }
+            ), 200
         resultado = aplicar_filtros_dashboard_com_paginacao(
             chamados_ref, request.args, limite=limite, cursor=cursor
         )

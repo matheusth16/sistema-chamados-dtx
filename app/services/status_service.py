@@ -26,6 +26,13 @@ logger = logging.getLogger(__name__)
 
 STATUS_VALIDOS = ("Aberto", "Em Atendimento", "Concluído", "Cancelado")
 
+TRANSICOES_VALIDAS: dict[str, set[str]] = {
+    "Aberto": {"Em Atendimento", "Cancelado", "Concluído"},
+    "Em Atendimento": {"Concluído", "Cancelado", "Aberto"},
+    "Concluído": {"Em Atendimento", "Cancelado"},
+    "Cancelado": {"Aberto", "Em Atendimento"},
+}
+
 
 def atualizar_status_chamado(
     chamado_id: str,
@@ -70,6 +77,19 @@ def atualizar_status_chamado(
             data_chamado = doc.to_dict()
 
         status_anterior = data_chamado.get("status")
+
+        # Valida transição de status
+        if (
+            status_anterior
+            and status_anterior in TRANSICOES_VALIDAS
+            and novo_status != status_anterior
+            and novo_status not in TRANSICOES_VALIDAS[status_anterior]
+        ):
+            return {
+                "sucesso": False,
+                "erro": f"Transição inválida: {status_anterior} → {novo_status}",
+                "codigo": 400,
+            }
 
         # Monta dados de atualização
         update_data = {"status": novo_status}
@@ -144,7 +164,7 @@ def atualizar_status_chamado(
 
     except Exception as e:
         logger.exception("Erro ao atualizar status do chamado %s: %s", chamado_id, e)
-        return {"sucesso": False, "erro": str(e)}
+        return {"sucesso": False, "erro": "Erro interno. Tente novamente.", "codigo": 500}
 
 
 def _notificar_solicitante(chamado_id: str, data_chamado: dict, novo_status: str):

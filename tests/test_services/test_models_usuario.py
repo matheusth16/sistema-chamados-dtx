@@ -124,6 +124,22 @@ def test_check_password_sem_hash_retorna_false():
         assert u.check_password("qualquer") is False
 
 
+# CWI 2.2 — hash Werkzeug: não é plaintext, contém prefixo scrypt:/pbkdf2:
+def test_senha_hash_usa_formato_werkzeug_nao_plaintext():
+    """CWI 2.2 — set_password gera hash Werkzeug (scrypt:/pbkdf2:), nunca plaintext."""
+    from app.models_usuario import Usuario
+
+    with patch("app.models_usuario.db"):
+        u = Usuario(id="u_cwi22", email="cwi@dtx.aero", nome="CWI Test")
+        u.set_password("SenhaCWI2_2!")
+
+    assert u.senha_hash is not None
+    assert u.senha_hash != "SenhaCWI2_2!", "senha_hash não deve ser plaintext"
+    assert u.senha_hash.startswith("scrypt:") or u.senha_hash.startswith("pbkdf2:"), (
+        f"Hash deve ter prefixo Werkzeug (scrypt:/pbkdf2:), obtido: {u.senha_hash[:20]!r}"
+    )
+
+
 # ── Property area ──────────────────────────────────────────────────────────────
 
 
@@ -408,6 +424,91 @@ def test_get_supervisores_por_area_retorna_vazio_quando_firestore_falha():
         result = Usuario.get_supervisores_por_area("Manutencao")
 
     assert result == []
+
+
+# ── Onda 2: campo ativo ────────────────────────────────────────────────────────
+
+
+def test_usuario_novo_ativo_por_default():
+    """Novo usuário tem ativo=True por padrão."""
+    from app.models_usuario import Usuario
+
+    with patch("app.models_usuario.db"):
+        u = Usuario(id="u1", email="x@dtx.aero", nome="X", perfil="solicitante")
+
+    assert u.ativo is True
+
+
+def test_from_dict_ativo_true_quando_campo_presente():
+    """from_dict lê ativo=True corretamente."""
+    from app.models_usuario import Usuario
+
+    data = {"email": "a@dtx.aero", "nome": "A", "perfil": "solicitante", "ativo": True}
+    with patch("app.models_usuario.db"):
+        u = Usuario.from_dict(data, "u_ativo")
+
+    assert u.ativo is True
+
+
+def test_from_dict_ativo_false():
+    """from_dict lê ativo=False corretamente."""
+    from app.models_usuario import Usuario
+
+    data = {"email": "a@dtx.aero", "nome": "A", "perfil": "solicitante", "ativo": False}
+    with patch("app.models_usuario.db"):
+        u = Usuario.from_dict(data, "u_inativo")
+
+    assert u.ativo is False
+
+
+def test_from_dict_campo_ativo_ausente_default_true():
+    """from_dict retorna ativo=True quando campo ausente (retrocompat. Firestore legado)."""
+    from app.models_usuario import Usuario
+
+    data = {"email": "a@dtx.aero", "nome": "A", "perfil": "solicitante"}
+    with patch("app.models_usuario.db"):
+        u = Usuario.from_dict(data, "u_sem_ativo")
+
+    assert u.ativo is True
+
+
+def test_to_dict_contem_campo_ativo():
+    """to_dict inclui campo ativo para persistência no Firestore."""
+    from app.models_usuario import Usuario
+
+    with patch("app.models_usuario.db"):
+        u = Usuario(id="u1", email="x@dtx.aero", nome="X", perfil="solicitante")
+        d = u.to_dict()
+
+    assert "ativo" in d
+    assert d["ativo"] is True
+
+
+def test_update_ativo_false_persiste():
+    """update(ativo=False) persiste ativo=False no Firestore."""
+    from app.models_usuario import Usuario
+
+    with patch("app.models_usuario.db") as mock_db:
+        u = Usuario(id="u1", email="x@dtx.aero", nome="X", perfil="solicitante")
+        u.update(ativo=False)
+
+    call_args = mock_db.collection.return_value.document.return_value.update.call_args[0][0]
+    assert call_args["ativo"] is False
+    assert u.ativo is False
+
+
+def test_update_ativo_true_persiste():
+    """update(ativo=True) persiste ativo=True no Firestore (reativação)."""
+    from app.models_usuario import Usuario
+
+    with patch("app.models_usuario.db") as mock_db:
+        u = Usuario(id="u1", email="x@dtx.aero", nome="X", perfil="solicitante")
+        u.ativo = False
+        u.update(ativo=True)
+
+    call_args = mock_db.collection.return_value.document.return_value.update.call_args[0][0]
+    assert call_args["ativo"] is True
+    assert u.ativo is True
 
 
 # ── __repr__ ───────────────────────────────────────────────────────────────────
