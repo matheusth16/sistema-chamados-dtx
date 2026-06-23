@@ -51,7 +51,7 @@ tests/test_config_production.py::test_testing_ignora_validacao PASSED
 tests/test_config_production.py::test_conftest_app_base_url_vazio_nao_quebra_boot PASSED
 tests/test_config_production.py::test_prod_config_completa_valida_nao_raise PASSED
 tests/test_config_production.py::test_cwi21_https_redirect_em_producao PASSED
-tests/test_config_production.py::test_cwi21_cookies_secure_em_producao PASSED
+tests/test_config_production.py::test_cwi21_cookies_secure_default_em_config_producao PASSED
 tests/test_config_production.py::test_import_config_producao_com_vars_validas_sobe PASSED
 tests/test_config_production.py::test_import_config_producao_sem_app_base_url_falha PASSED
 tests/test_config_production.py::test_import_config_producao_sem_health_secret_falha PASSED
@@ -138,7 +138,7 @@ A skill `review-security` foi executada sobre o diff da Onda 3 (implementação 
 
 - [x] SESSION_COOKIE_SECURE = True em produção
       config.py: _to_bool(..., default=(_env == "production")) → True quando FLASK_ENV=production
-      Testes: test_cwi21_cookies_secure_em_producao, test_import_config_producao_com_vars_validas_sobe
+      Testes: test_cwi21_cookies_secure_default_em_config_producao, test_import_config_producao_com_vars_validas_sobe
       Resolvido 2026-06-22 — Onda 3 (CWI 2.1)
 
 - [x] SESSION_COOKIE_HTTPONLY = True (hardcoded, não depende de env)

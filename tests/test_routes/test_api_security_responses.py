@@ -319,3 +319,37 @@ def test_atualizar_status_exception_em_service_nao_vaza_internals(client_logado_
     if data and data.get("erro"):
         assert "Firestore" not in data["erro"]
         assert "UNAVAILABLE" not in data["erro"]
+
+
+# ── L4 Polish — CWI 2.3: /api/supervisores/lista não expõe senha_hash ────────
+
+
+def test_api_supervisores_lista_nao_expoe_senha_hash(client_logado_solicitante):
+    """L4 / CWI 2.3 — GET /api/supervisores/lista não inclui senha_hash na resposta JSON.
+
+    O endpoint serializa manualmente {id, nome, email} — garante que o campo
+    interno senha_hash não vaza mesmo que o modelo contenha o atributo.
+    """
+    sup_com_hash = MagicMock()
+    sup_com_hash.id = "sup_externo"
+    sup_com_hash.nome = "Supervisor Externo"
+    sup_com_hash.email = "ext@dtx.aero"
+    sup_com_hash.senha_hash = "scrypt:32768:8:1:HASH_SECRETO"
+
+    with patch("app.routes.api.Usuario.get_supervisores_por_area", return_value=[sup_com_hash]):
+        r = client_logado_solicitante.get("/api/supervisores/lista?area=Manutencao")
+
+    assert r.status_code == 200
+    body = r.data.decode("utf-8", errors="replace")
+    assert "senha_hash" not in body, "senha_hash não deve aparecer na resposta de supervisores"
+    assert "HASH_SECRETO" not in body
+
+    data = r.get_json()
+    assert data is not None
+    assert data["sucesso"] is True
+    supervisores = data.get("supervisores", [])
+    assert len(supervisores) == 1
+    sup = supervisores[0]
+    assert set(sup.keys()) == {"id", "nome", "email"}, (
+        f"Campos inesperados na resposta: {set(sup.keys())}"
+    )

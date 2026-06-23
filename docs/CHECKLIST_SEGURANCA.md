@@ -177,7 +177,7 @@ Este documento deve ser consultado em **duas situações**:
 
 - [x] **`SESSION_COOKIE_SECURE = True` em produção**
   - Arquivo de referência: `config.py` — `SESSION_COOKIE_SECURE = _to_bool(..., default=(_env == "production"))` → `True` quando `FLASK_ENV=production`
-  - Teste: `tests/test_config_production.py::test_cwi21_cookies_secure_em_producao`, `test_import_config_producao_com_vars_validas_sobe`
+  - Teste: `tests/test_config_production.py::test_cwi21_cookies_secure_default_em_config_producao`, `test_import_config_producao_com_vars_validas_sobe`
   - Como verificar: `grep -n "SESSION_COOKIE_SECURE" config.py`
   - **Resolvido 2026-06-22 — Onda 3 (CWI 2.1)**
 
@@ -271,7 +271,8 @@ Este documento deve ser consultado em **duas situações**:
   - Assert: status ∈ {200, 400, 403}; corpo sem "Firestore", "Traceback", "Exception", "senha_hash"
   - Assert: lista retornada não explode (mock controlado, 0 chamados)
   - Como verificar QA: `curl -s "https://host/api/chamados/paginar?search=%27+OR+1%3D1--"` — deve retornar JSON com chamados da área do supervisor, não todos os chamados do sistema
-  - Testes automatizados: `tests/test_security/test_injection_regression.py` (13 testes CWI 3.1)
+  - Testes automatizados: `tests/test_security/test_injection_regression.py` (31 testes CWI 3.1: 8×3 search parametrizados + 2 literal + 5 swagger)
+  - Cobertura primária: parâmetro `search` em GET `/api/chamados/paginar`; POST `/api/editar-chamado` — validação via `validators.py` (ver L3 polish)
   - **Resolvido 2026-06-23 — Onda 3b (CWI 3.1)**
 
 ---
@@ -411,10 +412,18 @@ Este documento deve ser consultado em **duas situações**:
   - Handlers corrigidos (Onda 3b): `api_notificacoes_marcar_lida:L393`, `api_notificacoes_ler_todas:L405`, `api_push_subscribe:L438`
   - Fix específico: `bulk_atualizar_status:L331` — `str(e)` substituído por `"Erro ao processar chamado"` (evita vazar nome de exceção Firestore)
   - Padrão: erros 400/403 de negócio podem ter mensagens específicas ("Chamado não encontrado" — ok); erros 500 SEMPRE genéricos
-  - Fora de escopo: rotas HTML com `flash_t(..., error=str(e))` em `usuarios.py`, `categorias.py`, `dashboard.py` — backlog Onda futura
+  - Fora de escopo: rotas HTML com `flash_t(..., error=str(e))` em `usuarios.py`, `categorias.py`, `dashboard.py` — backlog Onda futura (ver §8.5)
   - Como verificar: `grep -n 'str(e)' app/routes/api.py` → sem ocorrências em handlers de erro
-  - Testes automatizados: `tests/test_routes/test_api_security_responses.py` (6 testes CWI 3.2)
+  - Testes automatizados: `tests/test_routes/test_api_security_responses.py` (11 testes CWI 3.2)
   - **Resolvido 2026-06-23 — Onda 3b (CWI 3.2)**
+
+### 8.5 Backlog pós-Onda 3b — flash HTML str(e)
+
+- [ ] **Rotas HTML ainda podem expor nome de exceção via `flash_t(..., error=str(e))`**
+  - Arquivo de referência: `app/routes/usuarios.py`, `app/routes/categorias.py`, `app/routes/dashboard.py`
+  - Como verificar: `grep -rn 'flash_t.*error=str(e)' app/routes/`
+  - Impacto: mensagens de erro renderizadas em HTML podem revelar nome de exceção interna (ex.: `FirebaseError: UNAVAILABLE`) para o usuário — não é JSON API, mas pode ser sensível
+  - **Backlog Onda futura** — fora de escopo das Ondas 1–3b (afeta apenas rotas de template, não endpoints JSON)
 
 ---
 

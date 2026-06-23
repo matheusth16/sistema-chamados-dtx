@@ -130,3 +130,28 @@ def test_swagger_routes_retornam_404(client, path):
     """CWI 4.2 — Rotas de documentação automática (swagger/openapi) não estão expostas."""
     r = client.get(path)
     assert r.status_code == 404, f"Rota {path} devolveu {r.status_code}, esperado 404"
+
+
+# ── L3 Polish — Injection: POST /api/editar-chamado com nova_descricao ────────
+
+
+@pytest.mark.parametrize("payload", PAYLOADS_SQL[:2])
+def test_editar_chamado_descricao_payload_nao_causa_500(client_logado_supervisor, payload):
+    """L3 — POST /api/editar-chamado com payload injection em nova_descricao não causa 500 nem vaza internals.
+
+    Cobertura complementar: o serviço de edição recebe a descrição como string literal;
+    validators.py rejeita ou aceita — nunca interpreta como query.
+    """
+    with patch(
+        "app.services.edicao_chamado_service.processar_edicao_chamado",
+        return_value={"sucesso": True, "mensagem": "ok", "dados": {}},
+    ):
+        r = client_logado_supervisor.post(
+            "/api/editar-chamado",
+            data={"chamado_id": "ch_001", "nova_descricao": payload},
+        )
+
+    assert r.status_code != 500, f"payload={payload!r} devolveu 500"
+    body = r.data.decode("utf-8", errors="replace")
+    for proibida in STRINGS_PROIBIDAS:
+        assert proibida not in body, f"payload={payload!r}: {proibida!r} vazou na resposta"
