@@ -1,6 +1,10 @@
 # Runbook de Incidentes — Sistema de Chamados
 
 > Ref rápida para quando algo quebra. Diagnose → Ação → Postmortem leve.
+>
+> **Ambiente de execução:** container Docker (gunicorn, 1 worker / 8 threads,
+> porta interna 8080) rodando em servidor local/on-premise. Banco: Firestore.
+> Anexos: Cloudflare R2 (com fallback Firebase Storage). E-mail: Microsoft Graph API.
 
 ---
 
@@ -8,42 +12,47 @@
 
 ```
 1. Confirmar o sintoma — o que usuário vê? (503? tela branca? login falha?)
-2. Verificar logs: gcloud run services logs read sistema-chamados --region=southamerica-east1 --limit=50
-3. Verificar health: curl https://SEU_DOMINIO/health
-4. Se crítico → rollback imediato (ver seção abaixo)
-5. Após estável → postmortem leve (ver template)
+2. Verificar status do container: docker compose ps
+3. Verificar logs:               docker compose logs --tail=100 web
+4. Verificar health:             curl http://localhost:5000/health
+5. Se crítico → rollback imediato (ver seção abaixo)
+6. Após estável → postmortem leve (ver template)
 ```
+
+> Substitua `localhost:5000` pelo host/porta reais do servidor se acessado remotamente.
 
 ---
 
 ## Cenários de falha comuns
 
-### 1. Serviço Cloud Run retorna 503 / não responde
+### 1. Container retorna 503 / não responde
 
 **Diagnose**
 ```bash
-gcloud run services describe sistema-chamados --region=southamerica-east1
-gcloud run services logs read sistema-chamados --region=southamerica-east1 --limit=100
+docker compose ps
+docker compose logs --tail=200 web
+docker stats --no-stream
 ```
 
 **Causas mais prováveis**
 | Sintoma nos logs | Causa | Ação |
 |---|---|---|
-| `WORKER TIMEOUT` | Requisição lenta (Firestore/e-mail) | Aumentar `--timeout` ou otimizar query |
-| `Error: credentials.json not found` | Secret não montado no Cloud Run | Verificar Secret Manager / variável de ambiente |
-| `OSError: [Errno 28] No space left` | Disco cheio (worker-tmp-dir) | Adicionar `--worker-tmp-dir /dev/shm` (já configurado) |
-| `Memory limit exceeded` | App consumindo > 512Mi | Aumentar memória: `gcloud run services update ... --memory 1Gi` |
-| Container não inicializa | Build com erro | Ver logs do Cloud Build; fazer rollback |
+| `WORKER TIMEOUT` | Requisição lenta (Firestore/e-mail) | Aumentar `--timeout` em `start.sh` ou otimizar query |
+| `Error: credentials.json not found` | Volume de credenciais não montado | Verificar volume `./credentials.json:/app/credentials.json:ro` no compose |
+| `OSError: [Errno 28] No space left` | Disco do host cheio | Liberar espaço; `--worker-tmp-dir /dev/shm` já configurado |
+| `MemoryError` / container morto (OOM) | App consumindo mais que o limite | Aumentar limite de memória no host/compose |
+| Container reinicia em loop | Erro de inicialização | Ver logs do build/start; fazer rollback |
 
 **Rollback rápido**
 ```bash
-# Ver revisões disponíveis
-gcloud run revisions list --service=sistema-chamados --region=southamerica-east1
+# Voltar para a imagem/tag anterior conhecida como estável
+docker compose down
+git checkout <tag-ou-commit-estável>
+docker compose up -d --build
 
-# Rollback para revisão anterior
-gcloud run services update-traffic sistema-chamados \
-  --region=southamerica-east1 \
-  --to-revisions=NOME-REVISAO-ANTERIOR=100
+# Ou, se houver imagem anterior taggeada:
+docker tag sistema-chamados:previous sistema-chamados:latest
+docker compose up -d
 ```
 
 ---
@@ -54,19 +63,17 @@ gcloud run services update-traffic sistema-chamados \
 
 **Diagnose**
 ```bash
-# Verificar se a conta de serviço tem as permissões corretas
-gcloud projects get-iam-policy SEU_PROJECT_ID \
-  --flatten="bindings[].members" \
-  --filter="bindings.members:serviceAccount:*"
+# Confirmar que o credentials.json está montado dentro do container
+docker compose exec web ls -l /app/credentials.json
 ```
 
 **Ações**
-1. Confirmar que `GOOGLE_APPLICATION_CREDENTIALS` está configurado **ou** que o Cloud Run usa a conta de serviço correta
-2. Se usando `credentials.json` via Secret Manager: verificar se o secret está montado
+1. Confirmar que o volume `./credentials.json:/app/credentials.json:ro` está montado e o arquivo existe na raiz do host
+2. Confirmar que a conta de serviço tem as permissões corretas no Firebase/Firestore
 3. Rolar a credencial se comprometida:
    - Firebase Console → Configurações → Contas de serviço → Gerar nova chave privada
-   - Atualizar o secret no Secret Manager
-   - Fazer novo deploy
+   - Substituir `credentials.json` no servidor
+   - Reiniciar: `docker compose restart web`
 
 ---
 
@@ -74,35 +81,40 @@ gcloud projects get-iam-policy SEU_PROJECT_ID \
 
 **Sintoma**: Dashboard demora >5s, usuários reclamam de tela travada
 
-**Diagnose**: Ver query N+1 em `app/services/dashboard_service.py` — problema conhecido (ALTO, backlog).
+**Diagnose**: Lentidão pode ser causada por volume alto de chamados na query inicial do dashboard. Verificar `app/services/dashboard_service.py` — usa paginação por cursor; reduzir janela se necessário.
 
 **Ação imediata**
 - Reduzir `ITENS_POR_PAGINA_DASHBOARD` no `.env` de 500 para 50
-- Reiniciar o serviço: `gcloud run services update sistema-chamados --region=... --clear-env-vars` (ou novo deploy)
+- Reiniciar o serviço: `docker compose restart web`
 
-**Fix definitivo**: Migrar para query agregada + paginação real (backlog crítico).
+**Contexto**: N+1 em relatório semanal (`report_service.py`) foi resolvido via batch `Usuario.get_by_ids` (F-24, Onda B 2026-06-18). Lentidão residual no dashboard é de volume, não de padrão N+1.
 
 ---
 
 ### 4. E-mails não enviados
 
-**Sintoma**: Supervisor não recebe notificações, logs mostram `SMTPAuthenticationError` ou timeout
+**Sintoma**: Supervisor não recebe notificações; logs mostram erro de autenticação
+do Microsoft Graph (`401`/`403`) ou throttling (`429`).
 
 **Diagnose**
 ```bash
-# Testar SMTP isolado (não afeta produção)
-cd scripts/
-python teste_email_smtp_m365.py
+# Conferir as variáveis Graph dentro do container
+docker compose exec web env | grep GRAPH_
+
+# Gerar/inspecionar snapshots visuais dos e-mails (não envia para produção)
+python scripts/gerar_email_visual_snapshots.py
 ```
 
 **Ações**
 | Erro | Causa | Ação |
 |---|---|---|
-| `SMTPAuthenticationError` | Senha expirou ou MFA mudou | Gerar nova senha de app no M365 Admin |
-| `ConnectionRefusedError` | Porta 587 bloqueada | Tentar porta 465 (SSL) |
-| `TimeoutError` | Servidor lento | Aumentar timeout em `app/services/notifications.py` |
+| `401 Unauthorized` | Client secret expirado | Gerar novo secret no Azure AD e atualizar `GRAPH_CLIENT_SECRET` |
+| `403 Forbidden` | App sem permissão `Mail.Send` | Conceder/consentir `Mail.Send` (Application) no Azure AD |
+| `429 Too Many Requests` | Throttling do Graph | Retentativa com backoff (ver `app/services/notify_retry.py`) |
+| Timeout | Rede/Graph lento | Verificar conectividade de saída do servidor |
 
-**Mitigação**: e-mails não-críticos. O sistema continua funcionando sem eles. Notificações in-app continuam ativas.
+**Mitigação**: e-mails não são críticos. O sistema continua funcionando sem eles.
+As notificações in-app e Web Push continuam ativas.
 
 ---
 
@@ -112,30 +124,29 @@ python teste_email_smtp_m365.py
 
 **Diagnose**
 ```bash
-gcloud run services logs read sistema-chamados --region=southamerica-east1 \
-  --filter="Firebase Storage" --limit=20
+docker compose logs web | grep -iE "R2|Storage|upload"
 ```
 
 **Ações**
 | Cenário | Ação |
 |---|---|
-| `Firebase Storage indisponível` | Verificar `FIREBASE_STORAGE_BUCKET` no Cloud Run env vars |
-| `403 Forbidden` | Conta de serviço sem permissão `Storage Object Admin` no bucket |
-| `File too large` | Limite de 10MB atingido (config `MAX_CONTENT_LENGTH`) |
+| `R2 indisponível` | Verificar `R2_*` no `.env`; sistema cai no fallback Firebase Storage |
+| `403 Forbidden` (R2) | Conferir credenciais/permissões do bucket R2 |
+| `Firebase Storage indisponível` | Verificar `FIREBASE_STORAGE_BUCKET` no `.env` |
+| `File too large` | Limite atingido (config `MAX_CONTENT_LENGTH`, ~10MB) |
 
 ---
 
-### 6. GCP billing desativado / serviço suspenso
+### 6. Servidor local indisponível / reinício
 
-**Contexto**: Cloud Run para automaticamente se o billing for desabilitado.
+**Contexto**: O container é reiniciado automaticamente (`restart: unless-stopped`),
+mas o host pode reiniciar (queda de energia, manutenção).
 
 **Ação**
-1. Acessar: https://console.cloud.google.com/billing
-2. Vincular método de pagamento
-3. Reativar o projeto: `gcloud projects undelete SEU_PROJECT_ID` (se necessário)
-4. O serviço Cloud Run volta automaticamente em ~5 minutos após billing ativo
-
-**PRAZO ATUAL: billing desativado — agir antes de 19/06/2026**
+1. Confirmar que o Docker está ativo no host: `docker info`
+2. Subir o stack: `docker compose up -d`
+3. Validar health: `curl http://localhost:5000/health`
+4. Conferir que o `restart: unless-stopped` está no `docker-compose.yml` para auto-recuperação
 
 ---
 
@@ -169,13 +180,17 @@ gcloud run services logs read sistema-chamados --region=southamerica-east1 \
 
 ---
 
-## Contatos e links úteis
+## Comandos e links úteis
 
-| Recurso | Link |
+| Recurso | Comando / Link |
 |---|---|
-| Cloud Run console | https://console.cloud.google.com/run |
-| Cloud Build history | https://console.cloud.google.com/cloud-build |
-| Firestore console | https://console.cloud.google.com/firestore |
+| Status dos containers | `docker compose ps` |
+| Logs em tempo real | `docker compose logs -f web` |
+| Reiniciar serviço | `docker compose restart web` |
+| Rebuild + subir | `docker compose up -d --build` |
+| Shell no container | `docker compose exec web sh` |
+| Health check | `curl http://localhost:5000/health` |
+| Firestore console | https://console.firebase.google.com |
 | Firebase Storage | https://console.firebase.google.com |
-| Billing | https://console.cloud.google.com/billing |
-| Logs Explorer | https://console.cloud.google.com/logs |
+| Cloudflare R2 | https://dash.cloudflare.com |
+| Azure AD (Graph / e-mail) | https://portal.azure.com |

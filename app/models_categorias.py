@@ -20,6 +20,11 @@ CACHE_KEY_SETORES = "categorias_setores_list"
 CACHE_KEY_GATES = "categorias_gates_list"
 CACHE_KEY_IMPACTOS = "categorias_impactos_list"
 
+# Chaves do static_cache usadas em chamados.py / __init__.py
+STATIC_CACHE_KEY_SETORES = "categorias_setor"
+STATIC_CACHE_KEY_GATES = "categorias_gate"
+STATIC_CACHE_KEY_IMPACTOS = "categorias_impacto"
+
 
 class CategoriaSetor:
     """Representa um Setor/Departamento do sistema"""
@@ -86,9 +91,19 @@ class CategoriaSetor:
             logger.error("Erro ao salvar setor: %s", e)
             raise
 
+    @firebase_retry(max_retries=3)
+    def delete(self):
+        """Deleta o setor do Firestore com retry automático"""
+        try:
+            db.collection("categorias_setores").document(self.id).delete()
+            return True
+        except Exception as e:
+            logger.error("Erro ao deletar setor: %s", e)
+            return False
+
     @classmethod
     def get_all(cls):
-        """Retorna todos os setores ativos"""
+        """Retorna todos os setores ativos (para formulários e seletores)."""
         try:
             docs = (
                 db.collection("categorias_setores")
@@ -98,6 +113,16 @@ class CategoriaSetor:
             return [cls.from_dict(doc.to_dict(), doc.id) for doc in docs]
         except Exception as e:
             logger.error("Erro ao buscar setores: %s", e)
+            return []
+
+    @classmethod
+    def get_all_incluindo_inativos(cls):
+        """Retorna todos os setores (ativos e inativos). Para a interface de administração."""
+        try:
+            docs = db.collection("categorias_setores").stream()
+            return [cls.from_dict(doc.to_dict(), doc.id) for doc in docs]
+        except Exception as e:
+            logger.error("Erro ao buscar setores (incluindo inativos): %s", e)
             return []
 
     @classmethod
@@ -114,7 +139,10 @@ class CategoriaSetor:
 
 
 class CategoriaGate:
-    """Representa um Gate do sistema"""
+    """Representa um Gate do sistema (gate pai + sub-etapa).
+
+    Valor canônico em nome_pt: 'Gate 1 - Desmontagem' (usado no formulário e no Firestore).
+    """
 
     def __init__(
         self,
@@ -124,6 +152,8 @@ class CategoriaGate:
         descricao_pt: str = None,
         descricao_en: str = None,
         descricao_es: str = None,
+        gate_pai: str = None,
+        etapa: str = None,
         ordem: int = 0,
         ativo: bool = True,
         id: str = None,
@@ -135,6 +165,8 @@ class CategoriaGate:
         self.descricao_pt = descricao_pt
         self.descricao_en = descricao_en
         self.descricao_es = descricao_es
+        self.gate_pai = gate_pai
+        self.etapa = etapa
         self.ordem = ordem
         self.ativo = ativo
         self.data_criacao = datetime.now(pytz.timezone("America/Sao_Paulo"))
@@ -148,6 +180,8 @@ class CategoriaGate:
             "descricao_pt": self.descricao_pt,
             "descricao_en": self.descricao_en,
             "descricao_es": self.descricao_es,
+            "gate_pai": self.gate_pai,
+            "etapa": self.etapa,
             "ordem": self.ordem,
             "ativo": self.ativo,
             "data_criacao": self.data_criacao,
@@ -163,6 +197,8 @@ class CategoriaGate:
             descricao_pt=data.get("descricao_pt"),
             descricao_en=data.get("descricao_en"),
             descricao_es=data.get("descricao_es"),
+            gate_pai=data.get("gate_pai"),
+            etapa=data.get("etapa"),
             ordem=data.get("ordem", 0),
             ativo=data.get("ativo", True),
             id=id,
@@ -182,16 +218,40 @@ class CategoriaGate:
             logger.error("Erro ao salvar gate: %s", e)
             raise
 
+    @firebase_retry(max_retries=3)
+    def delete(self):
+        """Deleta o gate do Firestore com retry automático"""
+        try:
+            db.collection("categorias_gates").document(self.id).delete()
+            return True
+        except Exception as e:
+            logger.error("Erro ao deletar gate: %s", e)
+            return False
+
     @classmethod
     def get_all(cls):
-        """Retorna todos os gates ordenados por ordem"""
+        """Retorna todos os gates ordenados por gate_pai + ordem (admin: inclui inativos)"""
         try:
             docs = db.collection("categorias_gates").stream()
             gates = [cls.from_dict(doc.to_dict(), doc.id) for doc in docs]
-            # Ordena por ordem no Python (evita problema de índice no Firestore)
-            return sorted(gates, key=lambda x: x.ordem)
+            return sorted(gates, key=lambda x: (x.gate_pai or "", x.ordem))
         except Exception as e:
             logger.error("Erro ao buscar gates: %s", e)
+            return []
+
+    @classmethod
+    def get_all_ativos(cls):
+        """Retorna apenas gates ativos, ordenados por gate_pai + ordem (para o formulário)"""
+        try:
+            docs = (
+                db.collection("categorias_gates")
+                .where(filter=FieldFilter("ativo", "==", True))
+                .stream()
+            )
+            gates = [cls.from_dict(doc.to_dict(), doc.id) for doc in docs]
+            return sorted(gates, key=lambda x: (x.gate_pai or "", x.ordem))
+        except Exception as e:
+            logger.error("Erro ao buscar gates ativos: %s", e)
             return []
 
     @classmethod
@@ -219,7 +279,7 @@ class CategoriaImpacto:
         descricao_en: str = None,
         descricao_es: str = None,
         nivel: int = 0,
-        cor: str = "#gray",
+        cor: str = "gray",
         ativo: bool = True,
         id: str = None,
     ):
@@ -231,7 +291,7 @@ class CategoriaImpacto:
         self.descricao_en = descricao_en
         self.descricao_es = descricao_es
         self.nivel = nivel  # Ordem de severidade
-        self.cor = cor  # Cor para exibição (ex: #red, #orange, #yellow, #green)
+        self.cor = cor  # Cor CSS válida para exibição (ex: red, orange, yellow, green, #808080)
         self.ativo = ativo
         self.data_criacao = datetime.now(pytz.timezone("America/Sao_Paulo"))
 
@@ -261,11 +321,12 @@ class CategoriaImpacto:
             descricao_en=data.get("descricao_en"),
             descricao_es=data.get("descricao_es"),
             nivel=data.get("nivel", 0),
-            cor=data.get("cor", "#gray"),
+            cor=data.get("cor", "gray"),
             ativo=data.get("ativo", True),
             id=id,
         )
 
+    @firebase_retry(max_retries=3)
     def save(self):
         """Salva o impacto no Firestore"""
         try:
@@ -279,9 +340,19 @@ class CategoriaImpacto:
             logger.error("Erro ao salvar impacto: %s", e)
             raise
 
+    @firebase_retry(max_retries=3)
+    def delete(self):
+        """Deleta o impacto do Firestore com retry automático"""
+        try:
+            db.collection("categorias_impactos").document(self.id).delete()
+            return True
+        except Exception as e:
+            logger.error("Erro ao deletar impacto: %s", e)
+            return False
+
     @classmethod
     def get_all(cls):
-        """Retorna todos os impactos ativos"""
+        """Retorna todos os impactos ativos (para formulários e seletores)."""
         try:
             docs = (
                 db.collection("categorias_impactos")
@@ -291,6 +362,16 @@ class CategoriaImpacto:
             return [cls.from_dict(doc.to_dict(), doc.id) for doc in docs]
         except Exception as e:
             logger.error("Erro ao buscar impactos: %s", e)
+            return []
+
+    @classmethod
+    def get_all_incluindo_inativos(cls):
+        """Retorna todos os impactos (ativos e inativos). Para a interface de administração."""
+        try:
+            docs = db.collection("categorias_impactos").stream()
+            return [cls.from_dict(doc.to_dict(), doc.id) for doc in docs]
+        except Exception as e:
+            logger.error("Erro ao buscar impactos (incluindo inativos): %s", e)
             return []
 
     @classmethod

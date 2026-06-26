@@ -1,6 +1,8 @@
 """Testes da API de atualização de status (AJAX). Ref: CT-STAT-*."""
 
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 
 def test_atualizar_status_sem_login_retorna_401_ou_redirect(client):
@@ -57,6 +59,9 @@ def test_atualizar_status_com_sucesso_retorna_200(client_logado_supervisor):
     doc.to_dict.return_value = {"area": "Manutencao", "status": "Aberto", "solicitante_id": "s1"}
     chamado_mock = MagicMock()
     chamado_mock.area = "Manutencao"
+    chamado_mock.responsavel_id = None  # sem dono → supervisor da área pode ver
+    chamado_mock.solicitante_id = "s1"
+    chamado_mock.participantes = []
     with (
         patch("app.routes.api.db") as mock_db,
         patch("app.routes.api.Chamado") as mock_chamado_cls,
@@ -81,20 +86,20 @@ def test_atualizar_status_com_sucesso_retorna_200(client_logado_supervisor):
 
 
 def test_atualizar_status_chamado_inexistente_retorna_404(client_logado_supervisor):
-    """CT-STAT-04: Chamado não encontrado retorna 404 (ou 403 por Origin)."""
-    with patch("app.routes.api.atualizar_status_chamado") as mock_atualizar:
-        mock_atualizar.return_value = {"sucesso": False, "erro": "Chamado não encontrado"}
+    """CT-STAT-04: Chamado não encontrado retorna 404."""
+    mock_doc = MagicMock()
+    mock_doc.exists = False
+    with patch("app.routes.api.db") as mock_db:
+        mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
         r = client_logado_supervisor.post(
             "/api/atualizar-status",
             json={"chamado_id": "ch_inexistente", "novo_status": "Em Atendimento"},
             content_type="application/json",
-            headers={"Origin": "http://localhost:5000"},
         )
-    assert r.status_code in (404, 403)
-    if r.status_code == 404:
-        data = r.get_json()
-        assert data.get("sucesso") is False
-        assert "não encontrado" in data.get("erro", "").lower()
+    assert r.status_code == 404
+    data = r.get_json()
+    assert data.get("sucesso") is False
+    assert "não encontrado" in data.get("erro", "").lower()
 
 
 def test_bulk_status_como_solicitante_retorna_403(client_logado_solicitante):
@@ -148,3 +153,78 @@ def test_bulk_status_novo_status_invalido_retorna_400(client_logado_supervisor):
             "inválido" in data.get("erro", "").lower()
             or "novo_status" in data.get("erro", "").lower()
         )
+
+
+@pytest.mark.regression
+def test_atualizar_status_supervisor_outra_area_retorna_403(client_logado_supervisor):
+    """CT-STAT-08 (IDOR): supervisor da área 'Manutencao' não pode alterar chamado da área 'TI'.
+
+    Verifica que verificar_permissao_mudanca_status bloqueia no endpoint,
+    não apenas no serviço de permissões.
+    """
+    doc = MagicMock()
+    doc.exists = True
+    doc.to_dict.return_value = {"area": "TI", "status": "Aberto", "solicitante_id": "outro_usuario"}
+
+    chamado_mock = MagicMock()
+    chamado_mock.area = "TI"
+    chamado_mock.solicitante_id = "outro_usuario"
+
+    with (
+        patch("app.routes.api.db") as mock_db,
+        patch("app.routes.api.Chamado") as mock_chamado_cls,
+    ):
+        mock_db.collection.return_value.document.return_value.get.return_value = doc
+        mock_chamado_cls.from_dict.return_value = chamado_mock
+
+        r = client_logado_supervisor.post(
+            "/api/atualizar-status",
+            json={"chamado_id": "ch_de_ti", "novo_status": "Em Atendimento"},
+            content_type="application/json",
+        )
+
+    assert r.status_code == 403, (
+        f"Supervisor de 'Manutencao' não deveria alterar chamado de 'TI'. "
+        f"Recebeu {r.status_code}: {r.get_json()}"
+    )
+    data = r.get_json()
+    assert data is not None and data.get("sucesso") is False
+
+
+# ── F-63: Transição inválida via API retorna 400 ──────────────────────────────
+
+
+def test_atualizar_status_transicao_invalida_retorna_400(client_logado_supervisor):
+    """CT-STAT-09 (F-63): Transição inválida (Concluído → Aberto) retorna 400."""
+    doc = MagicMock()
+    doc.exists = True
+    doc.to_dict.return_value = {
+        "area": "Manutencao",
+        "status": "Concluído",
+        "solicitante_id": "s1",
+    }
+    chamado_mock = MagicMock()
+    chamado_mock.area = "Manutencao"
+    chamado_mock.responsavel_id = None  # sem dono → supervisor da área pode ver
+    chamado_mock.solicitante_id = "s1"
+    chamado_mock.participantes = []
+    with (
+        patch("app.routes.api.db") as mock_db,
+        patch("app.routes.api.Chamado") as mock_chamado_cls,
+        patch("app.routes.api.atualizar_status_chamado") as mock_atualizar,
+    ):
+        mock_db.collection.return_value.document.return_value.get.return_value = doc
+        mock_chamado_cls.from_dict.return_value = chamado_mock
+        mock_atualizar.return_value = {
+            "sucesso": False,
+            "erro": "Transição inválida: Concluído → Aberto",
+            "codigo": 400,
+        }
+        r = client_logado_supervisor.post(
+            "/api/atualizar-status",
+            json={"chamado_id": "ch_conc", "novo_status": "Aberto"},
+            content_type="application/json",
+        )
+    assert r.status_code == 400
+    data = r.get_json()
+    assert data is not None and data.get("sucesso") is False

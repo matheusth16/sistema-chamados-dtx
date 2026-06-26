@@ -47,20 +47,10 @@ def test_admin_acessa_categorias(logged_in_admin: Page, base_url: str) -> None:
 
 
 @pytest.mark.e2e
-def test_admin_acessa_traducoes(logged_in_admin: Page, base_url: str) -> None:
-    """Admin deve acessar o painel de traduções."""
-    page = logged_in_admin
-    page.goto(f"{base_url}/admin/traducoes")
-    page.wait_for_load_state("networkidle")
-
-    assert "/login" not in page.url
-
-
-@pytest.mark.e2e
 def test_admin_acessa_relatorios(logged_in_admin: Page, base_url: str) -> None:
     """Admin deve acessar relatórios."""
     page = logged_in_admin
-    page.goto(f"{base_url}/relatorios")
+    page.goto(f"{base_url}/admin/relatorios")
     page.wait_for_load_state("networkidle")
 
     assert "/login" not in page.url

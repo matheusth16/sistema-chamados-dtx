@@ -172,7 +172,38 @@
         {"fieldPath": "responsavel", "order": "ASCENDING"},
         {"fieldPath": "data_abertura", "order": "DESCENDING"}
       ]
+    },
+    {
+      "collectionGroup": "chamados",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "status", "order": "ASCENDING"},
+        {"fieldPath": "escalacao_resposta_nivel", "order": "ASCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "chamados",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "status", "order": "ASCENDING"},
+        {"fieldPath": "escalacao_resolucao_nivel", "order": "ASCENDING"}
+      ]
     }
   ],
-  "fieldOverrides": []
+  "fieldOverrides": [
+    {
+      "collectionGroup": "usuarios",
+      "fieldPath": "email_lookup_hash",
+      "indexes": [
+        {"order": "ASCENDING", "queryScope": "COLLECTION"}
+      ]
+    },
+    {
+      "collectionGroup": "chamados",
+      "fieldPath": "supervisor_ids_com_acesso",
+      "indexes": [
+        {"arrayConfig": "CONTAINS", "queryScope": "COLLECTION"}
+      ]
+    }
+  ]
 }

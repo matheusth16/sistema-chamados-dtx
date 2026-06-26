@@ -13,6 +13,7 @@ def supervisor_pode_alterar_chamado(usuario: Any, chamado_area: str) -> bool:
 
     Admin pode sempre. Supervisor somente se a área do chamado
     estiver nas suas áreas (regra mais restritiva que a de leitura).
+    Gestor read-only (is_gestor_only=True) nunca pode escrever.
 
     Args:
         usuario: current_user (com .perfil e .areas)
@@ -23,6 +24,9 @@ def supervisor_pode_alterar_chamado(usuario: Any, chamado_area: str) -> bool:
     """
     if usuario.is_admin_or_above:
         return True
+    # Gestor sem privilégio admin → read-only, sem escrita
+    if getattr(usuario, "is_gestor_only", None) is True:
+        return False
     if usuario.perfil != "supervisor":
         return False
     return chamado_area in getattr(usuario, "areas", [])
@@ -48,6 +52,10 @@ def verificar_permissao_mudanca_status(
     """
     from app.services.permissions import usuario_pode_ver_chamado
 
+    # Gestor read-only: bloqueio antes de qualquer outra verificação
+    if getattr(usuario, "is_gestor_only", None) is True:
+        return False, "Acesso negado: gestores têm visão read-only"
+
     if usuario.perfil == "solicitante":
         if chamado.solicitante_id != usuario.id:
             return False, "Acesso negado: Você só pode atualizar seus próprios chamados"
@@ -56,6 +64,25 @@ def verificar_permissao_mudanca_status(
     elif usuario.perfil == "supervisor":
         if not usuario_pode_ver_chamado(usuario, chamado):
             return False, "Acesso negado: Sem permissão ou fora da sua área"
+    return True, None
+
+
+def usuario_pode_mutar_chamado(usuario: Any, chamado=None) -> tuple[bool, str | None]:
+    """Verifica se o usuário pode realizar qualquer mutação em chamados.
+
+    Gestor read-only (is_gestor_only=True) nunca pode escrever, mesmo se for
+    owner ou participante. Admin sempre pode. Supervisor comum pode (verificações
+    de área ficam a cargo dos callers).
+
+    Args:
+        usuario: current_user
+        chamado: ignorado nesta versão; mantido para compatibilidade futura
+
+    Returns:
+        (permitido, mensagem_erro) — mensagem_erro é None quando permitido.
+    """
+    if getattr(usuario, "is_gestor_only", None) is True:
+        return False, "Acesso negado: gestores têm visão read-only"
     return True, None
 
 

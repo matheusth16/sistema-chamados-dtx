@@ -1,155 +1,168 @@
 {% extends "base.html" %}
 
 {% block content %}
+<div class="max-w-xl mx-auto space-y-6">
 
-<div class="min-h-screen bg-gray-50 py-8">
-    <div class="max-w-xl mx-auto px-4">
+  <!-- Voltar -->
+  <div>
+    <a href="{{ url_for('main.gerenciar_usuarios') }}"
+       class="inline-flex items-center gap-1.5 text-sm font-medium text-dtx-600 hover:text-dtx-700 transition-colors">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+      </svg>
+      {{ t('back_to_user_list') }}
+    </a>
+  </div>
 
-        <!-- Cabeçalho -->
-        <div class="mb-6">
-            <a href="{{ url_for('main.gerenciar_usuarios') }}"
-                class="text-sm text-blue-600 hover:underline mb-2 inline-block">{{ t('back_to_user_list') }}</a>
-            {% if usuario %}
-            <h1 class="text-2xl font-bold text-gray-900">{{ t('edit_user') }}</h1>
-            <p class="text-sm text-gray-500 mt-1">{{ t('change_user_data') }}</p>
-            {% else %}
-            <h1 class="text-2xl font-bold text-gray-900">{{ t('new_user') }}</h1>
-            <p class="text-sm text-gray-500 mt-1">{{ t('fill_new_user_data') }}</p>
-            {% endif %}
-        </div>
-
-        <!-- Card do Formulário -->
-        <div class="bg-white rounded-lg shadow-md overflow-hidden">
-
-            {% if usuario %}
-            <!-- Header Editar -->
-            <div class="bg-purple-600 text-white px-6 py-4">
-                <h2 class="text-lg font-semibold">{{ t('edit_user') }}</h2>
-                <p class="text-sm text-purple-100">{{ t('change_user_data') }}</p>
-            </div>
-            {% else %}
-            <!-- Header Criar -->
-            <div class="bg-blue-600 text-white px-6 py-4">
-                <h2 class="text-lg font-semibold">{{ t('new_user') }}</h2>
-                <p class="text-sm text-blue-100">{{ t('fill_new_user_data') }}</p>
-            </div>
-            {% endif %}
-
-            <form method="POST"
-                action="{% if usuario %}{{ url_for('main.editar_usuario', usuario_id=usuario.id) }}{% else %}{{ url_for('main.gerenciar_usuarios') }}{% endif %}"
-                class="p-6 space-y-5">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-                {% if not usuario %}
-                <input type="hidden" name="acao" value="criar">
-                {% endif %}
-
-                <!-- Email -->
-                <div>
-                    <label for="input-email" class="block text-sm font-medium text-gray-700 mb-1">{{ t('email_required') }}</label>
-                    <input type="email" id="input-email" name="email" required value="{{ usuario.email if usuario else '' }}"
-                        class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                        placeholder="{{ t('ex_email') }}">
-                </div>
-
-                <!-- Nome -->
-                <div>
-                    <label for="input-nome" class="block text-sm font-medium text-gray-700 mb-1">{{ t('full_name_required') }}</label>
-                    <input type="text" id="input-nome" name="nome" required minlength="3" value="{{ usuario.nome if usuario else '' }}"
-                        class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                        placeholder="{{ t('ex_name') }}">
-                </div>
-
-                <!-- Perfil -->
-                <div>
-                    <label for="perfilSelect" class="block text-sm font-medium text-gray-700 mb-1">{{ t('profile_required') }}</label>
-                    <select name="perfil" id="perfilSelect" required onchange="toggleArea()"
-                        class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
-                        <option value="solicitante" {% if usuario and usuario.perfil=='solicitante' %}selected{% endif
-                            %}>{{ t('requester_creates_tickets') }}</option>
-                        <option value="supervisor" {% if usuario and usuario.perfil=='supervisor' %}selected{% endif %}>
-                            {{ t('supervisor_manages_area') }}</option>
-                        <option value="admin" {% if usuario and usuario.perfil=='admin' %}selected{% endif %}>{{ t('admin_full_access') }}</option>
-                    </select>
-                </div>
-
-                <!-- Áreas (visível apenas para supervisor) -->
-                <div id="areaDiv" class="hidden">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">{{ t('areas_sectors_select_one_or_more') }}</label>
-                    <p class="text-xs text-gray-500 mb-2">{{ t('supervisor_area_help') }}</p>
-                    <div class="grid grid-cols-2 gap-2 bg-gray-50 p-3 rounded-md border border-gray-300">
-                        {% set areas_usuario = usuario.areas if usuario and usuario.areas else [] %}
-                        {% for setor in setores %}
-                        {% set area_value = setor.nome_pt %}
-                        {% if current_language == 'en' %}
-                        {% set area_label = setor.nome_en if setor.nome_en else setor.nome_pt %}
-                        {% elif current_language == 'es' %}
-                        {% set area_label = setor.nome_es if setor.nome_es else setor.nome_pt %}
-                        {% else %}
-                        {% set area_label = setor.nome_pt %}
-                        {% endif %}
-                        <label class="inline-flex items-center">
-                            <input type="checkbox" name="areas" value="{{ area_value }}"
-                                class="form-checkbox text-blue-600 rounded" {% if area_value in areas_usuario %}checked{% endif %}>
-                            <span class="ml-2 text-sm text-gray-700">{{ area_label }}</span>
-                        </label>
-                        {% endfor %}
-
-                        {% if areas_extra %}
-                        {% for area_value in areas_extra %}
-                        <label class="inline-flex items-center">
-                            <input type="checkbox" name="areas" value="{{ area_value }}"
-                                class="form-checkbox text-blue-600 rounded" {% if area_value in areas_usuario %}checked{% endif %}>
-                            <span class="ml-2 text-sm text-gray-700">{{ area_value }}</span>
-                        </label>
-                        {% endfor %}
-                        {% endif %}
-                    </div>
-                </div>
-
-                <!-- Senha -->
-                <div class="bg-blue-50 border border-blue-200 rounded-md p-4">
-                    <p class="text-sm text-blue-800">
-                        <strong>ℹ️ {{ t('password_info_header') }}</strong> {{ t('password_info_created_with') }} <code class="bg-blue-100 px-2 py-1 rounded">123456</code>.
-                        {{ t('password_info_first_login') }}
-                    </p>
-                    <p class="text-xs text-blue-600 mt-2">{{ t('password_reset_hint') }}</p>
-                </div>
-
-                <!-- Botões -->
-                <div class="flex gap-3 justify-end pt-4 border-t border-gray-200">
-                    <a href="{{ url_for('main.gerenciar_usuarios') }}"
-                        class="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium rounded-md transition">
-                        {{ t('cancel') }}
-                    </a>
-                    {% if usuario %}
-                    <button type="submit"
-                        class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-md transition">
-                        {{ t('save_changes') }}
-                    </button>
-                    {% else %}
-                    <button type="submit"
-                        class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md transition">
-                        {{ t('create_user_btn') }}
-                    </button>
-                    {% endif %}
-                </div>
-            </form>
-        </div>
+  <!-- Card do Formulário -->
+  <div class="bg-surface-base border border-surface-border rounded-dtx-lg shadow-dtx-sm overflow-hidden">
+    <div class="px-6 pt-6 pb-0">
+      {% if usuario %}
+      <h1 class="text-xl font-semibold text-gray-900">{{ t('edit_user') }}</h1>
+      <p class="text-sm text-gray-500 mt-1">{{ t('change_user_data') }}</p>
+      {% else %}
+      <h1 class="text-xl font-semibold text-gray-900">{{ t('new_user') }}</h1>
+      <p class="text-sm text-gray-500 mt-1">{{ t('fill_new_user_data') }}</p>
+      {% endif %}
     </div>
+
+    <form method="POST"
+          action="{% if usuario %}{{ url_for('main.editar_usuario', usuario_id=usuario.id) }}{% else %}{{ url_for('main.gerenciar_usuarios') }}{% endif %}"
+          class="p-6 space-y-5">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+      {% if not usuario %}
+      <input type="hidden" name="acao" value="criar">
+      {% endif %}
+
+      <!-- Email -->
+      <div>
+        <label for="input-email" class="dtx-label">{{ t('email_required') }}</label>
+        <input type="email" id="input-email" name="email" required
+               value="{{ usuario.email if usuario else '' }}"
+               placeholder="{{ t('ex_email') }}"
+               class="dtx-input">
+      </div>
+
+      <!-- Nome -->
+      <div>
+        <label for="input-nome" class="dtx-label">{{ t('full_name_required') }}</label>
+        <input type="text" id="input-nome" name="nome" required minlength="3"
+               value="{{ usuario.nome if usuario else '' }}"
+               placeholder="{{ t('ex_name') }}"
+               class="dtx-input">
+      </div>
+
+      <!-- Perfil -->
+      <div>
+        <label for="perfilSelect" class="dtx-label">{{ t('profile_required') }}</label>
+        <select name="perfil" id="perfilSelect" required onchange="toggleArea()" class="dtx-select">
+          <option value="solicitante" {% if usuario and usuario.perfil=='solicitante' %}selected{% endif %}>{{ t('requester_creates_tickets') }}</option>
+          <option value="supervisor" {% if usuario and usuario.perfil=='supervisor' %}selected{% endif %}>{{ t('supervisor_manages_area') }}</option>
+          <option value="admin" {% if usuario and usuario.perfil=='admin' %}selected{% endif %}>{{ t('admin_full_access') }}</option>
+        </select>
+      </div>
+
+      <!-- Áreas (visível apenas para supervisor) -->
+      <div id="areaDiv" class="hidden">
+        <label class="dtx-label">{{ t('areas_sectors_select_one_or_more') }}</label>
+        <p class="text-xs text-gray-500 mb-2">{{ t('supervisor_area_help') }}</p>
+        <div class="grid grid-cols-2 gap-2 bg-surface-raised border border-surface-border rounded-dtx-md p-3">
+          {% set areas_usuario = usuario.areas if usuario and usuario.areas else [] %}
+          {% for setor in setores %}
+          {% set area_value = setor.nome_pt %}
+          {% if current_language == 'en' %}
+          {% set area_label = setor.nome_en if setor.nome_en else setor.nome_pt %}
+          {% elif current_language == 'es' %}
+          {% set area_label = setor.nome_es if setor.nome_es else setor.nome_pt %}
+          {% else %}
+          {% set area_label = setor.nome_pt %}
+          {% endif %}
+          <label class="inline-flex items-center gap-2">
+            <input type="checkbox" name="areas" value="{{ area_value }}"
+                   class="rounded border-gray-300 text-dtx-600 focus:ring-dtx-500"
+                   {% if area_value in areas_usuario %}checked{% endif %}>
+            <span class="text-sm text-gray-700">{{ area_label }}</span>
+          </label>
+          {% endfor %}
+
+          {% if areas_extra %}
+          {% for area_value in areas_extra %}
+          <label class="inline-flex items-center gap-2">
+            <input type="checkbox" name="areas" value="{{ area_value }}"
+                   class="rounded border-gray-300 text-dtx-600 focus:ring-dtx-500"
+                   {% if area_value in areas_usuario %}checked{% endif %}>
+            <span class="text-sm text-gray-700">{{ area_value }}</span>
+          </label>
+          {% endfor %}
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Status da conta (visível apenas na edição) -->
+      {% if usuario %}
+      <div class="border border-surface-border rounded-dtx-md p-4 space-y-2">
+        <label class="inline-flex items-center gap-3 cursor-pointer">
+          <input type="checkbox" name="ativo" value="on"
+                 class="rounded border-gray-300 text-dtx-600 focus:ring-dtx-500 w-4 h-4"
+                 {% if usuario.ativo %}checked{% endif %}>
+          <span class="text-sm font-medium text-gray-800">{{ t('active_status_label') }}</span>
+        </label>
+        <p class="text-xs text-gray-500 ml-7">{{ t('deactivate_account_help') }}</p>
+      </div>
+      {% endif %}
+
+      <!-- Nível de Gestão (Fase 5) — opcional, define acesso read-only ao Painel Gerencial -->
+      <div class="border border-surface-border rounded-dtx-md p-4 space-y-2">
+        <label for="nivel_gestao" class="dtx-label">Nível de Gestão <span class="text-xs font-normal text-gray-400">(opcional)</span></label>
+        <select name="nivel_gestao" id="nivel_gestao" class="dtx-select">
+          <option value="" {% if not usuario or not usuario.nivel_gestao %}selected{% endif %}>— Sem gestão —</option>
+          <option value="gestor_setor" {% if usuario and usuario.nivel_gestao == 'gestor_setor' %}selected{% endif %}>Gestor de Setor</option>
+          <option value="gerente_producao" {% if usuario and usuario.nivel_gestao == 'gerente_producao' %}selected{% endif %}>Gerente de Produção</option>
+          <option value="assistente_gm" {% if usuario and usuario.nivel_gestao == 'assistente_gm' %}selected{% endif %}>Assistente GM</option>
+          <option value="gm" {% if usuario and usuario.nivel_gestao == 'gm' %}selected{% endif %}>GM (General Manager)</option>
+        </select>
+        <p class="text-xs text-gray-500">Gestores recebem acesso read-only ao Painel Gerencial e são redirecionados para ele ao fazer login.</p>
+      </div>
+
+      <!-- Senha -->
+      <div class="bg-blue-50 border border-blue-200 rounded-dtx-md p-4 flex gap-3">
+        <svg class="w-4 h-4 text-blue-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+        <div>
+          <p class="text-sm text-blue-800">
+            <strong>{{ t('password_info_header') }}</strong> {{ t('password_info_created_with') }} <code class="bg-blue-100 px-1.5 py-0.5 rounded text-xs font-mono">123456</code>.
+            {{ t('password_info_first_login') }}
+          </p>
+          <p class="text-xs text-blue-600 mt-1.5">{{ t('password_reset_hint') }}</p>
+        </div>
+      </div>
+
+      <!-- Botões -->
+      <div class="flex gap-3 justify-end pt-4 border-t border-surface-border">
+        <a href="{{ url_for('main.gerenciar_usuarios') }}"
+           class="inline-flex items-center justify-center gap-2 h-9 px-4 text-sm font-medium rounded-dtx-md bg-white text-gray-700 border border-surface-muted hover:bg-surface-raised transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-dtx-600">
+          {{ t('cancel') }}
+        </a>
+        <button type="submit"
+                class="inline-flex items-center justify-center gap-2 h-9 px-4 text-sm font-medium rounded-dtx-md bg-dtx-600 text-white hover:bg-dtx-700 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-dtx-600">
+          {% if usuario %}{{ t('save_changes') }}{% else %}{{ t('create_user_btn') }}{% endif %}
+        </button>
+      </div>
+    </form>
+  </div>
 </div>
 
 <script nonce="{{ csp_nonce }}">
     function toggleArea() {
         const perfil = document.getElementById('perfilSelect').value;
         const areaDiv = document.getElementById('areaDiv');
-        // Apenas supervisores precisam de áreas; admins não precisam
         if (perfil === 'supervisor') {
             areaDiv.classList.remove('hidden');
         } else {
             areaDiv.classList.add('hidden');
         }
     }
-    // Executar na carga para mostrar áreas se perfil já é supervisor
     toggleArea();
 </script>
 

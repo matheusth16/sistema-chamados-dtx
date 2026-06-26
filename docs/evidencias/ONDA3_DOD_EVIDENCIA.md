@@ -269,8 +269,8 @@ curl -H "X-Health-Token: $HEALTH_SECRET" "https://host/health?deep=1"
 
 ### R3 — Teste cookies Secure não circular
 
-- `test_cwi21_cookies_secure_em_producao` removido (circular: setava valor e assertava o mesmo valor)
-- Substituído por `test_cwi21_cookies_secure_default_em_config_producao` — verifica `Config.SESSION_COOKIE_SECURE` via `importlib.reload` com env prod válida (igual ao padrão dos reload tests)
+- `test_cwi21_cookies_secure_em_producao` **renomeado/substituído** por `test_cwi21_cookies_secure_default_em_config_producao` (polish R3 — teste anterior era circular: setava `SESSION_COOKIE_SECURE=True` e assertava True)
+- Teste atual verifica `Config.SESSION_COOKIE_SECURE` via `importlib.reload` com env prod válida (igual ao padrão dos reload tests)
 - Não duplica `test_import_config_producao_com_vars_validas_sobe` — foco no assert de cookies especificamente
 
 ### R4 — Checklist operacional .env produção

@@ -392,6 +392,52 @@ def test_processar_edicao_novo_responsavel_atualiza_dados(app):
     assert update_data.get("responsavel") == "Novo Responsavel"
 
 
+def test_edicao_troca_responsavel_atualiza_supervisor_ids_com_acesso(app):
+    """Lacuna 4: trocar responsável deve recalcular supervisor_ids_com_acesso no update_data."""
+    from app.services.edicao_chamado_service import processar_edicao_chamado
+
+    u = _make_usuario()
+    doc = _make_doc()
+    novo_resp = MagicMock()
+    novo_resp.id = "resp2"
+    novo_resp.nome = "Novo Responsavel"
+    novo_resp.areas = ["Manutencao"]
+    novo_resp.area = "Manutencao"
+
+    with (
+        app.app_context(),
+        patch("app.services.edicao_chamado_service.db") as mock_db,
+        patch("app.services.edicao_chamado_service.Chamado") as mock_chamado_cls,
+        patch("app.services.edicao_chamado_service.Usuario") as mock_usuario_cls,
+        patch("app.services.edicao_chamado_service.execute_with_retry") as mock_retry,
+        patch(
+            "app.services.edicao_chamado_service.calcular_supervisor_ids_com_acesso",
+            return_value=["resp2"],
+        ) as mock_calc,
+    ):
+        mock_db.collection.return_value.document.return_value.get.return_value = doc
+        mock_db.batch.return_value = MagicMock()
+        mock_chamado_cls.from_dict.return_value = MagicMock()
+        mock_usuario_cls.get_by_id.return_value = novo_resp
+        result = processar_edicao_chamado(
+            usuario_atual=u,
+            chamado_id="ch1",
+            novo_status="",
+            motivo_cancelamento="",
+            nova_descricao="",
+            novo_responsavel_id="resp2",
+            novo_sla_str="",
+            arquivos_novos=[],
+            setores_adicionais_lista=[],
+        )
+
+    assert result["sucesso"] is True
+    update_data = mock_retry.call_args[0][1]
+    assert "supervisor_ids_com_acesso" in update_data
+    assert update_data["supervisor_ids_com_acesso"] == ["resp2"]
+    mock_calc.assert_called_once()
+
+
 # ── Setores adicionais ────────────────────────────────────────────────────────
 
 
@@ -614,3 +660,129 @@ def test_edicao_historico_criado_por_arquivo_adicionado(app):
         and c.args[1].get("campo_alterado") == "novo anexo"
     ]
     assert len(anexo_entries) == 2
+
+
+# ── F-25: Truncar nova_descricao em 3000 chars antes de salvar ────────────────
+
+
+def _base_patches_for_f25(mock_db, mock_chamado_cls):
+    doc = _make_doc(
+        data={
+            "numero_chamado": "CHM-F25",
+            "status": "Aberto",
+            "descricao": "desc curta",
+            "responsavel": "Resp",
+            "responsavel_id": "r1",
+            "area": "Manutencao",
+            "sla_dias": None,
+            "anexo": None,
+            "anexos": [],
+            "setores_adicionais": [],
+            "categoria": "Manutencao",
+            "tipo_solicitacao": "Corretiva",
+            "solicitante_nome": "Sol",
+        }
+    )
+    mock_db.collection.return_value.document.return_value.get.return_value = doc
+    mock_db.batch.return_value = MagicMock()
+    mock_chamado_cls.from_dict.return_value = MagicMock()
+
+
+def test_processar_edicao_descricao_acima_de_3000_chars_e_truncada(app):
+    """F-25: nova_descricao com > 3000 chars deve ser salva com no máximo 3000 chars."""
+    from app.services.edicao_chamado_service import processar_edicao_chamado
+
+    u = _make_usuario()
+    descricao_longa = "x" * 4000
+
+    with (
+        app.app_context(),
+        patch("app.services.edicao_chamado_service.db") as mock_db,
+        patch("app.services.edicao_chamado_service.Chamado") as mock_chamado_cls,
+        patch("app.services.edicao_chamado_service.execute_with_retry") as mock_retry,
+    ):
+        _base_patches_for_f25(mock_db, mock_chamado_cls)
+        result = processar_edicao_chamado(
+            usuario_atual=u,
+            chamado_id="ch_f25",
+            novo_status="",
+            motivo_cancelamento="",
+            nova_descricao=descricao_longa,
+            novo_responsavel_id="",
+            novo_sla_str="",
+            arquivos_novos=[],
+            setores_adicionais_lista=[],
+        )
+
+    assert result["sucesso"] is True
+    update_data = mock_retry.call_args[0][1]
+    assert "descricao" in update_data
+    assert len(update_data["descricao"]) <= 3000
+
+
+def test_processar_edicao_descricao_menor_que_3000_nao_e_alterada(app):
+    """F-25: nova_descricao com <= 3000 chars deve ser salva sem truncamento."""
+    from app.services.edicao_chamado_service import processar_edicao_chamado
+
+    u = _make_usuario()
+    descricao_normal = "Descrição de teste com tamanho normal"
+
+    with (
+        app.app_context(),
+        patch("app.services.edicao_chamado_service.db") as mock_db,
+        patch("app.services.edicao_chamado_service.Chamado") as mock_chamado_cls,
+        patch("app.services.edicao_chamado_service.execute_with_retry") as mock_retry,
+    ):
+        _base_patches_for_f25(mock_db, mock_chamado_cls)
+        result = processar_edicao_chamado(
+            usuario_atual=u,
+            chamado_id="ch_f25b",
+            novo_status="",
+            motivo_cancelamento="",
+            nova_descricao=descricao_normal,
+            novo_responsavel_id="",
+            novo_sla_str="",
+            arquivos_novos=[],
+            setores_adicionais_lista=[],
+        )
+
+    assert result["sucesso"] is True
+    update_data = mock_retry.call_args[0][1]
+    assert update_data.get("descricao") == descricao_normal
+
+
+# ── Fase 7 — Regressão: deadline imutável ────────────────────────────────────
+
+
+def test_edicao_descricao_nao_altera_data_em_atendimento(app):
+    """Fase 7 regressão: editar descrição NÃO deve incluir data_em_atendimento no update.
+
+    Garante que o deadline de resolução (calculado a partir de data_em_atendimento)
+    não seja alterado acidentalmente por edições de campos de texto.
+    """
+    from app.services.edicao_chamado_service import processar_edicao_chamado
+
+    u = _make_usuario()
+
+    with (
+        app.app_context(),
+        patch("app.services.edicao_chamado_service.db") as mock_db,
+        patch("app.services.edicao_chamado_service.Chamado") as mock_chamado_cls,
+        patch("app.services.edicao_chamado_service.execute_with_retry") as mock_retry,
+    ):
+        _base_patches_for_f25(mock_db, mock_chamado_cls)
+        result = processar_edicao_chamado(
+            usuario_atual=u,
+            chamado_id="ch_reg_1",
+            novo_status="",
+            motivo_cancelamento="",
+            nova_descricao="Descrição atualizada para teste de regressão",
+            novo_responsavel_id="",
+            novo_sla_str="",
+            arquivos_novos=[],
+            setores_adicionais_lista=[],
+        )
+
+    assert result["sucesso"] is True
+    update_data = mock_retry.call_args[0][1]
+    assert "data_em_atendimento" not in update_data

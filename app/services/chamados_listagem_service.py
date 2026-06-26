@@ -208,6 +208,7 @@ def listar_meus_chamados(
     if tem_proxima:
         docs = docs[:itens_por_pagina]
     cursor_next = docs[-1].id if docs and tem_proxima else None
+    cursor_prev = docs[0].id if docs and cursor else None
 
     chamados = []
     for doc in docs:

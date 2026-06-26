@@ -38,7 +38,7 @@ def login() -> Response:
         return redirect(url_for("main.admin"))
 
     if request.method == "POST":
-        email = request.form.get("email", "").strip()
+        email = request.form.get("email", "").strip().lower()
         senha = request.form.get("senha", "")
         client_ip = get_client_ip()
 
@@ -76,6 +76,12 @@ def login() -> Response:
 
         usuario = Usuario.get_by_email(email)
         if usuario and usuario.check_password(senha):
+            # Conta desativada: bloqueia antes de criar sessão; NÃO incrementa lockout
+            if not getattr(usuario, "ativo", True):
+                logger.warning("Login bloqueado: conta desativada %s", mask_email_for_log(email))
+                flash_t("account_disabled", "danger")
+                return redirect(url_for("main.login"))
+
             # Login bem-sucedido: reseta tentativas
             LoginAttemptTracker.reset_attempts(client_ip)
             LoginAttemptTracker.reset_attempts(email)
@@ -100,6 +106,11 @@ def login() -> Response:
             if usuario.perfil == "solicitante":
                 return redirect(url_for("main.index"))
             if usuario.perfil == "supervisor":
+                # Gestor read-only vai direto para o painel gerencial
+                if getattr(usuario, "is_gestor", False) and not getattr(
+                    usuario, "is_admin_or_above", False
+                ):
+                    return redirect(url_for("main.gestor_dashboard"))
                 return redirect(url_for("main.painel"))
             return redirect(url_for("main.admin"))
 

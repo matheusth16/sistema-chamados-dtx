@@ -1,17 +1,18 @@
 """Rotas de API (JSON) e service worker: status, notificações, push, paginação, disponibilidade."""
 
+import contextlib
 import hmac
 import logging
 import os
+import threading
 
-from firebase_admin import firestore
 from flask import abort, current_app, jsonify, redirect, request, send_from_directory, session
 from flask_login import current_user, login_required
 from google.cloud.firestore_v1.base_query import FieldFilter
 
 from app.cache import cache_set
 from app.database import db
-from app.firebase_retry import execute_with_retry
+from app.decoradores import requer_supervisor_area
 from app.limiter import limiter
 from app.models import Chamado
 from app.models_historico import Historico
@@ -26,7 +27,10 @@ from app.services.notifications_inapp import (
     marcar_como_lida,
     marcar_todas_como_lidas,
 )
-from app.services.permission_validation import verificar_permissao_mudanca_status
+from app.services.permission_validation import (
+    usuario_pode_mutar_chamado,
+    verificar_permissao_mudanca_status,
+)
 from app.services.permissions import usuario_pode_ver_chamado
 from app.services.status_service import atualizar_status_chamado
 from app.services.webpush_service import salvar_inscricao
@@ -36,6 +40,31 @@ logger = logging.getLogger(__name__)
 
 # Mensagem genérica em respostas 500 para não expor detalhes internos em produção
 ERRO_INTERNO_MSG = "Erro interno. Tente novamente."
+
+
+def _enviar_notificacao_reabrir(
+    app, chamado_id: str, data: dict, motivo: str, solicitante_nome: str
+) -> None:
+    """Notifica o responsável em background que o chamado foi reaberto pelo solicitante."""
+
+    def _run():
+        with app.app_context():
+            from app.services.notifications import notificar_supervisor_chamado_reaberto
+
+            try:
+                responsavel = Usuario.get_by_id(data.get("responsavel_id"))
+                notificar_supervisor_chamado_reaberto(
+                    chamado_id=chamado_id,
+                    numero_chamado=data.get("numero_chamado") or "N/A",
+                    categoria=data.get("categoria") or "Chamado",
+                    motivo=motivo,
+                    solicitante_nome=solicitante_nome,
+                    responsavel_usuario=responsavel,
+                )
+            except Exception as exc:
+                logger.warning("Notificação reabrir não enviada: %s", exc)
+
+    threading.Thread(target=_run, daemon=True).start()
 
 
 def _obter_health_token_request() -> str:
@@ -217,6 +246,8 @@ def api_editar_chamado():
     """Edita chamado de forma completa via FormData (incluindo arquivo, status, responsavel, descricao). Apenas supervisor/admin."""
     if not current_user.is_supervisor_or_above:
         return jsonify({"sucesso": False, "erro": "Acesso negado"}), 403
+    if getattr(current_user, "is_gestor_only", None) is True:
+        return jsonify({"sucesso": False, "erro": "Acesso negado"}), 403
 
     try:
         chamado_id = request.form.get("chamado_id")
@@ -276,6 +307,9 @@ def bulk_atualizar_status():
     """Atualiza status de múltiplos chamados em lote. Apenas supervisor/admin."""
     if not current_user.is_supervisor_or_above:
         return jsonify({"sucesso": False, "erro": "Acesso negado"}), 403
+    # Gestor read-only: bloqueio total antes do loop
+    if getattr(current_user, "is_gestor_only", None) is True:
+        return jsonify({"sucesso": False, "erro": "Acesso negado"}), 403
     try:
         dados = request.get_json()
         if not dados:
@@ -292,40 +326,33 @@ def bulk_atualizar_status():
 
         atualizados = 0
         erros = []
-        update_data = {"status": novo_status}
-        if novo_status == "Concluído":
-            update_data["data_conclusao"] = firestore.SERVER_TIMESTAMP
         for chamado_id in ids:
             try:
                 doc = db.collection("chamados").document(chamado_id).get()
                 if not doc.exists:
                     erros.append({"id": chamado_id, "erro": "Não encontrado"})
                     continue
-                data = doc.to_dict()
-                if current_user.perfil == "supervisor":
-                    chamado_area = data.get("area")
-                    if (chamado_area not in current_user.areas) and data.get(
-                        "responsavel_id"
-                    ) != current_user.id:
-                        erros.append({"id": chamado_id, "erro": "Sem permissão para este chamado"})
-                        continue
-                # Atualiza status com retry automático
-                execute_with_retry(
-                    db.collection("chamados").document(chamado_id).update,
-                    update_data,
-                    max_retries=3,
+                doc_data = doc.to_dict()
+                chamado_obj = Chamado.from_dict(doc_data, chamado_id)
+                if not usuario_pode_ver_chamado(current_user, chamado_obj):
+                    erros.append({"id": chamado_id, "erro": "Sem permissão para este chamado"})
+                    continue
+                resultado = atualizar_status_chamado(
+                    chamado_id=chamado_id,
+                    novo_status=novo_status,
+                    usuario_id=current_user.id,
+                    usuario_nome=current_user.nome,
+                    data_chamado=doc_data,
                 )
-                if data.get("status") != novo_status:
-                    Historico(
-                        chamado_id=chamado_id,
-                        usuario_id=current_user.id,
-                        usuario_nome=current_user.nome,
-                        acao="alteracao_status",
-                        campo_alterado="status",
-                        valor_anterior=data.get("status"),
-                        valor_novo=novo_status,
-                    ).save()
-                atualizados += 1
+                if resultado.get("sucesso"):
+                    atualizados += 1
+                else:
+                    erros.append(
+                        {
+                            "id": chamado_id,
+                            "erro": resultado.get("erro", "Erro ao processar chamado"),
+                        }
+                    )
             except Exception as e:
                 logger.warning("Bulk status: falha em %s: %s", chamado_id, e)
                 erros.append({"id": chamado_id, "erro": "Erro ao processar chamado"})
@@ -472,6 +499,7 @@ def api_chamado_por_id(chamado_id: str):
 def _aplicar_filtro_perfil(ref, user):
     """Restringe a query de chamados ao escopo do perfil — evita IDOR por omissão de filtro.
 
+    Supervisor: usa campo desnormalizado supervisor_ids_com_acesso (array_contains).
     Retorna None quando o supervisor não tem áreas configuradas:
     callers devem tratar None como lista vazia (não chamar aplicar_filtros).
     """
@@ -481,7 +509,7 @@ def _aplicar_filtro_perfil(ref, user):
         areas = list(getattr(user, "areas", None) or [])
         if not areas:
             return None  # Supervisor sem áreas não deve ver nenhum chamado
-        return ref.where(filter=FieldFilter("area", "in", areas[:30]))
+        return ref.where(filter=FieldFilter("supervisor_ids_com_acesso", "array_contains", user.id))
     return ref  # admin/admin_global: sem restrição
 
 
@@ -680,7 +708,16 @@ def api_confirmar_resolucao(chamado_id: str):
             )
         else:
             db.collection("chamados").document(chamado_id).update(
-                {"status": "Aberto", "confirmacao_solicitante": "reaberto", "data_conclusao": None}
+                {
+                    "status": "Aberto",
+                    "confirmacao_solicitante": "reaberto",
+                    "data_conclusao": None,
+                    "escalacao_resposta_nivel": 0,  # ADR-004: Escada A reinicia na reabertura
+                    # Fase 7 — Escada B: reinicia junto com Escada A na reabertura
+                    "escalacao_resolucao_nivel": 0,
+                    "alerta_supervisor_50_enviado": False,
+                    "alerta_supervisor_80_enviado": False,
+                }
             )
             Historico(
                 chamado_id=chamado_id,
@@ -692,6 +729,14 @@ def api_confirmar_resolucao(chamado_id: str):
                 valor_novo="Aberto",
                 detalhes=motivo[:500],
             ).save()
+            with contextlib.suppress(RuntimeError):
+                _enviar_notificacao_reabrir(
+                    current_app._get_current_object(),
+                    chamado_id,
+                    data,
+                    motivo,
+                    current_user.nome,
+                )
 
         return jsonify({"sucesso": True}), 200
 
@@ -734,6 +779,411 @@ def api_lista_supervisores():
                 "erro": ERRO_INTERNO_MSG,
             }
         ), 200
+
+
+# ---------------------------------------------------------------------------
+# Escalonamento — Fase 3
+# ---------------------------------------------------------------------------
+
+
+def _notificar_escalonamento(
+    app, chamado_id: str, dados_chamado: dict, tipo: str, destino_id: str
+) -> None:
+    """Dispara notificação de escalonamento em background."""
+
+    def _run():
+        with app.app_context():
+            try:
+                destino = Usuario.get_by_id(destino_id)
+                if not destino:
+                    return
+                numero = dados_chamado.get("numero_chamado") or "N/A"
+                area = dados_chamado.get("area") or ""
+                categoria = dados_chamado.get("categoria") or ""
+                if tipo == "transferencia_area":
+                    from app.services.notifications import notificar_supervisor_transferencia_area
+
+                    notificar_supervisor_transferencia_area(
+                        chamado_id=chamado_id,
+                        numero_chamado=numero,
+                        area=area,
+                        categoria=categoria,
+                        motivo=dados_chamado.get("motivo_ultima_escalacao") or "",
+                        responsavel_usuario=destino,
+                    )
+                else:
+                    from app.services.notifications import notificar_supervisor_escalonamento_colega
+
+                    notificar_supervisor_escalonamento_colega(
+                        chamado_id=chamado_id,
+                        numero_chamado=numero,
+                        area=area,
+                        categoria=categoria,
+                        motivo=dados_chamado.get("motivo_ultima_escalacao") or "",
+                        responsavel_usuario=destino,
+                    )
+            except Exception as exc:
+                logger.warning("Notificação de escalonamento não enviada: %s", exc)
+
+    threading.Thread(target=_run, daemon=True).start()
+
+
+@main.route("/api/chamado/<chamado_id>/transferir-area", methods=["POST"])
+@login_required
+@requer_supervisor_area
+def api_transferir_area(chamado_id: str):
+    """Transfere o chamado para outra área com novo responsável obrigatório.
+
+    Body JSON: {"area": str, "supervisor_id": str, "motivo": str}
+    Acesso: owner (responsavel_id == current_user.id) ou admin.
+    """
+    try:
+        dados = request.get_json(silent=True)
+        if not dados:
+            return jsonify({"sucesso": False, "erro": "JSON inválido ou vazio"}), 400
+
+        area = (dados.get("area") or "").strip()
+        supervisor_id = (dados.get("supervisor_id") or "").strip()
+        motivo = (dados.get("motivo") or "").strip()
+
+        if not area:
+            return jsonify({"sucesso": False, "erro": "Área destino é obrigatória"}), 400
+        if not supervisor_id:
+            return jsonify({"sucesso": False, "erro": "supervisor_id é obrigatório"}), 400
+        if not motivo:
+            return jsonify({"sucesso": False, "erro": "Motivo é obrigatório"}), 400
+
+        doc = db.collection("chamados").document(chamado_id).get()
+        if not doc.exists:
+            return jsonify({"sucesso": False, "erro": "Chamado não encontrado"}), 404
+
+        dados_chamado = doc.to_dict() or {}
+        chamado = Chamado.from_dict(dados_chamado, chamado_id)
+
+        if not usuario_pode_ver_chamado(current_user, chamado):
+            return jsonify({"sucesso": False, "erro": "Acesso negado"}), 403
+
+        pode_mutar, _ = usuario_pode_mutar_chamado(current_user)
+        if not pode_mutar:
+            return jsonify({"sucesso": False, "erro": "Acesso negado"}), 403
+
+        if not (chamado.responsavel_id == current_user.id or current_user.is_admin_or_above):
+            return jsonify(
+                {"sucesso": False, "erro": "Apenas o responsável ou admin pode transferir"}
+            ), 403
+
+        from app.services.escalonamento_service import transferir_area
+
+        resultado = transferir_area(chamado_id, area, supervisor_id, motivo, current_user)
+        if not resultado["sucesso"]:
+            return jsonify(resultado), 400
+
+        # Notifica destino em background — usa área destino (não a do doc original)
+        dados_notif = {**dados_chamado, "area": area, "motivo_ultima_escalacao": motivo}
+        _notificar_escalonamento(
+            current_app._get_current_object(),
+            chamado_id,
+            dados_notif,
+            "transferencia_area",
+            supervisor_id,
+        )
+
+        return jsonify(resultado), 200
+
+    except ValueError as exc:
+        return jsonify({"sucesso": False, "erro": str(exc)}), 400
+    except Exception as exc:
+        logger.exception("Erro em api_transferir_area chamado=%s: %s", chamado_id, exc)
+        return jsonify({"sucesso": False, "erro": ERRO_INTERNO_MSG}), 500
+
+
+@main.route("/api/chamado/<chamado_id>/escalonar-colega", methods=["POST"])
+@login_required
+@requer_supervisor_area
+def api_escalonar_colega(chamado_id: str):
+    """Escala o chamado para um colega da mesma área sem alterar a área.
+
+    Body JSON: {"supervisor_id": str, "motivo": str}
+    Acesso: owner (responsavel_id == current_user.id) ou admin.
+    """
+    try:
+        dados = request.get_json(silent=True)
+        if not dados:
+            return jsonify({"sucesso": False, "erro": "JSON inválido ou vazio"}), 400
+
+        supervisor_id = (dados.get("supervisor_id") or "").strip()
+        motivo = (dados.get("motivo") or "").strip()
+
+        if not supervisor_id:
+            return jsonify({"sucesso": False, "erro": "supervisor_id é obrigatório"}), 400
+        if not motivo:
+            return jsonify({"sucesso": False, "erro": "Motivo é obrigatório"}), 400
+
+        doc = db.collection("chamados").document(chamado_id).get()
+        if not doc.exists:
+            return jsonify({"sucesso": False, "erro": "Chamado não encontrado"}), 404
+
+        dados_chamado = doc.to_dict() or {}
+        chamado = Chamado.from_dict(dados_chamado, chamado_id)
+
+        if not usuario_pode_ver_chamado(current_user, chamado):
+            return jsonify({"sucesso": False, "erro": "Acesso negado"}), 403
+
+        pode_mutar, _ = usuario_pode_mutar_chamado(current_user)
+        if not pode_mutar:
+            return jsonify({"sucesso": False, "erro": "Acesso negado"}), 403
+
+        if not (chamado.responsavel_id == current_user.id or current_user.is_admin_or_above):
+            return jsonify(
+                {"sucesso": False, "erro": "Apenas o responsável ou admin pode escalonar"}
+            ), 403
+
+        from app.services.escalonamento_service import escalonar_colega
+
+        resultado = escalonar_colega(chamado_id, supervisor_id, motivo, current_user)
+        if not resultado["sucesso"]:
+            return jsonify(resultado), 400
+
+        # Notifica destino em background
+        dados_notif = {**dados_chamado, "motivo_ultima_escalacao": motivo}
+        _notificar_escalonamento(
+            current_app._get_current_object(),
+            chamado_id,
+            dados_notif,
+            "escalonamento_colega",
+            supervisor_id,
+        )
+
+        return jsonify(resultado), 200
+
+    except ValueError as exc:
+        return jsonify({"sucesso": False, "erro": str(exc)}), 400
+    except Exception as exc:
+        logger.exception("Erro em api_escalonar_colega chamado=%s: %s", chamado_id, exc)
+        return jsonify({"sucesso": False, "erro": ERRO_INTERNO_MSG}), 500
+
+
+# ---------------------------------------------------------------------------
+# Participantes — Fase 4
+# ---------------------------------------------------------------------------
+
+
+def _notificar_participante_incluido(
+    app, chamado_id: str, dados_chamado: dict, adicionados: list
+) -> None:
+    """Dispara notificações triplas (e-mail + in-app + Web Push) de inclusão de participante."""
+
+    def _run():
+        with app.app_context():
+            try:
+                from app.services.notifications import notificar_participante_incluido
+                from app.services.notifications_inapp import criar_notificacao
+                from app.services.webpush_service import enviar_webpush_usuario
+
+                numero = dados_chamado.get("numero_chamado") or "N/A"
+                categoria = dados_chamado.get("categoria") or ""
+                base_url = current_app.config.get("APP_BASE_URL", "").rstrip("/")
+                url_chamado = f"{base_url}/chamado/{chamado_id}" if base_url else None
+
+                for item in adicionados:
+                    sup_id = item.get("supervisor_id")
+                    destino = Usuario.get_by_id(sup_id)
+                    if not destino:
+                        continue
+
+                    notificar_participante_incluido(
+                        chamado_id=chamado_id,
+                        numero_chamado=numero,
+                        categoria=categoria,
+                        area=item.get("area") or "",
+                        responsavel_usuario=destino,
+                    )
+
+                    criar_notificacao(
+                        usuario_id=sup_id,
+                        chamado_id=chamado_id,
+                        numero_chamado=numero,
+                        titulo=f"Chamado {numero}: você foi incluído como participante",
+                        mensagem=f"Você foi adicionado como participante do chamado {numero} ({categoria}). Conclua sua parte quando finalizar.",
+                        tipo="participante_incluido",
+                        categoria=categoria,
+                    )
+
+                    enviar_webpush_usuario(
+                        sup_id,
+                        titulo=f"Chamado {numero}: você foi incluído",
+                        corpo="Você foi adicionado como participante. Conclua sua parte quando finalizar.",
+                        url=url_chamado,
+                    )
+            except Exception as exc:
+                logger.warning("Notificação de participante incluído não enviada: %s", exc)
+
+    threading.Thread(target=_run, daemon=True).start()
+
+
+def _notificar_owner_todos_concluiram(
+    app, chamado_id: str, dados_chamado: dict, owner_id: str
+) -> None:
+    """Notifica o owner que todos os participantes concluíram."""
+
+    def _run():
+        with app.app_context():
+            try:
+                from app.services.notifications import (
+                    notificar_owner_todos_participantes_concluiram,
+                )
+                from app.services.notifications_inapp import criar_notificacao
+                from app.services.webpush_service import enviar_webpush_usuario
+
+                owner = Usuario.get_by_id(owner_id)
+                numero = dados_chamado.get("numero_chamado") or "N/A"
+                categoria = dados_chamado.get("categoria") or ""
+
+                notificar_owner_todos_participantes_concluiram(
+                    chamado_id=chamado_id,
+                    numero_chamado=numero,
+                    categoria=categoria,
+                    owner_usuario=owner,
+                )
+
+                criar_notificacao(
+                    usuario_id=owner_id,
+                    chamado_id=chamado_id,
+                    numero_chamado=numero,
+                    titulo=f"Chamado {numero}: todos participantes concluíram",
+                    mensagem=f"Você pode fechar o chamado {numero} ({categoria})",
+                    tipo="todos_participantes_concluidos",
+                    categoria=categoria,
+                )
+
+                base_url = current_app.config.get("APP_BASE_URL", "").rstrip("/")
+                url = f"{base_url}/chamado/{chamado_id}/historico" if base_url else None
+                enviar_webpush_usuario(
+                    owner_id,
+                    titulo=f"Chamado {numero}: pronto para fechar",
+                    corpo="Todos os participantes concluíram sua parte.",
+                    url=url,
+                )
+            except Exception as exc:
+                logger.warning("Notificação owner todos concluíram não enviada: %s", exc)
+
+    threading.Thread(target=_run, daemon=True).start()
+
+
+@main.route("/api/chamado/<chamado_id>/incluir-participantes", methods=["POST"])
+@login_required
+@requer_supervisor_area
+def api_incluir_participantes(chamado_id: str):
+    """Adiciona supervisores colaboradores em participantes[].
+
+    Body JSON: {"participantes": [{"supervisor_id": str, "area": str}, ...]}
+    Acesso: owner (responsavel_id == current_user.id) ou admin.
+    """
+    try:
+        dados = request.get_json(silent=True)
+        if not dados:
+            return jsonify({"sucesso": False, "erro": "JSON inválido ou vazio"}), 400
+
+        participantes_novos = dados.get("participantes")
+        if not isinstance(participantes_novos, list) or not participantes_novos:
+            return jsonify(
+                {"sucesso": False, "erro": "participantes deve ser lista não vazia"}
+            ), 400
+
+        doc = db.collection("chamados").document(chamado_id).get()
+        if not doc.exists:
+            return jsonify({"sucesso": False, "erro": "Chamado não encontrado"}), 404
+
+        dados_chamado = doc.to_dict() or {}
+        chamado = Chamado.from_dict(dados_chamado, chamado_id)
+
+        if not usuario_pode_ver_chamado(current_user, chamado):
+            return jsonify({"sucesso": False, "erro": "Acesso negado"}), 403
+
+        pode_mutar, _ = usuario_pode_mutar_chamado(current_user)
+        if not pode_mutar:
+            return jsonify({"sucesso": False, "erro": "Acesso negado"}), 403
+
+        if not (chamado.responsavel_id == current_user.id or current_user.is_admin_or_above):
+            return jsonify(
+                {
+                    "sucesso": False,
+                    "erro": "Apenas o responsável ou admin pode incluir participantes",
+                }
+            ), 403
+
+        from app.services.escalonamento_service import incluir_participantes
+
+        resultado = incluir_participantes(chamado_id, participantes_novos, current_user)
+        if not resultado["sucesso"]:
+            return jsonify(resultado), 400
+
+        adicionados = resultado.get("dados", {}).get("adicionados", [])
+        if adicionados:
+            _notificar_participante_incluido(
+                current_app._get_current_object(),
+                chamado_id,
+                dados_chamado,
+                adicionados,
+            )
+
+        return jsonify(resultado), 200
+
+    except ValueError as exc:
+        return jsonify({"sucesso": False, "erro": str(exc)}), 400
+    except Exception as exc:
+        logger.exception("Erro em api_incluir_participantes chamado=%s: %s", chamado_id, exc)
+        return jsonify({"sucesso": False, "erro": ERRO_INTERNO_MSG}), 500
+
+
+@main.route("/api/chamado/<chamado_id>/concluir-minha-parte", methods=["POST"])
+@login_required
+def api_concluir_minha_parte(chamado_id: str):
+    """Participante marca sua parte como concluída.
+
+    Body JSON: {} (pode ser omitido)
+    Acesso: qualquer usuário logado que seja participante do chamado.
+    """
+    # Gestor read-only: bloqueado mesmo que seja participante (edge case fail-closed)
+    pode_mutar, _ = usuario_pode_mutar_chamado(current_user)
+    if not pode_mutar:
+        return jsonify({"sucesso": False, "erro": "Acesso negado"}), 403
+    try:
+        doc = db.collection("chamados").document(chamado_id).get()
+        if not doc.exists:
+            return jsonify({"sucesso": False, "erro": "Chamado não encontrado"}), 404
+
+        dados_chamado = doc.to_dict() or {}
+        chamado = Chamado.from_dict(dados_chamado, chamado_id)
+
+        participantes = chamado.participantes or []
+        ids_participantes = {p.get("supervisor_id") for p in participantes}
+        if current_user.id not in ids_participantes:
+            return jsonify(
+                {"sucesso": False, "erro": "Usuário não é participante deste chamado"}
+            ), 403
+
+        from app.services.escalonamento_service import concluir_minha_parte
+
+        resultado = concluir_minha_parte(chamado_id, current_user)
+        if not resultado["sucesso"]:
+            return jsonify(resultado), 400
+
+        if resultado.get("dados", {}).get("pode_concluir_global"):
+            owner_id = chamado.responsavel_id
+            if owner_id:
+                _notificar_owner_todos_concluiram(
+                    current_app._get_current_object(),
+                    chamado_id,
+                    dados_chamado,
+                    owner_id,
+                )
+
+        return jsonify(resultado), 200
+
+    except Exception as exc:
+        logger.exception("Erro em api_concluir_minha_parte chamado=%s: %s", chamado_id, exc)
+        return jsonify({"sucesso": False, "erro": ERRO_INTERNO_MSG}), 500
 
 
 _csp_logger = logging.getLogger("app.csp")

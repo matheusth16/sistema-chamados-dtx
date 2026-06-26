@@ -197,7 +197,7 @@ def _corpo_supervisor(
         f'<span style="color:#dc2626;">Overdue: {len(atrasados)}</span> &nbsp;|&nbsp; '
         f"Others: {len(outros)}</p>"
         f"{secoes}{btn}"
-        '<p style="margin-top:24px;color:#9ca3af;font-size:11px;"><em>DTX Digital Andon</em></p>'
+        '<p style="margin-top:24px;color:#9ca3af;font-size:11px;"><em>DTX Service Portal</em></p>'
         "</div>"
     )
 
@@ -270,6 +270,9 @@ def enviar_relatorio_semanal() -> dict[str, Any]:
     for c in chamados:
         grupos[c["responsavel_id"]].append(c)
 
+    ids_responsaveis = [rid for rid in grupos if rid]
+    supervisores_map = Usuario.get_by_ids(ids_responsaveis)
+
     enviados = ignorados = erros = 0
 
     for responsavel_id, lista in grupos.items():
@@ -277,7 +280,7 @@ def enviar_relatorio_semanal() -> dict[str, Any]:
             ignorados += len(lista)
             continue
 
-        supervisor = Usuario.get_by_id(responsavel_id)
+        supervisor = supervisores_map.get(responsavel_id)
         if not supervisor or not getattr(supervisor, "email", None):
             logger.debug("Supervisor %s sem e-mail; ignorado.", responsavel_id)
             ignorados += len(lista)
@@ -300,7 +303,7 @@ def enviar_relatorio_semanal() -> dict[str, Any]:
             erros += 1
             logger.warning("Falha ao enviar relatório para supervisor %s: %s", email_sup, err)
 
-    _enviar_resumo_admins(chamados, grupos, data_ref, link_dash, link_base)
+    _enviar_resumo_admins(chamados, grupos, supervisores_map, data_ref, link_dash, link_base)
 
     return {
         "enviados": enviados,
@@ -314,6 +317,7 @@ def enviar_relatorio_semanal() -> dict[str, Any]:
 def _enviar_resumo_admins(
     chamados: list[dict[str, Any]],
     grupos: dict[str, list],
+    supervisores_map: dict[str, Any],
     data_ref: str,
     link_dash: str,
     link_base: str,
@@ -336,7 +340,7 @@ def _enviar_resumo_admins(
 
     linhas_sup = []
     for resp_id, lista in sorted(grupos.items(), key=lambda x: -len(x[1])):
-        sup = Usuario.get_by_id(resp_id) if resp_id else None
+        sup = supervisores_map.get(resp_id) if resp_id else None
         nome_sup = (sup.nome if sup else None) or resp_id or "No assignee"
         n_atras = sum(1 for c in lista if c["atrasado"])
         cor = "#dc2626" if n_atras else "#16a34a"
@@ -378,7 +382,7 @@ def _enviar_resumo_admins(
             else '<p style="color:#6b7280;">None.</p>'
         )
         + f"{btn}"
-        '<p style="margin-top:24px;color:#9ca3af;font-size:11px;"><em>DTX Digital Andon</em></p>'
+        '<p style="margin-top:24px;color:#9ca3af;font-size:11px;"><em>DTX Service Portal</em></p>'
         "</div>"
     )
 

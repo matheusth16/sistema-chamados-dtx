@@ -151,6 +151,30 @@ def test_meus_chamados_excecao_generica_redireciona(client_logado_solicitante):
     assert r.status_code == 302
 
 
+def test_formulario_variante_b_renderiza_contador(client_logado_solicitante):
+    """Variante B inclui elemento contador de caracteres no HTML."""
+    with (
+        patch("app.routes.chamados.get_static_cached", return_value=[]),
+        patch("app.routes.chamados.obter_total_por_contagem", return_value=0),
+        patch("app.services.ab_service.get_variante", return_value="B"),
+    ):
+        r = client_logado_solicitante.get("/", follow_redirects=False)
+    assert r.status_code == 200
+    assert b"desc-contador" in r.data
+
+
+def test_formulario_variante_a_sem_contador(client_logado_solicitante):
+    """Variante A não inclui contador de caracteres."""
+    with (
+        patch("app.routes.chamados.get_static_cached", return_value=[]),
+        patch("app.routes.chamados.obter_total_por_contagem", return_value=0),
+        patch("app.services.ab_service.get_variante", return_value="A"),
+    ):
+        r = client_logado_solicitante.get("/", follow_redirects=False)
+    assert r.status_code == 200
+    assert b"desc-contador" not in r.data
+
+
 def test_gamificacao_oculta_na_navbar(client_logado_solicitante):
     """UI de gamificação está oculta (bloco XP removido da navbar até conquistas serem implementadas)."""
     with patch("app.routes.chamados.listar_meus_chamados") as mock_listar:

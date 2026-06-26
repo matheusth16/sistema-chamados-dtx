@@ -2,7 +2,7 @@
 Testes unitários do módulo i18n.
 Cobre: get_language_code, get_translation, get_translated_sector/category/status/field_label,
 get_translated_sector_list, flash_t, resolve_flash_message, _build_reverse_map,
-get_translations_dict (cache), save_translations_dict.
+get_translations_dict (cache).
 """
 
 from unittest.mock import mock_open, patch
@@ -20,7 +20,7 @@ def test_get_language_code_valido_retorna_codigo():
 
 
 def test_get_language_code_invalido_retorna_en():
-    """Idioma inválido retorna 'en' como fallback."""
+    """F-61: Idioma inválido retorna 'en' como fallback (padrão do sistema)."""
     from app.i18n import get_language_code
 
     assert get_language_code("fr") == "en"
@@ -94,32 +94,6 @@ def test_get_translations_dict_excecao_retorna_dict_vazio():
     # Restaura estado
     i18n._TRANSLATIONS_CACHE = None
     i18n._TRANSLATIONS_MTIME = None
-
-
-# ── save_translations_dict ────────────────────────────────────────────────────
-
-
-def test_save_translations_dict_salva_e_retorna_true():
-    """save_translations_dict escreve no arquivo e retorna True."""
-    from app.i18n import save_translations_dict
-
-    sample = {"k": {"pt_BR": "V", "en": "V", "es": "V"}}
-
-    with patch("builtins.open", mock_open()) as mock_f:
-        result = save_translations_dict(sample)
-
-    assert result is True
-    mock_f.assert_called_once()
-
-
-def test_save_translations_dict_excecao_retorna_false():
-    """save_translations_dict retorna False quando falha ao escrever."""
-    from app.i18n import save_translations_dict
-
-    with patch("builtins.open", side_effect=PermissionError("no write")):
-        result = save_translations_dict({"k": {}})
-
-    assert result is False
 
 
 # ── get_translation ───────────────────────────────────────────────────────────
@@ -362,3 +336,219 @@ def test_resolve_flash_message_sem_traducao_retorna_original():
     with patch("app.i18n.get_translations_dict", return_value={}):
         result = resolve_flash_message("mensagem_sem_traducao", "en")
     assert result == "mensagem_sem_traducao"
+
+
+# ── SECTOR_KEYS_MAP — PPCP renomeado e Compras unificado ─────────────────────
+
+
+def test_sector_keys_map_contem_planejamento_producao():
+    """SECTOR_KEYS_MAP deve mapear o novo nome canônico para a chave 'ppcp'."""
+    from app.i18n import SECTOR_KEYS_MAP
+
+    assert "Planejamento de Produção" in SECTOR_KEYS_MAP
+    assert SECTOR_KEYS_MAP["Planejamento de Produção"] == "ppcp"
+
+
+def test_sector_keys_map_alias_ppcp_mantido():
+    """SECTOR_KEYS_MAP mantém alias legado 'PPCP' → 'ppcp' para histórico."""
+    from app.i18n import SECTOR_KEYS_MAP
+
+    assert "PPCP" in SECTOR_KEYS_MAP
+    assert SECTOR_KEYS_MAP["PPCP"] == "ppcp"
+
+
+def test_sector_keys_map_contem_compras():
+    """SECTOR_KEYS_MAP deve mapear o nome canônico 'Compras' para a chave 'procurement'."""
+    from app.i18n import SECTOR_KEYS_MAP
+
+    assert "Compras" in SECTOR_KEYS_MAP
+    assert SECTOR_KEYS_MAP["Compras"] == "procurement"
+
+
+def test_sector_keys_map_alias_procurement_mantido():
+    """SECTOR_KEYS_MAP mantém alias legado 'Procurement' → 'procurement' para histórico."""
+    from app.i18n import SECTOR_KEYS_MAP
+
+    assert "Procurement" in SECTOR_KEYS_MAP
+    assert SECTOR_KEYS_MAP["Procurement"] == "procurement"
+
+
+def test_get_translated_sector_planejamento_producao_en():
+    """get_translated_sector traduz 'Planejamento de Produção' para inglês via chave ppcp."""
+    from app.i18n import get_translated_sector
+
+    sample = {
+        "ppcp": {
+            "pt_BR": "Planejamento de Produção",
+            "en": "Production Planning",
+            "es": "Planificación de Producción",
+        }
+    }
+    with patch("app.i18n.get_translations_dict", return_value=sample):
+        assert get_translated_sector("Planejamento de Produção", "en") == "Production Planning"
+
+
+def test_get_translated_sector_planejamento_producao_es():
+    """get_translated_sector traduz 'Planejamento de Produção' para espanhol."""
+    from app.i18n import get_translated_sector
+
+    sample = {
+        "ppcp": {
+            "pt_BR": "Planejamento de Produção",
+            "en": "Production Planning",
+            "es": "Planificación de Producción",
+        }
+    }
+    with patch("app.i18n.get_translations_dict", return_value=sample):
+        assert (
+            get_translated_sector("Planejamento de Produção", "es") == "Planificación de Producción"
+        )
+
+
+def test_get_translated_sector_alias_ppcp_en():
+    """Alias legado 'PPCP' traduz para inglês (histórico de chamados)."""
+    from app.i18n import get_translated_sector
+
+    sample = {
+        "ppcp": {
+            "pt_BR": "Planejamento de Produção",
+            "en": "Production Planning",
+            "es": "Planificación de Producción",
+        }
+    }
+    with patch("app.i18n.get_translations_dict", return_value=sample):
+        assert get_translated_sector("PPCP", "en") == "Production Planning"
+
+
+def test_get_translated_sector_compras_en():
+    """get_translated_sector traduz 'Compras' para inglês via chave procurement."""
+    from app.i18n import get_translated_sector
+
+    sample = {"procurement": {"pt_BR": "Compras", "en": "Procurement", "es": "Aprovisionamiento"}}
+    with patch("app.i18n.get_translations_dict", return_value=sample):
+        assert get_translated_sector("Compras", "en") == "Procurement"
+
+
+def test_get_translated_sector_alias_procurement_en():
+    """Alias legado 'Procurement' ainda traduz corretamente (histórico)."""
+    from app.i18n import get_translated_sector
+
+    sample = {"procurement": {"pt_BR": "Compras", "en": "Procurement", "es": "Aprovisionamiento"}}
+    with patch("app.i18n.get_translations_dict", return_value=sample):
+        assert get_translated_sector("Procurement", "en") == "Procurement"
+
+
+def test_get_translated_sector_producao_usinagem_historico():
+    """Setor de Produção desativado ainda traduz para histórico legível."""
+    from app.i18n import get_translated_sector
+
+    sample = {
+        "production_machining": {
+            "pt_BR": "Produção - Usinagem",
+            "en": "Production - Machining",
+            "es": "Producción - Mecanizado",
+        }
+    }
+    with patch("app.i18n.get_translations_dict", return_value=sample):
+        assert get_translated_sector("Produção - Usinagem", "en") == "Production - Machining"
+
+
+# ── get_translated_gate ────────────────────────────────────────────────────────
+
+
+def test_get_translated_gate_na_retorna_traduzido():
+    """N/A é traduzido para o idioma solicitado."""
+    from app.i18n import get_translated_gate
+
+    sample = {
+        "not_applicable_short": {
+            "pt_BR": "Não se aplica",
+            "en": "Not applicable",
+            "es": "No aplica",
+        }
+    }
+    with patch("app.i18n.get_translations_dict", return_value=sample):
+        assert get_translated_gate("N/A", "en") == "Not applicable"
+        assert get_translated_gate("N/A", "pt_BR") == "Não se aplica"
+
+
+def test_get_translated_gate_valor_completo_en():
+    """Gate 1 - Desmontagem traduz corretamente para inglês."""
+    from app.i18n import get_translated_gate
+
+    sample = {
+        "gate_1_desmontagem": {
+            "pt_BR": "Gate 1 - Desmontagem",
+            "en": "Gate 1 - Disassembly",
+            "es": "Gate 1 - Desmontaje",
+        }
+    }
+    with patch("app.i18n.get_translations_dict", return_value=sample):
+        result = get_translated_gate("Gate 1 - Desmontagem", "en")
+    assert result == "Gate 1 - Disassembly"
+
+
+def test_get_translated_gate_valor_completo_es():
+    """Gate 1 - Desmontagem traduz corretamente para espanhol."""
+    from app.i18n import get_translated_gate
+
+    sample = {
+        "gate_1_desmontagem": {
+            "pt_BR": "Gate 1 - Desmontagem",
+            "en": "Gate 1 - Disassembly",
+            "es": "Gate 1 - Desmontaje",
+        }
+    }
+    with patch("app.i18n.get_translations_dict", return_value=sample):
+        result = get_translated_gate("Gate 1 - Desmontagem", "es")
+    assert result == "Gate 1 - Desmontaje"
+
+
+def test_get_translated_gate_legado_gate1_retorna_traduzido():
+    """Valor legado 'Gate 1' (sem etapa) deve ser traduzido via alias."""
+    from app.i18n import get_translated_gate
+
+    sample = {"gate_1": {"pt_BR": "Gate 1", "en": "Gate 1", "es": "Gate 1"}}
+    with patch("app.i18n.get_translations_dict", return_value=sample):
+        result = get_translated_gate("Gate 1", "en")
+    assert result == "Gate 1"
+
+
+def test_get_translated_gate_desconhecido_retorna_original():
+    """Valor desconhecido é retornado sem alteração."""
+    from app.i18n import get_translated_gate
+
+    with patch("app.i18n.get_translations_dict", return_value={}):
+        result = get_translated_gate("Gate X", "en")
+    assert result == "Gate X"
+
+
+def test_gate_keys_map_contem_16_valores():
+    """GATE_KEYS_MAP deve ter exatamente 16 valores completos + aliases legados."""
+    from app.i18n import GATE_KEYS_MAP
+
+    completos = [k for k in GATE_KEYS_MAP if " - " in k]
+    assert len(completos) == 16
+
+
+# ── Chaves i18n Fases 4-5 (regressão) ──────────────────────────────────────
+
+
+def test_novas_chaves_gestor_e_participantes_presentes_em_tres_idiomas():
+    """Chaves adicionadas nas Fases 4-5 resolvem em PT/EN/ES sem retornar a própria chave."""
+    from app.i18n import get_translation
+
+    novas_chaves = [
+        "gestor_dashboard_title",
+        "gestor_readonly_notice",
+        "gestor_counter_total",
+        "gestor_counter_atrasados",
+        "gestor_counter_sem_resposta",
+        "gestor_counter_multi_setor",
+        "participantes_pendentes_aviso",
+    ]
+    for chave in novas_chaves:
+        for lang in ("pt_BR", "en", "es"):
+            resultado = get_translation(chave, lang)
+            assert resultado != chave, f"Chave '{chave}' não traduzida em '{lang}'"
+            assert resultado, f"Chave '{chave}' retornou vazio em '{lang}'"

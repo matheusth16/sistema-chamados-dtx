@@ -137,17 +137,18 @@ def _aplicar_filtros_em_memoria(
     # Busca por texto (case-insensitive) — único filtro genuinamente em memória
     if search:
         termo = search.lower()
-        resultado = [
-            doc
-            for doc in resultado
+        filtered = []
+        for doc in resultado:
+            d = doc.to_dict()
             if (
-                termo in str(doc.to_dict().get("descricao", "")).lower()
-                or termo in str(doc.to_dict().get("rl_codigo", "")).lower()
-                or termo in str(doc.to_dict().get("responsavel", "")).lower()
-                or termo in str(doc.to_dict().get("numero_chamado", "")).lower()
+                termo in str(d.get("descricao", "")).lower()
+                or termo in str(d.get("rl_codigo", "")).lower()
+                or termo in str(d.get("responsavel", "")).lower()
+                or termo in str(d.get("numero_chamado", "")).lower()
                 or termo in doc.id.lower()
-            )
-        ]
+            ):
+                filtered.append(doc)
+        resultado = filtered
 
     return resultado
 

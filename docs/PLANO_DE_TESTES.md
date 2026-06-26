@@ -34,13 +34,14 @@
 | Utilitários e exceções | Número de chamado, exceções customizadas |
 | Health / Service Worker | Health 200, sw.js servido |
 | Dashboard / Export / Relatórios | GET /admin, /exportar, /admin/relatorios (permissão supervisor/admin) |
-| Admin (usuários, categorias, traduções) | CRUD e listagens apenas para perfil admin; testes de permissão |
+| Admin (usuários, categorias) | CRUD e listagens apenas para perfil admin/admin_global; testes de permissão |
+| Admin Global | Rotas exclusivas `/admin-global/*` (promover/rebaixar admin); permissão `admin_global` |
 | Segurança | Validação Origin/Referer em POST sensíveis; rate limit (quando testável) |
+| E2E (navegador) | Fluxos principais via Playwright (login, dashboard, relatórios) — `tests/e2e/` |
 
 ### 2.2 Fora do Escopo (Nesta Fase)
 
 - Testes de carga e performance (Firestore/Redis).
-- Testes E2E em navegador (Selenium/Playwright) — podem ser adicionados depois.
 - Testes de integração com Firebase real (credenciais); preferir mocks.
 - Validação visual de UI (layout, i18n).
 
@@ -79,6 +80,14 @@
 - Verificar que a resposta JSON segue o formato documentado em [API.md](API.md) (campos obrigatórios, tipos).
 - Códigos HTTP: 200, 400, 403, 404, 401, 500 conforme especificação.
 
+### 3.5 Testes E2E (Navegador)
+
+- Fluxos ponta a ponta em navegador real validando integração frontend/backend.
+- Cenários: login por perfil, acesso ao dashboard, acesso a `/admin/relatorios`, bloqueio de rotas por perfil.
+
+**Ferramenta:** Playwright (`pytest` + `playwright`), marcador `@pytest.mark.e2e`.
+**Local:** `tests/e2e/`. Requer a aplicação rodando (ver `base_url` nas fixtures).
+
 ---
 
 ## 4. Cenários Prioritários (Resumo)
@@ -102,8 +111,10 @@
 
 ## 5. Ambiente e Dados de Teste
 
+- **Python:** 3.12+ (ver `.python-version` e `ruff.toml` `target-version = "py312"`).
+- **Frameworks:** `pytest` + `unittest.mock` (unidade/integração) e `playwright` (E2E).
 - **Config:** `FLASK_ENV=testing` (já definido em `conftest.py`); `WTF_CSRF_ENABLED=False` nos testes.
-- **Fixtures:** usuários mockados com `_usuario_mock(uid, email, nome, perfil, area, areas)`.
+- **Fixtures:** usuários mockados com `_usuario_mock(uid, email, nome, perfil, area, areas)`, incluindo `client_logado_admin_global`.
 - **Firestore:** não usar banco real nos testes automatizados; usar `patch('app.database.db', MagicMock())` ou equivalente.
 - **Cobertura:** executar com `pytest --cov=app` para acompanhar cobertura; focar em rotas e serviços de negócio.
 
@@ -142,6 +153,6 @@
 - Manter [CASOS_DE_TESTE.md](CASOS_DE_TESTE.md) atualizado com os cenários passo a passo (incluindo lacunas preenchidas: alterar senha, dashboard, export, relatórios, admin usuários/categorias/traduções, segurança Origin, rate limit).
 - Implementar ou completar testes automatizados para os novos casos (CT-SENHA-*, CT-DASH-01, CT-EXP-*, CT-ADM-*, CT-TRAD-01, CT-SEC-01, CT-RATE-01) conforme mapeamento em CASOS_DE_TESTE.
 - Adicionar testes de integração para dashboard e relatórios quando estável.
-- Considerar testes E2E para fluxos principais (login → criar chamado → ver lista) em fase posterior.
+- Expandir a suíte E2E existente (`tests/e2e/`) para cobrir o fluxo completo solicitante (login → criar chamado → ver lista).
 
 **Revisão do plano:** Este plano deve ser revisado quando houver mudança relevante de escopo ou de requisitos. Manter documentação alinhada: API.md, ANALISE_REQUISITOS_QA.md, CASOS_DE_TESTE.md e TESTES_REGRESSAO.md em sincronia com o código.

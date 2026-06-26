@@ -55,7 +55,7 @@ def test_criar_chamado_descricao_vazia_nao_cria(client_logado_solicitante):
             data={
                 "categoria": "Chamado",
                 "tipo": "Manutencao",
-                "gate": "Gate 1",
+                "gate": "Gate 1 - Desmontagem",
                 "impacto": "Qualidade",
                 "descricao": "",
             },
@@ -73,14 +73,18 @@ def test_criar_chamado_descricao_vazia_nao_cria(client_logado_solicitante):
 
 def test_criar_chamado_valido_redireciona_e_chama_service(client_logado_solicitante):
     """POST / com dados válidos chama criar_chamado e redireciona (302) com sucesso."""
-    with patch("app.routes.chamados.criar_chamado") as mock_criar:
+    with (
+        patch("app.routes.chamados.criar_chamado") as mock_criar,
+        patch("app.services.gates_service.CategoriaGate") as mock_gate_cls,
+    ):
         mock_criar.return_value = ("doc_id_01", "CHM-0001", None, None)
+        mock_gate_cls.get_all_ativos.return_value = []
         r = client_logado_solicitante.post(
             "/",
             data={
                 "categoria": "Chamado",
                 "tipo": "Manutencao",
-                "gate": "Gate 1",
+                "gate": "Gate 1 - Desmontagem",
                 "impacto": "Qualidade",
                 "descricao": "Equipamento parou de funcionar na linha 3",
             },

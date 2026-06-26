@@ -48,6 +48,7 @@ def gerenciar_usuarios() -> Response:
         nome = request.form.get("nome", "").strip()
         perfil = request.form.get("perfil", "solicitante")
         areas = [a.strip() for a in request.form.getlist("areas") if a.strip()]
+        nivel_gestao = request.form.get("nivel_gestao", "").strip() or None
         erros = []
         if not email or "@" not in email:
             erros.append("invalid_email")
@@ -74,6 +75,7 @@ def gerenciar_usuarios() -> Response:
                 nome=nome,
                 perfil=perfil,
                 areas=areas,
+                nivel_gestao=nivel_gestao,
                 must_change_password=True,
                 password_changed_at=None,
             )
@@ -169,6 +171,14 @@ def editar_usuario(usuario_id: str) -> Response:
             update_data["perfil"] = perfil
         if set(areas) != set(usuario.areas):
             update_data["areas"] = areas
+        # Checkbox ativo: presente no form → True; ausente → False
+        novo_ativo = request.form.get("ativo") == "on"
+        if novo_ativo != getattr(usuario, "ativo", True):
+            update_data["ativo"] = novo_ativo
+        # nivel_gestao: campo opcional select (vazio = None = sem gestão)
+        novo_nivel_gestao = request.form.get("nivel_gestao", "").strip() or None
+        if novo_nivel_gestao != getattr(usuario, "nivel_gestao", None):
+            update_data["nivel_gestao"] = novo_nivel_gestao
         if update_data:
             usuario.update(**update_data)
             cache_delete(CACHE_KEY_USUARIOS)
@@ -212,6 +222,57 @@ def deletar_usuario(usuario_id: str) -> Response:
         logger.exception("Erro ao deletar usuário: %s", e)
         flash_t("error_deleting_user", "danger", error=str(e))
         return redirect(url_for("main.gerenciar_usuarios"))
+
+
+@main.route("/admin/alterar-senha", methods=["GET", "POST"])
+@requer_perfil("admin")
+def alterar_senha_admin() -> Response:
+    """GET: exibe formulário de troca de senha. POST: aplica nova senha ao próprio perfil."""
+    from datetime import datetime
+
+    if request.method == "POST":
+        senha_atual = request.form.get("senha_atual", "").strip()
+        nova_senha = request.form.get("nova_senha", "").strip()
+        confirmar_senha = request.form.get("confirmar_senha", "").strip()
+
+        if not senha_atual or not nova_senha or not confirmar_senha:
+            flash_t("all_fields_required", "danger")
+            return redirect(url_for("main.alterar_senha_admin"))
+
+        if not current_user.check_password(senha_atual):
+            flash_t("current_password_incorrect", "danger")
+            return redirect(url_for("main.alterar_senha_admin"))
+
+        if len(nova_senha) < 8:
+            flash_t("password_min_8_chars", "danger")
+            return redirect(url_for("main.alterar_senha_admin"))
+
+        if not any(c.isalpha() for c in nova_senha) or not any(c.isdigit() for c in nova_senha):
+            flash_t("password_must_have_letter_and_digit", "danger")
+            return redirect(url_for("main.alterar_senha_admin"))
+
+        if nova_senha != confirmar_senha:
+            flash_t("passwords_must_match", "danger")
+            return redirect(url_for("main.alterar_senha_admin"))
+
+        try:
+            sucesso = current_user.update(
+                senha=nova_senha,
+                must_change_password=False,
+                password_changed_at=datetime.now(),
+            )
+            if sucesso:
+                logger.info("Admin %s alterou a própria senha.", current_user.email)
+                flash_t("password_changed_admin_success", "success")
+            else:
+                flash_t("error_updating_password", "danger")
+        except Exception as e:
+            logger.exception("Erro ao alterar senha do admin %s: %s", current_user.email, e)
+            flash_t("error_updating_password", "danger")
+
+        return redirect(url_for("main.alterar_senha_admin"))
+
+    return render_template("alterar_senha_admin.html")
 
 
 @main.route("/admin/usuarios/<usuario_id>/resetar-senha", methods=["POST"])
@@ -269,6 +330,57 @@ def resetar_senha_usuario(usuario_id: str) -> Response:
     except Exception as e:
         logger.exception("Erro ao resetar senha do usuário: %s", e)
         flash_t("error_resetting_password", "danger", error=str(e))
+        return redirect(url_for("main.gerenciar_usuarios"))
+
+
+@main.route("/admin/usuarios/<usuario_id>/desativar", methods=["POST"])
+@requer_perfil("admin")
+def desativar_usuario(usuario_id: str) -> Response:
+    """Soft-delete: marca ativo=False, bloqueando login e invalidando sessão."""
+    try:
+        usuario = Usuario.get_by_id(usuario_id)
+        if not usuario:
+            flash_t("user_not_found", "danger")
+            return redirect(url_for("main.gerenciar_usuarios"))
+        if usuario_id == current_user.id:
+            flash_t("cannot_deactivate_own_account", "warning")
+            return redirect(url_for("main.gerenciar_usuarios"))
+        if usuario.email == "admin@dtx.aero":
+            flash_t("cannot_deactivate_root_admin", "danger")
+            logger.warning("Tentativa de desativar admin@dtx.aero por %s", current_user.email)
+            return redirect(url_for("main.gerenciar_usuarios"))
+        nome_usuario = usuario.nome
+        usuario.update(ativo=False)
+        cache_delete(CACHE_KEY_USUARIOS)
+        cache_delete(f"usuario_{usuario_id}")
+        Usuario.invalidar_cache_supervisores_por_area()
+        flash_t("user_deactivated_success", "success", nome=nome_usuario)
+        return redirect(url_for("main.gerenciar_usuarios"))
+    except Exception as e:
+        logger.exception("Erro ao desativar usuário: %s", e)
+        flash_t("error_editing_user", "danger", error=str(e))
+        return redirect(url_for("main.gerenciar_usuarios"))
+
+
+@main.route("/admin/usuarios/<usuario_id>/ativar", methods=["POST"])
+@requer_perfil("admin")
+def ativar_usuario(usuario_id: str) -> Response:
+    """Reativa conta: marca ativo=True, permitindo login novamente."""
+    try:
+        usuario = Usuario.get_by_id(usuario_id)
+        if not usuario:
+            flash_t("user_not_found", "danger")
+            return redirect(url_for("main.gerenciar_usuarios"))
+        nome_usuario = usuario.nome
+        usuario.update(ativo=True)
+        cache_delete(CACHE_KEY_USUARIOS)
+        cache_delete(f"usuario_{usuario_id}")
+        Usuario.invalidar_cache_supervisores_por_area()
+        flash_t("user_activated_success", "success", nome=nome_usuario)
+        return redirect(url_for("main.gerenciar_usuarios"))
+    except Exception as e:
+        logger.exception("Erro ao reativar usuário: %s", e)
+        flash_t("error_editing_user", "danger", error=str(e))
         return redirect(url_for("main.gerenciar_usuarios"))
 
 

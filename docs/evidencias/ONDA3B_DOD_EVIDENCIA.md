@@ -98,7 +98,7 @@ $ pytest tests/test_security/ tests/test_routes/test_api_security_responses.py \
 | Arquivo | Testes | CWI |
 |---|---|---|
 | `tests/test_security/__init__.py` | (módulo) | — |
-| `tests/test_security/test_injection_regression.py` | 31 testes parametrizados (injection + swagger 404) | 3.1, 4.2 |
+| `tests/test_security/test_injection_regression.py` | 33 testes parametrizados (injection + swagger 404 + editar-chamado) | 3.1, 4.2 |
 | `tests/test_routes/test_api_security_responses.py` | 11 testes (to_public_dict, api/chamado, errors 500, status_service leak) | 2.3, 3.2 |
 
 ### 2.3 Teste adicionado ao modelo
@@ -207,7 +207,7 @@ A skill `review-security` foi executada sobre o diff da Onda 3b. Resultado: **CL
 |---|---|---|
 | **CWI 2.2** — Hash Werkzeug documentado | ✅ Atende | `docs/CHECKLIST_SEGURANCA.md §1.4` [x]; `test_senha_hash_usa_formato_werkzeug_nao_plaintext` PASSED; `app/models_usuario.py:73–78` |
 | **CWI 2.3** — PII minimizado/oculto | ✅ Parcial | `docs/CHECKLIST_SEGURANCA.md §9.4` [x parcial]; `test_to_public_dict_nao_contem_senha_hash`, `test_api_chamado_por_id_resposta_sem_campos_internos` PASSED; Fernet fecha na Onda 4 |
-| **CWI 3.1** — SQL/NoSQL injection | ✅ Atende | `docs/CHECKLIST_SEGURANCA.md §5.4` [x]; `test_injection_regression.py` — 31 testes parametrizados PASSED; 8 payloads SQL+NoSQL |
+| **CWI 3.1** — SQL/NoSQL injection | ✅ Atende | `docs/CHECKLIST_SEGURANCA.md §5.4` [x]; `test_injection_regression.py` — 33 testes parametrizados PASSED; 8 payloads SQL+NoSQL + editar-chamado |
 | **CWI 3.2** — Erros não vazam stack/tecnologia | ✅ Atende | `docs/CHECKLIST_SEGURANCA.md §8.4` [x]; `bulk_atualizar_status:~331` str(e) → genérico; 3 handlers sem ERRO_INTERNO_MSG corrigidos; `status_service.py:167` str(e) → genérico; 7 testes de erro 500 PASSED |
 | **CWI 4.2** — Swagger não exposto | ✅ Atende | `docs/CHECKLIST_SEGURANCA.md §7.3` [x]; `test_swagger_routes_retornam_404` (5 paths) PASSED |
 | **review-security** | ✅ CLEAN | 0 HIGH, 0 MEDIUM introduzidos; 1 backlog INFO (flash HTML) documentado |
@@ -225,7 +225,7 @@ A skill `review-security` foi executada sobre o diff da Onda 3b. Resultado: **CL
 
 | Lacuna | Status | Evidência |
 |---|---|---|
-| **L1** — Contagens desatualizadas no CHECKLIST | ✅ Corrigido | §5.4 "13 testes" → "31 testes"; §8.4 "6 testes" → "11 testes"; ONDA3B_DOD "26 testes" → "31 testes" |
+| **L1** — Contagens desatualizadas no CHECKLIST | ✅ Corrigido | §5.4 "13 testes" → "33 testes"; §8.4 "6 testes" → "11 testes"; micro-polish: 31→33 após L3 editar-chamado |
 | **L2** — Drift test name Onda 3 doc | ✅ Corrigido | CHECKLIST §3.2 + ONDA3_DOD_EVIDENCIA.md: `test_cwi21_cookies_secure_em_producao` → `test_cwi21_cookies_secure_default_em_config_producao` |
 | **L3** — Injection cobertura editar-chamado | ✅ Adicionado | `test_editar_chamado_descricao_payload_nao_causa_500` × 2 payloads em `test_injection_regression.py` |
 | **L4** — CWI 2.3 supervisores/lista senha_hash | ✅ Adicionado | `test_api_supervisores_lista_nao_expoe_senha_hash` em `test_api_security_responses.py` |
@@ -252,6 +252,15 @@ $ pytest tests/test_security/ tests/test_routes/test_api_security_responses.py t
 - `test_api_security_responses.py`: 11 → **12 testes** (+1 L4)
 - `test_api_supervisores.py`: 4 testes (sem alteração, sem regressão)
 
+### 6.4 Micro-doc polish (2026-06-23)
+
+| Ajuste | Arquivo | Detalhe |
+|---|---|---|
+| §5.4 contagem 31→33 | `CHECKLIST_SEGURANCA.md` | Inclui +2 `test_editar_chamado_descricao_payload_nao_causa_500` |
+| §9.4 teste supervisores | `CHECKLIST_SEGURANCA.md` | Ref `::test_api_supervisores_lista_nao_expoe_senha_hash` |
+| R3 rename clarificado | `ONDA3_DOD_EVIDENCIA.md` | Teste antigo documentado como renomeado, não só "removido" |
+| Contagens alinhadas | `ONDA3B_DOD_EVIDENCIA.md` | Todas refs "31 testes" → "33 testes" |
+
 ---
 
 ## 7. Declaração final
@@ -275,7 +284,7 @@ security(api): Onda 3b — erros genéricos, injection regression, swagger 404 (
 
 B1 (CWI 2.2): doc hash Werkzeug em CHECKLIST §1.4 + teste modelo
 B2 (CWI 2.3 parcial): testes to_public_dict e /api/chamado/<id> sem campos internos
-B3 (CWI 3.1): tests/test_security/test_injection_regression.py — 31 testes (8×3 search + 2 literal + 5 swagger)
+B3 (CWI 3.1): tests/test_security/test_injection_regression.py — 33 testes (8×3 search + 2 literal + 5 swagger + 2 editar-chamado)
 B4 (CWI 3.2): bulk_atualizar_status str(e) → genérico; +3 handlers ERRO_INTERNO_MSG; status_service.py:167 str(e) → genérico; 7 testes
 B5 (CWI 4.2): test_swagger_routes_retornam_404 (5 paths) — nenhuma rota exposta
 

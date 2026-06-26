@@ -124,8 +124,7 @@ sistema-chamados-dtx/
 │   │   ├── chamados.py           # Criação e listagem (solicitante)
 │   │   ├── dashboard.py          # Dashboard (supervisor/admin)
 │   │   ├── usuarios.py           # Gestão de usuários (admin)
-│   │   ├── categorias.py         # Gestão de categorias (admin)
-│   │   └── traducoes.py          # Gestão de traduções (admin)
+│   │   └── categorias.py         # Gestão de categorias (admin)
 │   ├── services/                 # Lógica de negócio
 │   │   ├── chamados_criacao_service.py
 │   │   ├── chamados_listagem_service.py
@@ -186,7 +185,7 @@ O projeto usa **GitHub Actions** com dois workflows:
 Roda a cada push/PR na `main`:
 
 ```
-Ruff lint → Ruff format → Bandit SAST → pip-audit → Pytest (cobertura ≥ 80%)
+Ruff lint → Ruff format → Bandit SAST → pip-audit → Pytest (cobertura ≥ 85%) → Gate por módulo (≥ 85%)
 ```
 
 ### E2E (`e2e.yml`) — bloqueante (SMOKE-01/02/03)
@@ -212,10 +211,13 @@ bandit -r app/ -ll
 pytest --tb=short -q \
   --cov=app \
   --cov-report=term-missing:skip-covered \
-  --cov-fail-under=80
+  --cov-fail-under=85
+
+# 4. Gate por módulo (>= 85%)
+python scripts/check_coverage_per_module.py --json-only
 ```
 
-**Gate de cobertura:** mínimo de **80%** — CI rejeita abaixo disso.
+**Gate de cobertura:** mínimo de **85%** global + **85% por módulo** — CI rejeita abaixo disso (1435 testes, 94,98%, 52/52 módulos OK).
 
 ### Rodar testes específicos
 
@@ -296,7 +298,7 @@ Ou crie manualmente no console:
 | [docs/QA_DEBUG_PLAYBOOK.md](docs/QA_DEBUG_PLAYBOOK.md) | Playbook de triagem sistemática de falhas de teste |
 | [docs/AB_TEST_PLAN.md](docs/AB_TEST_PLAN.md) | Plano de experimento A/B (AB-001: campo descrição guiado) |
 | [docs/POLITICA_SEGURANCA_LGPD.md](docs/POLITICA_SEGURANCA_LGPD.md) | Segurança e conformidade LGPD |
-| [docs/DEPLOYMENT_PLAN.md](docs/DEPLOYMENT_PLAN.md) | Deploy (Cloud Run, Firebase) |
+| [docs/DEPLOYMENT_PLAN.md](docs/DEPLOYMENT_PLAN.md) | Deploy (Docker / servidor local) |
 | [docs/onboarding.md](docs/onboarding.md) | Onboarding interativo: visão de produto e detalhes técnicos |
 | `firestore.rules` | Regras de segurança Firestore |
 | `firestore.indexes.json` | Índices Firestore |
@@ -368,7 +370,7 @@ Este projeto é propriedade da DTX Aerospace.
 - [x] PWA / notificações Web Push
 - [x] Onboarding interativo por perfil
 - [x] Gamificação para técnicos
-- [x] Suite de testes com cobertura ≥ 80% + E2E smoke bloqueante
+- [x] Suite de testes com cobertura ≥ 85% (94,98% atual) + gate por módulo 52/52 + E2E smoke bloqueante
 - [x] CI/CD com GitHub Actions (lint, SAST, cobertura, E2E bloqueante)
 - [x] Retry automático para notificações (backoff exponencial)
 - [ ] Cache local com IndexedDB (uso offline)

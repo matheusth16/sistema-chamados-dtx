@@ -24,15 +24,28 @@ from app.services.validators import validar_novo_chamado
 logger = logging.getLogger(__name__)
 
 
+def _setores_ativos():
+    return [s for s in CategoriaSetor.get_all() if getattr(s, "ativo", True)]
+
+
+def _build_gate_subetapas():
+    from app.services.gates_service import build_gate_subetapas
+
+    return build_gate_subetapas()
+
+
 @main.route("/", methods=["GET", "POST"])
 @requer_solicitante
 def index() -> Response:
     """GET: formulário de novo chamado. POST: processa e salva no Firestore."""
     if request.method != "POST":
-        setores = get_static_cached("categorias_setor", CategoriaSetor.get_all, ttl_seconds=300)
+        from app.services.ab_service import get_variante
+
+        setores = _setores_ativos()
         impactos = get_static_cached(
             "categorias_impacto", CategoriaImpacto.get_all, ttl_seconds=300
         )
+        ab_variante = get_variante(current_user.id, "AB-001")
 
         # Contagem por agregação (count) — sem ler documentos
         status_counts = {"Aberto": 0, "Em Atendimento": 0, "Concluído": 0, "Cancelado": 0}
@@ -53,13 +66,20 @@ def index() -> Response:
             setores=setores,
             impactos=impactos,
             status_counts=status_counts,
+            gate_subetapas=_build_gate_subetapas(),
+            ab_variante=ab_variante,
         )
 
-    lista_erros = validar_novo_chamado(request.form, request.files.get("anexo"))
+    from app.services.ab_service import get_variante
+
+    ab_variante = request.form.get("ab_variante") or get_variante(current_user.id, "AB-001")
+    arquivos = [f for f in request.files.getlist("anexo") if f and f.filename]
+    links_externos = request.form.getlist("links_externos")
+    lista_erros = validar_novo_chamado(request.form, arquivos, links_externos)
     if lista_erros:
         for erro in lista_erros:
             flash(erro, "danger")
-        setores = get_static_cached("categorias_setor", CategoriaSetor.get_all, ttl_seconds=300)
+        setores = _setores_ativos()
         impactos = get_static_cached(
             "categorias_impacto", CategoriaImpacto.get_all, ttl_seconds=300
         )
@@ -67,6 +87,8 @@ def index() -> Response:
             "formulario.html",
             setores=setores,
             impactos=impactos,
+            gate_subetapas=_build_gate_subetapas(),
+            ab_variante=ab_variante,
         )
 
     chamado_id, numero_chamado, erro, aviso = criar_chamado(
@@ -79,13 +101,19 @@ def index() -> Response:
     )
     if erro:
         flash(erro, "danger")
-        setores = get_static_cached("categorias_setor", CategoriaSetor.get_all, ttl_seconds=300)
+        setores = _setores_ativos()
         impactos = get_static_cached(
             "categorias_impacto", CategoriaImpacto.get_all, ttl_seconds=300
         )
-        return render_template("formulario.html", setores=setores, impactos=impactos)
+        return render_template(
+            "formulario.html",
+            setores=setores,
+            impactos=impactos,
+            gate_subetapas=_build_gate_subetapas(),
+            ab_variante=ab_variante,
+        )
     if aviso:
-        flash(f"⚠️ {aviso}", "warning")
+        flash(aviso, "warning")
     flash_t("ticket_created_success", "success")
     return redirect(url_for("main.index"))
 

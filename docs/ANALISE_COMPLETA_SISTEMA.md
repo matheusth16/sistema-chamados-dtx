@@ -108,11 +108,12 @@ Firebase/Firestore (Database)
 ### Infraestrutura
 | Componente | Tecnologia |
 |-----------|-----------|
-| **Database** | Google Cloud Firestore |
-| **Auth** | Firebase Authentication |
-| **Storage** | Cloud Storage (anexos) |
-| **Deploy** | Google Cloud Run (via Dockerfile) |
-| **Server** | Gunicorn |
+| **Database** | Google Firestore (firebase-admin) |
+| **Auth** | Flask-Login (sessão) |
+| **Storage** | Cloudflare R2 (anexos) com fallback Firebase Storage |
+| **E-mail** | Microsoft Graph API |
+| **Deploy** | Container Docker em servidor local/on-premise |
+| **Server** | Gunicorn (1 worker / 8 threads, gthread) |
 | **Cache (Opcional)** | Redis |
 
 ---
@@ -175,7 +176,6 @@ Firebase/Firestore (Database)
 | `dashboard.py` | `/dashboard`, `/filtragem` |
 | `usuarios.py` | `/usuarios`, `/usuario/<id>`, `/admin/usuarios` |
 | `categorias.py` | `/admin/categorias` |
-| `traducoes.py` | `/admin/traducoes` |
 
 ### `/app/services/` (Lógica de Negócio)
 | Serviço | Responsabilidade |
@@ -234,23 +234,25 @@ tests/
 - ⚠️ **Issue #3:** Docstring em `api.py` contradiz implementação (ver docs/PLANO_SUGESTOES.md)
 
 ### Autenticação
-- ✅ Firebase Authentication (OAuth + Email/Password)
-- ✅ Session timeout em 24h
+- ✅ **Flask-Login** (autenticação por sessão; e-mail/senha)
+- ✅ Timeout por inatividade de **15 min** (900s, `checar_inatividade`)
+- ✅ Cookie "lembrar" de 30 dias (`REMEMBER_COOKIE_DURATION`)
 - ✅ `SESSION_COOKIE_HTTPONLY = True` (JS não acessa)
 - ✅ `SESSION_COOKIE_SAMESITE = 'Lax'` (CSRF protection)
 - ✅ Redirecionar para login se não autenticado
 
 ### Rate Limiting
-- ✅ **Flask-Limiter** em rotas críticas
-- ✅ Em produção: **200 req/hour, 2000 req/day**
+- ✅ **Flask-Limiter** com limites por rota (decorador `@limiter.limit`)
+- ✅ Limites: login 10/min, atualizar-status 30/min, bulk-status 10/min, exportar 10/h, exportar-avançado 5/h
 - ✅ Storage em Redis (com fallback em memory)
-- ✅ ⚠️ Pode ser ajustado para melhor UX
+- ⚠️ Sem `default_limits` global (ver `app/limiter.py`)
 
 ### Validação de Entrada
-- ✅ Extensões permitidas: `{png, jpg, jpeg, pdf, xlsx}`
-- ✅ Tamanho máximo: 16MB
+- ✅ Extensões permitidas: imagens (`png, jpg, jpeg`), PDF, Excel (`xls, xlsx, xlsm, ...`), Word (`doc, docx, ...`), `csv`
+- ✅ Tamanho máximo: **10 MB por arquivo** (`MAX_ANEXO_BYTES`)
+- ✅ Validação por magic bytes (não apenas extensão)
 - ✅ Descrição: 3-5000 caracteres
-- ✅ Sanitização de inputs
+- ✅ Sanitização de inputs (`html.escape`)
 
 ### Logging & Auditoria
 - ✅ Logging estruturado (JSON via `python-json-logger`)
@@ -263,11 +265,13 @@ tests/
 # Em config.py
 SECRET_KEY = os.getenv('SECRET_KEY')  # Obrigatório em produção
 WTF_CSRF_ENABLED = True
-WTF_CSRF_TIME_LIMIT = None  # Tokens válidos indefinidamente
-SESSION_COOKIE_SECURE = True  # HTTPS apenas
+WTF_CSRF_TIME_LIMIT = 7200  # Tokens CSRF expiram em 2 horas
+SESSION_COOKIE_SECURE = True  # HTTPS apenas (produção)
 SESSION_COOKIE_HTTPONLY = True  # Sem acesso JS
 SESSION_COOKIE_SAMESITE = 'Lax'
-PERMANENT_SESSION_LIFETIME = 86400  # 24h
+# Expiração efetiva: timeout por inatividade de 15 min (checar_inatividade).
+# PERMANENT_SESSION_LIFETIME (24h) fica reservado e só aplica se session.permanent=True.
+PERMANENT_SESSION_LIFETIME = 86400
 ```
 
 ---
@@ -376,18 +380,18 @@ PERMANENT_SESSION_LIFETIME = 86400  # 24h
 ## 📊 Métricas & Performance
 
 ### Endpoints Críticos
-| Rota | Método | Autenticação | Rate Limit | Timeout |
-|-----|--------|-------------|-----------|---------|
-| `/api/atualizar-status` | POST | Obrigatório | 200/h | 5s |
-| `/api/bulk-status` | POST | Obrigatório | 200/h | 10s |
-| `/api/carregar-mais` | GET | Obrigatório | 500/h | 5s |
-| `/dashboard` | GET | Obrigatório | 500/h | 3s |
+| Rota | Método | Autenticação | Rate Limit |
+|-----|--------|-------------|-----------|
+| `/api/atualizar-status` | POST | Obrigatório | 30/min |
+| `/api/bulk-status` | POST | Obrigatório | 10/min |
+| `/api/carregar-mais` | POST | Obrigatório | sem limite explícito |
+| `/admin` (dashboard) | GET | Obrigatório | sem limite explícito |
 
 ### Tamanho de Dados
 - **Chamados por ano:** ~5.000-10.000 (estimado)
-- **Índices Firestore:** 7+ índices compostos otimizados
-- **Upload máximo:** 16MB por arquivo
-- **Paginação:** 10 itens/página (configurável)
+- **Índices Firestore:** índices compostos otimizados (`firestore.indexes.json`)
+- **Upload máximo:** 10 MB por arquivo (`MAX_ANEXO_BYTES`)
+- **Paginação:** dashboard 50 itens/página (cursor); listas 10 itens/página
 
 ### Cobertura de Testes
 ```
@@ -489,7 +493,7 @@ Overall Coverage ................ 60% ⚠️
 - ✅ `docs/MELHORIAS_QUALIDADE.md` - Análise técnica detalhada
 - ✅ `docs/PLANO_SUGESTOES.md` - Plano de execução
 - ✅ `docs/API.md` - Documentação de endpoints
-- ✅ `docs/DEPLOYMENT_PLAN.md` - Deploy em Cloud Run
+- ✅ `docs/DEPLOYMENT_PLAN.md` - Deploy via Docker (servidor local)
 - ✅ `docs/IMPLEMENTATION_PLAN.md` - Histórico de implementação
 
 ---
@@ -504,7 +508,7 @@ Overall Coverage ................ 60% ⚠️
 | **Testes** | ⚠️ Médio | Cobertura ~60%, pode melhorar |
 | **Documentação** | ⚠️ Médio | docs/ENV.md e docs/API.md |
 | **Código** | ✅ Bom | Limpo, bem organizado, poucas issues |
-| **Escalabilidade** | ✅ Boa | Firestore + Cloud Run adequados |
+| **Escalabilidade** | ✅ Boa | Firestore + container Docker adequados |
 
 **Nota Final:** O sistema está **saudável e produção-ready** com pequenos ajustes recomendados. As issues identificadas são **menores** e não afetam funcionalidade crítica, apenas qualidade e performance.
 

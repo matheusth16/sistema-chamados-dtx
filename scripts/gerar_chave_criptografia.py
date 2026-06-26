@@ -15,8 +15,11 @@ def main():
     key = Fernet.generate_key().decode("ascii")
     print("Adicione ao seu .env:")
     print(f"ENCRYPTION_KEY={key}")
-    print("\nPara ativar criptografia do campo 'nome' em usuários:")
+    print("\nPara ativar criptografia dos campos 'nome' e 'email' em usuários (LGPD):")
     print("ENCRYPT_PII_AT_REST=true")
+    print("\nDepois rode a migração de dados existentes:")
+    print("  python scripts/migrar_pii_criptografia.py           # dry-run")
+    print("  python scripts/migrar_pii_criptografia.py --apply   # aplica")
 
 
 if __name__ == "__main__":

@@ -18,6 +18,8 @@ from typing import Any
 from firebase_admin import firestore
 from google.cloud.firestore_v1.base_query import FieldFilter
 
+from app.services.business_time import percentual_prazo_resolucao
+
 logger = logging.getLogger(__name__)
 
 # Cache em memória (fallback quando Redis não está configurado)
@@ -68,13 +70,22 @@ def _dentro_sla(
 
 def obter_sla_para_exibicao(chamado: Any) -> dict[str, Any] | None:
     """Retorna dict para exibir SLA na Gestão (dashboard). Sem leituras ao Firestore.
+
     chamado: objeto com .data_abertura, .data_conclusao, .categoria, .status
-    Retorno: {'label': 'No prazo'|'Atrasado'|'Em risco', 'dentro_prazo': bool|None, 'em_risco': bool} ou None."""
+    e opcionalmente .data_em_atendimento (usado quando status == 'Em Atendimento').
+
+    Para status 'Em Atendimento' com data_em_atendimento presente, o percentual é
+    calculado em tempo útil via percentual_prazo_resolucao (Escada B / SLA resolução).
+    Nos demais casos usa a lógica de calendário (timedelta dias).
+
+    Retorno: {'label': 'No prazo'|'Atrasado'|'Em risco', 'dentro_prazo': bool|None,
+    'em_risco': bool} ou None."""
     data_abertura = getattr(chamado, "data_abertura", None)
     data_conclusao = getattr(chamado, "data_conclusao", None)
     categoria = getattr(chamado, "categoria", None) or ""
     status = getattr(chamado, "status", None) or "Aberto"
     sla_dias_custom = getattr(chamado, "sla_dias", None)
+    data_em_atendimento = getattr(chamado, "data_em_atendimento", None)
     dt_abertura = _to_datetime(data_abertura)
     if not dt_abertura:
         return None
@@ -84,7 +95,7 @@ def obter_sla_para_exibicao(chamado: Any) -> dict[str, Any] | None:
     if limite.tzinfo is not None:
         now = datetime.now(UTC)
     else:
-        now = datetime.utcnow()
+        now = datetime.now(UTC).replace(tzinfo=None)
     if status == "Cancelado":
         return None  # Chamados cancelados não entram em SLA
     if status == "Concluído":
@@ -97,7 +108,24 @@ def obter_sla_para_exibicao(chamado: Any) -> dict[str, Any] | None:
             "dentro_prazo": dentro,
             "em_risco": False,
         }
-    # Aberto ou Em Atendimento
+    # Em Atendimento com data_em_atendimento — usa tempo útil (SLA resolução / Escada B)
+    if status == "Em Atendimento":
+        dt_em_atendimento = _to_datetime(data_em_atendimento)
+        if dt_em_atendimento is not None:
+            # Normaliza para naive para compatibilidade com business_time
+            agora_naive = now.replace(tzinfo=None) if now.tzinfo else now
+            dt_naive = (
+                dt_em_atendimento.replace(tzinfo=None)
+                if dt_em_atendimento.tzinfo
+                else dt_em_atendimento
+            )
+            pct = percentual_prazo_resolucao(dt_naive, categoria, agora_naive)
+            if pct > 1.0:
+                return {"label": "Atrasado", "dentro_prazo": False, "em_risco": False}
+            if pct >= 0.5:  # alinhado com aviso 50% de processar_avisos_resolucao
+                return {"label": "Em risco", "dentro_prazo": None, "em_risco": True}
+            return {"label": "No prazo", "dentro_prazo": True, "em_risco": False}
+    # Aberto ou Em Atendimento sem data_em_atendimento — lógica calendário
     if now > limite:
         return {"label": "Atrasado", "dentro_prazo": False, "em_risco": False}
     um_dia = timedelta(days=1)
@@ -204,20 +232,33 @@ class AnalisadorChamados:
                 categorias[cat] = categorias.get(cat, 0) + 1
 
                 if chamado.get("status") not in ("Concluído",):
-                    data_abertura = chamado.get("data_abertura")
-                    categoria = chamado.get("categoria") or ""
-                    dt_ab = _to_datetime(data_abertura)
-                    if dt_ab is not None:
-                        dias_sla = _sla_dias_por_categoria(categoria, chamado.get("sla_dias"))
-                        limite = dt_ab + timedelta(days=dias_sla)
-                        if limite.tzinfo is not None:
-                            now = datetime.now(UTC)
-                        else:
-                            now = datetime.utcnow()
-                        if now > limite:
+                    status_ch = chamado.get("status") or ""
+                    dt_em_at = _to_datetime(chamado.get("data_em_atendimento"))
+                    if status_ch == "Em Atendimento" and dt_em_at is not None:
+                        # Usa tempo útil para chamados Em Atendimento (alinhado com badge)
+                        categoria = chamado.get("categoria") or ""
+                        agora_naive = datetime.now(UTC).replace(tzinfo=None)
+                        dt_naive = dt_em_at.replace(tzinfo=None) if dt_em_at.tzinfo else dt_em_at
+                        pct = percentual_prazo_resolucao(dt_naive, categoria, agora_naive)
+                        if pct > 1.0:
                             atrasado_abertos += 1
-                        elif (limite - now) <= um_dia:
+                        elif pct >= 0.5:
                             em_risco_count += 1
+                    else:
+                        data_abertura = chamado.get("data_abertura")
+                        categoria = chamado.get("categoria") or ""
+                        dt_ab = _to_datetime(data_abertura)
+                        if dt_ab is not None:
+                            dias_sla = _sla_dias_por_categoria(categoria, chamado.get("sla_dias"))
+                            limite = dt_ab + timedelta(days=dias_sla)
+                            if limite.tzinfo is not None:
+                                now = datetime.now(UTC)
+                            else:
+                                now = datetime.now(UTC).replace(tzinfo=None)
+                            if now > limite:
+                                atrasado_abertos += 1
+                            elif (limite - now) <= um_dia:
+                                em_risco_count += 1
 
             resumo_sla = {
                 "no_prazo": concluidos_dentro_sla,

@@ -7,11 +7,20 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from app.database import db
 from app.firebase_retry import firebase_retry
+from app.services.pii_encryption import (
+    email_lookup_hash,
+    is_pii_encryption_enabled,
+    maybe_decrypt,
+    maybe_encrypt,
+)
 
 logger = logging.getLogger(__name__)
 
 # Chave de cache para lista de usuários (usada em cache_delete nas rotas)
 CACHE_KEY_USUARIOS = "usuarios_list"
+
+# Valores válidos de nivel_gestao — lista fechada
+NIVEIS_GESTAO_VALIDOS = frozenset({"gestor_setor", "gerente_producao", "assistente_gm", "gm"})
 
 
 class Usuario(UserMixin):
@@ -32,6 +41,8 @@ class Usuario(UserMixin):
         password_changed_at=None,
         onboarding_completo: bool = False,
         onboarding_passo: int = 0,
+        ativo: bool = True,
+        nivel_gestao: str | None = None,
     ):
         self.id = id
         self.email = email
@@ -39,6 +50,7 @@ class Usuario(UserMixin):
         self.perfil = perfil  # 'solicitante', 'supervisor', 'admin' ou 'admin_global'
         self.areas = areas or []  # Lista de setores/departamentos
         self.senha_hash = None
+        self.ativo = ativo  # False bloqueia login e invalida sessão ativa
 
         # Controle de senha
         self.must_change_password = must_change_password
@@ -54,6 +66,11 @@ class Usuario(UserMixin):
         self.onboarding_completo = onboarding_completo
         self.onboarding_passo = onboarding_passo
 
+        # Gestão (Fase 5): valor fora da lista fechada → None (fail-safe)
+        self.nivel_gestao: str | None = (
+            nivel_gestao if nivel_gestao in NIVEIS_GESTAO_VALIDOS else None
+        )
+
     @property
     def is_admin_or_above(self) -> bool:
         return self.perfil in ("admin", "admin_global")
@@ -61,6 +78,16 @@ class Usuario(UserMixin):
     @property
     def is_supervisor_or_above(self) -> bool:
         return self.perfil in ("supervisor", "admin", "admin_global")
+
+    @property
+    def is_gestor(self) -> bool:
+        """True quando nivel_gestao está preenchido com valor válido."""
+        return self.nivel_gestao is not None
+
+    @property
+    def is_gestor_only(self) -> bool:
+        """Gestor sem privilégio admin — visão read-only do painel operacional."""
+        return self.is_gestor and not self.is_admin_or_above
 
     @property
     def area(self):
@@ -76,10 +103,14 @@ class Usuario(UserMixin):
         return check_password_hash(self.senha_hash, senha) if self.senha_hash else False
 
     def to_dict(self):
-        """Converte para dicionário para salvar no Firestore"""
-        return {
-            "email": self.email,
-            "nome": self.nome,
+        """Converte para dicionário para salvar no Firestore.
+
+        Quando ENCRYPT_PII_AT_REST=true: criptografa email/nome e inclui email_lookup_hash.
+        Quando falso: formato plaintext original (retrocompatível).
+        """
+        d = {
+            "email": maybe_encrypt(self.email),
+            "nome": maybe_encrypt(self.nome),
             "perfil": self.perfil,
             "areas": self.areas,
             "senha_hash": self.senha_hash,
@@ -93,7 +124,12 @@ class Usuario(UserMixin):
             "conquistas": self.conquistas,
             "onboarding_completo": self.onboarding_completo,
             "onboarding_passo": self.onboarding_passo,
+            "ativo": self.ativo,
+            "nivel_gestao": self.nivel_gestao,
         }
+        if is_pii_encryption_enabled():
+            d["email_lookup_hash"] = email_lookup_hash(self.email)
+        return d
 
     def to_public_dict(self) -> dict:
         """Serialização segura para respostas HTTP — sem senha_hash."""
@@ -126,8 +162,8 @@ class Usuario(UserMixin):
 
         usuario = cls(
             id=id,
-            email=data.get("email"),
-            nome=data.get("nome"),
+            email=maybe_decrypt(data.get("email") or ""),
+            nome=maybe_decrypt(data.get("nome") or ""),
             perfil=data.get("perfil", "solicitante"),
             areas=areas,
             exp_total=data.get("exp_total", 0),
@@ -138,17 +174,50 @@ class Usuario(UserMixin):
             password_changed_at=password_changed_at,
             onboarding_completo=data.get("onboarding_completo", False),
             onboarding_passo=data.get("onboarding_passo", 0),
+            # Docs sem campo ativo (legado) tratados como ativos — retrocompat.
+            ativo=data.get("ativo", True),
+            # Fase 5: nivel_gestao — valores inválidos normalizados para None pelo __init__
+            nivel_gestao=data.get("nivel_gestao"),
         )
         usuario.senha_hash = data.get("senha_hash")
         return usuario
 
     @classmethod
+    def _stream_by_email_lookup(cls, email: str):
+        """Query Firestore por email_lookup_hash (email normalizado)."""
+        lookup = email_lookup_hash(email)
+        return (
+            db.collection("usuarios")
+            .where(filter=FieldFilter("email_lookup_hash", "==", lookup))
+            .stream()
+        )
+
+    @classmethod
     def get_by_email(cls, email: str):
-        """Busca usuário por email"""
+        """Busca usuário por email.
+
+        Quando encryption ON: consulta email_lookup_hash (sha256 do email normalizado).
+        Quando encryption OFF: consulta campo email plaintext; se vazio, fallback
+        por hash (docs já migrados com email criptografado no Firestore).
+        """
+        email_norm = (email or "").strip().lower()
+        if not email_norm:
+            return None
         try:
-            docs = (
-                db.collection("usuarios").where(filter=FieldFilter("email", "==", email)).stream()
-            )
+            if is_pii_encryption_enabled():
+                docs = cls._stream_by_email_lookup(email_norm)
+            else:
+                docs = (
+                    db.collection("usuarios")
+                    .where(filter=FieldFilter("email", "==", email_norm))
+                    .stream()
+                )
+                first = next(iter(docs), None)
+                if first is not None:
+                    return cls.from_dict(first.to_dict(), first.id)
+                # Docs migrados: email no Firestore é fernet:v1:… — usar hash
+                docs = cls._stream_by_email_lookup(email_norm)
+
             for doc in docs:
                 data = doc.to_dict()
                 return cls.from_dict(data, doc.id)
@@ -191,11 +260,13 @@ class Usuario(UserMixin):
             # Aceita atualizações de campos específicos
             if "email" in kwargs:
                 self.email = kwargs["email"]
-                update_data["email"] = kwargs["email"]
+                update_data["email"] = maybe_encrypt(kwargs["email"])
+                if is_pii_encryption_enabled():
+                    update_data["email_lookup_hash"] = email_lookup_hash(kwargs["email"])
 
             if "nome" in kwargs:
                 self.nome = kwargs["nome"]
-                update_data["nome"] = kwargs["nome"]
+                update_data["nome"] = maybe_encrypt(kwargs["nome"])
 
             if "perfil" in kwargs:
                 self.perfil = kwargs["perfil"]
@@ -228,6 +299,16 @@ class Usuario(UserMixin):
             if "onboarding_passo" in kwargs:
                 self.onboarding_passo = kwargs["onboarding_passo"]
                 update_data["onboarding_passo"] = kwargs["onboarding_passo"]
+
+            if "ativo" in kwargs:
+                self.ativo = kwargs["ativo"]
+                update_data["ativo"] = kwargs["ativo"]
+
+            if "nivel_gestao" in kwargs:
+                raw = kwargs["nivel_gestao"]
+                valor = raw if raw in NIVEIS_GESTAO_VALIDOS else None
+                self.nivel_gestao = valor
+                update_data["nivel_gestao"] = valor
 
             if "gamification" in kwargs:
                 g_data = kwargs["gamification"]
@@ -289,31 +370,46 @@ class Usuario(UserMixin):
 
     @classmethod
     def get_all(cls):
-        """Retorna lista de todos os usuários"""
+        """Retorna lista de todos os usuários ordenada por nome.
+
+        Quando encryption ON: Firestore não pode ordenar por campo criptografado,
+        então faz stream() sem order_by e ordena em Python após decrypt.
+        Quando encryption OFF: usa order_by("nome") do Firestore (comportamento legado).
+        """
         try:
-            docs = db.collection("usuarios").order_by("nome").stream()
-            usuarios = []
-            for doc in docs:
-                data = doc.to_dict()
-                usuario = cls.from_dict(data, doc.id)
-                usuarios.append(usuario)
-            return usuarios
+            if is_pii_encryption_enabled():
+                docs = db.collection("usuarios").stream()
+                usuarios = [cls.from_dict(doc.to_dict(), doc.id) for doc in docs]
+                return sorted(usuarios, key=lambda u: (u.nome or "").lower())
+            else:
+                docs = db.collection("usuarios").order_by("nome").stream()
+                return [cls.from_dict(doc.to_dict(), doc.id) for doc in docs]
         except Exception as e:
             logger.exception("Erro ao buscar usuários: %s", e)
             return []
 
     @classmethod
     def email_existe(cls, email: str, id_atual: str = None) -> bool:
-        """Verifica se um email já existe (excluindo é um ID específico)
+        """Verifica se um email já existe (excluindo é um ID específico).
 
-        Args:
-            email: Email a verificar
-            id_atual: ID do usuário atual (para validação de atualização)
+        Quando encryption ON: consulta email_lookup_hash.
+        Quando encryption OFF: consulta campo email diretamente.
         """
+        email_norm = (email or "").strip().lower()
+        if not email_norm:
+            return False
         try:
-            docs = (
-                db.collection("usuarios").where(filter=FieldFilter("email", "==", email)).stream()
-            )
+            if is_pii_encryption_enabled():
+                docs = cls._stream_by_email_lookup(email_norm)
+            else:
+                docs = (
+                    db.collection("usuarios")
+                    .where(filter=FieldFilter("email", "==", email_norm))
+                    .stream()
+                )
+                if any(id_atual is None or doc.id != id_atual for doc in docs):
+                    return True
+                docs = cls._stream_by_email_lookup(email_norm)
             return any(id_atual is None or doc.id != id_atual for doc in docs)
         except Exception as e:
             logger.exception("Erro ao verificar email: %s", e)

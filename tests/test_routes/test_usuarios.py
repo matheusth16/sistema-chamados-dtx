@@ -1,7 +1,7 @@
 """Testes das rotas de administração de usuários (/admin/usuarios). Requer perfil admin."""
 
 import re
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 
 class _FakeThread:
@@ -480,3 +480,393 @@ def test_criar_usuario_id_usa_uuid_completo(client_logado_admin):
         hex_part = uid[len("user_") :]
         assert len(hex_part) == 32, f"UUID truncado — esperado 32 chars, obtido {len(hex_part)}"
         assert re.fullmatch(r"[0-9a-f]{32}", hex_part), f"Hex inválido: {hex_part}"
+
+
+# ── Segurança: auto-operações bloqueadas ──────────────────────────────────────
+
+
+def test_deletar_proprio_usuario_bloqueado(client_logado_admin):
+    """Admin não pode deletar a própria conta (cannot_delete_own_account)."""
+    # perfil="admin" necessário para passar o decorator @requer_perfil("admin")
+    admin_self = _usuario_fake(
+        uid="admin_1", email="admin@test.com", nome="Admin Teste", perfil="admin"
+    )
+    with patch("app.models_usuario.Usuario.get_by_id", return_value=admin_self):
+        r = client_logado_admin.post("/admin/usuarios/admin_1/deletar", follow_redirects=False)
+    assert r.status_code == 302
+    assert "/admin/usuarios" in (r.location or "")
+
+
+def test_resetar_senha_proprio_usuario_bloqueado(client_logado_admin):
+    """Admin não pode resetar a própria senha (cannot_reset_own_password)."""
+    # perfil="admin" necessário para passar o decorator @requer_perfil("admin")
+    admin_self = _usuario_fake(
+        uid="admin_1", email="admin@test.com", nome="Admin Teste", perfil="admin"
+    )
+    admin_self.set_password = lambda s: None
+    admin_self.update = lambda **kw: None
+    admin_self.areas = []
+    with patch("app.models_usuario.Usuario.get_by_id", return_value=admin_self):
+        r = client_logado_admin.post(
+            "/admin/usuarios/admin_1/resetar-senha", follow_redirects=False
+        )
+    assert r.status_code == 302
+    assert "/admin/usuarios" in (r.location or "")
+
+
+# ── Handlers except (flash genérico, sem vazar interno) ──────────────────────
+
+
+def test_criar_usuario_excecao_retorna_flash_erro(client_logado_admin):
+    """POST criar com exceção no save redireciona sem expor detalhe interno."""
+    with (
+        patch("app.routes.usuarios.Usuario.email_existe", return_value=False),
+        patch("app.routes.usuarios.Usuario") as mock_cls,
+    ):
+        instance = mock_cls.return_value
+        instance.set_password = lambda s: None
+        instance.save.side_effect = Exception("Firestore down")
+        r = client_logado_admin.post(
+            "/admin/usuarios",
+            data={
+                "acao": "criar",
+                "email": "x@dtx.aero",
+                "nome": "Novo Nome",
+                "perfil": "solicitante",
+            },
+            follow_redirects=False,
+        )
+    assert r.status_code == 302
+    assert "/admin/usuarios" in (r.location or "")
+
+
+def test_listar_usuarios_excecao_redireciona(client_logado_admin):
+    """GET /admin/usuarios com exceção em get_all redireciona com flash de erro."""
+    with patch("app.routes.usuarios.Usuario.get_all", side_effect=Exception("db error")):
+        r = client_logado_admin.get("/admin/usuarios", follow_redirects=False)
+    assert r.status_code == 302
+
+
+def test_deletar_usuario_excecao_redireciona(client_logado_admin):
+    """POST deletar com exceção em delete() redireciona com flash de erro."""
+    fake = _usuario_fake(uid="u_del", email="u@dtx.aero", nome="A Deletar")
+    fake.delete = MagicMock(side_effect=Exception("delete failed"))
+    with (
+        patch(
+            "app.models_usuario.Usuario.get_by_id",
+            side_effect=_get_by_id_side_effect("u_del", fake),
+        ),
+        patch("app.routes.usuarios.Usuario.invalidar_cache_supervisores_por_area"),
+    ):
+        r = client_logado_admin.post("/admin/usuarios/u_del/deletar", follow_redirects=False)
+    assert r.status_code == 302
+    assert "/admin/usuarios" in (r.location or "")
+
+
+def test_resetar_senha_excecao_redireciona(client_logado_admin):
+    """POST resetar-senha com exceção em set_password redireciona com flash de erro."""
+    fake = _usuario_fake(uid="u_pw", email="u@dtx.aero", nome="Usuario PW")
+    fake.set_password = MagicMock(side_effect=Exception("pw error"))
+    fake.update = lambda **kw: None
+    fake.areas = []
+    with patch(
+        "app.models_usuario.Usuario.get_by_id", side_effect=_get_by_id_side_effect("u_pw", fake)
+    ):
+        r = client_logado_admin.post("/admin/usuarios/u_pw/resetar-senha", follow_redirects=False)
+    assert r.status_code == 302
+    assert "/admin/usuarios" in (r.location or "")
+
+
+def test_resetar_exp_excecao_redireciona(client_logado_admin):
+    """POST reset-exp com exceção em update redireciona com flash de erro."""
+    fake = _usuario_fake(uid="u_exp", email="u@dtx.aero", nome="Usuario EXP")
+    fake.update = MagicMock(side_effect=Exception("exp error"))
+    with (
+        patch(
+            "app.models_usuario.Usuario.get_by_id",
+            side_effect=_get_by_id_side_effect("u_exp", fake),
+        ),
+        patch("app.routes.usuarios.Usuario.invalidar_cache_supervisores_por_area"),
+    ):
+        r = client_logado_admin.post("/admin/usuarios/u_exp/reset-exp", follow_redirects=False)
+    assert r.status_code == 302
+    assert "/admin/usuarios" in (r.location or "")
+
+
+# ── Editar usuário: cobertura do path POST ────────────────────────────────────
+
+
+def test_editar_usuario_post_sucesso_chama_update_e_cache(client_logado_admin):
+    """POST editar com dados válidos chama update e invalida cache."""
+    fake = _usuario_fake(
+        uid="u_edit", email="old@dtx.aero", nome="Usuario Edit", perfil="solicitante"
+    )
+    fake.areas = []
+    fake.update = MagicMock()
+    with (
+        patch(
+            "app.models_usuario.Usuario.get_by_id",
+            side_effect=_get_by_id_side_effect("u_edit", fake),
+        ),
+        patch("app.routes.usuarios.Usuario.email_existe", return_value=False),
+        patch("app.routes.usuarios.cache_delete") as mock_cd,
+        patch("app.routes.usuarios.Usuario.invalidar_cache_supervisores_por_area") as mock_inval,
+    ):
+        r = client_logado_admin.post(
+            "/admin/usuarios/u_edit/editar",
+            data={"email": "new@dtx.aero", "nome": "Usuario Edit Novo", "perfil": "solicitante"},
+            follow_redirects=False,
+        )
+    assert r.status_code == 302
+    assert "/admin/usuarios" in (r.location or "")
+    fake.update.assert_called_once()
+    assert mock_cd.call_count >= 1
+    mock_inval.assert_called_once()
+
+
+def test_editar_usuario_post_email_invalido_redireciona(client_logado_admin):
+    """POST editar com novo email sem @ redireciona com erro."""
+    fake = _usuario_fake(uid="u_em", email="old@dtx.aero", nome="Usuario EM", perfil="solicitante")
+    fake.areas = []
+    with (
+        patch(
+            "app.models_usuario.Usuario.get_by_id", side_effect=_get_by_id_side_effect("u_em", fake)
+        ),
+    ):
+        r = client_logado_admin.post(
+            "/admin/usuarios/u_em/editar",
+            data={"email": "invalido", "nome": "Usuario EM", "perfil": "solicitante"},
+            follow_redirects=False,
+        )
+    assert r.status_code == 302
+
+
+def test_editar_usuario_post_email_duplicado_redireciona(client_logado_admin):
+    """POST editar com email já existente redireciona com erro."""
+    fake = _usuario_fake(
+        uid="u_dup", email="old@dtx.aero", nome="Usuario Dup", perfil="solicitante"
+    )
+    fake.areas = []
+    with (
+        patch(
+            "app.models_usuario.Usuario.get_by_id",
+            side_effect=_get_by_id_side_effect("u_dup", fake),
+        ),
+        patch("app.routes.usuarios.Usuario.email_existe", return_value=True),
+    ):
+        r = client_logado_admin.post(
+            "/admin/usuarios/u_dup/editar",
+            data={"email": "outro@dtx.aero", "nome": "Usuario Dup", "perfil": "solicitante"},
+            follow_redirects=False,
+        )
+    assert r.status_code == 302
+
+
+def test_editar_usuario_post_supervisor_sem_area_redireciona(client_logado_admin):
+    """POST editar promovendo para supervisor sem área redireciona com erro."""
+    fake = _usuario_fake(
+        uid="u_sup", email="u_sup@dtx.aero", nome="Virar Sup", perfil="solicitante"
+    )
+    fake.areas = []
+    with (
+        patch(
+            "app.models_usuario.Usuario.get_by_id",
+            side_effect=_get_by_id_side_effect("u_sup", fake),
+        ),
+        patch("app.routes.usuarios.Usuario.email_existe", return_value=False),
+    ):
+        r = client_logado_admin.post(
+            "/admin/usuarios/u_sup/editar",
+            data={"email": "u_sup@dtx.aero", "nome": "Virar Sup", "perfil": "supervisor"},
+            follow_redirects=False,
+        )
+    assert r.status_code == 302
+
+
+def test_editar_usuario_post_admin_bloqueado_para_sub_admin(client_logado_admin):
+    """Sub-admin não pode promover usuário para perfil admin via edição (access_denied)."""
+    fake = _usuario_fake(uid="u_prom", email="u_prom@dtx.aero", nome="Prom", perfil="supervisor")
+    fake.areas = ["Geral"]
+    with (
+        patch(
+            "app.models_usuario.Usuario.get_by_id",
+            side_effect=_get_by_id_side_effect("u_prom", fake),
+        ),
+        patch("app.routes.usuarios.Usuario.email_existe", return_value=False),
+    ):
+        r = client_logado_admin.post(
+            "/admin/usuarios/u_prom/editar",
+            data={
+                "email": "u_prom@dtx.aero",
+                "nome": "Prom",
+                "perfil": "admin",
+                "areas": ["Geral"],
+            },
+            follow_redirects=False,
+        )
+    assert r.status_code == 302
+
+
+def test_editar_usuario_post_admin_global_pode_promover_para_admin(client_logado_admin_global):
+    """admin_global pode promover usuário para perfil admin via edição."""
+    fake = _usuario_fake(uid="u_prm2", email="u@dtx.aero", nome="Virar Admin", perfil="supervisor")
+    fake.areas = ["Geral"]
+    fake.update = MagicMock()
+    # admin_global user para o Flask-Login
+    ag_mock = _usuario_fake(
+        uid="ag_1", email="ag@test.com", nome="Admin Global", perfil="admin_global"
+    )
+
+    def _side(uid):
+        if uid == "u_prm2":
+            return fake
+        return ag_mock
+
+    with (
+        patch("app.models_usuario.Usuario.get_by_id", side_effect=_side),
+        patch("app.routes.usuarios.Usuario.email_existe", return_value=False),
+        patch("app.routes.usuarios.cache_delete"),
+        patch("app.routes.usuarios.Usuario.invalidar_cache_supervisores_por_area"),
+    ):
+        r = client_logado_admin_global.post(
+            "/admin/usuarios/u_prm2/editar",
+            data={
+                "email": "u@dtx.aero",
+                "nome": "Virar Admin",
+                "perfil": "admin",
+                "areas": ["Geral"],
+            },
+            follow_redirects=False,
+        )
+    assert r.status_code == 302
+    assert "/admin/usuarios" in (r.location or "")
+    fake.update.assert_called()
+
+
+def test_editar_usuario_post_excecao_redireciona(client_logado_admin):
+    """POST editar com exceção em update() redireciona com flash de erro."""
+    fake = _usuario_fake(uid="u_exc", email="u_exc@dtx.aero", nome="Exc User", perfil="solicitante")
+    fake.areas = []
+    fake.update = MagicMock(side_effect=Exception("db broke"))
+    with (
+        patch(
+            "app.models_usuario.Usuario.get_by_id",
+            side_effect=_get_by_id_side_effect("u_exc", fake),
+        ),
+        patch("app.routes.usuarios.Usuario.email_existe", return_value=False),
+    ):
+        r = client_logado_admin.post(
+            "/admin/usuarios/u_exc/editar",
+            data={"email": "u_exc@dtx.aero", "nome": "Exc User Novo", "perfil": "solicitante"},
+            follow_redirects=False,
+        )
+    assert r.status_code == 302
+
+
+# ── Onda 2: desativar / ativar usuário ────────────────────────────────────────
+
+
+def test_desativar_usuario_sucesso(client_logado_admin):
+    """POST /admin/usuarios/<id>/desativar com usuário existente chama update(ativo=False)."""
+    fake = _usuario_fake(uid="u_desat", email="u_desat@dtx.aero", nome="A Desativar")
+    fake.ativo = True
+    fake.update = MagicMock(return_value=True)
+    with (
+        patch(
+            "app.models_usuario.Usuario.get_by_id",
+            side_effect=_get_by_id_side_effect("u_desat", fake),
+        ),
+        patch("app.routes.usuarios.Usuario.invalidar_cache_supervisores_por_area"),
+        patch("app.routes.usuarios.cache_delete"),
+    ):
+        r = client_logado_admin.post("/admin/usuarios/u_desat/desativar", follow_redirects=False)
+    assert r.status_code == 302
+    assert "/admin/usuarios" in (r.location or "")
+    fake.update.assert_called_once_with(ativo=False)
+
+
+def test_desativar_proprio_usuario_bloqueado(client_logado_admin):
+    """Admin não pode desativar a própria conta (cannot_deactivate_own_account)."""
+    admin_self = _usuario_fake(
+        uid="admin_1", email="admin@test.com", nome="Admin Teste", perfil="admin"
+    )
+    admin_self.ativo = True
+    admin_self.update = MagicMock()
+    with patch("app.models_usuario.Usuario.get_by_id", return_value=admin_self):
+        r = client_logado_admin.post("/admin/usuarios/admin_1/desativar", follow_redirects=False)
+    assert r.status_code == 302
+    assert "/admin/usuarios" in (r.location or "")
+    admin_self.update.assert_not_called()
+
+
+def test_desativar_root_admin_bloqueado(client_logado_admin):
+    """Admin não pode desativar admin@dtx.aero (cannot_deactivate_root_admin)."""
+    fake_root = _usuario_fake(uid="root", email="admin@dtx.aero", nome="Root Admin")
+    fake_root.ativo = True
+    fake_root.update = MagicMock()
+    with patch(
+        "app.models_usuario.Usuario.get_by_id",
+        side_effect=_get_by_id_side_effect("root", fake_root),
+    ):
+        r = client_logado_admin.post("/admin/usuarios/root/desativar", follow_redirects=False)
+    assert r.status_code == 302
+    assert "/admin/usuarios" in (r.location or "")
+    fake_root.update.assert_not_called()
+
+
+def test_desativar_usuario_nao_encontrado(client_logado_admin):
+    """POST desativar com ID inexistente redireciona com erro."""
+    admin = _admin_mock_para_flask_login()
+    with patch(
+        "app.models_usuario.Usuario.get_by_id",
+        side_effect=lambda uid: None if uid == "naoexiste" else admin,
+    ):
+        r = client_logado_admin.post("/admin/usuarios/naoexiste/desativar", follow_redirects=False)
+    assert r.status_code == 302
+    assert "/admin/usuarios" in (r.location or "")
+
+
+def test_ativar_usuario_sucesso(client_logado_admin):
+    """POST /admin/usuarios/<id>/ativar chama update(ativo=True) — reativação."""
+    fake = _usuario_fake(uid="u_reat", email="u_reat@dtx.aero", nome="A Reativar")
+    fake.ativo = False
+    fake.update = MagicMock(return_value=True)
+    with (
+        patch(
+            "app.models_usuario.Usuario.get_by_id",
+            side_effect=_get_by_id_side_effect("u_reat", fake),
+        ),
+        patch("app.routes.usuarios.Usuario.invalidar_cache_supervisores_por_area"),
+        patch("app.routes.usuarios.cache_delete"),
+    ):
+        r = client_logado_admin.post("/admin/usuarios/u_reat/ativar", follow_redirects=False)
+    assert r.status_code == 302
+    assert "/admin/usuarios" in (r.location or "")
+    fake.update.assert_called_once_with(ativo=True)
+
+
+def test_admin_global_cria_usuario_admin(client_logado_admin_global):
+    """admin_global pode criar usuário com perfil=admin com sucesso."""
+    ag_mock = _usuario_fake(
+        uid="ag_1", email="ag@test.com", nome="Admin Global", perfil="admin_global"
+    )
+    with (
+        patch("app.models_usuario.Usuario.get_by_id", return_value=ag_mock),
+        patch("app.routes.usuarios.Usuario.email_existe", return_value=False),
+        patch("app.routes.usuarios.Usuario.save"),
+        patch("app.routes.usuarios.Usuario.invalidar_cache_supervisores_por_area"),
+        patch("app.routes.usuarios.cache_delete"),
+        patch("app.routes.usuarios.threading.Thread"),
+    ):
+        r = client_logado_admin_global.post(
+            "/admin/usuarios",
+            data={
+                "acao": "criar",
+                "email": "novo.admin@dtx.aero",
+                "nome": "Novo Admin Global",
+                "perfil": "admin",
+            },
+            follow_redirects=False,
+        )
+    assert r.status_code == 302
+    assert "/admin/usuarios" in (r.location or "")

@@ -14,7 +14,7 @@ if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 os.chdir(ROOT)
 
-from app.models_categorias import CategoriaGate, CategoriaImpacto, CategoriaSetor  # noqa: E402
+from app.models_categorias import CategoriaImpacto, CategoriaSetor  # noqa: E402
 
 
 def criar_setores_padrao():
@@ -39,23 +39,10 @@ def criar_setores_padrao():
 
 
 def criar_gates_padrao():
-    """Cria gates padrão se não existirem"""
-    gates_padrao = [
-        ("Gate 1", "Validação inicial de requisitos", 1),
-        ("Gate 2", "Análise de viabilidade técnica", 2),
-        ("Gate 3", "Prototipagem e testes", 3),
-        ("Gate 4", "Implementação em produção", 4),
-    ]
+    """Cria sub-etapas de gate padrão se não existirem (usa migrar_gates_subetapas)."""
+    from scripts.migrar_gates_subetapas import migrar
 
-    gates_existentes = CategoriaGate.get_all()
-    if len(gates_existentes) == 0:
-        print("\nCriando gates padrão...")
-        for nome_pt, descricao, ordem in gates_padrao:
-            gate = CategoriaGate(nome_pt=nome_pt, descricao_pt=descricao, ordem=ordem)
-            gate.save()
-            print(f"✅ Gate '{nome_pt}' criado com ordem {ordem}")
-    else:
-        print(f"\n✅ {len(gates_existentes)} gate(s) já cadastrado(s)")
+    migrar()
 
 
 def criar_impactos_padrao():

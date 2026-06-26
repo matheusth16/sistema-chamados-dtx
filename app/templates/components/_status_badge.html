@@ -2,41 +2,42 @@
   _status_badge.html
   Macro unica para status de chamado E perfil de usuario.
 
-  Uso: {% from 'components/_status_badge.html' import status_badge %}
+  Uso: {% from 'components/_status_badge.html' import status_badge, sla_badge with context %}
        {{ status_badge("Aberto") }}
        {{ status_badge("Em Atendimento") }}
-       {{ status_badge("Concluido") }}
+       {{ status_badge("Concluído") }}
        {{ status_badge("Cancelado") }}
        {{ status_badge("admin") }}
        {{ status_badge("supervisor") }}
        {{ status_badge("solicitante") }}
+       {{ sla_badge(chamado.sla_info, chamado.sla_dias) }}
 
   size: sm (padrao) | md
 #}
 {% macro status_badge(status, size="sm") %}
 {%- set s = status | lower | replace(" ", "_") | replace("í", "i") | replace("ú", "u") -%}
 
-{%- if s in ("aberto",) -%}
+{%- if s == "aberto" -%}
   {%- set cls = "bg-status-open-bg text-status-open border-status-open-border" -%}
-  {%- set label = "Aberto" -%}
-{%- elif s in ("em_atendimento", "em atendimento") -%}
+  {%- set label = translate_status(status) if translate_status is defined else "Aberto" -%}
+{%- elif s == "em_atendimento" -%}
   {%- set cls = "bg-status-active-bg text-status-active border-status-active-border" -%}
-  {%- set label = "Em Atendimento" -%}
+  {%- set label = translate_status(status) if translate_status is defined else "Em Atendimento" -%}
 {%- elif s in ("concluido", "concluído") -%}
   {%- set cls = "bg-status-done-bg text-status-done border-status-done-border" -%}
-  {%- set label = "Concluido" -%}
-{%- elif s in ("cancelado",) -%}
+  {%- set label = translate_status(status) if translate_status is defined else "Concluído" -%}
+{%- elif s == "cancelado" -%}
   {%- set cls = "bg-status-cancelled-bg text-status-cancelled border-status-cancelled-border" -%}
-  {%- set label = "Cancelado" -%}
+  {%- set label = translate_status(status) if translate_status is defined else "Cancelado" -%}
 {%- elif s == "admin" -%}
-  {%- set cls = "bg-dtx-50 text-dtx-700 border-dtx-200" -%}
-  {%- set label = "Admin" -%}
+  {%- set cls = "bg-dtx-50 text-dtx-800 border-dtx-200" -%}
+  {%- set label = t('admin') if t is defined else "Admin" -%}
 {%- elif s == "supervisor" -%}
   {%- set cls = "bg-violet-50 text-violet-800 border-violet-200" -%}
-  {%- set label = "Supervisor" -%}
+  {%- set label = t('supervisor') if t is defined else "Supervisor" -%}
 {%- elif s == "solicitante" -%}
-  {%- set cls = "bg-gray-100 text-gray-700 border-gray-200" -%}
-  {%- set label = "Solicitante" -%}
+  {%- set cls = "bg-slate-100 text-slate-700 border-slate-200" -%}
+  {%- set label = t('requester') if t is defined else "Solicitante" -%}
 {%- else -%}
   {%- set cls = "bg-status-pending-bg text-status-pending border-status-pending-border" -%}
   {%- set label = status -%}
@@ -53,3 +54,40 @@
   {{- label -}}
 </span>
 {%- endmacro %}
+
+
+{% macro sla_badge(sla_info, sla_dias=None, size="sm") %}
+{%- if sla_info -%}
+{%- if sla_info.dentro_prazo -%}
+  {%- set cls = "bg-status-done-bg text-status-done border-status-done-border" -%}
+{%- elif sla_info.em_risco -%}
+  {%- set cls = "bg-status-open-bg text-status-open border-status-open-border" -%}
+{%- else -%}
+  {%- set cls = "bg-status-cancelled-bg text-status-cancelled border-status-cancelled-border" -%}
+{%- endif -%}
+{%- if sla_info.label == 'No prazo' -%}
+  {%- set lbl = t('on_time') if t is defined else 'No prazo' -%}
+{%- elif sla_info.label == 'Atrasado' -%}
+  {%- set lbl = t('delayed') if t is defined else 'Atrasado' -%}
+{%- elif sla_info.label == 'Em risco' -%}
+  {%- set lbl = t('at_risk') if t is defined else 'Em risco' -%}
+{%- else -%}
+  {%- set lbl = sla_info.label -%}
+{%- endif -%}
+{%- if sla_dias -%}
+  {%- set tip = (t('sla_custom_tooltip') if t is defined else 'SLA personalizado') + ': ' + sla_dias|string + ' dias' -%}
+{%- else -%}
+  {%- set tip = t('sla_tooltip') if t is defined else 'SLA' -%}
+{%- endif -%}
+{%- if size == "md" -%}
+  {%- set size_cls = "px-2.5 py-1 text-xs" -%}
+{%- else -%}
+  {%- set size_cls = "px-2 py-0.5 text-xs" -%}
+{%- endif -%}
+<span class="inline-flex items-center rounded border font-bold {{ size_cls }} {{ cls }}" title="{{ tip }}">
+  {{- lbl -}}
+</span>
+{%- else -%}
+<span class="text-slate-300 text-xs font-bold">—</span>
+{%- endif -%}
+{% endmacro %}

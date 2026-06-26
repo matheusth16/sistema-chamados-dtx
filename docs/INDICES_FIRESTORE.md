@@ -24,8 +24,11 @@ Este documento descreve os índices compostos usados pelo sistema e como implant
 | Dashboard (gate, status, etc.) | chamados | gate ASC, status ASC, data_abertura DESC | Filtros por gate |
 | Dashboard (responsável) | chamados | responsavel ASC, status ASC | Filtro por responsável |
 | Relatórios / analytics | chamados | data_abertura ASC (ou DESC) + outros | Queries em analytics.py |
+| Dashboard supervisor (isolamento Fase 2) | chamados | supervisor_ids_com_acesso ARRAY_CONTAINS | Query `array_contains` para filtrar apenas chamados que o supervisor pode ver — owner, fila da área ou participante (ADR-004, Fase 2) |
 | Histórico do chamado | historico | chamado_id ASC, data_acao DESC | Timeline do chamado |
 | Notificações não lidas | notificacoes | usuario_id ASC, lida ASC | Listagem de notificações |
+| Escada A — chamados sem resposta (Fase 6) | chamados | status ASC, escalacao_resposta_nivel ASC | Query `status=="Aberto" AND escalacao_resposta_nivel<4` no job sla_escalacao (10 min) |
+| Escada B — chamados em atendimento vencidos (Fase 7) | chamados | status ASC, escalacao_resolucao_nivel ASC | Query `status=="Em Atendimento" AND escalacao_resolucao_nivel<4` no job sla_escalacao (10 min) |
 
 ## Verificação
 

@@ -164,6 +164,53 @@ def test_setor_get_by_id_excecao_retorna_none():
     assert result is None
 
 
+def test_setor_get_all_incluindo_inativos_retorna_ativos_e_inativos():
+    """get_all_incluindo_inativos retorna setores ativos e inativos."""
+    from app.models_categorias import CategoriaSetor
+
+    doc_ativo = MagicMock()
+    doc_ativo.id = "s_ativo"
+    doc_ativo.to_dict.return_value = {
+        "nome_pt": "TI",
+        "nome_en": "IT",
+        "nome_es": "TI",
+        "ativo": True,
+    }
+
+    doc_inativo = MagicMock()
+    doc_inativo.id = "s_inativo"
+    doc_inativo.to_dict.return_value = {
+        "nome_pt": "RH",
+        "nome_en": "HR",
+        "nome_es": "RH",
+        "ativo": False,
+    }
+
+    with (
+        patch("app.models_categorias.traduzir_categoria", return_value={"en": "X", "es": "X"}),
+        patch("app.models_categorias.db") as mock_db,
+    ):
+        mock_db.collection.return_value.stream.return_value = [doc_ativo, doc_inativo]
+        result = CategoriaSetor.get_all_incluindo_inativos()
+
+    assert len(result) == 2
+    ativos = [r for r in result if r.ativo]
+    inativos = [r for r in result if not r.ativo]
+    assert len(ativos) == 1
+    assert len(inativos) == 1
+
+
+def test_setor_get_all_incluindo_inativos_retorna_vazio_quando_excecao():
+    """get_all_incluindo_inativos retorna [] quando Firestore lança exceção."""
+    from app.models_categorias import CategoriaSetor
+
+    with patch("app.models_categorias.db") as mock_db:
+        mock_db.collection.return_value.stream.side_effect = Exception("err")
+        result = CategoriaSetor.get_all_incluindo_inativos()
+
+    assert result == []
+
+
 # ── CategoriaGate ─────────────────────────────────────────────────────────────
 
 
@@ -325,6 +372,51 @@ def test_impacto_get_all_retorna_lista():
     assert len(result) == 1
 
 
+def test_impacto_get_all_incluindo_inativos_retorna_ativos_e_inativos():
+    """get_all_incluindo_inativos retorna impactos ativos e inativos."""
+    from app.models_categorias import CategoriaImpacto
+
+    doc_ativo = MagicMock()
+    doc_ativo.id = "i_ativo"
+    doc_ativo.to_dict.return_value = {
+        "nome_pt": "Crítico",
+        "nome_en": "Critical",
+        "nome_es": "Crítico",
+        "ativo": True,
+    }
+
+    doc_inativo = MagicMock()
+    doc_inativo.id = "i_inativo"
+    doc_inativo.to_dict.return_value = {
+        "nome_pt": "Obsoleto",
+        "nome_en": "Obsolete",
+        "nome_es": "Obsoleto",
+        "ativo": False,
+    }
+
+    with (
+        patch("app.models_categorias.traduzir_categoria", return_value={"en": "X", "es": "X"}),
+        patch("app.models_categorias.db") as mock_db,
+    ):
+        mock_db.collection.return_value.stream.return_value = [doc_ativo, doc_inativo]
+        result = CategoriaImpacto.get_all_incluindo_inativos()
+
+    assert len(result) == 2
+    assert any(r.ativo for r in result)
+    assert any(not r.ativo for r in result)
+
+
+def test_impacto_get_all_incluindo_inativos_retorna_vazio_quando_excecao():
+    """get_all_incluindo_inativos retorna [] quando Firestore lança exceção."""
+    from app.models_categorias import CategoriaImpacto
+
+    with patch("app.models_categorias.db") as mock_db:
+        mock_db.collection.return_value.stream.side_effect = Exception("err")
+        result = CategoriaImpacto.get_all_incluindo_inativos()
+
+    assert result == []
+
+
 def test_impacto_get_all_retorna_vazio_quando_excecao():
     """CategoriaImpacto.get_all retorna [] quando Firestore lança exceção."""
     from app.models_categorias import CategoriaImpacto
@@ -364,3 +456,218 @@ def test_impacto_get_by_id_excecao_retorna_none():
         result = CategoriaImpacto.get_by_id("i1")
 
     assert result is None
+
+
+# ── delete() — TDD: estes testes devem FALHAR antes da implementação ──────────
+
+
+def test_setor_delete_chama_firestore():
+    """CategoriaSetor.delete() chama db.collection().document().delete()."""
+    from app.models_categorias import CategoriaSetor
+
+    with (
+        patch("app.models_categorias.traduzir_categoria", return_value={"en": "IT", "es": "TI"}),
+        patch("app.models_categorias.db") as mock_db,
+    ):
+        s = CategoriaSetor(nome_pt="TI", nome_en="IT", nome_es="TI", id="s1")
+        result = s.delete()
+
+    mock_db.collection.return_value.document.return_value.delete.assert_called_once()
+    assert result is True
+
+
+def test_setor_delete_retorna_false_em_excecao():
+    """CategoriaSetor.delete() retorna False quando Firestore lança exceção."""
+    from app.models_categorias import CategoriaSetor
+
+    with (
+        patch("app.models_categorias.traduzir_categoria", return_value={"en": "E", "es": "E"}),
+        patch("app.models_categorias.db") as mock_db,
+    ):
+        mock_db.collection.return_value.document.return_value.delete.side_effect = Exception("err")
+        s = CategoriaSetor(nome_pt="X", nome_en="X", nome_es="X", id="s1")
+        result = s.delete()
+
+    assert result is False
+
+
+def test_gate_delete_chama_firestore():
+    """CategoriaGate.delete() chama db.collection().document().delete()."""
+    from app.models_categorias import CategoriaGate
+
+    with (
+        patch("app.models_categorias.traduzir_categoria", return_value={"en": "G", "es": "G"}),
+        patch("app.models_categorias.db") as mock_db,
+    ):
+        g = CategoriaGate(
+            nome_pt="Gate 1 - Desmontagem", gate_pai="Gate 1", etapa="Desmontagem", id="g1"
+        )
+        result = g.delete()
+
+    mock_db.collection.return_value.document.return_value.delete.assert_called_once()
+    assert result is True
+
+
+def test_gate_delete_retorna_false_em_excecao():
+    """CategoriaGate.delete() retorna False quando exceção."""
+    from app.models_categorias import CategoriaGate
+
+    with (
+        patch("app.models_categorias.traduzir_categoria", return_value={"en": "G", "es": "G"}),
+        patch("app.models_categorias.db") as mock_db,
+    ):
+        mock_db.collection.return_value.document.return_value.delete.side_effect = Exception("err")
+        g = CategoriaGate(
+            nome_pt="Gate 1 - Desmontagem", gate_pai="Gate 1", etapa="Desmontagem", id="g1"
+        )
+        result = g.delete()
+
+    assert result is False
+
+
+def test_impacto_delete_chama_firestore():
+    """CategoriaImpacto.delete() chama db.collection().document().delete()."""
+    from app.models_categorias import CategoriaImpacto
+
+    with (
+        patch(
+            "app.models_categorias.traduzir_categoria", return_value={"en": "High", "es": "Alto"}
+        ),
+        patch("app.models_categorias.db") as mock_db,
+    ):
+        imp = CategoriaImpacto(nome_pt="Alto", nome_en="High", nome_es="Alto", id="i1")
+        result = imp.delete()
+
+    mock_db.collection.return_value.document.return_value.delete.assert_called_once()
+    assert result is True
+
+
+def test_impacto_delete_retorna_false_em_excecao():
+    """CategoriaImpacto.delete() retorna False quando exceção."""
+    from app.models_categorias import CategoriaImpacto
+
+    with (
+        patch("app.models_categorias.traduzir_categoria", return_value={"en": "H", "es": "H"}),
+        patch("app.models_categorias.db") as mock_db,
+    ):
+        mock_db.collection.return_value.document.return_value.delete.side_effect = Exception("err")
+        imp = CategoriaImpacto(nome_pt="Alto", nome_en="High", nome_es="Alto", id="i1")
+        result = imp.delete()
+
+    assert result is False
+
+
+# ── CategoriaGate — novos campos gate_pai + etapa ─────────────────────────────
+
+
+def test_gate_from_dict_carrega_gate_pai_e_etapa():
+    """CategoriaGate.from_dict carrega gate_pai e etapa quando presentes."""
+    from app.models_categorias import CategoriaGate
+
+    with patch("app.models_categorias.traduzir_categoria", return_value={"en": "G", "es": "G"}):
+        g = CategoriaGate.from_dict(
+            {
+                "nome_pt": "Gate 1 - Desmontagem",
+                "nome_en": "Gate 1 - Disassembly",
+                "nome_es": "Gate 1 - Desmontaje",
+                "gate_pai": "Gate 1",
+                "etapa": "Desmontagem",
+                "ordem": 1,
+                "ativo": True,
+            },
+            id="g1",
+        )
+
+    assert g.gate_pai == "Gate 1"
+    assert g.etapa == "Desmontagem"
+    assert g.nome_pt == "Gate 1 - Desmontagem"
+
+
+def test_gate_to_dict_inclui_gate_pai_e_etapa():
+    """CategoriaGate.to_dict inclui gate_pai e etapa."""
+    from app.models_categorias import CategoriaGate
+
+    with patch("app.models_categorias.traduzir_categoria", return_value={"en": "G", "es": "G"}):
+        g = CategoriaGate(nome_pt="Gate 2 - Forno", gate_pai="Gate 2", etapa="Forno")
+        d = g.to_dict()
+
+    assert d["gate_pai"] == "Gate 2"
+    assert d["etapa"] == "Forno"
+    assert d["nome_pt"] == "Gate 2 - Forno"
+
+
+def test_gate_get_all_ativos_retorna_so_ativos():
+    """CategoriaGate.get_all_ativos() retorna apenas gates com ativo=True."""
+    from app.models_categorias import CategoriaGate
+
+    doc_ativo = MagicMock()
+    doc_ativo.id = "g1"
+    doc_ativo.to_dict.return_value = {
+        "nome_pt": "Gate 1 - Desmontagem",
+        "gate_pai": "Gate 1",
+        "etapa": "Desmontagem",
+        "ordem": 1,
+        "ativo": True,
+    }
+
+    with (
+        patch("app.models_categorias.traduzir_categoria", return_value={"en": "G", "es": "G"}),
+        patch("app.models_categorias.db") as mock_db,
+    ):
+        mock_db.collection.return_value.where.return_value.stream.return_value = [doc_ativo]
+        result = CategoriaGate.get_all_ativos()
+
+    assert len(result) == 1
+    assert result[0].gate_pai == "Gate 1"
+    assert result[0].etapa == "Desmontagem"
+
+
+def test_gate_get_all_ativos_retorna_vazio_quando_excecao():
+    """CategoriaGate.get_all_ativos() retorna [] quando exceção."""
+    from app.models_categorias import CategoriaGate
+
+    with patch("app.models_categorias.db") as mock_db:
+        mock_db.collection.return_value.where.return_value.stream.side_effect = Exception("err")
+        result = CategoriaGate.get_all_ativos()
+
+    assert result == []
+
+
+# ── CategoriaImpacto.save() — S4-05: @firebase_retry ─────────────────────────
+
+
+def test_impacto_save_existente_chama_update():
+    """CategoriaImpacto.save com id existente chama db.collection().document().update()."""
+    from app.models_categorias import CategoriaImpacto
+
+    with (
+        patch("app.models_categorias.traduzir_categoria", return_value={"en": "H", "es": "H"}),
+        patch("app.models_categorias.db") as mock_db,
+    ):
+        imp = CategoriaImpacto(nome_pt="Impacto Existente", id="i1")
+        imp.save()
+
+    mock_db.collection.return_value.document.return_value.update.assert_called_once()
+
+
+def test_impacto_save_tem_firebase_retry():
+    """CategoriaImpacto.save deve ter @firebase_retry: retenta 3x em ServiceUnavailable."""
+    from google.api_core.exceptions import ServiceUnavailable
+
+    from app.models_categorias import CategoriaImpacto
+
+    with (
+        patch("app.models_categorias.traduzir_categoria", return_value={"en": "H", "es": "H"}),
+        patch("app.models_categorias.db") as mock_db,
+        patch("app.firebase_retry.time.sleep"),
+    ):
+        mock_db.collection.return_value.document.return_value.update.side_effect = (
+            ServiceUnavailable("db down")
+        )
+        import contextlib
+
+        imp = CategoriaImpacto(nome_pt="Impacto", id="i_retry")
+        with contextlib.suppress(ServiceUnavailable):
+            imp.save()
+
+    assert mock_db.collection.return_value.document.return_value.update.call_count == 3

@@ -209,12 +209,12 @@ def salvar_anexo(arquivo: Any) -> str | None:
     if url:
         return url
 
-    # 3) Em produção sem nenhum storage configurado: não salvar em disco (efêmero no Railway)
+    # 3) Em produção sem nenhum storage configurado: não salvar em disco (efêmero)
     if current_app.config.get("ENV") == "production":
         logger.error(
             "R2 e Firebase Storage falharam em produção. Anexo NÃO foi salvo. "
             "Configure R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, "
-            "R2_BUCKET_NAME e R2_PUBLIC_URL nas variáveis de ambiente do Railway."
+            "R2_BUCKET_NAME e R2_PUBLIC_URL nas variáveis de ambiente."
         )
         return None
 

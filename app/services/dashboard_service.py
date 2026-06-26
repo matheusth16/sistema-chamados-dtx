@@ -52,12 +52,15 @@ def ordenar_metricas_supervisores(lista: list[dict], campo: str, asc: bool) -> l
     """
     reverse = not asc
     if campo == "sla":
+        # None must always sort last regardless of direction; embed direction in
+        # the numeric component so reverse= is not needed for the sla branch.
+        sign = 1 if asc else -1
 
         def _sla_key(x):
             v = x.get("percentual_dentro_sla")
-            return (v is None, -(v or 0))
+            return (v is None, sign * (v or 0))
 
-        return sorted(lista, key=_sla_key, reverse=reverse)
+        return sorted(lista, key=_sla_key)
     key_fn = _CAMPOS_SUP.get(campo)
     if key_fn:
         return sorted(lista, key=key_fn, reverse=reverse)
@@ -150,9 +153,9 @@ def obter_contexto_admin(
     )
     chamados_ref = db.collection("chamados")
     if user.perfil == "supervisor" and getattr(user, "areas", None):
-        areas = user.areas[:10]
-        if areas:
-            chamados_ref = chamados_ref.where(filter=FieldFilter("area", "in", areas))
+        chamados_ref = chamados_ref.where(
+            filter=FieldFilter("supervisor_ids_com_acesso", "array_contains", user.id)
+        )
     cursor = (args.get("cursor") or "").strip() or None
     cursor_prev = (args.get("cursor_prev") or "").strip() or None
     pagina_atual = int(args.get("pagina") or 1)

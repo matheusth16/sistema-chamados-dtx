@@ -10,8 +10,12 @@ const DEBUG = Boolean(window.DTX_DEBUG) || (
 
 // i18n messages injected by the template via window.DTX_MSGS
 const MSGS = window.DTX_MSGS || {
+    cancellation_reason: 'Motivo do cancelamento',
+    cancellation_reason_placeholder: 'Informe o motivo do cancelamento',
     cancel_reason_prompt: 'Informe o motivo do cancelamento:',
     cancel_requires_reason: 'O cancelamento exige um motivo.',
+    back: 'Voltar',
+    apply: 'Aplicar',
     error_form_not_found: 'Erro: Formulário não encontrado',
     error_id_not_found: 'Erro: Campo ID não encontrado',
     error_id_empty: 'Erro: ID do chamado vazio. Recarregue a página.',
@@ -22,9 +26,114 @@ const MSGS = window.DTX_MSGS || {
     error_connection: 'Erro de conexão. Tente novamente.'
 };
 
+// Endpoints injected by the template via window.DTX_URLS (fallback para dev)
+const URLS = window.DTX_URLS || {};
+const URL_ATUALIZAR_STATUS = URLS.atualizar_status || '/api/atualizar-status';
+
+// Status canônicos injetados pelo template (fonte única no servidor)
+const STATUS_VALIDOS = window.DTX_STATUS_VALIDOS || ['Aberto', 'Em Atendimento', 'Concluído', 'Cancelado'];
+
 function debugLog() {
     if (!DEBUG || !window.console) return;
     console.log.apply(console, arguments);
+}
+
+// ============================================================================
+// MODAL DE CANCELAMENTO (substitui window.prompt — F-33 / S2-05)
+// ============================================================================
+
+let _cancelModalResolver = null;
+
+/**
+ * Abre modal acessível e aguarda motivo ou cancelamento do usuário.
+ * @returns {Promise<string|null>} motivo confirmado, ou null se usuário voltou/fechou
+ */
+function solicitarMotivoCancelamento() {
+    return new Promise((resolve) => {
+        const modal = document.getElementById('modal-cancelamento');
+        const textarea = document.getElementById('motivo-cancelamento-texto');
+        const erroEl = document.getElementById('modal-cancelamento-erro');
+        if (!modal || !textarea) {
+            resolve(null);
+            return;
+        }
+
+        textarea.value = '';
+        if (erroEl) {
+            erroEl.textContent = '';
+            erroEl.classList.add('hidden');
+        }
+
+        _cancelModalResolver = resolve;
+        if (typeof modal.showModal === 'function') {
+            modal.showModal();
+        } else {
+            resolve(null);
+            return;
+        }
+        textarea.focus();
+    });
+}
+
+function fecharModalCancelamento(resultado) {
+    const modal = document.getElementById('modal-cancelamento');
+    const resolver = _cancelModalResolver;
+    _cancelModalResolver = null;
+    if (modal && modal.open) {
+        modal.close();
+    }
+    if (resolver) {
+        resolver(resultado);
+    }
+}
+
+function initModalCancelamento() {
+    const modal = document.getElementById('modal-cancelamento');
+    const textarea = document.getElementById('motivo-cancelamento-texto');
+    const btnConfirm = document.getElementById('btn-confirmar-cancelamento');
+    const btnVoltar = document.getElementById('btn-voltar-cancelamento');
+    const erroEl = document.getElementById('modal-cancelamento-erro');
+    if (!modal || !textarea) return;
+
+    btnConfirm.addEventListener('click', () => {
+        const motivo = textarea.value.trim();
+        if (!motivo) {
+            if (erroEl) {
+                erroEl.textContent = MSGS.cancel_requires_reason;
+                erroEl.classList.remove('hidden');
+            } else {
+                mostrarNotificacao(MSGS.cancel_requires_reason, 'warning');
+            }
+            textarea.focus();
+            return;
+        }
+        fecharModalCancelamento(motivo);
+    });
+
+    btnVoltar.addEventListener('click', () => fecharModalCancelamento(null));
+
+    modal.addEventListener('cancel', (e) => {
+        e.preventDefault();
+        fecharModalCancelamento(null);
+    });
+
+    modal.addEventListener('keydown', (e) => {
+        if (e.key !== 'Tab' || !modal.open) return;
+        const focusables = modal.querySelectorAll(
+            'button, textarea, [href], input, select, [tabindex]:not([tabindex="-1"])'
+        );
+        const list = Array.from(focusables).filter((el) => !el.disabled);
+        if (!list.length) return;
+        const first = list[0];
+        const last = list[list.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+            e.preventDefault();
+            last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+            e.preventDefault();
+            first.focus();
+        }
+    });
 }
 
 // ============================================================================
@@ -40,7 +149,7 @@ async function atualizarStatusAjax(selectElement) {
     const form = selectElement.closest('form');
 
     if (!form) {
-        debugLog('❌ Erro: formulário não encontrado');
+        debugLog('Erro: formulário não encontrado');
         mostrarNotificacao(MSGS.error_form_not_found, 'danger');
         return;
     }
@@ -52,7 +161,7 @@ async function atualizarStatusAjax(selectElement) {
     const statusAnterior = selectElement.dataset.statusAnterior || selectElement.value;
 
     // Log detalhado para debug
-    debugLog('🔍 DEBUG - Dados coletados:', {
+    debugLog('DEBUG - Dados coletados:', {
         form_encontrado: !!form,
         input_encontrado: !!chamadoIdInput,
         chamado_id: chamadoId || '[VAZIO]',
@@ -63,13 +172,13 @@ async function atualizarStatusAjax(selectElement) {
 
     // Validações rigorosas
     if (!form.querySelector('input[name="chamado_id"]')) {
-        debugLog('❌ Campo input[name="chamado_id"] não encontrado no formulário');
+        debugLog('Campo input[name="chamado_id"] não encontrado no formulário');
         mostrarNotificacao(MSGS.error_id_not_found, 'danger');
         return;
     }
 
     if (!chamadoId) {
-        debugLog('❌ chamado_id está vazio!', {
+        debugLog('chamado_id está vazio!', {
             input_value: chamadoIdInput?.value,
             input_html: chamadoIdInput?.outerHTML
         });
@@ -78,39 +187,38 @@ async function atualizarStatusAjax(selectElement) {
     }
 
     if (!novoStatus) {
-        debugLog('❌ novo_status está vazio');
+        debugLog('novo_status está vazio');
         mostrarNotificacao(MSGS.error_status_not_selected, 'danger');
         return;
     }
 
     // Valida o status
-    const statusValidos = ['Aberto', 'Em Atendimento', 'Concluído', 'Cancelado'];
-    if (!statusValidos.includes(novoStatus)) {
-        debugLog('❌ Status inválido:', novoStatus);
+    if (!STATUS_VALIDOS.includes(novoStatus)) {
+        debugLog('Status inválido:', novoStatus);
         mostrarNotificacao(`${MSGS.error_invalid_status} "${novoStatus}"`, 'danger');
         selectElement.value = statusAnterior;
         return;
     }
 
     if (novoStatus === statusAnterior) {
-        debugLog('ℹ️ Status não mudou (mesmo valor)');
+        debugLog('Status não mudou (mesmo valor)');
         return;
     }
 
     let motivoCancelamento = '';
     if (novoStatus === 'Cancelado') {
-        motivoCancelamento = (window.prompt(MSGS.cancel_reason_prompt) || '').trim();
-        if (!motivoCancelamento) {
-            mostrarNotificacao(MSGS.cancel_requires_reason, 'warning');
+        const motivo = await solicitarMotivoCancelamento();
+        if (motivo === null) {
             selectElement.value = statusAnterior;
             return;
         }
+        motivoCancelamento = motivo;
     }
 
     try {
         // Desabilita o select durante o request
         selectElement.disabled = true;
-        debugLog(`🔄 Enviando atualização: ${chamadoId} → ${novoStatus}`);
+        debugLog('Enviando atualização:', chamadoId, '->', novoStatus);
 
         // Log do payload
         const payload = {
@@ -120,7 +228,7 @@ async function atualizarStatusAjax(selectElement) {
         if (novoStatus === 'Cancelado' && motivoCancelamento) {
             payload.motivo_cancelamento = motivoCancelamento;
         }
-        debugLog('📤 Payload enviado:', JSON.stringify(payload, null, 2));
+        debugLog('Payload enviado:', JSON.stringify(payload, null, 2));
 
         // Faz o request AJAX (CSRF no header para proteção)
         const csrfMeta = document.querySelector('meta[name="csrf-token"]');
@@ -129,48 +237,44 @@ async function atualizarStatusAjax(selectElement) {
             'X-Requested-With': 'XMLHttpRequest'
         };
         if (csrfMeta && csrfMeta.content) headers['X-CSRFToken'] = csrfMeta.content;
-        const response = await fetch('/api/atualizar-status', {
+        const response = await fetch(URL_ATUALIZAR_STATUS, {
             method: 'POST',
             headers: headers,
             body: JSON.stringify(payload)
         });
 
-        debugLog('📊 HTTP Status:', response.status, response.statusText);
-        debugLog('📊 Content-Type:', response.headers.get('content-type'));
+        debugLog('HTTP Status:', response.status, response.statusText);
+        debugLog('Content-Type:', response.headers.get('content-type'));
 
         const text = await response.text();
         let resultado;
         try {
             resultado = text ? JSON.parse(text) : {};
         } catch (parseError) {
-            debugLog('❌ Erro ao parsear JSON:', parseError);
+            debugLog('Erro ao parsear JSON:', parseError);
             debugLog('Resposta raw:', text);
             selectElement.value = statusAnterior;
             mostrarNotificacao(MSGS.error_server, 'danger');
             return false;
         }
 
-        debugLog('✅ Resposta do servidor:', resultado);
+        debugLog('Resposta do servidor:', resultado);
 
         if (response.ok && resultado.sucesso) {
-            // ✅ Sucesso: atualiza visualmente
             if (linha) {
                 atualizarLinhaStatus(linha, novoStatus);
             }
             mostrarNotificacao(resultado.mensagem, 'success');
             selectElement.dataset.statusAnterior = novoStatus;
-
-            // Previne que o formulário seja submetido (importante para modal)
             return false;
         } else {
-            // ❌ Erro: reverte o status
-            debugLog('❌ Erro na resposta:', resultado);
+            debugLog('Erro na resposta:', resultado);
             selectElement.value = statusAnterior;
             mostrarNotificacao(resultado.erro || MSGS.error_update, 'danger');
             return false;
         }
     } catch (erro) {
-        debugLog('❌ Erro de conexão:', erro);
+        debugLog('Erro de conexão:', erro);
         debugLog('Stack trace:', erro.stack);
         selectElement.value = statusAnterior;
         mostrarNotificacao(MSGS.error_connection, 'danger');
@@ -181,35 +285,33 @@ async function atualizarStatusAjax(selectElement) {
 }
 
 /**
- * Atualiza a linha da tabela com o novo status
+ * Atualiza a célula de status da linha usando os tokens de cor do design system
  * @param {HTMLElement} linha - O elemento <tr> da linha
  * @param {string} novoStatus - O novo status
  */
 function atualizarLinhaStatus(linha, novoStatus) {
-    // Encontra o span do status na linha
-    const spanStatus = linha.querySelector('td:nth-child(5) span');
-    if (!spanStatus) return;
+    const statusCell = linha.querySelector('[data-cell="status"]');
+    if (!statusCell) return;
 
-    // Remove classes anteriores
-    spanStatus.classList.remove('bg-green-100', 'text-green-800', 'bg-yellow-100', 'text-yellow-800', 'bg-gray-100', 'text-gray-800');
+    const label = typeof translateStatus === 'function'
+        ? translateStatus(novoStatus)
+        : novoStatus;
 
-    // Adiciona novas classes baseado no novo status
-    if (novoStatus === 'Concluído') {
-        spanStatus.classList.add('bg-green-100', 'text-green-800');
-    } else if (novoStatus === 'Em Atendimento') {
-        spanStatus.classList.add('bg-yellow-100', 'text-yellow-800');
+    if (typeof dtxStatusBadgeHtml === 'function') {
+        statusCell.innerHTML = dtxStatusBadgeHtml(novoStatus, label);
     } else {
-        spanStatus.classList.add('bg-gray-100', 'text-gray-800');
+        const cls = novoStatus === 'Concluído'
+            ? 'bg-status-done-bg text-status-done border-status-done-border'
+            : novoStatus === 'Em Atendimento'
+            ? 'bg-status-active-bg text-status-active border-status-active-border'
+            : novoStatus === 'Cancelado'
+            ? 'bg-status-cancelled-bg text-status-cancelled border-status-cancelled-border'
+            : 'bg-status-open-bg text-status-open border-status-open-border';
+        statusCell.innerHTML = `<span class="px-2.5 py-1 inline-flex items-center text-xs font-bold rounded-dtx-sm border ${cls}">${label}</span>`;
     }
 
-    // Atualiza o texto
-    spanStatus.textContent = novoStatus;
-
-    // Animação visual de sucesso
     linha.classList.add('dtx-row-flash');
-    setTimeout(() => {
-        linha.classList.remove('dtx-row-flash');
-    }, 1000);
+    setTimeout(() => linha.classList.remove('dtx-row-flash'), 1000);
 }
 
 /**
@@ -230,7 +332,6 @@ function mostrarNotificacao(mensagem, tipo = 'info') {
     div.textContent = mensagem;
     document.body.appendChild(div);
 
-    // Remove a notificação após 3 segundos
     setTimeout(() => {
         div.style.opacity = '0';
         div.style.transition = 'opacity 0.3s ease-out';
@@ -253,28 +354,15 @@ function configurarDebounceNaBusca() {
     if (!inputBusca) return;
 
     inputBusca.addEventListener('input', (e) => {
-        // Limpa o timer anterior
-        if (debounceTimer) {
-            clearTimeout(debounceTimer);
-        }
-
-        // Define um novo timer
+        if (debounceTimer) clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => {
-            // Envia o formulário de busca
             inputBusca.form.submit();
         }, DEBOUNCE_DELAY);
     });
 
-    // Remove o comportamento padrão do submit
     inputBusca.form.addEventListener('submit', (e) => {
-        // Permite o submit normal do botão Filtrar
-        if (e.submitter && e.submitter.type === 'submit') {
-            return; // Deixa fazer submit
-        }
-        // Bloqueia se for only debounce
-        if (e.isTrusted && e.submitter === null) {
-            e.preventDefault();
-        }
+        if (e.submitter && e.submitter.type === 'submit') return;
+        if (e.isTrusted && e.submitter === null) e.preventDefault();
     });
 }
 
@@ -296,67 +384,54 @@ function otimizarRenderizacaoTabela() {
 // ============================================================================
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Configura debounce na busca
+    initModalCancelamento();
     configurarDebounceNaBusca();
-
-    // Otimiza renderização
     otimizarRenderizacaoTabela();
 
-    // Adiciona listeners aos dropdowns de status (tabela e modal)
     document.querySelectorAll('select[name="novo_status"]').forEach((select) => {
-        // Armazena o status anterior
         select.dataset.statusAnterior = select.value;
 
-        // TODOS os dropdowns (tabela E modal) usam AJAX
         select.addEventListener('change', (e) => {
             const form = select.closest('form');
             if (form) {
                 const chamadoIdInput = form.querySelector('input[name="chamado_id"]');
                 const chamadoId = chamadoIdInput?.value;
                 if (chamadoId) {
-                    debugLog(`🔄 Mudança detectada: Chamado ${chamadoId} → ${select.value}`);
+                    debugLog('Mudança detectada: Chamado', chamadoId, '->', select.value);
                     select.dataset.chamadoId = chamadoId;
                     atualizarStatusAjax(select);
                 } else {
-                    debugLog('❌ Erro: chamado_id não encontrado no formulário');
+                    debugLog('Erro: chamado_id não encontrado no formulário');
                 }
             }
         });
     });
 
-    // Previne que o formulário do modal seja submetido (POST)
-    // Pois o AJAX já trata a atualização
     const formularioModal = document.querySelector('#modal-overlay form');
     if (formularioModal) {
         formularioModal.addEventListener('submit', (e) => {
-            debugLog('🛑 Bloqueando submit do modal (usar AJAX)');
+            debugLog('Bloqueando submit do modal (usar AJAX)');
             e.preventDefault();
             return false;
         });
     }
 
-    debugLog('✓ Dashboard otimizado: AJAX status (tabela + modal), Debounce busca ativados');
+    debugLog('Dashboard otimizado: AJAX status (tabela + modal), Debounce busca ativados');
 });
 
 // ============================================================================
 // 5. CSS ANIMATIONS (injetado dinamicamente)
 // ============================================================================
 
-const style = document.createElement('style');
-style.textContent = `
+if (!document.getElementById('dtx-dashboard-fade-keyframes')) {
+    const style = document.createElement('style');
+    style.id = 'dtx-dashboard-fade-keyframes';
+    style.textContent = `
     @keyframes fadeIn {
-        from {
-            opacity: 0;
-            transform: translateY(-10px);
-        }
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
+        from { opacity: 0; transform: translateY(-10px); }
+        to   { opacity: 1; transform: translateY(0); }
     }
-
-    .animate-fade-in {
-        animation: fadeIn 0.3s ease-in;
-    }
+    .animate-fade-in { animation: fadeIn 0.3s ease-in; }
 `;
-document.head.appendChild(style);
+    document.head.appendChild(style);
+}

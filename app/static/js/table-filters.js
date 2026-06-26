@@ -8,6 +8,18 @@
 (function() {
     'use strict';
 
+    // i18n e locale vindos do template (window.DTX_i18n), com fallback pt-BR
+    const I18N = window.DTX_i18n || {};
+    const LOCALE = I18N.locale || 'pt-BR';
+    const T_FILTER = I18N.filter_title || 'Filtrar';
+    const T_ALL = I18N.filter_all || 'Todos';
+
+    // Log de aviso apenas em desenvolvimento (evita ruído em produção)
+    function warnDebug() {
+        if (!window.DTX_DEBUG || !window.console) return;
+        console.warn.apply(console, arguments);
+    }
+
     // Estado global dos filtros e ordenação
     let state = {
         sortColumn: null,
@@ -36,7 +48,7 @@
                 state = JSON.parse(stored);
             }
         } catch (e) {
-            console.warn('Erro ao carregar estado:', e);
+            warnDebug('Erro ao carregar estado:', e);
         }
     }
 
@@ -47,7 +59,7 @@
         try {
             sessionStorage.setItem(`tableState_${PAGE_KEY}`, JSON.stringify(state));
         } catch (e) {
-            console.warn('Erro ao salvar estado:', e);
+            warnDebug('Erro ao salvar estado:', e);
         }
     }
 
@@ -111,7 +123,7 @@
             } else if (type === 'date') {
                 comparison = aValue - bValue;
             } else {
-                comparison = aValue.localeCompare(bValue, 'pt-BR');
+                comparison = aValue.localeCompare(bValue, LOCALE);
             }
             return direction === 'asc' ? comparison : -comparison;
         };
@@ -241,13 +253,13 @@
         const dropdown = document.createElement('div');
         dropdown.className = 'filter-dropdown';
 
-        let html = '<div class="filter-dropdown-header">Filtrar</div>';
+        let html = `<div class="filter-dropdown-header">${escapeHtml(T_FILTER)}</div>`;
         html += '<div class="filter-dropdown-options">';
 
         // Opção "Todos"
         html += `<label class="filter-option">
             <input type="radio" name="filter-${columnIndex}" value="" ${!state.filters[columnIndex] ? 'checked' : ''}>
-            <span>Todos</span>
+            <span>${escapeHtml(T_ALL)}</span>
         </label>`;
 
         // Opções dos valores únicos

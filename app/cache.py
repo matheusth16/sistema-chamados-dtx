@@ -93,6 +93,12 @@ def cache_delete(key: str) -> None:
     _MEMORY_TTL.pop(key, None)
 
 
+def static_cache_delete(key: str) -> None:
+    """Remove uma chave do cache estático em memória (usado por get_static_cached)."""
+    _static_cache.pop(key, None)
+    _static_expiry.pop(key, None)
+
+
 def is_redis_available() -> bool:
     """Retorna True se o Redis está em uso."""
     return _get_redis() is not None

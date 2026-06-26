@@ -321,3 +321,67 @@ def test_listar_meus_chamados_tem_proxima_pagina():
 
     assert result["cursor_next"] is not None
     assert len(result["chamados"]) == 10
+
+
+# ── F-26: cursor_prev = ID do 1º doc da página quando cursor é usado ──────────
+
+
+def test_listar_meus_chamados_cursor_prev_e_id_do_primeiro_doc():
+    """F-26: quando cursor é usado, cursor_prev deve ser o ID do primeiro doc da página."""
+    from app.services.chamados_listagem_service import listar_meus_chamados
+
+    docs = [_make_doc(f"c{i}", {"status": "Aberto", "prioridade": 1}) for i in range(3)]
+
+    cursor_doc = MagicMock()
+    cursor_doc.exists = True
+
+    with (
+        patch("app.services.chamados_listagem_service.db") as mock_db,
+        patch("app.services.chamados_listagem_service.obter_total_por_contagem", return_value=10),
+        patch("app.services.chamados_listagem_service.Chamado") as mock_chamado_cls,
+        patch("app.cache.cache_get", return_value=None),
+        patch("app.cache.cache_set"),
+    ):
+        mock_q = MagicMock()
+        mock_col = MagicMock()
+        mock_db.collection.return_value = mock_col
+        mock_col.where.return_value = mock_q
+        mock_col.document.return_value.get.return_value = cursor_doc
+        mock_q.where.return_value = mock_q
+        mock_q.order_by.return_value = mock_q
+        mock_q.start_after.return_value = mock_q
+        mock_q.limit.return_value = mock_q
+        mock_q.stream.return_value = docs
+        mock_chamado_cls.from_dict.return_value = MagicMock(rl_codigo="", prioridade=1)
+
+        result = listar_meus_chamados("u1", cursor="prev_cursor_id", itens_por_pagina=10)
+
+    assert result["cursor_prev"] == "c0", (
+        f"cursor_prev deve ser ID do primeiro doc (c0), recebeu: {result['cursor_prev']!r}"
+    )
+
+
+def test_listar_meus_chamados_sem_cursor_cursor_prev_e_none():
+    """F-26: sem cursor (primeira página), cursor_prev deve ser None."""
+    from app.services.chamados_listagem_service import listar_meus_chamados
+
+    docs = [_make_doc(f"c{i}", {"status": "Aberto", "prioridade": 1}) for i in range(3)]
+
+    with (
+        patch("app.services.chamados_listagem_service.db") as mock_db,
+        patch("app.services.chamados_listagem_service.obter_total_por_contagem", return_value=3),
+        patch("app.services.chamados_listagem_service.Chamado") as mock_chamado_cls,
+        patch("app.cache.cache_get", return_value=None),
+        patch("app.cache.cache_set"),
+    ):
+        mock_q = MagicMock()
+        mock_db.collection.return_value.where.return_value = mock_q
+        mock_q.where.return_value = mock_q
+        mock_q.order_by.return_value = mock_q
+        mock_q.limit.return_value = mock_q
+        mock_q.stream.return_value = docs
+        mock_chamado_cls.from_dict.return_value = MagicMock(rl_codigo="", prioridade=1)
+
+        result = listar_meus_chamados("u1", itens_por_pagina=10)
+
+    assert result["cursor_prev"] is None

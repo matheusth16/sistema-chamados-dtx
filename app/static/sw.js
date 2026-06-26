@@ -1,13 +1,15 @@
-/* Service Worker: Web Push - DTX Digital Andon */
+/* Service Worker: Web Push - DTX Service Portal */
 self.addEventListener('push', function(event) {
-    var data = { title: 'DTX Andon', body: '', url: '' };
+    var data = { title: 'DTX Service Portal', body: '', url: '' };
     if (event.data) {
         try {
             var payload = event.data.json();
             data.title = payload.title || data.title;
             data.body = payload.body || '';
             data.url = payload.url || '';
-        } catch (e) {}
+        } catch (e) {
+            console.error('[sw.js] Erro ao parsear payload push:', e);
+        }
     }
     var options = {
         body: data.body,

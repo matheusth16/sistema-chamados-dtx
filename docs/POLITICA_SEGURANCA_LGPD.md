@@ -29,8 +29,9 @@ Este documento descreve as medidas de segurança e o alinhamento do **Sistema de
 ### 3.1 Criptografia em repouso
 
 - **Senhas**: Armazenadas apenas como hash (Werkzeug/bcrypt), nunca em texto claro.
-- **Campos de dados pessoais (PII)**: Nome, e-mail e demais campos cadastrais são armazenados **sem criptografia adicional** no Firestore. A proteção reside no controle de acesso (Firestore rules + Firebase Admin SDK somente no backend) e no HTTPS em trânsito.
-  > **Roadmap**: a implementação de criptografia Fernet em repouso para o campo `nome` está prevista (`ENCRYPTION_KEY` / `ENCRYPT_PII_AT_REST` no `.env.example`) e será adicionada em versão futura com script de migração de dados existentes.
+- **Campos de dados pessoais (PII)**: `nome` e `email` dos usuários são armazenados **criptografados com Fernet (AES-128-CBC + HMAC-SHA256)** no Firestore quando `ENCRYPT_PII_AT_REST=true`. Um hash determinístico (`email_lookup_hash = sha256(email)`) permite busca/login sem descriptografar o índice. Formato: `fernet:v1:<token>`.
+  - Default `ENCRYPT_PII_AT_REST=false`: plaintext (retrocompatível) — ativar via procedimento em `docs/ENV.md`.
+  - Implementado na **Onda 4** (2026-06-23). Ver ADR: `docs/adr/001-criptografia-pii-fernet.md`.
 - **Firestore**: Acesso apenas pelo backend (Firebase Admin SDK). Regras do Firestore negam leitura/escrita direta do cliente.
 
 ### 3.2 Criptografia em trânsito
@@ -101,7 +102,7 @@ A organização deve indicar um **Encarregado de Dados (DPO)** e divulgar canal 
 
 | Medida                    | Onde está no código / config                              |
 |---------------------------|------------------------------------------------------------|
-| Criptografia (Fernet)     | **Não implementado** — previsto em roadmap; vars reservadas em `config.py` (ENCRYPTION_KEY, ENCRYPT_PII_AT_REST) |
+| Criptografia Fernet (PII) | **Implementado — Onda 4 (2026-06-23).** `nome` e `email` criptografados em repouso no Firestore quando `ENCRYPT_PII_AT_REST=true`. Ver `app/services/pii_encryption.py`, `app/models_usuario.py`, `scripts/migrar_pii_criptografia.py` e [`docs/adr/001-criptografia-pii-fernet.md`](adr/001-criptografia-pii-fernet.md). Default `false` (ativação via ops, ver `docs/ENV.md`). |
 | Hash de senha             | `app/models_usuario.py` (Werkzeug)                         |
 | Cookies e HSTS            | `config.py` (session), `app/__init__.py` (headers)          |
 | CSP e Permissions-Policy  | `app/__init__.py` (headers em produção)                     |
@@ -111,4 +112,4 @@ A organização deve indicar um **Encarregado de Dados (DPO)** e divulgar canal 
 | Mascaramento de PII em logs | `app/utils.py` (mask_email_for_log), `app/routes/auth.py` |
 | Firestore (somente backend) | `firestore.rules`, `app/database.py`                     |
 
-A criptografia Fernet de PII em repouso **ainda não está implementada** no código. As variáveis `ENCRYPTION_KEY` e `ENCRYPT_PII_AT_REST` estão reservadas em `config.py` e `.env.example` para uso futuro. Quando implementada, exigirá script de migração dos dados existentes no Firestore.
+A criptografia Fernet de PII em repouso foi **implementada na Onda 4** (2026-06-23) via `app/services/pii_encryption.py`. O default `ENCRYPT_PII_AT_REST=false` garante zero breaking change; a ativação exige migração prévia dos dados existentes com `scripts/migrar_pii_criptografia.py` e criação do índice Firestore em `email_lookup_hash`. Ver procedimento completo em `docs/ENV.md` e `docs/DEPLOYMENT_PLAN.md`.

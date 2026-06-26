@@ -204,7 +204,7 @@ def test_enviar_relatorio_semanal_envia_para_supervisor(app):
     with (
         app.app_context(),
         patch("app.services.report_service.buscar_chamados_abertos", return_value=chamados),
-        patch("app.services.report_service.Usuario.get_by_id", return_value=supervisor),
+        patch("app.services.report_service.Usuario.get_by_ids", return_value={"sup1": supervisor}),
         patch("app.services.report_service.Usuario.get_all", return_value=[]),
         patch("app.services.report_service.enviar_email", return_value=(True, None)) as mock_send,
     ):
@@ -282,7 +282,7 @@ def test_enviar_relatorio_semanal_envia_para_admin(app):
     with (
         app.app_context(),
         patch("app.services.report_service.buscar_chamados_abertos", return_value=chamados),
-        patch("app.services.report_service.Usuario.get_by_id", return_value=supervisor),
+        patch("app.services.report_service.Usuario.get_by_ids", return_value={"sup2": supervisor}),
         patch("app.services.report_service.Usuario.get_all", return_value=[admin]),
         patch("app.services.report_service.enviar_email", return_value=(True, None)) as mock_send,
     ):
@@ -293,3 +293,56 @@ def test_enviar_relatorio_semanal_envia_para_admin(app):
     destinos = [call[0][0] for call in mock_send.call_args_list]
     assert "sup2@test.com" in destinos
     assert "admin@test.com" in destinos
+
+
+def test_relatorio_semanal_usa_get_by_ids_e_nao_get_by_id(app):
+    """F-24: com 3+ responsáveis distintos, deve chamar get_by_ids 1× e get_by_id 0×."""
+    from app.services.report_service import enviar_relatorio_semanal
+
+    def _make_chamado(resp_id, numero):
+        return {
+            "id": numero,
+            "numero": numero,
+            "categoria": "TI",
+            "tipo": "Suporte",
+            "area": "TI",
+            "responsavel": f"Sup {resp_id}",
+            "responsavel_id": resp_id,
+            "solicitante": "Req",
+            "status": "Em Atendimento",
+            "data_abertura_fmt": "01/01/2026",
+            "dias_aberto": 1,
+            "sla_label": "No prazo",
+            "atrasado": False,
+            "sla_dias": None,
+            "alerta_prazo_24h_enviado_em": None,
+        }
+
+    chamados = [
+        _make_chamado("sup-a", "CH-001"),
+        _make_chamado("sup-b", "CH-002"),
+        _make_chamado("sup-c", "CH-003"),
+    ]
+    supervisores = {
+        "sup-a": _make_usuario("supa@test.com", "Sup A", "supervisor"),
+        "sup-b": _make_usuario("supb@test.com", "Sup B", "supervisor"),
+        "sup-c": _make_usuario("supc@test.com", "Sup C", "supervisor"),
+    }
+
+    with (
+        app.app_context(),
+        patch("app.services.report_service.buscar_chamados_abertos", return_value=chamados),
+        patch(
+            "app.services.report_service.Usuario.get_by_ids", return_value=supervisores
+        ) as mock_batch,
+        patch("app.services.report_service.Usuario.get_by_id") as mock_single,
+        patch("app.services.report_service.Usuario.get_all", return_value=[]),
+        patch("app.services.report_service.enviar_email", return_value=(True, None)),
+    ):
+        resultado = enviar_relatorio_semanal()
+
+    assert resultado["enviados"] == 3
+    mock_batch.assert_called_once()
+    ids_passados = set(mock_batch.call_args[0][0])
+    assert ids_passados == {"sup-a", "sup-b", "sup-c"}
+    mock_single.assert_not_called()

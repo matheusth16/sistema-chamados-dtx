@@ -326,7 +326,7 @@ def notificar_novo_usuario_cadastrado(
     email_dest = usuario_email.strip()
     areas_str = ", ".join(areas or [])
     link_dash = _link_dashboard()
-    assunto = "Welcome to DTX Digital Andon — your access credentials"
+    assunto = "Welcome to DTX Service Portal — your access credentials"
 
     detalhes_html = build_detail_table(
         [
@@ -343,11 +343,11 @@ def notificar_novo_usuario_cadastrado(
     )
 
     corpo_html = build_email_shell(
-        header_title="New account — DTX Digital Andon",
+        header_title="New account — DTX Service Portal",
         header_color="#2563eb",
         body_html=(
             f"<p>Hello, <strong>{escape(usuario_nome or 'user')}</strong>! "
-            "An account has been created for you in DTX Digital Andon.</p>"
+            "An account has been created for you in DTX Service Portal.</p>"
             + detalhes_html
             + "<p>You will be asked to change your password on first login.</p>"
             + "<p>If you do not recognize this account, contact support immediately.</p>"
@@ -356,7 +356,7 @@ def notificar_novo_usuario_cadastrado(
     )
     corpo_texto = (
         f"Hello {usuario_nome or 'user'},\n\n"
-        "An account has been created for you in DTX Digital Andon.\n"
+        "An account has been created for you in DTX Service Portal.\n"
         f"Role: {perfil}\nAreas: {areas_str or 'N/A'}\n"
         f"E-mail: {email_dest}\nInitial password: {senha_inicial}\n\n"
         "You will be asked to change your password on first login.\n"
@@ -594,3 +594,626 @@ def notificar_solicitante_status(
         logger.info("Status e-mail (%s) sent to %s (ticket %s)", novo_status, email, numero_chamado)
     else:
         logger.warning("Failed to send status e-mail to %s: %s", email, err)
+
+
+# ---------------------------------------------------------------------------
+# Ticket completed — ask requester to confirm resolution
+# ---------------------------------------------------------------------------
+
+
+def notificar_solicitante_confirmacao_pendente(
+    chamado_id: str,
+    numero_chamado: str,
+    categoria: str,
+    solicitante_usuario,
+) -> None:
+    """Notify the requester that the ticket is complete and awaits their confirmation."""
+    if not solicitante_usuario:
+        return
+    email = (getattr(solicitante_usuario, "email", None) or "").strip()
+    if not email:
+        return
+
+    nome = getattr(solicitante_usuario, "nome", None) or "Requester"
+    link = _link_chamado(chamado_id)
+
+    assunto = f"Ticket {numero_chamado}: please confirm resolution"
+
+    detalhes_html = build_detail_table(
+        [("Ticket", numero_chamado), ("Category", categoria), ("Status", "Completed")]
+    )
+    botoes_html = (
+        f'<p style="margin-top:20px;">{build_cta_button("Confirm or reopen", link, "#059669")}</p>'
+        if link
+        else '<p style="color:#6b7280;">Log in to the system to confirm or reopen your ticket.</p>'
+    )
+
+    corpo_html = build_email_shell(
+        header_title=f"Ticket {numero_chamado}: awaiting your confirmation",
+        header_color="#059669",
+        body_html=(
+            f"<p>Hello, <strong>{escape(nome)}</strong>! "
+            "Your ticket has been marked as <strong>completed</strong>. "
+            "Please open it to confirm whether the issue was resolved — "
+            "or reopen it if something is still pending.</p>" + detalhes_html + botoes_html
+        ),
+    )
+    corpo_texto = (
+        f"Hello, {nome}!\n\n"
+        f"Ticket: {numero_chamado}\nCategory: {categoria}\nStatus: Completed\n\n"
+        "Please confirm whether the issue was resolved or reopen it."
+        + (f"\n\nOpen ticket: {link}" if link else "")
+    )
+
+    ok, err = enviar_email(email, assunto, corpo_html, corpo_texto)
+    if ok:
+        logger.info("Confirmation request sent to %s (ticket %s)", email, numero_chamado)
+    else:
+        logger.warning("Failed to send confirmation request to %s: %s", email, err)
+
+
+# ---------------------------------------------------------------------------
+# Ticket reopened by requester — notify responsible (supervisor)
+# ---------------------------------------------------------------------------
+
+
+def notificar_supervisor_chamado_reaberto(
+    chamado_id: str,
+    numero_chamado: str,
+    categoria: str,
+    motivo: str,
+    solicitante_nome: str,
+    responsavel_usuario,
+) -> None:
+    """Notify the responsible that the requester rejected the resolution and reopened the ticket."""
+    if not responsavel_usuario:
+        return
+    email = (getattr(responsavel_usuario, "email", None) or "").strip()
+    if not email:
+        return
+
+    nome_responsavel = getattr(responsavel_usuario, "nome", None) or "Responsible"
+    link = _link_chamado(chamado_id)
+    link_dash = _link_dashboard()
+    motivo_truncado = (motivo or "")[:500]
+
+    assunto = f"Ticket {numero_chamado}: reopened by requester"
+
+    detalhes_html = build_detail_table(
+        [
+            ("Ticket", numero_chamado),
+            ("Category", categoria),
+            ("Requester", solicitante_nome),
+            ("Reason for reopening", motivo_truncado),
+        ]
+    )
+
+    ctas = []
+    if link:
+        ctas.append(("View ticket history", link, "#dc2626"))
+    if link_dash:
+        ctas.append(("View sector tickets", link_dash, "#6b7280"))
+    botoes_html = build_two_ctas(ctas) if ctas else ""
+
+    corpo_html = build_email_shell(
+        header_title=f"Ticket {numero_chamado}: reopened",
+        header_color="#dc2626",
+        body_html=(
+            f"<p>Hello, <strong>{escape(nome_responsavel)}</strong>! "
+            f"Ticket <strong>{escape(numero_chamado)}</strong> was <strong>reopened</strong> "
+            f"by the requester <strong>{escape(solicitante_nome)}</strong>.</p>"
+            + detalhes_html
+            + botoes_html
+        ),
+    )
+    corpo_texto = (
+        f"Hello, {nome_responsavel}!\n\n"
+        f"Ticket {numero_chamado} was reopened by {solicitante_nome}.\n"
+        f"Category: {categoria}\nReason: {motivo_truncado}"
+        + (f"\n\nView ticket: {link}" if link else "")
+    )
+
+    ok, err = enviar_email(email, assunto, corpo_html, corpo_texto)
+    if ok:
+        logger.info("Reopen notification sent to %s (ticket %s)", email, numero_chamado)
+    else:
+        logger.warning("Failed to send reopen notification to %s: %s", email, err)
+
+
+# ---------------------------------------------------------------------------
+# Escalonamento — Fase 3
+# ---------------------------------------------------------------------------
+
+
+def notificar_supervisor_transferencia_area(
+    chamado_id: str,
+    numero_chamado: str,
+    area: str,
+    categoria: str,
+    motivo: str,
+    responsavel_usuario,
+) -> None:
+    """Notifica o novo responsável que o chamado foi transferido para sua área."""
+    if not responsavel_usuario or not getattr(responsavel_usuario, "email", None):
+        logger.debug("Transfer notification skipped: recipient has no e-mail")
+        return
+
+    email_dest = responsavel_usuario.email.strip()
+    link = _link_chamado(chamado_id)
+    link_dash = _link_dashboard()
+    motivo_truncado = (motivo or "")[:500] + ("..." if len(motivo or "") > 500 else "")
+
+    assunto = f"Ticket transferred to your area: {numero_chamado}"
+
+    detalhes_html = build_detail_table(
+        [
+            ("Number", numero_chamado),
+            ("Category", categoria),
+            ("Area", area),
+            ("Reason", motivo_truncado),
+        ]
+    )
+
+    ctas = []
+    if link:
+        ctas.append(("View ticket", link, "#2563eb"))
+    if link_dash:
+        ctas.append(("View sector tickets", link_dash, "#6b7280"))
+    botoes_html = build_two_ctas(ctas) if ctas else ""
+
+    corpo_html = build_email_shell(
+        header_title="Ticket transferred to your area",
+        header_color="#2563eb",
+        body_html=(
+            f"<p>Hello, a ticket has been transferred to your area <strong>{escape(area)}</strong> "
+            f"and assigned to you.</p>" + detalhes_html + botoes_html
+        ),
+    )
+    corpo_texto = (
+        f"Number: {numero_chamado}\n"
+        f"Category: {categoria}\nArea: {area}\n"
+        f"Reason: {motivo_truncado}" + (f"\n\nView ticket: {link}" if link else "")
+    )
+
+    ok, err = enviar_email(email_dest, assunto, corpo_html, corpo_texto)
+    if ok:
+        logger.info("Transfer notification sent to %s (ticket %s)", email_dest, numero_chamado)
+    else:
+        logger.warning("Failed to send transfer notification to %s: %s", email_dest, err)
+
+
+def notificar_supervisor_escalonamento_colega(
+    chamado_id: str,
+    numero_chamado: str,
+    area: str,
+    categoria: str,
+    motivo: str,
+    responsavel_usuario,
+) -> None:
+    """Notifica o colega que recebeu o escalonamento do chamado."""
+    if not responsavel_usuario or not getattr(responsavel_usuario, "email", None):
+        logger.debug("Escalation notification skipped: recipient has no e-mail")
+        return
+
+    email_dest = responsavel_usuario.email.strip()
+    link = _link_chamado(chamado_id)
+    link_dash = _link_dashboard()
+    motivo_truncado = (motivo or "")[:500] + ("..." if len(motivo or "") > 500 else "")
+
+    assunto = f"Ticket escalated to you: {numero_chamado}"
+
+    detalhes_html = build_detail_table(
+        [
+            ("Number", numero_chamado),
+            ("Category", categoria),
+            ("Area", area),
+            ("Reason", motivo_truncado),
+        ]
+    )
+
+    ctas = []
+    if link:
+        ctas.append(("View ticket", link, "#7c3aed"))
+    if link_dash:
+        ctas.append(("View sector tickets", link_dash, "#6b7280"))
+    botoes_html = build_two_ctas(ctas) if ctas else ""
+
+    corpo_html = build_email_shell(
+        header_title="Ticket escalated to you",
+        header_color="#7c3aed",
+        body_html=(
+            f"<p>Hello, a ticket in area <strong>{escape(area)}</strong> has been escalated to you.</p>"
+            + detalhes_html
+            + botoes_html
+        ),
+    )
+    corpo_texto = (
+        f"Number: {numero_chamado}\n"
+        f"Category: {categoria}\nArea: {area}\n"
+        f"Reason: {motivo_truncado}" + (f"\n\nView ticket: {link}" if link else "")
+    )
+
+    ok, err = enviar_email(email_dest, assunto, corpo_html, corpo_texto)
+    if ok:
+        logger.info("Escalation notification sent to %s (ticket %s)", email_dest, numero_chamado)
+    else:
+        logger.warning("Failed to send escalation notification to %s: %s", email_dest, err)
+
+
+# ---------------------------------------------------------------------------
+# Participantes — Fase 4
+# ---------------------------------------------------------------------------
+
+
+def notificar_participante_incluido(
+    chamado_id: str,
+    numero_chamado: str,
+    categoria: str,
+    area: str,
+    responsavel_usuario,
+) -> None:
+    """Notifica o supervisor que foi incluído como participante do chamado."""
+    if not responsavel_usuario or not getattr(responsavel_usuario, "email", None):
+        logger.debug("Participant inclusion notification skipped: recipient has no e-mail")
+        return
+
+    email_dest = responsavel_usuario.email.strip()
+    link = _link_chamado(chamado_id)
+    link_dash = _link_dashboard()
+
+    assunto = f"You have been added as a participant: {numero_chamado}"
+
+    detalhes_html = build_detail_table(
+        [
+            ("Number", numero_chamado),
+            ("Category", categoria),
+            ("Area", area),
+        ]
+    )
+
+    ctas = []
+    if link:
+        ctas.append(("View ticket", link, "#2563eb"))
+    if link_dash:
+        ctas.append(("View sector tickets", link_dash, "#6b7280"))
+    botoes_html = build_two_ctas(ctas) if ctas else ""
+
+    corpo_html = build_email_shell(
+        header_title="You have been added as a participant",
+        header_color="#2563eb",
+        body_html=(
+            f"<p>You have been added as a collaborating participant to a ticket in area "
+            f"<strong>{escape(area)}</strong>. Please work on your part and mark it as done "
+            f'using the <em>"Completed my part"</em> button.</p>' + detalhes_html + botoes_html
+        ),
+    )
+    corpo_texto = (
+        f"Number: {numero_chamado}\nCategory: {categoria}\nArea: {area}\n\n"
+        "You have been added as a collaborating participant. "
+        "Please complete your part and mark it done." + (f"\n\nView ticket: {link}" if link else "")
+    )
+
+    ok, err = enviar_email(email_dest, assunto, corpo_html, corpo_texto)
+    if ok:
+        logger.info(
+            "Participant inclusion notification sent to %s (ticket %s)", email_dest, numero_chamado
+        )
+    else:
+        logger.warning(
+            "Failed to send participant inclusion notification to %s: %s", email_dest, err
+        )
+
+
+# ---------------------------------------------------------------------------
+# Escalada gerencial — Fase 6 (Escada A)
+# ---------------------------------------------------------------------------
+
+
+def notificar_escalada_resposta_gerencial(
+    chamado_data: dict,
+    chamado_id: str,
+    nivel: int,
+    email_dest: str,
+) -> None:
+    """Notifica gestor que um chamado Aberto excedeu o SLA de resposta (Escada A)."""
+    numero_chamado = chamado_data.get("numero_chamado") or "N/A"
+    categoria = chamado_data.get("categoria") or ""
+    area = chamado_data.get("area") or ""
+    tipo_solicitacao = chamado_data.get("tipo_solicitacao") or ""
+    descricao_resumo = (chamado_data.get("descricao") or "")[:500]
+
+    nomes_nivel = {
+        1: "Sector Manager",
+        2: "Production Manager",
+        3: "GM Assistant",
+        4: "GM",
+    }
+    nome_nivel = nomes_nivel.get(nivel, f"Level {nivel}")
+
+    link = _link_chamado(chamado_id)
+    link_dash = _link_dashboard()
+
+    assunto = f"[SLA Alert] Ticket {numero_chamado} — no response (Ladder A, Level {nivel})"
+
+    detalhes_html = build_detail_table(
+        [
+            ("Number", numero_chamado),
+            ("Category", categoria),
+            ("Type", tipo_solicitacao),
+            ("Area", area),
+            ("Escalation Level", f"{nivel} — {nome_nivel}"),
+        ]
+    )
+    summary_html = (
+        f'<p style="margin: 12px 0;">{escape(descricao_resumo)}</p>' if descricao_resumo else ""
+    )
+
+    ctas = []
+    if link:
+        ctas.append(("View ticket history", link, "#dc2626"))
+    if link_dash:
+        ctas.append(("View all tickets", link_dash, "#6b7280"))
+    botoes_html = build_two_ctas(ctas) if ctas else ""
+
+    corpo_html = build_email_shell(
+        header_title=f"SLA Alert — Ticket {escape(numero_chamado)} without response",
+        header_color="#dc2626",
+        body_html=(
+            f"<p>This ticket has been open for over <strong>{nivel} business hour(s)</strong> "
+            f"without being attended to. This notification is addressed to the "
+            f"<strong>{nome_nivel}</strong>.</p>" + detalhes_html + summary_html + botoes_html
+        ),
+    )
+    corpo_texto = (
+        f"SLA Alert — Ticket {numero_chamado} without response.\n"
+        f"Escalation Level {nivel} ({nome_nivel}).\n"
+        f"Category: {categoria}\nArea: {area}" + (f"\n\nView ticket: {link}" if link else "")
+    )
+
+    ok, err = enviar_email(email_dest, assunto, corpo_html, corpo_texto)
+    if ok:
+        logger.info(
+            "SLA escalation (level %d) sent to %s (ticket %s)", nivel, email_dest, numero_chamado
+        )
+    else:
+        logger.warning("Failed to send SLA escalation notification to %s: %s", email_dest, err)
+
+
+def notificar_owner_todos_participantes_concluiram(
+    chamado_id: str,
+    numero_chamado: str,
+    categoria: str,
+    owner_usuario,
+) -> None:
+    """Notifica o owner que todos os participantes concluíram — chamado pode ser fechado."""
+    if not owner_usuario or not getattr(owner_usuario, "email", None):
+        logger.debug("Owner all-done notification skipped: owner has no e-mail")
+        return
+
+    email_dest = owner_usuario.email.strip()
+    nome_owner = getattr(owner_usuario, "nome", None) or "Responsible"
+    link = _link_chamado(chamado_id)
+    link_dash = _link_dashboard()
+
+    assunto = f"Ticket {numero_chamado}: all participants completed their part"
+
+    detalhes_html = build_detail_table(
+        [
+            ("Number", numero_chamado),
+            ("Category", categoria),
+        ]
+    )
+
+    ctas = []
+    if link:
+        ctas.append(("Close ticket", link, "#16a34a"))
+    if link_dash:
+        ctas.append(("View sector tickets", link_dash, "#6b7280"))
+    botoes_html = build_two_ctas(ctas) if ctas else ""
+
+    corpo_html = build_email_shell(
+        header_title="All participants completed their part",
+        header_color="#16a34a",
+        body_html=(
+            f"<p>Hello, <strong>{escape(nome_owner)}</strong>! "
+            f"All collaborating participants of ticket <strong>{escape(numero_chamado)}</strong> "
+            f"have completed their part. You can now close the ticket.</p>"
+            + detalhes_html
+            + botoes_html
+        ),
+    )
+    corpo_texto = (
+        f"Hello, {nome_owner}!\n\n"
+        f"All participants of ticket {numero_chamado} ({categoria}) have completed their part.\n"
+        "You can now close the ticket." + (f"\n\nView ticket: {link}" if link else "")
+    )
+
+    ok, err = enviar_email(email_dest, assunto, corpo_html, corpo_texto)
+    if ok:
+        logger.info(
+            "All-done owner notification sent to %s (ticket %s)", email_dest, numero_chamado
+        )
+    else:
+        logger.warning("Failed to send all-done notification to %s: %s", email_dest, err)
+
+
+# ---------------------------------------------------------------------------
+# SLA Resolução — Fase 7 (Escada B)
+# ---------------------------------------------------------------------------
+
+
+def notificar_aviso_resolucao_supervisor(
+    chamado_data: dict,
+    chamado_id: str,
+    marco: int,
+    responsavel_id: str,
+    email_dest: str | None = None,
+) -> None:
+    """Avisa o supervisor responsável que o prazo de resolução atingiu um marco percentual.
+
+    Dispara sempre: notificação in-app + Web Push (quando responsavel_id presente).
+    E-mail somente quando email_dest for truthy.
+    marco: 50 ou 80 (percentual do SLA de resolução consumido).
+    """
+    numero_chamado = chamado_data.get("numero_chamado") or "N/A"
+    categoria = chamado_data.get("categoria") or ""
+    area = chamado_data.get("area") or ""
+    tipo_solicitacao = chamado_data.get("tipo_solicitacao") or ""
+    descricao_resumo = (chamado_data.get("descricao") or "")[:500]
+
+    assunto = f"[SLA {marco}%] Ticket {numero_chamado} — resolution deadline approaching"
+    link = _link_chamado(chamado_id)
+    link_dash = _link_dashboard()
+
+    # Notificação in-app
+    if responsavel_id:
+        try:
+            from app.services.notifications_inapp import criar_notificacao
+
+            criar_notificacao(
+                usuario_id=responsavel_id,
+                chamado_id=chamado_id,
+                numero_chamado=numero_chamado,
+                titulo=assunto,
+                mensagem=f"Ticket {numero_chamado} is at {marco}% of the resolution SLA deadline.",
+                tipo="sla_resolucao",
+                categoria=categoria,
+            )
+        except Exception as exc:
+            logger.warning("In-app SLA %d%% warning failed (ticket %s): %s", marco, chamado_id, exc)
+
+        # Web Push
+        try:
+            from app.services.webpush_service import enviar_webpush_usuario
+
+            enviar_webpush_usuario(
+                usuario_id=responsavel_id,
+                titulo=assunto,
+                corpo=f"Ticket {numero_chamado} is at {marco}% of the resolution deadline.",
+                url=link or None,
+            )
+        except Exception as exc:
+            logger.warning(
+                "WebPush SLA %d%% warning failed (ticket %s): %s", marco, chamado_id, exc
+            )
+
+    detalhes_html = build_detail_table(
+        [
+            ("Number", numero_chamado),
+            ("Category", categoria),
+            ("Type", tipo_solicitacao),
+            ("Area", area),
+            ("SLA Progress", f"{marco}%"),
+        ]
+    )
+    summary_html = (
+        f'<p style="margin: 12px 0;">{escape(descricao_resumo)}</p>' if descricao_resumo else ""
+    )
+
+    ctas = []
+    if link:
+        ctas.append(("View ticket history", link, "#d97706"))
+    if link_dash:
+        ctas.append(("View all tickets", link_dash, "#6b7280"))
+    botoes_html = build_two_ctas(ctas) if ctas else ""
+
+    corpo_html = build_email_shell(
+        header_title=f"SLA Warning — {marco}% of resolution deadline consumed",
+        header_color="#d97706",
+        body_html=(
+            f"<p>Ticket <strong>{escape(numero_chamado)}</strong> has consumed "
+            f"<strong>{marco}%</strong> of its resolution SLA deadline.</p>"
+            + detalhes_html
+            + summary_html
+            + botoes_html
+        ),
+    )
+    corpo_texto = (
+        f"SLA Warning — Ticket {numero_chamado}.\n"
+        f"Resolution deadline: {marco}% consumed.\n"
+        f"Category: {categoria}\nArea: {area}" + (f"\n\nView ticket: {link}" if link else "")
+    )
+
+    if email_dest:
+        ok, err = enviar_email(email_dest, assunto, corpo_html, corpo_texto)
+        if ok:
+            logger.info(
+                "SLA %d%% warning sent to %s (ticket %s)", marco, email_dest, numero_chamado
+            )
+        else:
+            logger.warning("Failed to send SLA %d%% warning to %s: %s", marco, email_dest, err)
+
+
+def notificar_escalada_resolucao_gerencial(
+    chamado_data: dict,
+    chamado_id: str,
+    nivel: int,
+    email_dest: str,
+) -> None:
+    """Notifica gestor que um chamado Em Atendimento excedeu o prazo de resolução (Escada B)."""
+    numero_chamado = chamado_data.get("numero_chamado") or "N/A"
+    categoria = chamado_data.get("categoria") or ""
+    area = chamado_data.get("area") or ""
+    tipo_solicitacao = chamado_data.get("tipo_solicitacao") or ""
+    descricao_resumo = (chamado_data.get("descricao") or "")[:500]
+
+    nomes_nivel = {
+        1: "Sector Manager",
+        2: "Production Manager",
+        3: "GM Assistant",
+        4: "GM",
+    }
+    nome_nivel = nomes_nivel.get(nivel, f"Level {nivel}")
+
+    link = _link_chamado(chamado_id)
+    link_dash = _link_dashboard()
+
+    assunto = f"[SLA Alert] Ticket {numero_chamado} — resolution overdue (Ladder B, Level {nivel})"
+
+    detalhes_html = build_detail_table(
+        [
+            ("Number", numero_chamado),
+            ("Category", categoria),
+            ("Type", tipo_solicitacao),
+            ("Area", area),
+            ("Escalation Level", f"{nivel} — {nome_nivel}"),
+        ]
+    )
+    summary_html = (
+        f'<p style="margin: 12px 0;">{escape(descricao_resumo)}</p>' if descricao_resumo else ""
+    )
+
+    ctas = []
+    if link:
+        ctas.append(("View ticket history", link, "#dc2626"))
+    if link_dash:
+        ctas.append(("View all tickets", link_dash, "#6b7280"))
+    botoes_html = build_two_ctas(ctas) if ctas else ""
+
+    corpo_html = build_email_shell(
+        header_title=f"SLA Alert — Ticket {escape(numero_chamado)} resolution overdue",
+        header_color="#dc2626",
+        body_html=(
+            f"<p>Ticket <strong>{escape(numero_chamado)}</strong> is overdue for resolution. "
+            f"This notification is addressed to the <strong>{nome_nivel}</strong>.</p>"
+            + detalhes_html
+            + summary_html
+            + botoes_html
+        ),
+    )
+    corpo_texto = (
+        f"SLA Alert — Ticket {numero_chamado} resolution overdue.\n"
+        f"Escalation Level {nivel} ({nome_nivel}).\n"
+        f"Category: {categoria}\nArea: {area}" + (f"\n\nView ticket: {link}" if link else "")
+    )
+
+    ok, err = enviar_email(email_dest, assunto, corpo_html, corpo_texto)
+    if ok:
+        logger.info(
+            "SLA resolution escalation (level %d) sent to %s (ticket %s)",
+            nivel,
+            email_dest,
+            numero_chamado,
+        )
+    else:
+        logger.warning("Failed to send SLA resolution escalation to %s: %s", email_dest, err)

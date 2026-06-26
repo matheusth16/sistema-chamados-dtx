@@ -2,6 +2,10 @@
 {% from 'components/_status_badge.html' import status_badge %}
 
 {% block content %}
+{% set participantes_pendentes = (chamado.participantes | rejectattr('status', 'equalto', 'concluido') | list) if chamado.participantes else [] %}
+{% set tem_participantes_pendentes = participantes_pendentes | length > 0 %}
+{% set participante_atual = (chamado.participantes | selectattr('supervisor_id', 'equalto', current_user.id) | list | first) if chamado.participantes else none %}
+{% set pode_concluir_parte = participante_atual is not none and participante_atual['status'] != 'concluido' %}
 <div class="max-w-5xl mx-auto space-y-3 -mt-2">
     <!-- Voltar: avisa a aba Gestão para atualizar o chamado, fecha a aba (ou redireciona se o navegador bloquear). -->
     <div>
@@ -121,6 +125,7 @@
                                     <div class="flex flex-col gap-2">
                                         {% for anx in anexos_unicos %}
                                             {% set is_r2 = anx.startswith('r2:') %}
+                                            {% set is_onedrive = anx.startswith('onedrive:') %}
                                             {% set is_url = anx.startswith('http://') or anx.startswith('https://') %}
 
                                             {# Tenta extrair o nome do arquivo da URL ou chave #}
@@ -136,17 +141,27 @@
 
                                             {% if is_r2 %}
                                                 {% set href_anexo = url_for('main.download_anexo', chamado_id=chamado.id, chave=anx) %}
+                                            {% elif is_onedrive %}
+                                                {% set href_anexo = anx[9:] %}
                                             {% elif is_url %}
                                                 {% set href_anexo = anx %}
                                             {% else %}
                                                 {% set href_anexo = url_for('static', filename='uploads/' + anx) %}
                                             {% endif %}
 
+                                            {% if is_onedrive %}
+                                            <a href="{{ href_anexo }}" target="_blank" rel="noopener noreferrer"
+                                                class="inline-flex max-w-fit items-center px-4 py-2 border border-blue-100 text-sm font-medium rounded-dtx-md text-blue-700 bg-blue-50 hover:bg-blue-100 hover:border-blue-200 transition-colors group">
+                                                <svg class="w-5 h-5 mr-2 flex-shrink-0 text-blue-500 group-hover:text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
+                                                <span class="truncate">{% set _ol = t('open_external_link') %}{{ _ol if _ol != 'open_external_link' else 'Open link' }} — OneDrive/SharePoint</span>
+                                            </a>
+                                            {% else %}
                                             <a href="{{ href_anexo }}" target="_blank"
                                                 class="inline-flex max-w-fit items-center px-4 py-2 border border-dtx-100 text-sm font-medium rounded-dtx-md text-dtx-700 bg-dtx-50 hover:bg-dtx-100 hover:border-dtx-200 transition-colors group">
                                                 <svg class="w-5 h-5 mr-2 flex-shrink-0 text-dtx-500 group-hover:text-dtx-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path></svg>
                                                 <span class="truncate">{{ nome_limpo }}</span>
                                             </a>
+                                            {% endif %}
                                         {% endfor %}
                                     </div>
                                 {% endif %}
@@ -227,13 +242,19 @@
                                         class="dtx-select py-3 px-4 font-semibold appearance-none">
                                         <option value="Aberto" {% if chamado.status == 'Aberto' %}selected{% endif %}>{{ t('option_open') if t else 'Aberto' }}</option>
                                         <option value="Em Atendimento" {% if chamado.status == 'Em Atendimento' %}selected{% endif %}>{{ t('option_in_progress') if t else 'Em Atendimento' }}</option>
-                                        <option value="Concluído" {% if chamado.status == 'Concluído' %}selected{% endif %}>{{ t('option_completed') if t else 'Concluído' }}</option>
+                                        <option value="Concluído" {% if chamado.status == 'Concluído' %}selected{% endif %} {% if tem_participantes_pendentes %}disabled{% endif %}>{{ t('option_completed') if t else 'Concluído' }}</option>
                                         <option value="Cancelado" {% if chamado.status == 'Cancelado' %}selected{% endif %}>{{ t('option_cancelled') if t else 'Cancelado' }}</option>
                                     </select>
                                     <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-gray-400">
                                         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
                                     </div>
                                 </div>
+                                {% if tem_participantes_pendentes %}
+                                <p class="text-xs text-amber-600 mt-1.5 font-medium flex items-center gap-1">
+                                    <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                                    {{ t('participantes_pendentes_aviso') if t else 'Há participantes com parte pendente — status Concluído bloqueado.' }}
+                                </p>
+                                {% endif %}
                                 <div id="wrap-motivo-cancelamento" class="mt-4 {% if chamado.status != 'Cancelado' %}hidden{% endif %}">
                                     <label for="motivo_cancelamento" class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">{% set _cr = t('cancellation_reason') %}{{ _cr if _cr != 'cancellation_reason' else 'Motivo do cancelamento' }} <span class="text-rose-500">*</span></label>
                                     <textarea id="motivo_cancelamento" form="form-status" name="motivo_cancelamento" rows="2" maxlength="500"
@@ -261,7 +282,8 @@
                             <!-- Setores adicionais: incluir outros setores no chamado -->
                             <div class="pt-5 border-t border-surface-border">
                                 <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">{{ t('additional_sectors') if t else 'Setores adicionais' }}</label>
-                                <p class="text-[11px] font-medium text-gray-400 mb-4 leading-snug">{{ t('additional_sectors_help') if t else 'Marque os setores a incluir no chamado. Os supervisores desses setores receberão e-mail informando a abertura.' }}</p>
+                                <p class="text-[11px] font-medium text-gray-400 mb-2 leading-snug">{{ t('additional_sectors_help') if t else 'Marque os setores a incluir no chamado. Os supervisores desses setores receberão e-mail informando a abertura.' }}</p>
+                                <p class="text-[10px] font-medium text-amber-600 mb-3 leading-snug italic">{{ t('participants_use_include_hint') if t else 'Para colaboração com acompanhamento individual de status, use' }} <strong>{{ t('escalation_include_supervisors_btn') if t else 'Incluir supervisores' }}</strong> {{ t('participants_hint_suffix') if t else '(participantes) abaixo.' }}</p>
 
                                 <div class="flex flex-wrap gap-2.5 max-h-48 overflow-y-auto py-1 custom-scrollbar pr-2">
                                     {% for setor in setores %}
@@ -280,6 +302,37 @@
                                 </div>
                             </div>
 
+                            <!-- Participantes (Fase 4) — edição -->
+                            {% if chamado.participantes %}
+                            <div class="pt-5 border-t border-surface-border">
+                                <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                                    <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                                    {{ t('participants_label') if t else 'Participantes' }}
+                                </label>
+                                <div class="space-y-2">
+                                    {% for p in chamado.participantes %}
+                                    {% set ns = namespace(p_nome='') %}
+                                    {% for s in supervisores_detalhados %}{% if s.id == p.supervisor_id %}{% set ns.p_nome = s.nome %}{% endif %}{% endfor %}
+                                    <div class="flex items-center justify-between px-3 py-2 bg-surface-raised rounded-dtx-md border border-surface-border text-sm">
+                                        <span class="font-medium text-gray-700 truncate mr-2">
+                                            {{ ns.p_nome if ns.p_nome else (p.supervisor_id[:8] ~ '…') }}
+                                            <span class="text-gray-400 text-xs">({{ p.area }})</span>
+                                        </span>
+                                        {% if p.status == 'concluido' %}
+                                        <span class="flex-shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-700">
+                                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                                            {{ t('participant_status_done') if t else 'Concluído' }}
+                                        </span>
+                                        {% elif p.status == 'em_atendimento' %}
+                                        <span class="flex-shrink-0 inline-flex px-2 py-0.5 rounded-full text-[11px] font-bold bg-blue-100 text-blue-700">{{ t('participant_status_in_progress') if t else 'Em atendimento' }}</span>
+                                        {% else %}
+                                        <span class="flex-shrink-0 inline-flex px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-700">{{ t('participant_status_pending') if t else 'Pendente' }}</span>
+                                        {% endif %}
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                            {% endif %}
                             <!-- SLA Personalizado -->
                             <div class="pt-5 border-t border-surface-border">
                                 <label for="input-sla-dias" class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 flex items-center">
@@ -333,6 +386,26 @@
                                 <div class="flex flex-wrap gap-1.5">
                                     {% for setor_nome in chamado.setores_adicionais %}
                                     <span class="inline-flex px-2.5 py-1 rounded-dtx-sm text-xs font-medium bg-teal-100 text-teal-800">{{ translate_sector(setor_nome) if setor_nome else setor_nome }}</span>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                            {% endif %}
+                            <!-- Participantes (Fase 4) — leitura -->
+                            {% if chamado.participantes %}
+                            <div>
+                                <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">{{ t('participants_label') if t else 'Participantes' }}</label>
+                                <div class="space-y-1.5">
+                                    {% for p in chamado.participantes %}
+                                    <div class="flex items-center justify-between px-3 py-1.5 bg-surface-raised rounded-dtx-md border border-surface-border text-sm">
+                                        <span class="font-medium text-gray-700 text-xs truncate mr-2">{{ p.area }}</span>
+                                        {% if p.status == 'concluido' %}
+                                        <span class="flex-shrink-0 inline-flex px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-700">{{ t('participant_status_done') if t else 'Concluído' }}</span>
+                                        {% elif p.status == 'em_atendimento' %}
+                                        <span class="flex-shrink-0 inline-flex px-2 py-0.5 rounded-full text-[11px] font-bold bg-blue-100 text-blue-700">{{ t('participant_status_in_progress') if t else 'Em atendimento' }}</span>
+                                        {% else %}
+                                        <span class="flex-shrink-0 inline-flex px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-700">{{ t('participant_status_pending') if t else 'Pendente' }}</span>
+                                        {% endif %}
+                                    </div>
                                     {% endfor %}
                                 </div>
                             </div>
@@ -394,6 +467,472 @@
         </div>
     </div>
 </div>
+
+{% set pode_escalonar = pode_editar and chamado.status in ('Aberto', 'Em Atendimento') and (chamado.responsavel_id == current_user.id or current_user.is_admin_or_above) %}
+
+{% if pode_escalonar %}
+<!-- ── Ações de Escalonamento (Fase 3) ─────────────────────────────────── -->
+<div class="max-w-5xl mx-auto mt-4 mb-2">
+    <div class="bg-surface-base rounded-dtx-lg border border-surface-border shadow-dtx-sm p-5">
+        <h4 class="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+            <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>
+            {{ t('escalation_actions_title') if t else 'Ações de Escalonamento' }}
+        </h4>
+        <div class="flex flex-wrap gap-3">
+            <button onclick="document.getElementById('modal-transferir-area').classList.remove('hidden')"
+                class="inline-flex items-center gap-2 px-4 py-2.5 rounded-dtx-md text-sm font-bold bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition-colors">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+                {{ t('escalation_transfer_area_btn') if t else 'Transferir Área' }}
+            </button>
+            <button onclick="carregarColegasEAbrirModal()"
+                class="inline-flex items-center gap-2 px-4 py-2.5 rounded-dtx-md text-sm font-bold bg-violet-50 text-violet-700 border border-violet-200 hover:bg-violet-100 transition-colors">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>
+                {{ t('escalation_escalate_colleague_btn') if t else 'Escalonar para Colega' }}
+            </button>
+            <button onclick="document.getElementById('modal-incluir-participantes').classList.remove('hidden')"
+                class="inline-flex items-center gap-2 px-4 py-2.5 rounded-dtx-md text-sm font-bold bg-teal-50 text-teal-700 border border-teal-200 hover:bg-teal-100 transition-colors">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                {{ t('escalation_include_supervisors_btn') if t else 'Incluir supervisores' }}
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Transferir Área -->
+<div id="modal-transferir-area" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+    <div class="bg-white rounded-dtx-lg shadow-lg w-full max-w-md border border-surface-border">
+        <div class="px-6 py-4 border-b border-surface-border flex items-center justify-between">
+            <h3 class="text-base font-black text-gray-800">{{ t('escalation_transfer_modal_title') if t else 'Transferir Área' }}</h3>
+            <button onclick="document.getElementById('modal-transferir-area').classList.add('hidden')" class="text-gray-400 hover:text-gray-600 transition-colors">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+        </div>
+        <div class="p-6 space-y-4">
+            <div>
+                <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">{{ t('escalation_dest_area_label') if t else 'Área Destino' }} <span class="text-rose-500">*</span></label>
+                <select id="transferir-area-select" onchange="carregarSupervisoresDestino(this.value)"
+                    class="dtx-select py-3 px-4 font-semibold w-full appearance-none">
+                    <option value="">{{ t('escalation_select_area') if t else 'Selecione uma área...' }}</option>
+                    {% for setor in setores %}
+                    {% if setor.nome_pt != chamado.area %}
+                    <option value="{{ setor.nome_pt }}">{{ translate_sector(setor.nome_pt) if setor.nome_pt else setor.nome_pt }}</option>
+                    {% endif %}
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">{{ t('escalation_dest_responsible_label') if t else 'Responsável Destino' }} <span class="text-rose-500">*</span></label>
+                <select id="transferir-supervisor-select" class="dtx-select py-3 px-4 font-semibold w-full appearance-none" disabled>
+                    <option value="">{{ t('escalation_select_area_first') if t else 'Selecione a área primeiro...' }}</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">{{ t('escalation_reason_label') if t else 'Motivo' }} <span class="text-rose-500">*</span></label>
+                <textarea id="transferir-motivo" rows="3" maxlength="500"
+                    placeholder="{{ t('escalation_transfer_reason_placeholder') if t else 'Descreva o motivo da transferência...' }}"
+                    class="dtx-input resize-none w-full"></textarea>
+            </div>
+            <div id="transferir-erro" class="hidden text-sm text-rose-600 font-medium bg-rose-50 border border-rose-100 rounded-dtx-md px-3 py-2"></div>
+        </div>
+        <div class="px-6 pb-5 flex gap-3">
+            <button onclick="document.getElementById('modal-transferir-area').classList.add('hidden')"
+                class="flex-1 py-2.5 rounded-dtx-md border border-surface-border text-sm font-bold text-gray-600 hover:bg-gray-50 transition-colors">
+                {{ t('cancel') if t else 'Cancelar' }}
+            </button>
+            <button onclick="executarTransferirArea()"
+                class="flex-1 py-2.5 rounded-dtx-md bg-amber-600 hover:bg-amber-700 text-white text-sm font-bold transition-colors">
+                {{ t('escalation_transfer_confirm_btn') if t else 'Transferir' }}
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Escalonar para Colega -->
+<div id="modal-escalonar-colega" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+    <div class="bg-white rounded-dtx-lg shadow-lg w-full max-w-md border border-surface-border">
+        <div class="px-6 py-4 border-b border-surface-border flex items-center justify-between">
+            <h3 class="text-base font-black text-gray-800">{{ t('escalation_escalate_modal_title') if t else 'Escalonar para Colega' }}</h3>
+            <button onclick="document.getElementById('modal-escalonar-colega').classList.add('hidden')" class="text-gray-400 hover:text-gray-600 transition-colors">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+        </div>
+        <div class="p-6 space-y-4">
+            <div>
+                <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">{{ t('escalation_colleague_label') if t else 'Colega' }} ({{ chamado.area }}) <span class="text-rose-500">*</span></label>
+                <select id="escalonar-supervisor-select" class="dtx-select py-3 px-4 font-semibold w-full appearance-none" disabled>
+                    <option value="">{{ t('loading_generic') if t else 'Carregando...' }}</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">{{ t('escalation_reason_label') if t else 'Motivo' }} <span class="text-rose-500">*</span></label>
+                <textarea id="escalonar-motivo" rows="3" maxlength="500"
+                    placeholder="{{ t('escalation_escalate_reason_placeholder') if t else 'Descreva o motivo do escalonamento...' }}"
+                    class="dtx-input resize-none w-full"></textarea>
+            </div>
+            <div id="escalonar-erro" class="hidden text-sm text-rose-600 font-medium bg-rose-50 border border-rose-100 rounded-dtx-md px-3 py-2"></div>
+        </div>
+        <div class="px-6 pb-5 flex gap-3">
+            <button onclick="document.getElementById('modal-escalonar-colega').classList.add('hidden')"
+                class="flex-1 py-2.5 rounded-dtx-md border border-surface-border text-sm font-bold text-gray-600 hover:bg-gray-50 transition-colors">
+                {{ t('cancel') if t else 'Cancelar' }}
+            </button>
+            <button onclick="executarEscalonarColega()"
+                class="flex-1 py-2.5 rounded-dtx-md bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold transition-colors">
+                {{ t('escalation_escalate_confirm_btn') if t else 'Escalonar' }}
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Incluir Supervisores (Fase 4) -->
+<div id="modal-incluir-participantes" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+    <div class="bg-white rounded-dtx-lg shadow-lg w-full max-w-md border border-surface-border">
+        <div class="px-6 py-4 border-b border-surface-border flex items-center justify-between">
+            <h3 class="text-base font-black text-gray-800">{{ t('escalation_include_modal_title') if t else 'Incluir supervisores' }}</h3>
+            <button onclick="document.getElementById('modal-incluir-participantes').classList.add('hidden')" class="text-gray-400 hover:text-gray-600 transition-colors">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+        </div>
+        <div class="p-6 space-y-4">
+            <div>
+                <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">{{ t('escalation_area_label') if t else 'Área' }} <span class="text-rose-500">*</span></label>
+                <select id="incluir-area-select" onchange="carregarSupervisoresParaIncluir(this.value)"
+                    class="dtx-select py-3 px-4 font-semibold w-full appearance-none">
+                    <option value="">{{ t('escalation_select_area') if t else 'Selecione uma área...' }}</option>
+                    {% for setor in setores %}
+                    <option value="{{ setor.nome_pt }}">{{ translate_sector(setor.nome_pt) if setor.nome_pt else setor.nome_pt }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">{{ t('escalation_supervisor_label') if t else 'Supervisor' }} <span class="text-rose-500">*</span></label>
+                <div class="flex gap-2">
+                    <select id="incluir-supervisor-select" class="dtx-select py-3 px-4 font-semibold flex-1 appearance-none" disabled>
+                        <option value="">{{ t('escalation_select_area_first') if t else 'Selecione a área primeiro...' }}</option>
+                    </select>
+                    <button onclick="adicionarParticipanteNaLista()"
+                        class="px-4 py-2.5 rounded-dtx-md bg-teal-600 hover:bg-teal-700 text-white text-sm font-bold transition-colors flex-shrink-0">
+                        {{ t('escalation_add_btn') if t else '+ Adicionar' }}
+                    </button>
+                </div>
+            </div>
+            <div id="incluir-lista-preview" class="space-y-1.5 max-h-36 overflow-y-auto"></div>
+            <div id="incluir-erro" class="hidden text-sm text-rose-600 font-medium bg-rose-50 border border-rose-100 rounded-dtx-md px-3 py-2"></div>
+        </div>
+        <div class="px-6 pb-5 flex gap-3">
+            <button onclick="document.getElementById('modal-incluir-participantes').classList.add('hidden'); limparModalIncluir()"
+                class="flex-1 py-2.5 rounded-dtx-md border border-surface-border text-sm font-bold text-gray-600 hover:bg-gray-50 transition-colors">
+                {{ t('cancel') if t else 'Cancelar' }}
+            </button>
+            <button onclick="executarIncluirParticipantes()"
+                class="flex-1 py-2.5 rounded-dtx-md bg-teal-600 hover:bg-teal-700 text-white text-sm font-bold transition-colors">
+                {{ t('escalation_include_confirm_btn') if t else 'Confirmar inclusão' }}
+            </button>
+        </div>
+    </div>
+</div>
+
+<script nonce="{{ csp_nonce }}">
+window.DTX_MSGS = window.DTX_MSGS || {};
+Object.assign(window.DTX_MSGS, {
+    loading: {{ t('loading_generic') | tojson }},
+    select_area_first: {{ t('escalation_select_area_first') | tojson }},
+    select_responsible: {{ t('escalation_select_responsible') | tojson }},
+    select_colleague: {{ t('escalation_select_colleague') | tojson }},
+    select_supervisor: {{ t('escalation_select_supervisor') | tojson }},
+    no_supervisor_available: {{ t('escalation_no_supervisor_available') | tojson }},
+    no_colleague_available: {{ t('escalation_no_colleague_available') | tojson }},
+    error_loading: {{ t('error_loading_short') | tojson }},
+    error_select_dest_area: {{ t('error_select_dest_area') | tojson }},
+    error_select_dest_responsible: {{ t('error_select_dest_responsible') | tojson }},
+    error_select_colleague: {{ t('error_select_colleague') | tojson }},
+    error_select_area: {{ t('error_select_area') | tojson }},
+    error_select_supervisor: {{ t('error_select_supervisor') | tojson }},
+    error_reason_required: {{ t('error_reason_required') | tojson }},
+    error_transfer: {{ t('error_transfer') | tojson }},
+    error_escalate: {{ t('error_escalate') | tojson }},
+    error_include_participants: {{ t('error_include_participants') | tojson }},
+    error_add_at_least_one_supervisor: {{ t('error_add_at_least_one_supervisor') | tojson }},
+    error_supervisor_already_in_list: {{ t('error_supervisor_already_in_list') | tojson }},
+    error_connection: {{ t('error_connection') | tojson }},
+    participant_all_done_success: {{ t('participant_all_done_success') | tojson }},
+    participant_part_done_success: {{ t('participant_part_done_success') | tojson }}
+});
+</script>
+<script nonce="{{ csp_nonce }}">
+(function() {
+    var CHAMADO_ID = {{ chamado.id | tojson }};
+    var AREA_ATUAL = {{ (chamado.area or '') | tojson }};
+    var CURRENT_USER_ID = {{ current_user.id | tojson }};
+    var CSRF_TOKEN = document.querySelector('meta[name="csrf-token"]') ? document.querySelector('meta[name="csrf-token"]').content : '';
+
+    function mostrarErro(elId, msg) {
+        var el = document.getElementById(elId);
+        if (el) { el.textContent = msg; el.classList.remove('hidden'); }
+    }
+    function esconderErro(elId) {
+        var el = document.getElementById(elId);
+        if (el) { el.classList.add('hidden'); }
+    }
+
+    window.carregarSupervisoresDestino = function(area) {
+        var selSup = document.getElementById('transferir-supervisor-select');
+        selSup.disabled = true;
+        selSup.innerHTML = '<option value="">' + DTX_MSGS.loading + '</option>';
+        if (!area) { selSup.innerHTML = '<option value="">' + DTX_MSGS.select_area_first + '</option>'; return; }
+        fetch('/api/supervisores/lista?area=' + encodeURIComponent(area), {
+            headers: { 'X-CSRFToken': CSRF_TOKEN }
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            selSup.innerHTML = '<option value="">' + DTX_MSGS.select_responsible + '</option>';
+            (data.supervisores || []).forEach(function(s) {
+                var opt = document.createElement('option');
+                opt.value = s.id; opt.textContent = s.nome;
+                selSup.appendChild(opt);
+            });
+            selSup.disabled = (data.supervisores || []).length === 0;
+            if ((data.supervisores || []).length === 0) {
+                selSup.innerHTML = '<option value="">' + DTX_MSGS.no_supervisor_available + '</option>';
+            }
+        })
+        .catch(function() { selSup.innerHTML = '<option value="">' + DTX_MSGS.error_loading + '</option>'; });
+    };
+
+    window.carregarColegasEAbrirModal = function() {
+        var selSup = document.getElementById('escalonar-supervisor-select');
+        selSup.disabled = true;
+        selSup.innerHTML = '<option value="">' + DTX_MSGS.loading + '</option>';
+        fetch('/api/supervisores/lista?area=' + encodeURIComponent(AREA_ATUAL), {
+            headers: { 'X-CSRFToken': CSRF_TOKEN }
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            selSup.innerHTML = '<option value="">' + DTX_MSGS.select_colleague + '</option>';
+            var colegas = (data.supervisores || []).filter(function(s) { return s.id !== CURRENT_USER_ID; });
+            colegas.forEach(function(s) {
+                var opt = document.createElement('option');
+                opt.value = s.id; opt.textContent = s.nome;
+                selSup.appendChild(opt);
+            });
+            selSup.disabled = colegas.length === 0;
+            if (colegas.length === 0) {
+                selSup.innerHTML = '<option value="">' + DTX_MSGS.no_colleague_available + '</option>';
+            }
+            document.getElementById('modal-escalonar-colega').classList.remove('hidden');
+        })
+        .catch(function() {
+            selSup.innerHTML = '<option value="">' + DTX_MSGS.error_loading + '</option>';
+            document.getElementById('modal-escalonar-colega').classList.remove('hidden');
+        });
+    };
+
+    window.executarTransferirArea = function() {
+        esconderErro('transferir-erro');
+        var area = document.getElementById('transferir-area-select').value;
+        var supervisorId = document.getElementById('transferir-supervisor-select').value;
+        var motivo = (document.getElementById('transferir-motivo').value || '').trim();
+        if (!area) { mostrarErro('transferir-erro', DTX_MSGS.error_select_dest_area); return; }
+        if (!supervisorId) { mostrarErro('transferir-erro', DTX_MSGS.error_select_dest_responsible); return; }
+        if (!motivo) { mostrarErro('transferir-erro', DTX_MSGS.error_reason_required); return; }
+        fetch('/api/chamado/' + CHAMADO_ID + '/transferir-area', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
+            body: JSON.stringify({ area: area, supervisor_id: supervisorId, motivo: motivo })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.sucesso) { window.location.reload(); }
+            else { mostrarErro('transferir-erro', data.erro || DTX_MSGS.error_transfer); }
+        })
+        .catch(function() { mostrarErro('transferir-erro', DTX_MSGS.error_connection); });
+    };
+
+    window.executarEscalonarColega = function() {
+        esconderErro('escalonar-erro');
+        var supervisorId = document.getElementById('escalonar-supervisor-select').value;
+        var motivo = (document.getElementById('escalonar-motivo').value || '').trim();
+        if (!supervisorId) { mostrarErro('escalonar-erro', DTX_MSGS.error_select_colleague); return; }
+        if (!motivo) { mostrarErro('escalonar-erro', DTX_MSGS.error_reason_required); return; }
+        fetch('/api/chamado/' + CHAMADO_ID + '/escalonar-colega', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
+            body: JSON.stringify({ supervisor_id: supervisorId, motivo: motivo })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.sucesso) { window.location.reload(); }
+            else { mostrarErro('escalonar-erro', data.erro || DTX_MSGS.error_escalate); }
+        })
+        .catch(function() { mostrarErro('escalonar-erro', DTX_MSGS.error_connection); });
+    };
+
+    // ── Incluir Participantes (Fase 4) ──────────────────────────────────────
+    var _participantesSelecionados = []; // [{supervisor_id, area, nome}]
+
+    window.carregarSupervisoresParaIncluir = function(area) {
+        var selSup = document.getElementById('incluir-supervisor-select');
+        selSup.disabled = true;
+        selSup.innerHTML = '<option value="">' + DTX_MSGS.loading + '</option>';
+        if (!area) { selSup.innerHTML = '<option value="">' + DTX_MSGS.select_area_first + '</option>'; return; }
+        fetch('/api/supervisores/lista?area=' + encodeURIComponent(area), {
+            headers: { 'X-CSRFToken': CSRF_TOKEN }
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            selSup.innerHTML = '<option value="">' + DTX_MSGS.select_supervisor + '</option>';
+            (data.supervisores || []).forEach(function(s) {
+                var opt = document.createElement('option');
+                opt.value = s.id;
+                opt.textContent = s.nome;
+                opt.setAttribute('data-nome', s.nome);
+                selSup.appendChild(opt);
+            });
+            selSup.disabled = (data.supervisores || []).length === 0;
+            if ((data.supervisores || []).length === 0) {
+                selSup.innerHTML = '<option value="">' + DTX_MSGS.no_supervisor_available + '</option>';
+            }
+        })
+        .catch(function() { selSup.innerHTML = '<option value="">' + DTX_MSGS.error_loading + '</option>'; });
+    };
+
+    window.adicionarParticipanteNaLista = function() {
+        esconderErro('incluir-erro');
+        var area = document.getElementById('incluir-area-select').value;
+        var selSup = document.getElementById('incluir-supervisor-select');
+        var supId = selSup.value;
+        var supNome = selSup.options[selSup.selectedIndex] ? selSup.options[selSup.selectedIndex].textContent : supId;
+        if (!area) { mostrarErro('incluir-erro', DTX_MSGS.error_select_area); return; }
+        if (!supId) { mostrarErro('incluir-erro', DTX_MSGS.error_select_supervisor); return; }
+        var jaDuplicado = _participantesSelecionados.some(function(p) { return p.supervisor_id === supId; });
+        if (jaDuplicado) { mostrarErro('incluir-erro', DTX_MSGS.error_supervisor_already_in_list); return; }
+        _participantesSelecionados.push({ supervisor_id: supId, area: area, nome: supNome });
+        _renderizarListaPreview();
+        document.getElementById('incluir-area-select').value = '';
+        selSup.innerHTML = '<option value="">' + DTX_MSGS.select_area_first + '</option>';
+        selSup.disabled = true;
+    };
+
+    function _renderizarListaPreview() {
+        var container = document.getElementById('incluir-lista-preview');
+        if (!container) return;
+        if (_participantesSelecionados.length === 0) { container.innerHTML = ''; return; }
+        var html = '';
+        _participantesSelecionados.forEach(function(p, i) {
+            html += '<div class="flex items-center justify-between px-3 py-1.5 bg-teal-50 rounded-dtx-md border border-teal-100 text-sm">'
+                + '<span class="font-medium text-teal-800 truncate mr-2">' + p.nome + ' <span class="text-teal-500 text-xs">(' + p.area + ')</span></span>'
+                + '<button onclick="removerParticipanteDaLista(' + i + ')" class="text-rose-400 hover:text-rose-600 transition-colors flex-shrink-0" title="Remover">'
+                + '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>'
+                + '</button></div>';
+        });
+        container.innerHTML = html;
+    }
+
+    window.removerParticipanteDaLista = function(idx) {
+        _participantesSelecionados.splice(idx, 1);
+        _renderizarListaPreview();
+    };
+
+    window.limparModalIncluir = function() {
+        _participantesSelecionados = [];
+        _renderizarListaPreview();
+        esconderErro('incluir-erro');
+        document.getElementById('incluir-area-select').value = '';
+        var selSup = document.getElementById('incluir-supervisor-select');
+        if (selSup) { selSup.innerHTML = '<option value="">' + DTX_MSGS.select_area_first + '</option>'; selSup.disabled = true; }
+    };
+
+    window.executarIncluirParticipantes = function() {
+        esconderErro('incluir-erro');
+        if (_participantesSelecionados.length === 0) { mostrarErro('incluir-erro', DTX_MSGS.error_add_at_least_one_supervisor); return; }
+        var payload = _participantesSelecionados.map(function(p) {
+            return { supervisor_id: p.supervisor_id, area: p.area };
+        });
+        fetch('/api/chamado/' + CHAMADO_ID + '/incluir-participantes', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
+            body: JSON.stringify({ participantes: payload })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.sucesso) { window.location.reload(); }
+            else { mostrarErro('incluir-erro', data.erro || DTX_MSGS.error_include_participants); }
+        })
+        .catch(function() { mostrarErro('incluir-erro', DTX_MSGS.error_connection); });
+    };
+})();
+</script>
+{% endif %}
+
+{% if pode_concluir_parte %}
+<!-- ── Concluir Minha Parte (Fase 4 — participante) ─────────────────────── -->
+<div class="max-w-5xl mx-auto mt-4 mb-2">
+    <div class="bg-teal-50 rounded-dtx-lg border border-teal-200 shadow-dtx-sm p-5">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+                <h4 class="text-sm font-black text-teal-800 flex items-center gap-2">
+                    <svg class="w-4 h-4 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    {{ t('participant_you_are_participant') if t else 'Você é participante deste chamado' }}
+                </h4>
+                <p class="text-[12px] text-teal-700 mt-1">{{ t('participant_finish_hint') if t else 'Quando terminar sua parte, clique em "Concluí minha parte" para notificar o responsável.' }}</p>
+            </div>
+            <button onclick="executarConcluirMinhaParte()"
+                class="flex-shrink-0 inline-flex items-center gap-2 px-5 py-2.5 rounded-dtx-md text-sm font-bold bg-teal-600 hover:bg-teal-700 text-white transition-colors active:scale-95">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                {{ t('participant_finish_my_part_btn') if t else 'Concluí minha parte' }}
+            </button>
+        </div>
+        <div id="concluir-parte-msg" class="hidden mt-3 text-sm font-medium rounded-dtx-md px-3 py-2"></div>
+    </div>
+</div>
+<script nonce="{{ csp_nonce }}">
+window.DTX_MSGS = window.DTX_MSGS || {};
+Object.assign(window.DTX_MSGS, {
+    participant_all_done_success: {{ t('participant_all_done_success') | tojson }},
+    participant_part_done_success: {{ t('participant_part_done_success') | tojson }},
+    error_connection: {{ t('error_connection') | tojson }}
+});
+</script>
+<script nonce="{{ csp_nonce }}">
+(function() {
+    var CHAMADO_ID_PARTE = {{ chamado.id | tojson }};
+    var CSRF_TOKEN_PARTE = document.querySelector('meta[name="csrf-token"]') ? document.querySelector('meta[name="csrf-token"]').content : '';
+    window.executarConcluirMinhaParte = function() {
+        var btn = document.querySelector('[onclick="executarConcluirMinhaParte()"]');
+        if (btn) btn.disabled = true;
+        fetch('/api/chamado/' + CHAMADO_ID_PARTE + '/concluir-minha-parte', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN_PARTE },
+            body: JSON.stringify({})
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            var msg = document.getElementById('concluir-parte-msg');
+            if (data.sucesso) {
+                msg.textContent = data.dados && data.dados.pode_concluir_global
+                    ? DTX_MSGS.participant_all_done_success
+                    : DTX_MSGS.participant_part_done_success;
+                msg.className = 'mt-3 text-sm font-medium rounded-dtx-md px-3 py-2 bg-emerald-50 text-emerald-700 border border-emerald-100';
+                msg.classList.remove('hidden');
+                setTimeout(function() { window.location.reload(); }, 2000);
+            } else {
+                msg.textContent = data.erro || 'Erro ao concluir parte.';
+                msg.className = 'mt-3 text-sm font-medium rounded-dtx-md px-3 py-2 bg-rose-50 text-rose-600 border border-rose-100';
+                msg.classList.remove('hidden');
+                if (btn) btn.disabled = false;
+            }
+        })
+        .catch(function() {
+            var msg = document.getElementById('concluir-parte-msg');
+            msg.textContent = DTX_MSGS.error_connection;
+            msg.className = 'mt-3 text-sm font-medium rounded-dtx-md px-3 py-2 bg-rose-50 text-rose-600 border border-rose-100';
+            msg.classList.remove('hidden');
+            if (btn) btn.disabled = false;
+        });
+    };
+})();
+</script>
+{% endif %}
 
 {% if pode_editar %}
 <script nonce="{{ csp_nonce }}">

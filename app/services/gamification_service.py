@@ -1,7 +1,13 @@
 import logging
 from typing import Any
 
+from app.database import db
 from app.models_usuario import Usuario
+
+try:
+    from google.cloud.firestore_v1 import Increment
+except ImportError:
+    Increment = None  # type: ignore[assignment,misc]
 
 logger = logging.getLogger(__name__)
 
@@ -70,14 +76,20 @@ class GamificationService:
 
     @staticmethod
     def _adicionar_exp(usuario_id: str, pontos: int, motivo: str) -> bool:
-        """Método interno para adicionar EXP a um usuário e checar level up."""
+        """Método interno para adicionar EXP a um usuário e checar level up.
+
+        exp_total e exp_semanal usam Increment(pontos) para evitar race condition (F-14):
+        sem Increment, dois requests simultâneos podem ler o mesmo valor e ambos
+        escreverem o mesmo total — perdendo um dos incrementos.
+        level e conquistas são calculados otimisticamente a partir do valor pré-leitura.
+        """
         try:
             usuario = Usuario.get_by_id(usuario_id)
             if not usuario:
                 return False
 
+            # Cálculo otimístico para level e conquistas (aceitável — são valores de exibição)
             nova_exp_total = usuario.exp_total + pontos
-            nova_exp_semanal = usuario.exp_semanal + pontos
             novo_level = GamificationService.get_level_for_exp(nova_exp_total)
 
             novas_conquistas = GamificationService._verificar_novas_conquistas(
@@ -88,29 +100,28 @@ class GamificationService:
             )
             conquistas_atualizadas = list(usuario.conquistas or []) + novas_conquistas
 
-            gamification_data = {
-                "exp_total": nova_exp_total,
-                "exp_semanal": nova_exp_semanal,
-                "level": novo_level,
-                "conquistas": conquistas_atualizadas,
-            }
+            # Increment(pontos) aplica o delta atomicamente no servidor Firestore,
+            # eliminando o race condition de read-then-write (F-14).
+            db.collection("usuarios").document(usuario_id).update(
+                {
+                    "exp_total": Increment(pontos),
+                    "exp_semanal": Increment(pontos),
+                    "level": novo_level,
+                    "conquistas": conquistas_atualizadas,
+                }
+            )
 
-            sucesso = usuario.update(gamification=gamification_data)
+            logger.info(
+                "Usuário %s ganhou %s EXP (%s). Novo nível: %s.",
+                usuario_id,
+                pontos,
+                motivo,
+                novo_level,
+            )
+            if novas_conquistas:
+                logger.info("Usuário %s desbloqueou conquistas: %s", usuario_id, novas_conquistas)
 
-            if sucesso:
-                logger.info(
-                    "Usuário %s ganhou %s EXP (%s). Novo nível: %s.",
-                    usuario_id,
-                    pontos,
-                    motivo,
-                    novo_level,
-                )
-                if novas_conquistas:
-                    logger.info(
-                        "Usuário %s desbloqueou conquistas: %s", usuario_id, novas_conquistas
-                    )
-
-            return sucesso
+            return True
 
         except Exception as e:
             logger.exception("Erro ao adicionar EXP para o usuário %s: %s", usuario_id, e)
@@ -149,6 +160,38 @@ class GamificationService:
 
         except Exception as e:
             logger.exception("Erro ao avaliar resolução de chamado para Gamificação: %s", e)
+
+    @staticmethod
+    def resetar_ranking_semanal() -> bool:
+        """Zera exp_semanal de todos os usuários. Chamado pelo APScheduler toda segunda-feira.
+
+        Usa batch Firestore (máx 500 ops/batch) para minimizar round-trips.
+        Pula usuários com exp_semanal == 0 para evitar writes desnecessários.
+        """
+        try:
+            usuarios_ref = db.collection("usuarios")
+            docs = usuarios_ref.stream()
+            batch = db.batch()
+            atualizados = 0
+            batch_count = 0
+            for doc in docs:
+                data = doc.to_dict()
+                if (data.get("exp_semanal") or 0) > 0:
+                    batch.update(usuarios_ref.document(doc.id), {"exp_semanal": 0})
+                    atualizados += 1
+                    batch_count += 1
+                    if batch_count >= 500:
+                        batch.commit()
+                        logger.info("Batch comitado: %d usuários", batch_count)
+                        batch = db.batch()
+                        batch_count = 0
+            if batch_count > 0:
+                batch.commit()
+            logger.info("Reset semanal concluído: %d usuários zerados.", atualizados)
+            return True
+        except Exception:
+            logger.exception("Falha ao resetar ranking semanal.")
+            return False
 
     @staticmethod
     def avaliar_atendimento_inicial(usuario_id: str) -> None:

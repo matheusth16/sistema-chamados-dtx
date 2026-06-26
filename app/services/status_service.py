@@ -9,6 +9,8 @@ Consolida a lógica que estava repetida em 3 locais:
 
 import logging
 import threading
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from firebase_admin import firestore
 from flask import current_app, session
@@ -19,7 +21,12 @@ from app.i18n import get_translated_status, get_translation
 from app.models_historico import Historico
 from app.models_usuario import Usuario
 from app.services.gamification_service import GamificationService
-from app.services.notifications import notificar_solicitante_status
+from app.services.notifications import (
+    notificar_solicitante_confirmacao_pendente,
+    notificar_solicitante_status,
+)
+from app.services.permissions import calcular_supervisor_ids_com_acesso
+from config import Config
 
 logger = logging.getLogger(__name__)
 
@@ -91,6 +98,16 @@ def atualizar_status_chamado(
                 "codigo": 400,
             }
 
+        # Fase 4: bloqueia conclusão global se houver participantes pendentes
+        if novo_status == "Concluído":
+            participantes = data_chamado.get("participantes") or []
+            pendentes = [p for p in participantes if p.get("status") != "concluido"]
+            if pendentes:
+                return {
+                    "sucesso": False,
+                    "erro": "Existem participantes pendentes — aguarde 'Concluí minha parte' de todos",
+                }
+
         # Monta dados de atualização
         update_data = {"status": novo_status}
         if novo_status == "Concluído":
@@ -102,6 +119,26 @@ def atualizar_status_chamado(
         elif novo_status == "Cancelado":
             update_data["motivo_cancelamento"] = (motivo_cancelamento or "").strip()
             update_data["data_cancelamento"] = firestore.SERVER_TIMESTAMP
+
+        # Fase 2 — Claim ao 1º Em Atendimento
+        if novo_status == "Em Atendimento" and status_anterior == "Aberto":
+            responsavel_atual = data_chamado.get("responsavel_id")
+            if not responsavel_atual:
+                # Claim: atribui ao usuário logado
+                update_data["responsavel_id"] = usuario_id
+                update_data["responsavel"] = usuario_nome
+                responsavel_atual = usuario_id
+            update_data["data_em_atendimento"] = datetime.now(ZoneInfo(Config.SLA_TIMEZONE))
+            # Recalcula IDs com acesso após claim
+            area = data_chamado.get("area", "")
+            participantes = data_chamado.get("participantes") or []
+            update_data["supervisor_ids_com_acesso"] = calcular_supervisor_ids_com_acesso(
+                area, responsavel_atual, participantes
+            )
+            # Fase 7 — Escada B: reset dos campos ao iniciar atendimento
+            update_data["escalacao_resolucao_nivel"] = 0
+            update_data["alerta_supervisor_50_enviado"] = False
+            update_data["alerta_supervisor_80_enviado"] = False
 
         # Atualiza no Firestore com retry
         execute_with_retry(
@@ -172,13 +209,22 @@ def _notificar_solicitante(chamado_id: str, data_chamado: dict, novo_status: str
     try:
         sid = data_chamado.get("solicitante_id")
         solicitante = Usuario.get_by_id(sid) if sid else None
-        notificar_solicitante_status(
-            chamado_id=chamado_id,
-            numero_chamado=data_chamado.get("numero_chamado") or "N/A",
-            novo_status=novo_status,
-            categoria=data_chamado.get("categoria") or "Chamado",
-            solicitante_usuario=solicitante,
-        )
+        # Concluído: e-mail específico pedindo confirmação; demais: notificação genérica
+        if novo_status == "Concluído":
+            notificar_solicitante_confirmacao_pendente(
+                chamado_id=chamado_id,
+                numero_chamado=data_chamado.get("numero_chamado") or "N/A",
+                categoria=data_chamado.get("categoria") or "Chamado",
+                solicitante_usuario=solicitante,
+            )
+        else:
+            notificar_solicitante_status(
+                chamado_id=chamado_id,
+                numero_chamado=data_chamado.get("numero_chamado") or "N/A",
+                novo_status=novo_status,
+                categoria=data_chamado.get("categoria") or "Chamado",
+                solicitante_usuario=solicitante,
+            )
         if sid:
             from app.services.webpush_service import enviar_webpush_usuario
 

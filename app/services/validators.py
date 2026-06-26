@@ -9,10 +9,14 @@ Centraliza regras de negócio para criação/edição de chamados:
 
 import csv
 import io
+import logging
 import re
 from typing import Any
+from urllib.parse import urlparse
 
 from flask import current_app
+
+logger = logging.getLogger(__name__)
 
 
 # Fallback se config não estiver disponível (ex.: testes)
@@ -138,16 +142,113 @@ def _arquivo_conteudo_permitido(arquivo: Any) -> tuple[bool, str]:
         return False, f"Erro ao validar arquivo: {e}"
 
 
+def _get_max_anexo_bytes() -> int:
+    try:
+        return current_app.config.get("MAX_ANEXO_BYTES", 10 * 1024 * 1024)
+    except RuntimeError:
+        return 10 * 1024 * 1024
+
+
+def _validar_tamanho(arquivo: Any) -> tuple[bool, str]:
+    """Verifica se o arquivo excede MAX_ANEXO_BYTES (10 MB por padrão).
+
+    Usa content_length quando disponível; caso contrário lê o stream e faz seek(0).
+    """
+    limite = _get_max_anexo_bytes()
+    tamanho = getattr(arquivo, "content_length", None)
+    if isinstance(tamanho, int) and tamanho > 0:
+        if tamanho > limite:
+            mb = limite // (1024 * 1024)
+            return False, f"{arquivo.filename}: excede {mb} MB por arquivo."
+        return True, ""
+    # Fallback: lê o stream para medir
+    try:
+        stream = getattr(arquivo, "stream", None)
+        if stream and hasattr(stream, "read"):
+            if hasattr(stream, "seek"):
+                stream.seek(0)
+            dados = stream.read()
+            if hasattr(stream, "seek"):
+                stream.seek(0)
+            if len(dados) > limite:
+                mb = limite // (1024 * 1024)
+                return False, f"{arquivo.filename}: excede {mb} MB por arquivo."
+    except Exception:
+        pass
+    return True, ""
+
+
+ALLOWED_EXTERNAL_LINK_DOMAINS: frozenset[str] = frozenset(
+    {
+        "sharepoint.com",
+        "onedrive.live.com",
+        "1drv.ms",
+    }
+)
+
+
+def validar_links_externos(links: list[str]) -> list[str]:
+    """Valida links OneDrive/SharePoint submetidos como alternativa a upload >10 MB.
+
+    Retorna lista de mensagens de erro; lista vazia indica que todos os links são válidos.
+    """
+    erros: list[str] = []
+    for link in links:
+        link = link.strip()
+        if not link:
+            continue
+        if not link.startswith("https://"):
+            erros.append("Link externo deve começar com https://.")
+            continue
+        try:
+            netloc = urlparse(link).netloc.lower()
+        except Exception:
+            erros.append("Link externo com formato inválido.")
+            continue
+        if not any(netloc == d or netloc.endswith("." + d) for d in ALLOWED_EXTERNAL_LINK_DOMAINS):
+            erros.append(
+                "Link inválido. Use uma URL do SharePoint ou OneDrive "
+                "(sharepoint.com, onedrive.live.com ou 1drv.ms)."
+            )
+    return erros
+
+
+def _log_ab_descricao_insuficiente(form: Any) -> None:
+    """Registra evento AB-001 quando a descrição é rejeitada pelo validador.
+
+    Threshold alinhado ao validador atual (3 chars), não à hipótese original (30 chars).
+    Ver docs/AB_TEST_PLAN.md seção 2 para justificativa.
+    """
+    ab_variante = (form.get("ab_variante") or "A") if hasattr(form, "get") else "A"
+    uid = ""
+    try:
+        from flask_login import current_user
+
+        uid = getattr(current_user, "id", "")
+    except Exception:
+        pass
+    logger.info(
+        "ab_event",
+        extra={
+            "experimento": "AB-001",
+            "variante": ab_variante,
+            "evento": "descricao_insuficiente",
+            "uid": uid,
+        },
+    )
+
+
 def validar_novo_chamado(
     form: Any,
-    arquivo: Any | None = None,
+    arquivos: list | None = None,
+    links_externos: list | None = None,
 ) -> list[str]:
     """
     Valida dados do formulário de novo chamado. Blindagem antes de persistir no Firestore.
 
     Args:
         form: Dict-like com campos do formulário (descricao, tipo, categoria, rl_codigo, etc.)
-        arquivo: FileStorage opcional (request.files.get('anexo')).
+        arquivos: Lista de FileStorage opcional (request.files.getlist('anexo')).
 
     Returns:
         Lista de mensagens de erro. Lista vazia indica que os dados são válidos.
@@ -157,7 +258,7 @@ def validar_novo_chamado(
         - Atribuição ao setor obrigatória.
         - Gate e impacto obrigatórios.
         - Categoria Projetos exige rl_codigo preenchido (letras, números e caracteres; 1 a 100 caracteres).
-        - Anexo: apenas extensões em EXTENSOES_PERMITIDAS (tamanho máximo em config).
+        - Cada anexo: extensão allowlist, magic bytes, máximo 10 MB.
     """
     erros = []
 
@@ -169,8 +270,10 @@ def validar_novo_chamado(
     impacto = (form.get("impacto") or "").strip()
 
     if not descricao:
+        _log_ab_descricao_insuficiente(form)
         erros.append("A descrição do chamado é obrigatória.")
     elif len(descricao) < 3:
+        _log_ab_descricao_insuficiente(form)
         erros.append("A descrição deve ter no mínimo 3 caracteres.")
 
     if not tipo:
@@ -181,6 +284,13 @@ def validar_novo_chamado(
 
     if not gate:
         erros.append("É necessário atribuir um gate.")
+    else:
+        from app.services.gates_service import is_gate_valido
+
+        if not is_gate_valido(gate):
+            erros.append(
+                "Gate inválido. Selecione N/A ou um gate com sub-etapa (ex: Gate 1 - Desmontagem)."
+            )
 
     if not impacto:
         erros.append("O impacto do chamado é obrigatório.")
@@ -199,15 +309,25 @@ def validar_novo_chamado(
                 "O código RL permite letras, números e os caracteres: espaço, - _ . / ( ) ,"
             )
 
-    # 3. Validação de Arquivo (Se houver upload): extensão + conteúdo (magic bytes)
-    if arquivo and arquivo.filename != "":
+    # 3. Validação de Arquivos (se houver uploads): extensão + magic bytes + tamanho
+    lista_efetiva = [a for a in (arquivos or []) if a and getattr(a, "filename", "")]
+    for arquivo in lista_efetiva:
         if not _arquivo_permitido(arquivo.filename):
             erros.append(
-                f"Formato de arquivo inválido. Permitidos: {', '.join(sorted(_get_extensoes_permitidas()))}"
+                f"{arquivo.filename}: Formato de arquivo inválido. "
+                f"Permitidos: {', '.join(sorted(_get_extensoes_permitidas()))}"
             )
-        else:
-            ok, msg = _arquivo_conteudo_permitido(arquivo)
-            if not ok:
-                erros.append(msg or "Conteúdo do arquivo não corresponde ao formato declarado.")
+            continue
+        ok_tam, msg_tam = _validar_tamanho(arquivo)
+        if not ok_tam:
+            erros.append(msg_tam)
+            continue
+        ok_cont, msg_cont = _arquivo_conteudo_permitido(arquivo)
+        if not ok_cont:
+            erros.append(msg_cont or "Conteúdo do arquivo não corresponde ao formato declarado.")
+
+    # 4. Validação de links externos OneDrive/SharePoint
+    if links_externos:
+        erros.extend(validar_links_externos(links_externos))
 
     return erros

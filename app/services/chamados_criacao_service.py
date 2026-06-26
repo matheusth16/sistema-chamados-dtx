@@ -24,6 +24,7 @@ from app.services.notifications import (
 )
 from app.services.notifications_inapp import criar_notificacao
 from app.services.notify_retry import executar_com_retry
+from app.services.permissions import calcular_supervisor_ids_com_acesso
 from app.services.upload import salvar_anexo
 from app.services.webpush_service import enviar_webpush_usuario
 from app.utils import gerar_numero_chamado
@@ -131,11 +132,42 @@ def criar_chamado(
         except ValueError as e:
             return (None, None, str(e), None)
 
-    responsavel, responsavel_id, motivo_atribuicao = _resolver_responsavel(
-        form, solicitante_id, solicitante_nome, area_solicitante
-    )
+    # Links externos OneDrive/SharePoint (alternativa a upload >10 MB)
+    if hasattr(form, "getlist"):
+        links_externos = [
+            lnk.strip() for lnk in form.getlist("links_externos") if lnk and lnk.strip()
+        ]
+    else:
+        raw = form.get("links_externos", [])
+        if isinstance(raw, str):
+            links_externos = [raw.strip()] if raw.strip() else []
+        else:
+            links_externos = [lnk.strip() for lnk in raw if lnk and lnk.strip()]
+    for link in links_externos:
+        caminhos_anexos.append(f"onedrive:{link}")
+
     area_chamado = (
         setor_para_area(tipo) if tipo else (area_solicitante if area_solicitante else "Geral")
+    )
+
+    # Fase 2 — Supervisor obrigatório quando área tem supervisores cadastrados
+    responsavel_id_form = (form.get("responsavel_id") or "").strip()
+    supervisores_da_area = Usuario.get_supervisores_por_area(area_chamado)
+    if not responsavel_id_form:
+        if supervisores_da_area:
+            return (
+                None,
+                None,
+                "Selecione um supervisor responsável para esta área.",
+                None,
+            )
+    elif supervisores_da_area:
+        ids_validos = {s.id for s in supervisores_da_area}
+        if responsavel_id_form not in ids_validos:
+            return (None, None, "Supervisor inválido para esta área.", None)
+
+    responsavel, responsavel_id, motivo_atribuicao = _resolver_responsavel(
+        form, solicitante_id, solicitante_nome, area_solicitante
     )
 
     grupo_rl_id = None
@@ -152,6 +184,9 @@ def criar_chamado(
 
     try:
         numero_chamado = gerar_numero_chamado()
+        ids_com_acesso = calcular_supervisor_ids_com_acesso(
+            area_chamado, responsavel_id or None, []
+        )
         novo_chamado = Chamado(
             numero_chamado=numero_chamado,
             categoria=categoria,
@@ -171,6 +206,7 @@ def criar_chamado(
             status="Aberto",
             grupo_rl_id=grupo_rl_id,
             setores_adicionais=setores_adicionais_lista,
+            supervisor_ids_com_acesso=ids_com_acesso,
         )
         doc_ref = execute_with_retry(
             db.collection("chamados").add,

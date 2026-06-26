@@ -365,3 +365,120 @@ def test_atribuir_retorna_falha_quando_escolhido_none(mock_get_sup, mock_db):
         r = atrib.atribuir(area="TI")
     assert r["sucesso"] is False
     assert "Não foi possível selecionar" in r["motivo"]
+
+
+# ── S4-08: Validação de área inválida em atribuir() ──────────────────────────
+
+
+def test_atribuir_area_vazia_retorna_falha():
+    """atribuir() com area='' retorna sucesso=False sem consultar supervisores."""
+    from app.services.assignment import AtribuidorAutomatico
+
+    atrib = AtribuidorAutomatico()
+    r = atrib.atribuir(area="")
+    assert r["sucesso"] is False
+    assert "inválida" in r["motivo"].lower() or "informada" in r["motivo"].lower()
+    assert "estrategia_usada" in r
+
+
+def test_atribuir_area_apenas_whitespace_retorna_falha():
+    """atribuir() com area somente de espaços retorna sucesso=False."""
+    from app.services.assignment import AtribuidorAutomatico
+
+    atrib = AtribuidorAutomatico()
+    r = atrib.atribuir(area="   ")
+    assert r["sucesso"] is False
+
+
+def test_atribuir_area_valida_nao_afetada():
+    """atribuir() com área válida segue o fluxo normal (sem regressão)."""
+    from app.services.assignment import AtribuidorAutomatico
+
+    with patch("app.services.assignment.Usuario.get_supervisores_por_area", return_value=[]):
+        atrib = AtribuidorAutomatico()
+        r = atrib.atribuir(area="Manutencao")
+    assert r["sucesso"] is False
+    assert "Nenhum supervisor" in r["motivo"]
+
+
+# ── F-20: estratégia aleatorio usa random.choice ──────────────────────────────
+
+
+@patch("app.services.assignment.db")
+@patch("app.services.assignment.Usuario.get_supervisores_por_area")
+def test_atribuir_aleatorio_usa_random_choice(mock_get_sup, mock_db):
+    """Estratégia aleatorio deve usar random.choice, não sempre pegar o primeiro supervisor."""
+
+    from app.services.assignment import AtribuidorAutomatico
+
+    sup_a = MagicMock()
+    sup_a.id = "a"
+    sup_a.nome = "Ana"
+    sup_a.email = "ana@test.com"
+    sup_a.area = "TI"
+    sup_b = MagicMock()
+    sup_b.id = "b"
+    sup_b.nome = "Bruno"
+    sup_b.email = "bruno@test.com"
+    sup_b.area = "TI"
+
+    mock_get_sup.return_value = [sup_a, sup_b]
+    mock_col = MagicMock()
+    mock_col.where.return_value = mock_col
+    mock_col.limit.return_value = mock_col
+    mock_col.stream.return_value = iter([])
+    mock_db.collection.return_value = mock_col
+
+    atrib = AtribuidorAutomatico(estrategia="aleatorio")
+
+    with patch("app.services.assignment.random.choice") as mock_choice:
+        mock_choice.return_value = {"usuario": sup_b, "chamados_abertos": 0}
+        r = atrib.atribuir(area="TI")
+
+    mock_choice.assert_called_once()
+    assert r["sucesso"] is True
+
+
+# ── F-21: round-robin atômico com Redis INCR ──────────────────────────────────
+
+
+def test_round_robin_usa_redis_incr_quando_disponivel():
+    """F-21: com REDIS_URL, _atribuir_round_robin usa Redis INCR para contador atômico cross-worker."""
+    from app.services.assignment import AtribuidorAutomatico
+
+    sup_a = MagicMock()
+    sup_a.nome = "Ana"
+    sup_b = MagicMock()
+    sup_b.nome = "Bruno"
+    carga = [{"usuario": sup_a, "chamados_abertos": 0}, {"usuario": sup_b, "chamados_abertos": 0}]
+
+    mock_redis = MagicMock()
+    mock_redis.incr.return_value = 1  # 1 % 2 = índice 1 → "Bruno"
+
+    with (
+        patch.dict("os.environ", {"REDIS_URL": "redis://localhost:6379"}),
+        patch("redis.from_url", return_value=mock_redis),
+    ):
+        atrib = AtribuidorAutomatico(estrategia="round_robin")
+        escolhido = atrib._atribuir_round_robin(carga, "TI")
+
+    mock_redis.incr.assert_called_once()
+    assert escolhido["usuario"].nome == "Bruno"
+
+
+def test_round_robin_fallback_em_memoria_quando_redis_indisponivel():
+    """F-21: sem REDIS_URL, _atribuir_round_robin usa contador em memória e ainda rotaciona."""
+    from app.services.assignment import AtribuidorAutomatico
+
+    sup_a = MagicMock()
+    sup_a.nome = "Ana"
+    sup_b = MagicMock()
+    sup_b.nome = "Bruno"
+    carga = [{"usuario": sup_a, "chamados_abertos": 0}, {"usuario": sup_b, "chamados_abertos": 0}]
+
+    with patch.dict("os.environ", {}, clear=True):
+        atrib = AtribuidorAutomatico(estrategia="round_robin")
+        primeiro = atrib._atribuir_round_robin(carga, "TI")
+        segundo = atrib._atribuir_round_robin(carga, "TI")
+
+    assert primeiro["usuario"].nome != segundo["usuario"].nome

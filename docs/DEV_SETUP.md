@@ -10,13 +10,22 @@ Guia para subir o projeto localmente do zero.
 |---|---|---|
 | Python | 3.12 | python.org/downloads |
 | Git | qualquer | git-scm.com |
+| Node.js | 20 (LTS) — só para gerar o CSS Tailwind | nodejs.org |
 | Docker Desktop (opcional) | qualquer | docker.com |
+
+> O Node.js é necessário se você for **alterar templates/CSS** e precisar
+> regenerar o `app/static/css/tailwind.min.css`.
+>
+> **`tailwind.min.css` não está versionado** (está no `.gitignore` desde S4-10).
+> Execute `npm run build:css` antes de rodar a aplicação pela primeira vez.
+> O `Dockerfile` regenera o arquivo automaticamente no build (stage `css-builder`).
 
 Verifique o que já está instalado:
 
 ```powershell
 python --version   # Python 3.12.x
 git --version
+node --version     # v20.x (só se for buildar o CSS)
 docker --version   # só se quiser usar o Compose
 ```
 
@@ -71,6 +80,25 @@ SECRET_KEY=qualquer-string-aleatoria-para-dev
 
 Para referência completa de todas as variáveis: **[docs/ENV.md](ENV.md)**
 
+> **E-mail:** o envio usa a Microsoft Graph API (`GRAPH_*`). Em dev é opcional —
+> sem essas variáveis, e-mails ficam desabilitados e o app funciona normalmente.
+
+---
+
+## 4.1 Gerar o CSS Tailwind (obrigatório no primeiro setup)
+
+`tailwind.min.css` **não está no repositório** (artefato de build, gerado localmente e no Docker).
+Execute os comandos abaixo antes de rodar a aplicação pela primeira vez:
+
+```powershell
+npm install            # instala tailwindcss (Node 20+)
+npm run build:css      # gera app/static/css/tailwind.min.css
+npm run watch:css      # regenera automaticamente ao salvar (desenvolvimento)
+```
+
+> **CI/Docker:** o stage `css-builder` do `Dockerfile` executa `npm run build:css`
+> automaticamente — nenhuma ação manual é necessária em builds containerizados.
+
 ---
 
 ## 5. Rodar a aplicação
@@ -106,6 +134,14 @@ pytest --cov=app --cov-report=term-missing -q
 
 Os testes usam mocks do Firestore — nenhuma conexão com Firebase é necessária.
 
+**Gate de cobertura por módulo (≥ 85%):** o CI exige que cada arquivo `app/**/*.py` atinja individualmente 85%. Para verificar localmente após rodar o pytest com `--cov-report=json`:
+
+```powershell
+python scripts/check_coverage_per_module.py --json-only
+```
+
+Exit 0 = todos os 52 módulos OK. Exit 1 = lista os módulos abaixo do gate.
+
 ---
 
 ## 7. Instalar os hooks de pré-commit (recomendado)
@@ -135,7 +171,7 @@ sistema_chamados/
 │   ├── services/         # Lógica de negócio
 │   └── templates/        # Jinja2 templates
 ├── tests/                # Suíte de testes (pytest)
-├── scripts/              # Utilitários (diagnóstico, deploy)
+├── scripts/              # Utilitários (diagnóstico, migrações) — ver scripts/README.md
 ├── docs/                 # Documentação
 ├── credentials.json      # Credencial Firebase (NÃO versionar)
 ├── .env                  # Variáveis de ambiente (NÃO versionar)

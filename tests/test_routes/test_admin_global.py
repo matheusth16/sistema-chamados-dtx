@@ -229,3 +229,246 @@ def test_sub_admin_nao_pode_editar_para_admin(client_logado_admin):
             follow_redirects=False,
         )
     assert r.status_code == 302
+
+
+# ---------------------------------------------------------------------------
+# T1E — requer_admin_global decorator
+# ---------------------------------------------------------------------------
+
+
+def test_requer_admin_global_envolve_com_requer_perfil_admin_global(app):
+    """requer_admin_global deve retornar uma função decorada por requer_perfil('admin_global')."""
+    from app.routes.admin_global import requer_admin_global
+
+    def rota_fake():
+        return "ok"
+
+    user = _usuario_mock("ag_1", "admin_global")
+    with (
+        app.test_request_context("/"),
+        patch("app.decoradores.current_user", user),
+    ):
+        resp = requer_admin_global(rota_fake)()
+    assert resp == "ok"
+
+
+# ---------------------------------------------------------------------------
+# T1F — Dashboard: branches inner/outer exception
+# ---------------------------------------------------------------------------
+
+
+def test_admin_global_dashboard_inner_db_exception_ainda_retorna_200(client_logado_admin_global):
+    """Quando db.collection("chamados").get() lança, total_chamados fica 0 mas retorna 200."""
+    with (
+        patch("app.routes.admin_global.db") as mock_db,
+        patch("app.routes.admin_global.Usuario") as mock_usuario,
+    ):
+        mock_usuario.get_all.return_value = []
+        mock_db.collection.return_value.get.side_effect = Exception("firestore fora")
+        r = client_logado_admin_global.get("/admin-global", follow_redirects=False)
+    assert r.status_code == 200
+
+
+def test_admin_global_dashboard_outer_exception_redireciona_para_admin(client_logado_admin_global):
+    """Quando Usuario.get_all() lança, redireciona para /admin com flash de erro."""
+    with (
+        patch("app.routes.admin_global.db"),
+        patch("app.routes.admin_global.Usuario") as mock_usuario,
+    ):
+        mock_usuario.get_all.side_effect = Exception("db down")
+        r = client_logado_admin_global.get("/admin-global", follow_redirects=False)
+    assert r.status_code == 302
+    assert "admin" in (r.location or "").lower()
+
+
+# ---------------------------------------------------------------------------
+# T1G — Rotas POST: rebaixar e promover
+# ---------------------------------------------------------------------------
+
+
+def test_admin_global_rebaixar_admin_sucesso(client_logado_admin_global):
+    """POST /admin-global/admins/<id>/rebaixar com sub-admin existente rebaixa para supervisor."""
+    sub_admin = _usuario_mock("sa_1", "admin", email="subadmin@test.com")
+    sub_admin.update = MagicMock()
+    ag_user = _usuario_mock("ag_1", "admin_global")
+
+    def _side(uid):
+        return sub_admin if uid == "sa_1" else ag_user
+
+    with patch("app.models_usuario.Usuario.get_by_id", side_effect=_side):
+        r = client_logado_admin_global.post(
+            "/admin-global/admins/sa_1/rebaixar", follow_redirects=False
+        )
+    assert r.status_code == 302
+    sub_admin.update.assert_called_once_with(perfil="supervisor")
+
+
+def test_admin_global_rebaixar_usuario_nao_encontrado(client_logado_admin_global):
+    """POST rebaixar com ID inexistente redireciona com flash user_not_found."""
+    ag_user = _usuario_mock("ag_1", "admin_global")
+
+    def _side(uid):
+        return None if uid == "nao_existe" else ag_user
+
+    with patch("app.models_usuario.Usuario.get_by_id", side_effect=_side):
+        r = client_logado_admin_global.post(
+            "/admin-global/admins/nao_existe/rebaixar", follow_redirects=False
+        )
+    assert r.status_code == 302
+    assert "admin" in (r.location or "").lower()
+
+
+def test_admin_global_rebaixar_usuario_nao_admin_redireciona(client_logado_admin_global):
+    """POST rebaixar com usuário de perfil ≠ admin (ex.: supervisor) redireciona sem alterar."""
+    sup = _usuario_mock("sup_x", "supervisor")
+    sup.update = MagicMock()
+    ag_user = _usuario_mock("ag_1", "admin_global")
+
+    def _side(uid):
+        return sup if uid == "sup_x" else ag_user
+
+    with patch("app.models_usuario.Usuario.get_by_id", side_effect=_side):
+        r = client_logado_admin_global.post(
+            "/admin-global/admins/sup_x/rebaixar", follow_redirects=False
+        )
+    assert r.status_code == 302
+    sup.update.assert_not_called()
+
+
+def test_admin_global_rebaixar_acesso_negado_para_admin(client_logado_admin):
+    """POST rebaixar por sub-admin é bloqueado — redireciona para /admin."""
+    r = client_logado_admin.post("/admin-global/admins/sa_1/rebaixar", follow_redirects=False)
+    assert r.status_code == 302
+    assert "admin" in (r.location or "").lower()
+
+
+def test_admin_global_rebaixar_excecao_redireciona(client_logado_admin_global):
+    """POST rebaixar com exceção em update() redireciona com flash error_server."""
+    sub_admin = _usuario_mock("sa_exc", "admin")
+    sub_admin.update = MagicMock(side_effect=Exception("db error"))
+    ag_user = _usuario_mock("ag_1", "admin_global")
+
+    def _side(uid):
+        return sub_admin if uid == "sa_exc" else ag_user
+
+    with patch("app.models_usuario.Usuario.get_by_id", side_effect=_side):
+        r = client_logado_admin_global.post(
+            "/admin-global/admins/sa_exc/rebaixar", follow_redirects=False
+        )
+    assert r.status_code == 302
+
+
+def test_admin_global_promover_supervisor_sucesso(client_logado_admin_global):
+    """POST /admin-global/admins/<id>/promover com supervisor existente promove para admin."""
+    sup = _usuario_mock("sup_prm", "supervisor", email="sup@test.com")
+    sup.update = MagicMock()
+    ag_user = _usuario_mock("ag_1", "admin_global")
+
+    def _side(uid):
+        return sup if uid == "sup_prm" else ag_user
+
+    with patch("app.models_usuario.Usuario.get_by_id", side_effect=_side):
+        r = client_logado_admin_global.post(
+            "/admin-global/admins/sup_prm/promover", follow_redirects=False
+        )
+    assert r.status_code == 302
+    sup.update.assert_called_once_with(perfil="admin")
+
+
+def test_admin_global_promover_usuario_nao_encontrado(client_logado_admin_global):
+    """POST promover com ID inexistente redireciona com flash user_not_found."""
+    ag_user = _usuario_mock("ag_1", "admin_global")
+
+    def _side(uid):
+        return None if uid == "nao_existe" else ag_user
+
+    with patch("app.models_usuario.Usuario.get_by_id", side_effect=_side):
+        r = client_logado_admin_global.post(
+            "/admin-global/admins/nao_existe/promover", follow_redirects=False
+        )
+    assert r.status_code == 302
+    assert "admin" in (r.location or "").lower()
+
+
+def test_admin_global_promover_usuario_nao_supervisor_redireciona(client_logado_admin_global):
+    """POST promover com usuário de perfil ≠ supervisor redireciona sem alterar."""
+    sol = _usuario_mock("sol_x", "solicitante")
+    sol.update = MagicMock()
+    ag_user = _usuario_mock("ag_1", "admin_global")
+
+    def _side(uid):
+        return sol if uid == "sol_x" else ag_user
+
+    with patch("app.models_usuario.Usuario.get_by_id", side_effect=_side):
+        r = client_logado_admin_global.post(
+            "/admin-global/admins/sol_x/promover", follow_redirects=False
+        )
+    assert r.status_code == 302
+    sol.update.assert_not_called()
+
+
+def test_admin_global_promover_acesso_negado_para_admin(client_logado_admin):
+    """POST promover por sub-admin é bloqueado — redireciona para /admin."""
+    r = client_logado_admin.post("/admin-global/admins/sup_1/promover", follow_redirects=False)
+    assert r.status_code == 302
+    assert "admin" in (r.location or "").lower()
+
+
+def test_admin_global_promover_excecao_redireciona(client_logado_admin_global):
+    """POST promover com exceção em update() redireciona com flash error_server."""
+    sup = _usuario_mock("sup_exc", "supervisor")
+    sup.update = MagicMock(side_effect=Exception("db error"))
+    ag_user = _usuario_mock("ag_1", "admin_global")
+
+    def _side(uid):
+        return sup if uid == "sup_exc" else ag_user
+
+    with patch("app.models_usuario.Usuario.get_by_id", side_effect=_side):
+        r = client_logado_admin_global.post(
+            "/admin-global/admins/sup_exc/promover", follow_redirects=False
+        )
+    assert r.status_code == 302
+
+
+# ---------------------------------------------------------------------------
+# T1H — Dashboard: agrupamento correto por perfil
+# ---------------------------------------------------------------------------
+
+
+def test_admin_global_dashboard_agrupa_por_perfil_corretamente(client_logado_admin_global):
+    """Dashboard agrupa usuários corretamente em sub_admins, supervisores e solicitantes."""
+    admin1 = _usuario_mock("a1", "admin")
+    sup1 = _usuario_mock("s1", "supervisor")
+    sol1 = _usuario_mock("sl1", "solicitante")
+    ag_user = _usuario_mock("ag_1", "admin_global")
+
+    with (
+        patch("app.routes.admin_global.db") as mock_db,
+        patch("app.routes.admin_global.Usuario") as mock_usuario,
+        patch("app.models_usuario.Usuario.get_by_id", return_value=ag_user),
+    ):
+        mock_usuario.get_all.return_value = [admin1, sup1, sol1]
+        mock_db.collection.return_value.get.return_value = [MagicMock(), MagicMock()]
+        r = client_logado_admin_global.get("/admin-global", follow_redirects=False)
+    assert r.status_code == 200
+
+
+# ---------------------------------------------------------------------------
+# T1I — Redirect por perfil (solicitante → index, supervisor → painel)
+# ---------------------------------------------------------------------------
+
+
+def test_admin_global_redirect_solicitante_para_index(client_logado_solicitante):
+    """GET /admin-global com perfil solicitante redireciona para /."""
+    r = client_logado_solicitante.get("/admin-global", follow_redirects=False)
+    assert r.status_code in (302, 403)
+    if r.status_code == 302:
+        assert "index" in r.location or "/" in r.location
+
+
+def test_admin_global_redirect_supervisor_para_painel(client_logado_supervisor):
+    """GET /admin-global com perfil supervisor redireciona para /painel."""
+    r = client_logado_supervisor.get("/admin-global", follow_redirects=False)
+    assert r.status_code in (302, 403)
+    if r.status_code == 302:
+        assert "painel" in r.location or "admin" in r.location

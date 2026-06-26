@@ -1,6 +1,6 @@
 """Testes dos serviços de notificação (e-mail, in-app)."""
 
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 
 def test_enviar_email_retorna_false_sem_destinatario(app):
@@ -59,7 +59,7 @@ def test_notificar_novo_usuario_cadastrado_envia_direto(app):
     assert mock_enviar.called
     destinatario, assunto, corpo_html, _corpo_texto = mock_enviar.call_args[0]
     assert destinatario == "novo.usuario@dtx.aero"
-    assert assunto == "Welcome to DTX Digital Andon — your access credentials"
+    assert assunto == "Welcome to DTX Service Portal — your access credentials"
     assert "Role" in corpo_html or "Initial password" in corpo_html
     assert "SenhaTest99" in corpo_html
     assert "123456" not in corpo_html
@@ -445,3 +445,627 @@ def test_notificar_aprovador_novo_chamado_html_com_ctas(app):
     assert "2026-102" in corpo_html
     assert "View ticket history" in corpo_html
     assert "View sector tickets" in corpo_html
+
+
+# ── _config fora de contexto ───────────────────────────────────────────────────
+
+
+def test_config_fora_de_contexto_retorna_default():
+    """_config fora do contexto Flask retorna o valor default."""
+    from app.services.notifications import _config
+
+    result = _config("QUALQUER_CHAVE", default="fallback_value")
+    assert result == "fallback_value"
+
+
+# ── _enviar_via_graph — caminhos de falha ────────────────────────────────────
+
+
+def test_enviar_via_graph_sem_access_token_na_resposta():
+    """_enviar_via_graph retorna (False, err) quando resposta do token não tem access_token."""
+    import json
+
+    from app.services.notifications import _enviar_via_graph
+
+    env = {
+        "GRAPH_TENANT_ID": "tid",
+        "GRAPH_CLIENT_ID": "cid",
+        "GRAPH_CLIENT_SECRET": "sec",
+        "GRAPH_SENDER_EMAIL": "x@dtx.aero",
+    }
+    token_body = json.dumps({"error": "invalid_client"}).encode()
+    token_resp = MagicMock()
+    token_resp.__enter__ = lambda s: s
+    token_resp.__exit__ = MagicMock(return_value=False)
+    token_resp.read.return_value = token_body
+
+    with (
+        patch.dict("os.environ", env),
+        patch("urllib.request.urlopen", return_value=token_resp),
+    ):
+        ok, err = _enviar_via_graph("dest@test.com", "Subj", "<p>H</p>", None, "x@dtx.aero")
+    assert ok is False
+    assert err is not None
+
+
+def test_enviar_via_graph_http_error_no_token():
+    """_enviar_via_graph retorna (False, err) em HTTPError ao obter token."""
+    import io
+    import urllib.error
+
+    from app.services.notifications import _enviar_via_graph
+
+    env = {
+        "GRAPH_TENANT_ID": "tid",
+        "GRAPH_CLIENT_ID": "cid",
+        "GRAPH_CLIENT_SECRET": "sec",
+        "GRAPH_SENDER_EMAIL": "x@dtx.aero",
+    }
+    http_err = urllib.error.HTTPError(
+        url="https://login...",
+        code=401,
+        msg="Unauthorized",
+        hdrs={},
+        fp=io.BytesIO(b"Unauthorized"),
+    )
+    with (
+        patch.dict("os.environ", env),
+        patch("urllib.request.urlopen", side_effect=http_err),
+    ):
+        ok, err = _enviar_via_graph("dest@test.com", "Subj", "<p>H</p>", None, "x@dtx.aero")
+    assert ok is False
+    assert "401" in str(err)
+
+
+def test_enviar_via_graph_sendmail_status_nao_202():
+    """_enviar_via_graph retorna (False, err) quando sendMail retorna status != 202."""
+    import json
+
+    from app.services.notifications import _enviar_via_graph
+
+    env = {
+        "GRAPH_TENANT_ID": "tid",
+        "GRAPH_CLIENT_ID": "cid",
+        "GRAPH_CLIENT_SECRET": "sec",
+        "GRAPH_SENDER_EMAIL": "x@dtx.aero",
+    }
+    token_body = json.dumps({"access_token": "tok_abc"}).encode()
+    token_resp = MagicMock()
+    token_resp.__enter__ = lambda s: s
+    token_resp.__exit__ = MagicMock(return_value=False)
+    token_resp.read.return_value = token_body
+
+    send_resp = MagicMock()
+    send_resp.__enter__ = lambda s: s
+    send_resp.__exit__ = MagicMock(return_value=False)
+    send_resp.read.return_value = b""
+    send_resp.status = 200  # not 202
+
+    with (
+        patch.dict("os.environ", env),
+        patch("urllib.request.urlopen", MagicMock(side_effect=[token_resp, send_resp])),
+    ):
+        ok, err = _enviar_via_graph("dest@test.com", "Subj", "<p>H</p>", None, "x@dtx.aero")
+    assert ok is False
+    assert err is not None
+
+
+def test_enviar_via_graph_excecao_generica_no_sendmail():
+    """_enviar_via_graph retorna (False, str(e)) em exceção genérica ao enviar e-mail."""
+    import json
+
+    from app.services.notifications import _enviar_via_graph
+
+    env = {
+        "GRAPH_TENANT_ID": "tid",
+        "GRAPH_CLIENT_ID": "cid",
+        "GRAPH_CLIENT_SECRET": "sec",
+        "GRAPH_SENDER_EMAIL": "x@dtx.aero",
+    }
+    token_body = json.dumps({"access_token": "tok_abc"}).encode()
+    token_resp = MagicMock()
+    token_resp.__enter__ = lambda s: s
+    token_resp.__exit__ = MagicMock(return_value=False)
+    token_resp.read.return_value = token_body
+
+    with (
+        patch.dict("os.environ", env),
+        patch(
+            "urllib.request.urlopen",
+            MagicMock(side_effect=[token_resp, Exception("network error")]),
+        ),
+    ):
+        ok, err = _enviar_via_graph("dest@test.com", "Subj", "<p>H</p>", None, "x@dtx.aero")
+    assert ok is False
+    assert "network error" in str(err)
+
+
+# ── Ramos de falha das funções de notificação ────────────────────────────────
+
+
+def test_notificar_aprovador_email_falha_loga_warning(app):
+    """notificar_aprovador_novo_chamado com envio falho não levanta exceção."""
+    from app.services.notifications import notificar_aprovador_novo_chamado
+
+    responsavel = type("Resp", (), {"email": "resp@dtx.aero"})()
+    with (
+        app.app_context(),
+        patch("app.services.notifications.enviar_email", return_value=(False, "SMTP error")),
+    ):
+        app.config["APP_BASE_URL"] = "https://example.test"
+        notificar_aprovador_novo_chamado(
+            chamado_id="ch_x",
+            numero_chamado="2026-200",
+            categoria="TI",
+            tipo_solicitacao="Corretiva",
+            descricao_resumo="Resumo",
+            area="TI",
+            solicitante_nome="Sol",
+            responsavel_usuario=responsavel,
+        )
+
+
+def test_notificar_prazo_24h_email_vazio_nao_envia(app):
+    """notificar_responsavel_prazo_24h com e-mail vazio não envia nada."""
+    from app.services.notifications import notificar_responsavel_prazo_24h
+
+    with (
+        app.app_context(),
+        patch("app.services.notifications.enviar_email") as mock_send,
+    ):
+        notificar_responsavel_prazo_24h(
+            chamado_id="ch1",
+            numero_chamado="2026-201",
+            responsavel_email="",
+        )
+    mock_send.assert_not_called()
+
+
+def test_notificar_prazo_24h_email_falha_nao_levanta(app):
+    """notificar_responsavel_prazo_24h com envio falho não levanta exceção."""
+    from app.services.notifications import notificar_responsavel_prazo_24h
+
+    with (
+        app.app_context(),
+        patch("app.services.notifications.enviar_email", return_value=(False, "err")),
+    ):
+        app.config["APP_BASE_URL"] = "https://example.test"
+        notificar_responsavel_prazo_24h(
+            chamado_id="ch1",
+            numero_chamado="2026-202",
+            responsavel_email="resp@dtx.aero",
+            categoria="TI",
+        )
+
+
+def test_notificar_novo_usuario_email_vazio_nao_envia(app):
+    """notificar_novo_usuario_cadastrado com e-mail vazio não envia nada."""
+    from app.services.notifications import notificar_novo_usuario_cadastrado
+
+    with (
+        app.app_context(),
+        patch("app.services.notifications.enviar_email") as mock_send,
+    ):
+        notificar_novo_usuario_cadastrado(
+            usuario_id="u1",
+            usuario_email="",
+            usuario_nome="Fulano",
+        )
+    mock_send.assert_not_called()
+
+
+def test_notificar_novo_usuario_email_falha_nao_levanta(app):
+    """notificar_novo_usuario_cadastrado com envio falho não levanta exceção."""
+    from app.services.notifications import notificar_novo_usuario_cadastrado
+
+    with (
+        app.app_context(),
+        patch("app.services.notifications.enviar_email", return_value=(False, "err")),
+    ):
+        app.config["APP_BASE_URL"] = "https://example.test"
+        notificar_novo_usuario_cadastrado(
+            usuario_id="u1",
+            usuario_email="user@dtx.aero",
+            usuario_nome="Fulano",
+            perfil="solicitante",
+            senha_inicial="abc123",
+        )
+
+
+def test_notificar_setor_adicional_email_vazio_nao_envia(app):
+    """notificar_responsavel_setor_adicional com e-mail vazio não envia nada."""
+    from app.services.notifications import notificar_responsavel_setor_adicional
+
+    with (
+        app.app_context(),
+        patch("app.services.notifications.enviar_email") as mock_send,
+    ):
+        notificar_responsavel_setor_adicional(
+            chamado_id="ch1",
+            numero_chamado="2026-203",
+            email_responsavel_setor="",
+            setor_adicional="TI",
+        )
+    mock_send.assert_not_called()
+
+
+def test_notificar_setor_adicional_email_falha_nao_levanta(app):
+    """notificar_responsavel_setor_adicional com envio falho não levanta exceção."""
+    from app.services.notifications import notificar_responsavel_setor_adicional
+
+    with (
+        app.app_context(),
+        patch("app.services.notifications.enviar_email", return_value=(False, "err")),
+    ):
+        app.config["APP_BASE_URL"] = "https://example.test"
+        notificar_responsavel_setor_adicional(
+            chamado_id="ch1",
+            numero_chamado="2026-204",
+            email_responsavel_setor="setor@dtx.aero",
+            setor_adicional="TI",
+            categoria="Projetos",
+        )
+
+
+def test_notificar_solicitante_status_email_falha_nao_levanta(app):
+    """notificar_solicitante_status com envio falho não levanta exceção."""
+    from app.services.notifications import notificar_solicitante_status
+
+    solicitante = MagicMock()
+    solicitante.email = "sol@dtx.aero"
+    solicitante.nome = "Sol"
+    with (
+        app.app_context(),
+        patch("app.services.notifications.enviar_email", return_value=(False, "err")),
+    ):
+        app.config["APP_BASE_URL"] = "https://example.test"
+        notificar_solicitante_status("ch1", "CH-001", "Concluído", "TI", solicitante)
+
+
+# ── notificar_setores_adicionais_chamado ──────────────────────────────────────
+
+
+def test_notificar_setores_adicionais_lista_vazia_retorna_imediatamente(app):
+    """notificar_setores_adicionais_chamado com lista vazia não faz nada."""
+    from app.services.notifications import notificar_setores_adicionais_chamado
+
+    with (
+        app.app_context(),
+        patch("app.services.notifications.enviar_email") as mock_send,
+    ):
+        notificar_setores_adicionais_chamado(
+            chamado_id="ch1",
+            numero_chamado="2026-300",
+            setores_novos=[],
+            categoria="TI",
+            tipo_solicitacao="Corretiva",
+            descricao_resumo="Resumo",
+            solicitante_nome="Sol",
+            quem_adicionou_nome="Sup",
+        )
+    mock_send.assert_not_called()
+
+
+def test_notificar_setores_adicionais_com_supervisor_envia_email(app):
+    """notificar_setores_adicionais_chamado com supervisores encontrados envia e-mails."""
+    from app.services.notifications import notificar_setores_adicionais_chamado
+
+    sup = MagicMock()
+    sup.id = "sup_1"
+    sup.email = "sup@dtx.aero"
+
+    with (
+        app.app_context(),
+        patch("app.models_usuario.Usuario.get_supervisores_por_area", return_value=[sup]),
+        patch("app.utils_areas.setor_para_area", return_value="Manutencao"),
+        patch("app.services.notifications.enviar_email", return_value=(True, None)) as mock_send,
+    ):
+        app.config["APP_BASE_URL"] = "https://example.test"
+        notificar_setores_adicionais_chamado(
+            chamado_id="ch1",
+            numero_chamado="2026-301",
+            setores_novos=["Manutencao"],
+            categoria="Projetos",
+            tipo_solicitacao="Corretiva",
+            descricao_resumo="Resumo do chamado",
+            solicitante_nome="Solicitante",
+            quem_adicionou_nome="Supervisor",
+        )
+    mock_send.assert_called_once()
+    dest = mock_send.call_args[0][0]
+    assert dest == "sup@dtx.aero"
+
+
+def test_notificar_setores_adicionais_supervisor_sem_email_ignorado(app):
+    """notificar_setores_adicionais_chamado ignora supervisores sem e-mail."""
+    from app.services.notifications import notificar_setores_adicionais_chamado
+
+    sup = MagicMock()
+    sup.id = "sup_2"
+    sup.email = ""
+
+    with (
+        app.app_context(),
+        patch("app.models_usuario.Usuario.get_supervisores_por_area", return_value=[sup]),
+        patch("app.utils_areas.setor_para_area", return_value=None),
+        patch("app.services.notifications.enviar_email") as mock_send,
+    ):
+        notificar_setores_adicionais_chamado(
+            chamado_id="ch2",
+            numero_chamado="2026-302",
+            setores_novos=["TI"],
+            categoria="TI",
+            tipo_solicitacao="Corretiva",
+            descricao_resumo="",
+            solicitante_nome="Sol",
+            quem_adicionou_nome="Sup",
+        )
+    mock_send.assert_not_called()
+
+
+# ── Fase 3: notificar_supervisor_transferencia_area / escalonamento_colega ────
+
+
+def test_notificar_transferencia_area_chama_enviar_email_com_area_correta(app):
+    """L3: notificar_supervisor_transferencia_area envia e-mail com assunto correto e área destino."""
+    from app.services.notifications import notificar_supervisor_transferencia_area
+
+    responsavel = MagicMock()
+    responsavel.email = "novo.resp@dtx.aero"
+    responsavel.nome = "Matheus Costa"
+
+    with (
+        app.app_context(),
+        patch("app.services.notifications.enviar_email", return_value=(True, None)) as mock_send,
+    ):
+        app.config["APP_BASE_URL"] = "https://example.test"
+        notificar_supervisor_transferencia_area(
+            chamado_id="ch_fase3",
+            numero_chamado="2026-999",
+            area="Planejamento",
+            categoria="Projetos",
+            motivo="Precisa de PPCP",
+            responsavel_usuario=responsavel,
+        )
+
+    mock_send.assert_called_once()
+    dest, assunto, corpo_html, _txt = mock_send.call_args[0]
+    assert dest == "novo.resp@dtx.aero"
+    assert "2026-999" in assunto
+    assert "transferred" in assunto.lower()
+    assert "Planejamento" in corpo_html
+
+
+def test_notificar_escalonamento_colega_chama_enviar_email(app):
+    """L3: notificar_supervisor_escalonamento_colega envia e-mail ao colega destino."""
+    from app.services.notifications import notificar_supervisor_escalonamento_colega
+
+    colega = MagicMock()
+    colega.email = "colega@dtx.aero"
+    colega.nome = "Julia Silva"
+
+    with (
+        app.app_context(),
+        patch("app.services.notifications.enviar_email", return_value=(True, None)) as mock_send,
+    ):
+        app.config["APP_BASE_URL"] = "https://example.test"
+        notificar_supervisor_escalonamento_colega(
+            chamado_id="ch_fase3b",
+            numero_chamado="2026-998",
+            area="Engenharia",
+            categoria="Corretiva",
+            motivo="Especialidade Julia",
+            responsavel_usuario=colega,
+        )
+
+    mock_send.assert_called_once()
+    dest, assunto, corpo_html, _txt = mock_send.call_args[0]
+    assert dest == "colega@dtx.aero"
+    assert "2026-998" in assunto
+    assert "escalated" in assunto.lower()
+    assert "Engenharia" in corpo_html
+
+
+def test_notificar_transferencia_sem_email_destino_nao_dispara(app):
+    """L3: fail-safe — sem e-mail no usuário destino, nenhum envio ocorre."""
+    from app.services.notifications import notificar_supervisor_transferencia_area
+
+    responsavel_sem_email = MagicMock()
+    responsavel_sem_email.email = ""
+
+    with (
+        app.app_context(),
+        patch("app.services.notifications.enviar_email") as mock_send,
+    ):
+        notificar_supervisor_transferencia_area(
+            chamado_id="ch_fase3c",
+            numero_chamado="2026-997",
+            area="TI",
+            categoria="TI",
+            motivo="motivo",
+            responsavel_usuario=responsavel_sem_email,
+        )
+
+    mock_send.assert_not_called()
+
+
+def test_notificar_setores_adicionais_envio_falho_nao_levanta(app):
+    """notificar_setores_adicionais_chamado com envio falho não levanta exceção."""
+    from app.services.notifications import notificar_setores_adicionais_chamado
+
+    sup = MagicMock()
+    sup.id = "sup_3"
+    sup.email = "sup3@dtx.aero"
+
+    with (
+        app.app_context(),
+        patch("app.models_usuario.Usuario.get_supervisores_por_area", return_value=[sup]),
+        patch("app.utils_areas.setor_para_area", return_value=None),
+        patch("app.services.notifications.enviar_email", return_value=(False, "err")),
+    ):
+        app.config["APP_BASE_URL"] = "https://example.test"
+        notificar_setores_adicionais_chamado(
+            chamado_id="ch3",
+            numero_chamado="2026-303",
+            setores_novos=["Engenharia"],
+            categoria="Projetos",
+            tipo_solicitacao="Nova",
+            descricao_resumo="Resumo",
+            solicitante_nome="Sol",
+            quem_adicionou_nome="Admin",
+        )
+
+
+# ── notificar_escalada_resposta_gerencial (Fase 6 — Escada A) ──────────────
+
+
+def test_notificar_escalada_resposta_gerencial_assunto_contem_numero(app):
+    """Smoke: assunto do e-mail contém o número do chamado e o nível."""
+    from app.services.notifications import notificar_escalada_resposta_gerencial
+
+    chamado_data = {
+        "numero_chamado": "CHM-0099",
+        "categoria": "Manutenção",
+        "area": "Engenharia",
+        "tipo_solicitacao": "Planejamento",
+        "descricao": "Máquina parada.",
+    }
+
+    with (
+        app.app_context(),
+        patch("app.services.notifications.enviar_email", return_value=(True, None)) as mock_send,
+    ):
+        app.config["APP_BASE_URL"] = "https://example.test"
+        notificar_escalada_resposta_gerencial(
+            chamado_data=chamado_data,
+            chamado_id="ch_99",
+            nivel=1,
+            email_dest="gestor@dtx.aero",
+        )
+
+    mock_send.assert_called_once()
+    _dest, assunto, _html, _txt = mock_send.call_args[0]
+    assert "CHM-0099" in assunto
+    assert "1" in assunto
+    assert _dest == "gestor@dtx.aero"
+
+
+def test_notificar_escalada_resposta_gerencial_falha_nao_levanta(app):
+    """enviar_email falho não deve propagar exceção (apenas log warning)."""
+    from app.services.notifications import notificar_escalada_resposta_gerencial
+
+    with (
+        app.app_context(),
+        patch("app.services.notifications.enviar_email", return_value=(False, "timeout")),
+    ):
+        notificar_escalada_resposta_gerencial(
+            chamado_data={"numero_chamado": "CHM-0001"},
+            chamado_id="ch_1",
+            nivel=2,
+            email_dest="gerente@dtx.aero",
+        )  # não deve levantar
+
+
+# ── Fase 7 — notificar_aviso_resolucao_supervisor / notificar_escalada_resolucao_gerencial ────
+
+
+def test_notificar_aviso_resolucao_supervisor_envia_email(app):
+    """notificar_aviso_resolucao_supervisor envia in-app + webpush + e-mail quando email_dest informado."""
+    from app.services.notifications import notificar_aviso_resolucao_supervisor
+
+    chamado_data = {
+        "numero_chamado": "CHM-0150",
+        "categoria": "Manutenção",
+        "area": "Engenharia",
+        "tipo_solicitacao": "Corretiva",
+        "descricao": "Máquina parada.",
+    }
+
+    with (
+        app.app_context(),
+        patch("app.services.notifications.enviar_email", return_value=(True, None)) as mock_email,
+        patch("app.services.notifications_inapp.criar_notificacao") as mock_criar,
+        patch("app.services.webpush_service.enviar_webpush_usuario") as mock_webpush,
+    ):
+        app.config["APP_BASE_URL"] = "https://example.test"
+        notificar_aviso_resolucao_supervisor(
+            chamado_data=chamado_data,
+            chamado_id="ch_150",
+            marco=50,
+            responsavel_id="sup_1",
+            email_dest="sup@dtx.aero",
+        )
+
+    mock_criar.assert_called_once()
+    assert mock_criar.call_args.kwargs.get("usuario_id") == "sup_1"
+    assert mock_criar.call_args.kwargs.get("tipo") == "sla_resolucao"
+    mock_webpush.assert_called_once()
+    assert mock_webpush.call_args.kwargs.get("usuario_id") == "sup_1"
+    mock_email.assert_called_once()
+    _dest, assunto, _html, _txt = mock_email.call_args[0]
+    assert "CHM-0150" in assunto
+    assert "50" in assunto
+    assert _dest == "sup@dtx.aero"
+
+
+def test_notificar_aviso_resolucao_supervisor_sem_email_dispara_inapp_e_webpush(app):
+    """email_dest=None → criar_notificacao e enviar_webpush_usuario chamados; enviar_email NÃO."""
+    from app.services.notifications import notificar_aviso_resolucao_supervisor
+
+    chamado_data = {
+        "numero_chamado": "CHM-0151",
+        "categoria": "Manutenção",
+        "area": "Engenharia",
+        "tipo_solicitacao": "Corretiva",
+        "descricao": "Teste sem email.",
+    }
+
+    with (
+        app.app_context(),
+        patch("app.services.notifications.enviar_email") as mock_email,
+        patch("app.services.notifications_inapp.criar_notificacao") as mock_criar,
+        patch("app.services.webpush_service.enviar_webpush_usuario") as mock_webpush,
+    ):
+        app.config["APP_BASE_URL"] = "https://example.test"
+        notificar_aviso_resolucao_supervisor(
+            chamado_data=chamado_data,
+            chamado_id="ch_151",
+            marco=50,
+            responsavel_id="sup_1",
+            email_dest=None,
+        )
+
+    mock_criar.assert_called_once()
+    mock_webpush.assert_called_once()
+    mock_email.assert_not_called()
+
+
+def test_notificar_escalada_resolucao_gerencial_envia_email(app):
+    """notificar_escalada_resolucao_gerencial envia e-mail com assunto contendo numero_chamado e nivel."""
+    from app.services.notifications import notificar_escalada_resolucao_gerencial
+
+    chamado_data = {
+        "numero_chamado": "CHM-0200",
+        "categoria": "Projetos",
+        "area": "Planejamento",
+        "tipo_solicitacao": "Nova",
+        "descricao": "Projeto urgente.",
+    }
+
+    with (
+        app.app_context(),
+        patch("app.services.notifications.enviar_email", return_value=(True, None)) as mock_email,
+    ):
+        app.config["APP_BASE_URL"] = "https://example.test"
+        notificar_escalada_resolucao_gerencial(
+            chamado_data=chamado_data,
+            chamado_id="ch_200",
+            nivel=2,
+            email_dest="gerente@dtx.aero",
+        )
+
+    mock_email.assert_called_once()
+    _dest, assunto, _html, _txt = mock_email.call_args[0]
+    assert "CHM-0200" in assunto
+    assert "2" in assunto
+    assert _dest == "gerente@dtx.aero"

@@ -88,7 +88,11 @@ def test_to_dict_contém_campos_esperados():
     """to_dict retorna dicionário com todos os campos necessários para Firestore."""
     from app.models_usuario import Usuario
 
-    with patch("app.models_usuario.db"):
+    with (
+        patch("app.models_usuario.db"),
+        patch("app.models_usuario.is_pii_encryption_enabled", return_value=False),
+        patch("app.models_usuario.maybe_encrypt", side_effect=lambda x: x),
+    ):
         u = Usuario(id="u1", email="x@dtx.aero", nome="X", perfil="admin", areas=["TI"])
         d = u.to_dict()
 
@@ -198,10 +202,14 @@ def test_save_retorna_false_quando_firestore_falha():
 
 
 def test_update_email_atualiza_campo():
-    """update com email chama Firestore update com novo email."""
+    """update com email chama Firestore update com novo email (encryption OFF)."""
     from app.models_usuario import Usuario
 
-    with patch("app.models_usuario.db") as mock_db:
+    with (
+        patch("app.models_usuario.db") as mock_db,
+        patch("app.models_usuario.is_pii_encryption_enabled", return_value=False),
+        patch("app.models_usuario.maybe_encrypt", side_effect=lambda x: x),
+    ):
         u = Usuario(id="u1", email="velho@dtx.aero", nome="X", perfil="solicitante")
         u.update(email="novo@dtx.aero")
 
@@ -291,14 +299,17 @@ def test_delete_retorna_false_quando_firestore_falha():
 
 
 def test_get_all_retorna_lista_de_usuarios():
-    """get_all retorna lista de instâncias Usuario para cada doc do Firestore."""
+    """get_all retorna lista de instâncias Usuario para cada doc do Firestore (encryption OFF)."""
     from app.models_usuario import Usuario
 
     doc = MagicMock()
     doc.id = "u1"
     doc.to_dict.return_value = {"email": "x@dtx.aero", "nome": "X", "perfil": "admin"}
 
-    with patch("app.models_usuario.db") as mock_db:
+    with (
+        patch("app.models_usuario.db") as mock_db,
+        patch("app.models_usuario.is_pii_encryption_enabled", return_value=False),
+    ):
         mock_db.collection.return_value.order_by.return_value.stream.return_value = [doc]
         result = Usuario.get_all()
 
@@ -523,3 +534,413 @@ def test_repr_contem_email():
         r = repr(u)
 
     assert "repr@dtx.aero" in r or "Usuario" in r
+
+
+# ── Onda 4: criptografia PII ───────────────────────────────────────────────────
+
+
+def test_to_dict_encryption_enabled_criptografa_email_e_nome():
+    """Onda 4: to_dict criptografa email e nome quando encryption ON."""
+    from app.models_usuario import Usuario
+
+    fake_encrypt = lambda x: f"fernet:v1:{x}"  # noqa: E731
+
+    with (
+        patch("app.models_usuario.db"),
+        patch("app.models_usuario.is_pii_encryption_enabled", return_value=True),
+        patch("app.models_usuario.maybe_encrypt", side_effect=fake_encrypt),
+        patch("app.models_usuario.email_lookup_hash", return_value="hash_abc123"),
+    ):
+        u = Usuario(id="u_enc", email="enc@dtx.aero", nome="Nome Secreto", perfil="solicitante")
+        d = u.to_dict()
+
+    assert d["email"] == "fernet:v1:enc@dtx.aero"
+    assert d["nome"] == "fernet:v1:Nome Secreto"
+    assert d["email_lookup_hash"] == "hash_abc123"
+
+
+def test_to_dict_encryption_disabled_nao_criptografa():
+    """Onda 4: to_dict grava plaintext quando encryption OFF (compatibilidade)."""
+    from app.models_usuario import Usuario
+
+    with (
+        patch("app.models_usuario.db"),
+        patch("app.models_usuario.is_pii_encryption_enabled", return_value=False),
+        patch("app.models_usuario.maybe_encrypt", side_effect=lambda x: x),
+    ):
+        u = Usuario(id="u_plain", email="plain@dtx.aero", nome="Nome Plain", perfil="solicitante")
+        d = u.to_dict()
+
+    assert d["email"] == "plain@dtx.aero"
+    assert d["nome"] == "Nome Plain"
+    assert "email_lookup_hash" not in d
+
+
+def test_from_dict_encryption_enabled_descriptografa_email_nome():
+    """Onda 4: from_dict descriptografa campos quando encryption ON."""
+    from app.models_usuario import Usuario
+
+    fake_decrypt = lambda x: x.replace("fernet:v1:", "") if x.startswith("fernet:v1:") else x  # noqa: E731
+
+    data = {
+        "email": "fernet:v1:secreto@dtx.aero",
+        "nome": "fernet:v1:Nome Secreto",
+        "perfil": "solicitante",
+    }
+    with (
+        patch("app.models_usuario.db"),
+        patch("app.models_usuario.maybe_decrypt", side_effect=fake_decrypt),
+    ):
+        u = Usuario.from_dict(data, "u_dec")
+
+    assert u.email == "secreto@dtx.aero"
+    assert u.nome == "Nome Secreto"
+
+
+def test_from_dict_legado_plaintext_sem_prefixo_passa_sem_erro():
+    """Onda 4: from_dict aceita docs sem prefixo (legado) mesmo com encryption ON."""
+    from app.models_usuario import Usuario
+
+    data = {"email": "legado@dtx.aero", "nome": "Nome Legado", "perfil": "admin"}
+    with (
+        patch("app.models_usuario.db"),
+        patch(
+            "app.models_usuario.maybe_decrypt",
+            side_effect=lambda x: x,  # legado passa como-está
+        ),
+    ):
+        u = Usuario.from_dict(data, "u_legado")
+
+    assert u.email == "legado@dtx.aero"
+    assert u.nome == "Nome Legado"
+
+
+def test_get_by_email_usa_hash_quando_encryption_enabled():
+    """Onda 4: get_by_email consulta email_lookup_hash quando encryption ON."""
+    from app.models_usuario import Usuario
+
+    doc = MagicMock()
+    doc.id = "u_hash"
+    doc.to_dict.return_value = {
+        "email": "fernet:v1:teste@dtx.aero",
+        "nome": "X",
+        "perfil": "solicitante",
+    }
+
+    with (
+        patch("app.models_usuario.db") as mock_db,
+        patch("app.models_usuario.is_pii_encryption_enabled", return_value=True),
+        patch("app.models_usuario.email_lookup_hash", return_value="hash_xyz"),
+        patch(
+            "app.models_usuario.maybe_decrypt",
+            side_effect=lambda x: x.replace("fernet:v1:", "") if x.startswith("fernet:v1:") else x,
+        ),
+    ):
+        mock_db.collection.return_value.where.return_value.stream.return_value = [doc]
+        result = Usuario.get_by_email("teste@dtx.aero")
+
+    # Deve ter consultado pelo hash, não pelo email plaintext
+    # where() deve ter sido chamado (via email_lookup_hash, não email plaintext)
+    mock_db.collection.return_value.where.assert_called_once()
+    assert result is not None
+    assert result.id == "u_hash"
+
+
+def test_get_by_email_usa_email_quando_encryption_disabled():
+    """Onda 4: get_by_email consulta campo email quando encryption OFF."""
+    from app.models_usuario import Usuario
+
+    doc = MagicMock()
+    doc.id = "u_plain"
+    doc.to_dict.return_value = {"email": "plain@dtx.aero", "nome": "X", "perfil": "solicitante"}
+
+    with (
+        patch("app.models_usuario.db") as mock_db,
+        patch("app.models_usuario.is_pii_encryption_enabled", return_value=False),
+        patch("app.models_usuario.maybe_decrypt", side_effect=lambda x: x),
+    ):
+        mock_db.collection.return_value.where.return_value.stream.return_value = [doc]
+        result = Usuario.get_by_email("plain@dtx.aero")
+
+    assert result is not None
+    assert result.id == "u_plain"
+
+
+def test_get_by_email_fallback_hash_quando_encryption_off_e_doc_migrado():
+    """Pós-migração: encryption OFF mas doc tem email criptografado → fallback hash lookup."""
+    from app.models_usuario import Usuario
+
+    doc_migrado = MagicMock()
+    doc_migrado.id = "admin_001"
+    doc_migrado.to_dict.return_value = {
+        "email": "fernet:v1:token",
+        "nome": "fernet:v1:nome",
+        "email_lookup_hash": "hash_admin",
+        "perfil": "admin",
+        "senha_hash": "scrypt:xxx",
+    }
+
+    empty_stream = iter([])
+    hash_stream = iter([doc_migrado])
+
+    def where_side_effect(*args, **kwargs):
+        mock = MagicMock()
+        # 1ª chamada: email plaintext vazio; 2ª: hash
+        if not hasattr(where_side_effect, "n"):
+            where_side_effect.n = 0
+        where_side_effect.n += 1
+        mock.stream.return_value = empty_stream if where_side_effect.n == 1 else hash_stream
+        return mock
+
+    with (
+        patch("app.models_usuario.db") as mock_db,
+        patch("app.models_usuario.is_pii_encryption_enabled", return_value=False),
+        patch("app.models_usuario.email_lookup_hash", return_value="hash_admin"),
+        patch(
+            "app.models_usuario.maybe_decrypt",
+            side_effect=lambda x: "admin@dtx.aero" if "token" in x else "Admin",
+        ),
+    ):
+        mock_db.collection.return_value.where.side_effect = where_side_effect
+        result = Usuario.get_by_email("admin@dtx.aero")
+
+    assert result is not None
+    assert result.id == "admin_001"
+    assert mock_db.collection.return_value.where.call_count == 2
+
+
+def test_get_all_ordena_em_python_quando_encryption_enabled():
+    """Onda 4: get_all usa sorted() em Python (não order_by Firestore) quando encryption ON."""
+    from app.models_usuario import Usuario
+
+    doc_b = MagicMock()
+    doc_b.id = "ub"
+    doc_b.to_dict.return_value = {
+        "email": "b@dtx.aero",
+        "nome": "fernet:v1:Zorro",
+        "perfil": "solicitante",
+    }
+
+    doc_a = MagicMock()
+    doc_a.id = "ua"
+    doc_a.to_dict.return_value = {
+        "email": "a@dtx.aero",
+        "nome": "fernet:v1:Abel",
+        "perfil": "solicitante",
+    }
+
+    with (
+        patch("app.models_usuario.db") as mock_db,
+        patch("app.models_usuario.is_pii_encryption_enabled", return_value=True),
+        patch(
+            "app.models_usuario.maybe_decrypt",
+            side_effect=lambda x: x.replace("fernet:v1:", "") if x.startswith("fernet:v1:") else x,
+        ),
+    ):
+        mock_db.collection.return_value.stream.return_value = [doc_b, doc_a]
+        result = Usuario.get_all()
+
+    # order_by do Firestore NÃO deve ter sido chamado
+    mock_db.collection.return_value.order_by.assert_not_called()
+    # Resultado ordenado por nome em Python: Abel < Zorro
+    assert result[0].id == "ua"
+    assert result[1].id == "ub"
+
+
+def test_update_email_recalcula_hash_quando_encryption_enabled():
+    """Onda 4: update(email=...) recalcula email_lookup_hash e criptografa quando ON."""
+    from app.models_usuario import Usuario
+
+    with (
+        patch("app.models_usuario.db") as mock_db,
+        patch("app.models_usuario.is_pii_encryption_enabled", return_value=True),
+        patch("app.models_usuario.maybe_encrypt", side_effect=lambda x: f"fernet:v1:{x}"),
+        patch("app.models_usuario.email_lookup_hash", return_value="novo_hash_xyz"),
+    ):
+        u = Usuario(id="u1", email="velho@dtx.aero", nome="X", perfil="solicitante")
+        u.update(email="novo@dtx.aero")
+
+    call_args = mock_db.collection.return_value.document.return_value.update.call_args[0][0]
+    assert call_args["email"] == "fernet:v1:novo@dtx.aero"
+    assert call_args["email_lookup_hash"] == "novo_hash_xyz"
+
+
+def test_email_existe_usa_hash_quando_encryption_enabled():
+    """Onda 4: email_existe consulta email_lookup_hash quando encryption ON."""
+    from app.models_usuario import Usuario
+
+    doc = MagicMock()
+    doc.id = "u_existente"
+
+    with (
+        patch("app.models_usuario.db") as mock_db,
+        patch("app.models_usuario.is_pii_encryption_enabled", return_value=True),
+        patch("app.models_usuario.email_lookup_hash", return_value="hash_existe"),
+    ):
+        mock_db.collection.return_value.where.return_value.stream.return_value = [doc]
+        result = Usuario.email_existe("existe@dtx.aero")
+
+    assert result is True
+
+
+# ── Integração Onda 4: round-trip real Fernet (sem mock de maybe_*) ────────────
+
+
+def test_integracao_fernet_to_dict_from_dict_round_trip():
+    """Integração: to_dict() criptografa campos reais; from_dict() restaura plaintext.
+
+    Sem mock de maybe_encrypt/maybe_decrypt — valida o fluxo end-to-end com Fernet real.
+    """
+    import os
+
+    from cryptography.fernet import Fernet
+
+    from app.models_usuario import Usuario
+
+    valid_key = Fernet.generate_key().decode()
+
+    with (
+        patch("app.models_usuario.db"),
+        patch("app.services.pii_encryption._get_flask_config", return_value=None),
+        patch.dict(
+            os.environ,
+            {"ENCRYPT_PII_AT_REST": "true", "ENCRYPTION_KEY": valid_key},
+            clear=False,
+        ),
+        patch("app.models_usuario.is_pii_encryption_enabled", return_value=True),
+    ):
+        u = Usuario(id="u_integ", email="integ@dtx.aero", nome="Nome Integração", perfil="admin")
+        d = u.to_dict()
+
+        # Campos devem estar criptografados
+        assert d["email"].startswith("fernet:v1:"), "email deve ter prefixo fernet:v1:"
+        assert d["nome"].startswith("fernet:v1:"), "nome deve ter prefixo fernet:v1:"
+        assert "email_lookup_hash" in d, "email_lookup_hash deve estar presente"
+
+        # from_dict com encryption ON deve restaurar plaintext
+        u2 = Usuario.from_dict(d, "u_integ")
+
+    assert u2.email == "integ@dtx.aero"
+    assert u2.nome == "Nome Integração"
+    assert u2.id == "u_integ"
+
+
+# ── Fase 5 — nivel_gestao ─────────────────────────────────────────────────────
+
+
+def test_usuario_from_dict_com_nivel_gestao():
+    """from_dict lê nivel_gestao quando presente no doc Firestore."""
+    from app.models_usuario import Usuario
+
+    data = {
+        "email": "gestor@dtx.aero",
+        "nome": "Gestor Setor",
+        "perfil": "supervisor",
+        "nivel_gestao": "gestor_setor",
+    }
+    with patch("app.models_usuario.db"):
+        u = Usuario.from_dict(data, "g_001")
+
+    assert u.nivel_gestao == "gestor_setor"
+
+
+def test_usuario_from_dict_sem_nivel_gestao():
+    """from_dict atribui None para nivel_gestao quando campo ausente."""
+    from app.models_usuario import Usuario
+
+    data = {"email": "sup@dtx.aero", "nome": "Sup", "perfil": "supervisor"}
+    with patch("app.models_usuario.db"):
+        u = Usuario.from_dict(data, "s_001")
+
+    assert u.nivel_gestao is None
+
+
+def test_usuario_to_dict_persiste_nivel_gestao():
+    """to_dict inclui nivel_gestao para persistência no Firestore."""
+    from app.models_usuario import Usuario
+
+    with (
+        patch("app.models_usuario.db"),
+        patch("app.models_usuario.is_pii_encryption_enabled", return_value=False),
+        patch("app.models_usuario.maybe_encrypt", side_effect=lambda x: x),
+    ):
+        u = Usuario(
+            id="g_002",
+            email="gm@dtx.aero",
+            nome="GM",
+            perfil="supervisor",
+            nivel_gestao="gm",
+        )
+        d = u.to_dict()
+
+    assert "nivel_gestao" in d
+    assert d["nivel_gestao"] == "gm"
+
+
+def test_is_gestor_true_quando_nivel_preenchido():
+    """is_gestor retorna True quando nivel_gestao é um valor válido."""
+    from app.models_usuario import Usuario
+
+    with patch("app.models_usuario.db"):
+        u = Usuario(id="g_003", email="g@dtx.aero", nome="G", nivel_gestao="gerente_producao")
+
+    assert u.is_gestor is True
+
+
+def test_is_gestor_false_quando_nivel_none():
+    """is_gestor retorna False quando nivel_gestao é None."""
+    from app.models_usuario import Usuario
+
+    with patch("app.models_usuario.db"):
+        u = Usuario(id="s_002", email="s@dtx.aero", nome="S")
+
+    assert u.is_gestor is False
+
+
+def test_is_gestor_only_false_para_admin_com_nivel_gestao():
+    """is_gestor_only é False para admin, mesmo com nivel_gestao preenchido (admin mantém write)."""
+    from app.models_usuario import Usuario
+
+    with patch("app.models_usuario.db"):
+        u = Usuario(
+            id="a_001",
+            email="a@dtx.aero",
+            nome="Admin Gestor",
+            perfil="admin",
+            nivel_gestao="gm",
+        )
+
+    assert u.is_gestor is True
+    assert u.is_gestor_only is False
+
+
+def test_is_gestor_only_true_para_supervisor_com_nivel_gestao():
+    """is_gestor_only é True para supervisor com nivel_gestao (read-only operacional)."""
+    from app.models_usuario import Usuario
+
+    with patch("app.models_usuario.db"):
+        u = Usuario(
+            id="g_004",
+            email="gsup@dtx.aero",
+            nome="Sup Gestor",
+            perfil="supervisor",
+            nivel_gestao="assistente_gm",
+        )
+
+    assert u.is_gestor_only is True
+
+
+def test_nivel_gestao_invalido_vira_none():
+    """nivel_gestao com valor inválido deve ser normalizado para None."""
+    from app.models_usuario import Usuario
+
+    data = {
+        "email": "x@dtx.aero",
+        "nome": "X",
+        "perfil": "supervisor",
+        "nivel_gestao": "cargo_inventado",
+    }
+    with patch("app.models_usuario.db"):
+        u = Usuario.from_dict(data, "x_001")
+
+    assert u.nivel_gestao is None

@@ -2,7 +2,23 @@
 
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from app.services.chamados_criacao_service import criar_chamado
+
+
+@pytest.fixture(autouse=True)
+def _patch_get_supervisores_default():
+    """Retorna lista vazia — simula área sem supervisores cadastrados.
+
+    Testes que precisam de supervisores sobrepõem este patch com seu próprio
+    `patch(..., return_value=[supervisor_mock])` dentro do corpo do teste.
+    """
+    with patch(
+        "app.models_usuario.Usuario.get_supervisores_por_area",
+        return_value=[],
+    ):
+        yield
 
 
 class _FakeThread:
@@ -289,6 +305,226 @@ def test_criar_chamado_persiste_categoria_e_solicitante_nome_na_notificacao(app)
     assert kwargs.get("solicitante_nome") == "Solicitante Teste"
 
 
+# ── links externos OneDrive/SharePoint ────────────────────────────────────────
+
+
+class _FormComLinks(dict):
+    """Form dict que simula request.form com getlist para links_externos e setores."""
+
+    def __init__(self, base, links_externos=None, setores_adicionais=None):
+        super().__init__(base)
+        self._links = links_externos or []
+        self._setores = setores_adicionais or []
+
+    def getlist(self, key):
+        if key == "links_externos":
+            return self._links
+        if key == "setores_adicionais":
+            return self._setores
+        return []
+
+
+def _chamado_dict_capturado(mock_retry):
+    """Extrai o dict do chamado passado para execute_with_retry."""
+    return mock_retry.call_args[0][1]
+
+
+def test_criar_chamado_com_link_externo_salva_onedrive_prefix(app):
+    """Links externos válidos são adicionados aos anexos com prefixo 'onedrive:'."""
+    link = "https://empresa.sharepoint.com/sites/chamados/documento.xlsx"
+    form = _FormComLinks(
+        {
+            "categoria": "Manutencao",
+            "tipo": "Manutencao",
+            "descricao": "Problema com arquivo grande no SharePoint.",
+            "rl_codigo": "",
+            "impacto": "",
+            "gate": "",
+        },
+        links_externos=[link],
+    )
+    files = MagicMock()
+    files.getlist.return_value = []
+
+    with (
+        patch("app.services.chamados_criacao_service.salvar_anexo", return_value=None),
+        patch(
+            "app.services.chamados_criacao_service.gerar_numero_chamado", return_value="2026-300"
+        ),
+        patch("app.services.chamados_criacao_service.atribuidor") as mock_atr,
+        patch("app.services.chamados_criacao_service.execute_with_retry") as mock_retry,
+        patch("app.services.chamados_criacao_service.Historico"),
+        patch("app.services.chamados_criacao_service.threading.Thread"),
+    ):
+        mock_atr.atribuir.return_value = {
+            "sucesso": True,
+            "supervisor": {"id": "sup1", "nome": "Supervisor"},
+            "motivo": "",
+        }
+        mock_ref = MagicMock()
+        mock_ref.id = "chamado_300"
+        mock_retry.return_value = (None, mock_ref)
+
+        with app.app_context():
+            chamado_id, numero, erro, _ = criar_chamado(
+                form=form,
+                files=files,
+                solicitante_id="sol1",
+                solicitante_nome="Solicitante",
+                area_solicitante="Manutencao",
+            )
+
+    assert erro is None
+    chamado_dict = _chamado_dict_capturado(mock_retry)
+    anexos = chamado_dict.get("anexos", [])
+    assert f"onedrive:{link}" in anexos
+
+
+def test_criar_chamado_com_multiplos_links_externos(app):
+    """Múltiplos links externos são todos salvos com prefixo 'onedrive:'."""
+    links = [
+        "https://empresa.sharepoint.com/doc1.pdf",
+        "https://1drv.ms/b/s!AkXY",
+    ]
+    form = _FormComLinks(
+        {
+            "categoria": "Manutencao",
+            "tipo": "Manutencao",
+            "descricao": "Dois documentos no SharePoint.",
+            "rl_codigo": "",
+            "impacto": "",
+            "gate": "",
+        },
+        links_externos=links,
+    )
+    files = MagicMock()
+    files.getlist.return_value = []
+
+    with (
+        patch("app.services.chamados_criacao_service.salvar_anexo", return_value=None),
+        patch(
+            "app.services.chamados_criacao_service.gerar_numero_chamado", return_value="2026-301"
+        ),
+        patch("app.services.chamados_criacao_service.atribuidor") as mock_atr,
+        patch("app.services.chamados_criacao_service.execute_with_retry") as mock_retry,
+        patch("app.services.chamados_criacao_service.Historico"),
+        patch("app.services.chamados_criacao_service.threading.Thread"),
+    ):
+        mock_atr.atribuir.return_value = {
+            "sucesso": True,
+            "supervisor": {"id": "sup1", "nome": "Supervisor"},
+            "motivo": "",
+        }
+        mock_ref = MagicMock()
+        mock_ref.id = "chamado_301"
+        mock_retry.return_value = (None, mock_ref)
+
+        with app.app_context():
+            _, _, erro, _ = criar_chamado(
+                form=form,
+                files=files,
+                solicitante_id="sol1",
+                solicitante_nome="Solicitante",
+            )
+
+    assert erro is None
+    anexos = _chamado_dict_capturado(mock_retry).get("anexos", [])
+    assert "onedrive:https://empresa.sharepoint.com/doc1.pdf" in anexos
+    assert "onedrive:https://1drv.ms/b/s!AkXY" in anexos
+
+
+def test_criar_chamado_sem_links_externos_nao_adiciona_onedrive(app):
+    """Sem links_externos no form, nenhum 'onedrive:' é adicionado aos anexos."""
+    form = {
+        "categoria": "Manutencao",
+        "tipo": "Manutencao",
+        "descricao": "Chamado sem links externos.",
+        "rl_codigo": "",
+        "impacto": "",
+        "gate": "",
+    }
+    files = MagicMock()
+    files.getlist.return_value = []
+
+    with (
+        patch("app.services.chamados_criacao_service.salvar_anexo", return_value=None),
+        patch(
+            "app.services.chamados_criacao_service.gerar_numero_chamado", return_value="2026-302"
+        ),
+        patch("app.services.chamados_criacao_service.atribuidor") as mock_atr,
+        patch("app.services.chamados_criacao_service.execute_with_retry") as mock_retry,
+        patch("app.services.chamados_criacao_service.Historico"),
+        patch("app.services.chamados_criacao_service.threading.Thread"),
+    ):
+        mock_atr.atribuir.return_value = {
+            "sucesso": True,
+            "supervisor": {"id": "sup1", "nome": "Supervisor"},
+            "motivo": "",
+        }
+        mock_ref = MagicMock()
+        mock_ref.id = "chamado_302"
+        mock_retry.return_value = (None, mock_ref)
+
+        with app.app_context():
+            _, _, erro, _ = criar_chamado(
+                form=form,
+                files=files,
+                solicitante_id="sol1",
+                solicitante_nome="Solicitante",
+            )
+
+    assert erro is None
+    anexos = _chamado_dict_capturado(mock_retry).get("anexos", [])
+    assert not any(a.startswith("onedrive:") for a in anexos)
+
+
+def test_criar_chamado_link_externo_via_dict_simples(app):
+    """form como dict simples (sem getlist) ainda processa links_externos."""
+    link = "https://empresa.sharepoint.com/doc.pdf"
+    form = {
+        "categoria": "Manutencao",
+        "tipo": "Manutencao",
+        "descricao": "Form simples com link externo.",
+        "rl_codigo": "",
+        "impacto": "",
+        "gate": "",
+        "links_externos": link,
+    }
+    files = MagicMock()
+    files.getlist.return_value = []
+
+    with (
+        patch("app.services.chamados_criacao_service.salvar_anexo", return_value=None),
+        patch(
+            "app.services.chamados_criacao_service.gerar_numero_chamado", return_value="2026-303"
+        ),
+        patch("app.services.chamados_criacao_service.atribuidor") as mock_atr,
+        patch("app.services.chamados_criacao_service.execute_with_retry") as mock_retry,
+        patch("app.services.chamados_criacao_service.Historico"),
+        patch("app.services.chamados_criacao_service.threading.Thread"),
+    ):
+        mock_atr.atribuir.return_value = {
+            "sucesso": True,
+            "supervisor": {"id": "sup1", "nome": "Supervisor"},
+            "motivo": "",
+        }
+        mock_ref = MagicMock()
+        mock_ref.id = "chamado_303"
+        mock_retry.return_value = (None, mock_ref)
+
+        with app.app_context():
+            _, _, erro, _ = criar_chamado(
+                form=form,
+                files=files,
+                solicitante_id="sol1",
+                solicitante_nome="Solicitante",
+            )
+
+    assert erro is None
+    anexos = _chamado_dict_capturado(mock_retry).get("anexos", [])
+    assert f"onedrive:{link}" in anexos
+
+
 # ── Testes anti-self-ticket (TDD RED → GREEN) ────────────────────────────────
 
 
@@ -478,6 +714,112 @@ def test_criar_chamado_falha_segundo_anexo_retorna_erro_sem_persistir(app):
     mock_retry.assert_not_called()
 
 
+# ── Fallback atribuição manual ────────────────────────────────────────────────
+
+
+def test_criar_chamado_atribuicao_manual_retorna_aviso_e_responsavel_fallback(app):
+    """Quando atribuidor não encontra supervisor, chamado é criado com aviso e responsável = solicitante."""
+    form = {
+        "categoria": "Manutencao",
+        "tipo": "Manutencao",
+        "descricao": "Chamado sem supervisor disponível.",
+        "rl_codigo": "",
+        "impacto": "",
+        "gate": "",
+    }
+    files = MagicMock()
+    files.getlist.return_value = []
+
+    chamado_capturado = {}
+
+    def _fake_add(dados):
+        chamado_capturado.update(dados)
+        ref = MagicMock()
+        ref.id = "chamado_manual_001"
+        return (None, ref)
+
+    with (
+        patch("app.services.chamados_criacao_service.salvar_anexo", return_value=None),
+        patch(
+            "app.services.chamados_criacao_service.gerar_numero_chamado", return_value="2026-500"
+        ),
+        patch("app.services.chamados_criacao_service.atribuidor") as mock_atr,
+        patch(
+            "app.services.chamados_criacao_service.execute_with_retry",
+            side_effect=lambda fn, dados, **kw: _fake_add(dados),
+        ),
+        patch("app.services.chamados_criacao_service.Historico"),
+        patch("app.services.chamados_criacao_service.threading.Thread"),
+    ):
+        mock_atr.atribuir.return_value = {
+            "sucesso": False,
+            "motivo": "Sem supervisores disponíveis",
+        }
+
+        with app.app_context():
+            chamado_id, numero, erro, aviso = criar_chamado(
+                form=form,
+                files=files,
+                solicitante_id="sol1",
+                solicitante_nome="Solicitante Teste",
+                area_solicitante="Manutencao",
+            )
+
+    assert erro is None
+    assert chamado_id == "chamado_manual_001"
+    # Aviso deve conter "Aguardando atribuição"
+    assert aviso is not None
+    assert "Aguardando" in aviso
+    # Responsável fallback = próprio solicitante
+    assert chamado_capturado.get("responsavel_id") == "sol1"
+
+
+def test_criar_chamado_excecao_persistencia_retorna_mensagem_erro(app):
+    """Quando execute_with_retry levanta exceção, retorna (None, None, mensagem, None)."""
+    form = {
+        "categoria": "Manutencao",
+        "tipo": "Manutencao",
+        "descricao": "Chamado que vai falhar na persistência.",
+        "rl_codigo": "",
+        "impacto": "",
+        "gate": "",
+    }
+    files = MagicMock()
+    files.getlist.return_value = []
+
+    with (
+        patch("app.services.chamados_criacao_service.salvar_anexo", return_value=None),
+        patch(
+            "app.services.chamados_criacao_service.gerar_numero_chamado", return_value="2026-999"
+        ),
+        patch("app.services.chamados_criacao_service.atribuidor") as mock_atr,
+        patch(
+            "app.services.chamados_criacao_service.execute_with_retry",
+            side_effect=Exception("Firestore unavailable"),
+        ),
+        patch("app.services.chamados_criacao_service.Historico"),
+    ):
+        mock_atr.atribuir.return_value = {
+            "sucesso": True,
+            "supervisor": {"id": "sup1", "nome": "Supervisor"},
+            "motivo": "",
+        }
+
+        with app.app_context():
+            chamado_id, numero, erro, aviso = criar_chamado(
+                form=form,
+                files=files,
+                solicitante_id="sol1",
+                solicitante_nome="Solicitante",
+                area_solicitante="Manutencao",
+            )
+
+    assert chamado_id is None
+    assert numero is None
+    assert erro is not None
+    assert aviso is None
+
+
 def test_criar_chamado_sem_anexos_usa_none_e_lista_vazia(app):
     """Sem arquivos → Chamado criado com anexo=None e anexos=[]."""
     form = {
@@ -531,3 +873,213 @@ def test_criar_chamado_sem_anexos_usa_none_e_lista_vazia(app):
     mock_salvar.assert_not_called()
     assert chamado_capturado.get("anexo") is None
     assert chamado_capturado.get("anexos") == []
+
+
+# ---------------------------------------------------------------------------
+# Fase 2 — Supervisor obrigatório na criação
+# ---------------------------------------------------------------------------
+
+
+def _form_base(responsavel_id="", responsavel_nome="", tipo="Manutencao"):
+    return {
+        "categoria": "Manutencao",
+        "tipo": tipo,
+        "descricao": "Descrição válida para teste de supervisor obrigatório.",
+        "rl_codigo": "",
+        "impacto": "",
+        "gate": "",
+        "responsavel_id": responsavel_id,
+        "responsavel_nome": responsavel_nome,
+    }
+
+
+def _files_empty():
+    f = MagicMock()
+    f.getlist.return_value = []
+    return f
+
+
+def test_criacao_falha_sem_supervisor_quando_area_tem_supervisores(app):
+    """Área com supervisor cadastrado e form sem responsavel_id → erro."""
+    supervisor_mock = MagicMock()
+    supervisor_mock.id = "id_julia"
+    supervisor_mock.nome = "Júlia"
+    supervisor_mock.perfil = "supervisor"
+
+    with (
+        patch(
+            "app.services.chamados_criacao_service.Usuario.get_supervisores_por_area",
+            return_value=[supervisor_mock],
+        ),
+    ):
+        chamado_id, numero, erro, _ = criar_chamado(
+            form=_form_base(responsavel_id=""),
+            files=_files_empty(),
+            solicitante_id="sol1",
+            solicitante_nome="Solicitante",
+            area_solicitante="Manutencao",
+        )
+
+    assert chamado_id is None
+    assert numero is None
+    assert erro is not None
+    assert "supervisor" in erro.lower()
+
+
+def test_criacao_ok_sem_supervisores_na_area(app):
+    """Área sem supervisores → criação permitida sem responsavel_id."""
+    with (
+        patch(
+            "app.services.chamados_criacao_service.Usuario.get_supervisores_por_area",
+            return_value=[],
+        ),
+        patch(
+            "app.services.chamados_criacao_service.gerar_numero_chamado", return_value="2026-100"
+        ),
+        patch("app.services.chamados_criacao_service.atribuidor") as mock_atr,
+        patch("app.services.chamados_criacao_service.execute_with_retry") as mock_retry,
+        patch("app.services.chamados_criacao_service.Historico"),
+        patch("app.services.chamados_criacao_service.threading.Thread"),
+    ):
+        mock_atr.atribuir.return_value = {
+            "sucesso": False,
+            "motivo": "Nenhum supervisor disponível",
+        }
+        mock_ref = MagicMock()
+        mock_ref.id = "chamado_novo_id"
+        mock_retry.return_value = (None, mock_ref)
+
+        with app.app_context():
+            chamado_id, numero, erro, _ = criar_chamado(
+                form=_form_base(responsavel_id=""),
+                files=_files_empty(),
+                solicitante_id="sol1",
+                solicitante_nome="Solicitante",
+                area_solicitante="Manutencao",
+            )
+
+    assert erro is None
+    assert chamado_id is not None
+
+
+def test_criacao_ok_com_supervisor_valido_escolhido(app):
+    """Área com supervisores e responsavel_id válido → criação bem-sucedida."""
+    supervisor_mock = MagicMock()
+    supervisor_mock.id = "id_julia"
+    supervisor_mock.nome = "Júlia"
+    supervisor_mock.perfil = "supervisor"
+
+    with (
+        patch(
+            "app.services.chamados_criacao_service.Usuario.get_supervisores_por_area",
+            return_value=[supervisor_mock],
+        ),
+        patch(
+            "app.services.chamados_criacao_service.Usuario.get_by_id",
+            return_value=supervisor_mock,
+        ),
+        patch(
+            "app.services.chamados_criacao_service.gerar_numero_chamado", return_value="2026-101"
+        ),
+        patch(
+            "app.services.chamados_criacao_service.calcular_supervisor_ids_com_acesso",
+            return_value=["id_julia"],
+        ),
+        patch("app.services.chamados_criacao_service.execute_with_retry") as mock_retry,
+        patch("app.services.chamados_criacao_service.Historico"),
+        patch("app.services.chamados_criacao_service.threading.Thread"),
+    ):
+        mock_ref = MagicMock()
+        mock_ref.id = "chamado_com_sup_id"
+        mock_retry.return_value = (None, mock_ref)
+
+        with app.app_context():
+            chamado_id, numero, erro, _ = criar_chamado(
+                form=_form_base(responsavel_id="id_julia", responsavel_nome="Júlia"),
+                files=_files_empty(),
+                solicitante_id="sol1",
+                solicitante_nome="Solicitante",
+                area_solicitante="Manutencao",
+            )
+
+    assert erro is None
+    assert chamado_id == "chamado_com_sup_id"
+
+
+def test_criacao_falha_quando_responsavel_id_invalido_para_area(app):
+    """Lacuna 3: responsavel_id fornecido mas não pertence aos supervisores da área → erro."""
+    supervisor_valido = MagicMock()
+    supervisor_valido.id = "id_julia"
+    supervisor_valido.nome = "Júlia"
+    supervisor_valido.perfil = "supervisor"
+
+    with (
+        patch(
+            "app.services.chamados_criacao_service.Usuario.get_supervisores_por_area",
+            return_value=[supervisor_valido],
+        ),
+    ):
+        chamado_id, numero, erro, _ = criar_chamado(
+            form=_form_base(responsavel_id="id_outra_area", responsavel_nome="Outro"),
+            files=_files_empty(),
+            solicitante_id="sol1",
+            solicitante_nome="Solicitante",
+            area_solicitante="Manutencao",
+        )
+
+    assert chamado_id is None
+    assert numero is None
+    assert erro is not None
+    assert "inválido" in erro.lower() or "área" in erro.lower()
+
+
+def test_criacao_grava_supervisor_ids_com_acesso(app):
+    """Criação com supervisor válido grava supervisor_ids_com_acesso no documento."""
+    supervisor_mock = MagicMock()
+    supervisor_mock.id = "id_julia"
+    supervisor_mock.nome = "Júlia"
+    supervisor_mock.perfil = "supervisor"
+
+    chamado_capturado = {}
+
+    def _capture_add(fn, data, **_kw):
+        # execute_with_retry(collection.add, to_dict_result, max_retries=N)
+        chamado_capturado.update(data)
+        ref = MagicMock()
+        ref.id = "chamado_ids_id"
+        return (None, ref)
+
+    with (
+        patch(
+            "app.services.chamados_criacao_service.Usuario.get_supervisores_por_area",
+            return_value=[supervisor_mock],
+        ),
+        patch(
+            "app.services.chamados_criacao_service.Usuario.get_by_id",
+            return_value=supervisor_mock,
+        ),
+        patch(
+            "app.services.chamados_criacao_service.gerar_numero_chamado", return_value="2026-102"
+        ),
+        patch(
+            "app.services.chamados_criacao_service.calcular_supervisor_ids_com_acesso",
+            return_value=["id_julia"],
+        ),
+        patch(
+            "app.services.chamados_criacao_service.execute_with_retry",
+            side_effect=_capture_add,
+        ),
+        patch("app.services.chamados_criacao_service.Historico"),
+        patch("app.services.chamados_criacao_service.threading.Thread"),
+        app.app_context(),
+    ):
+        chamado_id, _, erro, _ = criar_chamado(
+            form=_form_base(responsavel_id="id_julia", responsavel_nome="Júlia"),
+            files=_files_empty(),
+            solicitante_id="sol1",
+            solicitante_nome="Solicitante",
+            area_solicitante="Manutencao",
+        )
+
+    assert erro is None
+    assert "id_julia" in chamado_capturado.get("supervisor_ids_com_acesso", [])

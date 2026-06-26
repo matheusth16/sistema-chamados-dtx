@@ -1,4 +1,5 @@
 import contextlib
+import hmac
 import logging
 import os
 import secrets
@@ -47,6 +48,13 @@ def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
 
+    # ProxyFix: faz request.remote_addr refletir o IP real do cliente quando há
+    # um proxy reverso (nginx) na frente. Sem isso, X-Forwarded-For seria lido
+    # diretamente nas rotas, permitindo que atacantes forjem o IP via header.
+    from werkzeug.middleware.proxy_fix import ProxyFix
+
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+
     # Desabilita cache de arquivos estáticos em desenvolvimento
     if app.config.get("ENV") == "development" or app.debug:
         app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 0
@@ -74,7 +82,11 @@ def create_app():
     def load_user(user_id):
         from app.models_usuario import Usuario
 
-        return Usuario.get_by_id(user_id)
+        usuario = Usuario.get_by_id(user_id)
+        # Conta desativada: retorna None para invalidar a sessão ativa
+        if usuario is None or not getattr(usuario, "ativo", True):
+            return None
+        return usuario
 
     # Configuração de i18n (Internacionalização)
     _configurar_i18n(app)
@@ -86,6 +98,9 @@ def create_app():
 
     # Segurança: headers e validação Origin/Referer em POST sensíveis
     _configurar_seguranca(app)
+
+    # Proteção staging (CWI 4.1 — camada 2 fallback app; camada 1 = VPN/firewall ops)
+    _proteger_staging(app)
 
     # Timeout de inatividade (15 minutos)
     _configurar_timeout_sessao(app)
@@ -102,7 +117,9 @@ def create_app():
     # Não há tabelas para criar (Firestore é NoSQL)
 
     # Agendamento: relatório semanal toda sexta-feira às 10h (Brasília)
-    if not app.testing:
+    # Guard: Flask debug reloader spawns two processes; only the child (WERKZEUG_RUN_MAIN=true)
+    # should run the scheduler to avoid duplicate emails.
+    if not app.testing and (not app.debug or os.getenv("WERKZEUG_RUN_MAIN") == "true"):
         _iniciar_scheduler(app)
 
     # Aquece os caches estáticos em background para reduzir latência do primeiro request
@@ -159,10 +176,12 @@ def _verificar_upload_folder(app: Flask) -> None:
 
 
 def _iniciar_scheduler(app: Flask) -> None:
-    """Inicia APScheduler com o job de relatório semanal (sexta 10h BRT)."""
+    """Inicia APScheduler com jobs protegidos por lock Redis em multi-worker."""
     try:
         import pytz
         from apscheduler.schedulers.background import BackgroundScheduler
+
+        from app.services.scheduler_lock import executar_job_com_lock
 
         def _job_relatorio():
             with app.app_context():
@@ -174,38 +193,86 @@ def _iniciar_scheduler(app: Flask) -> None:
                 except Exception as exc:
                     app.logger.exception("Erro no job de relatório semanal: %s", exc)
 
-        def _job_alerta_prazo_24h():
+        def _job_sla_escalacao():
             with app.app_context():
                 try:
-                    from app.services.report_service import enviar_alertas_prazo_24h
+                    from app.services.sla_escalacao_service import (
+                        processar_avisos_resolucao,
+                        processar_escada_a,
+                        processar_escada_b,
+                    )
 
-                    resultado = enviar_alertas_prazo_24h()
-                    app.logger.info("Alerta de prazo 24h concluído: %s", resultado)
+                    resultado = {
+                        "escada_a": processar_escada_a(),
+                        "avisos_resolucao": processar_avisos_resolucao(),
+                        "escada_b": processar_escada_b(),
+                    }
+                    app.logger.info("Job SLA Escalonamento (A + avisos + B): %s", resultado)
                 except Exception as exc:
-                    app.logger.exception("Erro no job de alerta de prazo 24h: %s", exc)
+                    app.logger.exception("Erro no job SLA Escalonamento: %s", exc)
+
+        def _job_reset_ranking():
+            with app.app_context():
+                try:
+                    from app.services.gamification_service import GamificationService
+
+                    resultado = GamificationService.resetar_ranking_semanal()
+                    app.logger.info("Reset ranking semanal concluído: %s", resultado)
+                except Exception as exc:
+                    app.logger.exception("Erro no job de reset ranking semanal: %s", exc)
+
+        def _job_limpar_contadores():
+            with app.app_context():
+                try:
+                    from app.services.contadores_uso import limpar_contadores_antigos
+
+                    resultado = limpar_contadores_antigos(dias=90, dry_run=False)
+                    app.logger.info("Limpeza contadores_uso concluída: %s", resultado)
+                except Exception as exc:
+                    app.logger.exception("Erro no job de limpeza de contadores_uso: %s", exc)
 
         scheduler = BackgroundScheduler(
             timezone=pytz.timezone("America/Sao_Paulo"),
             job_defaults={"coalesce": True, "max_instances": 1},
         )
         scheduler.add_job(
-            _job_relatorio,
+            lambda: executar_job_com_lock(app, "relatorio_semanal", _job_relatorio),
             trigger="cron",
             day_of_week="fri",
             hour=10,
             minute=0,
             id="relatorio_semanal",
         )
+        # Job Escada A: escalada gerencial a cada 10 minutos (Fase 6 — ADR-004)
         scheduler.add_job(
-            _job_alerta_prazo_24h,
+            lambda: executar_job_com_lock(app, "sla_escalacao", _job_sla_escalacao),
+            trigger="interval",
+            minutes=10,
+            id="sla_escalacao",
+        )
+        # alerta_prazo_24h (cron 08h) desativado — Escada A (sla_escalacao) cobre o
+        # monitoramento contínuo de chamados sem resposta e usa business_time.
+        # A função enviar_alertas_prazo_24h permanece disponível para reativação.
+        scheduler.add_job(
+            lambda: executar_job_com_lock(app, "reset_ranking_semanal", _job_reset_ranking),
             trigger="cron",
-            hour=8,
+            day_of_week="sun",
+            hour=23,
+            minute=59,
+            id="reset_ranking_semanal",
+        )
+        scheduler.add_job(
+            lambda: executar_job_com_lock(app, "limpar_contadores_uso", _job_limpar_contadores),
+            trigger="cron",
+            day_of_week="sun",
+            hour=2,
             minute=0,
-            id="alerta_prazo_24h",
+            id="limpar_contadores_uso",
         )
         scheduler.start()
         app.logger.info(
-            "Scheduler iniciado — relatório semanal sexta 10h e alerta prazo 24h diário 08h (BRT)"
+            "Scheduler iniciado — SLA Escada A a cada 10 min, relatório semanal sexta 10h, "
+            "reset ranking domingo 23h59, limpeza contadores domingo 02h00 (BRT)"
         )
 
         import atexit
@@ -252,6 +319,74 @@ def _configurar_metricas_performance(app: Flask) -> None:
                     request.remote_addr,
                 )
         return response
+
+
+def _proteger_staging(app: Flask) -> None:
+    """Camada 2 (fallback app): Basic Auth em ambientes HML — CWI 4.1 / Onda 5.
+
+    Regras de ativação (fail-closed, opt-in explícito):
+    - Nunca em produção: VPN/firewall é o controle primário (ADR-002)
+    - Nunca em TESTING=True: pytest nunca bloqueado
+    - Requer STAGING_AUTH_ENABLED=true no ambiente
+    - Requer STAGING_AUTH_USER e STAGING_AUTH_PASSWORD configurados
+
+    Rotas excluídas: /health, /login, /sw.js
+    Credencial ausente ou inválida → 401 + WWW-Authenticate: Basic realm="DTX Staging"
+    Comparação timing-safe via hmac.compare_digest — senha nunca logada.
+    """
+    from flask import current_app, make_response
+
+    _excluidas_staging = frozenset({"/health", "/login", "/sw.js"})
+
+    def _resposta_401_staging():
+        resp = make_response("Acesso restrito ao ambiente de staging.", 401)
+        resp.headers["WWW-Authenticate"] = 'Basic realm="DTX Staging"'
+        return resp
+
+    @app.before_request
+    def _verificar_staging_auth():
+        # 1. Nunca em produção (camada primária = VPN/infra)
+        env = (current_app.config.get("ENV") or "production").strip().lower()
+        if env == "production":
+            return None
+
+        # 2. Nunca durante testes automatizados (pytest)
+        if current_app.config.get("TESTING"):
+            return None
+
+        # 3. Opt-in explícito via variável de ambiente
+        if os.environ.get("STAGING_AUTH_ENABLED", "").strip().lower() not in ("true", "1", "yes"):
+            return None
+
+        # 4. Credenciais devem estar configuradas (misconfiguration = desativado)
+        expected_user = os.environ.get("STAGING_AUTH_USER", "").strip()
+        expected_pass = os.environ.get("STAGING_AUTH_PASSWORD", "").strip()
+        if not expected_user or not expected_pass:
+            app.logger.warning(
+                "[STAGING] STAGING_AUTH_ENABLED=true mas credenciais ausentes — Basic Auth desativado"
+            )
+            return None
+
+        # 5. Rotas excluídas do Basic Auth
+        if request.path in _excluidas_staging:
+            return None
+
+        # 6. Verificar credencial Basic Auth (timing-safe)
+        auth = request.authorization
+        if not auth or not auth.username or not auth.password:
+            return _resposta_401_staging()
+
+        user_ok = hmac.compare_digest(auth.username.encode("utf-8"), expected_user.encode("utf-8"))
+        pass_ok = hmac.compare_digest(auth.password.encode("utf-8"), expected_pass.encode("utf-8"))
+        if not (user_ok and pass_ok):
+            app.logger.info(
+                "[STAGING] Credencial inválida. path=%s remote_addr=%s",
+                request.path,
+                request.remote_addr,
+            )
+            return _resposta_401_staging()
+
+        return None
 
 
 def _configurar_seguranca(app: Flask) -> None:
@@ -429,6 +564,7 @@ def _configurar_seguranca(app: Flask) -> None:
 def _configurar_i18n(app: Flask) -> None:
     """Configura sistema de internacionalização (i18n)"""
     from app.i18n import (
+        get_language_code,
         get_translated_category,
         get_translated_field_label,
         get_translated_gate,
@@ -442,9 +578,8 @@ def _configurar_i18n(app: Flask) -> None:
     @app.before_request
     def antes_da_requisicao():
         """Define o idioma para a requisição atual"""
-        # Obtém idioma do parâmetro URL ou da sessão (default: EN)
-        lang = request.args.get("lang") or session.get("language", "en")
-        session["language"] = lang
+        raw = request.args.get("lang") or session.get("language", "en")
+        session["language"] = get_language_code(raw)
 
     @app.context_processor
     def inject_i18n():
@@ -530,11 +665,14 @@ def _configurar_i18n(app: Flask) -> None:
         """Injeta endpoint de dashboard correto para o perfil do usuário atual."""
         from flask_login import current_user
 
+        from app.services.status_service import STATUS_VALIDOS
+
         if current_user.is_authenticated and current_user.perfil == "supervisor":
             endpoint = "main.painel"
         else:
             endpoint = "main.admin"
-        return {"dashboard_endpoint": endpoint}
+        # Fonte única dos status canônicos para o JS (evita lista hardcoded no template)
+        return {"dashboard_endpoint": endpoint, "status_validos": list(STATUS_VALIDOS)}
 
     # Registra funções as Jinja filters (para usar com o pipe |)
     @app.template_filter("translate_sector")
@@ -566,6 +704,16 @@ def _configurar_i18n(app: Flask) -> None:
     def filter_flash_msg(message):
         lang = session.get("language", "en")
         return resolve_flash_message(message, lang)
+
+    @app.template_filter("mask_email")
+    def filter_mask_email(email):
+        """Mascara e-mail para exibição na UI: u***@empresa.com (anti shoulder-surfing)."""
+        if not email or "@" not in str(email):
+            return email or ""
+        local, _, domain = str(email).partition("@")
+        if not local or not domain:
+            return "***@***"
+        return f"{local[0]}***@{domain}"
 
 
 def _configurar_timeout_sessao(app: Flask) -> None:

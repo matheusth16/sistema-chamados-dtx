@@ -13,7 +13,7 @@ th.filterable {
 
 th.sortable:hover,
 th.filterable:hover {
-    background-color: rgba(99, 102, 241, 0.05);
+    background-color: color-mix(in srgb, var(--color-dtx-600) 5%, transparent);
 }
 
 /* Ícones de Ordenação */
@@ -21,13 +21,13 @@ th.filterable:hover {
     display: inline-block;
     margin-left: 0.375rem;
     font-size: 0.875rem;
-    color: #9CA3AF;
+    color: #9CA3AF; /* gray-400 — ícone neutro inativo (sem token) */
     transition: color 0.2s ease;
     font-weight: normal;
 }
 
 .sort-icon.active {
-    color: #4F46E5;
+    color: var(--color-dtx-600);
     font-weight: bold;
 }
 
@@ -38,7 +38,7 @@ th.filterable:hover {
     right: 0.5rem;
     width: 0.5rem;
     height: 0.5rem;
-    background-color: #4F46E5;
+    background-color: var(--color-dtx-600);
     border-radius: 50%;
     font-size: 0;
 }
@@ -47,8 +47,8 @@ th.filterable:hover {
 .filter-dropdown {
     position: absolute;
     z-index: 1000;
-    background: white;
-    border: 1px solid #E5E7EB;
+    background: var(--color-surface-base);
+    border: 1px solid var(--color-surface-border);
     border-radius: 0.75rem;
     box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
     min-width: 12rem;
@@ -70,13 +70,13 @@ th.filterable:hover {
 
 .filter-dropdown-header {
     padding: 0.75rem 1rem;
-    background-color: #F9FAFB;
-    border-bottom: 1px solid #E5E7EB;
+    background-color: var(--color-surface-raised);
+    border-bottom: 1px solid var(--color-surface-border);
     font-size: 0.75rem;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    color: #6B7280;
+    color: #6B7280; /* gray-500 — texto neutro (sem token no design system) */
 }
 
 .filter-dropdown-options {
@@ -96,17 +96,17 @@ th.filterable:hover {
 }
 
 .filter-option:hover {
-    background-color: #EEF2FF;
+    background-color: var(--color-status-active-bg);
 }
 
 .filter-option input[type="radio"] {
     margin-right: 0.625rem;
     cursor: pointer;
-    accent-color: #4F46E5;
+    accent-color: var(--color-dtx-600);
 }
 
 .filter-option span {
-    color: #374151;
+    color: #374151; /* gray-700 — texto neutro (sem token no design system) */
     font-weight: 500;
     line-height: 1.25rem;
 }
@@ -117,17 +117,17 @@ th.filterable:hover {
 }
 
 .filter-dropdown-options::-webkit-scrollbar-track {
-    background: #F3F4F6;
+    background: var(--color-surface-raised);
     border-radius: 0.375rem;
 }
 
 .filter-dropdown-options::-webkit-scrollbar-thumb {
-    background: #D1D5DB;
+    background: var(--color-surface-muted);
     border-radius: 0.375rem;
 }
 
 .filter-dropdown-options::-webkit-scrollbar-thumb:hover {
-    background: #9CA3AF;
+    background: #9CA3AF; /* gray-400 — hover do thumb (sem token) */
 }
 
 /* Botão de Limpar Filtros */
@@ -137,18 +137,18 @@ th.filterable:hover {
     padding: 0.5rem 1rem;
     font-size: 0.875rem;
     font-weight: 600;
-    color: #6B7280;
-    background-color: white;
-    border: 1px solid #D1D5DB;
+    color: #6B7280; /* gray-500 — texto neutro (sem token no design system) */
+    background-color: var(--color-surface-base);
+    border: 1px solid var(--color-surface-muted);
     border-radius: 0.5rem;
     cursor: pointer;
     transition: all 0.2s ease;
 }
 
 .clear-filters-btn:hover {
-    color: #4F46E5;
-    border-color: #4F46E5;
-    background-color: #EEF2FF;
+    color: var(--color-dtx-600);
+    border-color: var(--color-dtx-600);
+    background-color: var(--color-status-active-bg);
 }
 
 .clear-filters-btn svg {
@@ -175,6 +175,21 @@ th.filterable:hover {
     display: flex;
     align-items: center;
     justify-content: center;
+}
+
+/* Focus ring consistente com o design system (DTX Blue) */
+.clear-filters-btn:focus-visible,
+th.sortable:focus-visible,
+th.filterable:focus-visible {
+    outline: 2px solid var(--color-dtx-600);
+    outline-offset: 2px;
+    border-radius: 4px;
+}
+
+.filter-option:focus-within {
+    background-color: var(--color-status-active-bg);
+    outline: 2px solid var(--color-dtx-600);
+    outline-offset: -2px;
 }
 
 /* Responsivo - Mobile */

@@ -3,10 +3,11 @@
 | Campo | Valor |
 |---|---|
 | **Documento** | Checklist de Segurança — Revisão de PR e Deploy |
-| **Versão** | 3.4 |
-| **Data** | 2026-06-22 |
+| **Versão** | 3.5 |
+| **Data** | 2026-06-23 |
 | **Autor** | DTX Aerospace — Engenharia de Software |
-| **Última auditoria** | 2026-06-23 (Sprint + F-81 + Onda A + Fase 0 + Onda B + Onda C wave 1 + Onda C wave 2 + Onda C wave 3 + Onda 2 — Segurança e API + Onda 3 — Negócio e relatórios + **Onda 4 — Infraestrutura** + **Gate Final — Cobertura** + **Desativação de usuários (ativo=false)** + **Onda 3 CWI — Hardening produção (CWI 2.1)** + **Onda 3b CWI — Auditoria API, injection, erros genéricos (CWI 2.2, 2.3-parcial, 3.1, 3.2, 4.2)** concluídos; **82/82 achados resolvidos**; gate **52/52**; global **94,98%**; 0 em backlog) |
+| **Última auditoria** | 2026-06-23 (**QA manual CWI executado** — 15 PASS / 2 SKIP ops; `scripts/executar_qa_manual_cwi.py`; **Onda 5 Polish**; **Onda 4 Fernet PII**; matriz CWI §20; Ondas 1–5+4 concluídas; **82/82 achados**; gate **52/52**; CWI 2.3 **COMPLETO**) |
+| **Encerramento plano CWI v2** | 2026-06-23 — **encerrado** — ver [`docs/ENCERRAMENTO_PROJETO_CWI.md`](ENCERRAMENTO_PROJETO_CWI.md) (rollout Fernet 2/2 usuários migrados) |
 
 ---
 
@@ -271,8 +272,8 @@ Este documento deve ser consultado em **duas situações**:
   - Assert: status ∈ {200, 400, 403}; corpo sem "Firestore", "Traceback", "Exception", "senha_hash"
   - Assert: lista retornada não explode (mock controlado, 0 chamados)
   - Como verificar QA: `curl -s "https://host/api/chamados/paginar?search=%27+OR+1%3D1--"` — deve retornar JSON com chamados da área do supervisor, não todos os chamados do sistema
-  - Testes automatizados: `tests/test_security/test_injection_regression.py` (31 testes CWI 3.1: 8×3 search parametrizados + 2 literal + 5 swagger)
-  - Cobertura primária: parâmetro `search` em GET `/api/chamados/paginar`; POST `/api/editar-chamado` — validação via `validators.py` (ver L3 polish)
+  - Testes automatizados: `tests/test_security/test_injection_regression.py` (33 testes CWI 3.1: 8×3 search parametrizados + 2 literal + 5 swagger + 2 editar-chamado)
+  - Cobertura: `search` em GET `/api/chamados/paginar`; `nova_descricao` em POST `/api/editar-chamado` (`test_editar_chamado_descricao_payload_nao_causa_500`)
   - **Resolvido 2026-06-23 — Onda 3b (CWI 3.1)**
 
 ---
@@ -457,17 +458,26 @@ Este documento deve ser consultado em **duas situações**:
 - [ ] **Existe procedimento documentado para atender solicitação de exclusão (direito ao esquecimento)**
   - Arquivo de referência: `docs/POLITICA_SEGURANCA_LGPD.md`
 
-### 9.4 Auditoria de respostas HTTP — CWI 2.3 (parcial)
+### 9.4 Auditoria de respostas HTTP e PII em repouso — CWI 2.3
 
 - [x] **Endpoints JSON não expõem `senha_hash`, `encryption_key`, stack trace ou nome de exceção interna**
-  - Arquivo de referência: `app/models_usuario.py:101` — `to_public_dict()` é a serialização segura para HTTP
+  - Arquivo de referência: `app/models_usuario.py` — `to_public_dict()` é a serialização segura para HTTP
   - `GET /api/chamado/<id>`: retorna whitelist explícita de campos (id, numero, categoria, tipo, gate, responsavel, descricao, data_abertura, status, sla_info) — sem campos internos
   - `GET /api/supervisores/lista`: usa campos seguros (id, nome, email) — sem senha_hash
   - `Usuario.to_dict()` inclui senha_hash — **uso exclusivo para Firestore**, nunca em respostas HTTP
   - `Usuario.to_public_dict()` é a versão segura para HTTP — sem senha_hash
   - Mascaramento UI: `app/utils.py:mask_email_for_log` + filtro Jinja `mask_email` em `app/__init__.py` (navbar)
-  - Testes: `tests/test_routes/test_api_security_responses.py::test_to_public_dict_nao_contem_senha_hash`, `::test_api_chamado_por_id_resposta_sem_campos_internos`
-  - **Resolvido 2026-06-23 — Onda 3b (CWI 2.3 parcial; Fernet PII fecha na Onda 4)**
+  - Testes: `tests/test_routes/test_api_security_responses.py::test_to_public_dict_nao_contem_senha_hash`, `::test_api_chamado_por_id_resposta_sem_campos_internos`, `::test_api_supervisores_lista_nao_expoe_senha_hash`
+  - **Resolvido 2026-06-23 — Onda 3b (respostas HTTP)**
+
+- [x] **Campos PII (`nome`, `email`) criptografados em repouso no Firestore com Fernet**
+  - Arquivo de referência: `app/services/pii_encryption.py` — `maybe_encrypt`, `maybe_decrypt`, `email_lookup_hash`
+  - Integração: `app/models_usuario.py` — `to_dict()`, `from_dict()`, `get_by_email()`, `email_existe()`, `update()`, `get_all()`
+  - Formato: `fernet:v1:<token>` nos campos; `email_lookup_hash = sha256(email)` para lookup
+  - Default `ENCRYPT_PII_AT_REST=false` — zero breaking change; ativar via `docs/ENV.md`
+  - ADR: `docs/adr/001-criptografia-pii-fernet.md`
+  - Testes: `tests/test_services/test_pii_encryption.py` (16 testes), `tests/test_services/test_models_usuario.py` (8 testes Onda 4)
+  - **Resolvido 2026-06-23 — Onda 4 (CWI 2.3 completo)**
 
 ---
 
@@ -518,6 +528,40 @@ Este documento deve ser consultado em **duas situações**:
 
 - [ ] **Logs não mostram erros 500 nas primeiras requisições**
   - Como verificar: `docker logs -f <container>` nos primeiros minutos após deploy
+
+### 10.4 Proteção de ambiente staging/HML — CWI 4.1
+
+**Implementação de código (verificável automaticamente):**
+
+- [x] Middleware `app/__init__.py:_proteger_staging()` — nunca ativo em `ENV=production` ou `TESTING=True`
+- [x] Rotas excluídas automaticamente: `/health`, `/login`, `/sw.js` (match exato; `/health/` com trailing slash não é excluído por design)
+- [x] Comparação timing-safe: `hmac.compare_digest` para user e senha
+- [x] Misconfiguration segura: `STAGING_AUTH_ENABLED=true` sem credenciais → desativado (não bloqueia app)
+- [x] ENV normalizado com `.strip().lower()` (robusto a whitespace)
+- [x] ADR: `docs/adr/002-protecao-ambientes-staging.md`
+- [x] 9 testes em `tests/test_routes/test_staging_auth.py` (desativado em testing/prod; 401 sem cred; cred correta/errada; rotas excluídas; deep health com HEALTH_SECRET; misconfiguration; trailing slash)
+- [x] Documentação: `.env.example`, `docs/ENV.md`, `docs/DEPLOYMENT_PLAN.md §Staging`
+
+**Validação manual em ambiente HML real (ops — preencher quando executado):**
+
+- [x] **Camada primária (CWI):** acessar URL HML de computador pessoal (sem VPN) → bloqueado pelo firewall de rede _antes_ de chegar à app
+  - _Validado 2026-06-23 — confirmado ops (CWI 4.1 camada rede)_
+- [x] **Camada fallback (app):** `STAGING_AUTH_ENABLED=true` configurado; `curl -I http://hml-host/admin` → `401 WWW-Authenticate: Basic realm="DTX Staging"`
+  - _Validado 2026-06-23 — simulação local + confirmado ops (CWI 4.1 camada app)_
+- [x] Rotas excluídas sem Basic Auth em HML: `curl -I http://hml-host/health` → `200 OK`
+
+**Verificação copy-paste (camada fallback):**
+
+```bash
+# Sem credencial → 401
+curl -I http://hml-host/dashboard
+# Com credencial → 302 login
+curl -u hml_user:$STAGING_AUTH_PASSWORD http://hml-host/dashboard
+# Rota excluída → 200
+curl -I http://hml-host/health
+```
+
+- [x] **Implementação app — Onda 5 (2026-06-23)** | **Validação ops HML — 2026-06-23 (CWI 4.1)**
 
 ---
 
@@ -1118,7 +1162,38 @@ Os itens deste checklist mapeiam para o OWASP Top 10 (2021):
 
 ---
 
+## Seção 20 — Matriz CWI QA manual 11/11
+
+> Status das 11 verificações do artigo [CWI — Testes de Segurança para QAs](https://cwi.com.br/blog/testes-de-seguranca-para-qas/).
+> **Automatizado** = cobertura por pytest automatizado. **QA manual** = checklist copy-paste para validação humana em HML/prod.
+
+| ID | Sub-item CWI | Automatizado? | Evidência / arquivo de teste | QA manual |
+|---|---|---|---|---|
+| **1.1** | Usuário anônimo → 302/401 (login obrigatório) | Sim | `tests/test_routes/test_auth.py`, `test_app_init.py`, `@login_required` em todas as rotas sensíveis | `[x]` 2026-06-23 — `executar_qa_manual_cwi.py` (302 em `/meus-chamados`, `/api/notificacoes`) |
+| **1.2** | Permissão por perfil (solicitante, supervisor, admin) | Sim | `tests/test_services/test_permissions.py`, `@requer_solicitante` / `@requer_supervisor_area` / `@requer_admin` em `app/routes/` | `[x]` 2026-06-23 — solicitante em `/admin/categorias` → 302 |
+| **1.3** | IDOR — só recursos próprios (URL, body, anexo) | Sim | `tests/test_routes/test_permissions.py`, `tests/test_routes/test_download_idor.py`, `test_api.py` | `[x]` 2026-06-23 — `GET /api/chamado/<id_alheio>` → 403 (+ pytest IDOR) |
+| **2.1** | HTTPS em produção (redirect HTTP→HTTPS) | Sim | `tests/test_config_production.py::test_cwi21_https_redirect_em_producao`, `tests/test_app_init.py` | `[x]` 2026-06-23 — prod simulada → 301 `https://` |
+| **2.2** | Senhas com hash forte (Werkzeug scrypt/pbkdf2) | Doc + teste | `tests/test_services/test_models_usuario.py::test_senha_hash_usa_formato_werkzeug_nao_plaintext`; `CHECKLIST_SEGURANCA.md §1.4` | `[x]` 2026-06-23 — Firestore `usuarios.senha_hash` prefixo `scrypt:32768:8:1$…` (não plaintext) |
+| **2.3** | PII minimizado/oculto nas respostas e criptografado em repouso | Sim | `tests/test_routes/test_api_security_responses.py` (respostas HTTP); `tests/test_services/test_pii_encryption.py` + `test_models_usuario.py` (Onda 4 Fernet) | `[x]` 2026-06-23 — resposta API sem `senha_hash`; Fernet `fernet:v1:` em `nome`/`email` (ENCRYPT_PII_AT_REST=false default; ativar em produção) |
+| **3.1** | SQL/NoSQL injection | Sim | `tests/test_security/test_injection_regression.py` — 33 testes parametrizados (SQL, NoSQL, editar-chamado) | `[x]` 2026-06-23 — `search=' OR 1=1--` → 200 (+ 33 pytest) |
+| **3.2** | Erros genéricos (sem stack/tecnologia nas respostas) | Sim | `tests/test_routes/test_api_security_responses.py` (500 handlers com `ERRO_INTERNO_MSG`); `CHECKLIST_SEGURANCA.md §8.4` | `[x]` 2026-06-23 — 500 → `Erro interno. Tente novamente.` |
+| **4.1** | Ambientes de teste não acessíveis publicamente | Sim (app) + ops (rede) | `tests/test_routes/test_staging_auth.py` — 9 testes; VPN/firewall + Basic Auth fallback | `[x]` 2026-06-23 — camada rede (VPN/firewall) + camada app (Basic Auth staging) validadas ops |
+| **4.2** | Swagger/documentação não exposta | Sim | `tests/test_security/test_injection_regression.py::test_swagger_routes_retornam_404` (5 paths); `CHECKLIST_SEGURANCA.md §7.3` | `[x]` 2026-06-23 — `/swagger`, `/docs`, `/openapi.json` → 404 |
+
+**Status consolidado:**
+
+| Meta | Status | Dependências pendentes |
+|---|---|---|
+| **CWI básico (execução QA 2026-06-23)** | ✅ **11/11 sub-itens CWI** | — |
+| **CWI 2.3 completo (Fernet/LGPD)** | ✅ **Completo** (Onda 4 + rollout 2026-06-23) | 2/2 usuários migrados; `ENCRYPT_PII_AT_REST=true` ativo no `.env` dev |
+| **CWI + baseline DTX** | ✅ Implementado | Onda 2 (`ativo=false`) implementada |
+
+> **Última execução QA manual:** 2026-06-23 — `python scripts/executar_qa_manual_cwi.py` → 15 PASS, 0 FAIL, 2 SKIP. Evidência: `docs/evidencias/QA_MANUAL_CWI_EVIDENCIA.md`
+
+---
+
 *Documento atualizado em 2026-06-17 — DTX Aerospace, Engenharia de Software*
+*Versão 3.5 — Onda 5 Polish 2026-06-23: matriz CWI 11/11 documentada, §10.4 distingue código vs ops, 9 testes staging_auth, config.py SESSION_COOKIE_SECURE fix, ratelimit fixture fix.*
 *Versão 3.4 — Gate Final 2026-06-22: i18n fix pt_BR padrão, CI 85%+gate por módulo, 1435 testes, 52/52 OK, docs sync concluído.*
 *Versão 3.3 — Onda 4 Infraestrutura 2026-06-22: database.py 52%→100%, __init__.py 72%→98%, +53 testes, ADR.*
 *Versão 3.1 — Sprint 2026-06-17: F-15 resolvido (html.escape em report_service); perfil admin_global documentado; path sw.js corrigido; F-04 ampliado para analytics.py:87*

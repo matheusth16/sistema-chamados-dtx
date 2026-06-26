@@ -3,13 +3,15 @@
 ## Stack
 - **Backend:** Flask 3.0 + Firestore (firebase-admin), Flask-Login, Flask-WTF (CSRF)
 - **Frontend:** Tailwind CSS (CDN), GSAP 3 (ScrollTrigger, ScrollToPlugin)
-- **Python:** 3.12+, pytest + unittest.mock
+- **Python:** 3.14, pytest + unittest.mock
 - **Blueprint:** único `main` — todos os módulos de rota registram nele
+- **Serviços externos:** Firebase/Firestore (banco), Cloudflare R2 (anexos — bucket privado, URLs pré-assinadas), Microsoft Graph API (e-mail)
 
 ## Perfis de usuário
 - `solicitante` — cria e acompanha os próprios chamados
 - `supervisor` — gerencia chamados da sua área + relatórios
-- `admin` — acesso total: chamados, usuários, categorias, traduções, relatórios
+- `admin` — acesso total: chamados, usuários, categorias, relatórios
+- `admin_global` — herda tudo de `admin`; usado para supervisores com acesso expandido entre áreas
 
 ## Padrões de código
 
@@ -47,7 +49,10 @@ bandit -r app/ -ll
 # 3. Testes
 pytest --tb=short -q
 
-# 4. Push (usa o script da skill)
+# 4. Gate de cobertura por módulo (>= 85%)
+python scripts/check_coverage_per_module.py --json-only
+
+# 5. Push (usa o script da skill)
 bash skills/Essencial/git-pushing/scripts/smart_commit.sh "tipo: descrição"
 ```
 
@@ -86,6 +91,7 @@ app/
 ├── models.py                # Modelo Chamado
 ├── models_usuario.py        # Classe Usuario (UserMixin), to_dict/from_dict
 ├── models_categorias.py     # Modelo de categorias
+├── models_historico.py      # Histórico de alterações dos chamados
 ├── database.py              # Instância Firestore
 ├── decoradores.py           # @requer_* decoradores
 ├── i18n.py                  # Internacionalização (PT-BR, EN, ES)
@@ -95,8 +101,7 @@ app/
 │   ├── chamados.py          # Criação e listagem (solicitante)
 │   ├── dashboard.py         # Dashboard (supervisor/admin)
 │   ├── usuarios.py          # Gestão de usuários (admin)
-│   ├── categorias.py        # Gestão de categorias (admin)
-│   └── traducoes.py         # Gestão de traduções (admin)
+│   └── categorias.py        # Gestão de categorias (admin)
 └── services/
     ├── chamados_criacao_service.py
     ├── chamados_listagem_service.py

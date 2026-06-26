@@ -211,14 +211,47 @@
     </div>
     {% endif %}
 
+    <!-- Modal acessível para motivo de cancelamento (substitui window.prompt — F-33 / S2-05) -->
+    <dialog id="modal-cancelamento"
+        class="rounded-dtx-md border border-surface-border bg-white p-0 shadow-dtx-lg backdrop:bg-black/40 max-w-md w-[calc(100%-2rem)] open:animate-fade-in"
+        aria-labelledby="modal-cancelamento-titulo">
+        <div class="p-6 space-y-4">
+            <h2 id="modal-cancelamento-titulo" class="font-display text-lg font-bold text-slate-800">
+                {{ t('cancellation_reason') }}
+            </h2>
+            <div>
+                <label for="motivo-cancelamento-texto" class="dtx-label">{{ t('cancellation_reason') }}</label>
+                <textarea id="motivo-cancelamento-texto" rows="4" required
+                    class="dtx-input mt-1 w-full resize-y min-h-[6rem]"
+                    placeholder="{{ t('cancellation_reason_placeholder') }}"
+                    aria-describedby="modal-cancelamento-erro"></textarea>
+                <p id="modal-cancelamento-erro" class="hidden mt-2 text-sm font-medium text-red-600" role="alert"></p>
+            </div>
+            <div class="flex flex-wrap justify-end gap-2 pt-2">
+                <button type="button" id="btn-voltar-cancelamento"
+                    class="min-h-[44px] px-4 py-2.5 text-sm font-bold text-slate-600 bg-surface-base border border-surface-border rounded-dtx-md hover:bg-surface-raised focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-dtx-600">
+                    {{ t('back') }}
+                </button>
+                <button type="button" id="btn-confirmar-cancelamento"
+                    class="min-h-[44px] px-4 py-2.5 text-sm font-bold text-white bg-red-600 border border-red-700 rounded-dtx-md hover:bg-red-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-red-500">
+                    {{ t('apply') }}
+                </button>
+            </div>
+        </div>
+    </dialog>
+
 {% endblock %}
 
 {% block page_scripts %}
     <!-- Mensagens i18n para dashboard_otimizacoes.js -->
     <script nonce="{{ csp_nonce }}">
     window.DTX_MSGS = {
+        cancellation_reason: {{ t('cancellation_reason') | tojson }},
+        cancellation_reason_placeholder: {{ t('cancellation_reason_placeholder') | tojson }},
         cancel_reason_prompt: {{ t('cancel_reason_prompt') | tojson }},
         cancel_requires_reason: {{ t('cancel_requires_reason') | tojson }},
+        back: {{ t('back') | tojson }},
+        apply: {{ t('apply') | tojson }},
         error_form_not_found: {{ t('error_form_not_found') | tojson }},
         error_id_not_found: {{ t('error_id_not_found') | tojson }},
         error_id_empty: {{ t('error_id_empty') | tojson }},
@@ -228,6 +261,14 @@
         error_update: {{ t('error_update') | tojson }},
         error_connection: {{ t('error_connection') | tojson }}
     };
+
+    // Endpoints da API (fonte única no servidor, evita URL hardcoded no JS)
+    window.DTX_URLS = {
+        atualizar_status: {{ url_for('main.atualizar_status_ajax') | tojson }}
+    };
+
+    // Status canônicos do domínio (fonte única no servidor: status_service.STATUS_VALIDOS)
+    window.DTX_STATUS_VALIDOS = {{ status_validos | tojson }};
 
     function dtxStatusBadgeClasses(status) {
         if (status === 'Concluído') return 'bg-status-done-bg text-status-done border-status-done-border';
@@ -251,7 +292,7 @@
     }
 </script>
     <!-- As funções abrirModal e fecharModal já estão definidas inline acima -->
-    <script src="{{ url_for('static', filename='js/dashboard_otimizacoes.js') }}?v=5"></script>
+    <script src="{{ url_for('static', filename='js/dashboard_otimizacoes.js') }}?v=6"></script>
     <script src="{{ url_for('static', filename='js/table-row-click.js') }}"></script>
 
     <script nonce="{{ csp_nonce }}">

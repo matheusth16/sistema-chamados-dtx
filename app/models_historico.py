@@ -82,7 +82,6 @@ class Historico:
 
             logger = logging.getLogger(__name__)
             logger.error("Erro ao salvar histórico: %s", e, exc_info=True)
-            print(f"Erro ao salvar histórico: {e}")
             return False
 
     @classmethod
@@ -140,7 +139,6 @@ class Historico:
 
             logger = logging.getLogger(__name__)
             logger.error("❌ Erro ao buscar histórico: %s", e, exc_info=True)
-            print(f"Erro ao buscar histórico: {e}")
             return []
 
     def _converter_timestamp(self, ts):

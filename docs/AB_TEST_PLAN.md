@@ -10,7 +10,7 @@
 `AB-001`
 
 ### Status
-`planejado`
+`implementado` — ativo desde 2026-06-18
 
 ---
 
@@ -31,14 +31,16 @@
 
 ## 2. Métrica primária
 
-**Taxa de chamados com descrição insuficiente** (`len(descricao.strip()) < 30`) no momento da submissão.
+**Taxa de chamados com descrição insuficiente** no momento da submissão.
 
 ```
 métrica = chamados_rejeitados_por_descricao / total_tentativas_criacao
 ```
 
-- Fonte dos dados: `app/services/validators.py` — erro `"Descrição muito curta"` já retornado
-- Logging necessário: registrar cada tentativa de criação (mesmo as rejeitadas) com flag `descricao_insuficiente: bool`
+- Fonte dos dados: `app/services/validators.py` — evento `ab_event` com `evento="descricao_insuficiente"` logado via `logger.info()`
+- Logging implementado em `_log_ab_descricao_insuficiente()` em `validators.py`
+
+> **Decisão de threshold (2026-06-18):** O logging de evento AB foi alinhado ao threshold real do validador (3 chars), não à hipótese original (30 chars). Motivo: alterar o validador para 30 chars mudaria o comportamento de produção. O campo de descrição com placeholder (variante B) guia o usuário a escrever mais — a melhoria esperada ainda é mensurável mesmo com o threshold em 3 chars. Se o experimento mostrar impacto insuficiente, elevar o validador para 30 chars pode ser feito em iteração futura com consenso de produto.
 
 ### Métricas secundárias (guardiãs)
 
@@ -200,11 +202,11 @@ def test_formulario_variante_a_sem_contador(client_logado_solicitante):
 
 ### 5.3 Checklist antes de ativar
 
-- [ ] Testes unitários de `ab_service.py` passando (TDD: escrever antes)
-- [ ] Testes de não-regressão do formulário passando
-- [ ] Coverage gate 70% mantido após novos testes
-- [ ] Logging de evento ativo em staging
-- [ ] Rollback documentado (basta remover `ab_variante` do template → Variante A para todos)
+- [x] Testes unitários de `ab_service.py` passando (TDD — 5 testes em `tests/test_services/test_ab_service.py`)
+- [x] Testes de não-regressão do formulário passando (`test_formulario_variante_b_renderiza_contador`, `test_formulario_variante_a_sem_contador`)
+- [x] Coverage gate 85% global + por módulo mantido (94,98% total — 1435 testes; 52/52 módulos OK via `check_coverage_per_module.py`)
+- [x] Logging de evento implementado em `validators.py:_log_ab_descricao_insuficiente()`
+- [x] Rollback documentado (basta `get_variante` retornar "A" para todos → remover bloco `{% if ab_variante == 'B' %}`)
 
 ---
 

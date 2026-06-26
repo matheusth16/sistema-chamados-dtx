@@ -1,14 +1,14 @@
 # SLOs — DTX Digital Andon System
 
-> Definições de Service Level Objectives para o ambiente de produção no Railway.
-> Revisão: 2026-06-10
+> Definições de Service Level Objectives para o ambiente de produção.
+> Revisão: 2026-06-17
 
 ---
 
 ## Contexto
 
 Sistema interno da DTX Aerospace utilizado por 3 perfis (solicitante, supervisor, admin).
-Deploy: Railway (instância única, Firestore como banco, Brevo para e-mail, R2 para anexos).
+Deploy: Docker (instância única, Firestore como banco, Microsoft Graph API para e-mail, R2 para anexos).
 Público-alvo: equipes internas — tolerância a downtime em horário fora-de-expediente é maior.
 
 ---
@@ -22,7 +22,7 @@ Público-alvo: equipes internas — tolerância a downtime em horário fora-de-e
 
 **Medição:** UptimeRobot (gratuito) monitora `GET /health` a cada 5 minutos.
 - Configurar alerta por e-mail quando down por > 2 checks consecutivos (10 min).
-- URL: `https://<seu-domínio>.up.railway.app/health`
+- URL: `https://<seu-dominio>/health`
 
 **Horário com peso:** dias úteis 07h–19h BRT têm peso 2× no orçamento.
 
@@ -37,8 +37,8 @@ Público-alvo: equipes internas — tolerância a downtime em horário fora-de-e
 | p99 | Qualquer rota | < 5 000 ms |
 
 **Medição:** log `app.performance` — cada linha tem `duration_ms`.
-- No Railway: filtrar logs por `duration_ms` para detectar regressões.
-- Query Railway log drain: `duration_ms > 2000 status=200`
+- Filtrar logs por `duration_ms` para detectar regressões.
+- Query: `duration_ms > 2000 status=200`
 
 ---
 
@@ -50,7 +50,7 @@ Público-alvo: equipes internas — tolerância a downtime em horário fora-de-e
 | Erros não tratados (500) | 0 em janela de 24h |
 
 **Medição:** log `app.errors` — linha por 5xx com `status=`, `path=`, `duration_ms=`.
-- No Railway: buscar `http_error` nos logs. Qualquer ocorrência é alarme.
+- Buscar `http_error` nos logs. Qualquer ocorrência é alarme.
 
 ---
 
@@ -74,23 +74,16 @@ Público-alvo: equipes internas — tolerância a downtime em horário fora-de-e
 | Relatório semanal | Sexta 10h BRT | Executar dentro de ±5 min |
 | Alerta prazo 24h | Diário 08h BRT | Executar dentro de ±10 min |
 
-**Medição:** `app.logger.info("Relatório semanal concluído: ...")` nos logs Railway.
+**Medição:** `app.logger.info("Relatório semanal concluído: ...")` nos logs da aplicação.
 - Ausência da linha de log na janela esperada = job não executou.
 
 ---
 
-## Setup de Monitoramento no Railway
+## Setup de Monitoramento
 
-### 1. Health Check Railway (nativo)
+### 1. Health Check (plataforma de deploy)
 
-No `railway.toml` ou via painel Railway:
-```toml
-[deploy]
-healthcheckPath = "/health"
-healthcheckTimeout = 300
-restartPolicyType = "ON_FAILURE"
-restartPolicyMaxRetries = 3
-```
+Configurar na plataforma: endpoint `/health`, timeout 30s, política `ON_FAILURE`, máx 3 restarts.
 
 ### 2. UptimeRobot (gratuito)
 
@@ -104,9 +97,9 @@ restartPolicyMaxRetries = 3
    - Keyword: `"status": "ok"` (falha se não encontrar)
    - Intervalo: 15 minutos
 
-### 3. Log Drain Railway (opcional, nível seguinte)
+### 3. Log Drain (opcional, nível seguinte)
 
-No painel Railway → Settings → Observability → Log Drain:
+Exportar stdout/stderr do container para um agregador:
 - Destino: Logtail (gratuito, 1GB/mês) ou Datadog
 - Filtros importantes para criar alertas no destino:
   - `http_error` → alerta Slack/e-mail
@@ -121,16 +114,16 @@ No painel Railway → Settings → Observability → Log Drain:
 
 ### App não responde (SLO-01 violado)
 
-1. Verificar Railway dashboard → Deployments → logs do deploy atual
+1. Verificar logs do container (`docker logs <container>` ou painel do provedor)
 2. Verificar se `GET /health` retorna 200 (curl ou browser)
-3. Se 502/503: Railway pode estar reiniciando — aguardar 2 min
-4. Se persiste: `railway redeploy` via CLI
+3. Se 502/503: container pode estar reiniciando — aguardar 2 min
+4. Se persiste: redeploy via CI/CD ou `docker compose up -d --force-recreate`
 
 ### Firestore degraded (SLO-04 violado)
 
 1. `GET /health?deep=1` → ver `checks.firestore`
 2. Verificar Firebase Console → Firestore → Usage → quotas
-3. Verificar `GOOGLE_CREDENTIALS_JSON` no Railway (Settings → Variables)
+3. Verificar `GOOGLE_CREDENTIALS_JSON` nas variáveis de ambiente do servidor
 4. Ver logs: filtrar por `health_check firestore falhou`
 
 ### Latência alta (SLO-02 violado)
@@ -145,7 +138,7 @@ No painel Railway → Settings → Observability → Log Drain:
 ## Alertas específicos — eventos de `app.metrics`
 
 O módulo `app/services/metrics.py` emite eventos estruturados via logger `app.metrics`.
-Filtre esses padrões no Railway log drain ou Cloud Logging para criar alertas.
+Filtre esses padrões no agregador de logs (Logtail, Datadog, Cloud Logging) para criar alertas.
 
 | Evento | Filtro no log | Alerta |
 |--------|--------------|--------|
@@ -155,7 +148,7 @@ Filtre esses padrões no Railway log drain ou Cloud Logging para criar alertas.
 | SLA vencido | `sla_vencido` | Informativo — sem alerta automático |
 | Job agendado ausente | (ausência de linha) | Ver SLO-05 |
 
-### Configurar alertas no Railway (Log Drain → Logtail)
+### Configurar alertas (Log Drain → Logtail)
 
 ```bash
 # Criar alerta no Logtail para 5xx

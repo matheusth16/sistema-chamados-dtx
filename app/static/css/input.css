@@ -2,34 +2,41 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ── CSS custom properties ── espelham os tokens Tailwind ──────────────────── */
+/* ── CSS custom properties ── fonte única de verdade para light + dark ─── */
 @layer base {
   :root {
-    /* DTX Blue */
-    --color-dtx-50:  #EEF4FF;
-    --color-dtx-100: #D9E7FF;
-    --color-dtx-200: #B3CEFF;
-    --color-dtx-300: #7DAEFF;
-    --color-dtx-400: #4A8AE8;
-    --color-dtx-500: #2E6ACC;
-    --color-dtx-600: #1e4a8c;
-    --color-dtx-700: #163A70;
-    --color-dtx-800: #0F2B54;
-    --color-dtx-900: #091D38;
+    /* DTX Blue — âncora da marca: #13274b em dtx-700 */
+    --color-dtx-50:  #f4f6fb;
+    --color-dtx-100: #e4eaf6;
+    --color-dtx-200: #c1d0ec;
+    --color-dtx-300: #81a0da;
+    --color-dtx-400: #3f70ca;
+    --color-dtx-500: #284e95;   /* primary action — 8:1 com branco */
+    --color-dtx-600: #1d3b72;   /* hover — 10.9:1 com branco */
+    --color-dtx-700: #13274b;   /* MARCA DTX — 14.8:1 com branco */
+    --color-dtx-800: #0c1931;
+    --color-dtx-900: #070f1d;
 
-    /* Superfícies */
-    --color-surface-canvas: #FBFBFA;
+    /* Navbar — navy sólido em light mode */
+    --color-nav-bg:     #13274b;
+    --color-nav-border: #1d3b72;
+    --color-nav-text:   #8ba8cc;
+    --color-nav-active: #ffffff;
+    --color-nav-accent: #3f70ca;
+
+    /* Superfícies — "papel técnico aeroespacial" */
+    --color-surface-canvas: #F2F4F7;
     --color-surface-base:   #FFFFFF;
-    --color-surface-raised: #F5F5F4;
-    --color-surface-border: #EAEAEA;
-    --color-surface-muted:  #D1D5DB;
+    --color-surface-raised: #E8ECF2;
+    --color-surface-border: #C4CDD9;
+    --color-surface-muted:  #8B9EC0;
 
     /* Status */
     --color-status-open-bg:          #FEF3C7;
-    --color-status-open-text:        #92400E;
+    --color-status-open-text:        #78350F;
     --color-status-open-border:      #FDE68A;
     --color-status-active-bg:        #EFF6FF;
-    --color-status-active-text:      #1D4ED8;
+    --color-status-active-text:      #1E3A8A;
     --color-status-active-border:    #BFDBFE;
     --color-status-done-bg:          #ECFDF5;
     --color-status-done-text:        #065F46;
@@ -40,29 +47,86 @@
     --color-status-pending-bg:       #F8FAFC;
     --color-status-pending-text:     #475569;
     --color-status-pending-border:   #E2E8F0;
+
+    /* Gradiente hero (login, páginas de marketing) */
+    --gradient-dtx: linear-gradient(135deg, #070f1d 0%, #13274b 55%, #284e95 100%);
   }
 
-  /* Light-only — sem dark mode */
+  /* ── Dark mode — Tactical Field Operations ───────────────────────────────── */
+  html.dark {
+    color-scheme: dark;
+
+    /* DTX Blue clareado para contrastar em fundo escuro */
+    --color-dtx-50:  #0d1f3c;
+    --color-dtx-100: #162740;
+    --color-dtx-200: #1e3554;
+    --color-dtx-300: #2a4a72;
+    --color-dtx-400: #3f70ca;   /* primary action no dark */
+    --color-dtx-500: #4a80d9;   /* hover */
+    --color-dtx-600: #60a5fa;   /* destaques, links */
+    --color-dtx-700: #93c5fd;
+    --color-dtx-800: #bfdbfe;
+    --color-dtx-900: #dbeafe;
+
+    /* Navbar no dark — funde com o canvas sem divisória dura */
+    --color-nav-bg:     #0d1117;
+    --color-nav-border: #1e2d3f;
+    --color-nav-text:   #6b8baa;
+    --color-nav-active: #e8edf5;
+    --color-nav-accent: #3f70ca;
+
+    /* Superfícies */
+    --color-surface-canvas: #0d1117;
+    --color-surface-base:   #131c27;
+    --color-surface-raised: #1e2d3f;
+    --color-surface-border: #2a3a50;
+    --color-surface-muted:  #3d5068;
+
+    /* Status no dark */
+    --color-status-open-bg:          #2d1d00;
+    --color-status-open-text:        #fde68a;
+    --color-status-open-border:      #78350f;
+    --color-status-active-bg:        #0d1f3c;
+    --color-status-active-text:      #93c5fd;
+    --color-status-active-border:    #1e3a5f;
+    --color-status-done-bg:          #052e16;
+    --color-status-done-text:        #86efac;
+    --color-status-done-border:      #14532d;
+    --color-status-cancelled-bg:     #2d0a0f;
+    --color-status-cancelled-text:   #fca5a5;
+    --color-status-cancelled-border: #7f1d1d;
+    --color-status-pending-bg:       #1c2028;
+    --color-status-pending-text:     #94a3b8;
+    --color-status-pending-border:   #334155;
+
+    /* Gradiente hero dark */
+    --gradient-dtx: linear-gradient(135deg, #020810 0%, #0d1117 55%, #13274b 100%);
+  }
+
   html {
-    color-scheme: light;
+    color-scheme: light dark;
   }
 
   body {
     font-family: 'Inter', sans-serif;
     background-color: var(--color-surface-canvas);
-    color: #111827;
+    color: #1a1e2e;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    transition: background-color 0.2s ease, color 0.2s ease;
   }
 
-  /* Focus ring consistente — DTX Blue, sem outline padrão do browser */
+  html.dark body {
+    color: #e8edf5;
+  }
+
+  /* Focus ring consistente */
   *:focus-visible {
-    outline: 2px solid var(--color-dtx-600);
+    outline: 2px solid var(--color-dtx-500);
     outline-offset: 2px;
     border-radius: 4px;
   }
 
-  /* Tipografia display para headings */
   h1, h2, h3 {
     font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   }
@@ -70,30 +134,48 @@
 
 /* ── Componentes globais reutilizáveis ─────────────────────────────────────── */
 @layer components {
-  /* Divisor padrão */
   .dtx-divider {
     @apply border-t border-surface-border;
   }
 
-  /* Card base: fundo branco, borda sutil, sombra mínima */
   .dtx-card {
-    @apply bg-surface-base rounded-dtx-md border border-surface-border shadow-dtx-sm;
+    @apply bg-surface-base rounded-dtx-md border border-surface-border;
+    box-shadow: 0 2px 8px rgb(0 0 0 / 0.06), 0 1px 2px rgb(0 0 0 / 0.04);
   }
 
-  /* Label de formulário */
+  .dtx-card-raised {
+    @apply dtx-card;
+    border-top: 3px solid var(--color-dtx-500);
+    box-shadow: 0 4px 16px rgb(0 0 0 / 0.10);
+  }
+
   .dtx-label {
-    @apply block text-sm font-medium text-gray-700 mb-1;
+    @apply block text-sm font-medium mb-1;
+    color: #374151;
   }
 
-  /* Input de formulário */
+  html.dark .dtx-label {
+    color: var(--color-nav-text);
+  }
+
   .dtx-input {
-    @apply block w-full rounded-dtx-md border border-surface-muted bg-white px-3 py-2 text-sm
-           text-gray-900 placeholder:text-gray-400
-           focus-visible:border-dtx-600 focus-visible:ring-0
-           disabled:bg-surface-raised disabled:text-gray-400;
+    @apply block w-full rounded-dtx-md border bg-surface-base px-3 py-2 text-sm
+           disabled:bg-surface-raised disabled:opacity-60;
+    border-color: var(--color-surface-border);
+    color: inherit;
+    transition: border-color 0.15s, box-shadow 0.15s;
   }
 
-  /* Select de formulário */
+  .dtx-input::placeholder {
+    color: var(--color-surface-muted);
+  }
+
+  .dtx-input:focus-visible {
+    outline: none;
+    border-color: var(--color-dtx-500);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-dtx-400) 20%, transparent);
+  }
+
   .dtx-select {
     @apply dtx-input appearance-none pr-8;
   }

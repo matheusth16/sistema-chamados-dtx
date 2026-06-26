@@ -177,11 +177,10 @@ def test_regression_editar_chamado_solicitante_403(client_logado_solicitante):
 
 
 def test_regression_editar_chamado_sem_chamado_id_400(client_logado_supervisor):
-    """Regressão: POST /api/editar-chamado sem chamado_id retorna 400."""
-    with patch("app.routes.api.db"):
-        r = client_logado_supervisor.post(
-            "/api/editar-chamado", data={}, content_type="multipart/form-data"
-        )
+    """Regressão: POST /api/editar-chamado sem chamado_id retorna 400 (validação antes do db)."""
+    r = client_logado_supervisor.post(
+        "/api/editar-chamado", data={}, content_type="multipart/form-data"
+    )
     assert r.status_code == 400
 
 
@@ -247,17 +246,25 @@ def test_regression_admin_pode_ver_qualquer_chamado():
 
 
 def test_regression_supervisor_so_ve_sua_area():
-    """Regressão: Supervisor só vê chamados da sua área."""
+    """Regressão: Supervisor vê fila da sua área; não vê fila de outra área."""
     from app.services.permissions import usuario_pode_ver_chamado
 
     supervisor = MagicMock()
     supervisor.perfil = "supervisor"
     supervisor.areas = ["Manutencao"]
     supervisor.is_admin_or_above = False
+    # Fila sem owner na área do supervisor — deve ver
     chamado_ok = MagicMock()
     chamado_ok.area = "Manutencao"
+    chamado_ok.responsavel_id = None  # fila, sem owner
+    chamado_ok.solicitante_id = "outro_sol"
+    chamado_ok.participantes = []
+    # Fila sem owner em área diferente — não deve ver
     chamado_outro = MagicMock()
     chamado_outro.area = "TI"
+    chamado_outro.responsavel_id = None
+    chamado_outro.solicitante_id = "outro_sol"
+    chamado_outro.participantes = []
     assert usuario_pode_ver_chamado(supervisor, chamado_ok) is True
     assert usuario_pode_ver_chamado(supervisor, chamado_outro) is False
 

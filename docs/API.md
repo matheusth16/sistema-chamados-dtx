@@ -9,7 +9,7 @@ Atualizado em: 2026-06-10 | Versão: 1.0
 
 | Propriedade | Valor |
 |-------------|-------|
-| **Base URL** | Mesma origem do frontend (ex.: `https://seu-dominio.up.railway.app`) |
+| **Base URL** | Mesma origem do frontend (ex.: `https://seu-dominio.com`) |
 | **Formato** | JSON em todos os endpoints (exceto `/api/download-anexo` e `/sw.js`) |
 | **Autenticação** | Sessão Flask-Login (cookie de sessão) |
 | **CSRF** | Header `X-CSRFToken` obrigatório em todos os POST com JSON |
@@ -85,6 +85,7 @@ Requisições não autenticadas recebem **302 → `/login`** (não JSON).
 | POST | `/api/onboarding/pular` | Sim | solicitante |
 | GET | `/api/supervisores/lista` | Sim | solicitante |
 | GET | `/sw.js` | Não | — |
+| GET | `/gestor/dashboard` | Sim | gestor (supervisor + nivel_gestao) ou admin |
 
 ---
 
@@ -94,7 +95,7 @@ Requisições não autenticadas recebem **302 → `/login`** (não JSON).
 
 Verifica disponibilidade da aplicação. Não exige autenticação.
 
-**Modo raso (padrão):** resposta imediata sem I/O — usado pelo Railway healthcheck.
+**Modo raso (padrão):** resposta imediata sem I/O — usado pelo healthcheck da plataforma de deploy.
 **Modo deep (`?deep=1`):** verifica Firestore e cache — usado por UptimeRobot/BetterUptime.
 
 **Query params:**
@@ -221,7 +222,7 @@ X-Requested-With: XMLHttpRequest
 
 **Exemplo cURL:**
 ```bash
-curl -X POST https://dominio.up.railway.app/api/atualizar-status \
+curl -X POST https://seu-dominio.com/api/atualizar-status \
   -H "Content-Type: application/json" \
   -H "X-CSRFToken: SEU_TOKEN_CSRF" \
   -b "session=COOKIE_DE_SESSAO" \
@@ -707,7 +708,7 @@ Lista supervisores disponíveis para uma área. Usado no formulário de abertura
 |-----------|--------|-----------|
 | `area` | `Geral` | Nome do setor (ex.: `Planejamento`, `TI`) |
 
-> O parâmetro `area` passa por resolução interna (`setor_para_area`) antes da busca.
+> O parâmetro `area` passa por resolução interna (`setor_para_area`) antes da busca. O mapa de setores → áreas é lido do Firestore (`config/setor_para_area`) com cache TTL 5 min e fallback estático (F-30 resolvido).
 
 **Resposta 200:**
 ```json
@@ -722,6 +723,345 @@ Lista supervisores disponíveis para uma área. Usado no formulário de abertura
 ```
 
 > Sempre retorna `200` mesmo em erro interno (lista vazia + campo `erro`).
+
+---
+
+## Escalonamento (Fase 3)
+
+### `POST /api/chamado/<chamado_id>/transferir-area`
+
+Transfere o chamado para outra área com novo responsável obrigatório.
+
+**Auth:** Sim — `@requer_supervisor_area`
+
+**Permissão:** Owner (`responsavel_id == current_user.id`) ou admin/admin_global.
+
+**Body JSON:**
+
+| Campo | Tipo | Obrigatório | Descrição |
+|-------|------|-------------|-----------|
+| `area` | string | Sim | Área destino (não vazia) |
+| `supervisor_id` | string | Sim | ID do supervisor destino (anti-órfão) |
+| `motivo` | string | Sim | Razão da transferência (máx 500 chars) |
+
+**Resposta 200:**
+```json
+{ "sucesso": true, "dados": { "area": "Planejamento", "responsavel_id": "uid_dest" } }
+```
+
+**Erros:**
+
+| Status | Motivo |
+|--------|--------|
+| 400 | `motivo` ou `supervisor_id` ou `area` vazios; supervisor não pertence à área destino |
+| 403 | Usuário sem acesso ao chamado (IDOR) ou não é owner |
+| 404 | Chamado não encontrado |
+
+**Efeitos colaterais:** recalcula `supervisor_ids_com_acesso`; grava `Historico` (acao=`transferencia_area`); notificação e-mail ao novo responsável (thread background).
+
+---
+
+### `POST /api/chamado/<chamado_id>/escalonar-colega`
+
+Escala o chamado para um colega da mesma área sem alterar a área.
+
+**Auth:** Sim — `@requer_supervisor_area`
+
+**Permissão:** Owner (`responsavel_id == current_user.id`) ou admin/admin_global.
+
+**Body JSON:**
+
+| Campo | Tipo | Obrigatório | Descrição |
+|-------|------|-------------|-----------|
+| `supervisor_id` | string | Sim | ID do colega destino (deve ser da mesma área; ≠ atual) |
+| `motivo` | string | Sim | Razão do escalonamento (máx 500 chars) |
+
+**Resposta 200:**
+```json
+{ "sucesso": true, "dados": { "responsavel_id": "uid_colega" } }
+```
+
+**Erros:**
+
+| Status | Motivo |
+|--------|--------|
+| 400 | `motivo` ou `supervisor_id` vazios; destino == atual; colega não pertence à área |
+| 403 | Usuário sem acesso ao chamado (IDOR) ou não é owner |
+| 404 | Chamado não encontrado |
+
+**Efeitos colaterais:** recalcula `supervisor_ids_com_acesso`; grava `Historico` (acao=`escalonamento_colega`); notificação e-mail ao colega (thread background); área inalterada.
+
+---
+
+## Participantes (Fase 4)
+
+### `POST /api/chamado/<chamado_id>/incluir-participantes`
+
+Adiciona supervisores colaboradores em `participantes[]`.
+
+**Auth:** Sim — `@requer_supervisor_area`
+
+**Permissão:** Owner (`responsavel_id == current_user.id`) ou admin/admin_global.
+
+**Body JSON:**
+
+| Campo | Tipo | Obrigatório | Descrição |
+|-------|------|-------------|-----------|
+| `participantes` | array | Sim | Lista de `{ "supervisor_id": str, "area": str }` |
+
+**Resposta 200:**
+```json
+{
+  "sucesso": true,
+  "dados": {
+    "participantes": [...],
+    "adicionados": [{ "supervisor_id": "uid", "area": "Logistica", "nome": "Pedro" }]
+  }
+}
+```
+
+**Invariantes:**
+- Owner não pode ser adicionado como participante.
+- `supervisor_id` já presente na lista é silenciosamente ignorado (sem duplicar).
+- Cada `supervisor_id` deve pertencer à `area` informada.
+- Após inclusão: `supervisor_ids_com_acesso` recalculado; histórico gravado (`acao=inclusao_participantes`).
+
+**Efeitos colaterais:** notificação e-mail a cada participante novo (thread background).
+
+**Erros:**
+
+| Status | Motivo |
+|--------|--------|
+| 400 | `participantes` vazia ou ausente |
+| 400 | `supervisor_id` não existe ou não pertence à `area` |
+| 400 | `supervisor_id` é o próprio owner |
+| 403 | Usuário sem acesso ao chamado (IDOR) ou não é owner/admin |
+| 404 | Chamado não encontrado |
+
+---
+
+### `POST /api/chamado/<chamado_id>/concluir-minha-parte`
+
+Participante marca sua parte como concluída.
+
+**Auth:** Sim — `@login_required` (qualquer perfil logado que seja participante)
+
+**Permissão:** `current_user.id` deve estar em `participantes[*].supervisor_id` com `status != "concluido"`.
+
+**Body JSON:** `{}` (pode ser omitido)
+
+**Resposta 200:**
+```json
+{ "sucesso": true, "dados": { "pode_concluir_global": true } }
+```
+
+`pode_concluir_global: true` indica que todos participantes concluíram — owner pode fechar o chamado.
+
+**Efeitos colaterais:**
+- Grava `concluido_em` (datetime no fuso `SLA_TIMEZONE`) e `status="concluido"` no item do participante.
+- Histórico gravado (`acao=conclusao_parte_participante`).
+- Quando `pode_concluir_global=true`: owner recebe notificação in-app + e-mail + Web Push (thread background).
+
+**Erros:**
+
+| Status | Motivo |
+|--------|--------|
+| 403 | Usuário não é participante do chamado |
+| 400 | Participante já concluiu sua parte |
+| 404 | Chamado não encontrado |
+
+---
+
+## Dashboard Gerencial (Fase 5)
+
+### `GET /gestor/dashboard`
+
+Dashboard read-only para usuários com `nivel_gestao` definido. Exibe contadores e listagem de
+chamados classificados por filtros gerenciais. Sem botões de ação — visualização pura.
+
+**Auth:** Sim — `@requer_gestor_ou_admin`
+
+**Perfis com acesso:**
+- `supervisor` com `nivel_gestao != None` → acesso read-only (sem edição)
+- `admin` (qualquer) → acesso com capacidade de edição mantida via `/painel`
+
+**Perfis bloqueados:** `solicitante`, supervisor sem `nivel_gestao` → 302 redirect.
+
+**Query params:**
+
+| Parâmetro | Padrão | Valores | Descrição |
+|-----------|--------|---------|-----------|
+| `filtro` | `todos` | `todos`, `atrasados`, `aberto_sem_resposta`, `aberto`, `multi_setor`, `multi_setor_travado` | Filtra a lista de chamados exibida |
+
+**Resposta:** `200 text/html` — página completa com template `gestor_dashboard.html`.
+
+**Contadores retornados no contexto do template:**
+
+| Chave | Descrição |
+|-------|-----------|
+| `contadores.total` | Total de chamados carregados (até 500 — limitação v1) |
+| `contadores.atrasados` | Chamados com `is_atrasado=True` ou SLA excedido |
+| `contadores.aberto_sem_resposta` | Chamados `status="Aberto"` há ≥ 60 min corridos (v1) |
+| `contadores.multi_setor_travado` | Chamados com participantes e ao menos um sem `status="concluido"` |
+
+> **Fase 6 (2026-06-25):** `aberto_sem_resposta` agora usa `business_time.minutos_uteis_entre`
+> (tempo útil real, não wall-clock). A limitação de 60 min corridos documentada na Fase 5
+> foi corrigida em `gestor_dashboard_service._is_aberto_sem_resposta`.
+
+**Erros:**
+- **302** — Usuário sem `nivel_gestao` ou sem perfil `supervisor`/`admin`
+
+---
+
+## Jobs em background / SLA Escalonamento (Fases 6–7)
+
+Os jobs APScheduler são internos — não há endpoints HTTP para acionar ou consultar.
+Esta seção documenta o comportamento observável e os efeitos colaterais de cada job.
+
+### Job `sla_escalacao` — ordem de execução
+
+A cada **10 minutos**, o job chama as três funções na ordem:
+1. `processar_escada_a()` — escalada de resposta (chamados Abertos sem atendimento)
+2. `processar_avisos_resolucao()` — avisos preventivos 50%/80% ao responsável
+3. `processar_escada_b()` — escalada de resolução (chamados Em Atendimento pós-deadline)
+
+---
+
+### Escada A — resposta gerencial (Fase 6)
+
+| Propriedade | Valor |
+|-------------|-------|
+| Intervalo | A cada **10 minutos** |
+| Lock | Redis via `executar_job_com_lock` (evita execuções paralelas em multi-worker) |
+| Serviço | `app/services/sla_escalacao_service.processar_escada_a()` |
+
+**Elegibilidade de chamado:**
+- `status == "Aberto"` (não iniciado o atendimento)
+- `escalacao_resposta_nivel < 4` (ainda há degraus disponíveis)
+
+**Degraus da Escada A** (tempo útil acumulado desde a abertura):
+
+| Degrau | Threshold | Destinatário | Chave `GESTOR_EMAILS` |
+|--------|-----------|-------------|------------------------|
+| 1 | +60 min úteis | Gestor do Setor | `gestor_setor` |
+| 2 | +120 min úteis | Gerente de Produção | `gerente_producao` |
+| 3 | +180 min úteis | Assistente GM | `assistente_gm` |
+| 4 | +240 min úteis | General Manager | `gm` |
+
+**Janela de envio:** seg–sex 07:00–11:30 e 13:00–16:30 BRT.
+Chamados elegíveis fora dessa janela são contabilizados em `pulados_fora_janela` e reprocessados na próxima execução.
+
+**Comportamento sem e-mail configurado:** se a chave do nível não estiver em `GESTOR_EMAILS`, o nível é incrementado normalmente (sem envio). Evita que um chamado fique preso esperando configuração ausente. Log de `WARNING` emitido.
+
+**Reabertura:** `POST /api/chamado/<id>/confirmar-resolucao` com `acao="reabrir"` reseta `escalacao_resposta_nivel = 0`, reiniciando a Escada A do zero (ADR-004).
+
+**Índice Firestore obrigatório** (deploy em produção):
+```json
+{ "status": "ASC", "escalacao_resposta_nivel": "ASC" }
+```
+Ver `docs/INDICES_FIRESTORE.md`.
+
+**Estatísticas retornadas** (logadas via `app.logger.info`):
+```json
+{ "processados": 5, "escalados": 2, "emails": 2, "erros": 0, "pulados_fora_janela": 1 }
+```
+
+---
+
+### Avisos preventivos 50%/80% (Fase 7 — pré-estouro)
+
+**Serviço:** `processar_avisos_resolucao()`
+
+**Elegibilidade:**
+- `status == "Em Atendimento"` com `data_em_atendimento` definido
+- `responsavel_id` presente
+- Flag correspondente ainda não enviada (`alerta_supervisor_50_enviado` / `alerta_supervisor_80_enviado`)
+
+**Marcos via `percentual_prazo_resolucao`:**
+
+| Marco | Threshold | Flag de idempotência |
+|-------|-----------|----------------------|
+| 50% | `pct >= 0.5` | `alerta_supervisor_50_enviado` |
+| 80% | `pct >= 0.8` | `alerta_supervisor_80_enviado` |
+
+**Canais ao responsável:** in-app + e-mail + Web Push.
+Se o responsável não tiver e-mail cadastrado, in-app + Web Push disparam normalmente e a flag é gravada mesmo assim (evita loop).
+
+**Janela útil:** seg–sex 07:00–11:30 e 13:00–16:30 BRT.
+Threshold atingido fora da janela → `pulados_fora_janela++`, reprocessado na próxima execução dentro da janela.
+
+**Estatísticas retornadas:**
+```json
+{ "processados": 3, "notificados_50": 1, "notificados_80": 0, "erros": 0, "pulados_fora_janela": 0 }
+```
+
+---
+
+### Escada B — resolução gerencial (Fase 7 — pós-estouro deadline)
+
+**Serviço:** `processar_escada_b()`
+
+**Deadline de resolução:**
+- `categoria == "Projetos"` → 2 dias úteis a partir de `data_em_atendimento` (até 16:30)
+- Demais categorias → 3 dias úteis (até 16:30)
+- Calculado via `adicionar_dias_uteis(data_em_atendimento, dias)`
+
+**Elegibilidade:**
+- `status == "Em Atendimento"` com `data_em_atendimento` definido
+- `agora > deadline` (prazo já vencido)
+- `escalacao_resolucao_nivel < 4`
+
+**Degraus pós-deadline** (minutos úteis APÓS o deadline):
+
+| Degrau | Threshold após deadline | Destinatário | Chave `GESTOR_EMAILS` |
+|--------|------------------------|-------------|------------------------|
+| 1 | +0 min úteis | Gestor do Setor | `gestor_setor` |
+| 2 | +240 min úteis (4h) | Gerente de Produção | `gerente_producao` |
+| 3 | +480 min úteis (8h) | Assistente GM | `assistente_gm` |
+| 4 | +720 min úteis (12h) | General Manager | `gm` |
+
+**Canal gerencial:** e-mail only (`notificar_escalada_resolucao_gerencial`).
+
+**Janela útil:** seg–sex 07:00–11:30 e 13:00–16:30 BRT. Fora da janela → `pulados_fora_janela++`.
+
+**Índice Firestore obrigatório:**
+```json
+{ "status": "ASC", "escalacao_resolucao_nivel": "ASC" }
+```
+
+**Estatísticas retornadas:**
+```json
+{ "processados": 2, "escalados": 1, "emails": 1, "erros": 0, "pulados_fora_janela": 0 }
+```
+
+---
+
+### Reset de flags (claim + reabertura)
+
+Ao fazer claim (Aberto → Em Atendimento) ou reabrir um chamado, todos os campos de escalação são zerados atomicamente:
+
+| Campo | Reset |
+|-------|-------|
+| `escalacao_resposta_nivel` | `0` |
+| `escalacao_resolucao_nivel` | `0` |
+| `alerta_supervisor_50_enviado` | `False` |
+| `alerta_supervisor_80_enviado` | `False` |
+
+### Job `relatorio_semanal`
+
+Executa toda sexta-feira às 10h00 BRT. Chama `enviar_relatorio_semanal()` via `app/services/report_service.py`. Lock Redis (`executar_job_com_lock`).
+
+### Job `reset_ranking_semanal`
+
+Executa todo domingo às 23h59 BRT. Chama `GamificationService.resetar_ranking_semanal()`.
+
+### Job `limpar_contadores_uso`
+
+Executa todo domingo às 02h00 BRT. Remove entradas de `contadores_uso` com mais de 90 dias.
+
+### Job `alerta_prazo_24h` — **desativado**
+
+Substituído pela Escada A (`sla_escalacao`) na Fase 6. A função `enviar_alertas_prazo_24h` permanece disponível em `report_service.py` para reativação se necessário.
 
 ---
 
@@ -773,14 +1113,21 @@ Rotas com perfil insuficiente retornam `403 { "sucesso": false, "erro": "Acesso 
 
 | Endpoint | Limite |
 |----------|--------|
-| `POST /api/atualizar-status` | 60/min |
-| `POST /api/bulk-status` | 20/min |
-| `GET /api/chamados/paginar` | 60/min |
-| `POST /api/carregar-mais` | 60/min |
-| `GET /api/supervisores/lista` | 30/min |
-| Outros endpoints | 100/min (global) |
+| `POST /api/atualizar-status` | 30/min |
+| `POST /api/bulk-status` | 10/min |
+| `POST /api/push-subscribe` | 5/min |
+| `POST /api/csp-report` | 20/min |
+| `POST /login` | 10/min |
+| `GET /exportar` | 10/hora |
+| `GET /exportar-avancado` | 5/hora |
+| Demais endpoints | Sem limite explícito (Flask-Limiter sem `default_limits`) |
 
 Ao exceder: `429 Too Many Requests` (resposta do Flask-Limiter).
+
+> Os limites são aplicados por decorador `@limiter.limit(...)` nas rotas. Endpoints
+> não listados (ex.: `/api/chamados/paginar`, `/api/carregar-mais`,
+> `/api/supervisores/lista`) **não** têm limite explícito — o limitador é
+> configurado sem `default_limits` (ver `app/limiter.py`).
 
 ---
 
@@ -794,3 +1141,11 @@ Ao exceder: `429 Too Many Requests` (resposta do Flask-Limiter).
 | 2026-06-10 | — | Endpoints de onboarding (`/avancar`, `/concluir`, `/pular`) |
 | 2026-06-10 | — | `GET /api/notificacoes/contar` — contador sem transferência de docs |
 | 2026-06-10 | — | `GET /api/download-anexo` — download via R2 pré-assinado |
+| 2026-06-24 | — | `POST /api/chamado/<id>/transferir-area` — Fase 3 escalonamento |
+| 2026-06-24 | — | `POST /api/chamado/<id>/escalonar-colega` — Fase 3 escalonamento |
+| 2026-06-25 | — | `POST /api/chamado/<id>/incluir-participantes` — Fase 4 multi-setor |
+| 2026-06-25 | — | `POST /api/chamado/<id>/concluir-minha-parte` — Fase 4 multi-setor |
+| 2026-06-25 | — | `GET /gestor/dashboard` — Fase 5 dashboard read-only gestor |
+| 2026-06-25 | — | Job `sla_escalacao` — Fase 6 Escada A gerencial a cada 10 min (substitui `alerta_prazo_24h`) |
+| 2026-06-25 | — | `gestor/dashboard` — `aberto_sem_resposta` corrigido para tempo útil (Fase 6) |
+| 2026-06-26 | — | Fase 7: avisos 50%/80% + Escada B resolução no job `sla_escalacao` |

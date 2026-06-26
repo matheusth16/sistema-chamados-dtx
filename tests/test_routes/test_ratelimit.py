@@ -8,16 +8,24 @@ import pytest
 
 @pytest.fixture
 def app_rl():
-    """App com rate limiting ativado (in-memory, sem Redis)."""
-    import config as cfg
+    """App com rate limiting ativado (in-memory, sem Redis).
+
+    Modifica diretamente o Config usado por create_app() (app.__init__.Config),
+    não config.Config, para ser imune a reloads de config.py feitos por outros testes.
+    """
+    import contextlib
+
+    import app as _app_module
     from app.limiter import limiter as _limiter
 
-    old_enabled = cfg.Config.RATELIMIT_ENABLED
+    old_enabled = _app_module.Config.RATELIMIT_ENABLED
+    old_storage_url = _app_module.Config.RATELIMIT_STORAGE_URL
+    old_storage_uri = _app_module.Config.RATELIMIT_STORAGE_URI
     old_limiter_enabled = _limiter.enabled
 
-    cfg.Config.RATELIMIT_ENABLED = True
-    cfg.Config.RATELIMIT_STORAGE_URL = "memory://"
-    cfg.Config.RATELIMIT_STORAGE_URI = "memory://"
+    _app_module.Config.RATELIMIT_ENABLED = True
+    _app_module.Config.RATELIMIT_STORAGE_URL = "memory://"
+    _app_module.Config.RATELIMIT_STORAGE_URI = "memory://"
 
     from app import create_app
 
@@ -28,12 +36,12 @@ def app_rl():
 
     yield app
 
-    import contextlib
-
     with contextlib.suppress(Exception):
         _limiter.reset()
     _limiter.enabled = old_limiter_enabled
-    cfg.Config.RATELIMIT_ENABLED = old_enabled
+    _app_module.Config.RATELIMIT_ENABLED = old_enabled
+    _app_module.Config.RATELIMIT_STORAGE_URL = old_storage_url
+    _app_module.Config.RATELIMIT_STORAGE_URI = old_storage_uri
 
 
 @pytest.fixture

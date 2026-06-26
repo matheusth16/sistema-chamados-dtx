@@ -269,7 +269,7 @@ def test_notificar_solicitante_com_sid_envia_notificacao_e_webpush(app):
         _notificar_solicitante(
             "ch1",
             {"solicitante_id": "s1", "numero_chamado": "CHM-001", "categoria": "TI"},
-            "Concluído",
+            "Em Atendimento",
         )
     mock_notif.assert_called_once()
     mock_webpush.assert_called_once()
@@ -285,7 +285,7 @@ def test_notificar_solicitante_sem_sid_nao_envia_webpush(app):
         _notificar_solicitante(
             "ch1",
             {"solicitante_id": None, "numero_chamado": "CHM-001", "categoria": "TI"},
-            "Concluído",
+            "Em Atendimento",
         )
     mock_notif.assert_called_once()
     mock_webpush.assert_not_called()
@@ -382,3 +382,360 @@ def test_transicoes_validas_permite_fluxo_normal():
                 motivo_cancelamento="motivo" if status_novo == "Cancelado" else None,
             )
         assert r["sucesso"] is True, f"Transição {status_ant} → {status_novo} deveria ser permitida"
+
+
+# ---------------------------------------------------------------------------
+# Fase 2 — Claim ao Em Atendimento + data_em_atendimento
+# ---------------------------------------------------------------------------
+
+
+def _patch_status_service(**extras):
+    """Context manager helper: patches comuns ao status_service para testes de claim."""
+    from contextlib import ExitStack
+    from unittest.mock import patch
+
+    stack = ExitStack()
+    patches = {
+        "execute_with_retry": stack.enter_context(
+            patch("app.services.status_service.execute_with_retry")
+        ),
+        "Historico": stack.enter_context(patch("app.services.status_service.Historico")),
+        "notif": stack.enter_context(patch("app.services.status_service._notificar_solicitante")),
+        "gamif": stack.enter_context(patch("app.services.status_service.GamificationService")),
+        "calc_ids": stack.enter_context(
+            patch(
+                "app.services.status_service.calcular_supervisor_ids_com_acesso",
+                return_value=["id_julia"],
+            )
+        ),
+    }
+    patches.update(extras)
+    return stack, patches
+
+
+def test_claim_atribui_owner_ao_em_atendimento():
+    """Aberto sem owner → Em Atendimento atribui responsavel_id ao usuário logado."""
+    with (
+        patch("app.services.status_service.execute_with_retry") as mock_retry,
+        patch("app.services.status_service.Historico"),
+        patch("app.services.status_service._notificar_solicitante"),
+        patch("app.services.status_service.GamificationService"),
+        patch(
+            "app.services.status_service.calcular_supervisor_ids_com_acesso",
+            return_value=["id_julia"],
+        ),
+    ):
+        resultado = atualizar_status_chamado(
+            chamado_id="id_chamado",
+            novo_status="Em Atendimento",
+            usuario_id="id_julia",
+            usuario_nome="Júlia",
+            data_chamado={
+                "status": "Aberto",
+                "responsavel_id": None,
+                "area": "Engenharia",
+                "participantes": [],
+                "solicitante_id": "sol1",
+                "numero_chamado": "CHM-001",
+                "categoria": "Manutenção",
+                "escalacao_resposta_nivel": 0,
+            },
+        )
+    assert resultado["sucesso"] is True
+    update_data = mock_retry.call_args[0][1]
+    assert update_data["responsavel_id"] == "id_julia"
+    assert update_data["data_em_atendimento"] is not None
+
+
+def test_claim_nao_sobrescreve_owner_existente():
+    """Aberto já com owner → Em Atendimento NÃO muda responsavel_id."""
+    with (
+        patch("app.services.status_service.execute_with_retry") as mock_retry,
+        patch("app.services.status_service.Historico"),
+        patch("app.services.status_service._notificar_solicitante"),
+        patch("app.services.status_service.GamificationService"),
+        patch(
+            "app.services.status_service.calcular_supervisor_ids_com_acesso",
+            return_value=["id_julia"],
+        ),
+    ):
+        atualizar_status_chamado(
+            chamado_id="id_chamado",
+            novo_status="Em Atendimento",
+            usuario_id="id_matheus",
+            usuario_nome="Matheus",
+            data_chamado={
+                "status": "Aberto",
+                "responsavel_id": "id_julia",
+                "area": "Engenharia",
+                "participantes": [],
+                "solicitante_id": "sol1",
+                "numero_chamado": "CHM-001",
+                "categoria": "Manutenção",
+                "escalacao_resposta_nivel": 0,
+            },
+        )
+    update_data = mock_retry.call_args[0][1]
+    # responsavel_id não deve ser sobrescrito — não deve aparecer no update como id_matheus
+    assert update_data.get("responsavel_id") != "id_matheus"
+
+
+def test_escada_a_congelada_ao_virar_em_atendimento():
+    """Nível de escalação Escada A não deve ser incrementado ao virar Em Atendimento."""
+    with (
+        patch("app.services.status_service.execute_with_retry") as mock_retry,
+        patch("app.services.status_service.Historico"),
+        patch("app.services.status_service._notificar_solicitante"),
+        patch("app.services.status_service.GamificationService"),
+        patch(
+            "app.services.status_service.calcular_supervisor_ids_com_acesso",
+            return_value=["id_julia"],
+        ),
+    ):
+        atualizar_status_chamado(
+            chamado_id="id_chamado",
+            novo_status="Em Atendimento",
+            usuario_id="id_julia",
+            usuario_nome="Júlia",
+            data_chamado={
+                "status": "Aberto",
+                "responsavel_id": None,
+                "area": "Engenharia",
+                "participantes": [],
+                "solicitante_id": "sol1",
+                "numero_chamado": "CHM-001",
+                "categoria": "Manutenção",
+                "escalacao_resposta_nivel": 2,
+            },
+        )
+    update_data = mock_retry.call_args[0][1]
+    # O nível não deve ter sido incrementado — Escada A congela em Em Atendimento
+    assert update_data.get("escalacao_resposta_nivel", 2) == 2
+
+
+def test_claim_atualiza_responsavel_nome():
+    """Lacuna 5: claim (Aberto→Em Atendimento sem owner) deve incluir 'responsavel' no update_data."""
+    with (
+        patch("app.services.status_service.execute_with_retry") as mock_retry,
+        patch("app.services.status_service.Historico"),
+        patch("app.services.status_service._notificar_solicitante"),
+        patch("app.services.status_service.GamificationService"),
+        patch(
+            "app.services.status_service.calcular_supervisor_ids_com_acesso",
+            return_value=["id_julia"],
+        ),
+    ):
+        atualizar_status_chamado(
+            chamado_id="id_chamado",
+            novo_status="Em Atendimento",
+            usuario_id="id_julia",
+            usuario_nome="Júlia Ferreira",
+            data_chamado={
+                "status": "Aberto",
+                "responsavel_id": None,
+                "area": "Engenharia",
+                "participantes": [],
+                "solicitante_id": "sol1",
+                "numero_chamado": "CHM-001",
+                "categoria": "Manutenção",
+                "escalacao_resposta_nivel": 0,
+            },
+        )
+    update_data = mock_retry.call_args[0][1]
+    assert update_data.get("responsavel") == "Júlia Ferreira"
+
+
+# ── Fase 4: bloqueio de conclusão com participantes pendentes ─────────────────
+
+
+def test_owner_nao_conclui_com_participantes_pendentes():
+    """Fase 4: atualizar_status Concluído falha quando há participantes pendentes."""
+    resultado = atualizar_status_chamado(
+        chamado_id="ch1",
+        novo_status="Concluído",
+        usuario_id="id_julia",
+        usuario_nome="Julia",
+        data_chamado={
+            "status": "Em Atendimento",
+            "solicitante_id": "sol1",
+            "participantes": [
+                {
+                    "supervisor_id": "id_pedro",
+                    "area": "Logistica",
+                    "status": "pendente",
+                    "concluido_em": None,
+                }
+            ],
+        },
+    )
+    assert resultado["sucesso"] is False
+    assert "participante" in resultado["erro"].lower()
+
+
+def test_owner_nao_conclui_com_participante_em_atendimento():
+    """Fase 4: participante em_atendimento também bloqueia conclusão global."""
+    resultado = atualizar_status_chamado(
+        chamado_id="ch1",
+        novo_status="Concluído",
+        usuario_id="id_julia",
+        usuario_nome="Julia",
+        data_chamado={
+            "status": "Em Atendimento",
+            "solicitante_id": "sol1",
+            "participantes": [
+                {
+                    "supervisor_id": "id_pedro",
+                    "area": "Logistica",
+                    "status": "em_atendimento",
+                    "concluido_em": None,
+                }
+            ],
+        },
+    )
+    assert resultado["sucesso"] is False
+
+
+def test_owner_conclui_quando_todos_participantes_concluidos():
+    """Fase 4: permite Concluído quando todos participantes têm status='concluido'."""
+    with (
+        patch("app.services.status_service.execute_with_retry"),
+        patch("app.services.status_service.Historico"),
+        patch("app.services.status_service._notificar_solicitante"),
+        patch("app.services.status_service.GamificationService"),
+    ):
+        resultado = atualizar_status_chamado(
+            chamado_id="ch1",
+            novo_status="Concluído",
+            usuario_id="id_julia",
+            usuario_nome="Julia",
+            data_chamado={
+                "status": "Em Atendimento",
+                "solicitante_id": "sol1",
+                "participantes": [
+                    {
+                        "supervisor_id": "id_pedro",
+                        "area": "L",
+                        "status": "concluido",
+                        "concluido_em": "x",
+                    }
+                ],
+            },
+        )
+    assert resultado["sucesso"] is True
+
+
+def test_concluir_global_sem_participantes_continua_funcionando():
+    """Fase 4 regressão: lista vazia de participantes não bloqueia conclusão."""
+    with (
+        patch("app.services.status_service.execute_with_retry"),
+        patch("app.services.status_service.Historico"),
+        patch("app.services.status_service._notificar_solicitante"),
+        patch("app.services.status_service.GamificationService"),
+    ):
+        resultado = atualizar_status_chamado(
+            chamado_id="ch1",
+            novo_status="Concluído",
+            usuario_id="u1",
+            usuario_nome="Test",
+            data_chamado={
+                "status": "Em Atendimento",
+                "solicitante_id": "sol1",
+                "participantes": [],
+            },
+        )
+    assert resultado["sucesso"] is True
+
+
+def test_concluido_grava_confirmacao_solicitante_pendente():
+    """Fase 4 regressão: ao Concluído (sem participantes pendentes), grava confirmacao_solicitante='pendente'."""
+    with (
+        patch("app.services.status_service.execute_with_retry") as mock_retry,
+        patch("app.services.status_service.Historico"),
+        patch("app.services.status_service._notificar_solicitante"),
+        patch("app.services.status_service.GamificationService"),
+    ):
+        atualizar_status_chamado(
+            chamado_id="ch1",
+            novo_status="Concluído",
+            usuario_id="u1",
+            usuario_nome="Test",
+            data_chamado={
+                "status": "Em Atendimento",
+                "solicitante_id": "sol1",
+                "participantes": [],
+            },
+        )
+    update_payload = mock_retry.call_args[0][1]
+    assert update_payload.get("confirmacao_solicitante") == "pendente"
+
+
+def test_claim_reseta_flags_escada_b():
+    """Fase 7 — Escada B: ao Aberto → Em Atendimento (claim), resetar os 3 campos Escada B."""
+    with (
+        patch("app.services.status_service.execute_with_retry") as mock_retry,
+        patch("app.services.status_service.Historico"),
+        patch("app.services.status_service._notificar_solicitante"),
+        patch("app.services.status_service.GamificationService"),
+        patch(
+            "app.services.status_service.calcular_supervisor_ids_com_acesso",
+            return_value=["id_julia"],
+        ),
+    ):
+        atualizar_status_chamado(
+            chamado_id="id_chamado",
+            novo_status="Em Atendimento",
+            usuario_id="id_julia",
+            usuario_nome="Júlia",
+            data_chamado={
+                "status": "Aberto",
+                "responsavel_id": None,
+                "area": "Engenharia",
+                "participantes": [],
+                "solicitante_id": "sol1",
+                "numero_chamado": "CHM-001",
+                "categoria": "Manutenção",
+                # Simula chamado que tinha escalada prévia
+                "escalacao_resolucao_nivel": 2,
+                "alerta_supervisor_50_enviado": True,
+                "alerta_supervisor_80_enviado": True,
+            },
+        )
+    update_data = mock_retry.call_args[0][1]
+    assert update_data.get("escalacao_resolucao_nivel") == 0
+    assert update_data.get("alerta_supervisor_50_enviado") is False
+    assert update_data.get("alerta_supervisor_80_enviado") is False
+
+
+def test_claim_data_em_atendimento_usa_config_sla_timezone():
+    """Lacuna 6: claim deve usar Config.SLA_TIMEZONE, não timezone hardcoded."""
+    with (
+        patch("app.services.status_service.Config") as mock_config,
+        patch("app.services.status_service.execute_with_retry") as mock_retry,
+        patch("app.services.status_service.Historico"),
+        patch("app.services.status_service._notificar_solicitante"),
+        patch("app.services.status_service.GamificationService"),
+        patch(
+            "app.services.status_service.calcular_supervisor_ids_com_acesso",
+            return_value=[],
+        ),
+    ):
+        mock_config.SLA_TIMEZONE = "UTC"
+        atualizar_status_chamado(
+            chamado_id="id_chamado",
+            novo_status="Em Atendimento",
+            usuario_id="id_user",
+            usuario_nome="User",
+            data_chamado={
+                "status": "Aberto",
+                "responsavel_id": None,
+                "area": "Engenharia",
+                "participantes": [],
+                "solicitante_id": "sol1",
+                "numero_chamado": "CHM-001",
+                "categoria": "Manutenção",
+            },
+        )
+    update_data = mock_retry.call_args[0][1]
+    dt = update_data.get("data_em_atendimento")
+    assert dt is not None
+    assert dt.tzname() == "UTC"

@@ -13,6 +13,9 @@ def _doc_chamado(solicitante_id="sol_1", status="Concluído", confirmacao="pende
         "categoria": "Manutenção",
         "numero_chamado": "CH-001",
         "area": "Planejamento",
+        "responsavel_id": "sup_1",
+        "responsavel": "Supervisor",
+        "solicitante_nome": "Solicitante",
     }
     return doc
 
@@ -130,6 +133,85 @@ def test_acao_invalida_retorna_400(client_logado_solicitante):
             content_type="application/json",
         )
     assert r.status_code == 400
+
+
+# ── E-mails ───────────────────────────────────────────────────────────────────
+
+
+def test_reabrir_dispara_notificacao_supervisor(client_logado_solicitante):
+    """Reabrir chamado chama _enviar_notificacao_reabrir com os dados corretos."""
+    doc = _doc_chamado()
+    with (
+        patch("app.routes.api.db") as mock_db,
+        patch("app.routes.api.Historico"),
+        patch("app.routes.api._enviar_notificacao_reabrir") as mock_notif,
+    ):
+        mock_db.collection.return_value.document.return_value.get.return_value = doc
+        r = client_logado_solicitante.post(
+            "/api/chamado/ch_123/confirmar-resolucao",
+            json={"acao": "reabrir", "motivo": "Problema persiste"},
+            content_type="application/json",
+        )
+    assert r.status_code == 200
+    mock_notif.assert_called_once()
+    _, chamado_id_arg, data_arg, motivo_arg, _ = mock_notif.call_args[0]
+    assert chamado_id_arg == "ch_123"
+    assert motivo_arg == "Problema persiste"
+
+
+def test_confirmar_nao_dispara_notificacao_supervisor(client_logado_solicitante):
+    """Confirmar resolução NÃO envia e-mail ao supervisor."""
+    doc = _doc_chamado()
+    with (
+        patch("app.routes.api.db") as mock_db,
+        patch("app.routes.api._enviar_notificacao_reabrir") as mock_notif,
+    ):
+        mock_db.collection.return_value.document.return_value.get.return_value = doc
+        r = client_logado_solicitante.post(
+            "/api/chamado/ch_123/confirmar-resolucao",
+            json={"acao": "confirmar"},
+            content_type="application/json",
+        )
+    assert r.status_code == 200
+    mock_notif.assert_not_called()
+
+
+def test_reabrir_reseta_escalacao_resposta_nivel(client_logado_solicitante):
+    """ADR-004: ao reabrir, escalacao_resposta_nivel deve ser zerado para reiniciar Escada A."""
+    doc = _doc_chamado()
+    with (
+        patch("app.routes.api.db") as mock_db,
+        patch("app.routes.api.Historico"),
+    ):
+        mock_db.collection.return_value.document.return_value.get.return_value = doc
+        r = client_logado_solicitante.post(
+            "/api/chamado/ch_123/confirmar-resolucao",
+            json={"acao": "reabrir", "motivo": "Não resolvido"},
+            content_type="application/json",
+        )
+    assert r.status_code == 200
+    payload = mock_db.collection.return_value.document.return_value.update.call_args[0][0]
+    assert payload.get("escalacao_resposta_nivel") == 0
+
+
+def test_reabrir_reseta_flags_escada_b(client_logado_solicitante):
+    """Fase 7: ao reabrir, campos Escada B devem ser zerados junto com Escada A."""
+    doc = _doc_chamado()
+    with (
+        patch("app.routes.api.db") as mock_db,
+        patch("app.routes.api.Historico"),
+    ):
+        mock_db.collection.return_value.document.return_value.get.return_value = doc
+        r = client_logado_solicitante.post(
+            "/api/chamado/ch_123/confirmar-resolucao",
+            json={"acao": "reabrir", "motivo": "Não resolvido"},
+            content_type="application/json",
+        )
+    assert r.status_code == 200
+    payload = mock_db.collection.return_value.document.return_value.update.call_args[0][0]
+    assert payload.get("escalacao_resolucao_nivel") == 0
+    assert payload.get("alerta_supervisor_50_enviado") is False
+    assert payload.get("alerta_supervisor_80_enviado") is False
 
 
 def test_chamado_nao_concluido_nao_permite_confirmacao(client_logado_solicitante):

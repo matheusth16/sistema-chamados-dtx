@@ -151,6 +151,188 @@ def test_filtrar_chamados_por_permissao_supervisor_filtra_por_area():
     mock_perm.assert_called()
 
 
+def test_ordenar_metricas_supervisores_por_sla_null_vai_ao_final():
+    """campo='sla': None vai ao final; valores maiores ficam primeiro (asc=False)."""
+    from app.services.dashboard_service import ordenar_metricas_supervisores
+
+    lista = [
+        {"supervisor_nome": "A", "percentual_dentro_sla": None},
+        {"supervisor_nome": "B", "percentual_dentro_sla": 95.0},
+        {"supervisor_nome": "C", "percentual_dentro_sla": 80.0},
+    ]
+    result = ordenar_metricas_supervisores(lista, "sla", asc=False)
+    assert result[0]["percentual_dentro_sla"] == 95.0
+    assert result[1]["percentual_dentro_sla"] == 80.0
+    assert result[2]["percentual_dentro_sla"] is None
+
+
+def test_ordenar_metricas_supervisores_por_sla_asc():
+    """campo='sla', asc=True: None vai ao final, menores primeiro."""
+    from app.services.dashboard_service import ordenar_metricas_supervisores
+
+    lista = [
+        {"supervisor_nome": "A", "percentual_dentro_sla": 95.0},
+        {"supervisor_nome": "B", "percentual_dentro_sla": None},
+        {"supervisor_nome": "C", "percentual_dentro_sla": 80.0},
+    ]
+    result = ordenar_metricas_supervisores(lista, "sla", asc=True)
+    assert result[-1]["percentual_dentro_sla"] is None
+
+
+def test_ordenar_metricas_areas_por_total_desc():
+    """ordenar_metricas_areas com campo='total' e asc=False: maior primeiro."""
+    from app.services.dashboard_service import ordenar_metricas_areas
+
+    lista = [
+        {"area": "B", "total_chamados": 5},
+        {"area": "A", "total_chamados": 10},
+        {"area": "C", "total_chamados": 1},
+    ]
+    result = ordenar_metricas_areas(lista, "total", asc=False)
+    assert result[0]["total_chamados"] == 10
+    assert result[-1]["total_chamados"] == 1
+
+
+def test_ordenar_metricas_areas_campo_desconhecido_retorna_original():
+    """ordenar_metricas_areas com campo não mapeado retorna lista sem alteração."""
+    from app.services.dashboard_service import ordenar_metricas_areas
+
+    lista = [{"area": "X"}, {"area": "Y"}]
+    result = ordenar_metricas_areas(lista, "campo_invalido", asc=True)
+    assert result == lista
+
+
+def test_preparar_metricas_paginadas_retorna_pagina_e_total_corretos():
+    """preparar_metricas_paginadas retorna items, total, total_paginas e pagina corretos."""
+    from app.services.dashboard_service import (
+        ordenar_metricas_supervisores,
+        preparar_metricas_paginadas,
+    )
+
+    items = [{"supervisor_nome": str(i), "total_chamados": i} for i in range(10)]
+    result = preparar_metricas_paginadas(
+        items,
+        "total",
+        False,
+        pagina=1,
+        itens_por_pagina=5,
+        ordenar_fn=ordenar_metricas_supervisores,
+    )
+    assert result["total"] == 10
+    assert result["total_paginas"] == 2
+    assert len(result["items"]) == 5
+    assert result["pagina"] == 1
+
+
+def test_preparar_metricas_paginadas_clampeia_pagina_fora_do_intervalo():
+    """preparar_metricas_paginadas clampeia pagina > total_paginas para total_paginas."""
+    from app.services.dashboard_service import (
+        ordenar_metricas_supervisores,
+        preparar_metricas_paginadas,
+    )
+
+    items = [{"supervisor_nome": "X", "total_chamados": 1}]
+    result = preparar_metricas_paginadas(
+        items,
+        "total",
+        True,
+        pagina=99,
+        itens_por_pagina=10,
+        ordenar_fn=ordenar_metricas_supervisores,
+    )
+    assert result["pagina"] == 1
+
+
+def test_obter_contexto_admin_projetos_no_topo_e_grupo_key_definido():
+    """Chamados Projetos ficam no topo e recebem grupo_key iniciando com '0|'."""
+    from app.services.dashboard_service import obter_contexto_admin
+
+    user = MagicMock()
+    user.perfil = "admin"
+    user.areas = ["Geral"]
+    user.id = "admin1"
+    user.is_admin_or_above = True
+
+    def _doc(num, cat, rl=""):
+        d = MagicMock()
+        d.id = f"doc_{num}"
+        d.to_dict.return_value = {
+            "categoria": cat,
+            "tipo_solicitacao": "Corretiva",
+            "descricao": f"D{num}",
+            "responsavel": "",
+            "numero_chamado": str(num).zfill(5),
+            "area": "Manutencao",
+            "rl_codigo": rl,
+            "status": "Aberto",
+        }
+        return d
+
+    docs = [_doc(3, "Manutencao"), _doc(1, "Projetos", rl="RL-001")]
+
+    with (
+        patch("app.services.dashboard_service.get_static_cached", return_value=[]),
+        patch("app.services.dashboard_service.filtrar_supervisores_por_area", return_value=[]),
+        patch("app.services.dashboard_service.db") as mock_db,
+        patch(
+            "app.services.dashboard_service.aplicar_filtros_dashboard_com_paginacao"
+        ) as mock_filtros,
+        patch("app.services.dashboard_service.obter_sla_para_exibicao", return_value=None),
+    ):
+        mock_db.collection.return_value = MagicMock()
+        mock_filtros.return_value = {
+            "docs": docs,
+            "proximo_cursor": None,
+            "tem_proxima": False,
+            "cursor_anterior": None,
+            "tem_anterior": False,
+        }
+        ctx = obter_contexto_admin(user, {}, itens_por_pagina=25)
+
+    chamados = ctx["chamados"]
+    assert len(chamados) == 2
+    assert chamados[0].categoria == "Projetos", "Projetos deve aparecer primeiro"
+    for c in chamados:
+        assert hasattr(c, "grupo_key"), "grupo_key deve ser definido em todos os chamados"
+    projetos_c = next(c for c in chamados if c.categoria == "Projetos")
+    assert projetos_c.grupo_key.startswith("0|")
+
+
+def test_obter_contexto_admin_supervisor_aplica_filtro_por_areas():
+    """obter_contexto_admin com perfil supervisor adiciona .where() na ref de chamados."""
+    from app.services.dashboard_service import obter_contexto_admin
+
+    user = MagicMock()
+    user.perfil = "supervisor"
+    user.areas = ["Manutencao"]
+    user.id = "sup1"
+    user.is_admin_or_above = False
+
+    mock_ref = MagicMock()
+    mock_ref.where.return_value = mock_ref
+
+    with (
+        patch("app.services.dashboard_service.get_static_cached", return_value=[]),
+        patch("app.services.dashboard_service.filtrar_supervisores_por_area", return_value=[]),
+        patch("app.services.dashboard_service.db") as mock_db,
+        patch(
+            "app.services.dashboard_service.aplicar_filtros_dashboard_com_paginacao"
+        ) as mock_filtros,
+        patch("app.services.dashboard_service.obter_sla_para_exibicao", return_value=None),
+    ):
+        mock_db.collection.return_value = mock_ref
+        mock_filtros.return_value = {
+            "docs": [],
+            "proximo_cursor": None,
+            "tem_proxima": False,
+            "cursor_anterior": None,
+            "tem_anterior": False,
+        }
+        obter_contexto_admin(user, {}, itens_por_pagina=25)
+
+    mock_ref.where.assert_called()
+
+
 def test_filtrar_chamados_usa_batch_fetch_nao_n_mais_1():
     """_filtrar_chamados_por_permissao usa get_by_ids (1 query) e não get_by_id em loop (N queries)."""
     from app.services.dashboard_service import _filtrar_chamados_por_permissao

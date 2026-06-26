@@ -11,12 +11,20 @@ __pycache__/
 htmlcov/
 .coverage.*
 coverage.xml
+coverage.json
 .mypy_cache/
 .ruff_cache/
 *.egg-info/
 *.egg
 dist/
 build/
+
+# --- Artefatos de build CSS (gerado por npm run build:css e pelo Dockerfile) ---
+# Não versionar: o Dockerfile regenera no build; dev local usa npm run build:css
+app/static/css/tailwind.min.css
+
+# --- Artefatos de build (bundle SPA experimental, não usado pelos templates) ---
+app/static/dist/
 
 # --- Ambiente Virtual ---
 .venv/
@@ -69,6 +77,9 @@ Thumbs.db
 .ipynb_checkpoints/
 tmp/
 
+# --- Checkpoints locais de migração (artefatos de execução, não versionados) ---
+scripts/.checkpoints/
+
 # --- Backup de arquivos não utilizados (análise de código morto) ---
 _backup_nao_utilizados/
 
@@ -79,4 +90,3 @@ _backup_nao_utilizados/
 # --- Arquivos locais de trabalho (não versionados) ---
 *.docx
 foto/
-confirmacao-solicitante.md

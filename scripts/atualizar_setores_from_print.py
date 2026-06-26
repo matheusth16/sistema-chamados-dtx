@@ -7,11 +7,20 @@ Objetivo (conforme solicitado):
 - Adicionar os demais departamentos do print, EXCETO:
   `NDT`, `MACHINING`, `ASSEMBLY`, `INSPECTION`.
 
+ATENÇÃO: Este script APAGA a coleção `categorias_setores` por completo e a
+recria. Por padrão executa em modo DRY-RUN (somente leitura). Use --apply
+para efetuar as alterações reais.
+
+Uso:
+    python scripts/atualizar_setores_from_print.py            # dry-run (seguro)
+    python scripts/atualizar_setores_from_print.py --apply    # grava de verdade
+
 Requer `credentials.json` na raiz do projeto.
 """
 
 from __future__ import annotations
 
+import argparse
 import os
 import sys
 from collections.abc import Iterable
@@ -38,18 +47,23 @@ def _init_firebase():
         firebase_admin.initialize_app(cred)
 
 
-def _delete_all(collection_name: str) -> None:
+def _delete_all(collection_name: str, apply: bool) -> None:
     ref = db.collection(collection_name)
     deletados = 0
     for doc in ref.stream():
-        doc.reference.delete()
+        if apply:
+            doc.reference.delete()
+            print(f"  Deletado setor doc_id={doc.id}")
+        else:
+            print(f"  [DRY-RUN] Deletaria setor doc_id={doc.id}")
         deletados += 1
-        print(f"  Deletado setor doc_id={doc.id}")
-    print(f"Total deletados em `{collection_name}`: {deletados}")
+    rotulo = "Total deletados" if apply else "Total que seria deletado"
+    print(f"{rotulo} em `{collection_name}`: {deletados}")
 
 
 def _upsert_sectors(
     sectors: Iterable[dict],
+    apply: bool,
 ) -> None:
     ts = datetime.now()
     count = 0
@@ -64,20 +78,37 @@ def _upsert_sectors(
             "ativo": bool(s.get("ativo", True)),
             "data_criacao": ts,
         }
-        doc = db.collection("categorias_setores").add(payload)[1]
-        print(f"[OK] Setor '{payload['nome_pt']}' criado (doc_id={doc.id})")
+        if apply:
+            doc = db.collection("categorias_setores").add(payload)[1]
+            print(f"[OK] Setor '{payload['nome_pt']}' criado (doc_id={doc.id})")
+        else:
+            print(f"  [DRY-RUN] Criaria setor '{payload['nome_pt']}'")
         count += 1
-    print(f"Total criados em `categorias_setores`: {count}")
+    rotulo = "Total criados" if apply else "Total que seria criado"
+    print(f"{rotulo} em `categorias_setores`: {count}")
 
 
 if __name__ == "__main__":
     from app.services.translation_service import traduzir_categoria
 
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--apply",
+        action="store_true",
+        help="Efetua alterações reais no Firestore (padrão: dry-run)",
+    )
+    args = parser.parse_args()
+
+    if args.apply:
+        print("[AVISO] Modo APPLY ativo — alterações SERÃO gravadas no Firestore.")
+    else:
+        print("[INFO] Modo DRY-RUN — nenhuma alteração será gravada. Use --apply para gravar.")
+
     _init_firebase()
     db = firestore.client()
 
     print("Resetando `categorias_setores` (somente setores) ...")
-    _delete_all("categorias_setores")
+    _delete_all("categorias_setores", args.apply)
 
     # Lista final validada (mantém Engenharia/Qualidade e adiciona do print).
     # Exclui explicitamente: NDT, MACHINING, ASSEMBLY, INSPECTION.
@@ -113,6 +144,9 @@ if __name__ == "__main__":
         )
 
     print("\nCriando setores finais ...")
-    _upsert_sectors(payloads)
+    _upsert_sectors(payloads, args.apply)
 
-    print("\nConcluído.")
+    if args.apply:
+        print("\nConcluído.")
+    else:
+        print("\nDry-run concluído. Nenhuma alteração foi feita. Use --apply para executar.")

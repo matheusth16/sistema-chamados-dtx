@@ -28,9 +28,9 @@ O sistema é uma aplicação web de **gerenciamento de chamados** com:
 | Banco | Firestore (acesso apenas via backend; regras negam acesso direto do cliente) |
 | Autenticação | Flask-Login + usuários em Firestore (`usuarios`), senha com werkzeug hash |
 | CSRF | WTF_CSRF_ENABLED = True (em produção); testes usam WTF_CSRF_ENABLED = False |
-| Upload | Máx. 16 MB; extensões: png, jpg, jpeg, pdf, xlsx |
-| Paginação | Cursor-based; limite configurável (ex.: 10 itens por página, API até 100) |
-| Rate limit | Produção: 200/hora, 2000/dia; bulk-status: 20/min; paginar/carregar-mais: 60/min; login: 5/min |
+| Upload | Máx. 10 MB por arquivo (`MAX_ANEXO_BYTES`); extensões: png, jpg, jpeg, pdf, Excel (xls/xlsx/...), Word (doc/docx/...), csv |
+| Paginação | Cursor-based; dashboard 50/página, listas 10/página, API até 100 |
+| Rate limit | Por rota: login 10/min; atualizar-status 30/min; bulk-status 10/min; push-subscribe 5/min; exportar 10/h; exportar-avançado 5/h (sem limite global) |
 
 ### 2.2 Estrutura de Dados
 
@@ -70,7 +70,7 @@ O sistema é uma aplicação web de **gerenciamento de chamados** com:
 - **Rota:** POST `/` (index); decorador `@requer_solicitante` e rate limit 10/hora.
 - **Campos obrigatórios:** descrição (mín. 3 caracteres), setor/tipo.
 - **Categoria Projetos:** `rl_codigo` obrigatório; 1–100 caracteres; caracteres permitidos: letras, números, espaço, `- _ . / ( ) ,` (regex `^[\w\s\-./(),]+$`).
-- **Anexo:** opcional; extensões: png, jpg, jpeg, pdf, xlsx; tamanho máx. 16 MB (config).
+- **Anexo:** opcional; extensões: png, jpg, jpeg, pdf, Excel (xls/xlsx/...), Word (doc/docx/...), csv; tamanho máx. 10 MB por arquivo (config).
 - **Prioridade:** Projetos = 0; demais = informada ou 1.
 - **Atribuição:** se solicitante escolher responsável no formulário (supervisor/admin), usa esse; senão, atribuição automática por área/categoria; se falhar, fica como solicitante e mensagem de aviso.
 - **Área do chamado:** setor (tipo) ou área do solicitante ou "Geral".

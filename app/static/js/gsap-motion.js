@@ -1,5 +1,5 @@
 /**
- * GSAP Motion - Animações suaves no DTX Digital Andon
+ * GSAP Motion - Animações suaves no DTX Service Portal
  *
  * Plugins: ScrollTrigger (reveal ao rolar), ScrollToPlugin (scroll suave).
  *
@@ -54,8 +54,8 @@
             onComplete: function () {
                 splash.remove();
                 // Reveal nav and footer with smooth animation
-                if (nav) gsap.to(nav, { opacity: 1, y: 0, duration: 0.5, ease: 'power2.out' });
-                if (footer) gsap.to(footer, { opacity: 1, duration: 0.5, ease: 'power2.out', delay: 0.2 });
+                if (nav) gsap.to(nav, { opacity: 1, y: 0, duration: 0.2, ease: 'power2.out' });
+                if (footer) gsap.to(footer, { opacity: 1, duration: 0.2, ease: 'power2.out', delay: 0.1 });
                 if (callback) callback();
             }
         });
@@ -97,8 +97,8 @@
                 gsap.fromTo(items, { opacity: 0, y: -16 }, {
                     opacity: 1,
                     y: 0,
-                    duration: 0.5,
-                    stagger: 0.1,
+                    duration: 0.2,
+                    stagger: 0.05,
                     ease: 'back.out(1.1)'
                 });
             }
@@ -115,7 +115,7 @@
         staggerContainers.forEach(function (container) {
             var children = container.querySelectorAll(':scope > .gsap-stagger');
             if (children.length) {
-                gsap.fromTo(children, defaultFrom, Object.assign({}, defaultTo, { duration: 0.5, stagger: 0.08 }));
+                gsap.fromTo(children, defaultFrom, Object.assign({}, defaultTo, { duration: 0.25, stagger: 0.04 }));
             }
         });
 
@@ -130,23 +130,23 @@
             animateLoginCard();
         }
 
-        // Página de login: card com escala + fade
+        // Página de login: card com fade + slide leve
         function animateLoginCard() {
             var loginCard = document.getElementById('login-card');
             if (!loginCard) return;
-            gsap.fromTo(loginCard, { opacity: 0, scale: 0.88 }, { opacity: 1, scale: 1, duration: 0.6, ease: 'back.out(1.4)' });
+            gsap.fromTo(loginCard, { opacity: 0, y: 12 }, { opacity: 1, y: 0, duration: 0.2, ease: 'power2.out' });
             var loginHeader = loginCard.querySelector('.gsap-login-header');
             var loginForm = loginCard.querySelector('form');
             var loginFooter = loginCard.querySelector('.gsap-login-footer');
-            if (loginHeader) gsap.fromTo(loginHeader, { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.5, delay: 0.15, ease: 'power2.out' });
-            if (loginForm) gsap.fromTo(loginForm, { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.5, delay: 0.3, ease: 'power2.out' });
-            if (loginFooter) gsap.fromTo(loginFooter, { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: 0.4, delay: 0.5 });
+            if (loginHeader) gsap.fromTo(loginHeader, { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: 0.2, delay: 0.05, ease: 'power2.out' });
+            if (loginForm) gsap.fromTo(loginForm, { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: 0.2, delay: 0.1, ease: 'power2.out' });
+            if (loginFooter) gsap.fromTo(loginFooter, { opacity: 0 }, { opacity: 1, duration: 0.15, delay: 0.15, ease: 'power1.out' });
         }
 
         // .gsap-scroll-reveal: animar quando entrar na viewport (requer ScrollTrigger)
         if (typeof ScrollTrigger !== 'undefined') {
             document.querySelectorAll('.gsap-scroll-reveal').forEach(function (el) {
-                gsap.fromTo(el, { opacity: 0, y: 48 }, {
+                gsap.fromTo(el, { opacity: 0, y: 16 }, {
                     opacity: 1,
                     y: 0,
                     duration: 0.65,
@@ -182,7 +182,7 @@
         init();
         try {
             if (typeof window !== 'undefined' && window.DTX_DEBUG) {
-                console.log('[DTX] GSAP Motion ativo ✓');
+                console.log('[DTX] GSAP Motion ativo');
             }
         } catch (e) {}
     }

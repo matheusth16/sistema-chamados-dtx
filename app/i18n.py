@@ -30,19 +30,6 @@ def get_translations_dict():
     return _TRANSLATIONS_CACHE
 
 
-def save_translations_dict(new_translations):
-    """Salva o dicionário de traduções no arquivo JSON e atualiza o cache."""
-    global _TRANSLATIONS_CACHE
-    try:
-        with open(_TRANSLATIONS_FILE, "w", encoding="utf-8") as f:
-            json.dump(new_translations, f, indent=4, ensure_ascii=False)
-        _TRANSLATIONS_CACHE = new_translations
-        return True
-    except Exception as e:
-        print(f"Erro ao salvar traduções: {e}")
-        return False
-
-
 # Idiomas suportados
 SUPPORTED_LANGUAGES = {
     "pt_BR": "Português (Brasil)",
@@ -62,12 +49,15 @@ SECTOR_KEYS_MAP = {
     "Material": "indirect_material",  # Abreviado no banco de dados
     "RH": "hr",
     "TI": "it",
+    # Nome novo (canônico) e alias legado para histórico
+    "Planejamento de Produção": "ppcp",
     "PPCP": "ppcp",
     "Planejamento Materiais": "material_planning",
     "Suprimentos": "supplies",
     "Logistica": "logistics",
     "Logística": "logistics",
     "Infraestrutura": "facility",
+    # Setores de Produção mantidos apenas para histórico (ativos desativados no Firestore)
     "Produção - Usinagem": "production_machining",
     "Produção - Montagem": "production_assembly",
     "Produção - Inspeções": "production_inspections",
@@ -76,6 +66,8 @@ SECTOR_KEYS_MAP = {
     "Engineering": "engineering",
     "Quality": "quality",
     "Commercial": "commercial",
+    # Nome novo (canônico) e alias legado Procurement para histórico
+    "Compras": "procurement",
     "Procurement": "procurement",
     "IT": "it",
     "HR": "hr",
@@ -98,6 +90,34 @@ STATUS_KEYS_MAP = {
     "Cancelado": "option_cancelled",
 }
 
+# Mapa de valores de Gate → chave de tradução
+GATE_KEYS_MAP: dict[str, str] = {
+    # Valores canônicos completos (16)
+    "Gate 1 - Desmontagem": "gate_1_desmontagem",
+    "Gate 1 - Limpeza": "gate_1_limpeza",
+    "Gate 1 - Remoção de Tinta": "gate_1_remocao_tinta",
+    "Gate 1 - Reconciliação": "gate_1_reconciliacao",
+    "Gate 2 - Forno": "gate_2_forno",
+    "Gate 2 - FPI": "gate_2_fpi",
+    "Gate 2 - MPI": "gate_2_mpi",
+    "Gate 2 - Inspeção": "gate_2_inspecao",
+    "Gate 3 - Galvanoplastia": "gate_3_galvanoplastia",
+    "Gate 3 - Usinagem": "gate_3_usinagem",
+    "Gate 3 - Bucha": "gate_3_bucha",
+    "Gate 3 - Pintura": "gate_3_pintura",
+    "Gate 4 - Inspeção de Partes": "gate_4_inspecao_partes",
+    "Gate 4 - Montagem": "gate_4_montagem",
+    "Gate 4 - Testes": "gate_4_testes",
+    "Gate 4 - Inspeção Final": "gate_4_inspecao_final",
+    # N/A
+    "N/A": "not_applicable_short",
+    # Aliases legados (somente leitura — histórico de chamados antigos)
+    "Gate 1": "gate_1",
+    "Gate 2": "gate_2",
+    "Gate 3": "gate_3",
+    "Gate 4": "gate_4",
+}
+
 # Nomes de campos (histórico/auditoria) -> chave de tradução para o rótulo exibido
 FIELD_LABEL_KEYS = {
     "motivo_cancelamento": "cancellation_reason",
@@ -113,7 +133,7 @@ FIELD_LABEL_KEYS = {
 def get_language_code(lang_param):
     """
     Valida e retorna o código de idioma.
-    Se inválido, retorna o padrão: pt_BR
+    Se inválido ou None, retorna o padrão: en
     """
     if lang_param in SUPPORTED_LANGUAGES:
         return lang_param
@@ -180,6 +200,23 @@ def get_translated_status(status_name, language="pt_BR"):
     if translation_key:
         return get_translation(translation_key, language)
     return status_name
+
+
+def get_translated_gate(gate_value, language="pt_BR"):
+    """
+    Traduz o valor canônico de um gate para o idioma solicitado.
+
+    Args:
+        gate_value (str): Valor canônico gravado no Firestore (ex: 'Gate 1 - Desmontagem', 'N/A')
+        language (str): Código do idioma (pt_BR, en, es)
+
+    Returns:
+        str: Texto traduzido ou o valor original se não mapeado
+    """
+    translation_key = GATE_KEYS_MAP.get(gate_value)
+    if translation_key:
+        return get_translation(translation_key, language)
+    return gate_value
 
 
 def get_translated_field_label(field_name, language="pt_BR"):

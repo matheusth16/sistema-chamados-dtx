@@ -14,6 +14,8 @@ from app.database import db
 
 logger = logging.getLogger(__name__)
 
+MAX_INSCRICOES = 20
+
 
 def salvar_inscricao(usuario_id: str, subscription: dict[str, Any]) -> bool:
     """
@@ -65,11 +67,18 @@ def obter_inscricoes(usuario_id: str) -> list[dict[str, Any]]:
     if not usuario_id:
         return []
     try:
-        docs = (
+        docs = list(
             db.collection("push_subscriptions")
             .where(filter=FieldFilter("usuario_id", "==", usuario_id))
+            .limit(MAX_INSCRICOES)
             .stream()
         )
+        if len(docs) >= MAX_INSCRICOES:
+            logger.warning(
+                "Web Push: limite de inscrições atingido (%d) para usuario=%s",
+                MAX_INSCRICOES,
+                usuario_id,
+            )
         out = []
         for doc in docs:
             d = doc.to_dict()

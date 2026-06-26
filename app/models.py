@@ -37,6 +37,17 @@ class Chamado:
         sla_dias: int = None,
         confirmacao_solicitante: str = None,
         id: str = None,
+        # Fase 2 — Escalonamento SLA
+        supervisor_ids_com_acesso: list = None,
+        data_em_atendimento=None,
+        escalacao_resposta_nivel: int = 0,
+        participantes: list = None,
+        # Fase 3 — Transferência e escalada
+        motivo_ultima_escalacao: str = None,
+        # Fase 7 — Escada B (resolução)
+        escalacao_resolucao_nivel: int = 0,
+        alerta_supervisor_50_enviado: bool = False,
+        alerta_supervisor_80_enviado: bool = False,
     ):
         self.id = id
         self.numero_chamado = numero_chamado
@@ -71,6 +82,21 @@ class Chamado:
         self.status = status
         self.data_abertura = data_abertura or firestore.SERVER_TIMESTAMP
         self.data_conclusao = data_conclusao
+        # Fase 2 — Escalonamento SLA
+        self.supervisor_ids_com_acesso = supervisor_ids_com_acesso or []
+        self.data_em_atendimento = data_em_atendimento
+        self.escalacao_resposta_nivel = (
+            escalacao_resposta_nivel if escalacao_resposta_nivel is not None else 0
+        )
+        self.participantes = participantes or []
+        # Fase 3 — Transferência e escalada
+        self.motivo_ultima_escalacao = motivo_ultima_escalacao
+        # Fase 7 — Escada B (resolução)
+        self.escalacao_resolucao_nivel = (
+            escalacao_resolucao_nivel if escalacao_resolucao_nivel is not None else 0
+        )
+        self.alerta_supervisor_50_enviado = bool(alerta_supervisor_50_enviado)
+        self.alerta_supervisor_80_enviado = bool(alerta_supervisor_80_enviado)
 
     def _converter_timestamp(self, ts):
         """Converte timestamp do Firestore para datetime em horário de Brasília.
@@ -145,6 +171,17 @@ class Chamado:
             "grupo_rl_id": self.grupo_rl_id,
             "sla_dias": self.sla_dias,
             "confirmacao_solicitante": self.confirmacao_solicitante,
+            # Fase 2 — Escalonamento SLA
+            "supervisor_ids_com_acesso": self.supervisor_ids_com_acesso,
+            "data_em_atendimento": self.data_em_atendimento,
+            "escalacao_resposta_nivel": self.escalacao_resposta_nivel,
+            "participantes": self.participantes,
+            # Fase 3 — Transferência e escalada
+            "motivo_ultima_escalacao": self.motivo_ultima_escalacao,
+            # Fase 7 — Escada B (resolução)
+            "escalacao_resolucao_nivel": self.escalacao_resolucao_nivel,
+            "alerta_supervisor_50_enviado": self.alerta_supervisor_50_enviado,
+            "alerta_supervisor_80_enviado": self.alerta_supervisor_80_enviado,
         }
 
     @classmethod
@@ -190,6 +227,21 @@ class Chamado:
             grupo_rl_id=data.get("grupo_rl_id"),
             sla_dias=data.get("sla_dias"),
             confirmacao_solicitante=data.get("confirmacao_solicitante"),
+            # Fase 2 — Escalonamento SLA
+            supervisor_ids_com_acesso=data.get("supervisor_ids_com_acesso")
+            if isinstance(data.get("supervisor_ids_com_acesso"), list)
+            else [],
+            data_em_atendimento=data.get("data_em_atendimento"),
+            escalacao_resposta_nivel=data.get("escalacao_resposta_nivel", 0),
+            participantes=data.get("participantes")
+            if isinstance(data.get("participantes"), list)
+            else [],
+            # Fase 3 — Transferência e escalada
+            motivo_ultima_escalacao=data.get("motivo_ultima_escalacao"),
+            # Fase 7 — Escada B (resolução)
+            escalacao_resolucao_nivel=data.get("escalacao_resolucao_nivel", 0),
+            alerta_supervisor_50_enviado=data.get("alerta_supervisor_50_enviado", False),
+            alerta_supervisor_80_enviado=data.get("alerta_supervisor_80_enviado", False),
         )
 
     def __repr__(self):

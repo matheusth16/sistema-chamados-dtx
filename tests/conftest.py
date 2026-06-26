@@ -63,6 +63,15 @@ def _usuario_mock(uid, email, nome, perfil, area="Geral", areas=None):
     u.must_change_password = False
     u.is_admin_or_above = perfil in ("admin", "admin_global")
     u.is_supervisor_or_above = perfil in ("supervisor", "admin", "admin_global")
+    # Onboarding concluído por padrão — evita injeção do tour em testes (F-62)
+    u.onboarding_completo = True
+    u.onboarding_passo = 0
+    # Onda 2: conta ativa por padrão (ativo=False bloqueia login e sessão)
+    u.ativo = True
+    # Fase 5: sem nivel_gestao por padrão (gestor é opt-in)
+    u.nivel_gestao = None
+    u.is_gestor = False
+    u.is_gestor_only = False
     return u
 
 
@@ -115,6 +124,44 @@ def client_logado_admin_global(client, app):
         patch("app.models_usuario.Usuario.get_by_id", return_value=user),
     ):
         client.post("/login", data={"email": "ag@test.com", "senha": "ok"}, follow_redirects=False)
+        yield client
+
+
+@pytest.fixture
+def client_logado_supervisor_sem_areas(client, app):
+    """Cliente com supervisor sem áreas — testa IDOR de paginação (CT-IDOR-PAG-01)."""
+    user = _usuario_mock(
+        "sup_sem_areas",
+        "sup_sem@test.com",
+        "Supervisor Sem Areas",
+        "supervisor",
+        "Geral",
+        areas=[],
+    )
+    with (
+        patch("app.routes.auth.Usuario.get_by_email", return_value=user),
+        patch("app.models_usuario.Usuario.get_by_id", return_value=user),
+    ):
+        client.post(
+            "/login", data={"email": "sup_sem@test.com", "senha": "ok"}, follow_redirects=False
+        )
+        yield client
+
+
+@pytest.fixture
+def client_logado_gestor(client, app):
+    """Cliente com usuário supervisor + nivel_gestao='gestor_setor' (read-only gestor)."""
+    user = _usuario_mock("gest_1", "gestor@test.com", "Gestor Teste", "supervisor", "Geral")
+    user.nivel_gestao = "gestor_setor"
+    user.is_gestor = True
+    user.is_gestor_only = True
+    with (
+        patch("app.routes.auth.Usuario.get_by_email", return_value=user),
+        patch("app.models_usuario.Usuario.get_by_id", return_value=user),
+    ):
+        client.post(
+            "/login", data={"email": "gestor@test.com", "senha": "ok"}, follow_redirects=False
+        )
         yield client
 
 

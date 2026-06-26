@@ -1,0 +1,71 @@
+﻿{
+  "executado_em": "2026-06-26T11:08:14.678236+00:00",
+  "resumo": {
+    "pass": 10,
+    "fail": 0,
+    "skip": 0,
+    "total": 10
+  },
+  "resultados": [
+    {
+      "id_esc": "ESC-01",
+      "descricao": "Isolamento supervisor: sup_a nao ve chamado de sup_b",
+      "status": "PASS",
+      "detalhe": "usuario_pode_ver_chamado(sup_a, chamado_sup_b) = False [OK]"
+    },
+    {
+      "id_esc": "ESC-02",
+      "descricao": "Fila da área: supervisor vê chamado sem owner",
+      "status": "PASS",
+      "detalhe": "usuario_pode_ver_chamado(sup_a, fila_TI) = True [OK]"
+    },
+    {
+      "id_esc": "ESC-03",
+      "descricao": "Claim: responsavel_id = current_user.id",
+      "status": "PASS",
+      "detalhe": "responsavel_id='sup_a' + data_em_atendimento setado [OK]"
+    },
+    {
+      "id_esc": "ESC-04",
+      "descricao": "Transferir área: ex-owner perde visão; novo owner ganha",
+      "status": "PASS",
+      "detalhe": "supervisor_ids_com_acesso=['sup_dest'] (sem sup_orig [OK], com sup_dest [OK])"
+    },
+    {
+      "id_esc": "ESC-05",
+      "descricao": "Escalonar colega: motivo obrigatório + troca responsavel_id",
+      "status": "PASS",
+      "detalhe": "motivo_vazio_rejeita=True [OK], responsavel_id='sup_b' [OK]"
+    },
+    {
+      "id_esc": "ESC-06",
+      "descricao": "Multi-setor: pendente bloqueia; todos concluídos libera",
+      "status": "PASS",
+      "detalhe": "pendente→pode_concluir_global=False [OK], todos_concluidos→True [OK]"
+    },
+    {
+      "id_esc": "ESC-07",
+      "descricao": "Tempo útil: 60 min atingidos às 13:30 (não 12:30 — pula almoço)",
+      "status": "PASS",
+      "detalhe": "min(11h→12h30)=30 (<60 [OK]), min(11h→13h30)=60 (≥60 [OK])"
+    },
+    {
+      "id_esc": "ESC-08",
+      "descricao": "Fora da janela: 16:45 e sábado bloqueados; 14:00 liberado",
+      "status": "PASS",
+      "detalhe": "16h45=False [OK], 14h00=True [OK], sábado=False [OK]"
+    },
+    {
+      "id_esc": "ESC-09",
+      "descricao": "Deadline imutável: edição de descrição não altera data_em_atendimento",
+      "status": "PASS",
+      "detalhe": "data_em_atendimento ausente no payload [OK] (update_payload.keys=['descricao'])"
+    },
+    {
+      "id_esc": "ESC-10",
+      "descricao": "Gestor read-only: dashboard 200 + mudança status negada",
+      "status": "PASS",
+      "detalhe": "GET /gestor/dashboard=200 [OK], verificar_permissao_mudanca_status=False [OK]"
+    }
+  ]
+}

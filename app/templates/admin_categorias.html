@@ -1,285 +1,562 @@
 {% extends "base.html" %}
+{% from 'components/_page_header.html' import page_header %}
 
 {% block content %}
-<div class="min-h-screen bg-gray-50 py-8">
-    <div class="max-w-7xl mx-auto px-4">
-        <!-- Cabeçalho -->
-        <div class="mb-8 bg-white/80 backdrop-blur-md rounded-[2rem] p-6 shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-white relative overflow-hidden">
-            <div class="absolute top-0 right-0 -mr-20 -mt-20 w-64 h-64 rounded-full bg-gradient-to-br from-blue-100 to-indigo-100 blur-[80px] opacity-60 pointer-events-none"></div>
-            <div class="relative z-10">
-                <h1 class="text-3xl font-black text-slate-800">{{ t('category_administration') }}</h1>
-                <p class="text-slate-500 font-medium mt-2">{{ t('manage_categories_desc') }}</p>
-            </div>
-        </div>
+<div class="space-y-6">
 
-        <!-- Abas de navegação -->
-        <div class="mb-8 bg-slate-100/50 p-1.5 rounded-2xl inline-flex flex-wrap gap-2">
-            <button onclick="mostrarAba('setores')" id="btn-setores" class="px-5 py-2.5 rounded-xl bg-white shadow-sm text-indigo-600 font-bold text-sm transition-all flex items-center gap-2 ring-1 ring-slate-200/50">
-                <span>🏢</span> {{ t('sectors') }}
-            </button>
-            <button onclick="mostrarAba('gates')" id="btn-gates" class="px-5 py-2.5 rounded-xl text-slate-500 hover:text-slate-800 font-bold text-sm transition-all hover:bg-white/50 flex items-center gap-2">
-                <span>🚪</span> {{ t('gates') }}
-            </button>
-            <button onclick="mostrarAba('impactos')" id="btn-impactos" class="px-5 py-2.5 rounded-xl text-slate-500 hover:text-slate-800 font-bold text-sm transition-all hover:bg-white/50 flex items-center gap-2">
-                <span>⚡</span> {{ t('impacts') }}
-            </button>
-        </div>
-        <!-- ABA: SETORES -->
-        <div id="aba-setores" class="tab-content">
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <!-- Formulário de criação -->
-                <div class="bg-white/80 backdrop-blur-sm rounded-[1.5rem] shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-white p-6 h-fit">
-                    <h2 class="text-lg font-black text-slate-800 mb-5 relative inline-block">
-                        {{ t('new_sector') }}
-                        <div class="absolute -bottom-1 left-0 w-1/2 h-1 bg-indigo-500 rounded-full"></div>
-                    </h2>
-                    <form method="POST" action="{{ url_for('main.criar_setor') }}" class="space-y-4">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                        <div>
-                            <label for="setor-nome" class="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">{{ t('name_portuguese') }}</label>
-                            <input type="text" id="setor-nome" name="nome_pt" required placeholder="{{ t('ex_maintenance') }}"
-                                   class="block w-full bg-slate-50/80 border border-slate-200 font-medium text-sm text-slate-700 rounded-xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-400 transition-all py-3 px-4 focus:bg-white shadow-inner hover:border-slate-300">
-                            <p class="text-[11px] font-medium text-slate-400 mt-2 ml-1">{{ t('auto_translated_note') }}</p>
-                        </div>
-                        <div>
-                            <label for="setor-descricao" class="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">{{ t('description_optional') }}</label>
-                            <textarea id="setor-descricao" name="descricao_pt" placeholder="{{ t('ex_maintenance_desc') }}"
-                                      rows="3" class="block w-full bg-slate-50/80 border border-slate-200 font-medium text-sm text-slate-700 rounded-xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-400 transition-all py-3 px-4 focus:bg-white shadow-inner resize-none hover:border-slate-300"></textarea>
-                        </div>
-                        <button type="submit" class="w-full flex justify-center py-3 px-4 rounded-xl shadow-[0_4px_15px_rgb(79,70,229,0.3)] text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-500 hover:shadow-[0_6px_20px_rgb(79,70,229,0.4)] focus:outline-none focus:ring-4 focus:ring-indigo-200 focus:ring-offset-1 active:scale-[0.98] transition-all duration-300 items-center mt-6">
-                            ➕ {{ t('add_sector') }}
-                        </button>
-                    </form>
-                </div>
+  {{ page_header(t('category_administration'), subtitle=t('manage_categories_desc')) }}
 
-                <!-- Lista de setores -->
-                <div class="lg:col-span-2">
-                    <div class="bg-white/80 backdrop-blur-sm rounded-[1.5rem] shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-white overflow-hidden">
-                        <div class="px-6 py-5 border-b border-slate-100 bg-slate-50/50">
-                            <h2 class="text-lg font-black text-slate-800">{{ t('registered_sectors') }}</h2>
-                        </div>
-                        <div class="divide-y divide-slate-100">
-                            {% if setores %}
-                                {% for setor in setores %}
-                                <div class="p-6 hover:bg-slate-50/80 transition-colors group">
-                                    <div class="flex justify-between items-start mb-2">
-                                        <div>
-                                            <h3 class="font-extrabold text-slate-800">{{ setor.nome_pt }}</h3>
-                                            <p class="text-xs font-semibold text-slate-400 mt-1 bg-slate-100/80 inline-block px-2 py-0.5 rounded-lg">🇬🇧 {{ setor.nome_en }} <span class="mx-1 text-slate-300">|</span> 🇪🇸 {{ setor.nome_es }}</p>
-                                            {% if setor.descricao_pt %}
-                                            <p class="text-sm font-medium text-slate-500 mt-3">{{ setor.descricao_pt }}</p>
-                                            {% endif %}
-                                        </div>
-                                        <span class="inline-flex px-3 py-1 bg-emerald-100 text-emerald-800 text-[10px] font-black uppercase tracking-wider rounded-xl shadow-sm border border-emerald-200">{{ t('active') if setor.ativo else t('inactive') }}</span>
-                                    </div>
-                                    <div class="mt-4 flex gap-2">
-                                        <button onclick="editarSetor('{{ setor.id }}')" class="text-xs px-3 py-1.5 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 font-bold transition-colors">
-                                            ✏️ {{ t('edit') }}
-                                        </button>
-                                        <form method="POST" action="{{ url_for('main.excluir_setor', setor_id=setor.id) }}" class="inline" onsubmit="return confirm(`{{ t('confirm_delete_sector') }}`);">
-                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                                            <button type="submit" class="text-xs px-3 py-1.5 rounded-lg bg-red-50 text-red-700 hover:bg-red-100 font-bold transition-colors">
-                                                🗑️ {{ t('delete') }}
-                                            </button>
-                                        </form>
-                                    </div>
-                                </div>
-                                {% endfor %}
-                            {% else %}
-                            <div class="p-8 text-center text-slate-500 font-medium">
-                                <p>{{ t('no_sectors_registered') }}</p>
-                            </div>
-                            {% endif %}
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+  <!-- Abas de navegação -->
+  <div class="bg-surface-raised p-1 rounded-dtx-md inline-flex flex-wrap gap-1">
+    <button type="button" onclick="mostrarAba('setores')" id="btn-setores"
+            class="px-5 py-2.5 rounded-dtx-md text-sm font-semibold transition-colors bg-white shadow-dtx-sm text-dtx-600 border border-surface-border">
+      {{ t('sectors') }}
+    </button>
+    <button type="button" onclick="mostrarAba('gates')" id="btn-gates"
+            class="px-5 py-2.5 rounded-dtx-md text-sm font-semibold transition-colors text-gray-500 hover:bg-surface-base">
+      {{ t('gates') }}
+    </button>
+    <button type="button" onclick="mostrarAba('impactos')" id="btn-impactos"
+            class="px-5 py-2.5 rounded-dtx-md text-sm font-semibold transition-colors text-gray-500 hover:bg-surface-base">
+      {{ t('impacts') }}
+    </button>
+  </div>
 
-        <!-- ABA: GATES -->
-        <div id="aba-gates" class="tab-content hidden">
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <!-- Formulário de criação -->
-                <div class="bg-white/80 backdrop-blur-sm rounded-[1.5rem] shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-white p-6 h-fit">
-                    <h2 class="text-lg font-black text-slate-800 mb-5 relative inline-block">
-                        {{ t('new_gate') }}
-                        <div class="absolute -bottom-1 left-0 w-1/2 h-1 bg-indigo-500 rounded-full"></div>
-                    </h2>
-                    <form method="POST" action="{{ url_for('main.criar_gate') }}" class="space-y-4">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                        <div>
-                            <label for="gate-nome" class="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">{{ t('name_portuguese') }}</label>
-                            <input type="text" id="gate-nome" name="nome_pt" required placeholder="{{ t('ex_gate_5') }}"
-                                   class="block w-full bg-slate-50/80 border border-slate-200 font-medium text-sm text-slate-700 rounded-xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-400 transition-all py-3 px-4 focus:bg-white shadow-inner hover:border-slate-300">
-                            <p class="text-[11px] font-medium text-slate-400 mt-2 ml-1">{{ t('auto_translated_note') }}</p>
-                        </div>
-                        <div>
-                            <label for="gate-descricao" class="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">{{ t('description_optional') }}</label>
-                            <textarea id="gate-descricao" name="descricao_pt" placeholder="{{ t('ex_validation_req') }}"
-                                      rows="3" class="block w-full bg-slate-50/80 border border-slate-200 font-medium text-sm text-slate-700 rounded-xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-400 transition-all py-3 px-4 focus:bg-white shadow-inner resize-none hover:border-slate-300"></textarea>
-                        </div>
-                        <p class="text-[11px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-100 p-3 rounded-xl mt-4">
-                            {{ t('order_auto_assigned_note') }}
-                        </p>
-                        <button type="submit" class="w-full flex justify-center py-3 px-4 rounded-xl shadow-[0_4px_15px_rgb(79,70,229,0.3)] text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-500 hover:shadow-[0_6px_20px_rgb(79,70,229,0.4)] focus:outline-none focus:ring-4 focus:ring-indigo-200 focus:ring-offset-1 active:scale-[0.98] transition-all duration-300 items-center mt-6">
-                            ➕ {{ t('add_gate') }}
-                        </button>
-                    </form>
-                </div>
-
-                <!-- Lista de gates -->
-                <div class="lg:col-span-2">
-                    <div class="bg-white/80 backdrop-blur-sm rounded-[1.5rem] shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-white overflow-hidden">
-                        <div class="px-6 py-5 border-b border-slate-100 bg-slate-50/50">
-                            <h2 class="text-lg font-black text-slate-800">{{ t('registered_gates') }}</h2>
-                        </div>
-                        <div class="divide-y divide-slate-100">
-                            {% if gates %}
-                                {% for gate in gates %}
-                                <div class="p-6 hover:bg-slate-50/80 transition-colors group">
-                                    <div class="flex justify-between items-start mb-2">
-                                        <div>
-                                            <h3 class="font-extrabold text-slate-800">
-                                                <span class="bg-slate-200 text-slate-700 px-2 py-0.5 rounded text-xs mr-2">#{{ gate.ordem }}</span>
-                                                {{ gate.nome_pt }}
-                                            </h3>
-                                            <p class="text-xs font-semibold text-slate-400 mt-2 bg-slate-100/80 inline-block px-2 py-0.5 rounded-lg">🇬🇧 {{ gate.nome_en }} <span class="mx-1 text-slate-300">|</span> 🇪🇸 {{ gate.nome_es }}</p>
-                                            {% if gate.descricao_pt %}
-                                            <p class="text-sm font-medium text-slate-500 mt-3">{{ gate.descricao_pt }}</p>
-                                            {% endif %}
-                                        </div>
-                                        <span class="inline-flex px-3 py-1 bg-emerald-100 text-emerald-800 text-[10px] font-black uppercase tracking-wider rounded-xl shadow-sm border border-emerald-200">{{ t('active') if gate.ativo else t('inactive') }}</span>
-                                    </div>
-                                    <div class="mt-4 flex gap-2">
-                                        <button onclick="editarGate('{{ gate.id }}')" class="text-xs px-3 py-1.5 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 font-bold transition-colors">
-                                            ✏️ {{ t('edit') }}
-                                        </button>
-                                        <form method="POST" action="{{ url_for('main.excluir_gate', gate_id=gate.id) }}" class="inline" onsubmit="return confirm(`{{ t('confirm_delete_gate') }}`);">
-                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                                            <button type="submit" class="text-xs px-3 py-1.5 rounded-lg bg-red-50 text-red-700 hover:bg-red-100 font-bold transition-colors">
-                                                🗑️ {{ t('delete') }}
-                                            </button>
-                                        </form>
-                                    </div>
-                                </div>
-                                {% endfor %}
-                            {% else %}
-                            <div class="p-8 text-center text-slate-500 font-medium">
-                                <p>{{ t('no_gates_registered') }}</p>
-                            </div>
-                            {% endif %}
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- ABA: IMPACTOS -->
-        <div id="aba-impactos" class="tab-content hidden">
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <!-- Formulário de criação -->
-                <div class="bg-white/80 backdrop-blur-sm rounded-[1.5rem] shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-white p-6 h-fit">
-                    <h2 class="text-lg font-black text-slate-800 mb-5 relative inline-block">
-                        {{ t('new_impact') }}
-                        <div class="absolute -bottom-1 left-0 w-1/2 h-1 bg-indigo-500 rounded-full"></div>
-                    </h2>
-                    <form method="POST" action="{{ url_for('main.criar_impacto') }}" class="space-y-4">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                        <div>
-                            <label for="impacto-nome" class="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">{{ t('name_portuguese') }}</label>
-                            <input type="text" id="impacto-nome" name="nome_pt" required placeholder="{{ t('ex_critical') }}"
-                                   class="block w-full bg-slate-50/80 border border-slate-200 font-medium text-sm text-slate-700 rounded-xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-400 transition-all py-3 px-4 focus:bg-white shadow-inner hover:border-slate-300">
-                            <p class="text-[11px] font-medium text-slate-400 mt-2 ml-1">{{ t('auto_translated_note') }}</p>
-                        </div>
-                        <div>
-                            <label for="impacto-descricao" class="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">{{ t('description_optional') }}</label>
-                            <textarea id="impacto-descricao" name="descricao_pt" placeholder="{{ t('ex_critical_desc') }}"
-                                      rows="3" class="block w-full bg-slate-50/80 border border-slate-200 font-medium text-sm text-slate-700 rounded-xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-400 transition-all py-3 px-4 focus:bg-white shadow-inner resize-none hover:border-slate-300"></textarea>
-                        </div>
-                        <button type="submit" class="w-full flex justify-center py-3 px-4 rounded-xl shadow-[0_4px_15px_rgb(79,70,229,0.3)] text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-500 hover:shadow-[0_6px_20px_rgb(79,70,229,0.4)] focus:outline-none focus:ring-4 focus:ring-indigo-200 focus:ring-offset-1 active:scale-[0.98] transition-all duration-300 items-center mt-6">
-                            ➕ {{ t('add_impact') }}
-                        </button>
-                    </form>
-                </div>
-
-                <!-- Lista de impactos -->
-                <div class="lg:col-span-2">
-                    <div class="bg-white/80 backdrop-blur-sm rounded-[1.5rem] shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-white overflow-hidden">
-                        <div class="px-6 py-5 border-b border-slate-100 bg-slate-50/50">
-                            <h2 class="text-lg font-black text-slate-800">{{ t('registered_impacts') }}</h2>
-                        </div>
-                        <div class="divide-y divide-slate-100">
-                            {% if impactos %}
-                                {% for impacto in impactos %}
-                                <div class="p-6 hover:bg-slate-50/80 transition-colors group">
-                                    <div class="flex justify-between items-start mb-2">
-                                        <div>
-                                            <h3 class="font-extrabold text-slate-800">{{ impacto.nome_pt }}</h3>
-                                            <p class="text-xs font-semibold text-slate-400 mt-2 bg-slate-100/80 inline-block px-2 py-0.5 rounded-lg">🇬🇧 {{ impacto.nome_en }} <span class="mx-1 text-slate-300">|</span> 🇪🇸 {{ impacto.nome_es }}</p>
-                                            {% if impacto.descricao_pt %}
-                                            <p class="text-sm font-medium text-slate-500 mt-3">{{ impacto.descricao_pt }}</p>
-                                            {% endif %}
-                                        </div>
-                                        <span class="inline-flex px-3 py-1 bg-emerald-100 text-emerald-800 text-[10px] font-black uppercase tracking-wider rounded-xl shadow-sm border border-emerald-200">{{ t('active') if impacto.ativo else t('inactive') }}</span>
-                                    </div>
-                                    <div class="mt-4 flex gap-2">
-                                        <button onclick="editarImpacto('{{ impacto.id }}')" class="text-xs px-3 py-1.5 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 font-bold transition-colors">
-                                            ✏️ {{ t('edit') }}
-                                        </button>
-                                        <form method="POST" action="{{ url_for('main.excluir_impacto', impacto_id=impacto.id) }}" class="inline" onsubmit="return confirm(`{{ t('confirm_delete_impact') }}`);">
-                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                                            <button type="submit" class="text-xs px-3 py-1.5 rounded-lg bg-red-50 text-red-700 hover:bg-red-100 font-bold transition-colors">
-                                                🗑️ {{ t('delete') }}
-                                            </button>
-                                        </form>
-                                    </div>
-                                </div>
-                                {% endfor %}
-                            {% else %}
-                            <div class="p-8 text-center text-slate-500 font-medium">
-                                <p>{{ t('no_impacts_registered') }}</p>
-                            </div>
-                            {% endif %}
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+  <!-- BARRA DE AÇÕES EM LOTE (inline, aparece ao selecionar) -->
+  <div id="batch-bar" class="hidden rounded-dtx-lg border border-dtx-200 bg-dtx-50 px-5 py-3">
+    <div class="flex items-center gap-3 flex-wrap">
+      <svg class="w-4 h-4 text-dtx-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+      </svg>
+      <span id="batch-count" class="text-sm font-semibold text-dtx-700"></span>
+      <span class="text-dtx-400 text-sm hidden sm:inline">—</span>
+      <span class="text-sm text-dtx-600 hidden sm:inline">{{ t('select_action') }}</span>
+      <div class="flex items-center gap-2 ml-auto">
+        <button type="button" onclick="batchAction('ativar')"
+                class="inline-flex items-center h-8 px-3 text-xs font-bold rounded-dtx-sm bg-emerald-600 hover:bg-emerald-500 text-white transition-colors">
+          {{ t('active_label') }}
+        </button>
+        <button type="button" onclick="batchAction('desativar')"
+                class="inline-flex items-center h-8 px-3 text-xs font-bold rounded-dtx-sm bg-gray-500 hover:bg-gray-400 text-white transition-colors">
+          {{ t('inactive') }}
+        </button>
+        <button type="button" onclick="batchAction('excluir')"
+                class="inline-flex items-center h-8 px-3 text-xs font-bold rounded-dtx-sm bg-red-600 hover:bg-red-500 text-white transition-colors">
+          {{ t('delete') }}
+        </button>
+        <button type="button" onclick="batchClear()"
+                aria-label="Cancelar seleção"
+                class="ml-1 p-1.5 rounded-dtx-sm hover:bg-dtx-100 text-dtx-400 hover:text-dtx-700 transition-colors">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
     </div>
+    <form id="batch-form" method="POST" class="hidden">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="acao" id="batch-acao">
+    </form>
+  </div>
+
+  <!-- ABA: SETORES -->
+  <div id="aba-setores" class="tab-content">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div class="bg-surface-base border border-surface-border rounded-dtx-lg shadow-dtx-sm p-6 h-fit">
+        <h2 class="text-base font-semibold text-gray-900 mb-5 pb-3 border-b border-surface-border">
+          {{ t('new_sector') }}
+        </h2>
+        <form method="POST" action="{{ url_for('main.criar_setor') }}" class="space-y-4">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+          <div>
+            <label for="setor-nome" class="dtx-label">{{ t('name_portuguese') }}</label>
+            <input type="text" id="setor-nome" name="nome_pt" required
+                   placeholder="{{ t('ex_maintenance') }}"
+                   class="dtx-input">
+            <p class="text-xs text-gray-400 mt-1.5">{{ t('auto_translated_note') }}</p>
+          </div>
+          <div>
+            <label for="setor-descricao" class="dtx-label">{{ t('description_optional') }}</label>
+            <textarea id="setor-descricao" name="descricao_pt"
+                      placeholder="{{ t('ex_maintenance_desc') }}"
+                      rows="3" class="dtx-input resize-none"></textarea>
+          </div>
+          <button type="submit"
+                  class="w-full inline-flex items-center justify-center h-10 px-4 text-sm font-semibold rounded-dtx-md bg-dtx-600 text-white hover:bg-dtx-700 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-dtx-600 mt-2">
+            {{ t('add_sector') }}
+          </button>
+        </form>
+      </div>
+
+      <div class="lg:col-span-2">
+        <div class="bg-surface-base border border-surface-border rounded-dtx-lg shadow-dtx-sm overflow-hidden">
+          <div class="px-6 py-4 border-b border-surface-border bg-surface-raised flex items-center gap-3">
+            <input type="checkbox" id="select-all-setores"
+                   class="h-4 w-4 rounded border-gray-300 text-dtx-600 focus:ring-dtx-500"
+                   onchange="toggleSelectAll('setores')" aria-label="{{ t('select_all') }}">
+            <h2 class="text-base font-semibold text-gray-900">{{ t('registered_sectors') }}</h2>
+          </div>
+          <div class="divide-y divide-surface-border">
+            {% if setores %}
+            {% for setor in setores %}
+            <div class="p-6 hover:bg-surface-raised transition-colors flex gap-4 items-start">
+              <input type="checkbox" class="item-check mt-1 h-4 w-4 rounded border-gray-300 text-dtx-600 focus:ring-dtx-500 shrink-0"
+                     value="{{ setor.id }}" onchange="updateBatchBar()">
+              <div class="flex-1 min-w-0">
+                <div class="flex justify-between items-start mb-2">
+                  <div>
+                    <h3 class="font-semibold text-gray-900">{{ setor.nome_pt }}</h3>
+                    <p class="text-xs text-gray-400 mt-1">EN: {{ setor.nome_en }} <span class="mx-1 text-gray-300">|</span> ES: {{ setor.nome_es }}</p>
+                    {% if setor.descricao_pt %}
+                    <p class="text-sm text-gray-500 mt-2">{{ setor.descricao_pt }}</p>
+                    {% endif %}
+                  </div>
+                  <span class="inline-flex px-2.5 py-1 {% if setor.ativo %}bg-emerald-50 text-emerald-700 border-emerald-200{% else %}bg-gray-50 text-gray-500 border-gray-200{% endif %} text-[10px] font-bold uppercase tracking-wider rounded-dtx-sm border shrink-0 ml-3">
+                    {{ t('active') if setor.ativo else t('inactive') }}
+                  </span>
+                </div>
+                <div class="mt-4 flex gap-2">
+                  <button type="button"
+                          onclick='abrirModalSetor({{ setor.id | tojson }}, {{ setor.nome_pt | tojson }}, {{ (setor.descricao_pt or "") | tojson }}, {{ setor.ativo | tojson }})'
+                          aria-label="{{ t('edit') }} {{ setor.nome_pt }}"
+                          class="inline-flex items-center h-8 px-3 text-xs font-bold rounded-dtx-sm bg-dtx-50 hover:bg-dtx-100 text-dtx-700 border border-dtx-100 transition-colors">
+                    {{ t('edit') }}
+                  </button>
+                  <form method="POST" action="{{ url_for('main.excluir_setor', setor_id=setor.id) }}" class="inline" onsubmit="return confirm(`{{ t('confirm_delete_sector') }}`);">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <button type="submit"
+                            class="inline-flex items-center h-8 px-3 text-xs font-bold rounded-dtx-sm bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 transition-colors">
+                      {{ t('delete') }}
+                    </button>
+                  </form>
+                </div>
+              </div>
+            </div>
+            {% endfor %}
+            {% else %}
+            <div class="p-8 text-center text-gray-400">
+              <p class="text-sm font-medium">{{ t('no_sectors_registered') }}</p>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ABA: GATES -->
+  <div id="aba-gates" class="tab-content hidden">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div class="bg-surface-base border border-surface-border rounded-dtx-lg shadow-dtx-sm p-6 h-fit">
+        <h2 class="text-base font-semibold text-gray-900 mb-5 pb-3 border-b border-surface-border">
+          {{ t('new_gate_substep') }}
+        </h2>
+        <form method="POST" action="{{ url_for('main.criar_gate') }}" class="space-y-4">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+          <div>
+            <label for="gate-pai" class="dtx-label">{{ t('gate_parent_label') }}</label>
+            <select id="gate-pai" name="gate_pai" required class="dtx-select mt-1">
+              <option value="" disabled selected>{{ t('select_gate_parent') }}</option>
+              {% for valor, label in gate_pai_opcoes %}
+              {% if valor != 'N/A' %}
+              <option value="{{ valor }}">{{ label }}</option>
+              {% endif %}
+              {% endfor %}
+            </select>
+          </div>
+          <div>
+            <label for="gate-etapa" class="dtx-label">{{ t('gate_step_label') }}</label>
+            <input type="text" id="gate-etapa" name="etapa" required
+                   placeholder="{{ t('gate_step_input_placeholder') }}"
+                   class="dtx-input">
+          </div>
+          <div>
+            <label for="gate-descricao" class="dtx-label">{{ t('description_optional') }}</label>
+            <textarea id="gate-descricao" name="descricao_pt"
+                      placeholder="{{ t('ex_validation_req') }}"
+                      rows="2" class="dtx-input resize-none"></textarea>
+          </div>
+          <p class="text-xs font-medium text-dtx-700 bg-dtx-50 border border-dtx-100 p-3 rounded-dtx-sm">
+            {{ t('gate_substep_note') }}
+          </p>
+          <button type="submit"
+                  class="w-full inline-flex items-center justify-center h-10 px-4 text-sm font-semibold rounded-dtx-md bg-dtx-600 text-white hover:bg-dtx-700 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-dtx-600">
+            {{ t('add_gate') }}
+          </button>
+        </form>
+      </div>
+
+      <div class="lg:col-span-2">
+        <div class="bg-surface-base border border-surface-border rounded-dtx-lg shadow-dtx-sm overflow-hidden">
+          <div class="px-6 py-4 border-b border-surface-border bg-surface-raised flex items-center gap-3">
+            <input type="checkbox" id="select-all-gates"
+                   class="h-4 w-4 rounded border-gray-300 text-dtx-600 focus:ring-dtx-500"
+                   onchange="toggleSelectAll('gates')" aria-label="{{ t('select_all') }}">
+            <h2 class="text-base font-semibold text-gray-900">{{ t('registered_gates') }}</h2>
+          </div>
+          <div class="divide-y divide-surface-border">
+            {% if gates %}
+            {% set ns = namespace(gate_pai_atual='') %}
+            {% for gate in gates %}
+            {% if gate.gate_pai and gate.gate_pai != ns.gate_pai_atual %}
+            {% set ns.gate_pai_atual = gate.gate_pai %}
+            <div class="px-6 py-2 bg-surface-raised border-b border-surface-border">
+              <span class="text-xs font-black uppercase tracking-widest text-dtx-600">{{ gate.gate_pai }}</span>
+            </div>
+            {% endif %}
+            <div class="p-6 hover:bg-surface-raised transition-colors flex gap-4 items-start">
+              <input type="checkbox" class="item-check mt-1 h-4 w-4 rounded border-gray-300 text-dtx-600 focus:ring-dtx-500 shrink-0"
+                     value="{{ gate.id }}" onchange="updateBatchBar()">
+              <div class="flex-1 min-w-0">
+                <div class="flex justify-between items-start mb-2">
+                  <div>
+                    <h3 class="font-semibold text-gray-900">
+                      {% if gate.gate_pai and gate.etapa %}
+                      <span class="bg-slate-100 text-slate-600 px-2 py-0.5 rounded-dtx-sm text-xs font-bold mr-2">{{ gate.etapa }}</span>
+                      {% else %}
+                      <span class="bg-slate-100 text-slate-600 px-2 py-0.5 rounded-dtx-sm text-xs font-bold mr-2">#{{ gate.ordem }}</span>
+                      {% endif %}
+                      {{ gate.nome_pt }}
+                    </h3>
+                    <p class="text-xs text-gray-400 mt-1">EN: {{ gate.nome_en }} <span class="mx-1 text-gray-300">|</span> ES: {{ gate.nome_es }}</p>
+                    {% if gate.descricao_pt %}
+                    <p class="text-sm text-gray-500 mt-2">{{ gate.descricao_pt }}</p>
+                    {% endif %}
+                  </div>
+                  <span class="inline-flex px-2.5 py-1 {% if gate.ativo %}bg-emerald-50 text-emerald-700 border-emerald-200{% else %}bg-gray-50 text-gray-500 border-gray-200{% endif %} text-[10px] font-bold uppercase tracking-wider rounded-dtx-sm border shrink-0 ml-3">
+                    {{ t('active') if gate.ativo else t('inactive') }}
+                  </span>
+                </div>
+                <div class="mt-4 flex gap-2">
+                  <button type="button"
+                          onclick='abrirModalGate({{ gate.id | tojson }}, {{ (gate.gate_pai or "") | tojson }}, {{ (gate.etapa or gate.nome_pt or "") | tojson }}, {{ (gate.descricao_pt or "") | tojson }}, {{ gate.ativo | tojson }})'
+                          aria-label="{{ t('edit') }} {{ gate.nome_pt }}"
+                          class="inline-flex items-center h-8 px-3 text-xs font-bold rounded-dtx-sm bg-dtx-50 hover:bg-dtx-100 text-dtx-700 border border-dtx-100 transition-colors">
+                    {{ t('edit') }}
+                  </button>
+                  <form method="POST" action="{{ url_for('main.excluir_gate', gate_id=gate.id) }}" class="inline" onsubmit="return confirm(`{{ t('confirm_delete_gate') }}`);">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <button type="submit"
+                            class="inline-flex items-center h-8 px-3 text-xs font-bold rounded-dtx-sm bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 transition-colors">
+                      {{ t('delete') }}
+                    </button>
+                  </form>
+                </div>
+              </div>
+            </div>
+            {% endfor %}
+            {% else %}
+            <div class="p-8 text-center text-gray-400">
+              <p class="text-sm font-medium">{{ t('no_gates_registered') }}</p>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ABA: IMPACTOS -->
+  <div id="aba-impactos" class="tab-content hidden">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div class="bg-surface-base border border-surface-border rounded-dtx-lg shadow-dtx-sm p-6 h-fit">
+        <h2 class="text-base font-semibold text-gray-900 mb-5 pb-3 border-b border-surface-border">
+          {{ t('new_impact') }}
+        </h2>
+        <form method="POST" action="{{ url_for('main.criar_impacto') }}" class="space-y-4">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+          <div>
+            <label for="impacto-nome" class="dtx-label">{{ t('name_portuguese') }}</label>
+            <input type="text" id="impacto-nome" name="nome_pt" required
+                   placeholder="{{ t('ex_critical') }}"
+                   class="dtx-input">
+            <p class="text-xs text-gray-400 mt-1.5">{{ t('auto_translated_note') }}</p>
+          </div>
+          <div>
+            <label for="impacto-descricao" class="dtx-label">{{ t('description_optional') }}</label>
+            <textarea id="impacto-descricao" name="descricao_pt"
+                      placeholder="{{ t('ex_critical_desc') }}"
+                      rows="3" class="dtx-input resize-none"></textarea>
+          </div>
+          <button type="submit"
+                  class="w-full inline-flex items-center justify-center h-10 px-4 text-sm font-semibold rounded-dtx-md bg-dtx-600 text-white hover:bg-dtx-700 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-dtx-600">
+            {{ t('add_impact') }}
+          </button>
+        </form>
+      </div>
+
+      <div class="lg:col-span-2">
+        <div class="bg-surface-base border border-surface-border rounded-dtx-lg shadow-dtx-sm overflow-hidden">
+          <div class="px-6 py-4 border-b border-surface-border bg-surface-raised flex items-center gap-3">
+            <input type="checkbox" id="select-all-impactos"
+                   class="h-4 w-4 rounded border-gray-300 text-dtx-600 focus:ring-dtx-500"
+                   onchange="toggleSelectAll('impactos')" aria-label="{{ t('select_all') }}">
+            <h2 class="text-base font-semibold text-gray-900">{{ t('registered_impacts') }}</h2>
+          </div>
+          <div class="divide-y divide-surface-border">
+            {% if impactos %}
+            {% for impacto in impactos %}
+            <div class="p-6 hover:bg-surface-raised transition-colors flex gap-4 items-start">
+              <input type="checkbox" class="item-check mt-1 h-4 w-4 rounded border-gray-300 text-dtx-600 focus:ring-dtx-500 shrink-0"
+                     value="{{ impacto.id }}" onchange="updateBatchBar()">
+              <div class="flex-1 min-w-0">
+                <div class="flex justify-between items-start mb-2">
+                  <div>
+                    <h3 class="font-semibold text-gray-900">{{ impacto.nome_pt }}</h3>
+                    <p class="text-xs text-gray-400 mt-1">EN: {{ impacto.nome_en }} <span class="mx-1 text-gray-300">|</span> ES: {{ impacto.nome_es }}</p>
+                    {% if impacto.descricao_pt %}
+                    <p class="text-sm text-gray-500 mt-2">{{ impacto.descricao_pt }}</p>
+                    {% endif %}
+                  </div>
+                  <span class="inline-flex px-2.5 py-1 {% if impacto.ativo %}bg-emerald-50 text-emerald-700 border-emerald-200{% else %}bg-gray-50 text-gray-500 border-gray-200{% endif %} text-[10px] font-bold uppercase tracking-wider rounded-dtx-sm border shrink-0 ml-3">
+                    {{ t('active') if impacto.ativo else t('inactive') }}
+                  </span>
+                </div>
+                <div class="mt-4 flex gap-2">
+                  <button type="button"
+                          onclick='abrirModalImpacto({{ impacto.id | tojson }}, {{ impacto.nome_pt | tojson }}, {{ (impacto.descricao_pt or "") | tojson }}, {{ impacto.ativo | tojson }})'
+                          aria-label="{{ t('edit') }} {{ impacto.nome_pt }}"
+                          class="inline-flex items-center h-8 px-3 text-xs font-bold rounded-dtx-sm bg-dtx-50 hover:bg-dtx-100 text-dtx-700 border border-dtx-100 transition-colors">
+                    {{ t('edit') }}
+                  </button>
+                  <form method="POST" action="{{ url_for('main.excluir_impacto', impacto_id=impacto.id) }}" class="inline" onsubmit="return confirm(`{{ t('confirm_delete_impact') }}`);">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <button type="submit"
+                            class="inline-flex items-center h-8 px-3 text-xs font-bold rounded-dtx-sm bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 transition-colors">
+                      {{ t('delete') }}
+                    </button>
+                  </form>
+                </div>
+              </div>
+            </div>
+            {% endfor %}
+            {% else %}
+            <div class="p-8 text-center text-gray-400">
+              <p class="text-sm font-medium">{{ t('no_impacts_registered') }}</p>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
 </div>
 
-<!-- Modais de edição serão adicionados -->
+
+<!-- ══ MODAL DE EDIÇÃO ══════════════════════════════════════════════════════ -->
+<div id="modal-edicao" role="dialog" aria-modal="true" aria-labelledby="modal-titulo"
+     class="fixed inset-0 z-50 hidden">
+  <!-- Overlay -->
+  <div class="absolute inset-0 bg-black/50" onclick="fecharModal()"></div>
+  <!-- Card -->
+  <div class="relative z-10 flex items-center justify-center min-h-screen p-4">
+    <div class="bg-white rounded-dtx-lg shadow-dtx-sm w-full max-w-md border border-surface-border">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-surface-border">
+        <h2 id="modal-titulo" class="text-base font-bold text-gray-900"></h2>
+        <button type="button" onclick="fecharModal()"
+                aria-label="{{ t('close_modal') }}"
+                class="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+      <form id="modal-form" method="POST" class="p-6 space-y-4">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+
+        <!-- Campos comuns: nome_pt (setor e impacto) -->
+        <div id="campo-nome" class="hidden">
+          <label for="modal-nome-pt" class="dtx-label">{{ t('name_portuguese') }}</label>
+          <input type="text" id="modal-nome-pt" name="nome_pt" class="dtx-input mt-1">
+        </div>
+
+        <!-- Campos específicos de gate: gate_pai + etapa -->
+        <div id="campo-gate-pai" class="hidden">
+          <label for="modal-gate-pai" class="dtx-label">{{ t('gate_parent_label') }}</label>
+          <select id="modal-gate-pai" name="gate_pai" class="dtx-select mt-1">
+            <option value="" disabled>{{ t('select_gate_parent') }}</option>
+            {% for valor, label in gate_pai_opcoes %}
+            {% if valor != 'N/A' %}
+            <option value="{{ valor }}">{{ label }}</option>
+            {% endif %}
+            {% endfor %}
+          </select>
+        </div>
+        <div id="campo-etapa" class="hidden">
+          <label for="modal-etapa" class="dtx-label">{{ t('gate_step_label') }}</label>
+          <input type="text" id="modal-etapa" name="etapa" class="dtx-input mt-1"
+                 placeholder="{{ t('gate_step_input_placeholder') }}">
+        </div>
+
+        <!-- Descrição (comum a todos) -->
+        <div>
+          <label for="modal-descricao" class="dtx-label">{{ t('description_optional') }}</label>
+          <textarea id="modal-descricao" name="descricao_pt" rows="3"
+                    class="dtx-input mt-1 resize-none"></textarea>
+        </div>
+
+        <!-- Checkbox Ativo -->
+        <div class="flex items-center gap-3 py-1">
+          <input type="checkbox" id="modal-ativo" name="ativo" value="on"
+                 class="h-4 w-4 rounded border-gray-300 text-dtx-600 focus:ring-dtx-600">
+          <label for="modal-ativo" class="text-sm font-medium text-gray-700">{{ t('active_label') }}</label>
+        </div>
+
+        <div class="pt-2 flex gap-3">
+          <button type="submit"
+                  class="flex-1 inline-flex items-center justify-center h-10 px-4 text-sm font-semibold rounded-dtx-md bg-dtx-600 text-white hover:bg-dtx-700 transition-colors">
+            {{ t('save_changes') }}
+          </button>
+          <button type="button" onclick="fecharModal()"
+                  class="flex-1 inline-flex items-center justify-center h-10 px-4 text-sm font-semibold rounded-dtx-md bg-white text-gray-700 border border-surface-border hover:bg-surface-raised transition-colors">
+            {{ t('close_modal') }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
 <script nonce="{{ csp_nonce }}">
+let currentTab = 'setores';
+
 function mostrarAba(abaName) {
-    // Esconde todas as abas
-    document.querySelectorAll('.tab-content').forEach(el => {
-        el.classList.add('hidden');
-    });
-
-    // Remove destaque de todos os botões
+    batchClear();
+    document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
     document.querySelectorAll('[id^="btn-"]').forEach(btn => {
-        btn.classList.remove('bg-white', 'shadow-sm', 'text-indigo-600', 'ring-1', 'ring-slate-200/50');
-        btn.classList.add('text-slate-500', 'hover:text-slate-800', 'hover:bg-white/50');
+        btn.classList.remove('bg-white', 'shadow-dtx-sm', 'text-dtx-600', 'border', 'border-surface-border');
+        btn.classList.add('text-gray-500');
     });
-
-    // Mostra a aba selecionada
     document.getElementById(`aba-${abaName}`).classList.remove('hidden');
-
-    // Destaca o botão selecionado
-    document.getElementById(`btn-${abaName}`).classList.remove('text-slate-500', 'hover:text-slate-800', 'hover:bg-white/50');
-    document.getElementById(`btn-${abaName}`).classList.add('bg-white', 'shadow-sm', 'text-indigo-600', 'ring-1', 'ring-slate-200/50');
+    const activeBtn = document.getElementById(`btn-${abaName}`);
+    activeBtn.classList.remove('text-gray-500');
+    activeBtn.classList.add('bg-white', 'shadow-dtx-sm', 'text-dtx-600', 'border', 'border-surface-border');
+    sessionStorage.setItem('adminCategoriasAba', abaName);
+    currentTab = abaName;
 }
 
-function editarSetor(setorId) {
-    alert("{{ t('edit_sector_soon') }}");
+function updateBatchBar() {
+    const tab = document.getElementById(`aba-${currentTab}`);
+    const checked = tab ? tab.querySelectorAll('.item-check:checked') : [];
+    const bar = document.getElementById('batch-bar');
+    const countEl = document.getElementById('batch-count');
+    if (checked.length > 0) {
+        countEl.textContent = `${checked.length} selecionado${checked.length > 1 ? 's' : ''}`;
+        bar.classList.remove('hidden');
+    } else {
+        bar.classList.add('hidden');
+    }
+    const allCheck = document.getElementById(`select-all-${currentTab}`);
+    if (allCheck) {
+        const all = tab ? tab.querySelectorAll('.item-check') : [];
+        allCheck.indeterminate = checked.length > 0 && checked.length < all.length;
+        allCheck.checked = all.length > 0 && checked.length === all.length;
+    }
 }
 
-function editarGate(gateId) {
-    alert("{{ t('edit_gate_soon') }}");
+function toggleSelectAll(tab) {
+    const container = document.getElementById(`aba-${tab}`);
+    if (!container) return;
+    const master = document.getElementById(`select-all-${tab}`);
+    container.querySelectorAll('.item-check').forEach(cb => { cb.checked = master.checked; });
+    updateBatchBar();
 }
 
-function editarImpacto(impactoId) {
-    alert("{{ t('edit_impact_soon') }}");
+function batchAction(acao) {
+    const tab = document.getElementById(`aba-${currentTab}`);
+    const checked = tab ? Array.from(tab.querySelectorAll('.item-check:checked')) : [];
+    if (checked.length === 0) return;
+    if (acao === 'excluir') {
+        const msg = `{{ t('confirm_delete_batch') }}`.replace('{count}', checked.length);
+        if (!confirm(msg)) return;
+    }
+    const endpointMap = { setores: '/admin/categorias/setor/lote', gates: '/admin/categorias/gate/lote', impactos: '/admin/categorias/impacto/lote' };
+    const form = document.getElementById('batch-form');
+    form.action = endpointMap[currentTab];
+    document.getElementById('batch-acao').value = acao;
+    // Remove previous id inputs
+    form.querySelectorAll('input[name="ids"]').forEach(el => el.remove());
+    checked.forEach(cb => {
+        const inp = document.createElement('input');
+        inp.type = 'hidden';
+        inp.name = 'ids';
+        inp.value = cb.value;
+        form.appendChild(inp);
+    });
+    form.classList.remove('hidden');
+    form.submit();
 }
+
+function batchClear() {
+    document.querySelectorAll('.item-check').forEach(cb => { cb.checked = false; });
+    ['setores', 'gates', 'impactos'].forEach(tab => {
+        const sa = document.getElementById(`select-all-${tab}`);
+        if (sa) { sa.checked = false; sa.indeterminate = false; }
+    });
+    document.getElementById('batch-bar').classList.add('hidden');
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    const aba = sessionStorage.getItem('adminCategoriasAba') || 'setores';
+    mostrarAba(['setores', 'gates', 'impactos'].includes(aba) ? aba : 'setores');
+});
+
+function abrirModal(titulo, action) {
+    document.getElementById('modal-titulo').textContent = titulo;
+    document.getElementById('modal-form').action = action;
+    document.getElementById('modal-edicao').classList.remove('hidden');
+    // Foco inicial no primeiro campo interativo
+    setTimeout(() => {
+        const primeiro = document.querySelector('#modal-edicao input:not([type=hidden]):not([type=checkbox]), #modal-edicao select');
+        if (primeiro) primeiro.focus();
+    }, 50);
+}
+
+function fecharModal() {
+    document.getElementById('modal-edicao').classList.add('hidden');
+    // Reset estado dos campos específicos de gate
+    document.getElementById('campo-nome').classList.add('hidden');
+    document.getElementById('campo-gate-pai').classList.add('hidden');
+    document.getElementById('campo-etapa').classList.add('hidden');
+}
+
+function abrirModalSetor(setorId, nomePt, descricaoPt, ativo) {
+    document.getElementById('campo-nome').classList.remove('hidden');
+    document.getElementById('campo-gate-pai').classList.add('hidden');
+    document.getElementById('campo-etapa').classList.add('hidden');
+    document.getElementById('modal-nome-pt').value = nomePt;
+    document.getElementById('modal-descricao').value = descricaoPt;
+    document.getElementById('modal-ativo').checked = ativo;
+    abrirModal('{{ t("edit_sector_title") }}', `/admin/categorias/setor/${setorId}/editar`);
+}
+
+function abrirModalGate(gateId, gatePai, etapa, descricaoPt, ativo) {
+    document.getElementById('campo-nome').classList.add('hidden');
+    document.getElementById('campo-gate-pai').classList.remove('hidden');
+    document.getElementById('campo-etapa').classList.remove('hidden');
+    const selectPai = document.getElementById('modal-gate-pai');
+    selectPai.value = gatePai || '';
+    document.getElementById('modal-etapa').value = etapa;
+    document.getElementById('modal-descricao').value = descricaoPt;
+    document.getElementById('modal-ativo').checked = ativo;
+    abrirModal('{{ t("edit_gate_title") }}', `/admin/categorias/gate/${gateId}/editar`);
+}
+
+function abrirModalImpacto(impactoId, nomePt, descricaoPt, ativo) {
+    document.getElementById('campo-nome').classList.remove('hidden');
+    document.getElementById('campo-gate-pai').classList.add('hidden');
+    document.getElementById('campo-etapa').classList.add('hidden');
+    document.getElementById('modal-nome-pt').value = nomePt;
+    document.getElementById('modal-descricao').value = descricaoPt;
+    document.getElementById('modal-ativo').checked = ativo;
+    abrirModal('{{ t("edit_impact_title") }}', `/admin/categorias/impacto/${impactoId}/editar`);
+}
+
+// Fechar com ESC
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') fecharModal();
+});
 </script>
 {% endblock %}

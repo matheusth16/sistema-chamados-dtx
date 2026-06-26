@@ -93,3 +93,23 @@ def test_safe_cell_neutraliza_formula(valor_entrada, esperado_prefixo):
 def test_safe_cell_nao_altera_valores_seguros(valor_seguro):
     """_safe_cell não deve modificar valores que não iniciam com char de fórmula."""
     assert _safe_cell(valor_seguro) == valor_seguro
+
+
+# ── F-59: Casos específicos de injection documentados ────────────────────────
+
+
+@pytest.mark.parametrize(
+    "valor_injecao",
+    [
+        "=CMD('calc')",
+        "+123",
+    ],
+    ids=["cmd_injection", "mais_numerico"],
+)
+def test_safe_cell_neutraliza_casos_documentados_f59(valor_injecao):
+    """F-59: _safe_cell neutraliza casos específicos de formula injection (=CMD, +123)."""
+    resultado = _safe_cell(valor_injecao)
+    assert resultado.startswith("'"), (
+        f"'{valor_injecao}' deve ser prefixado com ', recebeu: {resultado!r}"
+    )
+    assert valor_injecao in resultado

@@ -29,11 +29,11 @@
   // ─── Textos da UI por idioma ───────────────────────────────────────────────
 
   var UI = {
-    pt_BR: { next: 'Próximo →', finish: 'Concluir ✓', prev: '← Anterior', skip: 'Pular tour',
+    pt_BR: { next: 'Próximo →', finish: 'Concluir', prev: '← Anterior', skip: 'Pular tour',
              done_title: 'Pronto para começar!', done_msg: 'O tour foi concluído. Agora é com você!' },
-    en:    { next: 'Next →',    finish: 'Finish ✓',   prev: '← Back',     skip: 'Skip tour',
+    en:    { next: 'Next →',    finish: 'Finish',   prev: '← Back',     skip: 'Skip tour',
              done_title: 'Ready to start!',      done_msg: 'Tour completed. Now it\'s up to you!' },
-    es:    { next: 'Siguiente →', finish: 'Finalizar ✓', prev: '← Atrás', skip: 'Omitir tour',
+    es:    { next: 'Siguiente →', finish: 'Finalizar', prev: '← Atrás', skip: 'Omitir tour',
              done_title: '¡Listo para comenzar!', done_msg: '¡Tour completado. ¡Ahora es tu turno!' },
   };
 
@@ -45,32 +45,32 @@
     solicitante: {
       pt_BR: [
         {
-          icone: '👋',
-          titulo: 'Bem-vindo ao DTX Digital Andon.',
-          descricao: 'Olá, {nome}! Este é o sistema de chamados da DTX Aerospace. ' +
+          icon: 'wave',
+          titulo: 'Bem-vindo ao DTX Portal de Serviços.',
+          descricao: 'Olá, {nome}! Este é o DTX Portal de Serviços da DTX Aerospace. ' +
                      'Vamos te guiar pelos primeiros passos em menos de um minuto.',
         },
         {
-          icone: '➕',
+          icon: 'plus',
           titulo: 'Abrindo um Novo Chamado',
           descricao: 'Por aqui você abre um novo chamado para suporte. ' +
                      'Preencha as informações e nossa equipe entra em contato rapidamente.',
           selector: 'nav a[href="/"]',
         },
         {
-          icone: '📋',
+          icon: 'clipboard',
           titulo: 'Acompanhe Seus Chamados',
           descricao: 'Veja todos os chamados que você abriu e o status de cada um em tempo real.',
           selector: 'nav a[href="/meus-chamados"]',
         },
         {
-          icone: '💡',
+          icon: 'lightbulb',
           titulo: 'Dica: Mais detalhes = resposta mais rápida',
           descricao: 'Ao abrir um chamado, adicione uma descrição clara e anexos quando possível. ' +
                      'Quanto mais informação, mais rápida a resolução pela equipe!',
         },
         {
-          icone: '🚀',
+          icon: 'rocket',
           titulo: 'Tudo pronto!',
           descricao: 'Que tal abrir seu primeiro chamado agora?',
           selector: 'nav a[href="/"]',
@@ -79,32 +79,32 @@
       ],
       en: [
         {
-          icone: '👋',
-          titulo: 'Welcome to DTX Digital Andon.',
-          descricao: 'Hello, {nome}! This is DTX Digital Andon by DTX Aerospace. ' +
+          icon: 'wave',
+          titulo: 'Welcome to DTX Service Portal.',
+          descricao: 'Hello, {nome}! This is DTX Service Portal by DTX Aerospace. ' +
                      'We\'ll guide you through the first steps in less than a minute.',
         },
         {
-          icone: '➕',
+          icon: 'plus',
           titulo: 'Opening a New Ticket',
           descricao: 'Here you open a new support ticket. ' +
                      'Fill in the details and our team will get in touch quickly.',
           selector: 'nav a[href="/"]',
         },
         {
-          icone: '📋',
+          icon: 'clipboard',
           titulo: 'Track Your Tickets',
           descricao: 'View all the tickets you\'ve opened and the real-time status of each one.',
           selector: 'nav a[href="/meus-chamados"]',
         },
         {
-          icone: '💡',
+          icon: 'lightbulb',
           titulo: 'Tip: More details = faster response',
           descricao: 'When opening a ticket, add a clear description and attachments when possible. ' +
                      'The more information you provide, the faster the resolution!',
         },
         {
-          icone: '🚀',
+          icon: 'rocket',
           titulo: 'All set!',
           descricao: 'How about opening your first ticket right now?',
           selector: 'nav a[href="/"]',
@@ -113,32 +113,32 @@
       ],
       es: [
         {
-          icone: '👋',
-          titulo: 'Bienvenido a DTX Digital Andon.',
-          descricao: '¡Hola, {nome}! Este es DTX Digital Andon de DTX Aerospace. ' +
+          icon: 'wave',
+          titulo: 'Bienvenido al DTX Portal de Servicios.',
+          descricao: '¡Hola, {nome}! Este es DTX Portal de Servicios de DTX Aerospace. ' +
                      'Te guiaremos a través de los primeros pasos en menos de un minuto.',
         },
         {
-          icone: '➕',
+          icon: 'plus',
           titulo: 'Abriendo un Nuevo Ticket',
           descricao: 'Aquí puedes abrir un nuevo ticket de soporte. ' +
                      'Completa la información y nuestro equipo se pondrá en contacto rápidamente.',
           selector: 'nav a[href="/"]',
         },
         {
-          icone: '📋',
+          icon: 'clipboard',
           titulo: 'Seguimiento de Tus Tickets',
           descricao: 'Consulta todos los tickets que has abierto y el estado en tiempo real de cada uno.',
           selector: 'nav a[href="/meus-chamados"]',
         },
         {
-          icone: '💡',
+          icon: 'lightbulb',
           titulo: 'Consejo: Más detalles = respuesta más rápida',
           descricao: 'Al abrir un ticket, añade una descripción clara y archivos adjuntos cuando sea posible. ' +
                      '¡Cuanta más información proporciones, más rápida será la resolución!',
         },
         {
-          icone: '🚀',
+          icon: 'rocket',
           titulo: '¡Todo listo!',
           descricao: '¿Qué tal si abres tu primer ticket ahora mismo?',
           selector: 'nav a[href="/"]',
@@ -151,39 +151,39 @@
     supervisor: {
       pt_BR: [
         {
-          icone: '👋',
+          icon: 'wave',
           titulo: 'Bem-vindo, Supervisor!',
           descricao: 'Olá, {nome}! Como supervisor, você gerencia chamados da sua área ' +
                      'e acompanha o desempenho da equipe.',
         },
         {
-          icone: '📊',
+          icon: 'chart',
           titulo: 'Dashboard de Chamados',
           descricao: 'Aqui você vê todos os chamados da sua área em tempo real, ' +
                      'com filtros por status, prioridade e SLA.',
           selector: 'nav a[href="/admin"]',
         },
         {
-          icone: '🖱️',
+          icon: 'mouse',
           titulo: 'Interagindo com Chamados',
           descricao: 'Clique em qualquer linha da tabela para abrir os detalhes do chamado ' +
                      'em uma nova aba e atualizar o status.',
         },
         {
-          icone: '📈',
+          icon: 'trend',
           titulo: 'Relatórios e Métricas',
           descricao: 'Acesse métricas de SLA e relatórios semanais da sua área. ' +
                      'Exporte em Excel quando precisar.',
           selector: 'nav a[href*="relatorios"]',
         },
         {
-          icone: '⚠️',
+          icon: 'alert',
           titulo: 'Atenção ao SLA!',
           descricao: 'Use os filtros da tabela para encontrar chamados críticos. ' +
                      'Chamados com SLA em risco são sinalizados em vermelho.',
         },
         {
-          icone: '✅',
+          icon: 'check',
           titulo: 'Tudo pronto!',
           descricao: 'Comece revisando os chamados em aberto na sua área.',
           selector: 'nav a[href="/admin"]',
@@ -192,39 +192,39 @@
       ],
       en: [
         {
-          icone: '👋',
+          icon: 'wave',
           titulo: 'Welcome, Supervisor!',
           descricao: 'Hello, {nome}! As a supervisor, you manage tickets for your area ' +
                      'and track team performance.',
         },
         {
-          icone: '📊',
+          icon: 'chart',
           titulo: 'Ticket Dashboard',
           descricao: 'Here you see all tickets for your area in real time, ' +
                      'with filters by status, priority and SLA.',
           selector: 'nav a[href="/admin"]',
         },
         {
-          icone: '🖱️',
+          icon: 'mouse',
           titulo: 'Interacting with Tickets',
           descricao: 'Click any row in the table to open the ticket details in a new tab ' +
                      'and update its status.',
         },
         {
-          icone: '📈',
+          icon: 'trend',
           titulo: 'Reports and Metrics',
           descricao: 'Access SLA metrics and weekly reports for your area. ' +
                      'Export to Excel whenever you need.',
           selector: 'nav a[href*="relatorios"]',
         },
         {
-          icone: '⚠️',
+          icon: 'alert',
           titulo: 'Keep an eye on SLA!',
           descricao: 'Use the table filters to find critical tickets quickly. ' +
                      'Tickets with SLA at risk are flagged in red.',
         },
         {
-          icone: '✅',
+          icon: 'check',
           titulo: 'All set!',
           descricao: 'Start by reviewing the open tickets in your area.',
           selector: 'nav a[href="/admin"]',
@@ -233,39 +233,39 @@
       ],
       es: [
         {
-          icone: '👋',
+          icon: 'wave',
           titulo: '¡Bienvenido, Supervisor!',
           descricao: '¡Hola, {nome}! Como supervisor, gestionas los tickets de tu área ' +
                      'y realizas el seguimiento del rendimiento del equipo.',
         },
         {
-          icone: '📊',
+          icon: 'chart',
           titulo: 'Panel de Tickets',
           descricao: 'Aquí ves todos los tickets de tu área en tiempo real, ' +
                      'con filtros por estado, prioridad y SLA.',
           selector: 'nav a[href="/admin"]',
         },
         {
-          icone: '🖱️',
+          icon: 'mouse',
           titulo: 'Interactuando con Tickets',
           descricao: 'Haz clic en cualquier fila de la tabla para abrir los detalles ' +
                      'del ticket en una nueva pestaña y actualizar su estado.',
         },
         {
-          icone: '📈',
+          icon: 'trend',
           titulo: 'Informes y Métricas',
           descricao: 'Accede a las métricas de SLA e informes semanales de tu área. ' +
                      'Exporta a Excel cuando lo necesites.',
           selector: 'nav a[href*="relatorios"]',
         },
         {
-          icone: '⚠️',
+          icon: 'alert',
           titulo: '¡Atención al SLA!',
           descricao: 'Usa los filtros de la tabla para encontrar tickets críticos rápidamente. ' +
                      'Los tickets con SLA en riesgo están marcados en rojo.',
         },
         {
-          icone: '✅',
+          icon: 'check',
           titulo: '¡Todo listo!',
           descricao: 'Comienza revisando los tickets abiertos en tu área.',
           selector: 'nav a[href="/admin"]',
@@ -278,41 +278,41 @@
     admin: {
       pt_BR: [
         {
-          icone: '👋',
+          icon: 'wave',
           titulo: 'Bem-vindo, Administrador!',
           descricao: 'Olá, {nome}! Você tem acesso completo ao sistema. ' +
                      'Vamos apresentar as principais funcionalidades.',
         },
         {
-          icone: '📊',
+          icon: 'chart',
           titulo: 'Dashboard Geral',
           descricao: 'Visão consolidada de todos os chamados de todas as áreas, ' +
                      'com métricas de SLA e status em tempo real.',
           selector: 'nav a[href="/admin"]',
         },
         {
-          icone: '📈',
+          icon: 'trend',
           titulo: 'Relatórios Avançados',
           descricao: 'Exporte dados em Excel e gere relatórios semanais automáticos. ' +
                      'Monitore a performance de toda a operação.',
           selector: 'nav a[href*="relatorios"]',
         },
         {
-          icone: '👥',
+          icon: 'users',
           titulo: 'Gestão de Usuários',
           descricao: 'Crie, edite e gerencie os perfis de acesso de todos os colaboradores. ' +
-                     'Acesse pelo menu ☰ no canto superior direito da navegação.',
-          selector: '#btn-hamburger',
+                     'Acesse pelo link de Usuários no menu de navegação.',
+          selector: 'nav a[href*="admin/usuarios"]',
         },
         {
-          icone: '🏷️',
-          titulo: 'Categorias e Traduções',
-          descricao: 'Configure as categorias dos chamados e os textos do sistema ' +
-                     'em PT-BR, EN e ES. Também disponível no menu ☰.',
-          selector: '#btn-hamburger',
+          icon: 'tag',
+          titulo: 'Categorias',
+          descricao: 'Configure as categorias dos chamados. ' +
+                     'Acesse pelo link de Categorias no menu de navegação.',
+          selector: 'nav a[href*="admin/categorias"]',
         },
         {
-          icone: '⚙️',
+          icon: 'settings',
           titulo: 'Configurações Iniciais Recomendadas',
           checklist: [
             'Criar as categorias dos chamados',
@@ -322,7 +322,7 @@
           ],
         },
         {
-          icone: '🚀',
+          icon: 'rocket',
           titulo: 'Tudo pronto para começar!',
           descricao: 'Comece cadastrando os usuários da sua equipe e configurando as áreas.',
           cta: { label: 'Gerenciar Usuários', href: '/usuarios' },
@@ -330,41 +330,41 @@
       ],
       en: [
         {
-          icone: '👋',
+          icon: 'wave',
           titulo: 'Welcome, Administrator!',
           descricao: 'Hello, {nome}! You have full access to the system. ' +
                      'Let\'s walk through the main features.',
         },
         {
-          icone: '📊',
+          icon: 'chart',
           titulo: 'General Dashboard',
           descricao: 'Consolidated view of all tickets from all areas, ' +
                      'with SLA metrics and real-time status.',
           selector: 'nav a[href="/admin"]',
         },
         {
-          icone: '📈',
+          icon: 'trend',
           titulo: 'Advanced Reports',
           descricao: 'Export data to Excel and generate automatic weekly reports. ' +
                      'Monitor the performance of the entire operation.',
           selector: 'nav a[href*="relatorios"]',
         },
         {
-          icone: '👥',
+          icon: 'users',
           titulo: 'User Management',
           descricao: 'Create, edit and manage access profiles for all employees. ' +
-                     'Access through the ☰ menu in the top-right corner.',
-          selector: '#btn-hamburger',
+                     'Access via the Users link in the navigation menu.',
+          selector: 'nav a[href*="admin/usuarios"]',
         },
         {
-          icone: '🏷️',
-          titulo: 'Categories & Translations',
-          descricao: 'Configure ticket categories and system texts in PT-BR, EN and ES. ' +
-                     'Also available in the ☰ menu.',
-          selector: '#btn-hamburger',
+          icon: 'tag',
+          titulo: 'Categories',
+          descricao: 'Configure ticket categories. ' +
+                     'Access via the Categories link in the navigation menu.',
+          selector: 'nav a[href*="admin/categorias"]',
         },
         {
-          icone: '⚙️',
+          icon: 'settings',
           titulo: 'Recommended Initial Settings',
           checklist: [
             'Create ticket categories',
@@ -374,7 +374,7 @@
           ],
         },
         {
-          icone: '🚀',
+          icon: 'rocket',
           titulo: 'All set to get started!',
           descricao: 'Start by registering your team\'s users and setting up the work areas.',
           cta: { label: 'Manage Users', href: '/usuarios' },
@@ -382,41 +382,41 @@
       ],
       es: [
         {
-          icone: '👋',
+          icon: 'wave',
           titulo: '¡Bienvenido, Administrador!',
           descricao: '¡Hola, {nome}! Tienes acceso completo al sistema. ' +
                      'Vamos a presentar las principales funcionalidades.',
         },
         {
-          icone: '📊',
+          icon: 'chart',
           titulo: 'Panel General',
           descricao: 'Vista consolidada de todos los tickets de todas las áreas, ' +
                      'con métricas de SLA y estado en tiempo real.',
           selector: 'nav a[href="/admin"]',
         },
         {
-          icone: '📈',
+          icon: 'trend',
           titulo: 'Informes Avanzados',
           descricao: 'Exporta datos a Excel y genera informes semanales automáticos. ' +
                      'Monitorea el rendimiento de toda la operación.',
           selector: 'nav a[href*="relatorios"]',
         },
         {
-          icone: '👥',
+          icon: 'users',
           titulo: 'Gestión de Usuarios',
           descricao: 'Crea, edita y gestiona los perfiles de acceso de todos los colaboradores. ' +
-                     'Accede a través del menú ☰ en la esquina superior derecha.',
-          selector: '#btn-hamburger',
+                     'Accede mediante el enlace de Usuarios en el menú de navegación.',
+          selector: 'nav a[href*="admin/usuarios"]',
         },
         {
-          icone: '🏷️',
-          titulo: 'Categorías y Traducciones',
-          descricao: 'Configura las categorías de los tickets y los textos del sistema ' +
-                     'en PT-BR, EN y ES. También disponible en el menú ☰.',
-          selector: '#btn-hamburger',
+          icon: 'tag',
+          titulo: 'Categorías',
+          descricao: 'Configura las categorías de los tickets. ' +
+                     'Accede mediante el enlace de Categorías en el menú de navegación.',
+          selector: 'nav a[href*="admin/categorias"]',
         },
         {
-          icone: '⚙️',
+          icon: 'settings',
           titulo: 'Configuraciones Iniciales Recomendadas',
           checklist: [
             'Crear las categorías de los tickets',
@@ -426,13 +426,31 @@
           ],
         },
         {
-          icone: '🚀',
+          icon: 'rocket',
           titulo: '¡Todo listo para comenzar!',
           descricao: 'Comienza registrando los usuarios de tu equipo y configurando las áreas de trabajo.',
           cta: { label: 'Gestionar Usuarios', href: '/usuarios' },
         },
       ],
     },
+  };
+
+  // ─── Mapa semântico → SVG ─────────────────────────────────────────────────
+
+  var ONBOARDING_ICONS = {
+    wave:      '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 11V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2"></path><path d="M14 10V4a2 2 0 0 0-2-2a2 2 0 0 0-2 2v2"></path><path d="M10 10.5V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2v8"></path><path d="M18 11a2 2 0 1 1 4 0v3a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"></path></svg>',
+    plus:      '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>',
+    clipboard: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"></path><rect x="9" y="3" width="6" height="4" rx="1"></rect></svg>',
+    lightbulb: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"></path><path d="M10 22h4"></path><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"></path></svg>',
+    rocket:    '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"></path><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"></path><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"></path><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"></path></svg>',
+    chart:     '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line><line x1="2" y1="20" x2="22" y2="20"></line></svg>',
+    mouse:     '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="7"></rect><path d="M12 6v4"></path></svg>',
+    trend:     '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"></polyline><polyline points="16 7 22 7 22 13"></polyline></svg>',
+    alert:     '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path><path d="M12 9v4"></path><path d="M12 17h.01"></path></svg>',
+    check:     '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>',
+    users:     '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>',
+    tag:       '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z"></path><path d="M7 7h.01"></path></svg>',
+    settings:  '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg>',
   };
 
   // Seleciona o tour pelo perfil e idioma (fallback: pt_BR)
@@ -457,7 +475,7 @@
     backdrop.id = 'onboarding-backdrop';
     Object.assign(backdrop.style, {
       position: 'fixed', inset: '0',
-      background: 'rgba(11,27,61,0.78)',
+      background: 'rgba(15,23,42,0.35)',
       zIndex: '8999', pointerEvents: 'auto',
     });
 
@@ -470,7 +488,7 @@
       position: 'fixed', zIndex: '9001',
       maxWidth: '400px', width: 'calc(100vw - 32px)',
       background: 'white', borderRadius: '20px',
-      boxShadow: '0 25px 80px -10px rgba(0,0,0,0.4), 0 0 0 1px rgba(0,0,0,0.06)',
+      boxShadow: '0 8px 32px -4px rgba(0,0,0,0.18), 0 0 0 1px rgba(0,0,0,0.05)',
       fontFamily: 'Inter, sans-serif', overflow: 'hidden',
       pointerEvents: 'auto',
     });
@@ -523,11 +541,14 @@
     if (targetEl) { highlightTarget(targetEl); positionCard(targetEl); }
     else          { centerCard(); }
 
-    if (typeof gsap !== 'undefined') {
+    var prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (typeof gsap !== 'undefined' && !prefersReduced) {
       gsap.fromTo(card,
         { opacity: 0, scale: 0.94, y: 10 },
-        { opacity: 1, scale: 1, y: 0, duration: 0.32, ease: 'back.out(1.6)' }
+        { opacity: 1, scale: 1, y: 0, duration: 0.22, ease: 'power2.out' }
       );
+    } else {
+      card.style.opacity = '1';
     }
 
     if (index > 0) saveStep(index);
@@ -542,12 +563,13 @@
     // Conteúdo do corpo
     var bodyContent = '';
     if (step.checklist) {
+      var checkSvg = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>';
       bodyContent = '<ul style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px">' +
         step.checklist.map(function (item) {
           return '<li style="display:flex;align-items:flex-start;gap:10px;font-size:14px;color:#374151;line-height:1.5">' +
             '<span style="width:20px;height:20px;border-radius:50%;background:#d1fae5;color:#059669;' +
-            'font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;' +
-            'flex-shrink:0;margin-top:1px">✓</span>' +
+            'display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">' +
+            checkSvg + '</span>' +
             '<span>' + escHtml(item) + '</span></li>';
         }).join('') + '</ul>';
     } else if (step.descricao) {
@@ -559,11 +581,10 @@
     var ctaHTML = '';
     if (step.cta) {
       ctaHTML = '<div style="margin-top:14px">' +
-        '<a href="' + step.cta.href + '" ' +
+        '<a id="ob-cta" href="' + step.cta.href + '" ' +
         'style="display:inline-flex;align-items:center;gap:6px;padding:10px 18px;border-radius:10px;' +
-        'font-size:13px;font-weight:600;background:linear-gradient(135deg,#4f46e5,#6366f1);' +
-        'color:white;text-decoration:none;transition:opacity 0.15s" ' +
-        'onmouseover="this.style.opacity=\'0.88\'" onmouseout="this.style.opacity=\'1\'">' +
+        'font-size:13px;font-weight:600;background:#1e4a8c;' +
+        'color:white;text-decoration:none;transition:opacity 0.15s">' +
         escHtml(step.cta.label) +
         '<svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
         '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>' +
@@ -576,38 +597,34 @@
       var active = i === index;
       dotsHTML += '<div style="height:7px;border-radius:4px;transition:all 0.3s ease;' +
         'width:' + (active ? '20' : '7') + 'px;' +
-        'background:' + (active ? '#4f46e5' : '#e5e7eb') + '"></div>';
+        'background:' + (active ? '#1e4a8c' : '#e5e7eb') + '"></div>';
     }
     dotsHTML += '</div>';
 
     var prevBtn = !isFirst
       ? '<button id="ob-prev" style="padding:8px 14px;border:1px solid #e5e7eb;background:white;' +
-        'cursor:pointer;font-size:13px;color:#374151;border-radius:8px;font-weight:500;transition:all 0.15s" ' +
-        'onmouseover="this.style.borderColor=\'#d1d5db\';this.style.background=\'#f9fafb\'" ' +
-        'onmouseout="this.style.borderColor=\'#e5e7eb\';this.style.background=\'white\'">' +
+        'cursor:pointer;font-size:13px;color:#374151;border-radius:8px;font-weight:500;transition:all 0.15s">' +
         escHtml(ui.prev) + '</button>'
       : '';
 
     var nextBtn = '<button id="ob-next" style="padding:8px 18px;border:none;border-radius:8px;' +
       'cursor:pointer;font-size:13px;font-weight:600;color:white;transition:opacity 0.15s;' +
-      'background:linear-gradient(135deg,#4f46e5,#6366f1)" ' +
-      'onmouseover="this.style.opacity=\'0.88\'" onmouseout="this.style.opacity=\'1\'">' +
+      'background:#1e4a8c">' +
       escHtml(isLast ? ui.finish : ui.next) + '</button>';
 
     return (
       '<div style="padding:20px 20px 0;display:flex;align-items:flex-start;justify-content:space-between;gap:12px">' +
         '<div style="display:flex;align-items:center;gap:12px">' +
           '<div style="width:44px;height:44px;border-radius:12px;flex-shrink:0;' +
-          'background:linear-gradient(135deg,#ede9fe,#e0e7ff);' +
-          'display:flex;align-items:center;justify-content:center;font-size:22px">' +
-          step.icone + '</div>' +
+          'background:#eff6ff;border:1px solid #bfdbfe;color:#1e4a8c;' +
+          'display:flex;align-items:center;justify-content:center">' +
+          (ONBOARDING_ICONS[step.icon] || '') + '</div>' +
           '<h2 style="margin:0;font-size:15px;font-weight:700;color:#111827;line-height:1.35">' +
           escHtml(step.titulo) + '</h2>' +
         '</div>' +
         '<button id="ob-close" aria-label="' + escHtml(ui.skip) + '" ' +
         'style="flex-shrink:0;padding:4px 6px;border:none;background:none;cursor:pointer;' +
-        'color:#9ca3af;font-size:20px;line-height:1;border-radius:6px;transition:color 0.15s;margin-top:-2px" ' +
-        'onmouseover="this.style.color=\'#374151\'" onmouseout="this.style.color=\'#9ca3af\'">×</button>' +
+        'color:#9ca3af;font-size:20px;line-height:1;border-radius:6px;transition:color 0.15s;margin-top:-2px">×</button>' +
       '</div>' +
 
       '<div style="padding:14px 20px 20px">' + bodyContent + ctaHTML + '</div>' +
@@ -617,9 +634,7 @@
         dotsHTML +
         '<div style="display:flex;gap:8px;align-items:center">' +
           '<button id="ob-skip" style="padding:7px 11px;border:none;background:none;cursor:pointer;' +
-          'font-size:12px;color:#9ca3af;border-radius:7px;font-weight:500;transition:all 0.15s" ' +
-          'onmouseover="this.style.color=\'#6b7280\';this.style.background=\'#f3f4f6\'" ' +
-          'onmouseout="this.style.color=\'#9ca3af\';this.style.background=\'none\'">' +
+          'font-size:12px;color:#9ca3af;border-radius:7px;font-weight:500;transition:all 0.15s">' +
           escHtml(ui.skip) + '</button>' +
           prevBtn + nextBtn +
         '</div>' +
@@ -629,11 +644,37 @@
 
   function bindCardEvents(index) {
     var isLast = index === steps.length - 1;
-    document.getElementById('ob-close').addEventListener('click', skipTour);
-    document.getElementById('ob-skip').addEventListener('click', skipTour);
-    document.getElementById('ob-next').addEventListener('click', isLast ? completeTour : nextStep);
-    var p = document.getElementById('ob-prev');
-    if (p) p.addEventListener('click', prevStep);
+
+    var close = document.getElementById('ob-close');
+    var skip = document.getElementById('ob-skip');
+    var next = document.getElementById('ob-next');
+    var prev = document.getElementById('ob-prev');
+    var cta = document.getElementById('ob-cta');
+
+    close.addEventListener('click', skipTour);
+    skip.addEventListener('click', skipTour);
+    next.addEventListener('click', isLast ? completeTour : nextStep);
+    if (prev) prev.addEventListener('click', prevStep);
+
+    // Hover effects (CSP-safe — no inline onmouseover/onmouseout)
+    next.addEventListener('mouseenter', function() { next.style.opacity = '0.88'; });
+    next.addEventListener('mouseleave', function() { next.style.opacity = '1'; });
+
+    close.addEventListener('mouseenter', function() { close.style.color = '#374151'; });
+    close.addEventListener('mouseleave', function() { close.style.color = '#9ca3af'; });
+
+    skip.addEventListener('mouseenter', function() { skip.style.color = '#6b7280'; skip.style.background = '#f3f4f6'; });
+    skip.addEventListener('mouseleave', function() { skip.style.color = '#9ca3af'; skip.style.background = 'none'; });
+
+    if (prev) {
+      prev.addEventListener('mouseenter', function() { prev.style.borderColor = '#d1d5db'; prev.style.background = '#f9fafb'; });
+      prev.addEventListener('mouseleave', function() { prev.style.borderColor = '#e5e7eb'; prev.style.background = 'white'; });
+    }
+
+    if (cta) {
+      cta.addEventListener('mouseenter', function() { cta.style.opacity = '0.88'; });
+      cta.addEventListener('mouseleave', function() { cta.style.opacity = '1'; });
+    }
   }
 
   // ─── Highlight ─────────────────────────────────────────────────────────────
@@ -646,7 +687,7 @@
     }
     targetEl.style.position = targetEl.style.position || 'relative';
     targetEl.style.zIndex = '9000';
-    targetEl.style.boxShadow = '0 0 0 3px rgba(99,102,241,0.9), 0 0 24px rgba(99,102,241,0.35)';
+    targetEl.style.boxShadow = '0 0 0 3px rgba(30,74,140,0.9), 0 0 24px rgba(30,74,140,0.25)';
     targetEl.style.borderRadius = '10px';
     targetEl.style.pointerEvents = 'none';
     highlightedEl = targetEl;
@@ -739,17 +780,21 @@
       clearHighlight();
       card.innerHTML =
         '<div style="padding:36px 28px;text-align:center">' +
-          '<div style="font-size:52px;margin-bottom:14px;line-height:1">🎉</div>' +
+          '<div style="width:64px;height:64px;margin:0 auto 14px;border-radius:16px;background:#eff6ff;border:1px solid #bfdbfe;display:flex;align-items:center;justify-content:center;color:#1e4a8c">' +
+          '<svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">' +
+          '<path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"></path>' +
+          '</svg></div>' +
           '<h2 style="margin:0 0 8px;font-size:18px;font-weight:700;color:#111827">' +
           escHtml(ui.done_title) + '</h2>' +
           '<p style="margin:0;font-size:14px;color:#6b7280;line-height:1.6">' +
           escHtml(ui.done_msg) + '</p>' +
         '</div>';
       centerCard();
-      if (typeof gsap !== 'undefined') {
-        gsap.fromTo(card, { scale: 0.88 }, { scale: 1, duration: 0.45, ease: 'back.out(2)' });
+      var prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (typeof gsap !== 'undefined' && !prefersReduced) {
+        gsap.fromTo(card, { scale: 0.88 }, { scale: 1, duration: 0.25, ease: 'power2.out' });
         setTimeout(function () {
-          gsap.to([card, backdrop], { opacity: 0, duration: 0.4, onComplete: destroyTour });
+          gsap.to([card, backdrop], { opacity: 0, duration: 0.35, onComplete: destroyTour });
         }, 1600);
       } else { setTimeout(destroyTour, 1800); }
     });

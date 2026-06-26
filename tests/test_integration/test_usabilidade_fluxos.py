@@ -184,6 +184,9 @@ def test_usabilidade_atualizar_status_resposta_sucesso_ou_erro_explicito(client_
     doc.to_dict.return_value = {"area": "Manutencao", "status": "Aberto", "solicitante_id": "s1"}
     chamado_mock = MagicMock()
     chamado_mock.area = "Manutencao"
+    chamado_mock.responsavel_id = None  # sem dono → supervisor da área pode ver
+    chamado_mock.solicitante_id = "s1"
+    chamado_mock.participantes = []
     with (
         patch("app.routes.api.db") as mock_db,
         patch("app.routes.api.Chamado") as mock_chamado_cls,
@@ -210,7 +213,12 @@ def test_usabilidade_bulk_status_retorna_resumo_atualizados_e_erros(client_logad
         doc.exists = True
         doc.to_dict.return_value = {"area": "Manutencao", "status": "Aberto"}
         mock_db.collection.return_value.document.return_value.get.return_value = doc
-        with patch("app.routes.api.execute_with_retry"), patch("app.routes.api.Historico"):
+        with patch("app.routes.api.atualizar_status_chamado") as mock_atualizar:
+            mock_atualizar.return_value = {
+                "sucesso": True,
+                "mensagem": "ok",
+                "novo_status": "Concluído",
+            }
             r = client_logado_supervisor.post(
                 "/api/bulk-status",
                 json={"chamado_ids": ["ch1"], "novo_status": "Concluído"},

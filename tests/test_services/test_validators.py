@@ -1,7 +1,7 @@
 """Testes do serviço de validação de novo chamado."""
 
 import io
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -140,7 +140,7 @@ def test_validar_novo_chamado_arquivo_extensao_invalida():
     }
     arquivo = MagicMock()
     arquivo.filename = "documento.exe"
-    erros = validar_novo_chamado(form, arquivo)
+    erros = validar_novo_chamado(form, [arquivo])
     assert any("Formato de arquivo" in e or "inválido" in e.lower() for e in erros)
 
 
@@ -155,12 +155,12 @@ def test_validar_novo_chamado_arquivo_extensao_permitida():
     }
     arquivo = MagicMock()
     arquivo.filename = "anexo.pdf"
-    erros = validar_novo_chamado(form, arquivo)
+    erros = validar_novo_chamado(form, [arquivo])
     assert not any("arquivo" in e.lower() or "Formato" in e for e in erros)
 
 
 def test_validar_novo_chamado_sem_arquivo_nao_valida_arquivo():
-    """Sem arquivo (ou filename vazio), validação de arquivo é ignorada (descrição e tipo válidos)."""
+    """Sem arquivo (None ou lista vazia), validação de arquivo é ignorada."""
     form = {
         "descricao": "Descrição com mais de 3 caracteres",
         "tipo": "Manutencao",
@@ -170,10 +170,84 @@ def test_validar_novo_chamado_sem_arquivo_nao_valida_arquivo():
     }
     erros = validar_novo_chamado(form, None)
     assert erros == []
+    erros2 = validar_novo_chamado(form, [])
+    assert erros2 == []
     arquivo_vazio = MagicMock()
     arquivo_vazio.filename = ""
-    erros2 = validar_novo_chamado(form, arquivo_vazio)
-    assert erros2 == []
+    erros3 = validar_novo_chamado(form, [arquivo_vazio])
+    assert erros3 == []
+
+
+# ── Testes multi-arquivo (TDD RED → GREEN) ────────────────────────────────────
+
+
+_FORM_VALIDO = {
+    "descricao": "Descrição ok",
+    "tipo": "Manutencao",
+    "categoria": "Chamado",
+    "gate": "N/A",
+    "impacto": "Impacto Baixo",
+}
+
+
+def _make_pdf_arquivo(nome: str = "doc.pdf") -> MagicMock:
+    """FileStorage mock com magic bytes de PDF."""
+    buf = io.BytesIO(b"%PDF-1.4 content here")
+    arq = MagicMock()
+    arq.filename = nome
+    arq.stream = buf
+    arq.content_length = len(buf.getvalue())
+    return arq
+
+
+def test_varios_pdfs_validos_sem_erro():
+    """Dois PDFs válidos passados como lista não geram erro."""
+    arqs = [_make_pdf_arquivo("a.pdf"), _make_pdf_arquivo("b.pdf")]
+    erros = validar_novo_chamado(_FORM_VALIDO, arqs)
+    assert erros == []
+
+
+def test_exe_na_lista_retorna_erro_com_nome():
+    """Um .exe na lista retorna erro mencionando o arquivo."""
+    exe = MagicMock()
+    exe.filename = "virus.exe"
+    erros = validar_novo_chamado(_FORM_VALIDO, [exe])
+    assert len(erros) == 1
+    assert "virus.exe" in erros[0] or "Formato" in erros[0]
+
+
+def test_arquivo_maior_que_10mb_retorna_erro():
+    """Arquivo com mais de 10 MB retorna erro de tamanho."""
+    grande = MagicMock()
+    grande.filename = "enorme.pdf"
+    stream = io.BytesIO(b"%PDF" + b"\x00" * (10 * 1024 * 1024 + 1))
+    grande.stream = stream
+    grande.content_length = 10 * 1024 * 1024 + 1
+    erros = validar_novo_chamado(_FORM_VALIDO, [grande])
+    assert any(
+        "10" in e and ("MB" in e or "tamanho" in e.lower() or "excede" in e.lower()) for e in erros
+    )
+
+
+def test_arquivo_exatamente_10mb_aceito():
+    """Arquivo com exatamente 10 MB é aceito (limite é <=)."""
+    limite = MagicMock()
+    limite.filename = "exato.pdf"
+    limite.content_length = 10 * 1024 * 1024
+    stream = io.BytesIO(b"%PDF" + b"\x00" * (10 * 1024 * 1024 - 4))
+    limite.stream = stream
+    erros = validar_novo_chamado(_FORM_VALIDO, [limite])
+    assert not any("excede" in e.lower() or "MB" in e for e in erros)
+
+
+def test_mistura_valido_e_invalido_retorna_ambos_erros():
+    """Lista com um PDF válido e um .exe retorna erro somente para o .exe."""
+    pdf = _make_pdf_arquivo("ok.pdf")
+    exe = MagicMock()
+    exe.filename = "mal.exe"
+    erros = validar_novo_chamado(_FORM_VALIDO, [pdf, exe])
+    assert len(erros) == 1
+    assert "mal.exe" in erros[0] or "Formato" in erros[0]
 
 
 def _make_csv_arquivo(conteudo: str, filename: str = "dados.csv"):
@@ -195,7 +269,7 @@ def test_csv_valido_nao_gera_erro():
         "impacto": "Impacto Baixo",
     }
     arquivo = _make_csv_arquivo("nome,valor\nAlpha,1\nBeta,2")
-    erros = validar_novo_chamado(form, arquivo)
+    erros = validar_novo_chamado(form, [arquivo])
     assert not any("CSV" in e or "arquivo" in e.lower() for e in erros)
 
 
@@ -209,7 +283,7 @@ def test_csv_vazio_retorna_erro():
         "impacto": "Impacto Baixo",
     }
     arquivo = _make_csv_arquivo("")
-    erros = validar_novo_chamado(form, arquivo)
+    erros = validar_novo_chamado(form, [arquivo])
     assert any("CSV" in e or "vazio" in e.lower() for e in erros)
 
 
@@ -230,7 +304,7 @@ def test_csv_binario_renomeado_retorna_erro():
     # PNG é lido como texto com erros de decode; csv.reader tentará parsear —
     # pode retornar True (replace de erros) mas o stream seek é chamado corretamente
     # O teste garante que a função é chamada e não lança exceção
-    erros = validar_novo_chamado(form, arquivo)
+    erros = validar_novo_chamado(form, [arquivo])
     # Não deve lançar exceção; erro ou não depende do conteúdo parseado
     assert isinstance(erros, list)
 
@@ -385,3 +459,64 @@ def test_validar_novo_chamado_categoria_vazia_retorna_erro():
     }
     erros = validar_novo_chamado(form)
     assert any("categoria" in e.lower() and "obrigatória" in e.lower() for e in erros)
+
+
+# ── Gate com sub-etapas (valores canônicos) ───────────────────────────────────
+
+
+def test_validar_gate_na_aceito():
+    """Gate N/A é válido sem sub-etapa."""
+    form = {
+        "descricao": "Descrição ok",
+        "tipo": "Manutencao",
+        "categoria": "Chamado",
+        "gate": "N/A",
+        "impacto": "Impacto Baixo",
+    }
+    erros = validar_novo_chamado(form)
+    assert erros == []
+
+
+def test_validar_gate_completo_desmontagem_aceito():
+    """Gate com sub-etapa completa é aceito (fallback estático quando Firestore vazio)."""
+    form = {
+        "descricao": "Descrição ok",
+        "tipo": "Manutencao",
+        "categoria": "Chamado",
+        "gate": "Gate 1 - Desmontagem",
+        "impacto": "Impacto Baixo",
+    }
+    with patch("app.services.gates_service.CategoriaGate") as mock_cls:
+        mock_cls.get_all_ativos.return_value = []
+        erros = validar_novo_chamado(form)
+    assert erros == []
+
+
+def test_validar_gate_sem_subetapa_rejeitado():
+    """Gate 1 sem sub-etapa (valor legado) é rejeitado em novos chamados."""
+    form = {
+        "descricao": "Descrição ok",
+        "tipo": "Manutencao",
+        "categoria": "Chamado",
+        "gate": "Gate 1",
+        "impacto": "Impacto Baixo",
+    }
+    with patch("app.services.gates_service.CategoriaGate") as mock_cls:
+        mock_cls.get_all_ativos.return_value = []
+        erros = validar_novo_chamado(form)
+    assert any("gate" in e.lower() for e in erros)
+
+
+def test_validar_gate_invalido_rejeitado():
+    """Valor de gate arbitrário é rejeitado."""
+    form = {
+        "descricao": "Descrição ok",
+        "tipo": "Manutencao",
+        "categoria": "Chamado",
+        "gate": "Gate 99",
+        "impacto": "Impacto Baixo",
+    }
+    with patch("app.services.gates_service.CategoriaGate") as mock_cls:
+        mock_cls.get_all_ativos.return_value = []
+        erros = validar_novo_chamado(form)
+    assert any("gate" in e.lower() for e in erros)

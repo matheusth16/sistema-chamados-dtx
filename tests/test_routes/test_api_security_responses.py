@@ -188,14 +188,6 @@ def test_bulk_status_erro_por_item_usa_mensagem_generica(client_logado_superviso
         "responsavel_id": "sup_1",
     }
 
-    mock_doc_fail = MagicMock()
-    mock_doc_fail.exists = True
-    mock_doc_fail.to_dict.return_value = {
-        "status": "Aberto",
-        "area": "Manutencao",
-        "responsavel_id": "sup_1",
-    }
-
     call_count = {"n": 0}
 
     def get_side_effect():
@@ -207,14 +199,16 @@ def test_bulk_status_erro_por_item_usa_mensagem_generica(client_logado_superviso
     mock_col = MagicMock()
     mock_col.document.return_value.get.side_effect = get_side_effect
 
-    execute_patch_path = "app.routes.api.execute_with_retry"
-
     with (
         patch("app.routes.api.db") as mock_db,
-        patch(execute_patch_path) as mock_execute,
+        patch("app.routes.api.atualizar_status_chamado") as mock_atualizar,
     ):
         mock_db.collection.return_value = mock_col
-        mock_execute.side_effect = RuntimeError("Firestore: UNAVAILABLE — could not connect")
+        mock_atualizar.return_value = {
+            "sucesso": True,
+            "mensagem": "ok",
+            "novo_status": "Em Atendimento",
+        }
         r = client_logado_supervisor.post(
             "/api/bulk-status",
             json={"chamado_ids": ["ch_001", "ch_002"], "novo_status": "Em Atendimento"},

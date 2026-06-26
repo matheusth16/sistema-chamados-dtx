@@ -12,6 +12,8 @@ Uso:
 """
 
 import logging
+import os
+import random
 
 from google.cloud.firestore_v1.base_query import FieldFilter
 
@@ -89,7 +91,15 @@ class AtribuidorAutomatico:
             ...     print(f"Erro: {resultado['motivo']}")
         """
         try:
-            area = setor_para_area(area) or area
+            area = (setor_para_area(area) or area or "").strip()
+            if not area:
+                logger.warning("atribuir: área inválida ou vazia.")
+                return {
+                    "sucesso": False,
+                    "supervisor": None,
+                    "motivo": "Área inválida ou não informada",
+                    "estrategia_usada": self.estrategia,
+                }
             logger.debug(
                 "Atribuindo chamado: area=%s, categoria=%s, prioridade=%s",
                 area,
@@ -120,7 +130,7 @@ class AtribuidorAutomatico:
             elif self.estrategia == "round_robin":
                 supervisor_escolhido = self._atribuir_round_robin(supervisores_com_carga, area)
             else:  # aleatorio
-                supervisor_escolhido = supervisores_com_carga[0]  # Sem estratégia específica
+                supervisor_escolhido = random.choice(supervisores_com_carga)
 
             if not supervisor_escolhido:
                 return {
@@ -223,30 +233,39 @@ class AtribuidorAutomatico:
 
     def _atribuir_round_robin(self, supervisores_com_carga: list[dict], area: str) -> dict | None:
         """
-        Estratégia: Distribui sequencialmente entre supervisores
-        Garante que cada supervisor recebe chamados na sequência
+        Estratégia: Distribui sequencialmente entre supervisores.
+
+        Usa Redis INCR para contador atômico cross-worker quando REDIS_URL está
+        configurada. Fallback em memória quando Redis não está disponível.
         """
         if not supervisores_com_carga:
             return None
 
-        # Inicializa contador se não existe para essa área
+        n = len(supervisores_com_carga)
+        redis_url = os.getenv("REDIS_URL", "").strip()
+
+        if redis_url:
+            try:
+                import redis as redis_lib
+
+                r = redis_lib.from_url(redis_url)
+                key = f"rr_counter:{area}"
+                idx = int(r.incr(key)) % n
+                logger.debug("Round-Robin (Redis INCR): índice %s", idx)
+                return supervisores_com_carga[idx]
+            except Exception as e:
+                logger.debug(
+                    "Redis INCR falhou para round-robin, usando fallback em memória: %s", e
+                )
+
+        # Fallback: contador em memória por processo
         if area not in self.contador_round_robin:
             self.contador_round_robin[area] = 0
+        idx = self.contador_round_robin[area] % n
+        self.contador_round_robin[area] = (idx + 1) % n
 
-        # Seleciona o próximo supervisor na sequência
-        idx = self.contador_round_robin[area] % len(supervisores_com_carga)
-        supervisor_escolhido = supervisores_com_carga[idx]
-
-        # Incrementa para próximo
-        self.contador_round_robin[area] = (idx + 1) % len(supervisores_com_carga)
-
-        logger.debug(
-            "Round-Robin: %s selecionado (índice %s)",
-            supervisor_escolhido["usuario"].nome,
-            idx,
-        )
-
-        return supervisor_escolhido
+        logger.debug("Round-Robin (memória): índice %s", idx)
+        return supervisores_com_carga[idx]
 
     def obter_disponibilidade(self, area: str) -> dict:
         """

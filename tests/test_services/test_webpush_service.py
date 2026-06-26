@@ -1,8 +1,14 @@
 """Testes do serviço Web Push (webpush_service)."""
 
+import logging
 from unittest.mock import MagicMock, patch
 
-from app.services.webpush_service import enviar_webpush_usuario, obter_inscricoes, salvar_inscricao
+from app.services.webpush_service import (
+    MAX_INSCRICOES,
+    enviar_webpush_usuario,
+    obter_inscricoes,
+    salvar_inscricao,
+)
 
 
 def test_salvar_inscricao_sem_usuario_id_retorna_false():
@@ -145,3 +151,152 @@ def test_enviar_webpush_le_chave_via_config_get(app):
 
     assert n == 1
     mock_webpush.assert_called_once()
+
+
+# ── S4-04: Limite de inscrições WebPush ──────────────────────────────────────
+
+
+def test_obter_inscricoes_aplica_limite_maximo():
+    """obter_inscricoes deve chamar .limit(MAX_INSCRICOES) na query."""
+    mock_doc = MagicMock()
+    mock_doc.to_dict.return_value = {
+        "endpoint": "https://push.example.com/x",
+        "p256dh": "k1",
+        "auth": "k2",
+    }
+
+    mock_db = MagicMock()
+    mock_col = mock_db.collection.return_value
+    mock_col.where.return_value = mock_col
+    mock_col.limit.return_value = mock_col
+    mock_col.stream.return_value = iter([mock_doc] * MAX_INSCRICOES)
+
+    with patch("app.services.webpush_service.db", mock_db):
+        result = obter_inscricoes("u1")
+
+    mock_col.limit.assert_called_with(MAX_INSCRICOES)
+    assert len(result) == MAX_INSCRICOES
+
+
+# ── Caminhos de erro / exceção ────────────────────────────────────────────────
+
+
+def test_enviar_webpush_sem_app_context_retorna_zero():
+    """Fora de app context, enviar_webpush_usuario captura RuntimeError e retorna 0."""
+    n = enviar_webpush_usuario("u1", "Título", "Corpo")
+    assert n == 0
+
+
+def test_enviar_webpush_pywebpush_nao_instalado_retorna_zero(app):
+    """Quando pywebpush não está disponível (ImportError), retorna 0."""
+    import sys
+
+    app.config["VAPID_PRIVATE_KEY"] = "chave-privada"
+    with (
+        app.app_context(),
+        patch("app.services.webpush_service.obter_inscricoes", return_value=[]),
+        patch.dict(sys.modules, {"pywebpush": None}),
+    ):
+        n = enviar_webpush_usuario("u1", "Título", "Corpo")
+    assert n == 0
+
+
+def test_enviar_webpush_excecao_generica_continua_outros_envios(app):
+    """Exceção genérica em um dispositivo não interrompe envio para os demais."""
+    import pywebpush
+
+    app.config["VAPID_PRIVATE_KEY"] = "chave-privada"
+    sub1 = {"doc_id": "d1", "endpoint": "https://x.com/1", "keys": {"p256dh": "k1", "auth": "a1"}}
+    sub2 = {"doc_id": "d2", "endpoint": "https://x.com/2", "keys": {"p256dh": "k2", "auth": "a2"}}
+
+    call_count = [0]
+
+    def _fake_webpush(**kw):
+        if kw["subscription_info"]["endpoint"].endswith("1"):
+            raise Exception("generic device error")
+        call_count[0] += 1
+
+    with (
+        app.app_context(),
+        patch("app.services.webpush_service.obter_inscricoes", return_value=[sub1, sub2]),
+        patch.object(pywebpush, "webpush", side_effect=_fake_webpush),
+    ):
+        n = enviar_webpush_usuario("u1", "T", "B")
+
+    assert n == 1
+
+
+def test_salvar_inscricao_excecao_retorna_false():
+    """Exceção no Firestore durante salvar_inscricao retorna False sem propagar."""
+    mock_db = MagicMock()
+    mock_db.collection.return_value.where.return_value.where.return_value.limit.return_value.stream.side_effect = Exception(
+        "firestore error"
+    )
+    with patch("app.services.webpush_service.db", mock_db):
+        result = salvar_inscricao(
+            "u1",
+            {
+                "endpoint": "https://push.example.com/send/x",
+                "keys": {"p256dh": "k1", "auth": "k2"},
+            },
+        )
+    assert result is False
+
+
+def test_obter_inscricoes_excecao_retorna_lista_vazia():
+    """Exceção no Firestore durante obter_inscricoes retorna lista vazia."""
+    mock_db = MagicMock()
+    mock_db.collection.return_value.where.return_value.limit.return_value.stream.side_effect = (
+        Exception("firestore unavailable")
+    )
+    with patch("app.services.webpush_service.db", mock_db):
+        result = obter_inscricoes("u1")
+    assert result == []
+
+
+def test_deletar_subscricao_sem_doc_id_nao_acessa_firestore():
+    """_deletar_subscricao com doc_id vazio retorna sem chamar Firestore."""
+    from app.services.webpush_service import _deletar_subscricao
+
+    mock_db = MagicMock()
+    with patch("app.services.webpush_service.db", mock_db):
+        _deletar_subscricao("")
+        _deletar_subscricao(None)
+    mock_db.collection.assert_not_called()
+
+
+def test_deletar_subscricao_excecao_nao_propaga():
+    """_deletar_subscricao com exceção no delete não propaga o erro."""
+    from app.services.webpush_service import _deletar_subscricao
+
+    mock_db = MagicMock()
+    mock_db.collection.return_value.document.return_value.delete.side_effect = Exception(
+        "firestore error"
+    )
+    with patch("app.services.webpush_service.db", mock_db):
+        _deletar_subscricao("doc_abc")  # não deve levantar
+    mock_db.collection.return_value.document.assert_called_once_with("doc_abc")
+
+
+def test_obter_inscricoes_loga_warning_ao_atingir_limite(caplog):
+    """obter_inscricoes emite warning quando o limite de inscrições é atingido."""
+    mock_doc = MagicMock()
+    mock_doc.to_dict.return_value = {
+        "endpoint": "https://push.example.com/x",
+        "p256dh": "k1",
+        "auth": "k2",
+    }
+
+    mock_db = MagicMock()
+    mock_col = mock_db.collection.return_value
+    mock_col.where.return_value = mock_col
+    mock_col.limit.return_value = mock_col
+    mock_col.stream.return_value = iter([mock_doc] * MAX_INSCRICOES)
+
+    with (
+        patch("app.services.webpush_service.db", mock_db),
+        caplog.at_level(logging.WARNING, logger="app.services.webpush_service"),
+    ):
+        obter_inscricoes("u1")
+
+    assert "limite" in caplog.text.lower()

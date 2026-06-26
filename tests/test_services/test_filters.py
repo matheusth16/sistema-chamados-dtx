@@ -310,3 +310,37 @@ def test_aplicar_filtros_dashboard_com_paginacao_cursor_anterior():
     )
     assert "docs" in resultado
     assert "tem_anterior" in resultado
+
+
+# ── F-23: to_dict() chamado exatamente 1x por doc na busca textual ─────────────
+
+
+def test_aplicar_filtros_em_memoria_to_dict_chamado_uma_vez_por_doc():
+    """F-23: _aplicar_filtros_em_memoria deve chamar to_dict() apenas 1x por doc,
+    independente de quantos campos são testados na busca textual."""
+    doc_a = MagicMock()
+    doc_a.to_dict.return_value = {
+        "descricao": "Falha no equipamento",
+        "rl_codigo": "RL-001",
+        "responsavel": "Ana",
+        "numero_chamado": "CHM-0001",
+    }
+    doc_a.id = "doc_a"
+
+    doc_b = MagicMock()
+    doc_b.to_dict.return_value = {
+        "descricao": "Outro assunto",
+        "rl_codigo": "RL-002",
+        "responsavel": "Bruno",
+        "numero_chamado": "CHM-0002",
+    }
+    doc_b.id = "doc_b"
+
+    _aplicar_filtros_em_memoria([doc_a, doc_b], None, None, None, "equipamento")
+
+    assert doc_a.to_dict.call_count == 1, (
+        f"to_dict() deve ser chamado exatamente 1x para doc_a, chamado {doc_a.to_dict.call_count}x"
+    )
+    assert doc_b.to_dict.call_count == 1, (
+        f"to_dict() deve ser chamado exatamente 1x para doc_b, chamado {doc_b.to_dict.call_count}x"
+    )

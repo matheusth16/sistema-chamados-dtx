@@ -1,6 +1,12 @@
 import re
 
+import pytest
 from playwright.sync_api import Page, expect
+
+# Arquivo legado: substituído por tests/e2e/test_fluxo_solicitante.py.
+# Mantido apenas como referência histórica — usa BASE_URL hardcoded e não
+# deve rodar no CI. Ver achado F-53 / tarefa S0-03.
+pytestmark = pytest.mark.skip(reason="legado — substituído por test_fluxo_solicitante.py (F-53)")
 
 BASE_URL = "http://127.0.0.1:5000"
 
@@ -20,7 +26,7 @@ def test_solicitante_login_create_ticket(page: Page):
     # Wait, testing in production database or development? It connects to Firebase.
     # Let's just print a message that script is ready to run and assert page titles.
 
-    expect(page).to_have_title(re.compile("DTX Digital Andon"))
+    expect(page).to_have_title(re.compile("DTX Service Portal"))
 
     print("Se a tela de login carregou perfeitamente, o E2E inicial está conectado!")
     # O restante do fluxo seria adaptado com credenciais de teste configuradas no .env

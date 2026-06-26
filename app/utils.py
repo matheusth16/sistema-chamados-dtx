@@ -85,22 +85,11 @@ def gerar_numero_chamado() -> str:
 
 
 def get_client_ip() -> str:
+    """Retorna o IP do cliente a partir de request.remote_addr.
+
+    ProxyFix (configurado em create_app) já processou X-Forwarded-For
+    e atualizou remote_addr com o IP correto quando há proxy reverso.
+    Ler XFF diretamente permitiria que atacantes forjassem o IP e
+    burlassem o lockout de brute-force.
     """
-    Obtém o endereço IP real do cliente, considerando proxies reversos.
-    Verifica os headers X-Forwarded-For (lista de IPs), X-Real-IP e remote_addr.
-
-    Returns:
-        Endereço IP do cliente
-    """
-    # Verifica X-Forwarded-For (primeiro IP da lista é o cliente original)
-    if request.headers.get("X-Forwarded-For"):
-        # X-Forwarded-For pode conter múltiplos IPs (client, proxy1, proxy2...)
-        # O primeiro é sempre o cliente original
-        return request.headers.get("X-Forwarded-For").split(",")[0].strip()
-
-    # Verifica X-Real-IP (usado por alguns proxies reversos)
-    if request.headers.get("X-Real-IP"):
-        return request.headers.get("X-Real-IP")
-
-    # Fallback para request.remote_addr (conexão direta)
     return request.remote_addr or "unknown"

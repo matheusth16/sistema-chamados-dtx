@@ -74,6 +74,9 @@ def test_api_atualizar_status_sucesso_200_estrutura(client_logado_supervisor):
     doc.to_dict.return_value = {"area": "Manutencao", "status": "Aberto", "solicitante_id": "s1"}
     chamado_mock = MagicMock()
     chamado_mock.area = "Manutencao"
+    chamado_mock.responsavel_id = None  # sem dono → supervisor da área pode ver
+    chamado_mock.solicitante_id = "s1"
+    chamado_mock.participantes = []
     with (
         patch("app.routes.api.db") as mock_db,
         patch("app.routes.api.Chamado") as mock_chamado_cls,
@@ -141,7 +144,12 @@ def test_api_bulk_status_sucesso_200_estrutura(client_logado_supervisor):
         doc.exists = True
         doc.to_dict.return_value = {"area": "Manutencao", "status": "Aberto"}
         mock_db.collection.return_value.document.return_value.get.return_value = doc
-        with patch("app.routes.api.execute_with_retry"), patch("app.routes.api.Historico"):
+        with patch("app.routes.api.atualizar_status_chamado") as mock_atualizar:
+            mock_atualizar.return_value = {
+                "sucesso": True,
+                "mensagem": "ok",
+                "novo_status": "Concluído",
+            }
             r = client_logado_supervisor.post(
                 "/api/bulk-status",
                 json={"chamado_ids": ["ch1"], "novo_status": "Concluído"},
@@ -176,11 +184,10 @@ def test_api_editar_chamado_solicitante_403(client_logado_solicitante):
 
 @pytest.mark.api
 def test_api_editar_chamado_sem_chamado_id_400(client_logado_supervisor):
-    """POST /api/editar-chamado sem chamado_id retorna 400."""
-    with patch("app.routes.api.db"):
-        r = client_logado_supervisor.post(
-            "/api/editar-chamado", data={}, content_type="multipart/form-data"
-        )
+    """POST /api/editar-chamado sem chamado_id retorna 400 (validação antes do db)."""
+    r = client_logado_supervisor.post(
+        "/api/editar-chamado", data={}, content_type="multipart/form-data"
+    )
     assert r.status_code == 400
     assert "erro" in (r.get_json() or {})
 
@@ -265,7 +272,7 @@ def test_api_chamado_por_id_sem_login_401(client):
 
 @pytest.mark.api
 def test_api_chamado_por_id_sucesso_200_estrutura(client_logado_supervisor):
-    """GET /api/chamado/<id> retorna 200 com objeto chamado (ou 404 se rota/recurso não encontrado)."""
+    """GET /api/chamado/<id> retorna 200 com objeto chamado."""
     mock_doc = MagicMock()
     mock_doc.exists = True
     mock_doc.id = "ch1"
@@ -279,15 +286,17 @@ def test_api_chamado_por_id_sucesso_200_estrutura(client_logado_supervisor):
         "responsavel": "Sup",
         "tipo_solicitacao": "Manutencao",
     }
-    with patch("app.routes.api.db") as mock_db:
+    with (
+        patch("app.routes.api.db") as mock_db,
+        patch("app.routes.api.usuario_pode_ver_chamado", return_value=True),
+        patch("app.routes.api.obter_sla_para_exibicao", return_value=None),
+    ):
         mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
-        with patch("app.routes.api.obter_sla_para_exibicao", return_value=None):
-            r = client_logado_supervisor.get("/api/chamado/ch1")
-    assert r.status_code in (200, 404)
-    if r.status_code == 200:
-        data = r.get_json()
-        assert data.get("sucesso") is True and "chamado" in data
-        assert "numero_chamado" in data["chamado"] and "status" in data["chamado"]
+        r = client_logado_supervisor.get("/api/chamado/ch1")
+    assert r.status_code == 200
+    data = r.get_json()
+    assert data.get("sucesso") is True and "chamado" in data
+    assert "numero_chamado" in data["chamado"] and "status" in data["chamado"]
 
 
 # --- GET /api/notificacoes ---
@@ -389,12 +398,7 @@ def test_api_supervisores_disponibilidade_sem_login_401(client):
 
 
 @pytest.mark.api
-def test_api_supervisores_disponibilidade_sucesso_200_estrutura(client_logado_supervisor):
-    """GET /api/supervisores/disponibilidade retorna 200 com sucesso, supervisores, area."""
-    with patch("app.routes.api.atribuidor") as mock_atr:
-        mock_atr.obter_disponibilidade.return_value = {"supervisores": [], "area": "Manutencao"}
-        r = client_logado_supervisor.get("/api/supervisores/disponibilidade")
-    assert r.status_code in (200, 403, 404)
-    if r.status_code == 200:
-        data = r.get_json()
-        assert data.get("sucesso") is True and "supervisores" in data and "area" in data
+def test_api_supervisores_disponibilidade_nao_implementada(client_logado_supervisor):
+    """GET /api/supervisores/disponibilidade retorna 404 — rota não implementada em api.py."""
+    r = client_logado_supervisor.get("/api/supervisores/disponibilidade")
+    assert r.status_code == 404

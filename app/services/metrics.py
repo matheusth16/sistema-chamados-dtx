@@ -1,9 +1,8 @@
 """
 Métricas de negócio — log estruturado de eventos.
 
-Emit eventos chave como linhas JSON no logger `app.metrics`. No Railway,
-essas linhas aparecem nos logs do deploy e podem ser exportadas via log drain
-para qualquer destino (Datadog, Logtail, etc.).
+Emit eventos chave como linhas JSON no logger `app.metrics`. Essas linhas
+podem ser exportadas via log drain para qualquer destino (Datadog, Logtail, etc.).
 
 Uso:
     from app.services.metrics import log_evento

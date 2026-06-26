@@ -325,6 +325,34 @@ def test_login_ip_bloqueado_redireciona_sem_verificar_senha(client):
     mock_get.assert_not_called()
 
 
+def test_lockout_nao_bypassado_com_xff_forjado_na_frente(client):
+    """ProxyFix(x_for=1): IP falso no início do X-Forwarded-For não é usado para lockout.
+
+    Comportamento esperado com ProxyFix:
+    - X-Forwarded-For: "1.2.3.4, 127.0.0.1" → ProxyFix usa o último IP (127.0.0.1)
+    - get_client_ip() retorna remote_addr = 127.0.0.1 (controlado pelo proxy)
+    - "1.2.3.4" (forjado pelo atacante) é ignorado
+    """
+    with (
+        patch("app.routes.auth.LoginAttemptTracker.is_locked_out", return_value=False),
+        patch("app.routes.auth.Usuario.get_by_email", return_value=None),
+        patch("app.routes.auth.LoginAttemptTracker.increment_attempt", return_value=1) as mock_inc,
+        patch("app.routes.auth.LoginAttemptTracker.log_failed_attempt"),
+    ):
+        client.post(
+            "/login",
+            data={"email": "test@test.com", "senha": "errada"},
+            headers={"X-Forwarded-For": "1.2.3.4, 127.0.0.1"},
+            follow_redirects=False,
+        )
+
+    ips_usados = [call.args[0] for call in mock_inc.call_args_list]
+    # ProxyFix(x_for=1) toma o último IP do XFF → 127.0.0.1 (REMOTE_ADDR real)
+    # O IP forjado "1.2.3.4" (primeiro) NÃO deve ser usado
+    assert "1.2.3.4" not in ips_usados, f"IP forjado não deve ser usado; ips={ips_usados}"
+    assert "127.0.0.1" in ips_usados, f"REMOTE_ADDR real deve ser usado; ips={ips_usados}"
+
+
 def test_alterar_senha_sem_must_change_redireciona_supervisor(client, app):
     """Supervisor que já trocou senha é redirecionado para /painel ao acessar alterar-senha."""
     usuario = MagicMock()
@@ -460,6 +488,132 @@ def test_alterar_senha_update_retorna_false_redireciona(client, app):
     assert "alterar-senha" in (r.location or "")
 
 
+# ── Onda 2: conta desativada (ativo=False) ────────────────────────────────────
+
+
+def test_login_usuario_inativo_nao_autentica(client):
+    """CT-AUTH-I1: Login com ativo=False e senha correta NÃO cria sessão autenticada."""
+    usuario = MagicMock()
+    usuario.id = "u_inativo"
+    usuario.email = "inativo@test.com"
+    usuario.nome = "Inativo Teste"
+    usuario.perfil = "solicitante"
+    usuario.ativo = False
+    usuario.must_change_password = False
+    usuario.get_id = lambda: "u_inativo"
+    usuario.is_authenticated = True
+    usuario.is_active = True
+    usuario.is_anonymous = False
+    usuario.check_password = MagicMock(return_value=True)
+
+    with patch("app.routes.auth.Usuario.get_by_email", return_value=usuario):
+        r = client.post(
+            "/login",
+            data={"email": "inativo@test.com", "senha": "ok"},
+            follow_redirects=False,
+        )
+
+    assert r.status_code == 302
+    assert "login" in (r.location or "")
+
+    # Rota protegida ainda deve redirecionar — sessão NÃO foi criada
+    r2 = client.get("/", follow_redirects=False)
+    assert r2.status_code == 302
+    assert "login" in (r2.location or "")
+
+
+def test_login_usuario_inativo_exibe_flash_account_disabled(client):
+    """CT-AUTH-I2: Login com ativo=False exibe mensagem de conta desativada."""
+    usuario = MagicMock()
+    usuario.id = "u_inativo2"
+    usuario.email = "inativo2@test.com"
+    usuario.nome = "Inativo Dois"
+    usuario.perfil = "solicitante"
+    usuario.ativo = False
+    usuario.must_change_password = False
+    usuario.get_id = lambda: "u_inativo2"
+    usuario.is_authenticated = True
+    usuario.is_active = True
+    usuario.is_anonymous = False
+    usuario.check_password = MagicMock(return_value=True)
+
+    with patch("app.routes.auth.Usuario.get_by_email", return_value=usuario):
+        r = client.post(
+            "/login",
+            data={"email": "inativo2@test.com", "senha": "ok"},
+            follow_redirects=True,
+        )
+
+    assert r.status_code == 200
+    # "disabled" aparece na mensagem traduzida en: "Account disabled"
+    assert b"disabled" in r.data.lower()
+
+
+def test_login_usuario_inativo_nao_incrementa_lockout(client):
+    """CT-AUTH-I3: Login com ativo=False não incrementa contador de brute-force."""
+    usuario = MagicMock()
+    usuario.ativo = False
+    usuario.check_password = MagicMock(return_value=True)
+
+    with (
+        patch("app.routes.auth.Usuario.get_by_email", return_value=usuario),
+        patch("app.routes.auth.LoginAttemptTracker.is_locked_out", return_value=False),
+        patch("app.routes.auth.LoginAttemptTracker.increment_attempt") as mock_inc,
+    ):
+        client.post(
+            "/login",
+            data={"email": "inativo3@test.com", "senha": "ok"},
+            follow_redirects=False,
+        )
+
+    mock_inc.assert_not_called()
+
+
+def test_user_loader_usuario_inativo_retorna_none(client, app):
+    """CT-AUTH-I4: Sessão ativa é invalidada quando user_loader encontra ativo=False."""
+    # Fase 1: login com usuário ativo
+    usuario_ativo = MagicMock()
+    usuario_ativo.id = "u_loader_inativo"
+    usuario_ativo.email = "loader_inativo@test.com"
+    usuario_ativo.nome = "Loader Inativo"
+    usuario_ativo.perfil = "solicitante"
+    usuario_ativo.ativo = True
+    usuario_ativo.must_change_password = False
+    usuario_ativo.onboarding_completo = True
+    usuario_ativo.get_id = lambda: "u_loader_inativo"
+    usuario_ativo.is_authenticated = True
+    usuario_ativo.is_active = True
+    usuario_ativo.is_anonymous = False
+    usuario_ativo.check_password = MagicMock(return_value=True)
+
+    with (
+        patch("app.routes.auth.Usuario.get_by_email", return_value=usuario_ativo),
+        patch("app.models_usuario.Usuario.get_by_id", return_value=usuario_ativo),
+    ):
+        r_login = client.post(
+            "/login",
+            data={"email": "loader_inativo@test.com", "senha": "ok"},
+            follow_redirects=False,
+        )
+    assert r_login.status_code == 302
+
+    # Fase 2: usuário foi desativado — user_loader deve retornar None
+    usuario_inativo = MagicMock()
+    usuario_inativo.id = "u_loader_inativo"
+    usuario_inativo.ativo = False
+    usuario_inativo.get_id = lambda: "u_loader_inativo"
+    usuario_inativo.is_authenticated = True
+    usuario_inativo.is_active = True
+    usuario_inativo.is_anonymous = False
+    usuario_inativo.must_change_password = False
+
+    with patch("app.models_usuario.Usuario.get_by_id", return_value=usuario_inativo):
+        r = client.get("/", follow_redirects=False)
+
+    assert r.status_code == 302
+    assert "login" in (r.location or "")
+
+
 def test_alterar_senha_excecao_no_update_redireciona(client, app):
     """Exceção em current_user.update redireciona de volta para alterar-senha."""
     usuario = MagicMock()
@@ -490,3 +644,44 @@ def test_alterar_senha_excecao_no_update_redireciona(client, app):
         )
     assert r.status_code == 302
     assert "alterar-senha" in (r.location or "")
+
+
+# ── Onda 4: login via email_lookup_hash ────────────────────────────────────────
+
+
+def test_login_funciona_quando_get_by_email_usa_hash_lookup(client):
+    """Onda 4: login funciona mesmo quando get_by_email usa hash lookup internamente.
+
+    Testa que o fluxo de autenticação (route → get_by_email → check_password)
+    é transparente ao mecanismo de lookup (hash vs. plaintext).
+    """
+    usuario = MagicMock()
+    usuario.id = "u_hash_login"
+    usuario.email = "hash_user@dtx.aero"
+    usuario.nome = "Hash Login User"
+    usuario.perfil = "solicitante"
+    usuario.must_change_password = False
+    usuario.get_id = lambda: "u_hash_login"
+    usuario.is_authenticated = True
+    usuario.is_active = True
+    usuario.is_anonymous = False
+    usuario.check_password = MagicMock(return_value=True)
+    usuario.ativo = True
+    usuario.onboarding_completo = True
+    usuario.onboarding_passo = 0
+    usuario.is_admin_or_above = False
+    usuario.is_supervisor_or_above = False
+
+    # Simula get_by_email usando hash lookup (retorna usuário normalmente)
+    with (
+        patch("app.routes.auth.Usuario.get_by_email", return_value=usuario),
+        patch("app.models_usuario.Usuario.get_by_id", return_value=usuario),
+    ):
+        r = client.post(
+            "/login",
+            data={"email": "hash_user@dtx.aero", "senha": "SenhaValida123!"},
+            follow_redirects=False,
+        )
+
+    assert r.status_code == 302
+    assert "/login" not in (r.location or "")

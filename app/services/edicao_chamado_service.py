@@ -12,6 +12,7 @@ from app.models import Chamado
 from app.models_historico import Historico
 from app.models_usuario import Usuario
 from app.services.notifications import notificar_setores_adicionais_chamado
+from app.services.permissions import calcular_supervisor_ids_com_acesso
 from app.services.status_service import atualizar_status_chamado
 from app.services.upload import salvar_anexo
 
@@ -35,6 +36,12 @@ def processar_edicao_chamado(
     """
     if not chamado_id:
         return {"sucesso": False, "erro": "ID do chamado é obrigatório"}
+
+    from app.services.permission_validation import usuario_pode_mutar_chamado
+
+    pode_mutar, msg_erro = usuario_pode_mutar_chamado(usuario_atual)
+    if not pode_mutar:
+        return {"sucesso": False, "erro": msg_erro, "codigo": 403}
 
     doc_chamado = db.collection("chamados").document(chamado_id).get()
     if not doc_chamado.exists:
@@ -120,10 +127,15 @@ def processar_edicao_chamado(
                         valor_novo=novo_resp.nome,
                     )
                 )
+                area_final = update_data.get("area") or data_chamado.get("area", "")
+                participantes = data_chamado.get("participantes") or []
+                update_data["supervisor_ids_com_acesso"] = calcular_supervisor_ids_com_acesso(
+                    area_final, update_data.get("responsavel_id"), participantes
+                )
 
         # 3. Descrição
         if nova_descricao and nova_descricao.strip() != data_chamado.get("descricao", "").strip():
-            nova_descricao = bleach.clean(nova_descricao.strip(), tags=[], strip=True)
+            nova_descricao = bleach.clean(nova_descricao.strip(), tags=[], strip=True)[:3000]
             descricao_anterior = (data_chamado.get("descricao") or "").strip()
             update_data["descricao"] = nova_descricao
             max_len = 3000

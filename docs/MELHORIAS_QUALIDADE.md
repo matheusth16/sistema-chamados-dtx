@@ -6,6 +6,8 @@
 > **Versão:** 1.0
 > **Status:** ✅ Pronto para implementação
 
+> **Estado de qualidade atualizado (2026-06-22 — Gate Final):** 1435 testes passando, cobertura global 94,98%, gate 85% global + 85% por módulo (`python scripts/check_coverage_per_module.py` — 52/52 OK). CI alinhado em `.github/workflows/ci.yml`. Este documento descreve melhorias históricas de fev/2026; para métricas vivas, consulte `docs/CHECKLIST_SEGURANCA.md`, `docs/GUIA_ONBOARDING_TECNICO.md` e `README.md`.
+
 ---
 
 ## 📊 Resumo Executivo

@@ -1,5 +1,5 @@
 """
-Entry point da aplicação DTX Digital Andon.
+Entry point da aplicação DTX Service Portal.
 
 Configura ambiente e inicia servidor Flask com segurança.
 Debug é ativado apenas em desenvolvimento via variável de ambiente.
@@ -23,15 +23,15 @@ if __name__ == "__main__":
     # Porta padrão: 5000, pode ser alterada via PORT
     port = int(os.getenv("PORT", 5000))
 
-    # Host: localhost em dev, 0.0.0.0 em produção (se configurado)
-    host = os.getenv("FLASK_HOST", "127.0.0.1" if debug_mode else "localhost")
+    # Host: 127.0.0.1 em dev (apenas local), 0.0.0.0 em produção (aceita conexões externas)
+    host = os.getenv("FLASK_HOST", "127.0.0.1" if debug_mode else "0.0.0.0")  # nosec B104
 
     # Log de inicialização
     log_level = logging.DEBUG if debug_mode else logging.INFO
     logger.setLevel(log_level)
 
     print(f"\n{'=' * 60}")
-    print("DTX Digital Andon - DTX Aerospace")
+    print("DTX Service Portal - DTX Aerospace")
     print(f"{'=' * 60}")
     print(f"Ambiente: {'DESENVOLVIMENTO' if debug_mode else 'PRODUÇÃO'}")
     print(f"Host: {host}:{port}")

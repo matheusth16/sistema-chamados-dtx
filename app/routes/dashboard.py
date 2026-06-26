@@ -19,8 +19,9 @@ from flask import (
 from flask_login import current_user, login_required
 from google.api_core.exceptions import FailedPrecondition
 
+from app.cache import get_static_cached
 from app.database import db
-from app.decoradores import requer_perfil, requer_supervisor_area
+from app.decoradores import requer_gestor_ou_admin, requer_perfil, requer_supervisor_area
 from app.i18n import flash_t, get_translation
 from app.limiter import limiter
 from app.models import Chamado
@@ -40,13 +41,11 @@ from app.services.dashboard_service import (
     ordenar_metricas_supervisores,
     preparar_metricas_paginadas,
 )
-from app.services.excel_export_service import MAX_EXPORT_CHAMADOS
+from app.services.excel_export_service import MAX_EXPORT_CHAMADOS, _safe_cell
 from app.services.filters import aplicar_filtros_dashboard_com_paginacao
+from app.services.gestor_dashboard_service import obter_contexto_gestor_dashboard
 from app.services.pagination import OptimizadorQuery
-from app.services.permission_validation import (
-    filtrar_supervisores_por_area,
-    supervisor_pode_alterar_chamado,
-)
+from app.services.permission_validation import filtrar_supervisores_por_area
 from app.services.permissions import usuario_pode_ver_chamado
 from app.services.status_service import atualizar_status_chamado
 from app.utils import formatar_data_para_excel
@@ -81,6 +80,10 @@ def _redirect_dashboard(**kwargs) -> Response:
 def _render_dashboard() -> Response:
     """Lógica compartilhada de dashboard — chamada por admin() e painel()."""
     if request.method == "POST":
+        # Gestor read-only: bloquear mutação de status via formulário do dashboard
+        if getattr(current_user, "is_gestor_only", False):
+            flash_t("access_denied_profiles", "danger", profiles="gestor")
+            return redirect(url_for("main.gestor_dashboard"))
         chamado_id = request.form.get("chamado_id")
         novo_status = request.form.get("novo_status")
         logger.debug("Alterar status: chamado_id=%s, novo_status=%s", chamado_id, novo_status)
@@ -91,7 +94,8 @@ def _render_dashboard() -> Response:
                     flash_t("ticket_not_found", "danger")
                     return _redirect_dashboard(**request.args)
                 data_anterior = doc_anterior.to_dict()
-                if not supervisor_pode_alterar_chamado(current_user, data_anterior.get("area", "")):
+                chamado_obj = Chamado.from_dict(data_anterior, chamado_id)
+                if not usuario_pode_ver_chamado(current_user, chamado_obj):
                     flash_t("only_update_tickets_your_area", "danger")
                     return _redirect_dashboard(**request.args)
 
@@ -129,6 +133,16 @@ def _render_dashboard() -> Response:
         raise
 
 
+@main.route("/gestor/dashboard", methods=["GET"])
+@login_required
+@requer_gestor_ou_admin
+def gestor_dashboard() -> Response:
+    """Dashboard gerencial read-only (Fase 5). Acessível por gestores e admins."""
+    filtro = request.args.get("filtro")
+    contexto = obter_contexto_gestor_dashboard(filtro=filtro)
+    return render_template("gestor_dashboard.html", **contexto)
+
+
 @main.route("/admin", methods=["GET", "POST"])
 @requer_supervisor_area
 def admin() -> Response:
@@ -144,6 +158,9 @@ def painel() -> Response:
     """Dashboard para supervisores. Admins são redirecionados a /admin."""
     if current_user.perfil in ("admin", "admin_global"):
         return redirect(url_for("main.admin", **request.args))
+    # Gestor read-only: redirecionar para dashboard gerencial (GET e POST)
+    if getattr(current_user, "is_gestor_only", False):
+        return redirect(url_for("main.gestor_dashboard"))
     return _render_dashboard()
 
 
@@ -161,14 +178,12 @@ def visualizar_detalhe_chamado(chamado_id: str) -> Response:
                 else url_for("main.meus_chamados")
             )
         chamado = Chamado.from_dict(doc_chamado.to_dict(), chamado_id)
-        if current_user.perfil == "solicitante":
-            if chamado.solicitante_id != current_user.id:
+        if not usuario_pode_ver_chamado(current_user, chamado):
+            if current_user.perfil == "solicitante":
                 flash_t("ticket_not_found", "danger")
                 return redirect(url_for("main.meus_chamados"))
-        else:
-            if not usuario_pode_ver_chamado(current_user, chamado):
-                flash_t("only_view_history_your_area", "danger")
-                return _redirect_dashboard()
+            flash_t("only_view_history_your_area", "danger")
+            return _redirect_dashboard()
         voltar_url = (
             request.referrer
             if request.referrer and _same_origin(request.referrer)
@@ -178,8 +193,10 @@ def visualizar_detalhe_chamado(chamado_id: str) -> Response:
                 else url_for("main.meus_chamados")
             )
         )
-        pode_editar = current_user.perfil in ("supervisor", "admin")
-        usuarios_gestao = Usuario.get_all()
+        pode_editar = current_user.perfil in ("supervisor", "admin") and not getattr(
+            current_user, "is_gestor_only", False
+        )
+        usuarios_gestao = get_static_cached("usuarios_all", Usuario.get_all, ttl_seconds=300)
         supervisores_list = [u for u in usuarios_gestao if u.perfil == "supervisor" and u.nome]
         if pode_editar:
             supervisores_list = filtrar_supervisores_por_area(current_user, supervisores_list)
@@ -217,6 +234,11 @@ def editar_chamado_pagina() -> Response:
     if not current_user.is_supervisor_or_above:
         flash_t("only_supervisor_can_edit", "danger")
         return redirect(url_for("main.index"))
+
+    # Gestor read-only não pode editar chamados
+    if getattr(current_user, "is_gestor_only", False):
+        flash_t("access_denied_profiles", "danger", profiles="gestor")
+        return redirect(url_for("main.gestor_dashboard"))
 
     chamado_id = request.form.get("chamado_id")
     if not chamado_id:
@@ -332,7 +354,7 @@ def exportar() -> Response:
         if dados:
             ws.append(list(dados[0].keys()))
             for row in dados:
-                ws.append(list(row.values()))
+                ws.append([_safe_cell(v) for v in row.values()])
         output = io.BytesIO()
         wb.save(output)
         output.seek(0)
@@ -500,7 +522,7 @@ def relatorios() -> Response:
 
         # Ranking Gamificação Top 3 da Semana
         # Aproveitar os usuários puxados do banco ou base no relatorio
-        usuarios_gestao = Usuario.get_all()
+        usuarios_gestao = get_static_cached("usuarios_all", Usuario.get_all, ttl_seconds=300)
         ranking_gamificacao = sorted(
             [
                 u

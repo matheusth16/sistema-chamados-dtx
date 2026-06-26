@@ -156,3 +156,71 @@ def requer_solicitante(f):
         return f(*args, **kwargs)
 
     return funcao_decorada
+
+
+def requer_gestor(f):
+    """Exige que o usuário tenha nivel_gestao preenchido (is_gestor=True).
+
+    Fail-closed: qualquer usuário sem nivel_gestao recebe flash + redirect.
+    """
+
+    @wraps(f)
+    def funcao_decorada(*args, **kwargs):
+        if not current_user.is_authenticated:
+            logger.warning("Acesso negado: usuário não autenticado tentou acessar %s", f.__name__)
+            flash_t("login_required_msg", "danger")
+            return redirect(url_for("main.login"))
+
+        if not getattr(current_user, "is_gestor", False):
+            logger.warning(
+                "Acesso negado: %s (%s) sem nivel_gestao tentou acessar %s",
+                current_user.email,
+                current_user.perfil,
+                f.__name__,
+            )
+            flash_t("access_denied_profiles", "danger", profiles="gestor")
+            if current_user.perfil == "solicitante":
+                return redirect(url_for("main.index"))
+            if current_user.perfil == "supervisor":
+                return redirect(url_for("main.painel"))
+            return redirect(url_for("main.admin"))
+
+        return f(*args, **kwargs)
+
+    return funcao_decorada
+
+
+def requer_gestor_ou_admin(f):
+    """Exige is_gestor OR is_admin_or_above.
+
+    Usado no /gestor/dashboard: gestor acessa read-only; admin acessa com privilégios totais.
+    Fail-closed: qualquer outro perfil recebe flash + redirect.
+    """
+
+    @wraps(f)
+    def funcao_decorada(*args, **kwargs):
+        if not current_user.is_authenticated:
+            logger.warning("Acesso negado: usuário não autenticado tentou acessar %s", f.__name__)
+            flash_t("login_required_msg", "danger")
+            return redirect(url_for("main.login"))
+
+        is_gestor = getattr(current_user, "is_gestor", False)
+        is_admin = getattr(current_user, "is_admin_or_above", False)
+
+        if not (is_gestor or is_admin):
+            logger.warning(
+                "Acesso negado: %s (%s) não é gestor nem admin, tentou acessar %s",
+                current_user.email,
+                current_user.perfil,
+                f.__name__,
+            )
+            flash_t("access_denied_profiles", "danger", profiles="gestor, admin")
+            if current_user.perfil == "solicitante":
+                return redirect(url_for("main.index"))
+            if current_user.perfil == "supervisor":
+                return redirect(url_for("main.painel"))
+            return redirect(url_for("main.admin"))
+
+        return f(*args, **kwargs)
+
+    return funcao_decorada

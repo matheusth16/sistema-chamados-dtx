@@ -667,15 +667,15 @@
 
 ## 13. Admin: usuários, categorias, traduções
 
-### CT-ADM-01: Rotas admin apenas para admin (usuários/categorias/traduções)
+### CT-ADM-01: Rotas admin apenas para admin (usuários/categorias)
 
 | Campo | Descrição |
 |-------|-----------|
 | **ID** | CT-ADM-01 |
 | **Tipo** | I |
-| **Objetivo** | Solicitante ou supervisor não acessa CRUD de usuários, categorias ou traduções (apenas admin). |
+| **Objetivo** | Solicitante ou supervisor não acessa CRUD de usuários ou categorias (apenas admin). |
 | **Pré-condição** | Cliente logado como solicitante ou supervisor. |
-| **Passos** | 1. GET `/admin/usuarios`, GET `/admin/categorias`, GET `/admin/traducoes` |
+| **Passos** | 1. GET `/admin/usuarios`, GET `/admin/categorias` |
 | **Resultado esperado** | 403 ou redirecionamento conforme regra de perfil (apenas admin). |
 | **Prioridade** | Alta |
 
@@ -691,19 +691,6 @@
 | **Pré-condição** | Cliente logado como admin. |
 | **Passos** | 1. GET `/admin/usuarios`, GET `/admin/categorias` |
 | **Resultado esperado** | 200; HTML com lista (ou vazia). |
-| **Prioridade** | Média |
-
----
-
-### CT-TRAD-01: GET /admin/traducoes exige admin
-
-| Campo | Descrição |
-|-------|-----------|
-| **ID** | CT-TRAD-01 |
-| **Tipo** | I |
-| **Objetivo** | Rota de traduções só é acessível por admin. |
-| **Passos** | 1. GET `/admin/traducoes` como supervisor ou solicitante |
-| **Resultado esperado** | 403 ou redirect. GET como admin → 200. |
 | **Prioridade** | Média |
 
 ---
@@ -737,10 +724,180 @@
 
 ---
 
+## 15. Escalonamento, Multi-setor e SLA (Onda 6)
+
+### CT-ESC-01: Isolamento supervisor mesma área
+
+| Campo | Descrição |
+|-------|-----------|
+| **ID** | CT-ESC-01 |
+| **Tipo** | U |
+| **Objetivo** | Supervisor A não vê chamado atribuído ao Supervisor B, mesmo na mesma área. |
+| **Pré-condição** | Chamado com `responsavel_id=sup_b`, `supervisor_ids_com_acesso=["sup_b"]`; sup_a com mesma área. |
+| **Passos** | 1. Chamar `usuario_pode_ver_chamado(sup_a, chamado)` |
+| **Resultado esperado** | Retorna `False`. |
+| **Prioridade** | Alta |
+
+---
+
+### CT-ESC-02: Fila sem owner visível
+
+| Campo | Descrição |
+|-------|-----------|
+| **ID** | CT-ESC-02 |
+| **Tipo** | U |
+| **Objetivo** | Chamado Aberto sem `responsavel_id` é visível para supervisor da área (fila). |
+| **Pré-condição** | Chamado com `responsavel_id=None`, `supervisor_ids_com_acesso=["sup_a"]`; sup_a com área correspondente. |
+| **Passos** | 1. Chamar `usuario_pode_ver_chamado(sup_a, chamado)` |
+| **Resultado esperado** | Retorna `True`. |
+| **Prioridade** | Alta |
+
+---
+
+### CT-ESC-03: Claim Aberto → Em Atendimento
+
+| Campo | Descrição |
+|-------|-----------|
+| **ID** | CT-ESC-03 |
+| **Tipo** | I |
+| **Objetivo** | POST status `Em Atendimento` em chamado `Aberto` sem owner atribui `responsavel_id = current_user.id`. |
+| **Pré-condição** | Chamado com `status=Aberto`, `responsavel_id=None`; usuário supervisor autenticado. |
+| **Passos** | 1. Chamar `atualizar_status_chamado(chamado_id, "Em Atendimento", user_id, user_nome)` |
+| **Resultado esperado** | `sucesso=True`; `responsavel_id = user_id`; `data_em_atendimento` gravado. |
+| **Prioridade** | Alta |
+
+---
+
+### CT-ESC-04: Transferir área (motivo + supervisor obrigatório)
+
+| Campo | Descrição |
+|-------|-----------|
+| **ID** | CT-ESC-04 |
+| **Tipo** | I |
+| **Objetivo** | `transferir_area` troca área e owner; ex-owner perde visão; novo owner ganha. |
+| **Pré-condição** | Owner sup_orig ativo; sup_dest em área destino. |
+| **Passos** | 1. `transferir_area(chamado_id, "Manutencao", "sup_dest", "motivo", sup_orig)` |
+| **Resultado esperado** | `sucesso=True`; `supervisor_ids_com_acesso` não contém sup_orig; contém sup_dest. |
+| **Prioridade** | Alta |
+
+---
+
+### CT-ESC-05: Escalonar colega mesma área
+
+| Campo | Descrição |
+|-------|-----------|
+| **ID** | CT-ESC-05 |
+| **Tipo** | I |
+| **Objetivo** | `escalonar_colega` troca `responsavel_id` na mesma área; motivo vazio lança ValueError. |
+| **Pré-condição** | Owner sup_a; colega sup_b na mesma área. |
+| **Passos** | 1. `escalonar_colega(id, "sup_b", "   ", sup_a)` → ValueError.<br>2. `escalonar_colega(id, "sup_b", "Motivo", sup_a)` → sucesso |
+| **Resultado esperado** | Passo 1: `ValueError`. Passo 2: `sucesso=True`; `responsavel_id="sup_b"`. |
+| **Prioridade** | Alta |
+
+---
+
+### CT-ESC-06: Incluir participantes
+
+| Campo | Descrição |
+|-------|-----------|
+| **ID** | CT-ESC-06 |
+| **Tipo** | I |
+| **Objetivo** | Owner inclui supervisor de outra área como participante; `supervisor_ids_com_acesso` atualizado. |
+| **Pré-condição** | Chamado com owner; sup_b em área diferente. |
+| **Passos** | 1. `incluir_participantes(id, [{"supervisor_id":"sup_b","area":"TI"}], owner)` |
+| **Resultado esperado** | `sucesso=True`; `adicionados=[{...}]`; `supervisor_ids_com_acesso` inclui sup_b. |
+| **Prioridade** | Alta |
+
+---
+
+### CT-ESC-07: Concluí minha parte + bloqueio fechamento global
+
+| Campo | Descrição |
+|-------|-----------|
+| **ID** | CT-ESC-07 |
+| **Tipo** | U |
+| **Objetivo** | `pode_concluir_global` retorna False com participante pendente; True quando todos concluídos. |
+| **Pré-condição** | Chamado com participante `status=pendente`. |
+| **Passos** | 1. `pode_concluir_global(chamado_com_pendente)` → False.<br>2. Marcar participante como `concluido`.<br>3. `pode_concluir_global(chamado_concluido)` → True |
+| **Resultado esperado** | Passo 1: `False`. Passo 3: `True`. |
+| **Prioridade** | Alta |
+
+---
+
+### CT-ESC-08: Gestor dashboard read-only + 403 write
+
+| Campo | Descrição |
+|-------|-----------|
+| **ID** | CT-ESC-08 |
+| **Tipo** | I |
+| **Objetivo** | Gestor acessa `/gestor/dashboard` (200) mas não pode alterar status. |
+| **Pré-condição** | Usuário com `is_gestor_only=True`. |
+| **Passos** | 1. GET `/gestor/dashboard` autenticado como gestor.<br>2. `verificar_permissao_mudanca_status(gestor, chamado, "Concluído")` |
+| **Resultado esperado** | 1. HTTP 200. 2. `(False, "Acesso negado: gestores têm visão read-only")`. |
+| **Prioridade** | Alta |
+
+---
+
+### CT-SLA-01: Escada A — degrau +1h útil após abertura 11:00 → notificação 13:30
+
+| Campo | Descrição |
+|-------|-----------|
+| **ID** | CT-SLA-01 |
+| **Tipo** | U |
+| **Objetivo** | Threshold de 60 min úteis atingido às 13:30 (não 12:30), pois almoço 11:30–13:00 não conta. |
+| **Pré-condição** | `SLA_HORARIO_INICIO=07:00`, `SLA_ALMOCO_INICIO=11:30`, `SLA_ALMOCO_FIM=13:00`. |
+| **Passos** | 1. `minutos_uteis_entre(11:00, 12:30)` → deve ser < 60.<br>2. `minutos_uteis_entre(11:00, 13:30)` → deve ser ≥ 60 |
+| **Resultado esperado** | `min_12h30 < 60` e `min_13h30 ≥ 60`. |
+| **Prioridade** | Alta |
+
+---
+
+### CT-SLA-02: Escada A/B — nenhum envio fora janela (almoço, após 16:30, fim de semana)
+
+| Campo | Descrição |
+|-------|-----------|
+| **ID** | CT-SLA-02 |
+| **Tipo** | U |
+| **Objetivo** | `pode_enviar_notificacao_agora()` retorna False fora da janela útil DTX. |
+| **Pré-condição** | Timezone `America/Sao_Paulo`. |
+| **Passos** | 1. Sexta 16:45 BRT.<br>2. Sexta 14:00 BRT (dentro).<br>3. Sábado 10:00 BRT |
+| **Resultado esperado** | 1. `False`. 2. `True`. 3. `False`. |
+| **Prioridade** | Alta |
+
+---
+
+### CT-SLA-03: Escada B — deadline Projetos 2d / demais 3d úteis; data_em_atendimento imutável
+
+| Campo | Descrição |
+|-------|-----------|
+| **ID** | CT-SLA-03 |
+| **Tipo** | U/I |
+| **Objetivo** | Editar descrição de chamado em atendimento não altera `data_em_atendimento`. |
+| **Pré-condição** | Chamado `Em Atendimento` com `data_em_atendimento` gravado. |
+| **Passos** | 1. `processar_edicao_chamado(..., nova_descricao="X", ...)` |
+| **Resultado esperado** | Payload de update enviado ao Firestore não contém `data_em_atendimento`. |
+| **Prioridade** | Alta |
+
+---
+
+### CT-SLA-04: Avisos 50%/80% + badge em_risco ≥50%
+
+| Campo | Descrição |
+|-------|-----------|
+| **ID** | CT-SLA-04 |
+| **Tipo** | I |
+| **Objetivo** | `processar_avisos_resolucao()` grava flag `alerta_supervisor_50_enviado` ao atingir 50% do prazo; flag é idempotente. |
+| **Pré-condição** | Chamado `Em Atendimento` com `data_em_atendimento` e percentual ≥ 50%. |
+| **Passos** | 1. Executar `processar_avisos_resolucao()` com mock de chamado elegível.<br>2. Executar novamente → não deve reenviar |
+| **Resultado esperado** | 1. `notificados_50=1`, flag gravada. 2. `notificados_50=0` (idempotente). |
+| **Prioridade** | Alta |
+
+---
+
 ## Resumo por prioridade
 
-- **Alta:** CT-AUTH-01 a 07, CT-CHAM-01 a 06 e 09, CT-STAT-01 a 05, CT-EDIT-01 a 04, CT-PAG-02, CT-ID-01 e 02, CT-PERM-01 e 02, CT-HEALTH-01, CT-DASH-01, CT-ADM-01.
-- **Média:** CT-AUTH-07, CT-CHAM-07, 08, 10, CT-STAT-06 e 07, CT-PAG-01, CT-PERM-03, CT-NOT-01 e 02, CT-SW-01, CT-EXC-01, CT-SENHA-01 e 02, CT-EXP-01 e 02, CT-ADM-02, CT-TRAD-01, CT-SEC-01.
+- **Alta:** CT-AUTH-01 a 07, CT-CHAM-01 a 06 e 09, CT-STAT-01 a 05, CT-EDIT-01 a 04, CT-PAG-02, CT-ID-01 e 02, CT-PERM-01 e 02, CT-HEALTH-01, CT-DASH-01, CT-ADM-01, CT-ESC-01 a 08, CT-SLA-01 a 04.
+- **Média:** CT-AUTH-07, CT-CHAM-07, 08, 10, CT-STAT-06 e 07, CT-PAG-01, CT-PERM-03, CT-NOT-01 e 02, CT-SW-01, CT-EXC-01, CT-SENHA-01 e 02, CT-EXP-01 e 02, CT-ADM-02, CT-SEC-01.
 - **Baixa:** CT-PUSH-01, CT-SENHA-03, CT-RATE-01.
 
 Estes casos podem ser implementados como testes automatizados (pytest) conforme o [PLANO_DE_TESTES.md](PLANO_DE_TESTES.md). Muitos já possuem equivalentes em `tests/`; este documento serve como especificação funcional e checklist de cobertura.
@@ -771,6 +928,17 @@ Estes casos podem ser implementados como testes automatizados (pytest) conforme 
 | CT-SENHA-01 a 03 | test_routes/test_auth.py | test_alterar_senha_* (a implementar conforme cenários) |
 | CT-DASH-01, CT-EXP-* | test_routes/test_dashboard.py | test_admin_*, test_exportar_* (a implementar) |
 | CT-ADM-01, CT-ADM-02 | test_routes/test_usuarios.py, test_routes/test_categorias.py | test_*_requer_admin (a implementar) |
-| CT-TRAD-01 | test_routes/test_traducoes.py | test_traducoes_requer_admin (a implementar) |
 | CT-SEC-01 | test_routes/test_security_origin.py | test_*_origin_invalida |
 | CT-RATE-01 | test_routes/test_auth.py | test_rate_limit_login (a implementar se configurável em test) |
+| CT-ESC-01, 02 | test_services/test_permissions.py | TestUsuarioPodeVerChamado.test_supervisor_nao_ve_chamado_de_outro, test_supervisor_ve_fila_sem_owner |
+| CT-ESC-03 | test_routes/test_api_escalonamento.py | test_claim_atribui_responsavel_id |
+| CT-ESC-04 | test_services/test_escalonamento_service.py | test_transferir_area_atualiza_supervisor_ids_com_acesso |
+| CT-ESC-05 | test_services/test_escalonamento_service.py | test_escalonar_colega_motivo_vazio_rejeita, test_escalonar_colega_sucesso |
+| CT-ESC-06 | test_services/test_escalonamento_service.py | test_incluir_participantes_* |
+| CT-ESC-07 | test_services/test_escalonamento_service.py | test_pode_concluir_global_falso_com_participante_pendente, test_pode_concluir_global_verdadeiro |
+| CT-ESC-08 | test_routes/test_api_escalonamento.py | test_gestor_dashboard_retorna_200, test_gestor_nao_pode_mudar_status |
+| CT-SLA-01 | test_services/test_business_time.py | test_minutos_uteis_pula_almoco |
+| CT-SLA-02 | test_services/test_business_time.py | test_pode_enviar_notificacao_fora_janela, test_pode_enviar_notificacao_sabado |
+| CT-SLA-03 | test_services/test_edicao_chamado_service.py, test_services/test_escalonamento_service.py | test_edicao_descricao_nao_altera_data_em_atendimento, test_concluir_minha_parte_nao_altera_data_em_atendimento |
+| CT-SLA-04 | test_services/test_sla_escalacao_service.py | test_processar_avisos_resolucao_*, test_idempotencia_aviso_50 |
+| CT-ESC-* (script QA) | tests/test_scripts/test_executar_qa_escalonamento.py | 5 testes de estrutura e exit code |

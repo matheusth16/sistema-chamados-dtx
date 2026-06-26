@@ -16,13 +16,12 @@ def test_api_editar_chamado_solicitante_recebe_403(client_logado_solicitante):
 
 
 def test_api_editar_chamado_sem_chamado_id_retorna_400(client_logado_supervisor):
-    """POST /api/editar-chamado sem chamado_id retorna 400."""
-    with patch("app.routes.api.db"):
-        r = client_logado_supervisor.post(
-            "/api/editar-chamado",
-            data={},
-            content_type="multipart/form-data",
-        )
+    """POST /api/editar-chamado sem chamado_id retorna 400 (validação antes do db)."""
+    r = client_logado_supervisor.post(
+        "/api/editar-chamado",
+        data={},
+        content_type="multipart/form-data",
+    )
     assert r.status_code == 400
     assert r.get_json().get("erro") and "obrigatório" in r.get_json().get("erro", "").lower()
 
@@ -210,30 +209,47 @@ def test_api_supervisores_disponibilidade_sem_login_retorna_401_json(client):
 
 def test_bulk_status_supervisor_outra_area_retorna_erro_por_chamado(client_logado_supervisor):
     """Edge case: no bulk-status, chamados de outra área do supervisor retornam em erros (sem permissão)."""
-    # Supervisor do conftest tem areas=['Manutencao']. Doc 1 = mesma área, Doc 2 = outra área.
     doc_manutencao = MagicMock()
     doc_manutencao.exists = True
-    doc_manutencao.to_dict.return_value = {"area": "Manutencao", "status": "Aberto"}
+    doc_manutencao.to_dict.return_value = {
+        "area": "Manutencao",
+        "status": "Aberto",
+        "responsavel_id": None,
+        "solicitante_id": "sol_outro",
+        "participantes": [],
+    }
     doc_ti = MagicMock()
     doc_ti.exists = True
-    doc_ti.to_dict.return_value = {"area": "TI", "status": "Aberto"}
-    with patch("app.routes.api.db") as mock_db:
+    doc_ti.to_dict.return_value = {
+        "area": "TI",
+        "status": "Aberto",
+        "responsavel_id": None,
+        "solicitante_id": "sol_outro",
+        "participantes": [],
+    }
+    with (
+        patch("app.routes.api.db") as mock_db,
+        patch("app.routes.api.atualizar_status_chamado") as mock_atualizar,
+    ):
         col = mock_db.collection.return_value
 
         def doc_side_effect(doc_id):
             m = MagicMock()
             m.get.return_value = doc_manutencao if doc_id == "ch_manutencao" else doc_ti
-            m.update = MagicMock()
             return m
 
         col.document.side_effect = doc_side_effect
-        with patch("app.routes.api.execute_with_retry"):
-            r = client_logado_supervisor.post(
-                "/api/bulk-status",
-                json={"chamado_ids": ["ch_manutencao", "ch_ti"], "novo_status": "Em Atendimento"},
-                content_type="application/json",
-                headers={"Origin": "http://localhost:5000"},
-            )
+        mock_atualizar.return_value = {
+            "sucesso": True,
+            "mensagem": "ok",
+            "novo_status": "Em Atendimento",
+        }
+        r = client_logado_supervisor.post(
+            "/api/bulk-status",
+            json={"chamado_ids": ["ch_manutencao", "ch_ti"], "novo_status": "Em Atendimento"},
+            content_type="application/json",
+            headers={"Origin": "http://localhost:5000"},
+        )
     assert r.status_code in (200, 403)
     if r.status_code != 200:
         return
@@ -307,6 +323,46 @@ def test_api_chamado_por_id_supervisor_sua_area_retorna_200(client_logado_superv
     assert data["chamado"].get("status") == "Aberto"
 
 
+# ── IDOR: POST body com chamado_id alheio ─────────────────────────────────────
+
+
+def test_post_editar_chamado_chamado_id_alheio_retorna_403(client_logado_solicitante):
+    """CT-IDOR-POST-01: Solicitante com chamado_id de outro usuário no JSON → 403.
+
+    Garante que o IDOR guard em /api/atualizar-status rejeita chamados cujo
+    solicitante_id não corresponde ao current_user.id, mesmo com JSON válido.
+    """
+    mock_doc = MagicMock()
+    mock_doc.exists = True
+    mock_doc.to_dict.return_value = {
+        "numero_chamado": "CHM-9999",
+        "categoria": "Chamado",
+        "status": "Aberto",
+        "descricao": "Desc alheio",
+        "area": "TI",
+        "solicitante_id": "outro_usuario",  # ≠ "sol_1" do fixture
+        "responsavel": "Resp",
+        "tipo_solicitacao": "Suporte",
+        "prioridade": 2,
+    }
+    with patch("app.routes.api.db") as mock_db:
+        mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
+        r = client_logado_solicitante.post(
+            "/api/atualizar-status",
+            json={
+                "chamado_id": "ch_alheio_99",
+                "novo_status": "Cancelado",
+                "motivo_cancelamento": "teste IDOR",
+            },
+            content_type="application/json",
+        )
+    assert r.status_code == 403
+    data = r.get_json()
+    assert data is not None and data.get("sucesso") is False
+    erro = (data.get("erro") or "").lower()
+    assert "acesso negado" in erro or "negado" in erro or "permissão" in erro or "permissao" in erro
+
+
 # ── CSP report ────────────────────────────────────────────────────────────────
 
 
@@ -373,3 +429,73 @@ def test_api_notificacoes_listar_passa_lang_pt_quando_session_pt(client_logado_s
 
     _, kwargs = mock_listar.call_args
     assert kwargs.get("language") == "pt_BR"
+
+
+# ── IDOR: _aplicar_filtro_perfil e paginação ─────────────────────────────────
+
+
+def test_filtro_perfil_supervisor_sem_areas_retorna_none():
+    """CT-IDOR-FILTRO: supervisor com areas=[] → _aplicar_filtro_perfil retorna None.
+
+    RED antes do fix: a função retornava ref sem filtro (IDOR — expõe todos os chamados).
+    GREEN depois do fix: retorna None → callers tratam como lista vazia.
+    """
+    from unittest.mock import MagicMock
+
+    from app.routes.api import _aplicar_filtro_perfil
+
+    ref = MagicMock()
+    user = MagicMock()
+    user.perfil = "supervisor"
+    user.areas = []
+
+    result = _aplicar_filtro_perfil(ref, user)
+    assert result is None, (
+        "Supervisor sem áreas não deve receber ref sem filtro (exporia todos os chamados)"
+    )
+
+
+def test_paginar_supervisor_sem_areas_nao_expoe_todos_chamados(
+    client_logado_supervisor_sem_areas,
+):
+    """CT-IDOR-PAG-01: GET /api/chamados/paginar com supervisor areas=[] → lista vazia.
+
+    RED antes do fix:
+      _aplicar_filtro_perfil retorna ref sem filtro → aplicar_filtros é chamado → retorna docs alheios.
+    GREEN depois do fix:
+      _aplicar_filtro_perfil retorna None → short-circuit → lista vazia sem chamar aplicar_filtros.
+    """
+    from unittest.mock import MagicMock
+
+    doc_alheio = MagicMock()
+    doc_alheio.id = "ch_alheio"
+    doc_alheio.to_dict.return_value = {
+        "area": "TI",
+        "status": "Aberto",
+        "descricao": "Desc",
+        "solicitante_id": "outro_id",
+        "numero_chamado": "CHM-9999",
+        "categoria": "CAT",
+        "tipo_solicitacao": "Tipo",
+        "responsavel": "Resp",
+        "prioridade": 1,
+    }
+
+    with patch("app.routes.api.aplicar_filtros_dashboard_com_paginacao") as mock_filtros:
+        mock_filtros.return_value = {
+            "docs": [doc_alheio],  # Simula que existem docs no banco
+            "proximo_cursor": None,
+            "tem_proxima": False,
+        }
+        r = client_logado_supervisor_sem_areas.get("/api/chamados/paginar")
+
+    assert r.status_code == 200
+    data = r.get_json()
+    assert data.get("sucesso") is True
+    # Supervisor sem áreas NÃO deve receber chamados alheios
+    assert data.get("chamados") == [], (
+        "Supervisor com areas=[] expôs chamados (IDOR): aplicar_filtros não deve ser chamado"
+    )
+    assert not mock_filtros.called, (
+        "aplicar_filtros não deve ser chamado quando _aplicar_filtro_perfil retorna None"
+    )

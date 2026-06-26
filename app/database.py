@@ -65,7 +65,7 @@ def _inicializar_firebase_com_retry(max_tentativas: int = 3, delay_inicial: floa
 
             bucket_env = os.getenv("FIREBASE_STORAGE_BUCKET", "").strip()
 
-            # 1. Variável de ambiente com JSON das credenciais (Railway/produção sem GCP)
+            # 1. Variável de ambiente com JSON das credenciais (produção sem GCP)
             creds_json_env = os.getenv("GOOGLE_CREDENTIALS_JSON", "").strip()
 
             # 2. Arquivo local (desenvolvimento)

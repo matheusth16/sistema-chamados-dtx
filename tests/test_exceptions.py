@@ -1,10 +1,20 @@
-"""Testes das exceções customizadas (ChamadoNaoEncontradoError, ValidacaoChamadoError) e de fluxos que as levantam."""
+"""Testes das exceções customizadas e de fluxos que as levantam."""
 
 import pytest
 
 from app.exceptions import (
+    ArquivoNaoPermitidoError,
+    AutenticacaoError,
     ChamadoError,
     ChamadoNaoEncontradoError,
+    DocumentoNaoEncontradoError,
+    ErroTransacaoError,
+    FirestoreError,
+    PermissaoNegadaError,
+    TamanhoArquivoExcedidoError,
+    UploadError,
+    UsuarioError,
+    UsuarioNaoEncontradoError,
     ValidacaoChamadoError,
 )
 from app.models import Chamado
@@ -42,6 +52,102 @@ class TestValidacaoChamadoError:
         exc = ValidacaoChamadoError("Dados inválidos")
         assert exc.erros == []
         assert exc.mensagem == "Dados inválidos"
+
+
+class TestUsuarioNaoEncontradoError:
+    def test_herda_de_usuario_error(self):
+        assert issubclass(UsuarioNaoEncontradoError, UsuarioError)
+
+    def test_atributo_email(self):
+        exc = UsuarioNaoEncontradoError("user@test.com")
+        assert exc.email == "user@test.com"
+
+    def test_mensagem_contem_email(self):
+        exc = UsuarioNaoEncontradoError("user@test.com")
+        assert "user@test.com" in str(exc)
+        assert "não encontrado" in str(exc).lower()
+
+
+class TestAutenticacaoError:
+    def test_herda_de_usuario_error(self):
+        assert issubclass(AutenticacaoError, UsuarioError)
+
+    def test_mensagem_padrao(self):
+        exc = AutenticacaoError()
+        assert "Email" in str(exc) or "senha" in str(exc).lower()
+
+    def test_mensagem_customizada(self):
+        exc = AutenticacaoError("Sessão expirada")
+        assert "Sessão expirada" in str(exc)
+
+
+class TestPermissaoNegadaError:
+    def test_herda_de_usuario_error(self):
+        assert issubclass(PermissaoNegadaError, UsuarioError)
+
+    def test_mensagem_padrao(self):
+        exc = PermissaoNegadaError()
+        assert "permissão" in str(exc).lower()
+
+    def test_mensagem_customizada(self):
+        exc = PermissaoNegadaError("Apenas admins podem acessar")
+        assert "Apenas admins" in str(exc)
+
+
+class TestDocumentoNaoEncontradoError:
+    def test_herda_de_firestore_error(self):
+        assert issubclass(DocumentoNaoEncontradoError, FirestoreError)
+
+    def test_atributos_colecao_e_doc_id(self):
+        exc = DocumentoNaoEncontradoError("chamados", "abc123")
+        assert exc.colecao == "chamados"
+        assert exc.doc_id == "abc123"
+
+    def test_mensagem_contem_colecao_e_doc_id(self):
+        exc = DocumentoNaoEncontradoError("usuarios", "uid_xyz")
+        assert "uid_xyz" in str(exc)
+        assert "usuarios" in str(exc)
+
+
+class TestErroTransacaoError:
+    def test_herda_de_firestore_error(self):
+        assert issubclass(ErroTransacaoError, FirestoreError)
+
+    def test_mensagem_contem_prefixo_e_detalhe(self):
+        exc = ErroTransacaoError("timeout na escrita")
+        assert "Erro em transação Firestore" in str(exc)
+        assert "timeout na escrita" in str(exc)
+
+
+class TestArquivoNaoPermitidoError:
+    def test_herda_de_upload_error(self):
+        assert issubclass(ArquivoNaoPermitidoError, UploadError)
+
+    def test_atributos_extensao_e_permitidas(self):
+        exc = ArquivoNaoPermitidoError("exe", ["pdf", "xlsx"])
+        assert exc.extensao == "exe"
+        assert exc.permitidas == ["pdf", "xlsx"]
+
+    def test_mensagem_lista_extensoes_permitidas(self):
+        exc = ArquivoNaoPermitidoError("bat", ["pdf", "docx"])
+        assert "bat" in str(exc)
+        assert "pdf" in str(exc)
+        assert "docx" in str(exc)
+
+
+class TestTamanhoArquivoExcedidoError:
+    def test_herda_de_upload_error(self):
+        assert issubclass(TamanhoArquivoExcedidoError, UploadError)
+
+    def test_atributos_tamanho_e_maximo(self):
+        exc = TamanhoArquivoExcedidoError(15.5, 10.0)
+        assert exc.tamanho_mb == 15.5
+        assert exc.maximo_mb == 10.0
+
+    def test_mensagem_contem_tamanhos(self):
+        exc = TamanhoArquivoExcedidoError(12.34, 10.0)
+        assert "12.34" in str(exc)
+        assert "10.0" in str(exc)
 
 
 class TestChamadoFromDictLevantaValidacaoChamadoError:

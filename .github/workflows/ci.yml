@@ -52,7 +52,11 @@ jobs:
             --cov=app \
             --cov-report=term-missing:skip-covered \
             --cov-report=xml:coverage.xml \
-            --cov-fail-under=80
+            --cov-report=json:coverage.json \
+            --cov-fail-under=85
+
+      - name: Gate de cobertura por módulo (>= 85%)
+        run: python scripts/check_coverage_per_module.py --json-only
 
       - name: Upload relatório de cobertura
         if: always()

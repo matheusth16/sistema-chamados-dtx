@@ -625,9 +625,9 @@
     "es": "Definido automáticamente por el sistema."
   },
   "login_title": {
-    "pt_BR": "DTX Digital Andon",
-    "en": "DTX Digital Andon",
-    "es": "DTX Digital Andon"
+    "pt_BR": "DTX Portal de Serviços",
+    "en": "DTX Service Portal",
+    "es": "DTX Portal de Servicios"
   },
   "remember_me": {
     "pt_BR": "Manter-me conectado por 30 dias",
@@ -920,9 +920,9 @@
     "es": "DTX Aerospace. Todos los derechos reservados."
   },
   "footer_system_name": {
-    "pt_BR": "DTX Digital Andon System",
-    "en": "DTX Digital Andon System",
-    "es": "DTX Digital Andon System"
+    "pt_BR": "DTX Portal de Serviços",
+    "en": "DTX Service Portal",
+    "es": "DTX Portal de Servicios"
   },
   "level_label": {
     "pt_BR": "Nível",
@@ -1464,20 +1464,35 @@
     "en": "Are you sure you want to delete this impact?",
     "es": "¿Está seguro de que desea eliminar este impacto?"
   },
-  "edit_sector_soon": {
-    "pt_BR": "Edição de setor será implementada em breve",
-    "en": "Sector editing will be implemented soon",
-    "es": "La edición de sector se implementará pronto"
+  "confirm_delete_batch": {
+    "pt_BR": "Excluir {count} item(s) selecionado(s)? Esta ação não pode ser desfeita.",
+    "en": "Delete {count} selected item(s)? This action cannot be undone.",
+    "es": "¿Eliminar {count} elemento(s) seleccionado(s)? Esta acción no se puede deshacer."
   },
-  "edit_gate_soon": {
-    "pt_BR": "Edição de gate será implementada em breve",
-    "en": "Gate editing will be implemented soon",
-    "es": "La edición de gate se implementará pronto"
+  "no_items_selected": {
+    "pt_BR": "Nenhum item selecionado.",
+    "en": "No items selected.",
+    "es": "Ningún elemento seleccionado."
   },
-  "edit_impact_soon": {
-    "pt_BR": "Edição de impacto será implementada em breve",
-    "en": "Impact editing will be implemented soon",
-    "es": "La edición de impacto se implementará pronto"
+  "batch_items_deleted": {
+    "pt_BR": "{count} item(s) excluído(s) com sucesso.",
+    "en": "{count} item(s) deleted successfully.",
+    "es": "{count} elemento(s) eliminado(s) con éxito."
+  },
+  "batch_items_activated": {
+    "pt_BR": "{count} item(s) ativado(s) com sucesso.",
+    "en": "{count} item(s) activated successfully.",
+    "es": "{count} elemento(s) activado(s) con éxito."
+  },
+  "batch_items_deactivated": {
+    "pt_BR": "{count} item(s) desativado(s) com sucesso.",
+    "en": "{count} item(s) deactivated successfully.",
+    "es": "{count} elemento(s) desactivado(s) con éxito."
+  },
+  "select_action": {
+    "pt_BR": "Escolha uma ação:",
+    "en": "Choose an action:",
+    "es": "Elige una acción:"
   },
   "translation_management": {
     "pt_BR": "Gerenciamento de Traduções",
@@ -2319,6 +2334,36 @@
     "en": "Change Password",
     "es": "Cambiar Contraseña"
   },
+  "change_own_password": {
+    "pt_BR": "Alterar Minha Senha",
+    "en": "Change My Password",
+    "es": "Cambiar Mi Contraseña"
+  },
+  "change_own_password_subtitle": {
+    "pt_BR": "Confirme sua senha atual antes de definir uma nova.",
+    "en": "Confirm your current password before setting a new one.",
+    "es": "Confirme su contraseña actual antes de establecer una nueva."
+  },
+  "current_password": {
+    "pt_BR": "Senha Atual",
+    "en": "Current Password",
+    "es": "Contraseña Actual"
+  },
+  "current_password_incorrect": {
+    "pt_BR": "Senha atual incorreta.",
+    "en": "Current password is incorrect.",
+    "es": "La contraseña actual es incorrecta."
+  },
+  "password_changed_admin_success": {
+    "pt_BR": "Senha alterada com sucesso!",
+    "en": "Password changed successfully!",
+    "es": "¡Contraseña cambiada con éxito!"
+  },
+  "nav_change_password": {
+    "pt_BR": "Alterar Senha",
+    "en": "Change Password",
+    "es": "Cambiar Contraseña"
+  },
   "need_help": {
     "pt_BR": "Precisa de ajuda? Entre em contato com o administrador.",
     "en": "Need help? Contact the administrator.",
@@ -2818,5 +2863,365 @@
     "pt_BR": "O nome completo será gerado automaticamente (ex: Gate 1 - Desmontagem)",
     "en": "The full name will be generated automatically (e.g. Gate 1 - Disassembly)",
     "es": "El nombre completo se generará automáticamente (ej: Gate 1 - Desmontaje)"
+  },
+  "file_too_large_use_link": {
+    "pt_BR": "Arquivo grande demais. Cole o link do OneDrive/SharePoint:",
+    "en": "File too large for direct upload. Paste the OneDrive/SharePoint link:",
+    "es": "Archivo demasiado grande. Pega el enlace de OneDrive/SharePoint:"
+  },
+  "external_link_placeholder": {
+    "pt_BR": "https://empresa.sharepoint.com/sites/...",
+    "en": "https://company.sharepoint.com/sites/...",
+    "es": "https://empresa.sharepoint.com/sites/..."
+  },
+  "external_link_add_btn": {
+    "pt_BR": "Adicionar link",
+    "en": "Add link",
+    "es": "Agregar enlace"
+  },
+  "external_link_invalid": {
+    "pt_BR": "Link invalido. Use uma URL do SharePoint ou OneDrive.",
+    "en": "Invalid link. Use a SharePoint or OneDrive URL.",
+    "es": "Enlace invalido. Use una URL de SharePoint o OneDrive."
+  },
+  "open_external_link": {
+    "pt_BR": "Abrir link",
+    "en": "Open link",
+    "es": "Abrir enlace"
+  },
+  "external_link_attached": {
+    "pt_BR": "Link externo adicionado",
+    "en": "External link added",
+    "es": "Enlace externo agregado"
+  },
+  "account_disabled": {
+    "pt_BR": "Conta desativada. Entre em contato com o administrador.",
+    "en": "Account disabled. Contact your administrator.",
+    "es": "Cuenta desactivada. Contacte al administrador."
+  },
+  "user_deactivated_success": {
+    "pt_BR": "Usuário {nome} desativado com sucesso.",
+    "en": "User {nome} deactivated successfully.",
+    "es": "Usuario {nome} desactivado con éxito."
+  },
+  "user_activated_success": {
+    "pt_BR": "Usuário {nome} reativado com sucesso.",
+    "en": "User {nome} reactivated successfully.",
+    "es": "Usuario {nome} reactivado con éxito."
+  },
+  "cannot_deactivate_own_account": {
+    "pt_BR": "Você não pode desativar a própria conta.",
+    "en": "You cannot deactivate your own account.",
+    "es": "No puede desactivar su propia cuenta."
+  },
+  "cannot_deactivate_root_admin": {
+    "pt_BR": "Não é possível desativar o administrador raiz.",
+    "en": "Cannot deactivate the root administrator.",
+    "es": "No se puede desactivar el administrador raíz."
+  },
+  "active_status_label": {
+    "pt_BR": "Ativo",
+    "en": "Active",
+    "es": "Activo"
+  },
+  "inactive_status_label": {
+    "pt_BR": "Inativo",
+    "en": "Inactive",
+    "es": "Inactivo"
+  },
+  "deactivate_account_help": {
+    "pt_BR": "Desativar bloqueia o login. A conta pode ser reativada. Para remoção definitiva, use Excluir.",
+    "en": "Deactivating blocks login. The account can be reactivated. For permanent removal, use Delete.",
+    "es": "Desactivar bloquea el inicio de sesión. La cuenta se puede reactivar. Para eliminación permanente, use Eliminar."
+  },
+  "nav_management_board": {
+    "pt_BR": "Painel Gerencial",
+    "en": "Management Board",
+    "es": "Panel Gerencial"
+  },
+  "gestor_dashboard_title": {
+    "pt_BR": "Painel Gerencial",
+    "en": "Management Board",
+    "es": "Panel Gerencial"
+  },
+  "gestor_readonly_notice": {
+    "pt_BR": "Visão somente leitura — ações de edição não estão disponíveis neste painel.",
+    "en": "Read-only view — editing actions are not available in this panel.",
+    "es": "Vista de solo lectura — las acciones de edición no están disponibles en este panel."
+  },
+  "gestor_counter_total": {
+    "pt_BR": "Total",
+    "en": "Total",
+    "es": "Total"
+  },
+  "gestor_counter_atrasados": {
+    "pt_BR": "Atrasados",
+    "en": "Overdue",
+    "es": "Atrasados"
+  },
+  "gestor_counter_sem_resposta": {
+    "pt_BR": "Sem resposta",
+    "en": "No response",
+    "es": "Sin respuesta"
+  },
+  "gestor_counter_multi_setor": {
+    "pt_BR": "Multi-setor",
+    "en": "Multi-sector",
+    "es": "Multi-sector"
+  },
+  "participantes_pendentes_aviso": {
+    "pt_BR": "Há participantes com parte pendente — status Concluído bloqueado.",
+    "en": "There are participants with pending work — Completed status is blocked.",
+    "es": "Hay participantes con trabajo pendiente — el estado Completado está bloqueado."
+  },
+  "escalation_actions_title": {
+    "pt_BR": "Ações de Escalonamento",
+    "en": "Escalation Actions",
+    "es": "Acciones de Escalamiento"
+  },
+  "escalation_transfer_area_btn": {
+    "pt_BR": "Transferir Área",
+    "en": "Transfer Area",
+    "es": "Transferir Área"
+  },
+  "escalation_escalate_colleague_btn": {
+    "pt_BR": "Escalonar para Colega",
+    "en": "Escalate to Colleague",
+    "es": "Escalar a Colega"
+  },
+  "escalation_include_supervisors_btn": {
+    "pt_BR": "Incluir supervisores",
+    "en": "Include Supervisors",
+    "es": "Incluir supervisores"
+  },
+  "escalation_transfer_modal_title": {
+    "pt_BR": "Transferir Área",
+    "en": "Transfer Area",
+    "es": "Transferir Área"
+  },
+  "escalation_dest_area_label": {
+    "pt_BR": "Área Destino",
+    "en": "Destination Area",
+    "es": "Área Destino"
+  },
+  "escalation_select_area": {
+    "pt_BR": "Selecione uma área...",
+    "en": "Select an area...",
+    "es": "Seleccione un área..."
+  },
+  "escalation_dest_responsible_label": {
+    "pt_BR": "Responsável Destino",
+    "en": "Destination Responsible",
+    "es": "Responsable Destino"
+  },
+  "escalation_select_area_first": {
+    "pt_BR": "Selecione a área primeiro...",
+    "en": "Select an area first...",
+    "es": "Seleccione un área primero..."
+  },
+  "escalation_reason_label": {
+    "pt_BR": "Motivo",
+    "en": "Reason",
+    "es": "Motivo"
+  },
+  "escalation_transfer_reason_placeholder": {
+    "pt_BR": "Descreva o motivo da transferência...",
+    "en": "Describe the reason for the transfer...",
+    "es": "Describa el motivo de la transferencia..."
+  },
+  "escalation_transfer_confirm_btn": {
+    "pt_BR": "Transferir",
+    "en": "Transfer",
+    "es": "Transferir"
+  },
+  "escalation_escalate_modal_title": {
+    "pt_BR": "Escalonar para Colega",
+    "en": "Escalate to Colleague",
+    "es": "Escalar a Colega"
+  },
+  "escalation_colleague_label": {
+    "pt_BR": "Colega (mesma área)",
+    "en": "Colleague (same area)",
+    "es": "Colega (misma área)"
+  },
+  "escalation_escalate_reason_placeholder": {
+    "pt_BR": "Descreva o motivo do escalonamento...",
+    "en": "Describe the reason for the escalation...",
+    "es": "Describa el motivo de la escalación..."
+  },
+  "escalation_escalate_confirm_btn": {
+    "pt_BR": "Escalonar",
+    "en": "Escalate",
+    "es": "Escalar"
+  },
+  "escalation_include_modal_title": {
+    "pt_BR": "Incluir supervisores",
+    "en": "Include Supervisors",
+    "es": "Incluir supervisores"
+  },
+  "escalation_area_label": {
+    "pt_BR": "Área",
+    "en": "Area",
+    "es": "Área"
+  },
+  "escalation_supervisor_label": {
+    "pt_BR": "Supervisor",
+    "en": "Supervisor",
+    "es": "Supervisor"
+  },
+  "escalation_add_btn": {
+    "pt_BR": "+ Adicionar",
+    "en": "+ Add",
+    "es": "+ Agregar"
+  },
+  "escalation_include_confirm_btn": {
+    "pt_BR": "Confirmar inclusão",
+    "en": "Confirm Inclusion",
+    "es": "Confirmar inclusión"
+  },
+  "participants_label": {
+    "pt_BR": "Participantes",
+    "en": "Participants",
+    "es": "Participantes"
+  },
+  "participant_status_done": {
+    "pt_BR": "Concluído",
+    "en": "Completed",
+    "es": "Completado"
+  },
+  "participant_status_in_progress": {
+    "pt_BR": "Em atendimento",
+    "en": "In Progress",
+    "es": "En progreso"
+  },
+  "participant_status_pending": {
+    "pt_BR": "Pendente",
+    "en": "Pending",
+    "es": "Pendiente"
+  },
+  "participants_use_include_hint": {
+    "pt_BR": "Para colaboração com acompanhamento individual de status, use",
+    "en": "For collaboration with individual status tracking, use",
+    "es": "Para colaboración con seguimiento individual de estado, use"
+  },
+  "participants_hint_suffix": {
+    "pt_BR": "(participantes) abaixo.",
+    "en": "(participants) below.",
+    "es": "(participantes) abajo."
+  },
+  "participant_you_are_participant": {
+    "pt_BR": "Você é participante deste chamado",
+    "en": "You are a participant in this ticket",
+    "es": "Usted es participante de este ticket"
+  },
+  "participant_finish_hint": {
+    "pt_BR": "Quando terminar sua parte, clique em \"Concluí minha parte\" para notificar o responsável.",
+    "en": "When you finish your part, click \"I completed my part\" to notify the responsible party.",
+    "es": "Cuando termine su parte, haga clic en \"Completé mi parte\" para notificar al responsable."
+  },
+  "participant_finish_my_part_btn": {
+    "pt_BR": "Concluí minha parte",
+    "en": "I completed my part",
+    "es": "Completé mi parte"
+  },
+  "loading_generic": {
+    "pt_BR": "Carregando...",
+    "en": "Loading...",
+    "es": "Cargando..."
+  },
+  "error_loading_short": {
+    "pt_BR": "Erro ao carregar",
+    "en": "Error loading",
+    "es": "Error al cargar"
+  },
+  "escalation_select_responsible": {
+    "pt_BR": "Selecione o responsável...",
+    "en": "Select the responsible...",
+    "es": "Seleccione el responsable..."
+  },
+  "escalation_select_colleague": {
+    "pt_BR": "Selecione o colega...",
+    "en": "Select the colleague...",
+    "es": "Seleccione el colega..."
+  },
+  "escalation_select_supervisor": {
+    "pt_BR": "Selecione o supervisor...",
+    "en": "Select the supervisor...",
+    "es": "Seleccione el supervisor..."
+  },
+  "escalation_no_supervisor_available": {
+    "pt_BR": "Nenhum supervisor disponível",
+    "en": "No supervisor available",
+    "es": "Ningún supervisor disponible"
+  },
+  "escalation_no_colleague_available": {
+    "pt_BR": "Nenhum colega disponível",
+    "en": "No colleague available",
+    "es": "Ningún colega disponible"
+  },
+  "error_select_dest_area": {
+    "pt_BR": "Selecione a área destino.",
+    "en": "Select the destination area.",
+    "es": "Seleccione el área destino."
+  },
+  "error_select_dest_responsible": {
+    "pt_BR": "Selecione o responsável destino.",
+    "en": "Select the destination responsible.",
+    "es": "Seleccione el responsable destino."
+  },
+  "error_select_colleague": {
+    "pt_BR": "Selecione o colega.",
+    "en": "Select the colleague.",
+    "es": "Seleccione el colega."
+  },
+  "error_select_area": {
+    "pt_BR": "Selecione a área.",
+    "en": "Select the area.",
+    "es": "Seleccione el área."
+  },
+  "error_select_supervisor": {
+    "pt_BR": "Selecione o supervisor.",
+    "en": "Select the supervisor.",
+    "es": "Seleccione el supervisor."
+  },
+  "error_reason_required": {
+    "pt_BR": "O motivo é obrigatório.",
+    "en": "The reason is required.",
+    "es": "El motivo es obligatorio."
+  },
+  "error_transfer": {
+    "pt_BR": "Erro ao transferir.",
+    "en": "Error transferring.",
+    "es": "Error al transferir."
+  },
+  "error_escalate": {
+    "pt_BR": "Erro ao escalonar.",
+    "en": "Error escalating.",
+    "es": "Error al escalar."
+  },
+  "error_include_participants": {
+    "pt_BR": "Erro ao incluir participantes.",
+    "en": "Error including participants.",
+    "es": "Error al incluir participantes."
+  },
+  "error_add_at_least_one_supervisor": {
+    "pt_BR": "Adicione ao menos um supervisor à lista.",
+    "en": "Add at least one supervisor to the list.",
+    "es": "Agregue al menos un supervisor a la lista."
+  },
+  "error_supervisor_already_in_list": {
+    "pt_BR": "Supervisor já adicionado à lista.",
+    "en": "Supervisor already added to the list.",
+    "es": "Supervisor ya añadido a la lista."
+  },
+  "participant_all_done_success": {
+    "pt_BR": "Parte concluída! Todos participantes terminaram — o responsável já pode fechar o chamado.",
+    "en": "Part completed! All participants finished — the responsible party can now close the ticket.",
+    "es": "¡Parte completada! Todos los participantes terminaron — el responsable ya puede cerrar el ticket."
+  },
+  "participant_part_done_success": {
+    "pt_BR": "Parte concluída com sucesso!",
+    "en": "Part completed successfully!",
+    "es": "¡Parte completada con éxito!"
   }
 }

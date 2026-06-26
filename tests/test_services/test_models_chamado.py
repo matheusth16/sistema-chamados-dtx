@@ -266,3 +266,113 @@ def test_repr_contem_id_e_categoria():
     r = repr(c)
     assert "ch_repr" in r
     assert "Engenharia" in r
+
+
+# ── participantes[] — Fase 4 ──────────────────────────────────────────────────
+
+
+def test_chamado_from_dict_com_participantes():
+    from app.models import Chamado
+
+    data = {
+        "categoria": "TI",
+        "tipo_solicitacao": "Suporte",
+        "descricao": "Teste",
+        "responsavel": "Ana",
+        "participantes": [
+            {"supervisor_id": "id_julia", "area": "TI", "status": "pendente", "concluido_em": None}
+        ],
+    }
+    c = Chamado.from_dict(data)
+    assert len(c.participantes) == 1
+    assert c.participantes[0]["supervisor_id"] == "id_julia"
+    assert c.participantes[0]["status"] == "pendente"
+
+
+def test_chamado_from_dict_sem_participantes_lista_vazia():
+    from app.models import Chamado
+
+    data = {
+        "categoria": "TI",
+        "tipo_solicitacao": "Suporte",
+        "descricao": "Teste",
+        "responsavel": "Ana",
+    }
+    c = Chamado.from_dict(data)
+    assert c.participantes == []
+
+
+def test_chamado_to_dict_inclui_participantes():
+    from app.models import Chamado
+
+    participantes = [
+        {"supervisor_id": "x", "area": "TI", "status": "pendente", "concluido_em": None}
+    ]
+    c = Chamado(
+        categoria="TI",
+        tipo_solicitacao="Suporte",
+        descricao="Teste",
+        responsavel="Ana",
+        participantes=participantes,
+    )
+    d = c.to_dict()
+    assert "participantes" in d
+    assert d["participantes"][0]["supervisor_id"] == "x"
+    assert d["participantes"][0]["status"] == "pendente"
+
+
+def test_chamado_from_dict_participantes_nao_lista_vira_lista_vazia():
+    from app.models import Chamado
+
+    data = {
+        "categoria": "TI",
+        "tipo_solicitacao": "Suporte",
+        "descricao": "Teste",
+        "responsavel": "Ana",
+        "participantes": "invalido",
+    }
+    c = Chamado.from_dict(data)
+    assert c.participantes == []
+
+
+def test_chamado_participantes_default_lista_vazia():
+    c = _chamado()
+    assert c.participantes == []
+
+
+# ── Escada B — Fase 7 ──────────────────────────────────────────────────────────
+
+
+def test_chamado_campos_escada_b_defaults():
+    """Campos da Escada B têm defaults corretos: nivel=0, alertas=False/False."""
+    c = _chamado()
+    assert c.escalacao_resolucao_nivel == 0
+    assert c.alerta_supervisor_50_enviado is False
+    assert c.alerta_supervisor_80_enviado is False
+
+
+def test_chamado_to_dict_inclui_campos_escada_b():
+    """to_dict inclui os 3 campos da Escada B."""
+    d = _chamado().to_dict()
+    assert "escalacao_resolucao_nivel" in d
+    assert d["escalacao_resolucao_nivel"] == 0
+    assert "alerta_supervisor_50_enviado" in d
+    assert d["alerta_supervisor_50_enviado"] is False
+    assert "alerta_supervisor_80_enviado" in d
+    assert d["alerta_supervisor_80_enviado"] is False
+
+
+def test_chamado_from_dict_campos_escada_b_ausentes_usa_defaults():
+    """from_dict sem campos Escada B usa defaults seguros (retro-compatibilidade)."""
+    from app.models import Chamado
+
+    data = {
+        "categoria": "TI",
+        "tipo_solicitacao": "Suporte",
+        "descricao": "Teste",
+        "responsavel": "Ana",
+    }
+    c = Chamado.from_dict(data)
+    assert c.escalacao_resolucao_nivel == 0
+    assert c.alerta_supervisor_50_enviado is False
+    assert c.alerta_supervisor_80_enviado is False

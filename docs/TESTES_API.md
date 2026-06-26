@@ -28,7 +28,9 @@ Validar que os **endpoints da API** respondem conforme o contrato documentado: c
 | POST `/api/notificacoes/<id>/ler` | Sim | 401 sem login; 200 `{"sucesso": true/false}` |
 | GET `/api/push-vapid-public` | Sim | 401 sem login; 200 com `vapid_public_key` |
 | POST `/api/push-subscribe` | Sim | 401 sem login; 400 subscription inválida; 200 sucesso |
-| GET `/api/supervisores/disponibilidade` | Sim | 401 sem login; 200 com `sucesso`, `supervisores`, `area` |
+| GET `/api/supervisores/lista` | Sim | 401 sem login; 200 com `sucesso`, `supervisores`, `area` |
+| GET `/api/notificacoes/contar` | Sim | 401 sem login; 200 com `total_nao_lidas` |
+| POST `/api/chamado/<id>/confirmar-resolucao` | Sim (solicitante) | 401 sem login; 400 ação/motivo inválidos; 200 sucesso |
 
 ---
 

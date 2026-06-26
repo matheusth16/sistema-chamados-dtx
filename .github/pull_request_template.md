@@ -35,7 +35,7 @@
 - [ ] `usuarios` — criação, edição, permissões por perfil
 - [ ] `dashboard` — filtros, agregações, relatórios
 - [ ] `api` — contratos JSON (sucesso/erro), paginação
-- [ ] `categorias` / `traducoes` — admin
+- [ ] `categorias` — admin
 
 ---
 

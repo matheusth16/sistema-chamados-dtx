@@ -30,7 +30,7 @@ def test_supervisor_acessa_dashboard(logged_in_supervisor: Page, base_url: str) 
 def test_supervisor_acessa_relatorios(logged_in_supervisor: Page, base_url: str) -> None:
     """Supervisor deve conseguir acessar a página de relatórios."""
     page = logged_in_supervisor
-    page.goto(f"{base_url}/relatorios")
+    page.goto(f"{base_url}/admin/relatorios")
     page.wait_for_load_state("networkidle")
 
     # Não deve redirecionar para login
@@ -83,12 +83,12 @@ def test_supervisor_nao_acessa_admin_categorias(logged_in_supervisor: Page, base
 
 @pytest.mark.e2e
 def test_supervisor_relatorios_tem_conteudo(logged_in_supervisor: Page, base_url: str) -> None:
-    """Supervisor acessa /relatorios e vê a página sem erro (status 200)."""
+    """Supervisor acessa /admin/relatorios e vê a página sem erro (status 200)."""
     page = logged_in_supervisor
     responses = []
     page.on("response", lambda r: responses.append(r) if "/relatorios" in r.url else None)
 
-    page.goto(f"{base_url}/relatorios")
+    page.goto(f"{base_url}/admin/relatorios")
     page.wait_for_load_state("networkidle", timeout=DEFAULT_TIMEOUT)
 
     assert "/login" not in page.url

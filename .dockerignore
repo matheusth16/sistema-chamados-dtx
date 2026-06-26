@@ -1,7 +1,6 @@
 # Controle de versão
 .git
 .gitignore
-.gcloudignore
 
 # Ambientes virtuais
 .venv/
