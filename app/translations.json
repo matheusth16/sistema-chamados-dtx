@@ -3223,5 +3223,130 @@
     "pt_BR": "Parte concluída com sucesso!",
     "en": "Part completed successfully!",
     "es": "¡Parte completada con éxito!"
+  },
+  "profile_supervisor": {
+    "pt_BR": "Supervisor",
+    "en": "Supervisor",
+    "es": "Supervisor"
+  },
+  "profile_solicitante": {
+    "pt_BR": "Solicitante",
+    "en": "Requester",
+    "es": "Solicitante"
+  },
+  "profile_admin_global": {
+    "pt_BR": "Administrador Global",
+    "en": "Global Administrator",
+    "es": "Administrador Global"
+  },
+  "management_level_label": {
+    "pt_BR": "Nível de Gestão",
+    "en": "Management Level",
+    "es": "Nivel de Gestión"
+  },
+  "management_level_optional": {
+    "pt_BR": "(opcional)",
+    "en": "(optional)",
+    "es": "(opcional)"
+  },
+  "management_level_none": {
+    "pt_BR": "— Sem gestão —",
+    "en": "— No management —",
+    "es": "— Sin gestión —"
+  },
+  "management_level_sector_manager": {
+    "pt_BR": "Gestor de Setor",
+    "en": "Sector Manager",
+    "es": "Gestor de Sector"
+  },
+  "management_level_production_manager": {
+    "pt_BR": "Gerente de Produção",
+    "en": "Production Manager",
+    "es": "Gerente de Producción"
+  },
+  "management_level_gm_assistant": {
+    "pt_BR": "Assistente GM",
+    "en": "GM Assistant",
+    "es": "Asistente GM"
+  },
+  "management_level_gm": {
+    "pt_BR": "GM (Diretor Geral)",
+    "en": "GM (General Manager)",
+    "es": "GM (Director General)"
+  },
+  "management_level_help": {
+    "pt_BR": "Gestores recebem acesso read-only ao Painel Gerencial e são redirecionados para ele ao fazer login.",
+    "en": "Managers receive read-only access to the Management Board and are redirected to it upon login.",
+    "es": "Los gestores reciben acceso de solo lectura al Panel Gerencial y son redirigidos a él al iniciar sesión."
+  },
+  "admin_global_title": {
+    "pt_BR": "Admin Global — Painel Sistêmico",
+    "en": "Admin Global — System Panel",
+    "es": "Admin Global — Panel Sistémico"
+  },
+  "total_users": {
+    "pt_BR": "Usuários totais",
+    "en": "Total users",
+    "es": "Usuarios totales"
+  },
+  "active_sub_admins": {
+    "pt_BR": "Sub-admins ativos",
+    "en": "Active sub-admins",
+    "es": "Sub-admins activos"
+  },
+  "sub_administrators": {
+    "pt_BR": "Sub-Administradores",
+    "en": "Sub-Administrators",
+    "es": "Sub-Administradores"
+  },
+  "admin_global_only_can_manage": {
+    "pt_BR": "Apenas Admin Global pode gerenciar",
+    "en": "Only Admin Global can manage",
+    "es": "Solo Admin Global puede gestionar"
+  },
+  "supervisors_promote_title": {
+    "pt_BR": "Supervisores — Promover para Sub-Admin",
+    "en": "Supervisors — Promote to Sub-Admin",
+    "es": "Supervisores — Promover a Sub-Admin"
+  },
+  "promote_to_admin_btn": {
+    "pt_BR": "Promover para Admin",
+    "en": "Promote to Admin",
+    "es": "Promover a Admin"
+  },
+  "demote_to_supervisor_btn": {
+    "pt_BR": "Rebaixar para Supervisor",
+    "en": "Demote to Supervisor",
+    "es": "Degradar a Supervisor"
+  },
+  "no_sub_admins": {
+    "pt_BR": "Nenhum sub-administrador cadastrado.",
+    "en": "No sub-administrators registered.",
+    "es": "Sin sub-administradores registrados."
+  },
+  "no_supervisors_for_promotion": {
+    "pt_BR": "Nenhum supervisor disponível para promoção.",
+    "en": "No supervisors available for promotion.",
+    "es": "Sin supervisores disponibles para promoción."
+  },
+  "confirm_promote_to_admin": {
+    "pt_BR": "Promover {nome} para sub-admin?",
+    "en": "Promote {nome} to sub-admin?",
+    "es": "¿Promover a {nome} a sub-admin?"
+  },
+  "confirm_demote_to_supervisor": {
+    "pt_BR": "Rebaixar {nome} para supervisor?",
+    "en": "Demote {nome} to supervisor?",
+    "es": "¿Degradar a {nome} a supervisor?"
+  },
+  "name": {
+    "pt_BR": "Nome",
+    "en": "Name",
+    "es": "Nombre"
+  },
+  "general": {
+    "pt_BR": "Geral",
+    "en": "General",
+    "es": "General"
   }
 }

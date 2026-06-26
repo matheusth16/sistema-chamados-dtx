@@ -75,7 +75,7 @@
   {%- set lbl = sla_info.label -%}
 {%- endif -%}
 {%- if sla_dias -%}
-  {%- set tip = (t('sla_custom_tooltip') if t is defined else 'SLA personalizado') + ': ' + sla_dias|string + ' dias' -%}
+  {%- set tip = (t('sla_custom_tooltip') if t is defined else 'SLA personalizado') + ': ' + sla_dias|string + ' ' + (t('days') if t is defined else 'dias') -%}
 {%- else -%}
   {%- set tip = t('sla_tooltip') if t is defined else 'SLA' -%}
 {%- endif -%}

@@ -9,8 +9,24 @@ def test_enviar_email_retorna_false_sem_destinatario(app):
 
     with app.app_context():
         ok, err = enviar_email("", "Assunto", "<p>Teste</p>")
-        assert ok is False
-        assert err is None
+    assert ok is False
+    assert err is None
+
+
+def test_enviar_email_suprimido_quando_desabilitado(app):
+    """enviar_email não chama Graph quando NOTIFY_EMAIL_ENABLED=false."""
+    from app.services.notifications import enviar_email
+
+    with (
+        app.app_context(),
+        patch("app.services.notifications._enviar_via_graph") as mock_graph,
+    ):
+        app.config["NOTIFY_EMAIL_ENABLED"] = False
+        app.config["TESTING"] = False
+        ok, err = enviar_email("dest@test.com", "Assunto", "<p>Teste</p>")
+    assert ok is True
+    assert err is None
+    mock_graph.assert_not_called()
 
 
 def test_criar_notificacao_retorna_none_sem_usuario_id():
@@ -121,7 +137,7 @@ def test_notificar_responsavel_setor_adicional_envia_direto(app):
     assert destinatario == "setor@dtx.aero"
     assert assunto == "Ticket 2026-101: your department has been included"
     assert "2026-101" in corpo_html
-    assert "Engenharia" in corpo_html
+    assert "Engineering" in corpo_html  # "Engenharia" translated to English in emails
 
 
 def test_notificar_aprovador_envia_direto_ao_responsavel(app):
@@ -405,6 +421,8 @@ def test_enviar_email_usa_graph_quando_configurado(app):
             "app.services.notifications._enviar_via_graph", return_value=(True, None)
         ) as mock_graph,
     ):
+        app.config["NOTIFY_EMAIL_ENABLED"] = True
+        app.config["TESTING"] = False
         ok, err = enviar_email("dest@test.com", "Assunto", "<p>HTML</p>", "Texto")
 
     assert ok is True
@@ -833,7 +851,7 @@ def test_notificar_transferencia_area_chama_enviar_email_com_area_correta(app):
     assert dest == "novo.resp@dtx.aero"
     assert "2026-999" in assunto
     assert "transferred" in assunto.lower()
-    assert "Planejamento" in corpo_html
+    assert "Planning" in corpo_html  # "Planejamento" is translated to English in emails
 
 
 def test_notificar_escalonamento_colega_chama_enviar_email(app):
@@ -863,7 +881,7 @@ def test_notificar_escalonamento_colega_chama_enviar_email(app):
     assert dest == "colega@dtx.aero"
     assert "2026-998" in assunto
     assert "escalated" in assunto.lower()
-    assert "Engenharia" in corpo_html
+    assert "Engineering" in corpo_html  # "Engenharia" is translated to English in emails
 
 
 def test_notificar_transferencia_sem_email_destino_nao_dispara(app):

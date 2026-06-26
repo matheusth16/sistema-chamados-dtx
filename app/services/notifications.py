@@ -23,12 +23,38 @@ from html import escape
 
 from flask import current_app, request
 
+from app.i18n import (
+    get_translated_category,
+    get_translated_role,
+    get_translated_sector,
+    get_translated_sector_list,
+    get_translated_status,
+)
 from app.services.email_templates import (
     build_cta_button,
     build_detail_table,
     build_email_shell,
     build_two_ctas,
 )
+
+_EMAIL_LANG = "en"
+
+
+def _tc(v: str) -> str:
+    return get_translated_category(v, _EMAIL_LANG) if v else ""
+
+
+def _ts(v: str) -> str:
+    return get_translated_sector(v, _EMAIL_LANG) if v else ""
+
+
+def _tsl(v: str) -> str:
+    return get_translated_sector_list(v, _EMAIL_LANG) if v else ""
+
+
+def _tst(v: str) -> str:
+    return get_translated_status(v, _EMAIL_LANG) if v else ""
+
 
 logger = logging.getLogger(__name__)
 
@@ -130,11 +156,27 @@ def _enviar_via_graph(
         return (False, str(e))
 
 
+def _email_envio_permitido() -> bool:
+    """True quando o ambiente permite envio real (produção ou opt-in explícito)."""
+    if _config("TESTING"):
+        return False
+    return bool(_config("NOTIFY_EMAIL_ENABLED", False))
+
+
 def enviar_email(destinatario: str, assunto: str, corpo_html: str, corpo_texto: str = None):
     """Send e-mail via Microsoft Graph API. Returns (True, None) or (False, error)."""
     if not destinatario or not destinatario.strip():
         logger.warning("Notification skipped: empty recipient")
         return (False, None)
+    if not _email_envio_permitido():
+        motivo = "TESTING" if _config("TESTING") else "NOTIFY_EMAIL_ENABLED=false"
+        logger.info(
+            "E-mail suppressed (%s): %s — %s",
+            motivo,
+            destinatario.strip(),
+            assunto[:80],
+        )
+        return (True, None)
     from_addr = os.getenv("GRAPH_SENDER_EMAIL", "").strip() or "noreply@localhost"
     return _enviar_via_graph(destinatario.strip(), assunto, corpo_html, corpo_texto, from_addr)
 
@@ -188,15 +230,18 @@ def notificar_aprovador_novo_chamado(
     solicitante_linha = solicitante_nome
     if solicitante_email and solicitante_email.strip():
         solicitante_linha += f" ({solicitante_email.strip()})"
+    cat_d = _tc(categoria)
+    tipo_d = _ts(tipo_solicitacao)
+    area_d = _ts(area)
 
     assunto = f"New ticket assigned: {numero_chamado}"
 
     detalhes_html = build_detail_table(
         [
             ("Number", numero_chamado),
-            ("Category", categoria),
-            ("Type", tipo_solicitacao),
-            ("Area", area),
+            ("Category", cat_d),
+            ("Type", tipo_d),
+            ("Area", area_d),
             ("Requester", solicitante_linha),
         ]
     )
@@ -221,8 +266,8 @@ def notificar_aprovador_novo_chamado(
     )
     corpo_texto = (
         f"Number: {numero_chamado}\n"
-        f"Category: {categoria}\nType: {tipo_solicitacao}\n"
-        f"Area: {area}\nRequester: {solicitante_linha}\n"
+        f"Category: {cat_d}\nType: {tipo_d}\n"
+        f"Area: {area_d}\nRequester: {solicitante_linha}\n"
         f"Summary: {resumo_truncado}"
     )
 
@@ -259,14 +304,17 @@ def notificar_responsavel_prazo_24h(
     resumo_truncado = (descricao_resumo or "")[:500] + (
         "..." if len(descricao_resumo or "") > 500 else ""
     )
+    cat_d = _tc(categoria)
+    tipo_d = _ts(tipo_solicitacao)
+    area_d = _ts(area)
     assunto = f"Ticket {numero_chamado}: deadline in 24h"
 
     detalhes_html = build_detail_table(
         [
             ("Number", numero_chamado),
-            ("Category", categoria),
-            ("Type", tipo_solicitacao),
-            ("Area", area),
+            ("Category", cat_d),
+            ("Type", tipo_d),
+            ("Area", area_d),
             ("Requester", solicitante_nome),
         ]
     )
@@ -294,8 +342,8 @@ def notificar_responsavel_prazo_24h(
     corpo_texto = (
         f"Number: {numero_chamado}\n"
         "Warning: this ticket is about to breach its SLA (24h remaining).\n"
-        f"Category: {categoria}\nType: {tipo_solicitacao}\n"
-        f"Area: {area}\nRequester: {solicitante_nome}"
+        f"Category: {cat_d}\nType: {tipo_d}\n"
+        f"Area: {area_d}\nRequester: {solicitante_nome}"
     )
 
     ok, err = enviar_email(email_dest, assunto, corpo_html, corpo_texto)
@@ -324,14 +372,15 @@ def notificar_novo_usuario_cadastrado(
         return
 
     email_dest = usuario_email.strip()
-    areas_str = ", ".join(areas or [])
+    perfil_display = get_translated_role(perfil, "en") if perfil else "N/A"
+    areas_display = get_translated_sector_list(", ".join(areas or []), "en") or "N/A"
     link_dash = _link_dashboard()
     assunto = "Welcome to DTX Service Portal — your access credentials"
 
     detalhes_html = build_detail_table(
         [
-            ("Role", perfil or "N/A"),
-            ("Areas", areas_str or "N/A"),
+            ("Role", perfil_display),
+            ("Areas", areas_display),
             ("E-mail", email_dest),
             ("Initial password", senha_inicial),
         ]
@@ -357,7 +406,7 @@ def notificar_novo_usuario_cadastrado(
     corpo_texto = (
         f"Hello {usuario_nome or 'user'},\n\n"
         "An account has been created for you in DTX Service Portal.\n"
-        f"Role: {perfil}\nAreas: {areas_str or 'N/A'}\n"
+        f"Role: {perfil_display}\nAreas: {areas_display}\n"
         f"E-mail: {email_dest}\nInitial password: {senha_inicial}\n\n"
         "You will be asked to change your password on first login.\n"
         "If you do not recognize this account, contact support immediately."
@@ -397,15 +446,18 @@ def notificar_responsavel_setor_adicional(
     resumo_truncado = (descricao_resumo or "")[:500] + (
         "..." if len(descricao_resumo or "") > 500 else ""
     )
+    setor_d = _ts(setor_adicional)
+    cat_d = _tc(categoria)
+    tipo_d = _ts(tipo_solicitacao)
     assunto = f"Ticket {numero_chamado}: your department has been included"
 
     detalhes_html = build_detail_table(
         [
             ("Number", numero_chamado),
-            ("Department", setor_adicional),
+            ("Department", setor_d),
             ("Added by", quem_adicionou_nome),
-            ("Category", categoria),
-            ("Type", tipo_solicitacao),
+            ("Category", cat_d),
+            ("Type", tipo_d),
             ("Requester", solicitante_nome),
         ]
     )
@@ -431,9 +483,9 @@ def notificar_responsavel_setor_adicional(
         ),
     )
     corpo_texto = (
-        f"Number: {numero_chamado}\nDepartment: {setor_adicional}\n"
-        f"Added by: {quem_adicionou_nome}\nCategory: {categoria}\n"
-        f"Type: {tipo_solicitacao}\nRequester: {solicitante_nome}"
+        f"Number: {numero_chamado}\nDepartment: {setor_d}\n"
+        f"Added by: {quem_adicionou_nome}\nCategory: {cat_d}\n"
+        f"Type: {tipo_d}\nRequester: {solicitante_nome}"
     )
 
     ok, err = enviar_email(email_dest, assunto, corpo_html, corpo_texto)
@@ -466,6 +518,9 @@ def notificar_setores_adicionais_chamado(
     link = _link_chamado(chamado_id)
     link_dash = _link_dashboard()
     setores_str = setores_nomes or ", ".join(setores_novos)
+    setores_str_d = _tsl(setores_str)
+    cat_d = _tc(categoria)
+    tipo_d = _ts(tipo_solicitacao)
     resumo_truncado = (descricao_resumo or "")[:500] + (
         "..." if len(descricao_resumo or "") > 500 else ""
     )
@@ -490,11 +545,11 @@ def notificar_setores_adicionais_chamado(
         detalhes_html = build_detail_table(
             [
                 ("Number", numero_chamado),
-                ("Category", categoria),
-                ("Type", tipo_solicitacao),
+                ("Category", cat_d),
+                ("Type", tipo_d),
                 ("Requester", solicitante_nome),
                 ("Added by", quem_adicionou_nome),
-                ("Departments added", setores_str),
+                ("Departments added", setores_str_d),
             ]
         )
         summary_html = (
@@ -521,7 +576,7 @@ def notificar_setores_adicionais_chamado(
         )
         corpo_texto = (
             f"Number: {numero_chamado}\nRequester: {solicitante_nome}\n"
-            f"Added by: {quem_adicionou_nome}\nDepartments: {setores_str}"
+            f"Added by: {quem_adicionou_nome}\nDepartments: {setores_str_d}"
         )
 
         ok, err = enviar_email(email.strip(), assunto, corpo_html, corpo_texto)
@@ -553,6 +608,8 @@ def notificar_solicitante_status(
 
     nome = getattr(solicitante_usuario, "nome", None) or "Requester"
     link = _link_chamado(chamado_id)
+    status_display = _tst(novo_status)
+    cat_d = _tc(categoria)
 
     if novo_status == "Concluído":
         assunto = f"Ticket {numero_chamado}: completed"
@@ -566,7 +623,7 @@ def notificar_solicitante_status(
         msg_status = "your ticket is <strong>in progress</strong>"
 
     detalhes_html = build_detail_table(
-        [("Ticket", numero_chamado), ("Category", categoria), ("Status", novo_status)]
+        [("Ticket", numero_chamado), ("Category", cat_d), ("Status", status_display)]
     )
     botoes_html = (
         f'<p style="margin-top:20px;">{build_cta_button("View ticket", link, "#2563eb")}</p>'
@@ -585,7 +642,7 @@ def notificar_solicitante_status(
     )
     corpo_texto = (
         f"Hello, {nome}!\n\n"
-        f"Ticket: {numero_chamado}\nCategory: {categoria}\nStatus: {novo_status}"
+        f"Ticket: {numero_chamado}\nCategory: {cat_d}\nStatus: {status_display}"
         + (f"\n\nView ticket: {link}" if link else "")
     )
 
@@ -616,11 +673,12 @@ def notificar_solicitante_confirmacao_pendente(
 
     nome = getattr(solicitante_usuario, "nome", None) or "Requester"
     link = _link_chamado(chamado_id)
+    cat_d = _tc(categoria)
 
     assunto = f"Ticket {numero_chamado}: please confirm resolution"
 
     detalhes_html = build_detail_table(
-        [("Ticket", numero_chamado), ("Category", categoria), ("Status", "Completed")]
+        [("Ticket", numero_chamado), ("Category", cat_d), ("Status", "Completed")]
     )
     botoes_html = (
         f'<p style="margin-top:20px;">{build_cta_button("Confirm or reopen", link, "#059669")}</p>'
@@ -640,7 +698,7 @@ def notificar_solicitante_confirmacao_pendente(
     )
     corpo_texto = (
         f"Hello, {nome}!\n\n"
-        f"Ticket: {numero_chamado}\nCategory: {categoria}\nStatus: Completed\n\n"
+        f"Ticket: {numero_chamado}\nCategory: {cat_d}\nStatus: Completed\n\n"
         "Please confirm whether the issue was resolved or reopen it."
         + (f"\n\nOpen ticket: {link}" if link else "")
     )
@@ -676,13 +734,14 @@ def notificar_supervisor_chamado_reaberto(
     link = _link_chamado(chamado_id)
     link_dash = _link_dashboard()
     motivo_truncado = (motivo or "")[:500]
+    cat_d = _tc(categoria)
 
     assunto = f"Ticket {numero_chamado}: reopened by requester"
 
     detalhes_html = build_detail_table(
         [
             ("Ticket", numero_chamado),
-            ("Category", categoria),
+            ("Category", cat_d),
             ("Requester", solicitante_nome),
             ("Reason for reopening", motivo_truncado),
         ]
@@ -709,7 +768,7 @@ def notificar_supervisor_chamado_reaberto(
     corpo_texto = (
         f"Hello, {nome_responsavel}!\n\n"
         f"Ticket {numero_chamado} was reopened by {solicitante_nome}.\n"
-        f"Category: {categoria}\nReason: {motivo_truncado}"
+        f"Category: {cat_d}\nReason: {motivo_truncado}"
         + (f"\n\nView ticket: {link}" if link else "")
     )
 
@@ -742,14 +801,16 @@ def notificar_supervisor_transferencia_area(
     link = _link_chamado(chamado_id)
     link_dash = _link_dashboard()
     motivo_truncado = (motivo or "")[:500] + ("..." if len(motivo or "") > 500 else "")
+    cat_d = _tc(categoria)
+    area_d = _ts(area)
 
     assunto = f"Ticket transferred to your area: {numero_chamado}"
 
     detalhes_html = build_detail_table(
         [
             ("Number", numero_chamado),
-            ("Category", categoria),
-            ("Area", area),
+            ("Category", cat_d),
+            ("Area", area_d),
             ("Reason", motivo_truncado),
         ]
     )
@@ -765,13 +826,13 @@ def notificar_supervisor_transferencia_area(
         header_title="Ticket transferred to your area",
         header_color="#2563eb",
         body_html=(
-            f"<p>Hello, a ticket has been transferred to your area <strong>{escape(area)}</strong> "
+            f"<p>Hello, a ticket has been transferred to your area <strong>{escape(area_d)}</strong> "
             f"and assigned to you.</p>" + detalhes_html + botoes_html
         ),
     )
     corpo_texto = (
         f"Number: {numero_chamado}\n"
-        f"Category: {categoria}\nArea: {area}\n"
+        f"Category: {cat_d}\nArea: {area_d}\n"
         f"Reason: {motivo_truncado}" + (f"\n\nView ticket: {link}" if link else "")
     )
 
@@ -799,14 +860,16 @@ def notificar_supervisor_escalonamento_colega(
     link = _link_chamado(chamado_id)
     link_dash = _link_dashboard()
     motivo_truncado = (motivo or "")[:500] + ("..." if len(motivo or "") > 500 else "")
+    cat_d = _tc(categoria)
+    area_d = _ts(area)
 
     assunto = f"Ticket escalated to you: {numero_chamado}"
 
     detalhes_html = build_detail_table(
         [
             ("Number", numero_chamado),
-            ("Category", categoria),
-            ("Area", area),
+            ("Category", cat_d),
+            ("Area", area_d),
             ("Reason", motivo_truncado),
         ]
     )
@@ -822,14 +885,14 @@ def notificar_supervisor_escalonamento_colega(
         header_title="Ticket escalated to you",
         header_color="#7c3aed",
         body_html=(
-            f"<p>Hello, a ticket in area <strong>{escape(area)}</strong> has been escalated to you.</p>"
+            f"<p>Hello, a ticket in area <strong>{escape(area_d)}</strong> has been escalated to you.</p>"
             + detalhes_html
             + botoes_html
         ),
     )
     corpo_texto = (
         f"Number: {numero_chamado}\n"
-        f"Category: {categoria}\nArea: {area}\n"
+        f"Category: {cat_d}\nArea: {area_d}\n"
         f"Reason: {motivo_truncado}" + (f"\n\nView ticket: {link}" if link else "")
     )
 
@@ -860,14 +923,16 @@ def notificar_participante_incluido(
     email_dest = responsavel_usuario.email.strip()
     link = _link_chamado(chamado_id)
     link_dash = _link_dashboard()
+    cat_d = _tc(categoria)
+    area_d = _ts(area)
 
     assunto = f"You have been added as a participant: {numero_chamado}"
 
     detalhes_html = build_detail_table(
         [
             ("Number", numero_chamado),
-            ("Category", categoria),
-            ("Area", area),
+            ("Category", cat_d),
+            ("Area", area_d),
         ]
     )
 
@@ -883,12 +948,12 @@ def notificar_participante_incluido(
         header_color="#2563eb",
         body_html=(
             f"<p>You have been added as a collaborating participant to a ticket in area "
-            f"<strong>{escape(area)}</strong>. Please work on your part and mark it as done "
+            f"<strong>{escape(area_d)}</strong>. Please work on your part and mark it as done "
             f'using the <em>"Completed my part"</em> button.</p>' + detalhes_html + botoes_html
         ),
     )
     corpo_texto = (
-        f"Number: {numero_chamado}\nCategory: {categoria}\nArea: {area}\n\n"
+        f"Number: {numero_chamado}\nCategory: {cat_d}\nArea: {area_d}\n\n"
         "You have been added as a collaborating participant. "
         "Please complete your part and mark it done." + (f"\n\nView ticket: {link}" if link else "")
     )
@@ -921,6 +986,9 @@ def notificar_escalada_resposta_gerencial(
     area = chamado_data.get("area") or ""
     tipo_solicitacao = chamado_data.get("tipo_solicitacao") or ""
     descricao_resumo = (chamado_data.get("descricao") or "")[:500]
+    cat_d = _tc(categoria)
+    area_d = _ts(area)
+    tipo_d = _ts(tipo_solicitacao)
 
     nomes_nivel = {
         1: "Sector Manager",
@@ -938,9 +1006,9 @@ def notificar_escalada_resposta_gerencial(
     detalhes_html = build_detail_table(
         [
             ("Number", numero_chamado),
-            ("Category", categoria),
-            ("Type", tipo_solicitacao),
-            ("Area", area),
+            ("Category", cat_d),
+            ("Type", tipo_d),
+            ("Area", area_d),
             ("Escalation Level", f"{nivel} — {nome_nivel}"),
         ]
     )
@@ -967,7 +1035,7 @@ def notificar_escalada_resposta_gerencial(
     corpo_texto = (
         f"SLA Alert — Ticket {numero_chamado} without response.\n"
         f"Escalation Level {nivel} ({nome_nivel}).\n"
-        f"Category: {categoria}\nArea: {area}" + (f"\n\nView ticket: {link}" if link else "")
+        f"Category: {cat_d}\nArea: {area_d}" + (f"\n\nView ticket: {link}" if link else "")
     )
 
     ok, err = enviar_email(email_dest, assunto, corpo_html, corpo_texto)
@@ -994,13 +1062,14 @@ def notificar_owner_todos_participantes_concluiram(
     nome_owner = getattr(owner_usuario, "nome", None) or "Responsible"
     link = _link_chamado(chamado_id)
     link_dash = _link_dashboard()
+    cat_d = _tc(categoria)
 
     assunto = f"Ticket {numero_chamado}: all participants completed their part"
 
     detalhes_html = build_detail_table(
         [
             ("Number", numero_chamado),
-            ("Category", categoria),
+            ("Category", cat_d),
         ]
     )
 
@@ -1024,7 +1093,7 @@ def notificar_owner_todos_participantes_concluiram(
     )
     corpo_texto = (
         f"Hello, {nome_owner}!\n\n"
-        f"All participants of ticket {numero_chamado} ({categoria}) have completed their part.\n"
+        f"All participants of ticket {numero_chamado} ({cat_d}) have completed their part.\n"
         "You can now close the ticket." + (f"\n\nView ticket: {link}" if link else "")
     )
 
@@ -1060,6 +1129,9 @@ def notificar_aviso_resolucao_supervisor(
     area = chamado_data.get("area") or ""
     tipo_solicitacao = chamado_data.get("tipo_solicitacao") or ""
     descricao_resumo = (chamado_data.get("descricao") or "")[:500]
+    cat_d = _tc(categoria)
+    area_d = _ts(area)
+    tipo_d = _ts(tipo_solicitacao)
 
     assunto = f"[SLA {marco}%] Ticket {numero_chamado} — resolution deadline approaching"
     link = _link_chamado(chamado_id)
@@ -1100,9 +1172,9 @@ def notificar_aviso_resolucao_supervisor(
     detalhes_html = build_detail_table(
         [
             ("Number", numero_chamado),
-            ("Category", categoria),
-            ("Type", tipo_solicitacao),
-            ("Area", area),
+            ("Category", cat_d),
+            ("Type", tipo_d),
+            ("Area", area_d),
             ("SLA Progress", f"{marco}%"),
         ]
     )
@@ -1131,7 +1203,7 @@ def notificar_aviso_resolucao_supervisor(
     corpo_texto = (
         f"SLA Warning — Ticket {numero_chamado}.\n"
         f"Resolution deadline: {marco}% consumed.\n"
-        f"Category: {categoria}\nArea: {area}" + (f"\n\nView ticket: {link}" if link else "")
+        f"Category: {cat_d}\nArea: {area_d}" + (f"\n\nView ticket: {link}" if link else "")
     )
 
     if email_dest:
@@ -1156,6 +1228,9 @@ def notificar_escalada_resolucao_gerencial(
     area = chamado_data.get("area") or ""
     tipo_solicitacao = chamado_data.get("tipo_solicitacao") or ""
     descricao_resumo = (chamado_data.get("descricao") or "")[:500]
+    cat_d = _tc(categoria)
+    area_d = _ts(area)
+    tipo_d = _ts(tipo_solicitacao)
 
     nomes_nivel = {
         1: "Sector Manager",
@@ -1173,9 +1248,9 @@ def notificar_escalada_resolucao_gerencial(
     detalhes_html = build_detail_table(
         [
             ("Number", numero_chamado),
-            ("Category", categoria),
-            ("Type", tipo_solicitacao),
-            ("Area", area),
+            ("Category", cat_d),
+            ("Type", tipo_d),
+            ("Area", area_d),
             ("Escalation Level", f"{nivel} — {nome_nivel}"),
         ]
     )
@@ -1204,7 +1279,7 @@ def notificar_escalada_resolucao_gerencial(
     corpo_texto = (
         f"SLA Alert — Ticket {numero_chamado} resolution overdue.\n"
         f"Escalation Level {nivel} ({nome_nivel}).\n"
-        f"Category: {categoria}\nArea: {area}" + (f"\n\nView ticket: {link}" if link else "")
+        f"Category: {cat_d}\nArea: {area_d}" + (f"\n\nView ticket: {link}" if link else "")
     )
 
     ok, err = enviar_email(email_dest, assunto, corpo_html, corpo_texto)

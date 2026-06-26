@@ -62,6 +62,9 @@ SECTOR_KEYS_MAP = {
     "Produção - Montagem": "production_assembly",
     "Produção - Inspeções": "production_inspections",
     "Produção - Processos Especiais": "production_special_processes",
+    # Fallback genérico
+    "Geral": "general",
+    "General": "general",
     # --- Setores já cadastrados em inglês no banco ---
     "Engineering": "engineering",
     "Quality": "quality",
@@ -116,6 +119,14 @@ GATE_KEYS_MAP: dict[str, str] = {
     "Gate 2": "gate_2",
     "Gate 3": "gate_3",
     "Gate 4": "gate_4",
+}
+
+# Mapa de Perfis de usuário para Chaves de Tradução
+ROLE_KEYS_MAP = {
+    "supervisor": "profile_supervisor",
+    "solicitante": "profile_solicitante",
+    "admin": "profile_admin",
+    "admin_global": "profile_admin_global",
 }
 
 # Nomes de campos (histórico/auditoria) -> chave de tradução para o rótulo exibido
@@ -217,6 +228,23 @@ def get_translated_gate(gate_value, language="pt_BR"):
     if translation_key:
         return get_translation(translation_key, language)
     return gate_value
+
+
+def get_translated_role(role_name, language="en"):
+    """
+    Traduz o nome interno de um perfil de usuário para o idioma solicitado.
+
+    Args:
+        role_name (str): Identificador interno (ex: 'supervisor', 'solicitante')
+        language (str): Código do idioma (pt_BR, en, es)
+
+    Returns:
+        str: Texto traduzido ou o valor original se não mapeado
+    """
+    translation_key = ROLE_KEYS_MAP.get(role_name)
+    if translation_key:
+        return get_translation(translation_key, language)
+    return role_name
 
 
 def get_translated_field_label(field_name, language="pt_BR"):

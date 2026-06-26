@@ -78,7 +78,7 @@ def admin_global_rebaixar_admin(usuario_id: str) -> Response:
         logger.info(
             "admin_global %s rebaixou %s para supervisor", current_user.email, usuario.email
         )
-        flash_t("user_updated_success", "success")
+        flash_t("user_updated_success", "success", nome=usuario.nome)
     except Exception as e:
         logger.exception("Erro ao rebaixar admin %s: %s", usuario_id, e)
         flash_t("error_server", "danger")
@@ -100,7 +100,7 @@ def admin_global_promover_supervisor(usuario_id: str) -> Response:
             return redirect(url_for("main.admin_global_dashboard"))
         usuario.update(perfil="admin")
         logger.info("admin_global %s promoveu %s para admin", current_user.email, usuario.email)
-        flash_t("user_updated_success", "success")
+        flash_t("user_updated_success", "success", nome=usuario.nome)
     except Exception as e:
         logger.exception("Erro ao promover supervisor %s: %s", usuario_id, e)
         flash_t("error_server", "danger")

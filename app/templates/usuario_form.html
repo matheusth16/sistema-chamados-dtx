@@ -111,17 +111,17 @@
       </div>
       {% endif %}
 
-      <!-- Nível de Gestão (Fase 5) — opcional, define acesso read-only ao Painel Gerencial -->
+      <!-- Management Level (Phase 5) — optional, defines read-only access to Management Board -->
       <div class="border border-surface-border rounded-dtx-md p-4 space-y-2">
-        <label for="nivel_gestao" class="dtx-label">Nível de Gestão <span class="text-xs font-normal text-gray-400">(opcional)</span></label>
+        <label for="nivel_gestao" class="dtx-label">{{ t('management_level_label') }} <span class="text-xs font-normal text-gray-400">{{ t('management_level_optional') }}</span></label>
         <select name="nivel_gestao" id="nivel_gestao" class="dtx-select">
-          <option value="" {% if not usuario or not usuario.nivel_gestao %}selected{% endif %}>— Sem gestão —</option>
-          <option value="gestor_setor" {% if usuario and usuario.nivel_gestao == 'gestor_setor' %}selected{% endif %}>Gestor de Setor</option>
-          <option value="gerente_producao" {% if usuario and usuario.nivel_gestao == 'gerente_producao' %}selected{% endif %}>Gerente de Produção</option>
-          <option value="assistente_gm" {% if usuario and usuario.nivel_gestao == 'assistente_gm' %}selected{% endif %}>Assistente GM</option>
-          <option value="gm" {% if usuario and usuario.nivel_gestao == 'gm' %}selected{% endif %}>GM (General Manager)</option>
+          <option value="" {% if not usuario or not usuario.nivel_gestao %}selected{% endif %}>{{ t('management_level_none') }}</option>
+          <option value="gestor_setor" {% if usuario and usuario.nivel_gestao == 'gestor_setor' %}selected{% endif %}>{{ t('management_level_sector_manager') }}</option>
+          <option value="gerente_producao" {% if usuario and usuario.nivel_gestao == 'gerente_producao' %}selected{% endif %}>{{ t('management_level_production_manager') }}</option>
+          <option value="assistente_gm" {% if usuario and usuario.nivel_gestao == 'assistente_gm' %}selected{% endif %}>{{ t('management_level_gm_assistant') }}</option>
+          <option value="gm" {% if usuario and usuario.nivel_gestao == 'gm' %}selected{% endif %}>{{ t('management_level_gm') }}</option>
         </select>
-        <p class="text-xs text-gray-500">Gestores recebem acesso read-only ao Painel Gerencial e são redirecionados para ele ao fazer login.</p>
+        <p class="text-xs text-gray-500">{{ t('management_level_help') }}</p>
       </div>
 
       <!-- Senha -->
