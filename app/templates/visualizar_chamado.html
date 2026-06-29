@@ -227,6 +227,7 @@
 
                         {% set nivel_congelamento = nivel_congelamento if nivel_congelamento is defined else none %}
                         {% set pode_reabrir = nivel_congelamento is not none and current_user.perfil in ['admin', 'admin_global', 'supervisor'] and not current_user.is_gestor_only and (current_user.is_admin_or_above or (current_user.perfil == 'supervisor' and nivel_congelamento == 'pendente')) %}
+                        {% set pode_cancelar = nivel_congelamento == 'pendente' and current_user.perfil in ['admin', 'admin_global', 'supervisor'] and not current_user.is_gestor_only %}
 
                         {% if nivel_congelamento is not none and current_user.perfil in ['admin', 'admin_global', 'supervisor'] and not current_user.is_gestor_only %}
                         <div class="mb-4 {% if nivel_congelamento == 'confirmado' %}bg-gray-50 border-gray-200{% else %}bg-amber-50 border-amber-200{% endif %} border rounded-dtx-md p-4">
@@ -241,13 +242,22 @@
                                     {{ t('ticket_frozen_awaiting_confirmation') if t else 'Chamado concluído — aguardando confirmação do solicitante. Edição bloqueada.' }}
                                 {% endif %}
                             </p>
+                            <div class="mt-3 flex flex-wrap gap-2">
                             {% if pode_reabrir %}
                             <button type="button" onclick="document.getElementById('modal-reabrir-admin').classList.remove('hidden')"
-                                class="mt-3 inline-flex items-center gap-2 px-4 py-2 rounded-dtx-md text-sm font-bold bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors">
+                                class="inline-flex items-center gap-2 px-4 py-2 rounded-dtx-md text-sm font-bold bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
                                 {{ t('ticket_reopen_admin_btn') if t else 'Reabrir chamado' }}
                             </button>
                             {% endif %}
+                            {% if pode_cancelar %}
+                            <button type="button" onclick="document.getElementById('modal-cancelar-admin').classList.remove('hidden')"
+                                class="inline-flex items-center gap-2 px-4 py-2 rounded-dtx-md text-sm font-bold bg-white border border-red-300 text-red-700 hover:bg-red-50 transition-colors">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                                {{ t('ticket_cancel_frozen_btn') if t else 'Cancelar chamado' }}
+                            </button>
+                            {% endif %}
+                            </div>
                         </div>
                         {% endif %}
 
@@ -1046,6 +1056,59 @@ function reabrirChamadoAdmin() {
     .catch(function() { alert('{{ t("error_connection") if t else "Erro de conexão. Tente novamente." }}'); });
 }
 </script>
+
+{% if pode_cancelar is defined and pode_cancelar %}
+<!-- ── Modal Cancelamento (Nível 1) ───────────────────────────────────────── -->
+<div id="modal-cancelar-admin" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+    <div class="bg-white rounded-dtx-lg shadow-dtx-sm w-full max-w-md border border-surface-border">
+        <div class="px-6 py-4 border-b border-surface-border flex items-center justify-between">
+            <h3 class="font-display font-bold text-red-700">{{ t('ticket_cancel_frozen_btn') if t else 'Cancelar chamado' }}</h3>
+            <button onclick="document.getElementById('modal-cancelar-admin').classList.add('hidden')" class="text-gray-400 hover:text-gray-600 transition-colors">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+        </div>
+        <div class="p-6 space-y-4">
+            <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">
+                {{ t('ticket_cancel_frozen_confirm') if t else 'Informe o motivo do cancelamento' }} <span class="text-rose-500">*</span>
+            </label>
+            <textarea id="motivo-cancelar-admin" rows="3" maxlength="500"
+                placeholder="{{ t('ticket_cancel_frozen_confirm') if t else 'Descreva o motivo para cancelar este chamado...' }}"
+                class="dtx-input resize-none w-full"></textarea>
+            <div class="flex gap-3 pt-2">
+                <button onclick="document.getElementById('modal-cancelar-admin').classList.add('hidden')"
+                    class="flex-1 py-2.5 rounded-dtx-md border border-surface-border text-gray-600 font-bold text-sm hover:bg-gray-50 transition-colors">
+                    {{ t('cancel') if t else 'Fechar' }}
+                </button>
+                <button onclick="cancelarChamadoAdmin()"
+                    class="flex-1 py-2.5 rounded-dtx-md bg-red-600 hover:bg-red-700 text-white font-bold text-sm transition-colors">
+                    {{ t('ticket_cancel_frozen_btn') if t else 'Cancelar chamado' }}
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+<script nonce="{{ csp_nonce }}">
+function cancelarChamadoAdmin() {
+    var motivo = (document.getElementById('motivo-cancelar-admin').value || '').trim();
+    if (motivo.length < 3) {
+        document.getElementById('motivo-cancelar-admin').focus();
+        return;
+    }
+    fetch('/api/atualizar-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content },
+        body: JSON.stringify({ chamado_id: '{{ chamado.id }}', novo_status: 'Cancelado', motivo_cancelamento: motivo })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.sucesso) { window.location.reload(); }
+        else { alert(data.erro || '{{ t("error_server") if t else "Erro ao cancelar chamado." }}'); }
+    })
+    .catch(function() { alert('{{ t("error_connection") if t else "Erro de conexão. Tente novamente." }}'); });
+}
+</script>
+{% endif %}
+
 {% endif %}
 
 {% if chamado.solicitante_id == current_user.id and chamado.status == 'Concluído' and chamado.confirmacao_solicitante == 'pendente' %}

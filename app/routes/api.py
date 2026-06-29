@@ -296,6 +296,19 @@ def atualizar_status_ajax():
 
         motivo_reabertura = (dados.get("motivo_reabertura") or "").strip()
 
+        # Lacuna 4: reabertura de Concluído requer motivo explícito (mín. 3 chars)
+        if (
+            novo_status == "Aberto"
+            and chamado_obj.status == "Concluído"
+            and len(motivo_reabertura) < 3
+        ):
+            return jsonify(
+                {
+                    "sucesso": False,
+                    "erro": "Informe o motivo para reabrir o chamado (mínimo 3 caracteres).",
+                }
+            ), 400
+
         resultado = atualizar_status_chamado(
             chamado_id=chamado_id,
             novo_status=novo_status,

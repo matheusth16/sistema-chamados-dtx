@@ -228,3 +228,114 @@ def test_atualizar_status_transicao_invalida_retorna_400(client_logado_superviso
     assert r.status_code == 400
     data = r.get_json()
     assert data is not None and data.get("sucesso") is False
+
+
+# ── Lacuna 4: motivo_reabertura obrigatório ao reabrir de Concluído ───────────
+
+
+def test_atualizar_status_reabrir_concluido_sem_motivo_retorna_400(client_logado_admin):
+    """Lacuna 4: Concluído → Aberto sem motivo_reabertura retorna 400."""
+    doc = MagicMock()
+    doc.exists = True
+    doc.to_dict.return_value = {
+        "area": "Geral",
+        "status": "Concluído",
+        "confirmacao_solicitante": "pendente",
+        "solicitante_id": "s1",
+    }
+    chamado_mock = MagicMock()
+    chamado_mock.status = "Concluído"
+    chamado_mock.area = "Geral"
+    chamado_mock.responsavel_id = None
+    chamado_mock.solicitante_id = "s1"
+    chamado_mock.participantes = []
+    chamado_mock.confirmacao_solicitante = "pendente"
+    with (
+        patch("app.routes.api.db") as mock_db,
+        patch("app.routes.api.Chamado") as mock_chamado_cls,
+    ):
+        mock_db.collection.return_value.document.return_value.get.return_value = doc
+        mock_chamado_cls.from_dict.return_value = chamado_mock
+        r = client_logado_admin.post(
+            "/api/atualizar-status",
+            json={"chamado_id": "ch_conc", "novo_status": "Aberto"},
+            content_type="application/json",
+        )
+    assert r.status_code == 400
+    data = r.get_json()
+    assert data is not None and data.get("sucesso") is False
+    assert "motivo" in data.get("erro", "").lower() or "reabrir" in data.get("erro", "").lower()
+
+
+def test_atualizar_status_reabrir_concluido_motivo_curto_retorna_400(client_logado_admin):
+    """Lacuna 4: motivo_reabertura com menos de 3 chars retorna 400."""
+    doc = MagicMock()
+    doc.exists = True
+    doc.to_dict.return_value = {
+        "area": "Geral",
+        "status": "Concluído",
+        "confirmacao_solicitante": "confirmado",
+        "solicitante_id": "s1",
+    }
+    chamado_mock = MagicMock()
+    chamado_mock.status = "Concluído"
+    chamado_mock.area = "Geral"
+    chamado_mock.responsavel_id = None
+    chamado_mock.solicitante_id = "s1"
+    chamado_mock.participantes = []
+    chamado_mock.confirmacao_solicitante = "confirmado"
+    with (
+        patch("app.routes.api.db") as mock_db,
+        patch("app.routes.api.Chamado") as mock_chamado_cls,
+    ):
+        mock_db.collection.return_value.document.return_value.get.return_value = doc
+        mock_chamado_cls.from_dict.return_value = chamado_mock
+        r = client_logado_admin.post(
+            "/api/atualizar-status",
+            json={"chamado_id": "ch_conc", "novo_status": "Aberto", "motivo_reabertura": "ok"},
+            content_type="application/json",
+        )
+    assert r.status_code == 400
+
+
+def test_atualizar_status_reabrir_concluido_com_motivo_valido_passa(client_logado_admin):
+    """Lacuna 4: Concluído → Aberto com motivo_reabertura válido passa a validação de motivo."""
+    doc = MagicMock()
+    doc.exists = True
+    doc.to_dict.return_value = {
+        "area": "Geral",
+        "status": "Concluído",
+        "confirmacao_solicitante": "confirmado",
+        "solicitante_id": "s1",
+    }
+    chamado_mock = MagicMock()
+    chamado_mock.status = "Concluído"
+    chamado_mock.area = "Geral"
+    chamado_mock.responsavel_id = None
+    chamado_mock.solicitante_id = "s1"
+    chamado_mock.participantes = []
+    chamado_mock.confirmacao_solicitante = "confirmado"
+    with (
+        patch("app.routes.api.db") as mock_db,
+        patch("app.routes.api.Chamado") as mock_chamado_cls,
+        patch("app.routes.api.atualizar_status_chamado") as mock_atualizar,
+    ):
+        mock_db.collection.return_value.document.return_value.get.return_value = doc
+        mock_chamado_cls.from_dict.return_value = chamado_mock
+        mock_atualizar.return_value = {
+            "sucesso": True,
+            "mensagem": "Status alterado para Aberto",
+            "novo_status": "Aberto",
+        }
+        r = client_logado_admin.post(
+            "/api/atualizar-status",
+            json={
+                "chamado_id": "ch_conc",
+                "novo_status": "Aberto",
+                "motivo_reabertura": "Problema recorrente identificado",
+            },
+            content_type="application/json",
+        )
+    assert r.status_code == 200
+    data = r.get_json()
+    assert data.get("sucesso") is True

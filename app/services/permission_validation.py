@@ -5,7 +5,10 @@ Centraliza blocos de verificação (supervisor → areas) que apareciam
 duplicados em rotas do dashboard.
 """
 
+import logging
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 
 def supervisor_pode_alterar_chamado(usuario: Any, chamado_area: str) -> bool:
@@ -103,9 +106,16 @@ def nivel_congelamento_chamado(chamado) -> str | None:
 
     if status != "Concluído":
         return None
-    if confirmacao in ("pendente", "confirmado"):
-        return confirmacao
-    return None
+    if confirmacao == "confirmado":
+        return "confirmado"
+    # "reaberto" + Concluído é estado anômalo (reabertura deveria mudar status para Aberto)
+    if confirmacao == "reaberto":
+        logger.warning(
+            "Chamado Concluído com confirmacao_solicitante='reaberto' — estado anômalo; "
+            "tratando como pendente por segurança"
+        )
+    # None, "", "pendente", "reaberto" ou qualquer outro valor → congela como nível 1 (pendente)
+    return "pendente"
 
 
 def chamado_aceita_edicao_operacional(usuario: Any, chamado: Any) -> tuple[bool, str | None]:

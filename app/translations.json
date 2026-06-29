@@ -2544,6 +2544,16 @@
     "en": "Please provide a reason to reopen the ticket.",
     "es": "Proporcione un motivo para reabrir el ticket."
   },
+  "ticket_cancel_frozen_btn": {
+    "pt_BR": "Cancelar chamado",
+    "en": "Cancel ticket",
+    "es": "Cancelar ticket"
+  },
+  "ticket_cancel_frozen_confirm": {
+    "pt_BR": "Informe o motivo do cancelamento",
+    "en": "Please provide a reason for cancellation",
+    "es": "Proporcione un motivo para la cancelación"
+  },
   "sectors_added_notify_failed": {
     "pt_BR": "Setores adicionados, mas houve falha ao notificar.",
     "en": "Sectors added, but notification failed.",

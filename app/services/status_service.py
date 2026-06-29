@@ -49,6 +49,7 @@ def atualizar_status_chamado(
     data_chamado: dict = None,
     motivo_cancelamento: str = None,
     motivo_reabertura: str = None,
+    usuario=None,
 ) -> dict:
     """Atualiza o status de um chamado, registra histórico e envia notificação.
 
@@ -98,6 +99,27 @@ def atualizar_status_chamado(
                 "erro": f"Transição inválida: {status_anterior} → {novo_status}",
                 "codigo": 400,
             }
+
+        # Defesa em profundidade: valida congelamento mesmo em chamadas diretas ao service
+        if status_anterior and novo_status != status_anterior:
+            _u = usuario
+            if _u is None:
+                try:
+                    _u = Usuario.get_by_id(usuario_id)
+                except Exception as exc:
+                    logger.debug(
+                        "Validação de congelamento ignorada (usuário não carregável): %s", exc
+                    )
+            if _u is not None:
+                from app.services.permission_validation import chamado_aceita_transicao_status
+
+                _pode, _ = chamado_aceita_transicao_status(_u, data_chamado, novo_status)
+                if not _pode:
+                    return {
+                        "sucesso": False,
+                        "erro": "Chamado Concluído não permite esta transição de status",
+                        "codigo": 403,
+                    }
 
         # Fase 4: bloqueia conclusão global se houver participantes pendentes
         if novo_status == "Concluído":

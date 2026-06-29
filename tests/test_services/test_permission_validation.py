@@ -329,6 +329,77 @@ def test_nivel_congelamento_aceita_dict():
 
 
 # ---------------------------------------------------------------------------
+# Lacuna 1 — chamados legados (confirmacao_solicitante ausente / None)
+# ---------------------------------------------------------------------------
+
+
+def test_nivel_congelamento_concluido_confirmacao_none_congela_como_pendente():
+    """Lacuna 1: Concluído + confirmacao_solicitante=None → congelado como pendente (legado)."""
+    from app.services.permission_validation import nivel_congelamento_chamado
+
+    chamado = MagicMock()
+    chamado.status = "Concluído"
+    chamado.confirmacao_solicitante = None
+    assert nivel_congelamento_chamado(chamado) == "pendente"
+
+
+def test_nivel_congelamento_concluido_campo_ausente_no_dict_congela():
+    """Lacuna 1: dict Concluído sem campo confirmacao_solicitante → congelado como pendente."""
+    from app.services.permission_validation import nivel_congelamento_chamado
+
+    # dict sem a chave (get retorna None)
+    assert nivel_congelamento_chamado({"status": "Concluído"}) == "pendente"
+
+
+def test_nivel_congelamento_concluido_confirmacao_string_vazia_congela():
+    """Lacuna 1: Concluído + confirmacao_solicitante='' → congelado como pendente."""
+    from app.services.permission_validation import nivel_congelamento_chamado
+
+    assert (
+        nivel_congelamento_chamado({"status": "Concluído", "confirmacao_solicitante": ""})
+        == "pendente"
+    )
+
+
+def test_nivel_congelamento_concluido_reaberto_anomalia_congela_como_pendente():
+    """Lacuna 1: Concluído + confirmacao='reaberto' é anomalia → congelado como pendente por segurança."""
+    from app.services.permission_validation import nivel_congelamento_chamado
+
+    chamado = MagicMock()
+    chamado.status = "Concluído"
+    chamado.confirmacao_solicitante = "reaberto"
+    # Deve congelar mesmo sendo estado anômalo
+    assert nivel_congelamento_chamado(chamado) == "pendente"
+
+
+def test_edicao_operacional_concluido_legado_none_bloqueado():
+    """Lacuna 1: chamado legado (confirmacao=None) com status Concluído bloqueia edição operacional."""
+    from app.services.permission_validation import chamado_aceita_edicao_operacional
+
+    admin = MagicMock()
+    chamado = MagicMock()
+    chamado.status = "Concluído"
+    chamado.confirmacao_solicitante = None
+    pode, msg = chamado_aceita_edicao_operacional(admin, chamado)
+    assert pode is False
+    assert msg is not None
+
+
+def test_transicao_nivel1_legado_supervisor_aberto_aceito():
+    """Lacuna 1: chamado legado (confirmacao=None) → nível 1; supervisor pode reabrir."""
+    from app.services.permission_validation import chamado_aceita_transicao_status
+
+    sup = MagicMock()
+    sup.perfil = "supervisor"
+    sup.is_admin_or_above = False
+    chamado = MagicMock()
+    chamado.status = "Concluído"
+    chamado.confirmacao_solicitante = None
+    pode, _ = chamado_aceita_transicao_status(sup, chamado, "Aberto")
+    assert pode is True
+
+
+# ---------------------------------------------------------------------------
 # chamado_aceita_edicao_operacional — bloqueia qualquer nível
 # ---------------------------------------------------------------------------
 

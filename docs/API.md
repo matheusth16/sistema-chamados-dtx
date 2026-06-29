@@ -195,6 +195,7 @@ X-Requested-With: XMLHttpRequest
 | `chamado_id` | string | Sim | ID Firestore |
 | `novo_status` | string | Sim | `Aberto`, `Em Atendimento`, `Concluído`, `Cancelado` |
 | `motivo_cancelamento` | string | Sim se `Cancelado` | Texto livre |
+| `motivo_reabertura` | string | Sim se `Aberto` e chamado estava `Concluído` | Mínimo 3 caracteres, máx. 500 |
 
 **Respostas:**
 
@@ -207,15 +208,21 @@ X-Requested-With: XMLHttpRequest
 }
 ```
 
-- **400** — Parâmetro ausente ou status inválido:
+- **400** — Parâmetro ausente, status inválido ou motivo de reabertura ausente:
 ```json
 { "sucesso": false, "erro": "Status inválido \"Encerrado\"" }
+{ "sucesso": false, "erro": "Informe o motivo para reabrir o chamado (mínimo 3 caracteres)." }
 ```
 
-- **403** — Sem permissão para alterar este chamado/status:
+- **403** — Sem permissão para alterar este chamado/status, ou chamado congelado:
 ```json
 { "sucesso": false, "erro": "Apenas o responsável ou admin pode concluir este chamado" }
+{ "sucesso": false, "erro": "Chamado Concluído não permite esta transição de status" }
 ```
+
+> **Congelamento:** chamados com `status == "Concluído"` aplicam regras adicionais de
+> permissão conforme o nível de congelamento (ver `docs/plans/confirmacao-solicitante.md`).
+> Supervisor não pode operar em Nível 2 (confirmado). Admin pode apenas reabrir em Nível 2.
 
 - **404** — Chamado não encontrado
 - **500** — Erro interno
@@ -281,9 +288,12 @@ Apenas **supervisor** ou **admin**. Supervisor só pode editar chamados da próp
 ```
 
 - **400** — `chamado_id` ausente ou validação falhou
-- **403** — Perfil solicitante ou supervisor de outra área
+- **403** — Perfil solicitante, supervisor de outra área, ou chamado congelado (`Concluído` — qualquer nível)
 - **404** — Chamado não encontrado
 - **500** — Erro interno
+
+> **Congelamento:** chamados `Concluído` bloqueiam toda edição operacional (descrição,
+> responsável, SLA, setores, anexos). Apenas a reabertura via `/api/atualizar-status` é possível.
 
 ---
 
@@ -1149,4 +1159,5 @@ Ao exceder: `429 Too Many Requests` (resposta do Flask-Limiter).
 | 2026-06-25 | — | Job `sla_escalacao` — Fase 6 Escada A gerencial a cada 10 min (substitui `alerta_prazo_24h`) |
 | 2026-06-25 | — | `gestor/dashboard` — `aberto_sem_resposta` corrigido para tempo útil (Fase 6) |
 | 2026-06-29 | — | `POST /api/chamado/<id>/confirmar-resolucao` — `acao=confirmar` agora notifica responsável por e-mail |
+| 2026-06-29 | — | Congelamento 2 níveis: `POST /api/atualizar-status` exige `motivo_reabertura` (≥ 3 chars) ao reabrir de Concluído; `POST /api/editar-chamado` retorna 403 para chamados Concluídos; chamados legados (confirmacao=None) tratados como Nível 1 |
 | 2026-06-26 | — | Fase 7: avisos 50%/80% + Escada B resolução no job `sla_escalacao` |

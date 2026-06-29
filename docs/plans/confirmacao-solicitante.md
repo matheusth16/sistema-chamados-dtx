@@ -120,6 +120,72 @@ job lembrete_confirmacao (a cada 6 h)
 **Índice Firestore necessário:**
 - Composto: `status ASC, confirmacao_solicitante ASC` (deploy: `firebase deploy --only firestore:indexes`)
 
+## Congelamento (read-only) em 2 níveis
+
+Quando um chamado atinge `status == "Concluído"`, o sistema aplica um bloqueio progressivo
+sobre quem pode realizar operações nele. O congelamento é **obrigatório no backend** — a UI
+reflete o estado, mas a proteção não depende dela.
+
+### Matriz por nível
+
+| Nível | Condição | Supervisor | Admin | Solicitante |
+|-------|----------|------------|-------|-------------|
+| **1 — Pendente** | `Concluído` + `confirmacao_solicitante` ≠ `"confirmado"` (inclui `None`, `""`, `"pendente"` — legado e novos chamados) | Só reabrir (→ Aberto) ou cancelar | Só reabrir ou cancelar | Confirmar ou reabrir via `/confirmar-resolucao` |
+| **2 — Confirmado** | `Concluído` + `confirmacao_solicitante == "confirmado"` | Somente visualizar | Só reabrir (→ Aberto) com motivo obrigatório | Somente visualizar |
+
+> **Chamados legados:** chamados com `status == "Concluído"` e `confirmacao_solicitante = None`
+> (anteriores à implementação do fluxo de confirmação) são tratados como Nível 1 — mesmo
+> comportamento de bloqueio, permitindo reabertura/cancelamento por supervisor/admin.
+>
+> **Estado anômalo:** `confirmacao_solicitante == "reaberto"` com `status == "Concluído"` indica
+> inconsistência de dados. O sistema trata como Nível 1 e emite um `logger.warning`.
+
+### Funções centralizadas (`app/services/permission_validation.py`)
+
+| Função | Retorno | Uso |
+|--------|---------|-----|
+| `nivel_congelamento_chamado(chamado)` | `None` \| `"pendente"` \| `"confirmado"` | Base para os checks abaixo |
+| `chamado_aceita_edicao_operacional(usuario, chamado)` | `(bool, chave_i18n \| None)` | Bloqueia edição de campos (descrição, responsável, SLA, etc.) |
+| `chamado_aceita_transicao_status(usuario, chamado, novo_status)` | `(bool, chave_i18n \| None)` | Bloqueia transições de status não permitidas pelo nível |
+
+### Rotas protegidas
+
+| Rota | Proteção aplicada |
+|------|-------------------|
+| `POST /chamado/editar` | `chamado_aceita_edicao_operacional` em `edicao_chamado_service` |
+| `POST /api/editar-chamado` | Idem |
+| `POST /api/atualizar-status` | `chamado_aceita_transicao_status` + motivo_reabertura obrigatório (≥ 3 chars) |
+| `POST /api/bulk-status` | `chamado_aceita_transicao_status` por chamado |
+| `POST /api/chamado/<id>/transferir-area` | `chamado_aceita_edicao_operacional` |
+| `POST /api/chamado/<id>/escalonar-colega` | `chamado_aceita_edicao_operacional` |
+| `POST /api/chamado/<id>/incluir-participantes` | `chamado_aceita_edicao_operacional` |
+| `POST /api/chamado/<id>/concluir-minha-parte` | Verificação direta `status == "Concluído"` |
+| `POST /admin` e `POST /painel` (dashboard) | `chamado_aceita_transicao_status` |
+
+### Reabertura via modal (UI)
+
+Disponível em `visualizar_chamado.html` quando `pode_reabrir` é verdadeiro:
+- **Nível 1**: supervisor e admin → botão "Reabrir chamado" + botão "Cancelar chamado"
+- **Nível 2**: apenas admin → botão "Reabrir chamado"
+
+Ambos os botões abrem modais que coletam o motivo e chamam:
+```
+POST /api/atualizar-status
+{ "chamado_id": "<id>", "novo_status": "Aberto"|"Cancelado", "motivo_reabertura": "<texto>" }
+```
+
+O campo `motivo_reabertura` é **obrigatório** (mínimo 3 caracteres) quando `novo_status == "Aberto"`
+e o chamado estava `Concluído`. Requisições sem motivo recebem **400**.
+
+### Defesa em profundidade
+
+`atualizar_status_chamado` (status_service) valida `chamado_aceita_transicao_status` mesmo em
+chamadas diretas ao serviço (sem passar pela rota). O parâmetro `usuario` pode ser fornecido
+explicitamente; se omitido, o serviço tenta carregar via `Usuario.get_by_id(usuario_id)`. Em
+ambiente sem Firestore (testes sem mock), a validação é ignorada com `logger.debug`.
+
+---
+
 ## Tasks
 
 - [ ] **1. Modelo** — Adicionar campo `confirmacao_solicitante: str | None` em `app/models.py`

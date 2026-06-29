@@ -182,11 +182,15 @@ def test_atualizar_em_atendimento_chama_gamificacao_inicial():
 
 def test_saindo_de_concluido_para_aberto_reseta_confirmacao_solicitante():
     """Regressão: Concluído → Aberto (reabertura) limpa confirmacao_solicitante=None."""
+    admin_mock = MagicMock()
+    admin_mock.perfil = "admin"
+    admin_mock.is_admin_or_above = True
     with (
         patch("app.services.status_service.execute_with_retry") as mock_retry,
         patch("app.services.status_service.Historico"),
         patch("app.services.status_service._notificar_solicitante"),
         patch("app.services.status_service.GamificationService"),
+        patch("app.services.status_service.Usuario.get_by_id", return_value=admin_mock),
     ):
         resultado = atualizar_status_chamado(
             chamado_id="ch1",
@@ -226,11 +230,15 @@ def test_concluido_para_em_atendimento_transicao_invalida():
 
 def test_reabertura_admin_grava_historico_com_motivo():
     """Concluído → Aberto com motivo_reabertura grava entrada de reabertura no histórico."""
+    admin_mock = MagicMock()
+    admin_mock.perfil = "admin"
+    admin_mock.is_admin_or_above = True
     with (
         patch("app.services.status_service.execute_with_retry"),
         patch("app.services.status_service.Historico") as mock_hist,
         patch("app.services.status_service._notificar_solicitante"),
         patch("app.services.status_service.GamificationService"),
+        patch("app.services.status_service.Usuario.get_by_id", return_value=admin_mock),
     ):
         resultado = atualizar_status_chamado(
             chamado_id="ch1",
@@ -382,11 +390,15 @@ def test_notificar_solicitante_excecao_nao_propaga(app):
 
 def test_atualizar_status_transicao_concluido_para_aberto_valida():
     """Concluído → Aberto é transição válida (reabertura administrativa)."""
+    admin_mock = MagicMock()
+    admin_mock.perfil = "admin"
+    admin_mock.is_admin_or_above = True
     with (
         patch("app.services.status_service.execute_with_retry"),
         patch("app.services.status_service.Historico"),
         patch("app.services.status_service._notificar_solicitante"),
         patch("app.services.status_service.GamificationService"),
+        patch("app.services.status_service.Usuario.get_by_id", return_value=admin_mock),
     ):
         resultado = atualizar_status_chamado(
             chamado_id="ch1",
@@ -436,6 +448,9 @@ def test_atualizar_status_sem_status_anterior_nao_rejeita():
 
 def test_transicoes_validas_permite_fluxo_normal():
     """F-63: fluxo principal deve ser permitido; Concluído → Em Atendimento é inválido."""
+    admin_mock = MagicMock()
+    admin_mock.perfil = "admin"
+    admin_mock.is_admin_or_above = True
     for status_ant, status_novo in [
         ("Aberto", "Em Atendimento"),
         ("Em Atendimento", "Concluído"),
@@ -447,6 +462,7 @@ def test_transicoes_validas_permite_fluxo_normal():
             patch("app.services.status_service.Historico"),
             patch("app.services.status_service._notificar_solicitante"),
             patch("app.services.status_service.GamificationService"),
+            patch("app.services.status_service.Usuario.get_by_id", return_value=admin_mock),
         ):
             r = atualizar_status_chamado(
                 chamado_id="ch1",
@@ -457,6 +473,111 @@ def test_transicoes_validas_permite_fluxo_normal():
                 motivo_cancelamento="motivo" if status_novo == "Cancelado" else None,
             )
         assert r["sucesso"] is True, f"Transição {status_ant} → {status_novo} deveria ser permitida"
+
+
+# ---------------------------------------------------------------------------
+# Lacuna 5 — Defesa em profundidade: freeze no service
+# ---------------------------------------------------------------------------
+
+
+def test_defesa_profundidade_supervisor_nivel2_cancelar_bloqueado():
+    """Lacuna 5: supervisor não pode cancelar chamado confirmado (Nível 2) mesmo via service direto."""
+    sup = MagicMock()
+    sup.perfil = "supervisor"
+    sup.is_admin_or_above = False
+
+    resultado = atualizar_status_chamado(
+        chamado_id="ch1",
+        novo_status="Cancelado",
+        usuario_id="u1",
+        usuario_nome="Supervisor",
+        data_chamado={
+            "status": "Concluído",
+            "confirmacao_solicitante": "confirmado",
+            "solicitante_id": "s1",
+        },
+        motivo_cancelamento="Motivo teste",
+        usuario=sup,
+    )
+    assert resultado["sucesso"] is False
+    assert resultado.get("codigo") == 403
+
+
+def test_defesa_profundidade_admin_nivel2_cancelar_bloqueado():
+    """Lacuna 5: admin não pode cancelar chamado confirmado (Nível 2) — apenas reabrir."""
+    admin = MagicMock()
+    admin.perfil = "admin"
+    admin.is_admin_or_above = True
+
+    resultado = atualizar_status_chamado(
+        chamado_id="ch1",
+        novo_status="Cancelado",
+        usuario_id="admin1",
+        usuario_nome="Admin",
+        data_chamado={
+            "status": "Concluído",
+            "confirmacao_solicitante": "confirmado",
+            "solicitante_id": "s1",
+        },
+        motivo_cancelamento="Motivo teste",
+        usuario=admin,
+    )
+    assert resultado["sucesso"] is False
+    assert resultado.get("codigo") == 403
+
+
+def test_defesa_profundidade_admin_nivel2_reabrir_permitido():
+    """Lacuna 5: admin pode reabrir chamado confirmado (Nível 2) via service direto."""
+    admin = MagicMock()
+    admin.perfil = "admin"
+    admin.is_admin_or_above = True
+
+    with (
+        patch("app.services.status_service.execute_with_retry"),
+        patch("app.services.status_service.Historico"),
+        patch("app.services.status_service._notificar_solicitante"),
+        patch("app.services.status_service.GamificationService"),
+    ):
+        resultado = atualizar_status_chamado(
+            chamado_id="ch1",
+            novo_status="Aberto",
+            usuario_id="admin1",
+            usuario_nome="Admin",
+            data_chamado={
+                "status": "Concluído",
+                "confirmacao_solicitante": "confirmado",
+                "solicitante_id": "s1",
+            },
+            motivo_reabertura="Problema recorrente",
+            usuario=admin,
+        )
+    assert resultado["sucesso"] is True
+
+
+def test_defesa_profundidade_usuario_none_nao_bloqueia_sem_db():
+    """Lacuna 5: quando usuario=None e Usuario.get_by_id falha, validação é ignorada graciosamente."""
+    with (
+        patch("app.services.status_service.execute_with_retry"),
+        patch("app.services.status_service.Historico"),
+        patch("app.services.status_service._notificar_solicitante"),
+        patch("app.services.status_service.GamificationService"),
+        patch(
+            "app.services.status_service.Usuario.get_by_id",
+            side_effect=Exception("no db"),
+        ),
+    ):
+        resultado = atualizar_status_chamado(
+            chamado_id="ch1",
+            novo_status="Aberto",
+            usuario_id="u1",
+            usuario_nome="Test",
+            data_chamado={
+                "status": "Concluído",
+                "confirmacao_solicitante": "pendente",
+                "solicitante_id": "s1",
+            },
+        )
+    assert resultado["sucesso"] is True
 
 
 # ---------------------------------------------------------------------------
