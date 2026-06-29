@@ -143,7 +143,7 @@ def test_iniciar_scheduler_import_error_loga_warning(app):
 
 
 def test_iniciar_scheduler_registra_quatro_jobs(app):
-    """_iniciar_scheduler registra 4 jobs no scheduler e chama scheduler.start()."""
+    """_iniciar_scheduler registra 5 jobs no scheduler e chama scheduler.start()."""
     from app import _iniciar_scheduler
 
     mock_sched = MagicMock()
@@ -158,11 +158,12 @@ def test_iniciar_scheduler_registra_quatro_jobs(app):
     ):
         _iniciar_scheduler(app)
 
-    assert len(add_job_calls) == 4
+    assert len(add_job_calls) == 5
     assert "relatorio_semanal" in add_job_calls
     assert "sla_escalacao" in add_job_calls
     assert "reset_ranking_semanal" in add_job_calls
     assert "limpar_contadores_uso" in add_job_calls
+    assert "lembrete_confirmacao" in add_job_calls
     mock_sched.start.assert_called_once()
 
 

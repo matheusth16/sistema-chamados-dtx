@@ -283,6 +283,218 @@ def test_usuario_pode_mutar_chamado_ignora_argumento_chamado():
 
 
 # ---------------------------------------------------------------------------
+# nivel_congelamento_chamado — Nível 1 / Nível 2 / sem congelamento
+# ---------------------------------------------------------------------------
+
+
+def test_nivel_congelamento_nao_concluido_retorna_none():
+    """Chamado não Concluído → sem congelamento (None)."""
+    from app.services.permission_validation import nivel_congelamento_chamado
+
+    chamado = MagicMock()
+    chamado.status = "Aberto"
+    chamado.confirmacao_solicitante = None
+    assert nivel_congelamento_chamado(chamado) is None
+
+
+def test_nivel_congelamento_concluido_pendente():
+    """Concluído + confirmacao pendente → nível 1 ('pendente')."""
+    from app.services.permission_validation import nivel_congelamento_chamado
+
+    chamado = MagicMock()
+    chamado.status = "Concluído"
+    chamado.confirmacao_solicitante = "pendente"
+    assert nivel_congelamento_chamado(chamado) == "pendente"
+
+
+def test_nivel_congelamento_concluido_confirmado():
+    """Concluído + confirmacao confirmado → nível 2 ('confirmado')."""
+    from app.services.permission_validation import nivel_congelamento_chamado
+
+    chamado = MagicMock()
+    chamado.status = "Concluído"
+    chamado.confirmacao_solicitante = "confirmado"
+    assert nivel_congelamento_chamado(chamado) == "confirmado"
+
+
+def test_nivel_congelamento_aceita_dict():
+    """nivel_congelamento_chamado aceita dict além de objeto."""
+    from app.services.permission_validation import nivel_congelamento_chamado
+
+    assert (
+        nivel_congelamento_chamado({"status": "Concluído", "confirmacao_solicitante": "pendente"})
+        == "pendente"
+    )
+    assert nivel_congelamento_chamado({"status": "Aberto", "confirmacao_solicitante": None}) is None
+
+
+# ---------------------------------------------------------------------------
+# chamado_aceita_edicao_operacional — bloqueia qualquer nível
+# ---------------------------------------------------------------------------
+
+
+def test_edicao_operacional_nao_concluido_aceita():
+    """Chamado Aberto → edição operacional aceita para qualquer perfil."""
+    from app.services.permission_validation import chamado_aceita_edicao_operacional
+
+    admin = MagicMock()
+    chamado = MagicMock()
+    chamado.status = "Aberto"
+    chamado.confirmacao_solicitante = None
+    pode, msg = chamado_aceita_edicao_operacional(admin, chamado)
+    assert pode is True
+    assert msg is None
+
+
+def test_edicao_operacional_concluido_pendente_bloqueado_supervisor():
+    """Nível 1 (pendente): supervisor não pode editar campos operacionais."""
+    from app.services.permission_validation import chamado_aceita_edicao_operacional
+
+    sup = MagicMock()
+    sup.perfil = "supervisor"
+    chamado = MagicMock()
+    chamado.status = "Concluído"
+    chamado.confirmacao_solicitante = "pendente"
+    pode, msg = chamado_aceita_edicao_operacional(sup, chamado)
+    assert pode is False
+    assert msg is not None
+
+
+def test_edicao_operacional_concluido_pendente_bloqueado_admin():
+    """Nível 1 (pendente): admin não pode editar campos operacionais (apenas reabrir)."""
+    from app.services.permission_validation import chamado_aceita_edicao_operacional
+
+    admin = MagicMock()
+    admin.perfil = "admin"
+    chamado = MagicMock()
+    chamado.status = "Concluído"
+    chamado.confirmacao_solicitante = "pendente"
+    pode, msg = chamado_aceita_edicao_operacional(admin, chamado)
+    assert pode is False
+
+
+def test_edicao_operacional_concluido_confirmado_bloqueado():
+    """Nível 2 (confirmado): ninguém pode editar campos operacionais."""
+    from app.services.permission_validation import chamado_aceita_edicao_operacional
+
+    admin = MagicMock()
+    chamado = MagicMock()
+    chamado.status = "Concluído"
+    chamado.confirmacao_solicitante = "confirmado"
+    pode, msg = chamado_aceita_edicao_operacional(admin, chamado)
+    assert pode is False
+
+
+# ---------------------------------------------------------------------------
+# chamado_aceita_transicao_status — regras por nível e perfil
+# ---------------------------------------------------------------------------
+
+
+def test_transicao_status_nao_concluido_sempre_aceita():
+    """Chamado não Concluído → sem restrição adicional de congelamento."""
+    from app.services.permission_validation import chamado_aceita_transicao_status
+
+    sup = MagicMock()
+    chamado = MagicMock()
+    chamado.status = "Em Atendimento"
+    chamado.confirmacao_solicitante = None
+    pode, _ = chamado_aceita_transicao_status(sup, chamado, "Concluído")
+    assert pode is True
+
+
+def test_transicao_nivel1_supervisor_aberto_aceito():
+    """Nível 1: supervisor pode reabrir (→ Aberto)."""
+    from app.services.permission_validation import chamado_aceita_transicao_status
+
+    sup = MagicMock()
+    sup.perfil = "supervisor"
+    sup.is_admin_or_above = False
+    chamado = MagicMock()
+    chamado.status = "Concluído"
+    chamado.confirmacao_solicitante = "pendente"
+    pode, _ = chamado_aceita_transicao_status(sup, chamado, "Aberto")
+    assert pode is True
+
+
+def test_transicao_nivel1_supervisor_em_atendimento_negado():
+    """Nível 1: supervisor NÃO pode ir para Em Atendimento (contorna confirmação)."""
+    from app.services.permission_validation import chamado_aceita_transicao_status
+
+    sup = MagicMock()
+    sup.perfil = "supervisor"
+    sup.is_admin_or_above = False
+    chamado = MagicMock()
+    chamado.status = "Concluído"
+    chamado.confirmacao_solicitante = "pendente"
+    pode, _ = chamado_aceita_transicao_status(sup, chamado, "Em Atendimento")
+    assert pode is False
+
+
+def test_transicao_nivel1_admin_aberto_aceito():
+    """Nível 1: admin pode reabrir (→ Aberto)."""
+    from app.services.permission_validation import chamado_aceita_transicao_status
+
+    admin = MagicMock()
+    admin.perfil = "admin"
+    admin.is_admin_or_above = True
+    chamado = MagicMock()
+    chamado.status = "Concluído"
+    chamado.confirmacao_solicitante = "pendente"
+    pode, _ = chamado_aceita_transicao_status(admin, chamado, "Aberto")
+    assert pode is True
+
+
+def test_transicao_nivel1_admin_em_atendimento_negado():
+    """Nível 1: admin NÃO pode ir para Em Atendimento (bloqueia bypass)."""
+    from app.services.permission_validation import chamado_aceita_transicao_status
+
+    admin = MagicMock()
+    admin.perfil = "admin"
+    admin.is_admin_or_above = True
+    chamado = MagicMock()
+    chamado.status = "Concluído"
+    chamado.confirmacao_solicitante = "pendente"
+    pode, _ = chamado_aceita_transicao_status(admin, chamado, "Em Atendimento")
+    assert pode is False
+
+
+def test_transicao_nivel2_supervisor_tudo_negado():
+    """Nível 2: supervisor não pode fazer nenhuma transição."""
+    from app.services.permission_validation import chamado_aceita_transicao_status
+
+    sup = MagicMock()
+    sup.perfil = "supervisor"
+    sup.is_admin_or_above = False
+    chamado = MagicMock()
+    chamado.status = "Concluído"
+    chamado.confirmacao_solicitante = "confirmado"
+    for status in ("Aberto", "Em Atendimento", "Cancelado"):
+        pode, _ = chamado_aceita_transicao_status(sup, chamado, status)
+        assert pode is False, f"Supervisor nível 2 não deveria poder ir para {status}"
+
+
+def test_transicao_nivel2_admin_somente_aberto():
+    """Nível 2: admin pode apenas → Aberto; Cancelado e Em Atendimento negados."""
+    from app.services.permission_validation import chamado_aceita_transicao_status
+
+    admin = MagicMock()
+    admin.perfil = "admin"
+    admin.is_admin_or_above = True
+    chamado = MagicMock()
+    chamado.status = "Concluído"
+    chamado.confirmacao_solicitante = "confirmado"
+
+    pode_aberto, _ = chamado_aceita_transicao_status(admin, chamado, "Aberto")
+    assert pode_aberto is True
+
+    pode_cancelado, _ = chamado_aceita_transicao_status(admin, chamado, "Cancelado")
+    assert pode_cancelado is False
+
+    pode_em_at, _ = chamado_aceita_transicao_status(admin, chamado, "Em Atendimento")
+    assert pode_em_at is False
+
+
+# ---------------------------------------------------------------------------
 # Defesa em profundidade — processar_edicao_chamado bloqueia gestor
 # ---------------------------------------------------------------------------
 

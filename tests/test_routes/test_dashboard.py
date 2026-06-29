@@ -188,7 +188,25 @@ def test_indices_firestore_com_solicitante_redireciona(client_logado_solicitante
 
 def test_admin_post_status_change_admin_sucesso(client_logado_admin):
     """POST /admin com admin altera status com sucesso e redireciona."""
-    with patch("app.routes.dashboard.atualizar_status_chamado") as mock_atualizar:
+    mock_doc = MagicMock()
+    mock_doc.exists = True
+    mock_doc.to_dict.return_value = {
+        "status": "Em Atendimento",
+        "confirmacao_solicitante": None,
+        "area": "Geral",
+        "solicitante_id": "s1",
+        "participantes": [],
+    }
+    with (
+        patch("app.routes.dashboard.db") as mock_db,
+        patch("app.routes.dashboard.Chamado") as mock_chamado_cls,
+        patch("app.routes.dashboard.atualizar_status_chamado") as mock_atualizar,
+    ):
+        mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
+        mock_chamado = MagicMock()
+        mock_chamado.status = "Em Atendimento"
+        mock_chamado.confirmacao_solicitante = None
+        mock_chamado_cls.from_dict.return_value = mock_chamado
         mock_atualizar.return_value = {"sucesso": True, "mensagem": "Status atualizado"}
         r = client_logado_admin.post(
             "/admin",

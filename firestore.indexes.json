@@ -178,6 +178,14 @@
       "queryScope": "COLLECTION",
       "fields": [
         {"fieldPath": "status", "order": "ASCENDING"},
+        {"fieldPath": "confirmacao_solicitante", "order": "ASCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "chamados",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "status", "order": "ASCENDING"},
         {"fieldPath": "escalacao_resposta_nivel", "order": "ASCENDING"}
       ]
     },
@@ -187,6 +195,50 @@
       "fields": [
         {"fieldPath": "status", "order": "ASCENDING"},
         {"fieldPath": "escalacao_resolucao_nivel", "order": "ASCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "chamados",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "supervisor_ids_com_acesso", "arrayConfig": "CONTAINS"},
+        {"fieldPath": "data_abertura", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "chamados",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "supervisor_ids_com_acesso", "arrayConfig": "CONTAINS"},
+        {"fieldPath": "status", "order": "ASCENDING"},
+        {"fieldPath": "data_abertura", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "chamados",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "supervisor_ids_com_acesso", "arrayConfig": "CONTAINS"},
+        {"fieldPath": "categoria", "order": "ASCENDING"},
+        {"fieldPath": "data_abertura", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "chamados",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "supervisor_ids_com_acesso", "arrayConfig": "CONTAINS"},
+        {"fieldPath": "gate", "order": "ASCENDING"},
+        {"fieldPath": "data_abertura", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "chamados",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "supervisor_ids_com_acesso", "arrayConfig": "CONTAINS"},
+        {"fieldPath": "responsavel", "order": "ASCENDING"},
+        {"fieldPath": "data_abertura", "order": "DESCENDING"}
       ]
     }
   ],

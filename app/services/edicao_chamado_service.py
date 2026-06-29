@@ -72,6 +72,18 @@ def processar_edicao_chamado(
     def _t(key, **kwargs):
         return get_translation(key, _lang, **kwargs)
 
+    # Congelamento: Chamado Concluído é read-only para edição operacional.
+    # Reabertura deve ser feita via /api/atualizar-status com chamado_aceita_transicao_status.
+    from app.services.permission_validation import chamado_aceita_edicao_operacional
+
+    _pode_op, _msg_key = chamado_aceita_edicao_operacional(usuario_atual, chamado_obj)
+    if not _pode_op:
+        return {
+            "sucesso": False,
+            "erro": _t(_msg_key or "error_ticket_frozen_no_edit"),
+            "codigo": 403,
+        }
+
     try:
         import bleach
 

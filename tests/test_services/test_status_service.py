@@ -61,6 +61,33 @@ def test_atualizar_status_chamado_com_data_chamado_atualiza_e_retorna_sucesso():
     )
 
 
+def test_conclusao_reseta_flags_lembrete():
+    """Ao ir para Concluído, flags de lembrete devem ser zeradas para novo ciclo de envio."""
+    with (
+        patch("app.services.status_service.execute_with_retry") as mock_retry,
+        patch("app.services.status_service.Historico"),
+        patch("app.services.status_service._notificar_solicitante"),
+        patch("app.services.status_service.GamificationService"),
+    ):
+        resultado = atualizar_status_chamado(
+            chamado_id="ch1",
+            novo_status="Concluído",
+            usuario_id="u1",
+            usuario_nome="Test",
+            data_chamado={
+                "status": "Em Atendimento",
+                "lembrete_confirmacao_1_enviado": True,
+                "lembrete_confirmacao_2_enviado": True,
+                "solicitante_id": "sol1",
+                "participantes": [],
+            },
+        )
+    assert resultado["sucesso"] is True
+    update_data = mock_retry.call_args[0][1]
+    assert update_data.get("lembrete_confirmacao_1_enviado") is False
+    assert update_data.get("lembrete_confirmacao_2_enviado") is False
+
+
 def test_atualizar_status_chamado_mesmo_status_nao_chama_gamificacao():
     """Quando o status não muda (ex.: já era Concluído), não chama gamificação."""
     with (
@@ -153,21 +180,17 @@ def test_atualizar_em_atendimento_chama_gamificacao_inicial():
     mock_gamif.avaliar_atendimento_inicial.assert_called_once_with("u1")
 
 
-def test_saindo_de_concluido_reseta_confirmacao_solicitante():
-    """Regressão: transição de 'Concluído' para outro status limpa confirmacao_solicitante=None.
-
-    Evita que flag residual 'pendente' mostre bloco de confirmação ao solicitante
-    mesmo após o supervisor ter reaberto o chamado manualmente.
-    """
+def test_saindo_de_concluido_para_aberto_reseta_confirmacao_solicitante():
+    """Regressão: Concluído → Aberto (reabertura) limpa confirmacao_solicitante=None."""
     with (
         patch("app.services.status_service.execute_with_retry") as mock_retry,
         patch("app.services.status_service.Historico"),
         patch("app.services.status_service._notificar_solicitante"),
         patch("app.services.status_service.GamificationService"),
     ):
-        atualizar_status_chamado(
+        resultado = atualizar_status_chamado(
             chamado_id="ch1",
-            novo_status="Em Atendimento",
+            novo_status="Aberto",
             usuario_id="u1",
             usuario_nome="Test",
             data_chamado={
@@ -177,8 +200,55 @@ def test_saindo_de_concluido_reseta_confirmacao_solicitante():
             },
         )
 
+    assert resultado["sucesso"] is True
     update_payload = mock_retry.call_args[0][1]
     assert update_payload.get("confirmacao_solicitante") is None
+
+
+def test_concluido_para_em_atendimento_transicao_invalida():
+    """Concluído → Em Atendimento deve ser transição inválida (TRANSICOES_VALIDAS)."""
+    resultado = atualizar_status_chamado(
+        chamado_id="ch1",
+        novo_status="Em Atendimento",
+        usuario_id="u1",
+        usuario_nome="Test",
+        data_chamado={
+            "status": "Concluído",
+            "confirmacao_solicitante": "pendente",
+            "solicitante_id": "s1",
+        },
+    )
+    assert resultado["sucesso"] is False
+    assert "inválida" in resultado.get("erro", "").lower() or "Concluído" in resultado.get(
+        "erro", ""
+    )
+
+
+def test_reabertura_admin_grava_historico_com_motivo():
+    """Concluído → Aberto com motivo_reabertura grava entrada de reabertura no histórico."""
+    with (
+        patch("app.services.status_service.execute_with_retry"),
+        patch("app.services.status_service.Historico") as mock_hist,
+        patch("app.services.status_service._notificar_solicitante"),
+        patch("app.services.status_service.GamificationService"),
+    ):
+        resultado = atualizar_status_chamado(
+            chamado_id="ch1",
+            novo_status="Aberto",
+            usuario_id="admin1",
+            usuario_nome="Admin",
+            data_chamado={
+                "status": "Concluído",
+                "confirmacao_solicitante": "confirmado",
+                "solicitante_id": "s1",
+            },
+            motivo_reabertura="Problema recorrente identificado",
+        )
+    assert resultado["sucesso"] is True
+    # histórico: alteracao_status + reabertura (2 chamadas)
+    assert mock_hist.call_count >= 2
+    acoes = [call.kwargs.get("acao") for call in mock_hist.call_args_list]
+    assert "reabertura" in acoes
 
 
 def test_atualizar_status_excecao_retorna_falso():
@@ -300,6 +370,9 @@ def test_notificar_solicitante_excecao_nao_propaga(app):
             "app.services.status_service.notificar_solicitante_status",
             side_effect=Exception("smtp error"),
         ),
+        patch("app.services.status_service.notificar_solicitante_confirmacao_pendente"),
+        patch("app.services.webpush_service.enviar_webpush_usuario"),
+        patch("app.services.notifications_inapp.criar_notificacao_solicitante"),
     ):
         _notificar_solicitante("ch1", {"solicitante_id": "s1"}, "Concluído")
 
@@ -307,20 +380,22 @@ def test_notificar_solicitante_excecao_nao_propaga(app):
 # ── F-63: Validação de transição de status ─────────────────────────────────────
 
 
-def test_atualizar_status_transicao_invalida_concluido_para_aberto():
-    """F-63: Concluído → Aberto é transição inválida — retorna sucesso=False."""
-    resultado = atualizar_status_chamado(
-        chamado_id="ch1",
-        novo_status="Aberto",
-        usuario_id="u1",
-        usuario_nome="Test",
-        data_chamado={"status": "Concluído"},
-    )
-    assert resultado["sucesso"] is False
-    assert (
-        "transição" in resultado.get("erro", "").lower()
-        or "inválid" in resultado.get("erro", "").lower()
-    )
+def test_atualizar_status_transicao_concluido_para_aberto_valida():
+    """Concluído → Aberto é transição válida (reabertura administrativa)."""
+    with (
+        patch("app.services.status_service.execute_with_retry"),
+        patch("app.services.status_service.Historico"),
+        patch("app.services.status_service._notificar_solicitante"),
+        patch("app.services.status_service.GamificationService"),
+    ):
+        resultado = atualizar_status_chamado(
+            chamado_id="ch1",
+            novo_status="Aberto",
+            usuario_id="u1",
+            usuario_nome="Test",
+            data_chamado={"status": "Concluído", "solicitante_id": "s1"},
+        )
+    assert resultado["sucesso"] is True
 
 
 def test_atualizar_status_mesmo_status_nao_rejeita_transicao():
@@ -360,11 +435,11 @@ def test_atualizar_status_sem_status_anterior_nao_rejeita():
 
 
 def test_transicoes_validas_permite_fluxo_normal():
-    """F-63: Aberto → Em Atendimento → Concluído deve ser permitido."""
+    """F-63: fluxo principal deve ser permitido; Concluído → Em Atendimento é inválido."""
     for status_ant, status_novo in [
         ("Aberto", "Em Atendimento"),
         ("Em Atendimento", "Concluído"),
-        ("Concluído", "Em Atendimento"),
+        ("Concluído", "Aberto"),
         ("Aberto", "Cancelado"),
     ]:
         with (
@@ -739,3 +814,109 @@ def test_claim_data_em_atendimento_usa_config_sla_timezone():
     dt = update_data.get("data_em_atendimento")
     assert dt is not None
     assert dt.tzname() == "UTC"
+
+
+# ── Notificação in-app ao solicitante ─────────────────────────────────────────
+
+
+def test_notificar_solicitante_em_atendimento_cria_notificacao_inapp(app):
+    """_notificar_solicitante para 'Em Atendimento' chama criar_notificacao_solicitante com tipo correto."""
+    with (
+        app.app_context(),
+        patch("app.services.status_service.Usuario.get_by_id", return_value=MagicMock()),
+        patch("app.services.status_service.notificar_solicitante_status"),
+        patch("app.services.webpush_service.enviar_webpush_usuario"),
+        patch("app.services.notifications_inapp.criar_notificacao_solicitante") as mock_inapp,
+    ):
+        from app.services.status_service import _notificar_solicitante
+
+        _notificar_solicitante(
+            "ch1",
+            {
+                "solicitante_id": "sol1",
+                "numero_chamado": "CHM-001",
+                "categoria": "TI",
+            },
+            "Em Atendimento",
+        )
+
+    mock_inapp.assert_called_once()
+    call_kwargs = mock_inapp.call_args.kwargs
+    assert call_kwargs["tipo"] == "status_em_atendimento"
+    assert call_kwargs["solicitante_id"] == "sol1"
+
+
+def test_notificar_solicitante_concluido_cria_notificacao_inapp(app):
+    """_notificar_solicitante para 'Concluído' chama criar_notificacao_solicitante com tipo correto."""
+    with (
+        app.app_context(),
+        patch("app.services.status_service.Usuario.get_by_id", return_value=MagicMock()),
+        patch("app.services.status_service.notificar_solicitante_confirmacao_pendente"),
+        patch("app.services.webpush_service.enviar_webpush_usuario"),
+        patch("app.services.notifications_inapp.criar_notificacao_solicitante") as mock_inapp,
+    ):
+        from app.services.status_service import _notificar_solicitante
+
+        _notificar_solicitante(
+            "ch1",
+            {
+                "solicitante_id": "sol1",
+                "numero_chamado": "CHM-001",
+                "categoria": "TI",
+            },
+            "Concluído",
+        )
+
+    mock_inapp.assert_called_once()
+    call_kwargs = mock_inapp.call_args.kwargs
+    assert call_kwargs["tipo"] == "status_concluido_confirmar"
+    assert call_kwargs["solicitante_id"] == "sol1"
+
+
+def test_notificar_solicitante_inapp_falha_nao_propaga(app):
+    """Falha ao criar notificação in-app não propaga exceção (log warning apenas)."""
+    with (
+        app.app_context(),
+        patch("app.services.status_service.Usuario.get_by_id", return_value=MagicMock()),
+        patch("app.services.status_service.notificar_solicitante_status"),
+        patch("app.services.webpush_service.enviar_webpush_usuario"),
+        patch(
+            "app.services.notifications_inapp.criar_notificacao_solicitante",
+            side_effect=Exception("Firestore down"),
+        ),
+    ):
+        from app.services.status_service import _notificar_solicitante
+
+        # Não deve lançar exceção
+        _notificar_solicitante(
+            "ch1",
+            {
+                "solicitante_id": "sol1",
+                "numero_chamado": "CHM-001",
+                "categoria": "TI",
+            },
+            "Em Atendimento",
+        )
+
+
+def test_notificar_solicitante_sem_sid_nao_cria_inapp(app):
+    """_notificar_solicitante sem solicitante_id NÃO chama criar_notificacao_solicitante."""
+    with (
+        app.app_context(),
+        patch("app.services.status_service.notificar_solicitante_status"),
+        patch("app.services.webpush_service.enviar_webpush_usuario"),
+        patch("app.services.notifications_inapp.criar_notificacao_solicitante") as mock_inapp,
+    ):
+        from app.services.status_service import _notificar_solicitante
+
+        _notificar_solicitante(
+            "ch1",
+            {
+                "solicitante_id": None,
+                "numero_chamado": "CHM-001",
+                "categoria": "TI",
+            },
+            "Em Atendimento",
+        )
+
+    mock_inapp.assert_not_called()

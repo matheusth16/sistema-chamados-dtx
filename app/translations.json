@@ -2519,6 +2519,31 @@
     "en": "No changes were made.",
     "es": "No se realizaron cambios."
   },
+  "error_ticket_frozen_no_edit": {
+    "pt_BR": "Chamado Concluído não permite edição operacional. Use a opção de reabertura.",
+    "en": "Completed ticket does not allow operational edits. Use the reopen option.",
+    "es": "El ticket concluido no permite ediciones operativas. Use la opción de reapertura."
+  },
+  "ticket_frozen_awaiting_confirmation": {
+    "pt_BR": "Chamado concluído — aguardando confirmação do solicitante. Edição bloqueada.",
+    "en": "Ticket completed — awaiting requester confirmation. Editing is blocked.",
+    "es": "Ticket concluido — esperando confirmación del solicitante. La edición está bloqueada."
+  },
+  "ticket_frozen_confirmed": {
+    "pt_BR": "Chamado encerrado e confirmado. Somente administradores podem reabrir.",
+    "en": "Ticket closed and confirmed. Only administrators can reopen it.",
+    "es": "Ticket cerrado y confirmado. Solo los administradores pueden reabrirlo."
+  },
+  "ticket_reopen_admin_btn": {
+    "pt_BR": "Reabrir chamado",
+    "en": "Reopen ticket",
+    "es": "Reabrir ticket"
+  },
+  "ticket_reopen_reason_required": {
+    "pt_BR": "Informe o motivo para reabrir o chamado.",
+    "en": "Please provide a reason to reopen the ticket.",
+    "es": "Proporcione un motivo para reabrir el ticket."
+  },
   "sectors_added_notify_failed": {
     "pt_BR": "Setores adicionados, mas houve falha ao notificar.",
     "en": "Sectors added, but notification failed.",
@@ -2788,6 +2813,36 @@
     "pt_BR": "{categoria} · Solicitante: {solicitante}",
     "en": "{categoria} · Requester: {solicitante}",
     "es": "{categoria} · Solicitante: {solicitante}"
+  },
+  "notification_status_in_progress_title": {
+    "pt_BR": "Chamado {numero} em atendimento",
+    "en": "Ticket {numero} in progress",
+    "es": "Ticket {numero} en atención"
+  },
+  "notification_status_in_progress_message": {
+    "pt_BR": "Sua solicitação de {categoria} está sendo atendida",
+    "en": "Your {categoria} request is being handled",
+    "es": "Su solicitud de {categoria} está siendo atendida"
+  },
+  "notification_status_completed_confirm_title": {
+    "pt_BR": "Chamado {numero} concluído — confirme",
+    "en": "Ticket {numero} completed — please confirm",
+    "es": "Ticket {numero} completado — por favor confirme"
+  },
+  "notification_status_completed_confirm_message": {
+    "pt_BR": "{categoria} — Por favor, confirme a resolução ou reabra o chamado",
+    "en": "{categoria} — Please confirm the resolution or reopen the ticket",
+    "es": "{categoria} — Por favor, confirme la resolución o reabra el ticket"
+  },
+  "notification_reminder_confirm_title": {
+    "pt_BR": "Lembrete #{n}: confirme o chamado {numero}",
+    "en": "Reminder #{n}: confirm ticket {numero}",
+    "es": "Recordatorio #{n}: confirme el ticket {numero}"
+  },
+  "notification_reminder_confirm_message": {
+    "pt_BR": "{categoria} — Aguardamos sua confirmação da resolução",
+    "en": "{categoria} — We are waiting for your confirmation",
+    "es": "{categoria} — Esperamos su confirmación"
   },
   "edit_sector": {
     "pt_BR": "Editar Setor",

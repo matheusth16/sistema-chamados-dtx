@@ -255,6 +255,12 @@ class Config:
     # Notificação e-mail ao solicitante em mudança de status (opt-in)
     NOTIFY_SOLICITANTE_EMAIL = _to_bool(os.getenv("NOTIFY_SOLICITANTE_EMAIL"), default=False)
 
+    # Envio global de e-mails transacionais (Graph API).
+    # Desligado por padrão fora de produção — evita disparos acidentais em dev/testes locais.
+    NOTIFY_EMAIL_ENABLED = _to_bool(
+        os.getenv("NOTIFY_EMAIL_ENABLED"), default=(_env == "production")
+    )
+
     # MyMemory Translation API (opcional — aumenta limite de 5k para 10k chars/dia)
     # Cadastre em mymemory.translated.net e defina MYMEMORY_EMAIL nas variáveis de ambiente
     MYMEMORY_EMAIL = os.getenv("MYMEMORY_EMAIL", "").strip()

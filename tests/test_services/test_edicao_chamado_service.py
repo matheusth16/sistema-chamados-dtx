@@ -117,6 +117,83 @@ def test_processar_edicao_supervisor_sem_permissao_retorna_403(app):
     assert result.get("codigo") == 403
 
 
+# ── Congelamento (Nível 1 / Nível 2) ──────────────────────────────────────────
+
+
+def test_processar_edicao_concluido_pendente_retorna_403(app):
+    """Chamado Concluído aguardando confirmação → processar_edicao retorna 403 para admin."""
+    from app.services.edicao_chamado_service import processar_edicao_chamado
+
+    admin = _make_usuario(perfil="admin")
+    doc = _make_doc(
+        data={
+            **_make_doc().to_dict(),
+            "status": "Concluído",
+            "confirmacao_solicitante": "pendente",
+        }
+    )
+
+    with (
+        app.app_context(),
+        patch("app.services.edicao_chamado_service.db") as mock_db,
+        patch("app.services.edicao_chamado_service.Chamado") as mock_chamado_cls,
+    ):
+        mock_db.collection.return_value.document.return_value.get.return_value = doc
+        mock_chamado = MagicMock()
+        mock_chamado.status = "Concluído"
+        mock_chamado.confirmacao_solicitante = "pendente"
+        mock_chamado_cls.from_dict.return_value = mock_chamado
+
+        result = processar_edicao_chamado(
+            usuario_atual=admin,
+            chamado_id="ch_conc",
+            novo_status="",
+            motivo_cancelamento="",
+            nova_descricao="Nova descrição",
+            novo_responsavel_id="",
+            novo_sla_str="",
+            arquivos_novos=[],
+            setores_adicionais_lista=[],
+        )
+    assert result["sucesso"] is False
+    assert result.get("codigo") == 403
+
+
+def test_processar_edicao_concluido_confirmado_retorna_403(app):
+    """Chamado Concluído e confirmado → processar_edicao retorna 403 para qualquer perfil."""
+    from app.services.edicao_chamado_service import processar_edicao_chamado
+
+    sup = _make_usuario(perfil="supervisor")
+    doc = _make_doc()
+
+    with (
+        app.app_context(),
+        patch("app.services.edicao_chamado_service.db") as mock_db,
+        patch("app.services.edicao_chamado_service.Chamado") as mock_chamado_cls,
+        patch("app.services.permissions.usuario_pode_ver_chamado", return_value=True),
+    ):
+        mock_db.collection.return_value.document.return_value.get.return_value = doc
+        mock_chamado = MagicMock()
+        mock_chamado.status = "Concluído"
+        mock_chamado.confirmacao_solicitante = "confirmado"
+        mock_chamado.area = "Manutencao"
+        mock_chamado_cls.from_dict.return_value = mock_chamado
+
+        result = processar_edicao_chamado(
+            usuario_atual=sup,
+            chamado_id="ch_conf",
+            novo_status="",
+            motivo_cancelamento="",
+            nova_descricao="Tentativa de editar descrição",
+            novo_responsavel_id="",
+            novo_sla_str="",
+            arquivos_novos=[],
+            setores_adicionais_lista=[],
+        )
+    assert result["sucesso"] is False
+    assert result.get("codigo") == 403
+
+
 # ── Sem alterações ─────────────────────────────────────────────────────────────
 
 

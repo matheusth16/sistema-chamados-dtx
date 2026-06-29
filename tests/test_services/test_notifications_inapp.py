@@ -515,3 +515,213 @@ def test_localizar_notificacao_tipo_desconhecido_nao_altera():
     out = localizar_notificacao(doc, "en")
     assert out["titulo"] == "Algum título"
     assert out["mensagem"] == "Alguma mensagem"
+
+
+# ── Novos tipos — solicitante ──────────────────────────────────────────────────
+
+
+def test_localizar_status_em_atendimento_en():
+    """localizar_notificacao traduz tipo status_em_atendimento para EN."""
+    from app.services.notifications_inapp import localizar_notificacao
+
+    doc = {
+        "tipo": "status_em_atendimento",
+        "numero_chamado": "CHM-010",
+        "categoria": "TI",
+        "titulo": "fallback",
+        "mensagem": "fallback",
+    }
+    out = localizar_notificacao(doc, "en")
+    assert "CHM-010" in out["titulo"]
+    assert "in progress" in out["titulo"].lower()
+    assert "being handled" in out["mensagem"].lower()
+
+
+def test_localizar_status_em_atendimento_pt():
+    """localizar_notificacao traduz tipo status_em_atendimento para pt_BR."""
+    from app.services.notifications_inapp import localizar_notificacao
+
+    doc = {
+        "tipo": "status_em_atendimento",
+        "numero_chamado": "CHM-010",
+        "categoria": "TI",
+        "titulo": "fallback",
+        "mensagem": "fallback",
+    }
+    out = localizar_notificacao(doc, "pt_BR")
+    assert "CHM-010" in out["titulo"]
+    assert "atendimento" in out["titulo"].lower()
+
+
+def test_localizar_status_concluido_confirmar_en():
+    """localizar_notificacao traduz tipo status_concluido_confirmar para EN."""
+    from app.services.notifications_inapp import localizar_notificacao
+
+    doc = {
+        "tipo": "status_concluido_confirmar",
+        "numero_chamado": "CHM-020",
+        "categoria": "Manutencao",
+        "titulo": "fallback",
+        "mensagem": "fallback",
+    }
+    out = localizar_notificacao(doc, "en")
+    assert "CHM-020" in out["titulo"]
+    assert "completed" in out["titulo"].lower()
+    assert "confirm" in out["mensagem"].lower()
+
+
+def test_localizar_lembrete_confirmacao_1_en():
+    """localizar_notificacao traduz tipo lembrete_confirmacao_1 para EN com n=1."""
+    from app.services.notifications_inapp import localizar_notificacao
+
+    doc = {
+        "tipo": "lembrete_confirmacao_1",
+        "numero_chamado": "CHM-030",
+        "categoria": "TI",
+        "titulo": "fallback",
+        "mensagem": "fallback",
+    }
+    out = localizar_notificacao(doc, "en")
+    assert "1" in out["titulo"]
+    assert "reminder" in out["titulo"].lower()
+    assert "CHM-030" in out["titulo"]
+    assert "confirmation" in out["mensagem"].lower()
+
+
+def test_localizar_lembrete_confirmacao_2_en():
+    """localizar_notificacao traduz tipo lembrete_confirmacao_2 para EN com n=2."""
+    from app.services.notifications_inapp import localizar_notificacao
+
+    doc = {
+        "tipo": "lembrete_confirmacao_2",
+        "numero_chamado": "CHM-031",
+        "categoria": "TI",
+        "titulo": "fallback",
+        "mensagem": "fallback",
+    }
+    out = localizar_notificacao(doc, "en")
+    assert "2" in out["titulo"]
+    assert "reminder" in out["titulo"].lower()
+
+
+def test_localizar_lembrete_confirmacao_1_pt():
+    """localizar_notificacao traduz tipo lembrete_confirmacao_1 para pt_BR."""
+    from app.services.notifications_inapp import localizar_notificacao
+
+    doc = {
+        "tipo": "lembrete_confirmacao_1",
+        "numero_chamado": "CHM-032",
+        "categoria": "TI",
+        "titulo": "fallback",
+        "mensagem": "fallback",
+    }
+    out = localizar_notificacao(doc, "pt_BR")
+    assert "Lembrete" in out["titulo"]
+    assert "1" in out["titulo"]
+
+
+# ── texto_notificacao_status_solicitante ───────────────────────────────────────
+
+
+def test_texto_status_solicitante_em_atendimento_en():
+    """texto_notificacao_status_solicitante retorna título e msg EN para em_atendimento."""
+    from app.services.notifications_inapp import texto_notificacao_status_solicitante
+
+    titulo, mensagem = texto_notificacao_status_solicitante(
+        numero="CHM-099", categoria="TI", tipo_evento="status_em_atendimento", language="en"
+    )
+    assert "CHM-099" in titulo
+    assert "in progress" in titulo.lower()
+    assert "being handled" in mensagem.lower()
+
+
+def test_texto_status_solicitante_concluido_confirmar_pt():
+    """texto_notificacao_status_solicitante retorna título e msg pt_BR para concluido_confirmar."""
+    from app.services.notifications_inapp import texto_notificacao_status_solicitante
+
+    titulo, mensagem = texto_notificacao_status_solicitante(
+        numero="CHM-099",
+        categoria="TI",
+        tipo_evento="status_concluido_confirmar",
+        language="pt_BR",
+    )
+    assert "concluído" in titulo.lower()
+    assert "confirme" in titulo.lower() or "confirmação" in mensagem.lower()
+
+
+def test_texto_status_solicitante_lembrete_en():
+    """texto_notificacao_status_solicitante retorna texto correto para lembrete #2."""
+    from app.services.notifications_inapp import texto_notificacao_status_solicitante
+
+    titulo, mensagem = texto_notificacao_status_solicitante(
+        numero="CHM-099",
+        categoria="TI",
+        tipo_evento="lembrete_confirmacao",
+        language="en",
+        numero_lembrete=2,
+    )
+    assert "2" in titulo
+    assert "reminder" in titulo.lower()
+    assert "confirmation" in mensagem.lower()
+
+
+# ── criar_notificacao_solicitante ──────────────────────────────────────────────
+
+
+def test_criar_notificacao_solicitante_chama_criar_notificacao():
+    """criar_notificacao_solicitante delega para criar_notificacao com dados corretos."""
+    from unittest.mock import patch
+
+    from app.services.notifications_inapp import criar_notificacao_solicitante
+
+    with patch("app.services.notifications_inapp.criar_notificacao") as mock_criar:
+        mock_criar.return_value = "notif_xyz"
+        result = criar_notificacao_solicitante(
+            solicitante_id="sol1",
+            chamado_id="ch1",
+            numero_chamado="CHM-001",
+            categoria="TI",
+            tipo="status_em_atendimento",
+            language="en",
+        )
+
+    assert result == "notif_xyz"
+    mock_criar.assert_called_once()
+    call_kwargs = mock_criar.call_args
+    assert call_kwargs.kwargs["tipo"] == "status_em_atendimento"
+    assert call_kwargs.kwargs["usuario_id"] == "sol1"
+
+
+def test_criar_notificacao_solicitante_lembrete_1_usa_tipo_correto():
+    """criar_notificacao_solicitante usa tipo 'lembrete_confirmacao_1'."""
+    from unittest.mock import patch
+
+    from app.services.notifications_inapp import criar_notificacao_solicitante
+
+    with patch("app.services.notifications_inapp.criar_notificacao") as mock_criar:
+        mock_criar.return_value = "notif_l1"
+        criar_notificacao_solicitante(
+            solicitante_id="sol1",
+            chamado_id="ch1",
+            numero_chamado="CHM-001",
+            categoria="TI",
+            tipo="lembrete_confirmacao_1",
+            language="en",
+        )
+
+    call_kwargs = mock_criar.call_args
+    assert call_kwargs.kwargs["tipo"] == "lembrete_confirmacao_1"
+
+
+def test_criar_notificacao_solicitante_retorna_none_sem_ids():
+    """criar_notificacao_solicitante retorna None quando solicitante_id vazio."""
+    from app.services.notifications_inapp import criar_notificacao_solicitante
+
+    result = criar_notificacao_solicitante(
+        solicitante_id="",
+        chamado_id="ch1",
+        numero_chamado="CHM-001",
+        categoria="TI",
+        tipo="status_em_atendimento",
+    )
+    assert result is None

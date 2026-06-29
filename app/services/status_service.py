@@ -36,7 +36,7 @@ STATUS_VALIDOS = ("Aberto", "Em Atendimento", "Concluído", "Cancelado")
 TRANSICOES_VALIDAS: dict[str, set[str]] = {
     "Aberto": {"Em Atendimento", "Cancelado", "Concluído"},
     "Em Atendimento": {"Concluído", "Cancelado", "Aberto"},
-    "Concluído": {"Em Atendimento", "Cancelado"},
+    "Concluído": {"Aberto", "Cancelado"},
     "Cancelado": {"Aberto", "Em Atendimento"},
 }
 
@@ -48,6 +48,7 @@ def atualizar_status_chamado(
     usuario_nome: str,
     data_chamado: dict = None,
     motivo_cancelamento: str = None,
+    motivo_reabertura: str = None,
 ) -> dict:
     """Atualiza o status de um chamado, registra histórico e envia notificação.
 
@@ -113,9 +114,18 @@ def atualizar_status_chamado(
         if novo_status == "Concluído":
             update_data["data_conclusao"] = firestore.SERVER_TIMESTAMP
             update_data["confirmacao_solicitante"] = "pendente"
+            # Reseta flags de lembrete para que novo ciclo de 24 h/48 h seja enviado
+            # (cobre reconclusão após reabertura manual por admin/supervisor)
+            update_data["lembrete_confirmacao_1_enviado"] = False
+            update_data["lembrete_confirmacao_2_enviado"] = False
         elif status_anterior == "Concluído":
-            # Saindo de Concluído (ex.: admin reabre manualmente) — limpa flag de confirmação
+            # Saindo de Concluído (reabertura) — limpa confirmação e reinicia flags de escalonamento
             update_data["confirmacao_solicitante"] = None
+            update_data["escalacao_resolucao_nivel"] = 0
+            update_data["alerta_supervisor_50_enviado"] = False
+            update_data["alerta_supervisor_80_enviado"] = False
+            update_data["lembrete_confirmacao_1_enviado"] = False
+            update_data["lembrete_confirmacao_2_enviado"] = False
         elif novo_status == "Cancelado":
             update_data["motivo_cancelamento"] = (motivo_cancelamento or "").strip()
             update_data["data_cancelamento"] = firestore.SERVER_TIMESTAMP
@@ -166,6 +176,18 @@ def atualizar_status_chamado(
                     valor_anterior="-",
                     valor_novo=(motivo_cancelamento or "").strip()[:500],
                 ).save()
+            if novo_status == "Aberto" and status_anterior == "Concluído":
+                motivo = (motivo_reabertura or "Reabertura administrativa").strip()
+                Historico(
+                    chamado_id=chamado_id,
+                    usuario_id=usuario_id,
+                    usuario_nome=usuario_nome,
+                    acao="reabertura",
+                    campo_alterado="status",
+                    valor_anterior="Concluído",
+                    valor_novo="Aberto",
+                    detalhe=motivo[:500],
+                ).save()
 
         # Envia notificação ao solicitante em background (não para Cancelado)
         if novo_status in ("Em Atendimento", "Concluído"):
@@ -209,22 +231,26 @@ def _notificar_solicitante(chamado_id: str, data_chamado: dict, novo_status: str
     try:
         sid = data_chamado.get("solicitante_id")
         solicitante = Usuario.get_by_id(sid) if sid else None
+        numero = data_chamado.get("numero_chamado") or "N/A"
+        categoria = data_chamado.get("categoria") or "Chamado"
+
         # Concluído: e-mail específico pedindo confirmação; demais: notificação genérica
         if novo_status == "Concluído":
             notificar_solicitante_confirmacao_pendente(
                 chamado_id=chamado_id,
-                numero_chamado=data_chamado.get("numero_chamado") or "N/A",
-                categoria=data_chamado.get("categoria") or "Chamado",
+                numero_chamado=numero,
+                categoria=categoria,
                 solicitante_usuario=solicitante,
             )
         else:
             notificar_solicitante_status(
                 chamado_id=chamado_id,
-                numero_chamado=data_chamado.get("numero_chamado") or "N/A",
+                numero_chamado=numero,
                 novo_status=novo_status,
-                categoria=data_chamado.get("categoria") or "Chamado",
+                categoria=categoria,
                 solicitante_usuario=solicitante,
             )
+
         if sid:
             from app.services.webpush_service import enviar_webpush_usuario
 
@@ -232,9 +258,29 @@ def _notificar_solicitante(chamado_id: str, data_chamado: dict, novo_status: str
             url_chamado = f"{base_url}/chamado/{chamado_id}/historico" if base_url else None
             enviar_webpush_usuario(
                 sid,
-                titulo=f"Chamado {data_chamado.get('numero_chamado') or 'N/A'}: {novo_status}",
-                corpo=data_chamado.get("categoria") or "",
+                titulo=f"Chamado {numero}: {novo_status}",
+                corpo=categoria,
                 url=url_chamado,
             )
+
+            # Notificação in-app (sino) — falha não interrompe e-mail/webpush
+            try:
+                from app.services.notifications_inapp import criar_notificacao_solicitante
+
+                tipo_inapp = (
+                    "status_concluido_confirmar"
+                    if novo_status == "Concluído"
+                    else "status_em_atendimento"
+                )
+                criar_notificacao_solicitante(
+                    solicitante_id=sid,
+                    chamado_id=chamado_id,
+                    numero_chamado=numero,
+                    categoria=categoria,
+                    tipo=tipo_inapp,
+                )
+            except Exception as e_inapp:
+                logger.warning("Notificação in-app ao solicitante não criada: %s", e_inapp)
+
     except Exception as e:
         logger.warning("Notificação ao solicitante não enviada: %s", e)

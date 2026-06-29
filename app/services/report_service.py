@@ -17,6 +17,7 @@ from firebase_admin import firestore as fs_admin
 from google.cloud.firestore_v1.base_query import FieldFilter
 
 from app.database import db
+from app.i18n import get_translated_status
 from app.models import Chamado
 from app.models_usuario import Usuario
 from app.services.analytics import _to_datetime, obter_sla_para_exibicao
@@ -26,6 +27,12 @@ from app.services.notifications import (
     enviar_email,
     notificar_responsavel_prazo_24h,
 )
+
+_SLA_EN = {
+    "Em risco": "At risk",
+    "Atrasado": "Overdue",
+    "No prazo": "On time",
+}
 
 logger = logging.getLogger(__name__)
 
@@ -135,7 +142,10 @@ def _tabela_html(chamados: list[dict[str, Any]], link_base: str) -> str:
         else:
             cor_sla = "#16a34a"
         dias_txt = f" ({c.get('sla_dias')}d)" if c.get("sla_dias") else ""
-        badge = f'<span style="color:{cor_sla};font-weight:600;">{c["sla_label"] or c["status"]}{dias_txt}</span>'
+        sla_display = (
+            _SLA_EN.get(c["sla_label"]) or get_translated_status(c["status"], "en") or c["status"]
+        )
+        badge = f'<span style="color:{cor_sla};font-weight:600;">{sla_display}{dias_txt}</span>'
         link = f"{link_base}/chamado/{c['id']}/historico" if link_base else ""
         numero_html = (
             f'<a href="{link}" style="color:#2563eb;text-decoration:none;">{c["numero"]}</a>'
@@ -288,7 +298,7 @@ def enviar_relatorio_semanal() -> dict[str, Any]:
 
         email_sup = supervisor.email.strip()
         nome = supervisor.nome or email_sup
-        assunto = f"Resumo semanal de chamados — {data_ref}"
+        assunto = f"Weekly ticket report — {data_ref}"
 
         html, texto = _corpo_supervisor(nome, lista, link_dash, link_base, data_ref)
         ok, err = enviar_email(email_sup, assunto, html, texto)
@@ -388,7 +398,7 @@ def _enviar_resumo_admins(
 
     for admin in admins:
         email_admin = admin.email.strip()
-        assunto = f"Resumo semanal consolidado — {data_ref}"
+        assunto = f"Weekly consolidated report — {data_ref}"
         ok, err = enviar_email(email_admin, assunto, html_admin)
         if ok:
             logger.info("Resumo semanal enviado para admin %s", email_admin)

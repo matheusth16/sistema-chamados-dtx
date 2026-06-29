@@ -45,7 +45,11 @@ from app.services.excel_export_service import MAX_EXPORT_CHAMADOS, _safe_cell
 from app.services.filters import aplicar_filtros_dashboard_com_paginacao
 from app.services.gestor_dashboard_service import obter_contexto_gestor_dashboard
 from app.services.pagination import OptimizadorQuery
-from app.services.permission_validation import filtrar_supervisores_por_area
+from app.services.permission_validation import (
+    chamado_aceita_transicao_status,
+    filtrar_supervisores_por_area,
+    nivel_congelamento_chamado,
+)
 from app.services.permissions import usuario_pode_ver_chamado
 from app.services.status_service import atualizar_status_chamado
 from app.utils import formatar_data_para_excel
@@ -88,22 +92,30 @@ def _render_dashboard() -> Response:
         novo_status = request.form.get("novo_status")
         logger.debug("Alterar status: chamado_id=%s, novo_status=%s", chamado_id, novo_status)
         try:
-            if current_user.perfil == "supervisor":
-                doc_anterior = db.collection("chamados").document(chamado_id).get()
-                if not doc_anterior.exists:
-                    flash_t("ticket_not_found", "danger")
-                    return _redirect_dashboard(**request.args)
-                data_anterior = doc_anterior.to_dict()
-                chamado_obj = Chamado.from_dict(data_anterior, chamado_id)
-                if not usuario_pode_ver_chamado(current_user, chamado_obj):
-                    flash_t("only_update_tickets_your_area", "danger")
-                    return _redirect_dashboard(**request.args)
+            doc_anterior = db.collection("chamados").document(chamado_id).get()
+            if not doc_anterior.exists:
+                flash_t("ticket_not_found", "danger")
+                return _redirect_dashboard(**request.args)
+            data_anterior = doc_anterior.to_dict()
+            chamado_obj = Chamado.from_dict(data_anterior, chamado_id)
+
+            if current_user.perfil == "supervisor" and not usuario_pode_ver_chamado(
+                current_user, chamado_obj
+            ):
+                flash_t("only_update_tickets_your_area", "danger")
+                return _redirect_dashboard(**request.args)
+
+            pode_trans, _ = chamado_aceita_transicao_status(current_user, chamado_obj, novo_status)
+            if not pode_trans:
+                flash_t("error_ticket_frozen_no_edit", "danger")
+                return _redirect_dashboard(**request.args)
 
             resultado = atualizar_status_chamado(
                 chamado_id=chamado_id,
                 novo_status=novo_status,
                 usuario_id=current_user.id,
                 usuario_nome=current_user.nome,
+                data_chamado=data_anterior,
             )
             if resultado["sucesso"]:
                 flash(resultado["mensagem"], "success")
@@ -193,19 +205,25 @@ def visualizar_detalhe_chamado(chamado_id: str) -> Response:
                 else url_for("main.meus_chamados")
             )
         )
-        pode_editar = current_user.perfil in ("supervisor", "admin") and not getattr(
-            current_user, "is_gestor_only", False
-        )
+        nivel = nivel_congelamento_chamado(chamado)
+        pode_editar_base = current_user.perfil in (
+            "supervisor",
+            "admin",
+            "admin_global",
+        ) and not getattr(current_user, "is_gestor_only", False)
+        # Chamado Concluído (qualquer nível) bloqueia edição operacional no formulário
+        pode_editar = pode_editar_base and nivel is None
+
         usuarios_gestao = get_static_cached("usuarios_all", Usuario.get_all, ttl_seconds=300)
         supervisores_list = [u for u in usuarios_gestao if u.perfil == "supervisor" and u.nome]
-        if pode_editar:
+        if pode_editar_base:
             supervisores_list = filtrar_supervisores_por_area(current_user, supervisores_list)
         supervisores_detalhados = (
             sorted(
                 [{"id": u.id, "nome": u.nome, "area": u.area} for u in supervisores_list],
                 key=lambda x: (x["nome"] or "").upper(),
             )
-            if pode_editar
+            if pode_editar_base
             else []
         )
         setores = [s for s in CategoriaSetor.get_all() if getattr(s, "ativo", True)]
@@ -214,6 +232,7 @@ def visualizar_detalhe_chamado(chamado_id: str) -> Response:
             chamado=chamado,
             voltar_url=voltar_url,
             pode_editar=pode_editar,
+            nivel_congelamento=nivel,
             supervisores_detalhados=supervisores_detalhados,
             setores=setores,
         )
@@ -286,9 +305,20 @@ def editar_chamado_pagina() -> Response:
 
 
 @main.route("/chamado/<chamado_id>/historico")
-@requer_supervisor_area
+@login_required
 def visualizar_historico(chamado_id: str) -> Response:
-    """Exibe histórico de alterações do chamado."""
+    """Exibe histórico de alterações do chamado.
+
+    Solicitantes que chegam por link de e-mail antigo são redirecionados
+    para a página de detalhe do chamado (onde fica o bloco de confirmação).
+    """
+    if current_user.perfil == "solicitante":
+        return redirect(url_for("main.visualizar_detalhe_chamado", chamado_id=chamado_id))
+
+    if current_user.perfil not in ("supervisor", "admin", "admin_global"):
+        flash_t("access_denied_supervisors", "danger")
+        return redirect(url_for("main.index"))
+
     try:
         doc_chamado = db.collection("chamados").document(chamado_id).get()
         if not doc_chamado.exists:

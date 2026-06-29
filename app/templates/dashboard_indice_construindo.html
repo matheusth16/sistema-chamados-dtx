@@ -9,10 +9,25 @@
             </svg>
         </div>
         <h1 class="text-xl font-semibold text-gray-800 mb-2">Índice do banco em construção</h1>
-        <p class="text-gray-600 mb-6">O Firestore está finalizando um índice necessário para o dashboard. Isso costuma levar alguns minutos. Atualize a página em instantes.</p>
+        <p class="text-gray-600 mb-2">O Firestore está finalizando um índice necessário para o dashboard. Isso costuma levar alguns minutos.</p>
+        <p class="text-sm text-gray-500 mb-6">Esta página será recarregada automaticamente em <span id="countdown">30</span>s.</p>
         <a href="{{ url_for(dashboard_endpoint) }}" class="inline-flex items-center min-h-[44px] px-5 py-2.5 border border-transparent text-sm font-medium rounded-dtx-md text-white bg-dtx-600 hover:bg-dtx-700 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-dtx-600">
-            Atualizar página
+            Atualizar agora
         </a>
     </div>
 </div>
+<script>
+(function () {
+    var segundos = 30;
+    var el = document.getElementById('countdown');
+    var timer = setInterval(function () {
+        segundos -= 1;
+        if (el) el.textContent = String(segundos);
+        if (segundos <= 0) {
+            clearInterval(timer);
+            window.location.reload();
+        }
+    }, 1000);
+})();
+</script>
 {% endblock %}

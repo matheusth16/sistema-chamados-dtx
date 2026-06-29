@@ -64,8 +64,11 @@ def test_reabrir_chamado_sucesso(client_logado_solicitante):
     payload = update_call.call_args[0][0]
     assert payload["status"] == "Aberto"
     assert payload["confirmacao_solicitante"] == "reaberto"
-    # Histórico deve ter sido criado
+    # Histórico deve ter sido criado com o parâmetro correto (detalhe, não detalhes)
     mock_historico.assert_called_once()
+    _, kwargs = mock_historico.call_args
+    assert "detalhe" in kwargs, "Historico deve ser criado com 'detalhe=', não 'detalhes='"
+    assert "detalhes" not in kwargs, "Typo 'detalhes' não deve ser usado"
 
 
 def test_reabrir_sem_motivo_retorna_400(client_logado_solicitante):
@@ -85,14 +88,31 @@ def test_reabrir_sem_motivo_retorna_400(client_logado_solicitante):
 # ── Controle de acesso ─────────────────────────────────────────────────────────
 
 
-def test_supervisor_nao_pode_confirmar(client_logado_supervisor):
-    """Supervisor não tem acesso à rota de confirmação (403)."""
-    r = client_logado_supervisor.post(
-        "/api/chamado/ch_123/confirmar-resolucao",
-        json={"acao": "confirmar"},
-        content_type="application/json",
-    )
+def test_supervisor_nao_pode_confirmar_chamado_alheio(client_logado_supervisor):
+    """Supervisor não pode confirmar chamado que não abriu (solicitante_id diferente)."""
+    doc = _doc_chamado(solicitante_id="sol_1")  # sup_1 != sol_1
+    with patch("app.routes.api.db") as mock_db:
+        mock_db.collection.return_value.document.return_value.get.return_value = doc
+        r = client_logado_supervisor.post(
+            "/api/chamado/ch_123/confirmar-resolucao",
+            json={"acao": "confirmar"},
+            content_type="application/json",
+        )
     assert r.status_code == 403
+
+
+def test_supervisor_pode_confirmar_chamado_que_abriu(client_logado_supervisor):
+    """Supervisor que é o solicitante do chamado pode confirmar a resolução."""
+    doc = _doc_chamado(solicitante_id="sup_1")  # mesmo ID do supervisor logado
+    with patch("app.routes.api.db") as mock_db:
+        mock_db.collection.return_value.document.return_value.get.return_value = doc
+        r = client_logado_supervisor.post(
+            "/api/chamado/ch_123/confirmar-resolucao",
+            json={"acao": "confirmar"},
+            content_type="application/json",
+        )
+    assert r.status_code == 200
+    assert r.get_json()["sucesso"] is True
 
 
 def test_solicitante_nao_confirma_chamado_alheio(client_logado_solicitante):
@@ -111,6 +131,20 @@ def test_solicitante_nao_confirma_chamado_alheio(client_logado_solicitante):
 def test_chamado_sem_confirmacao_pendente_retorna_400(client_logado_solicitante):
     """Não é possível confirmar chamado que não está aguardando confirmação."""
     doc = _doc_chamado(confirmacao=None)
+    with patch("app.routes.api.db") as mock_db:
+        mock_db.collection.return_value.document.return_value.get.return_value = doc
+        r = client_logado_solicitante.post(
+            "/api/chamado/ch_123/confirmar-resolucao",
+            json={"acao": "confirmar"},
+            content_type="application/json",
+        )
+    assert r.status_code == 400
+    assert r.get_json()["sucesso"] is False
+
+
+def test_solicitante_nao_confirma_nivel2_confirmado(client_logado_solicitante):
+    """Regressão Nível 2: solicitante não pode confirmar chamado já 'confirmado' (400)."""
+    doc = _doc_chamado(confirmacao="confirmado")
     with patch("app.routes.api.db") as mock_db:
         mock_db.collection.return_value.document.return_value.get.return_value = doc
         r = client_logado_solicitante.post(
@@ -159,12 +193,12 @@ def test_reabrir_dispara_notificacao_supervisor(client_logado_solicitante):
     assert motivo_arg == "Problema persiste"
 
 
-def test_confirmar_nao_dispara_notificacao_supervisor(client_logado_solicitante):
-    """Confirmar resolução NÃO envia e-mail ao supervisor."""
+def test_confirmar_dispara_notificacao_responsavel(client_logado_solicitante):
+    """Confirmar resolução notifica o responsável designado do chamado."""
     doc = _doc_chamado()
     with (
         patch("app.routes.api.db") as mock_db,
-        patch("app.routes.api._enviar_notificacao_reabrir") as mock_notif,
+        patch("app.routes.api._enviar_notificacao_confirmar") as mock_notif,
     ):
         mock_db.collection.return_value.document.return_value.get.return_value = doc
         r = client_logado_solicitante.post(
@@ -173,7 +207,72 @@ def test_confirmar_nao_dispara_notificacao_supervisor(client_logado_solicitante)
             content_type="application/json",
         )
     assert r.status_code == 200
+    mock_notif.assert_called_once()
+    # Verifica que o helper recebeu o chamado_id correto
+    _, chamado_id_arg, _data_arg, solicitante_nome_arg = mock_notif.call_args[0]
+    assert chamado_id_arg == "ch_123"
+    assert solicitante_nome_arg == "Solicitante Teste"
+
+
+def test_confirmar_nao_dispara_notificacao_reabrir(client_logado_solicitante):
+    """Confirmar resolução NÃO chama o helper de reabertura."""
+    doc = _doc_chamado()
+    with (
+        patch("app.routes.api.db") as mock_db,
+        patch("app.routes.api._enviar_notificacao_reabrir") as mock_reabrir,
+        patch("app.routes.api._enviar_notificacao_confirmar"),
+    ):
+        mock_db.collection.return_value.document.return_value.get.return_value = doc
+        r = client_logado_solicitante.post(
+            "/api/chamado/ch_123/confirmar-resolucao",
+            json={"acao": "confirmar"},
+            content_type="application/json",
+        )
+    assert r.status_code == 200
+    mock_reabrir.assert_not_called()
+
+
+def test_confirmar_nao_notifica_se_confirmacao_nao_persistiu(client_logado_solicitante):
+    """Notificação de confirmação é ignorada se o chamado não estiver confirmado no Firestore."""
+    doc = _doc_chamado()
+    doc_sem_confirmacao = MagicMock()
+    doc_sem_confirmacao.exists = False
+
+    with (
+        patch("app.routes.api.db") as mock_db,
+        patch("app.routes.api.threading.Thread", side_effect=_thread_executa_sync),
+        patch("app.services.notifications.notificar_responsavel_chamado_confirmado") as mock_notif,
+    ):
+        mock_db.collection.return_value.document.return_value.get.side_effect = [
+            doc,
+            doc_sem_confirmacao,
+        ]
+        r = client_logado_solicitante.post(
+            "/api/chamado/ch_123/confirmar-resolucao",
+            json={"acao": "confirmar"},
+            content_type="application/json",
+        )
+    assert r.status_code == 200
     mock_notif.assert_not_called()
+
+
+def test_reabrir_reseta_flags_lembrete(client_logado_solicitante):
+    """Ao reabrir, flags de lembrete devem ser zeradas para o próximo ciclo de conclusão."""
+    doc = _doc_chamado()
+    with (
+        patch("app.routes.api.db") as mock_db,
+        patch("app.routes.api.Historico"),
+    ):
+        mock_db.collection.return_value.document.return_value.get.return_value = doc
+        r = client_logado_solicitante.post(
+            "/api/chamado/ch_123/confirmar-resolucao",
+            json={"acao": "reabrir", "motivo": "Ainda com problema"},
+            content_type="application/json",
+        )
+    assert r.status_code == 200
+    payload = mock_db.collection.return_value.document.return_value.update.call_args[0][0]
+    assert payload.get("lembrete_confirmacao_1_enviado") is False
+    assert payload.get("lembrete_confirmacao_2_enviado") is False
 
 
 def test_reabrir_reseta_escalacao_resposta_nivel(client_logado_solicitante):
@@ -230,3 +329,38 @@ def test_chamado_nao_concluido_nao_permite_confirmacao(client_logado_solicitante
         )
     assert r.status_code == 400
     assert r.get_json()["sucesso"] is False
+
+
+def _thread_executa_sync(target, daemon=True):
+    """Substituto de threading.Thread que executa o target na hora (para testes)."""
+
+    class _T:
+        def start(self):
+            target()
+
+    return _T()
+
+
+def test_reabrir_nao_notifica_se_chamado_removido_antes_do_email(client_logado_solicitante):
+    """Notificação de reabertura é ignorada se o chamado não existir mais no Firestore."""
+    doc = _doc_chamado()
+    doc_removido = MagicMock()
+    doc_removido.exists = False
+
+    with (
+        patch("app.routes.api.db") as mock_db,
+        patch("app.routes.api.Historico"),
+        patch("app.routes.api.threading.Thread", side_effect=_thread_executa_sync),
+        patch("app.services.notifications.notificar_supervisor_chamado_reaberto") as mock_notif,
+    ):
+        mock_db.collection.return_value.document.return_value.get.side_effect = [
+            doc,
+            doc_removido,
+        ]
+        r = client_logado_solicitante.post(
+            "/api/chamado/ch_123/confirmar-resolucao",
+            json={"acao": "reabrir", "motivo": "Problema persiste"},
+            content_type="application/json",
+        )
+    assert r.status_code == 200
+    mock_notif.assert_not_called()

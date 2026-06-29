@@ -481,8 +481,8 @@ Apenas o **solicitante dono** do chamado, quando `confirmacao_solicitante == "pe
 { "sucesso": true }
 ```
 
-- `acao: "confirmar"` → atualiza `confirmacao_solicitante = "confirmado"`
-- `acao: "reabrir"` → reverte status para `Aberto`, registra histórico com o motivo
+- `acao: "confirmar"` → atualiza `confirmacao_solicitante = "confirmado"` e envia e-mail ao responsável (`notificar_responsavel_chamado_confirmado`) em background
+- `acao: "reabrir"` → reverte status para `Aberto`, registra histórico com o motivo e envia e-mail ao responsável (`notificar_supervisor_chamado_reaberto`) em background
 
 **Erros:**
 - **400** — `acao` inválida, `motivo` ausente para `reabrir`, ou chamado não aguarda confirmação
@@ -1148,4 +1148,5 @@ Ao exceder: `429 Too Many Requests` (resposta do Flask-Limiter).
 | 2026-06-25 | — | `GET /gestor/dashboard` — Fase 5 dashboard read-only gestor |
 | 2026-06-25 | — | Job `sla_escalacao` — Fase 6 Escada A gerencial a cada 10 min (substitui `alerta_prazo_24h`) |
 | 2026-06-25 | — | `gestor/dashboard` — `aberto_sem_resposta` corrigido para tempo útil (Fase 6) |
+| 2026-06-29 | — | `POST /api/chamado/<id>/confirmar-resolucao` — `acao=confirmar` agora notifica responsável por e-mail |
 | 2026-06-26 | — | Fase 7: avisos 50%/80% + Escada B resolução no job `sla_escalacao` |

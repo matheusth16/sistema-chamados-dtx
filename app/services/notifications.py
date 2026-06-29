@@ -194,6 +194,12 @@ def _base_url() -> str:
 
 def _link_chamado(chamado_id: str) -> str:
     base = _base_url()
+    return f"{base}/chamado/{chamado_id}" if base else ""
+
+
+def _link_historico(chamado_id: str) -> str:
+    """Link para supervisores/admins — vai direto para o histórico do chamado."""
+    base = _base_url()
     return f"{base}/chamado/{chamado_id}/historico" if base else ""
 
 
@@ -711,6 +717,82 @@ def notificar_solicitante_confirmacao_pendente(
 
 
 # ---------------------------------------------------------------------------
+# Reminder — requester still hasn't confirmed resolution
+# ---------------------------------------------------------------------------
+
+
+def notificar_solicitante_lembrete_confirmacao(
+    chamado_id: str,
+    numero_chamado: str,
+    categoria: str,
+    solicitante_usuario,
+    numero_lembrete: int = 1,
+) -> bool:
+    """Send a reminder to the requester that the ticket is still awaiting their confirmation.
+
+    Returns True if the e-mail was sent successfully, False otherwise.
+    """
+    if not solicitante_usuario:
+        return False
+    email = (getattr(solicitante_usuario, "email", None) or "").strip()
+    if not email:
+        return False
+
+    nome = getattr(solicitante_usuario, "nome", None) or "Requester"
+    link = _link_chamado(chamado_id)
+    cat_d = _tc(categoria)
+
+    assunto = f"Reminder #{numero_lembrete}: ticket {numero_chamado} awaiting your confirmation"
+
+    detalhes_html = build_detail_table(
+        [("Ticket", numero_chamado), ("Category", cat_d), ("Status", "Completed")]
+    )
+    botoes_html = (
+        f'<p style="margin-top:20px;">{build_cta_button("Confirm or reopen", link, "#059669")}</p>'
+        if link
+        else ""
+    )
+
+    corpo_html = build_email_shell(
+        header_title=f"Reminder: ticket {numero_chamado} needs your attention",
+        header_color="#d97706",
+        body_html=(
+            f"<p>Hello, <strong>{escape(nome)}</strong>! "
+            f"This is reminder <strong>#{numero_lembrete}</strong>. "
+            "Ticket <strong>"
+            f"{escape(numero_chamado)}</strong> was marked as <strong>completed</strong> "
+            "but still awaits your confirmation. "
+            "Please open it to confirm or reopen.</p>" + detalhes_html + botoes_html
+        ),
+    )
+    corpo_texto = (
+        f"Hello, {nome}!\n\n"
+        f"Reminder #{numero_lembrete}: ticket {numero_chamado} is still awaiting your "
+        f"confirmation.\nCategory: {cat_d}\nStatus: Completed\n\n"
+        "Please confirm whether the issue was resolved or reopen it."
+        + (f"\n\nOpen ticket: {link}" if link else "")
+    )
+
+    ok, err = enviar_email(email, assunto, corpo_html, corpo_texto)
+    if ok:
+        logger.info(
+            "Confirmation reminder #%s sent to %s (ticket %s)",
+            numero_lembrete,
+            email,
+            numero_chamado,
+        )
+        return True
+    else:
+        logger.warning(
+            "Failed to send confirmation reminder #%s to %s: %s",
+            numero_lembrete,
+            email,
+            err,
+        )
+        return False
+
+
+# ---------------------------------------------------------------------------
 # Ticket reopened by requester — notify responsible (supervisor)
 # ---------------------------------------------------------------------------
 
@@ -731,7 +813,7 @@ def notificar_supervisor_chamado_reaberto(
         return
 
     nome_responsavel = getattr(responsavel_usuario, "nome", None) or "Responsible"
-    link = _link_chamado(chamado_id)
+    link = _link_historico(chamado_id)
     link_dash = _link_dashboard()
     motivo_truncado = (motivo or "")[:500]
     cat_d = _tc(categoria)
@@ -777,6 +859,72 @@ def notificar_supervisor_chamado_reaberto(
         logger.info("Reopen notification sent to %s (ticket %s)", email, numero_chamado)
     else:
         logger.warning("Failed to send reopen notification to %s: %s", email, err)
+
+
+# ---------------------------------------------------------------------------
+# Ticket confirmed by requester — notify responsible
+# ---------------------------------------------------------------------------
+
+
+def notificar_responsavel_chamado_confirmado(
+    chamado_id: str,
+    numero_chamado: str,
+    categoria: str,
+    solicitante_nome: str,
+    responsavel_usuario,
+) -> None:
+    """Notify the responsible that the requester confirmed the ticket was resolved."""
+    if not responsavel_usuario:
+        return
+    email = (getattr(responsavel_usuario, "email", None) or "").strip()
+    if not email:
+        return
+
+    nome_responsavel = getattr(responsavel_usuario, "nome", None) or "Responsible"
+    link = _link_historico(chamado_id)
+    link_dash = _link_dashboard()
+    cat_d = _tc(categoria)
+
+    assunto = f"Ticket {numero_chamado}: requester confirmed resolution"
+
+    detalhes_html = build_detail_table(
+        [
+            ("Ticket", numero_chamado),
+            ("Category", cat_d),
+            ("Requester", escape(solicitante_nome)),
+            ("Status", "Confirmed — resolved"),
+        ]
+    )
+
+    ctas = []
+    if link:
+        ctas.append(("View ticket history", link, "#059669"))
+    if link_dash:
+        ctas.append(("View sector tickets", link_dash, "#6b7280"))
+    botoes_html = build_two_ctas(ctas) if ctas else ""
+
+    corpo_html = build_email_shell(
+        header_title=f"Ticket {numero_chamado}: confirmed resolved",
+        header_color="#059669",
+        body_html=(
+            f"<p>Hello, <strong>{escape(nome_responsavel)}</strong>! "
+            f"The requester <strong>{escape(solicitante_nome)}</strong> has confirmed that "
+            f"ticket <strong>{escape(numero_chamado)}</strong> was successfully resolved. "
+            "No further action is required.</p>" + detalhes_html + botoes_html
+        ),
+    )
+    corpo_texto = (
+        f"Hello, {nome_responsavel}!\n\n"
+        f"Ticket {numero_chamado} was confirmed as resolved by {solicitante_nome}.\n"
+        f"Category: {cat_d}\nStatus: Confirmed — resolved"
+        + (f"\n\nView ticket: {link}" if link else "")
+    )
+
+    ok, err = enviar_email(email, assunto, corpo_html, corpo_texto)
+    if ok:
+        logger.info("Confirmation notification sent to %s (ticket %s)", email, numero_chamado)
+    else:
+        logger.warning("Failed to send confirmation notification to %s: %s", email, err)
 
 
 # ---------------------------------------------------------------------------

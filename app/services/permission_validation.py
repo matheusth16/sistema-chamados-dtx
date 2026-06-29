@@ -86,6 +86,81 @@ def usuario_pode_mutar_chamado(usuario: Any, chamado=None) -> tuple[bool, str | 
     return True, None
 
 
+def nivel_congelamento_chamado(chamado) -> str | None:
+    """Retorna None | 'pendente' | 'confirmado' conforme status + confirmacao_solicitante.
+
+    Suporta objeto Chamado (com atributos) ou dict.
+    'pendente' = Nível 1 (aguardando confirmação do solicitante).
+    'confirmado' = Nível 2 (encerrado e confirmado pelo solicitante).
+    None = sem congelamento (chamado não está Concluído, ou está em estado transitório).
+    """
+    if isinstance(chamado, dict):
+        status = chamado.get("status")
+        confirmacao = chamado.get("confirmacao_solicitante")
+    else:
+        status = getattr(chamado, "status", None)
+        confirmacao = getattr(chamado, "confirmacao_solicitante", None)
+
+    if status != "Concluído":
+        return None
+    if confirmacao in ("pendente", "confirmado"):
+        return confirmacao
+    return None
+
+
+def chamado_aceita_edicao_operacional(usuario: Any, chamado: Any) -> tuple[bool, str | None]:
+    """False se Concluído (nível 1 ou 2) — bloqueia edição operacional para qualquer perfil.
+
+    Edição operacional: descrição, responsável, anexos, setores, SLA, participantes.
+    Para reabrir, use /api/atualizar-status com chamado_aceita_transicao_status.
+
+    Returns:
+        (permitido, chave_i18n_erro) — chave_i18n_erro é None quando permitido.
+    """
+    if nivel_congelamento_chamado(chamado) is not None:
+        return False, "error_ticket_frozen_no_edit"
+    return True, None
+
+
+def chamado_aceita_transicao_status(
+    usuario: Any, chamado: Any, novo_status: str
+) -> tuple[bool, str | None]:
+    """Regras de transição de status quando Concluído.
+
+    Nível 1 (pendente):
+    - Supervisor ou Admin: Aberto (reabrir) ou Cancelado OK
+    - Em Atendimento sempre bloqueado (contornaria confirmação do solicitante)
+    - Solicitante: tudo bloqueado (usa /api/chamado/<id>/confirmar-resolucao)
+
+    Nível 2 (confirmado):
+    - Admin: apenas → Aberto (reabrir com motivo)
+    - Supervisor / Solicitante: tudo bloqueado
+
+    Fora dos níveis (não Concluído): retorna True sem restrição adicional.
+
+    Returns:
+        (permitido, chave_i18n_erro) — chave_i18n_erro é None quando permitido.
+    """
+    nivel = nivel_congelamento_chamado(chamado)
+    if nivel is None:
+        return True, None
+
+    is_admin = getattr(usuario, "is_admin_or_above", False)
+    perfil = getattr(usuario, "perfil", "")
+
+    if nivel == "pendente":
+        if (is_admin or perfil == "supervisor") and novo_status in ("Aberto", "Cancelado"):
+            return True, None
+        return False, "error_ticket_frozen_no_edit"
+
+    if nivel == "confirmado":
+        if is_admin and novo_status == "Aberto":
+            return True, None
+        return False, "error_ticket_frozen_no_edit"
+
+    return True, None
+
+
 def filtrar_supervisores_por_area(usuario: Any, supervisores: list) -> list:
     """Filtra lista de supervisores para mostrar apenas os da mesma área do usuário.
 

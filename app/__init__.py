@@ -231,6 +231,18 @@ def _iniciar_scheduler(app: Flask) -> None:
                 except Exception as exc:
                     app.logger.exception("Erro no job de limpeza de contadores_uso: %s", exc)
 
+        def _job_lembrete_confirmacao():
+            with app.app_context():
+                try:
+                    from app.services.lembrete_confirmacao_service import (
+                        processar_lembretes_confirmacao,
+                    )
+
+                    resultado = processar_lembretes_confirmacao()
+                    app.logger.info("Lembretes confirmação: %s", resultado)
+                except Exception as exc:
+                    app.logger.exception("Erro no job de lembretes de confirmação: %s", exc)
+
         scheduler = BackgroundScheduler(
             timezone=pytz.timezone("America/Sao_Paulo"),
             job_defaults={"coalesce": True, "max_instances": 1},
@@ -269,10 +281,18 @@ def _iniciar_scheduler(app: Flask) -> None:
             minute=0,
             id="limpar_contadores_uso",
         )
+        # Lembretes de confirmação de resolução: 1º após 24 h, 2º após 48 h
+        scheduler.add_job(
+            lambda: executar_job_com_lock(app, "lembrete_confirmacao", _job_lembrete_confirmacao),
+            trigger="interval",
+            hours=6,
+            id="lembrete_confirmacao",
+        )
         scheduler.start()
         app.logger.info(
             "Scheduler iniciado — SLA Escada A a cada 10 min, relatório semanal sexta 10h, "
-            "reset ranking domingo 23h59, limpeza contadores domingo 02h00 (BRT)"
+            "lembretes confirmação a cada 6 h, reset ranking domingo 23h59, "
+            "limpeza contadores domingo 02h00 (BRT)"
         )
 
         import atexit

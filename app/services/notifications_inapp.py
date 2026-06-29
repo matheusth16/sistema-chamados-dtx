@@ -36,33 +36,152 @@ def _parse_legacy_novo_chamado(titulo: str, mensagem: str) -> tuple[str, str, st
     return numero, categoria, solicitante
 
 
+_TIPOS_SOLICITANTE = frozenset(
+    {
+        "status_em_atendimento",
+        "status_concluido_confirmar",
+        "lembrete_confirmacao_1",
+        "lembrete_confirmacao_2",
+    }
+)
+
+
 def localizar_notificacao(doc: dict, language: str = "en") -> dict:
     """
     Retorna uma cópia do doc com titulo/mensagem traduzidos para o idioma dado.
     Funciona tanto para notificações novas (com categoria/solicitante_nome no doc)
     quanto para notificações legadas (parse do texto PT como fallback).
-    Tipos diferentes de novo_chamado são retornados sem alteração.
+    Tipos desconhecidos são retornados sem alteração.
     """
     out = dict(doc)
-    if doc.get("tipo") != "novo_chamado":
-        return out
+    tipo = doc.get("tipo")
 
-    numero = doc.get("numero_chamado") or ""
-    categoria_raw = doc.get("categoria") or ""
-    solicitante = doc.get("solicitante_nome") or ""
+    if tipo == "novo_chamado":
+        numero = doc.get("numero_chamado") or ""
+        categoria_raw = doc.get("categoria") or ""
+        solicitante = doc.get("solicitante_nome") or ""
 
-    if not categoria_raw or not solicitante:
-        n, c, s = _parse_legacy_novo_chamado(doc.get("titulo", ""), doc.get("mensagem", ""))
-        numero = numero or n
-        categoria_raw = categoria_raw or c
-        solicitante = solicitante or s
+        if not categoria_raw or not solicitante:
+            n, c, s = _parse_legacy_novo_chamado(doc.get("titulo", ""), doc.get("mensagem", ""))
+            numero = numero or n
+            categoria_raw = categoria_raw or c
+            solicitante = solicitante or s
 
-    cat = get_translated_category(categoria_raw, language)
-    out["titulo"] = get_translation("notification_new_ticket_title", language, numero=numero)
-    out["mensagem"] = get_translation(
-        "notification_new_ticket_message", language, categoria=cat, solicitante=solicitante
-    )
+        cat = get_translated_category(categoria_raw, language)
+        out["titulo"] = get_translation("notification_new_ticket_title", language, numero=numero)
+        out["mensagem"] = get_translation(
+            "notification_new_ticket_message", language, categoria=cat, solicitante=solicitante
+        )
+
+    elif tipo in _TIPOS_SOLICITANTE:
+        numero = doc.get("numero_chamado") or ""
+        cat = get_translated_category(doc.get("categoria") or "", language)
+
+        if tipo == "status_em_atendimento":
+            out["titulo"] = get_translation(
+                "notification_status_in_progress_title", language, numero=numero
+            )
+            out["mensagem"] = get_translation(
+                "notification_status_in_progress_message", language, categoria=cat
+            )
+        elif tipo == "status_concluido_confirmar":
+            out["titulo"] = get_translation(
+                "notification_status_completed_confirm_title", language, numero=numero
+            )
+            out["mensagem"] = get_translation(
+                "notification_status_completed_confirm_message", language, categoria=cat
+            )
+        else:
+            n = 1 if tipo == "lembrete_confirmacao_1" else 2
+            out["titulo"] = get_translation(
+                "notification_reminder_confirm_title", language, numero=numero, n=n
+            )
+            out["mensagem"] = get_translation(
+                "notification_reminder_confirm_message", language, categoria=cat, n=n
+            )
+
     return out
+
+
+def texto_notificacao_status_solicitante(
+    numero: str,
+    categoria: str,
+    tipo_evento: str,
+    language: str = "en",
+    numero_lembrete: int | None = None,
+) -> tuple[str, str]:
+    """
+    Retorna (titulo, mensagem) para notificações de status destinadas ao solicitante.
+
+    tipo_evento: 'status_em_atendimento' | 'status_concluido_confirmar' | 'lembrete_confirmacao'
+    numero_lembrete: 1 ou 2, usado apenas quando tipo_evento == 'lembrete_confirmacao'
+    """
+    cat = get_translated_category(categoria, language)
+    if tipo_evento == "status_em_atendimento":
+        titulo = get_translation("notification_status_in_progress_title", language, numero=numero)
+        mensagem = get_translation(
+            "notification_status_in_progress_message", language, categoria=cat
+        )
+    elif tipo_evento == "status_concluido_confirmar":
+        titulo = get_translation(
+            "notification_status_completed_confirm_title", language, numero=numero
+        )
+        mensagem = get_translation(
+            "notification_status_completed_confirm_message", language, categoria=cat
+        )
+    else:
+        n = numero_lembrete or 1
+        titulo = get_translation(
+            "notification_reminder_confirm_title", language, numero=numero, n=n
+        )
+        mensagem = get_translation(
+            "notification_reminder_confirm_message", language, categoria=cat, n=n
+        )
+    return titulo, mensagem
+
+
+def criar_notificacao_solicitante(
+    solicitante_id: str,
+    chamado_id: str,
+    numero_chamado: str,
+    categoria: str,
+    tipo: str,
+    numero_lembrete: int | None = None,
+    language: str = "en",
+) -> str | None:
+    """
+    Cria notificação in-app para o solicitante em eventos de status/lembrete.
+
+    tipo: 'status_em_atendimento' | 'status_concluido_confirmar'
+          | 'lembrete_confirmacao_1' | 'lembrete_confirmacao_2'
+    """
+    if not solicitante_id or not chamado_id:
+        return None
+
+    # Mapeia tipo lembrete para o tipo_evento do helper de texto
+    if tipo in ("lembrete_confirmacao_1", "lembrete_confirmacao_2"):
+        n = 1 if tipo == "lembrete_confirmacao_1" else 2
+        tipo_evento = "lembrete_confirmacao"
+        numero_lembrete = n
+    else:
+        tipo_evento = tipo
+
+    titulo, mensagem = texto_notificacao_status_solicitante(
+        numero=numero_chamado,
+        categoria=categoria,
+        tipo_evento=tipo_evento,
+        language=language,
+        numero_lembrete=numero_lembrete,
+    )
+    return criar_notificacao(
+        usuario_id=solicitante_id,
+        chamado_id=chamado_id,
+        numero_chamado=numero_chamado,
+        titulo=titulo,
+        mensagem=mensagem,
+        tipo=tipo,
+        categoria=categoria,
+    )
 
 
 def texto_notificacao_novo_chamado(

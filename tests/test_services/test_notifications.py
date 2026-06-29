@@ -140,6 +140,78 @@ def test_notificar_responsavel_setor_adicional_envia_direto(app):
     assert "Engineering" in corpo_html  # "Engenharia" translated to English in emails
 
 
+def test_notificar_responsavel_chamado_confirmado_envia_email(app):
+    """notificar_responsavel_chamado_confirmado envia e-mail ao responsável com assunto e corpo corretos."""
+    from app.services.notifications import notificar_responsavel_chamado_confirmado
+
+    responsavel = MagicMock()
+    responsavel.email = "responsavel@dtx.aero"
+    responsavel.nome = "João Responsável"
+
+    with (
+        app.app_context(),
+        patch("app.services.notifications.enviar_email") as mock_enviar,
+    ):
+        app.config["APP_BASE_URL"] = "https://example.test"
+        mock_enviar.return_value = (True, None)
+        notificar_responsavel_chamado_confirmado(
+            chamado_id="ch_abc",
+            numero_chamado="2026-200",
+            categoria="Manutenção",
+            solicitante_nome="Maria Solicitante",
+            responsavel_usuario=responsavel,
+        )
+
+    assert mock_enviar.called
+    destinatario, assunto, corpo_html, _corpo_texto = mock_enviar.call_args[0]
+    assert destinatario == "responsavel@dtx.aero"
+    assert assunto == "Ticket 2026-200: requester confirmed resolution"
+    assert "2026-200" in corpo_html
+    assert "confirmed" in corpo_html.lower()
+    assert "Maria Solicitante" in corpo_html
+
+
+def test_notificar_responsavel_chamado_confirmado_skip_sem_responsavel(app):
+    """notificar_responsavel_chamado_confirmado não envia quando responsável é None."""
+    from app.services.notifications import notificar_responsavel_chamado_confirmado
+
+    with (
+        app.app_context(),
+        patch("app.services.notifications.enviar_email") as mock_enviar,
+    ):
+        notificar_responsavel_chamado_confirmado(
+            chamado_id="ch_abc",
+            numero_chamado="2026-200",
+            categoria="Manutenção",
+            solicitante_nome="Maria",
+            responsavel_usuario=None,
+        )
+
+    mock_enviar.assert_not_called()
+
+
+def test_notificar_responsavel_chamado_confirmado_skip_sem_email(app):
+    """notificar_responsavel_chamado_confirmado não envia quando responsável não tem e-mail."""
+    from app.services.notifications import notificar_responsavel_chamado_confirmado
+
+    responsavel_sem_email = MagicMock()
+    responsavel_sem_email.email = ""
+
+    with (
+        app.app_context(),
+        patch("app.services.notifications.enviar_email") as mock_enviar,
+    ):
+        notificar_responsavel_chamado_confirmado(
+            chamado_id="ch_abc",
+            numero_chamado="2026-200",
+            categoria="Manutenção",
+            solicitante_nome="Maria",
+            responsavel_usuario=responsavel_sem_email,
+        )
+
+    mock_enviar.assert_not_called()
+
+
 def test_notificar_aprovador_envia_direto_ao_responsavel(app):
     """notificar_aprovador_novo_chamado envia diretamente ao e-mail do responsável."""
     from app.services.notifications import notificar_aprovador_novo_chamado

@@ -42,6 +42,17 @@ logger = logging.getLogger(__name__)
 ERRO_INTERNO_MSG = "Erro interno. Tente novamente."
 
 
+def _dados_chamado_reaberto_valido(chamado_id: str) -> dict | None:
+    """Retorna dados do chamado se ainda existir e estiver reaberto; senão None."""
+    doc = db.collection("chamados").document(chamado_id).get()
+    if not doc.exists:
+        return None
+    atual = doc.to_dict() or {}
+    if atual.get("status") != "Aberto" or atual.get("confirmacao_solicitante") != "reaberto":
+        return None
+    return atual
+
+
 def _enviar_notificacao_reabrir(
     app, chamado_id: str, data: dict, motivo: str, solicitante_nome: str
 ) -> None:
@@ -52,17 +63,75 @@ def _enviar_notificacao_reabrir(
             from app.services.notifications import notificar_supervisor_chamado_reaberto
 
             try:
-                responsavel = Usuario.get_by_id(data.get("responsavel_id"))
+                atual = _dados_chamado_reaberto_valido(chamado_id)
+                if not atual:
+                    logger.info(
+                        "Notificação reabrir ignorada: chamado %s inexistente ou não reaberto",
+                        chamado_id,
+                    )
+                    return
+                responsavel_id = atual.get("responsavel_id") or data.get("responsavel_id")
+                responsavel = Usuario.get_by_id(responsavel_id)
                 notificar_supervisor_chamado_reaberto(
                     chamado_id=chamado_id,
-                    numero_chamado=data.get("numero_chamado") or "N/A",
-                    categoria=data.get("categoria") or "Chamado",
+                    numero_chamado=atual.get("numero_chamado")
+                    or data.get("numero_chamado")
+                    or "N/A",
+                    categoria=atual.get("categoria") or data.get("categoria") or "Chamado",
                     motivo=motivo,
                     solicitante_nome=solicitante_nome,
                     responsavel_usuario=responsavel,
                 )
             except Exception as exc:
                 logger.warning("Notificação reabrir não enviada: %s", exc)
+
+    threading.Thread(target=_run, daemon=True).start()
+
+
+def _dados_chamado_confirmado_valido(chamado_id: str) -> dict | None:
+    """Retorna dados do chamado se confirmacao_solicitante == 'confirmado'; senão None."""
+    doc = db.collection("chamados").document(chamado_id).get()
+    if not doc.exists:
+        return None
+    atual = doc.to_dict() or {}
+    if atual.get("confirmacao_solicitante") != "confirmado":
+        return None
+    return atual
+
+
+def _enviar_notificacao_confirmar(app, chamado_id: str, data: dict, solicitante_nome: str) -> None:
+    """Notifica o responsável em background que o solicitante confirmou a resolução."""
+
+    def _run():
+        with app.app_context():
+            from app.services.notifications import notificar_responsavel_chamado_confirmado
+
+            try:
+                atual = _dados_chamado_confirmado_valido(chamado_id)
+                if not atual:
+                    logger.info(
+                        "Notificação confirmar ignorada: chamado %s inexistente ou não confirmado",
+                        chamado_id,
+                    )
+                    return
+                responsavel_id = atual.get("responsavel_id") or data.get("responsavel_id")
+                if not responsavel_id:
+                    logger.debug(
+                        "Notificação confirmar: responsavel_id ausente no chamado %s", chamado_id
+                    )
+                    return
+                responsavel = Usuario.get_by_id(responsavel_id)
+                notificar_responsavel_chamado_confirmado(
+                    chamado_id=chamado_id,
+                    numero_chamado=atual.get("numero_chamado")
+                    or data.get("numero_chamado")
+                    or "N/A",
+                    categoria=atual.get("categoria") or data.get("categoria") or "Chamado",
+                    solicitante_nome=solicitante_nome,
+                    responsavel_usuario=responsavel,
+                )
+            except Exception as exc:
+                logger.warning("Notificação confirmar não enviada: %s", exc)
 
     threading.Thread(target=_run, daemon=True).start()
 
@@ -217,12 +286,23 @@ def atualizar_status_ajax():
         if not permitido:
             return jsonify({"sucesso": False, "erro": erro_perm}), 403
 
+        from app.services.permission_validation import chamado_aceita_transicao_status
+
+        pode_trans, _ = chamado_aceita_transicao_status(current_user, chamado_obj, novo_status)
+        if not pode_trans:
+            return jsonify(
+                {"sucesso": False, "erro": "Chamado Concluído não permite esta transição de status"}
+            ), 403
+
+        motivo_reabertura = (dados.get("motivo_reabertura") or "").strip()
+
         resultado = atualizar_status_chamado(
             chamado_id=chamado_id,
             novo_status=novo_status,
             usuario_id=current_user.id,
             usuario_nome=current_user.nome,
             motivo_cancelamento=motivo_cancelamento if novo_status == "Cancelado" else None,
+            motivo_reabertura=motivo_reabertura if novo_status == "Aberto" else None,
             data_chamado=doc_chamado.to_dict(),
         )
         if resultado["sucesso"]:
@@ -336,6 +416,16 @@ def bulk_atualizar_status():
                 chamado_obj = Chamado.from_dict(doc_data, chamado_id)
                 if not usuario_pode_ver_chamado(current_user, chamado_obj):
                     erros.append({"id": chamado_id, "erro": "Sem permissão para este chamado"})
+                    continue
+                from app.services.permission_validation import chamado_aceita_transicao_status
+
+                pode_trans, _ = chamado_aceita_transicao_status(
+                    current_user, chamado_obj, novo_status
+                )
+                if not pode_trans:
+                    erros.append(
+                        {"id": chamado_id, "erro": "Chamado Concluído não permite esta transição"}
+                    )
                     continue
                 resultado = atualizar_status_chamado(
                     chamado_id=chamado_id,
@@ -676,9 +766,6 @@ def api_onboarding_pular():
 def api_confirmar_resolucao(chamado_id: str):
     """Solicitante confirma ou rejeita a resolução de um chamado Concluído."""
 
-    if current_user.perfil != "solicitante":
-        return jsonify({"sucesso": False, "erro": "Acesso negado"}), 403
-
     dados = request.get_json(silent=True) or {}
     acao = dados.get("acao", "")
     motivo = (dados.get("motivo") or "").strip()
@@ -706,6 +793,13 @@ def api_confirmar_resolucao(chamado_id: str):
             db.collection("chamados").document(chamado_id).update(
                 {"confirmacao_solicitante": "confirmado"}
             )
+            with contextlib.suppress(RuntimeError):
+                _enviar_notificacao_confirmar(
+                    current_app._get_current_object(),
+                    chamado_id,
+                    data,
+                    current_user.nome,
+                )
         else:
             db.collection("chamados").document(chamado_id).update(
                 {
@@ -717,6 +811,9 @@ def api_confirmar_resolucao(chamado_id: str):
                     "escalacao_resolucao_nivel": 0,
                     "alerta_supervisor_50_enviado": False,
                     "alerta_supervisor_80_enviado": False,
+                    # Lembretes resetados para que o próximo ciclo de conclusão funcione
+                    "lembrete_confirmacao_1_enviado": False,
+                    "lembrete_confirmacao_2_enviado": False,
                 }
             )
             Historico(
@@ -727,7 +824,7 @@ def api_confirmar_resolucao(chamado_id: str):
                 campo_alterado="status",
                 valor_anterior="Concluído",
                 valor_novo="Aberto",
-                detalhes=motivo[:500],
+                detalhe=motivo[:500],
             ).save()
             with contextlib.suppress(RuntimeError):
                 _enviar_notificacao_reabrir(
@@ -867,6 +964,14 @@ def api_transferir_area(chamado_id: str):
         if not pode_mutar:
             return jsonify({"sucesso": False, "erro": "Acesso negado"}), 403
 
+        from app.services.permission_validation import chamado_aceita_edicao_operacional
+
+        _pode_op, _ = chamado_aceita_edicao_operacional(current_user, chamado)
+        if not _pode_op:
+            return jsonify(
+                {"sucesso": False, "erro": "Chamado Concluído não permite esta operação"}
+            ), 403
+
         if not (chamado.responsavel_id == current_user.id or current_user.is_admin_or_above):
             return jsonify(
                 {"sucesso": False, "erro": "Apenas o responsável ou admin pode transferir"}
@@ -932,6 +1037,14 @@ def api_escalonar_colega(chamado_id: str):
         pode_mutar, _ = usuario_pode_mutar_chamado(current_user)
         if not pode_mutar:
             return jsonify({"sucesso": False, "erro": "Acesso negado"}), 403
+
+        from app.services.permission_validation import chamado_aceita_edicao_operacional
+
+        _pode_op, _ = chamado_aceita_edicao_operacional(current_user, chamado)
+        if not _pode_op:
+            return jsonify(
+                {"sucesso": False, "erro": "Chamado Concluído não permite esta operação"}
+            ), 403
 
         if not (chamado.responsavel_id == current_user.id or current_user.is_admin_or_above):
             return jsonify(
@@ -1104,6 +1217,12 @@ def api_incluir_participantes(chamado_id: str):
         if not pode_mutar:
             return jsonify({"sucesso": False, "erro": "Acesso negado"}), 403
 
+        from app.services.permission_validation import chamado_aceita_edicao_operacional
+
+        _pode_op, _ = chamado_aceita_edicao_operacional(current_user, chamado)
+        if not _pode_op:
+            return jsonify({"sucesso": False, "erro": "Acesso negado"}), 403
+
         if not (chamado.responsavel_id == current_user.id or current_user.is_admin_or_above):
             return jsonify(
                 {
@@ -1155,6 +1274,9 @@ def api_concluir_minha_parte(chamado_id: str):
 
         dados_chamado = doc.to_dict() or {}
         chamado = Chamado.from_dict(dados_chamado, chamado_id)
+
+        if chamado.status == "Concluído":
+            return jsonify({"sucesso": False, "erro": "Chamado já está Concluído"}), 400
 
         participantes = chamado.participantes or []
         ids_participantes = {p.get("supervisor_id") for p in participantes}

@@ -24,9 +24,12 @@ Este documento descreve os índices compostos usados pelo sistema e como implant
 | Dashboard (gate, status, etc.) | chamados | gate ASC, status ASC, data_abertura DESC | Filtros por gate |
 | Dashboard (responsável) | chamados | responsavel ASC, status ASC | Filtro por responsável |
 | Relatórios / analytics | chamados | data_abertura ASC (ou DESC) + outros | Queries em analytics.py |
-| Dashboard supervisor (isolamento Fase 2) | chamados | supervisor_ids_com_acesso ARRAY_CONTAINS | Query `array_contains` para filtrar apenas chamados que o supervisor pode ver — owner, fila da área ou participante (ADR-004, Fase 2) |
+| Dashboard supervisor (isolamento Fase 2) | chamados | supervisor_ids_com_acesso ARRAY_CONTAINS, data_abertura DESC | Painel `/painel` — filtro por visibilidade + paginação ordenada por data (ADR-004, Fase 2) |
+| Dashboard supervisor + status | chamados | supervisor_ids_com_acesso ARRAY_CONTAINS, status ASC, data_abertura DESC | Filtro de status no painel do supervisor |
+| Dashboard supervisor + categoria/gate/responsável | chamados | supervisor_ids_com_acesso ARRAY_CONTAINS, categoria/gate/responsavel ASC, data_abertura DESC | Filtros adicionais no painel do supervisor |
 | Histórico do chamado | historico | chamado_id ASC, data_acao DESC | Timeline do chamado |
 | Notificações não lidas | notificacoes | usuario_id ASC, lida ASC | Listagem de notificações |
+| Lembretes de confirmação (job 6 h) | chamados | status ASC, confirmacao_solicitante ASC | Query `status=="Concluído" AND confirmacao_solicitante=="pendente"` no job lembrete_confirmacao |
 | Escada A — chamados sem resposta (Fase 6) | chamados | status ASC, escalacao_resposta_nivel ASC | Query `status=="Aberto" AND escalacao_resposta_nivel<4` no job sla_escalacao (10 min) |
 | Escada B — chamados em atendimento vencidos (Fase 7) | chamados | status ASC, escalacao_resolucao_nivel ASC | Query `status=="Em Atendimento" AND escalacao_resolucao_nivel<4` no job sla_escalacao (10 min) |
 
