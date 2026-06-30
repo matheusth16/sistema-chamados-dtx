@@ -301,7 +301,7 @@ def enviar_relatorio_semanal() -> dict[str, Any]:
         assunto = f"Weekly ticket report — {data_ref}"
 
         html, texto = _corpo_supervisor(nome, lista, link_dash, link_base, data_ref)
-        ok, err = enviar_email(email_sup, assunto, html, texto)
+        ok, err = enviar_email(email_sup, assunto, html, texto, importance="low")
         if ok:
             enviados += 1
             logger.info(
@@ -399,7 +399,7 @@ def _enviar_resumo_admins(
     for admin in admins:
         email_admin = admin.email.strip()
         assunto = f"Weekly consolidated report — {data_ref}"
-        ok, err = enviar_email(email_admin, assunto, html_admin)
+        ok, err = enviar_email(email_admin, assunto, html_admin, importance="low")
         if ok:
             logger.info("Resumo semanal enviado para admin %s", email_admin)
         else:

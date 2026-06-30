@@ -3413,5 +3413,190 @@
     "pt_BR": "Geral",
     "en": "General",
     "es": "General"
+  },
+  "preview_modal_title": {
+    "pt_BR": "Revise seu chamado antes de enviar",
+    "en": "Review your ticket before submitting",
+    "es": "Revise su ticket antes de enviar"
+  },
+  "preview_confirm_btn": {
+    "pt_BR": "Confirmar envio",
+    "en": "Confirm & send",
+    "es": "Confirmar y enviar"
+  },
+  "preview_edit_btn": {
+    "pt_BR": "Voltar e editar",
+    "en": "Back to edit",
+    "es": "Volver y editar"
+  },
+  "preview_category": {
+    "pt_BR": "Categoria",
+    "en": "Category",
+    "es": "Categoría"
+  },
+  "preview_sector": {
+    "pt_BR": "Setor",
+    "en": "Sector",
+    "es": "Sector"
+  },
+  "preview_description": {
+    "pt_BR": "Descrição",
+    "en": "Description",
+    "es": "Descripción"
+  },
+  "preview_responsible": {
+    "pt_BR": "Responsável",
+    "en": "Responsible",
+    "es": "Responsable"
+  },
+  "preview_attachments": {
+    "pt_BR": "Anexos",
+    "en": "Attachments",
+    "es": "Adjuntos"
+  },
+  "preview_observers": {
+    "pt_BR": "Observadores (cópia)",
+    "en": "CC (observers)",
+    "es": "Observadores (CC)"
+  },
+  "preview_none": {
+    "pt_BR": "Nenhum",
+    "en": "None",
+    "es": "Ninguno"
+  },
+  "preview_review_header": {
+    "pt_BR": "Confirme os dados do chamado",
+    "en": "Confirm ticket details",
+    "es": "Confirme los datos del ticket"
+  },
+  "observers_cc": {
+    "pt_BR": "Em cópia",
+    "en": "CC (Observers)",
+    "es": "En copia"
+  },
+  "search_user_placeholder": {
+    "pt_BR": "Buscar por nome ou e-mail…",
+    "en": "Search by name or email…",
+    "es": "Buscar por nombre o correo…"
+  },
+  "observers_hint": {
+    "pt_BR": "Máx. 5 observadores. Receberão notificações por e-mail.",
+    "en": "Max. 5 observers. They will receive email notifications.",
+    "es": "Máx. 5 observadores. Recibirán notificaciones por correo."
+  },
+  "observers_watching_hint": {
+    "pt_BR": "Chamados em que você está em cópia",
+    "en": "Tickets where you are CC'd",
+    "es": "Tickets en los que estás en copia"
+  },
+  "edit_description_sol_title": {
+    "pt_BR": "Editar descrição",
+    "en": "Edit description",
+    "es": "Editar descripción"
+  },
+  "edit_description_sol_hint": {
+    "pt_BR": "Disponível por 30 minutos após a abertura do chamado.",
+    "en": "Available for 30 minutes after opening the ticket.",
+    "es": "Disponible por 30 minutos después de abrir el ticket."
+  },
+  "edit_description_countdown": {
+    "pt_BR": "Tempo restante",
+    "en": "Time remaining",
+    "es": "Tiempo restante"
+  },
+  "edit_description_save_btn": {
+    "pt_BR": "Salvar descrição",
+    "en": "Save description",
+    "es": "Guardar descripción"
+  },
+  "edit_description_success": {
+    "pt_BR": "Descrição atualizada com sucesso.",
+    "en": "Description updated successfully.",
+    "es": "Descripción actualizada correctamente."
+  },
+  "cancel_ticket_sol_title": {
+    "pt_BR": "Cancelar chamado",
+    "en": "Cancel ticket",
+    "es": "Cancelar ticket"
+  },
+  "cancel_ticket_sol_hint": {
+    "pt_BR": "Informe o motivo do cancelamento (obrigatório).",
+    "en": "Enter the reason for cancellation (required).",
+    "es": "Ingrese el motivo de cancelación (obligatorio)."
+  },
+  "cancel_ticket_confirm_btn": {
+    "pt_BR": "Confirmar cancelamento",
+    "en": "Confirm cancellation",
+    "es": "Confirmar cancelación"
+  },
+  "cancel_ticket_success": {
+    "pt_BR": "Chamado cancelado com sucesso.",
+    "en": "Ticket cancelled successfully.",
+    "es": "Ticket cancelado correctamente."
+  },
+  "sol_actions_title": {
+    "pt_BR": "Suas ações",
+    "en": "Your actions",
+    "es": "Tus acciones"
+  },
+  "notification_obs_edicao_titulo": {
+    "pt_BR": "Descrição editada — Chamado {numero}",
+    "en": "Description edited — Ticket {numero}",
+    "es": "Descripción editada — Ticket {numero}"
+  },
+  "notification_obs_edicao_mensagem": {
+    "pt_BR": "{categoria}",
+    "en": "{categoria}",
+    "es": "{categoria}"
+  },
+  "notification_obs_anexo_titulo": {
+    "pt_BR": "Novo anexo — Chamado {numero}",
+    "en": "New attachment — Ticket {numero}",
+    "es": "Nuevo adjunto — Ticket {numero}"
+  },
+  "notification_obs_anexo_mensagem": {
+    "pt_BR": "{categoria}",
+    "en": "{categoria}",
+    "es": "{categoria}"
+  },
+  "notification_obs_cancelamento_titulo": {
+    "pt_BR": "Chamado {numero} cancelado",
+    "en": "Ticket {numero} cancelled",
+    "es": "Ticket {numero} cancelado"
+  },
+  "notification_obs_cancelamento_mensagem": {
+    "pt_BR": "{categoria}",
+    "en": "{categoria}",
+    "es": "{categoria}"
+  },
+  "notification_observer_status_in_progress_title": {
+    "pt_BR": "Chamado {numero} em atendimento",
+    "en": "Ticket {numero} in progress",
+    "es": "Ticket {numero} en atención"
+  },
+  "notification_observer_status_in_progress_message": {
+    "pt_BR": "{categoria}",
+    "en": "{categoria}",
+    "es": "{categoria}"
+  },
+  "notification_observer_status_completed_title": {
+    "pt_BR": "Chamado {numero} concluído",
+    "en": "Ticket {numero} completed",
+    "es": "Ticket {numero} completado"
+  },
+  "notification_observer_status_completed_message": {
+    "pt_BR": "{categoria}",
+    "en": "{categoria}",
+    "es": "{categoria}"
+  },
+  "notification_observer_added_title": {
+    "pt_BR": "Você foi adicionado como observador — Chamado {numero}",
+    "en": "You were added as observer — Ticket {numero}",
+    "es": "Fuiste agregado como observador — Ticket {numero}"
+  },
+  "notification_observer_added_message": {
+    "pt_BR": "{categoria}",
+    "en": "{categoria}",
+    "es": "{categoria}"
   }
 }

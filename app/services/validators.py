@@ -331,3 +331,47 @@ def validar_novo_chamado(
         erros.extend(validar_links_externos(links_externos))
 
     return erros
+
+
+MAX_OBSERVADORES = 5
+
+
+def validar_observadores(
+    observadores: list,
+    solicitante_id: str,
+) -> list[str]:
+    """Valida lista de observadores (em cópia) antes de persistir.
+
+    Regras:
+    - Máximo MAX_OBSERVADORES (5) observadores por chamado.
+    - Solicitante não pode ser observador do próprio chamado.
+    - Cada observador deve ter usuario_id presente.
+    - Duplicatas são ignoradas silenciosamente (sem erro).
+
+    Returns:
+        Lista de mensagens de erro; vazia se tudo OK.
+    """
+    erros: list[str] = []
+    if not observadores:
+        return erros
+
+    vistos: set[str] = set()
+    ids_validos: list[str] = []
+
+    for obs in observadores:
+        uid = (obs.get("usuario_id") if isinstance(obs, dict) else None) or ""
+        if not uid:
+            erros.append("Observador sem usuario_id informado.")
+            continue
+        if uid in vistos:
+            continue  # deduplicação silenciosa
+        vistos.add(uid)
+        ids_validos.append(uid)
+
+    if solicitante_id in vistos:
+        erros.append("O solicitante não pode ser observador do próprio chamado.")
+
+    if len(vistos) > MAX_OBSERVADORES:
+        erros.append(f"Máximo de {MAX_OBSERVADORES} observadores por chamado.")
+
+    return erros

@@ -361,6 +361,45 @@ def test_listar_meus_chamados_cursor_prev_e_id_do_primeiro_doc():
     )
 
 
+# ── Cobertura: linhas 87 e 105 ───────────────────────────────────────────────
+
+
+def test_fallback_doc_vazio_e_ignorado():
+    """Fallback ignora doc cujo to_dict() retorna {} (cobre linha 87 — continue)."""
+    from app.services.chamados_listagem_service import listar_meus_chamados_fallback
+
+    doc_vazio = MagicMock()
+    doc_vazio.to_dict.return_value = {}
+
+    with patch("app.services.chamados_listagem_service.db") as mock_db:
+        mock_db.collection.return_value.where.return_value.limit.return_value.stream.return_value = [
+            doc_vazio
+        ]
+        result = listar_meus_chamados_fallback("u1", "", 10, 1)
+
+    assert result["chamados"] == []
+
+
+def test_fallback_chamado_prioridade_zero_define_grupo_key_projeto():
+    """Chamado com prioridade=0 define _grupo_prio[rl]=0 (cobre linha 105)."""
+    from app.services.chamados_listagem_service import listar_meus_chamados_fallback
+
+    doc = _make_doc("c1", {"status": "Aberto", "prioridade": 0})
+
+    with patch("app.services.chamados_listagem_service.db") as mock_db:
+        mock_db.collection.return_value.where.return_value.limit.return_value.stream.return_value = [
+            doc
+        ]
+        with patch("app.services.chamados_listagem_service.Chamado") as mock_chamado_cls:
+            c = MagicMock()
+            c.rl_codigo = "RL-PROJ"
+            c.prioridade = 0
+            mock_chamado_cls.from_dict.return_value = c
+            result = listar_meus_chamados_fallback("u1", "", 10, 1)
+
+    assert result["chamados"][0].grupo_key == "0|RL-PROJ"
+
+
 def test_listar_meus_chamados_sem_cursor_cursor_prev_e_none():
     """F-26: sem cursor (primeira página), cursor_prev deve ser None."""
     from app.services.chamados_listagem_service import listar_meus_chamados
@@ -385,3 +424,77 @@ def test_listar_meus_chamados_sem_cursor_cursor_prev_e_none():
         result = listar_meus_chamados("u1", itens_por_pagina=10)
 
     assert result["cursor_prev"] is None
+
+
+# ── listar_chamados_como_observador (Lacuna F) ────────────────────────────────
+
+
+class TestListarChamadosComoObservadorFallback:
+    """Lacuna F: fallback em memória quando query observadores_ids retorna vazio."""
+
+    def test_fallback_retorna_chamado_quando_query_vazia(self):
+        """Query observadores_ids retorna [] → scan memória filtra por observadores[*].usuario_id."""
+        from app.services.chamados_listagem_service import listar_chamados_como_observador
+
+        user_id = "obs_1"
+        doc_match = _make_doc(
+            "ch1",
+            {
+                "status": "Aberto",
+                "observadores": [{"usuario_id": user_id, "nome": "Obs 1"}],
+            },
+        )
+        doc_no_match = _make_doc(
+            "ch2",
+            {
+                "status": "Aberto",
+                "observadores": [{"usuario_id": "outro", "nome": "Outro"}],
+            },
+        )
+
+        mock_db = MagicMock()
+        # observadores_ids query → vazio (fallback acionado)
+        mock_db.collection.return_value.where.return_value.limit.return_value.stream.return_value = []
+        # scan recente
+        mock_db.collection.return_value.order_by.return_value.limit.return_value.stream.return_value = [
+            doc_match,
+            doc_no_match,
+        ]
+
+        with (
+            patch("app.services.chamados_listagem_service.db", mock_db),
+            patch("app.services.chamados_listagem_service.Chamado") as mock_chamado_cls,
+        ):
+            chamado_mock = MagicMock()
+            mock_chamado_cls.from_dict.return_value = chamado_mock
+            result = listar_chamados_como_observador(user_id)
+
+        assert len(result) == 1
+        assert result[0].em_copia is True
+
+    def test_fallback_nao_acionado_quando_query_retorna_docs(self):
+        """Query retorna docs → sem fallback, order_by não é chamado."""
+        from app.services.chamados_listagem_service import listar_chamados_como_observador
+
+        doc = _make_doc(
+            "ch1",
+            {
+                "status": "Aberto",
+                "observadores": [{"usuario_id": "obs_1"}],
+            },
+        )
+
+        mock_db = MagicMock()
+        mock_db.collection.return_value.where.return_value.limit.return_value.stream.return_value = [
+            doc
+        ]
+
+        with (
+            patch("app.services.chamados_listagem_service.db", mock_db),
+            patch("app.services.chamados_listagem_service.Chamado") as mock_chamado_cls,
+        ):
+            mock_chamado_cls.from_dict.return_value = MagicMock()
+            result = listar_chamados_como_observador("obs_1")
+
+        assert len(result) == 1
+        mock_db.collection.return_value.order_by.assert_not_called()

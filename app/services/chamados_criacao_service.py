@@ -75,6 +75,36 @@ def _resolver_responsavel(
     )
 
 
+def _notificar_observadores_inclusao(
+    app,
+    chamado_id: str,
+    numero_chamado: str,
+    categoria: str,
+    solicitante_nome: str,
+    observadores: list,
+) -> None:
+    """Notifica cada observador que foi incluído no chamado no momento da criação."""
+
+    def _run():
+        with app.app_context():
+            try:
+                from app.services.chamado_notificacao_service import (
+                    notificar_observadores_criacao,
+                )
+
+                notificar_observadores_criacao(
+                    chamado_id=chamado_id,
+                    numero_chamado=numero_chamado,
+                    categoria=categoria,
+                    solicitante_nome=solicitante_nome,
+                    observadores=observadores,
+                )
+            except Exception as exc:
+                logger.warning("Notif. observadores inclusão não enviada: %s", exc)
+
+    threading.Thread(target=_run, daemon=True).start()
+
+
 def criar_chamado(
     form: dict[str, Any],
     files: Any,
@@ -146,6 +176,25 @@ def criar_chamado(
     for link in links_externos:
         caminhos_anexos.append(f"onedrive:{link}")
 
+    # Observadores (em cópia, read-only) — JSON [{usuario_id, nome, email}]
+    import json as _json
+
+    _obs_raw = (form.get("observadores_json") or "").strip()
+    try:
+        observadores_list = _json.loads(_obs_raw) if _obs_raw else []
+        if not isinstance(observadores_list, list):
+            observadores_list = []
+    except Exception:
+        logger.warning("observadores_json inválido, ignorando: %.80r", _obs_raw)
+        observadores_list = []
+
+    if observadores_list:
+        from app.services.validators import validar_observadores
+
+        erros_obs = validar_observadores(observadores_list, solicitante_id)
+        if erros_obs:
+            return (None, None, erros_obs[0], None)
+
     area_chamado = (
         setor_para_area(tipo) if tipo else (area_solicitante if area_solicitante else "Geral")
     )
@@ -207,10 +256,15 @@ def criar_chamado(
             grupo_rl_id=grupo_rl_id,
             setores_adicionais=setores_adicionais_lista,
             supervisor_ids_com_acesso=ids_com_acesso,
+            observadores=observadores_list,
         )
+        chamado_dict = novo_chamado.to_dict()
+        chamado_dict["observadores_ids"] = [
+            obs.get("usuario_id") for obs in observadores_list if obs.get("usuario_id")
+        ]
         doc_ref = execute_with_retry(
             db.collection("chamados").add,
-            novo_chamado.to_dict(),
+            chamado_dict,
             max_retries=3,
         )
         chamado_id = doc_ref[1].id
@@ -220,6 +274,18 @@ def criar_chamado(
             usuario_nome=solicitante_nome,
             acao="criacao",
         ).save()
+
+        if observadores_list:
+            nomes_obs = ", ".join(o.get("nome", "") for o in observadores_list if o.get("nome"))
+            Historico(
+                chamado_id=chamado_id,
+                usuario_id=solicitante_id,
+                usuario_nome=solicitante_nome,
+                acao="inclusao_observadores",
+                campo_alterado="observadores",
+                valor_anterior=None,
+                valor_novo=nomes_obs or str(len(observadores_list)) + " observador(es)",
+            ).save()
 
         _app = current_app._get_current_object()
 
@@ -242,6 +308,15 @@ def criar_chamado(
                         responsavel_usuario=responsavel_usuario,
                         solicitante_email=solicitante_email,
                     )
+                    if observadores_list:
+                        _notificar_observadores_inclusao(
+                            _app,
+                            chamado_id=chamado_id,
+                            numero_chamado=numero_chamado,
+                            categoria=categoria or "",
+                            solicitante_nome=solicitante_nome,
+                            observadores=observadores_list,
+                        )
                     if setores_adicionais_lista:
                         executar_com_retry(
                             notificar_setores_adicionais_chamado,

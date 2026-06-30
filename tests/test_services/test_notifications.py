@@ -237,7 +237,8 @@ def test_notificar_aprovador_envia_direto_ao_responsavel(app):
 
     destinatario, assunto, _html, _txt = mock_enviar.call_args[0]
     assert destinatario == "resp@dtx.aero"
-    assert assunto == "New ticket assigned: 2026-103"
+    # categoria=Projetos → prefixo "Action required: "
+    assert assunto == "Action required: New ticket assigned: 2026-103"
 
 
 # ── notificar_solicitante_status (C1) ─────────────────────────────────────────
@@ -531,7 +532,8 @@ def test_notificar_aprovador_novo_chamado_html_com_ctas(app):
     assert mock_enviar.called
     destinatario, assunto, corpo_html, _corpo_texto = mock_enviar.call_args[0]
     assert destinatario == "resp@dtx.aero"
-    assert assunto == "New ticket assigned: 2026-102"
+    # categoria=Projetos → prefixo "Action required: "
+    assert assunto == "Action required: New ticket assigned: 2026-102"
     assert "2026-102" in corpo_html
     assert "View ticket history" in corpo_html
     assert "View sector tickets" in corpo_html
@@ -1159,3 +1161,20 @@ def test_notificar_escalada_resolucao_gerencial_envia_email(app):
     assert "CHM-0200" in assunto
     assert "2" in assunto
     assert _dest == "gerente@dtx.aero"
+
+
+# ── Cobertura: _email_envio_permitido linha 223 ───────────────────────────────
+
+
+def test_email_suprimido_quando_testing_true(app):
+    """_email_envio_permitido retorna False (linha 223) quando TESTING=True.
+
+    A conftest seta TESTING=True; não sobrescrever aqui para bater exatamente
+    nessa branch não coberta pelos outros testes (que explicitamente setam False).
+    """
+    from app.services.notifications import enviar_email
+
+    with app.app_context():
+        ok, err = enviar_email("dest@test.com", "Assunto", "<p>Teste</p>")
+    assert ok is True
+    assert err is None

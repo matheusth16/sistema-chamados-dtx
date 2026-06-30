@@ -271,8 +271,28 @@
                 </p>
             </div>
 
+            <!-- Observadores (em cópia) -->
+            <div class="mt-4">
+                <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">
+                    {{ t('observers_cc') }}
+                </label>
+                {% set _obs_ph = t('search_user_placeholder') %}
+                {% set _obs_hint = t('observers_hint') %}
+                <div class="relative">
+                    <input type="text" id="obs-busca"
+                           placeholder="{{ _obs_ph if _obs_ph != 'search_user_placeholder' else 'Buscar por nome ou e-mail…' }}"
+                           autocomplete="off"
+                           class="block w-full border border-surface-muted rounded-dtx-md sm:text-sm p-2.5 focus:ring-dtx-600 focus:border-dtx-600">
+                    <ul id="obs-sugestoes" class="hidden absolute z-30 mt-1 w-full bg-white border border-surface-border rounded-dtx-md shadow-lg max-h-48 overflow-y-auto text-sm"></ul>
+                </div>
+                <div id="obs-tags" class="flex flex-wrap gap-1.5 mt-2 min-h-[1.5rem]"></div>
+                <input type="hidden" name="observadores_json" id="observadores_json" value="[]">
+                <p class="text-[10px] text-gray-400 mt-1">{{ _obs_hint if _obs_hint != 'observers_hint' else 'Máx. 5 observadores. Receberão notificações por e-mail.' }}</p>
+            </div>
+
             <div class="pt-6 pb-2">
-                <button id="btn-submit" data-testid="submit-btn" type="submit"
+                {# type="button" — interceptado por JS para abrir modal de pré-envio #}
+                <button id="btn-submit" data-testid="submit-btn" type="button"
                         class="w-full flex justify-center items-center gap-2 py-3.5 px-4 rounded-dtx-md shadow-dtx text-sm font-bold text-white bg-dtx-600 hover:bg-dtx-700 active:bg-dtx-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-dtx-600 transition-colors">
                     <svg id="btn-submit-icon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
                     <svg id="btn-submit-spinner" class="w-5 h-5 hidden animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
@@ -280,6 +300,57 @@
                 </button>
             </div>
         </form>
+
+        <!-- Modal de pré-envio (preview read-only antes do submit) -->
+        <dialog id="modal-preview-chamado"
+                class="rounded-dtx-lg shadow-2xl border border-surface-border p-0 w-full max-w-lg backdrop:bg-gray-900/50"
+                aria-labelledby="preview-modal-title"
+                aria-modal="true">
+            <div class="p-6">
+                <div class="flex items-center gap-3 mb-5 border-b border-surface-border pb-4">
+                    <div class="w-9 h-9 rounded-dtx-md bg-dtx-50 border border-dtx-100 flex items-center justify-center text-dtx-600 shrink-0">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    </div>
+                    <h2 id="preview-modal-title" class="font-display text-base font-extrabold text-gray-900">{{ t('preview_review_header') }}</h2>
+                </div>
+                <dl class="space-y-3 text-sm" id="preview-dl">
+                    <div class="flex justify-between gap-4">
+                        <dt class="font-bold text-gray-500 shrink-0">{{ t('preview_category') }}</dt>
+                        <dd id="preview-categoria" class="text-gray-900 font-medium text-right">—</dd>
+                    </div>
+                    <div class="flex justify-between gap-4">
+                        <dt class="font-bold text-gray-500 shrink-0">{{ t('preview_sector') }}</dt>
+                        <dd id="preview-setor" class="text-gray-900 font-medium text-right">—</dd>
+                    </div>
+                    <div class="flex justify-between gap-4">
+                        <dt class="font-bold text-gray-500 shrink-0">{{ t('preview_responsible') }}</dt>
+                        <dd id="preview-responsavel" class="text-gray-900 font-medium text-right">—</dd>
+                    </div>
+                    <div class="flex flex-col gap-1">
+                        <dt class="font-bold text-gray-500">{{ t('preview_description') }}</dt>
+                        <dd id="preview-descricao" class="text-gray-700 bg-surface-raised border border-surface-border rounded-dtx-sm px-3 py-2 text-xs leading-relaxed max-h-28 overflow-y-auto whitespace-pre-wrap break-words">—</dd>
+                    </div>
+                    <div class="flex justify-between gap-4">
+                        <dt class="font-bold text-gray-500 shrink-0">{{ t('preview_attachments') }}</dt>
+                        <dd id="preview-anexos" class="text-gray-600 text-xs text-right">—</dd>
+                    </div>
+                    <div class="flex justify-between gap-4">
+                        <dt class="font-bold text-gray-500 shrink-0">{{ t('preview_observers') }}</dt>
+                        <dd id="preview-observadores" class="text-gray-600 text-xs text-right">—</dd>
+                    </div>
+                </dl>
+                <div class="flex flex-col sm:flex-row gap-3 mt-6 pt-4 border-t border-surface-border">
+                    <button id="btn-preview-edit" type="button"
+                            class="flex-1 py-2.5 px-4 rounded-dtx-md border border-surface-border text-sm font-bold text-gray-700 bg-white hover:bg-surface-raised transition-colors">
+                        ← {{ t('preview_edit_btn') }}
+                    </button>
+                    <button id="btn-preview-confirm" type="button"
+                            class="flex-1 py-2.5 px-4 rounded-dtx-md text-sm font-bold text-white bg-dtx-600 hover:bg-dtx-700 active:bg-dtx-800 transition-colors">
+                        {{ t('preview_confirm_btn') }} →
+                    </button>
+                </div>
+            </div>
+        </dialog>
     </div>
 </div>
 
@@ -389,28 +460,107 @@
         document.getElementById('responsavel_nome').value = opt ? (opt.getAttribute('data-nome') || '') : '';
     });
 
-    // Loading state no botão de envio para evitar submissão dupla
+    // Modal de pré-envio + loading state no submit real
     (function () {
-        var form = document.getElementById('form-chamado');
-        var btn = document.getElementById('btn-submit');
-        var icon = document.getElementById('btn-submit-icon');
-        var spinner = document.getElementById('btn-submit-spinner');
-        var label = document.getElementById('btn-submit-text');
-        var loadingText = "{{ t('submit_request_loading') }}";
+        var form     = document.getElementById('form-chamado');
+        var btn      = document.getElementById('btn-submit');
+        var icon     = document.getElementById('btn-submit-icon');
+        var spinner  = document.getElementById('btn-submit-spinner');
+        var label    = document.getElementById('btn-submit-text');
+        var dialog   = document.getElementById('modal-preview-chamado');
+        var btnEdit  = document.getElementById('btn-preview-edit');
+        var btnConf  = document.getElementById('btn-preview-confirm');
+        var loadingText      = "{{ t('submit_request_loading') }}";
+        var labelNenhum      = "{{ t('preview_none') }}";
         var submitting = false;
 
-        if (form && btn) {
-            form.addEventListener('submit', function (e) {
-                if (submitting) {
-                    e.preventDefault();
+        function _preview_texto(el, id, fallback) {
+            var dd = document.getElementById(id);
+            if (dd) dd.textContent = (el && el.value && el.value.trim()) ? el.value.trim() : fallback;
+        }
+
+        function _popularPreview() {
+            // Categoria
+            var cat = document.querySelector('input[name="categoria"]:checked');
+            _preview_texto(cat, 'preview-categoria', '—');
+
+            // Setor
+            var tipoEl = document.getElementById('tipo');
+            var setorTxt = tipoEl && tipoEl.selectedIndex > 0 ? tipoEl.options[tipoEl.selectedIndex].text : '—';
+            var ddSetor = document.getElementById('preview-setor');
+            if (ddSetor) ddSetor.textContent = setorTxt;
+
+            // Responsável
+            var respNome = (document.getElementById('responsavel_nome') || {}).value || '';
+            if (!respNome) {
+                var rv = document.getElementById('responsavel_visual');
+                respNome = (rv && !rv.disabled) ? rv.value : '';
+            }
+            var ddResp = document.getElementById('preview-responsavel');
+            if (ddResp) ddResp.textContent = respNome || '—';
+
+            // Descrição
+            var descEl = document.getElementById('descricao');
+            var ddDesc = document.getElementById('preview-descricao');
+            if (ddDesc) ddDesc.textContent = (descEl && descEl.value.trim()) ? descEl.value.trim() : '—';
+
+            // Anexos (arquivos + links externos)
+            var inputArq = document.getElementById('anexo_arquivo');
+            var linksExt = document.querySelectorAll('#container_links_externos input[name="links_externos"]');
+            var nomes = [];
+            if (inputArq && inputArq.files) {
+                for (var i = 0; i < inputArq.files.length; i++) nomes.push(inputArq.files[i].name);
+            }
+            for (var j = 0; j < linksExt.length; j++) {
+                try { nomes.push(new URL(linksExt[j].value).hostname); } catch(e) { nomes.push(linksExt[j].value); }
+            }
+            var ddAnexos = document.getElementById('preview-anexos');
+            if (ddAnexos) ddAnexos.textContent = nomes.length ? nomes.join(', ') : labelNenhum;
+
+            // Observadores (populado em Fase 2 via campo oculto; por enquanto mostra Nenhum)
+            var obsEl = document.getElementById('preview-observadores');
+            if (obsEl) {
+                var obsInputs = document.querySelectorAll('input[name="observadores_ids[]"]');
+                var obsNomes = [];
+                document.querySelectorAll('.obs-tag-nome').forEach(function(el) { obsNomes.push(el.textContent.trim()); });
+                obsEl.textContent = obsNomes.length ? obsNomes.join(', ') : labelNenhum;
+            }
+        }
+
+        // btn-submit (type=button) abre o modal após validação nativa do browser
+        if (btn && dialog && form) {
+            btn.addEventListener('click', function () {
+                if (!form.checkValidity()) {
+                    form.reportValidity();
                     return;
                 }
+                _popularPreview();
+                dialog.showModal();
+            });
+
+            // "Voltar e editar" — fecha modal sem submeter
+            if (btnEdit) btnEdit.addEventListener('click', function () { dialog.close(); });
+
+            // Clique no backdrop fecha modal
+            dialog.addEventListener('click', function (e) { if (e.target === dialog) dialog.close(); });
+
+            // "Confirmar envio" — fecha modal e dispara submit real (aciona anti-duplo-clique abaixo)
+            if (btnConf) {
+                btnConf.addEventListener('click', function () {
+                    dialog.close();
+                    form.requestSubmit();
+                });
+            }
+
+            // Anti-duplo-clique no submit real (requestSubmit dispara este evento)
+            form.addEventListener('submit', function (e) {
+                if (submitting) { e.preventDefault(); return; }
                 submitting = true;
                 btn.style.pointerEvents = 'none';
                 btn.style.opacity = '0.7';
-                icon.classList.add('hidden');
-                spinner.classList.remove('hidden');
-                label.textContent = loadingText;
+                if (icon) icon.classList.add('hidden');
+                if (spinner) spinner.classList.remove('hidden');
+                if (label) label.textContent = loadingText;
             });
         }
     })();
@@ -556,6 +706,84 @@
                 msgInvalido.classList.add('hidden');
             }
         });
+    })();
+
+    // Observadores — autocomplete + tags
+    (function () {
+        var MAX_OBS = 5;
+        var busca    = document.getElementById('obs-busca');
+        var sugs     = document.getElementById('obs-sugestoes');
+        var tags     = document.getElementById('obs-tags');
+        var jsonHid  = document.getElementById('observadores_json');
+        var observadores = [];  // [{usuario_id, nome, email}]
+        var debounceTimer;
+
+        function _renderTags() {
+            tags.innerHTML = '';
+            observadores.forEach(function(obs) {
+                var tag = document.createElement('span');
+                tag.className = 'obs-tag inline-flex items-center gap-1 bg-dtx-100 text-dtx-800 text-xs font-medium px-2 py-0.5 rounded-full';
+                tag.setAttribute('data-id', obs.usuario_id);
+                tag.innerHTML = '<span class="obs-tag-nome">' + obs.nome + '</span>' +
+                    '<button type="button" class="obs-tag-rm text-dtx-500 hover:text-dtx-800 leading-none" aria-label="Remover">×</button>';
+                tag.querySelector('.obs-tag-rm').addEventListener('click', function() {
+                    observadores = observadores.filter(function(o) { return o.usuario_id !== obs.usuario_id; });
+                    _renderTags();
+                    _syncHidden();
+                });
+                tags.appendChild(tag);
+            });
+            busca.disabled = observadores.length >= MAX_OBS;
+        }
+
+        function _syncHidden() {
+            jsonHid.value = JSON.stringify(observadores);
+        }
+
+        function _addObs(usuario) {
+            if (observadores.length >= MAX_OBS) return;
+            if (observadores.some(function(o) { return o.usuario_id === usuario.id; })) return;
+            observadores.push({usuario_id: usuario.id, nome: usuario.nome, email: usuario.email});
+            _renderTags();
+            _syncHidden();
+            busca.value = '';
+            sugs.innerHTML = '';
+            sugs.classList.add('hidden');
+        }
+
+        function _buscar(q) {
+            if (!q || q.length < 2) { sugs.innerHTML = ''; sugs.classList.add('hidden'); return; }
+            fetch('/api/usuarios/buscar?q=' + encodeURIComponent(q))
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    sugs.innerHTML = '';
+                    if (!data.sucesso || !data.dados.length) { sugs.classList.add('hidden'); return; }
+                    var jaIds = observadores.map(function(o) { return o.usuario_id; });
+                    var filtrados = data.dados.filter(function(u) { return !jaIds.includes(u.id); });
+                    if (!filtrados.length) { sugs.classList.add('hidden'); return; }
+                    filtrados.forEach(function(u) {
+                        var li = document.createElement('li');
+                        li.className = 'px-3 py-2 hover:bg-dtx-50 cursor-pointer flex flex-col';
+                        li.innerHTML = '<span class="font-medium text-gray-800">' + u.nome + '</span>' +
+                                       '<span class="text-gray-500 text-xs">' + u.email + '</span>';
+                        li.addEventListener('mousedown', function(e) { e.preventDefault(); _addObs(u); });
+                        sugs.appendChild(li);
+                    });
+                    sugs.classList.remove('hidden');
+                })
+                .catch(function() { sugs.classList.add('hidden'); });
+        }
+
+        busca.addEventListener('input', function() {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(function() { _buscar(busca.value.trim()); }, 250);
+        });
+
+        busca.addEventListener('blur', function() {
+            setTimeout(function() { sugs.classList.add('hidden'); }, 200);
+        });
+
+        _syncHidden();
     })();
 </script>
 {% endblock %}

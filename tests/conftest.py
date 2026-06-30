@@ -15,6 +15,31 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "api: testes de contrato e validação de API.")
 
 
+@pytest.fixture(autouse=True)
+def _patch_utils_areas_db_default():
+    """Evita chamadas ao Firestore via utils_areas em todos os testes.
+
+    Substitui app.utils_areas.db por um mock cujo doc.exists=False, fazendo
+    _carregar_mapa_firestore retornar o fallback estático SETOR_PARA_AREA sem
+    bloquear na rede. Limpa o cache antes e depois do teste para evitar
+    interferência entre testes.
+
+    Testes que precisam de comportamento específico do Firestore (ex.:
+    test_carregar_mapa_firestore_*) devem usar patch("app.utils_areas.db") ou
+    patch("app.utils_areas._carregar_mapa_firestore") internamente — o patch
+    interno tem precedência sobre este autouse.
+    """
+    from app.cache import static_cache_delete
+
+    static_cache_delete("setor_para_area_map")
+    _doc = MagicMock()
+    _doc.exists = False
+    with patch("app.utils_areas.db") as _mock_db:
+        _mock_db.collection.return_value.document.return_value.get.return_value = _doc
+        yield
+    static_cache_delete("setor_para_area_map")
+
+
 @pytest.fixture
 def app():
     """Cria aplicação Flask para testes."""

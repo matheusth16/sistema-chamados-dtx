@@ -79,7 +79,10 @@ def usuario_pode_ver_chamado(user: Usuario, chamado: Any) -> bool:
         return True
 
     if user.perfil == "solicitante":
-        return getattr(chamado, "solicitante_id", None) == user.id
+        if getattr(chamado, "solicitante_id", None) == user.id:
+            return True
+        # Observador em cópia (read-only)
+        return _eh_observador(user.id, chamado)
 
     if user.perfil == "supervisor":
         # a) abriu o chamado
@@ -105,8 +108,19 @@ def usuario_pode_ver_chamado(user: Usuario, chamado: Any) -> bool:
             if sid and sid == user.id:
                 return True
 
-        return False
+        # e) é observador em cópia
+        return bool(_eh_observador(user.id, chamado))
 
+    return False
+
+
+def _eh_observador(user_id: str, chamado) -> bool:
+    """True se user_id aparece em chamado.observadores[*].usuario_id."""
+    observadores = getattr(chamado, "observadores", None) or []
+    for obs in observadores:
+        oid = obs.get("usuario_id") if isinstance(obs, dict) else getattr(obs, "usuario_id", None)
+        if oid and oid == user_id:
+            return True
     return False
 
 

@@ -894,10 +894,284 @@
 
 ---
 
+---
+
+## 16. Nível 1 — Requester (Lacunas fechadas)
+
+### CT-REQ-01: Criação com observadores → e-mail enviado a cada um
+
+| Campo | Descrição |
+|-------|-----------|
+| **ID** | CT-REQ-01 |
+| **Tipo** | U |
+| **Objetivo** | `notificar_observadores_criacao` envia e-mail a cada observador na lista. |
+| **Pré-condição** | Lista de observadores com 2 entradas, cada uma com `email` válido. |
+| **Passos** | 1. Chamar `notificar_observadores_criacao(chamado_id, "CH-001", "TI", "João", obs_list)` |
+| **Resultado esperado** | `enviar_email` chamado 2 vezes; endereços corretos. |
+| **Arquivo de teste** | `tests/test_services/test_chamado_notificacao_service.py::TestNotificarObservadoresCriacao` |
+| **Prioridade** | Alta |
+
+---
+
+### CT-REQ-02: Observador sem e-mail não recebe notificação
+
+| Campo | Descrição |
+|-------|-----------|
+| **ID** | CT-REQ-02 |
+| **Tipo** | U |
+| **Objetivo** | Observador com `email=""` é ignorado silenciosamente por `notificar_observadores_criacao`. |
+| **Pré-condição** | Lista com 2 observadores: 1 sem e-mail, 1 com e-mail. |
+| **Passos** | 1. Chamar `notificar_observadores_criacao(...)` |
+| **Resultado esperado** | `enviar_email` chamado apenas 1 vez (para o que tem e-mail). |
+| **Arquivo de teste** | `tests/test_services/test_chamado_notificacao_service.py::TestNotificarObservadoresCriacao::test_observador_sem_email_ignorado` |
+| **Prioridade** | Alta |
+
+---
+
+### CT-REQ-03: Histórico gravado na criação com observadores
+
+| Campo | Descrição |
+|-------|-----------|
+| **ID** | CT-REQ-03 |
+| **Tipo** | U/I |
+| **Objetivo** | `criar_chamado` grava `Historico(acao="inclusao_observadores")` quando há observadores. |
+| **Pré-condição** | FormData com `observadores_json` contendo ao menos 1 observador válido. |
+| **Passos** | 1. `criar_chamado(form, solicitante)` com observadores na lista |
+| **Resultado esperado** | `Historico.save()` chamado 2×: 1 para "criacao" e 1 para "inclusao_observadores". |
+| **Arquivo de teste** | `app/services/chamados_criacao_service.py` (lógica testada via integração) |
+| **Prioridade** | Média |
+
+---
+
+### CT-REQ-04: Edição de descrição pelo solicitante (janela 30 min)
+
+| Campo | Descrição |
+|-------|-----------|
+| **ID** | CT-REQ-04 |
+| **Tipo** | I |
+| **Objetivo** | `POST /api/chamado/<id>/editar-solicitante` permite edição dentro da janela; bloqueia após. |
+| **Pré-condição** | Chamado `Aberto` aberto há < 30 min; solicitante é o dono. |
+| **Passos** | 1. POST com `{"descricao":"abc"}` (3 chars — mínimo atual) dentro da janela.<br>2. POST com o mesmo payload após 30 min. |
+| **Resultado esperado** | 1. 200 `{"sucesso": true}`.<br>2. 403 com mensagem de janela encerrada. |
+| **Arquivo de teste** | `tests/test_services/test_solicitante_edicao_service.py::TestEditarDescricaoSolicitante` |
+| **Prioridade** | Alta |
+
+---
+
+### CT-REQ-05: Notificação enviada após edição de descrição
+
+| Campo | Descrição |
+|-------|-----------|
+| **ID** | CT-REQ-05 |
+| **Tipo** | U |
+| **Objetivo** | `editar_descricao_solicitante` dispara `_notificar_edicao_descricao` em background após sucesso. |
+| **Pré-condição** | Chamado `Aberto` com dono como solicitante, dentro da janela. |
+| **Passos** | 1. `editar_descricao_solicitante(chamado_id, "Novo texto", usuario)` com `_notificar_edicao_descricao` mockado |
+| **Resultado esperado** | `_notificar_edicao_descricao.assert_called_once()`. |
+| **Arquivo de teste** | `tests/test_services/test_solicitante_edicao_service.py::TestNotificacaoEdicaoDescricao::test_edicao_sucedida_dispara_notificacao_em_thread` |
+| **Prioridade** | Alta |
+
+---
+
+### CT-REQ-06: Anexo tardio — sucesso e notificação
+
+| Campo | Descrição |
+|-------|-----------|
+| **ID** | CT-REQ-06 |
+| **Tipo** | U/I |
+| **Objetivo** | `adicionar_anexo_tardio` salva anexo no Firestore e dispara `_notificar_anexo_tardio`. |
+| **Pré-condição** | Chamado `Em Atendimento` com o solicitante como dono. |
+| **Passos** | 1. `adicionar_anexo_tardio(chamado_id, "path/f.pdf", "Motivo suficiente", usuario)` com `_notificar_anexo_tardio` mockado |
+| **Resultado esperado** | `{"sucesso": true}`; `_notificar_anexo_tardio.assert_called_once()`. |
+| **Arquivo de teste** | `tests/test_services/test_solicitante_edicao_service.py::TestNotificacaoAnexoTardio` |
+| **Prioridade** | Alta |
+
+---
+
+### CT-REQ-07: Rota POST /api/chamado/<id>/anexo-solicitante — 403 para não-solicitante
+
+| Campo | Descrição |
+|-------|-----------|
+| **ID** | CT-REQ-07 |
+| **Tipo** | I |
+| **Objetivo** | Supervisor e admin recebem 403 ao tentar enviar anexo tardio. |
+| **Pré-condição** | Usuário autenticado com perfil `supervisor`. |
+| **Passos** | 1. POST `/api/chamado/ch1/anexo-solicitante` como supervisor (multipart). |
+| **Resultado esperado** | HTTP 403 `{"sucesso": false, "erro": "Acesso restrito ao solicitante."}`. |
+| **Arquivo de teste** | `tests/test_routes/test_api_anexo_solicitante.py::TestAnexoSolicitanteRota::test_supervisor_recebe_403` |
+| **Prioridade** | Alta |
+
+---
+
+### CT-REQ-08: Rota POST /api/chamado/<id>/anexo-solicitante — 400 sem motivo
+
+| Campo | Descrição |
+|-------|-----------|
+| **ID** | CT-REQ-08 |
+| **Tipo** | I |
+| **Objetivo** | Motivo com menos de 10 caracteres retorna 400 sem chamar o service. |
+| **Pré-condição** | Usuário `solicitante` autenticado. |
+| **Passos** | 1. POST com `motivo="curto"` (< 10 chars). |
+| **Resultado esperado** | HTTP 400; `adicionar_anexo_tardio` NÃO é chamado. |
+| **Arquivo de teste** | `tests/test_routes/test_api_anexo_solicitante.py::TestAnexoSolicitanteRota::test_motivo_vazio_retorna_400` |
+| **Prioridade** | Alta |
+
+---
+
+### CT-REQ-09: Cancelamento grava data_cancelamento
+
+| Campo | Descrição |
+|-------|-----------|
+| **ID** | CT-REQ-09 |
+| **Tipo** | U |
+| **Objetivo** | `cancelar_chamado_solicitante` inclui `data_cancelamento: SERVER_TIMESTAMP` no payload Firestore. |
+| **Pré-condição** | Chamado `Aberto`, dono como solicitante. |
+| **Passos** | 1. `cancelar_chamado_solicitante(chamado_id, "Motivo suficiente", usuario)` |
+| **Resultado esperado** | `db.collection.update` chamado com `"data_cancelamento"` no payload. |
+| **Arquivo de teste** | `tests/test_services/test_cancelamento_solicitante.py::TestCancelarDataCancelamento` |
+| **Prioridade** | Alta |
+
+---
+
+### CT-REQ-10: Fan-out de status para observadores (Em Atendimento / Concluído)
+
+| Campo | Descrição |
+|-------|-----------|
+| **ID** | CT-REQ-10 |
+| **Tipo** | U |
+| **Objetivo** | `notificar_observadores_mudanca_status` envia e-mail e in-app a cada destinatário. |
+| **Pré-condição** | Chamado com responsável + 1 observador; `destinatarios_do_chamado` retorna 2 usuários. |
+| **Passos** | 1. `notificar_observadores_mudanca_status(chamado_id, "CH-001", "TI", "Em Atendimento", dados_chamado)` |
+| **Resultado esperado** | `enviar_email` chamado 2×; `criar_notificacao` chamado 2×. |
+| **Arquivo de teste** | `tests/test_services/test_chamado_notificacao_service.py::TestNotificarObservadoresMudancaStatus` |
+| **Prioridade** | Alta |
+
+---
+
+### CT-REQ-11: status_service dispara fan-out de observadores em background
+
+| Campo | Descrição |
+|-------|-----------|
+| **ID** | CT-REQ-11 |
+| **Tipo** | I |
+| **Objetivo** | `atualizar_status_chamado` inclui `_notificar_observadores_status` na closure do thread ao ir para `Em Atendimento`. |
+| **Pré-condição** | Chamado `Aberto`; app context disponível. |
+| **Passos** | 1. `atualizar_status_chamado(chamado_id, "Em Atendimento", ...)` com `threading.Thread` mockado.<br>2. Executar closure manualmente com `_notificar_observadores_status` mockado. |
+| **Resultado esperado** | `_notificar_observadores_status.assert_called_once()`. |
+| **Arquivo de teste** | `tests/test_services/test_status_service.py::test_notificacao_observers_disparada_em_background` |
+| **Prioridade** | Alta |
+
+---
+
+### CT-REQ-12: Deduplicação em destinatarios_do_chamado
+
+| Campo | Descrição |
+|-------|-----------|
+| **ID** | CT-REQ-12 |
+| **Tipo** | U |
+| **Objetivo** | Quando responsável também consta em `observadores`, aparece apenas 1× na lista de destinatários. |
+| **Pré-condição** | `dados_chamado` com `responsavel_id="sup_1"` e observadores incluindo `{"usuario_id": "sup_1"}`. |
+| **Passos** | 1. `destinatarios_do_chamado(dados_chamado)` |
+| **Resultado esperado** | Lista de tamanho 2 (responsável + 1 observador único); `ids.count("sup_1") == 1`. |
+| **Arquivo de teste** | `tests/test_services/test_chamado_notificacao_service.py::TestNotificarObservadoresCriacao::test_responsavel_tambem_observador_aparece_uma_vez` |
+| **Prioridade** | Alta |
+
+---
+
+### CT-REQ-13: Notificação in-app e web push ao editar descrição
+
+| Campo | Descrição |
+|-------|-----------|
+| **ID** | CT-REQ-13 |
+| **Tipo** | U |
+| **Objetivo** | `notificar_edicao_descricao_solicitante` cria notificação in-app (`tipo=observador_edicao_descricao`) e web push para cada destinatário. |
+| **Pré-condição** | `destinatarios_do_chamado` mockado retornando 1 usuário. |
+| **Passos** | 1. Chamar `notificar_edicao_descricao_solicitante(...)` com `criar_notificacao` e `enviar_webpush_usuario` mockados. |
+| **Resultado esperado** | `criar_notificacao` chamado 1× com `tipo="observador_edicao_descricao"`; `enviar_webpush_usuario` chamado 1×. |
+| **Arquivo de teste** | `tests/test_services/test_chamado_notificacao_service.py::TestInAppEWebPushNotificacoes` |
+| **Prioridade** | Alta |
+
+---
+
+### CT-REQ-14: Notificação in-app e web push ao adicionar anexo tardio
+
+| Campo | Descrição |
+|-------|-----------|
+| **ID** | CT-REQ-14 |
+| **Tipo** | U |
+| **Objetivo** | `notificar_anexo_tardio_chamado` cria notificação in-app (`tipo=observador_anexo_tardio`) e web push para cada destinatário. |
+| **Pré-condição** | `destinatarios_do_chamado` mockado retornando 1 usuário. |
+| **Passos** | 1. Chamar `notificar_anexo_tardio_chamado(...)` com `criar_notificacao` e `enviar_webpush_usuario` mockados. |
+| **Resultado esperado** | `criar_notificacao` chamado 1× com `tipo="observador_anexo_tardio"`; `enviar_webpush_usuario` chamado 1×. |
+| **Arquivo de teste** | `tests/test_services/test_chamado_notificacao_service.py::TestInAppEWebPushNotificacoes` |
+| **Prioridade** | Alta |
+
+---
+
+### CT-REQ-15: Notificação in-app ao cancelar chamado
+
+| Campo | Descrição |
+|-------|-----------|
+| **ID** | CT-REQ-15 |
+| **Tipo** | U |
+| **Objetivo** | `notificar_cancelamento_chamado` cria notificação in-app (`tipo=observador_cancelamento`) para cada destinatário. |
+| **Pré-condição** | `destinatarios_do_chamado` mockado retornando 1 usuário. |
+| **Passos** | 1. Chamar `notificar_cancelamento_chamado(...)` com `criar_notificacao` e `enviar_email` mockados. |
+| **Resultado esperado** | `criar_notificacao` chamado 1× com `tipo="observador_cancelamento"`. |
+| **Arquivo de teste** | `tests/test_services/test_chamado_notificacao_service.py::TestInAppEWebPushNotificacoes` |
+| **Prioridade** | Alta |
+
+---
+
+### CT-REQ-16: Web Push em mudança de status para destinatários
+
+| Campo | Descrição |
+|-------|-----------|
+| **ID** | CT-REQ-16 |
+| **Tipo** | U |
+| **Objetivo** | `notificar_observadores_mudanca_status` envia web push para cada destinatário além de e-mail e in-app. |
+| **Pré-condição** | `destinatarios_do_chamado` mockado retornando 1 usuário; `enviar_webpush_usuario` mockado. |
+| **Passos** | 1. Chamar `notificar_observadores_mudanca_status(...)` dentro de app context. |
+| **Resultado esperado** | `enviar_webpush_usuario` chamado 1× por destinatário. |
+| **Arquivo de teste** | `tests/test_services/test_chamado_notificacao_service.py::TestNotificarObservadoresMudancaStatusLacunas::test_webpush_enviado_por_destinatario` |
+| **Prioridade** | Alta |
+
+---
+
+### CT-REQ-17: Tipo in-app correto para fan-out de status (observador vs. solicitante)
+
+| Campo | Descrição |
+|-------|-----------|
+| **ID** | CT-REQ-17 |
+| **Tipo** | U |
+| **Objetivo** | `notificar_observadores_mudanca_status` usa `observador_status_concluido` / `observador_status_em_atendimento` — não `status_concluido_confirmar` (que é exclusivo do fluxo de confirmação do solicitante). |
+| **Pré-condição** | `destinatarios_do_chamado` mockado retornando 1 usuário. |
+| **Passos** | 1. Chamar com `novo_status="Concluído"` → checar tipo. 2. Chamar com `novo_status="Em Atendimento"` → checar tipo. |
+| **Resultado esperado** | `tipo="observador_status_concluido"` e `tipo="observador_status_em_atendimento"` respectivamente. |
+| **Arquivo de teste** | `tests/test_services/test_chamado_notificacao_service.py::TestNotificarObservadoresMudancaStatusLacunas` |
+| **Prioridade** | Alta |
+
+---
+
+### CT-REQ-18: In-app e web push na inclusão de observador (criação)
+
+| Campo | Descrição |
+|-------|-----------|
+| **ID** | CT-REQ-18 |
+| **Tipo** | U |
+| **Objetivo** | `notificar_observadores_criacao` cria notificação in-app (`tipo=observador_incluido`) e web push para obs com `usuario_id`. Obs sem `usuario_id` não geram in-app. |
+| **Pré-condição** | Lista de observadores com/sem `usuario_id`; `criar_notificacao` e `enviar_webpush_usuario` mockados. |
+| **Passos** | 1. Chamar com obs contendo `usuario_id`. 2. Chamar com obs sem `usuario_id`. |
+| **Resultado esperado** | Cenário 1: `criar_notificacao` chamado 1× com `tipo="observador_incluido"`. Cenário 2: `criar_notificacao` não chamado. |
+| **Arquivo de teste** | `tests/test_services/test_chamado_notificacao_service.py::TestNotificarObservadoresCriacaoInApp` |
+| **Prioridade** | Alta |
+
+---
+
 ## Resumo por prioridade
 
-- **Alta:** CT-AUTH-01 a 07, CT-CHAM-01 a 06 e 09, CT-STAT-01 a 05, CT-EDIT-01 a 04, CT-PAG-02, CT-ID-01 e 02, CT-PERM-01 e 02, CT-HEALTH-01, CT-DASH-01, CT-ADM-01, CT-ESC-01 a 08, CT-SLA-01 a 04.
-- **Média:** CT-AUTH-07, CT-CHAM-07, 08, 10, CT-STAT-06 e 07, CT-PAG-01, CT-PERM-03, CT-NOT-01 e 02, CT-SW-01, CT-EXC-01, CT-SENHA-01 e 02, CT-EXP-01 e 02, CT-ADM-02, CT-SEC-01.
+- **Alta:** CT-AUTH-01 a 07, CT-CHAM-01 a 06 e 09, CT-STAT-01 a 05, CT-EDIT-01 a 04, CT-PAG-02, CT-ID-01 e 02, CT-PERM-01 e 02, CT-HEALTH-01, CT-DASH-01, CT-ADM-01, CT-ESC-01 a 08, CT-SLA-01 a 04, CT-REQ-01, 02, 04 a 18.
+- **Média:** CT-AUTH-07, CT-CHAM-07, 08, 10, CT-STAT-06 e 07, CT-PAG-01, CT-PERM-03, CT-NOT-01 e 02, CT-SW-01, CT-EXC-01, CT-SENHA-01 e 02, CT-EXP-01 e 02, CT-ADM-02, CT-SEC-01, CT-REQ-03.
 - **Baixa:** CT-PUSH-01, CT-SENHA-03, CT-RATE-01.
 
 Estes casos podem ser implementados como testes automatizados (pytest) conforme o [PLANO_DE_TESTES.md](PLANO_DE_TESTES.md). Muitos já possuem equivalentes em `tests/`; este documento serve como especificação funcional e checklist de cobertura.

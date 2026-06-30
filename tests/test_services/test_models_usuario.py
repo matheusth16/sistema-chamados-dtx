@@ -855,6 +855,55 @@ def test_usuario_from_dict_sem_nivel_gestao():
     assert u.nivel_gestao is None
 
 
+# ── buscar_ativos — linhas 430-443 ────────────────────────────────────────────
+
+
+def test_buscar_ativos_q_vazio_retorna_lista_vazia():
+    """buscar_ativos com q vazio retorna [] sem chamar get_all (linhas 431-432)."""
+    from app.models_usuario import Usuario
+
+    with patch.object(Usuario, "get_all") as mock_get_all:
+        result = Usuario.buscar_ativos("")
+
+    assert result == []
+    mock_get_all.assert_not_called()
+
+
+def test_buscar_ativos_encontra_por_nome():
+    """buscar_ativos retorna usuário ativo cujo nome contém q (linhas 430-443)."""
+    from app.models_usuario import Usuario
+
+    u1 = MagicMock()
+    u1.ativo = True
+    u1.nome = "Maria Silva"
+    u1.email = "maria@dtx.aero"
+
+    u2 = MagicMock()
+    u2.ativo = True
+    u2.nome = "João Souza"
+    u2.email = "joao@dtx.aero"
+
+    with patch.object(Usuario, "get_all", return_value=[u1, u2]):
+        result = Usuario.buscar_ativos("maria")
+
+    assert result == [u1]
+
+
+def test_buscar_ativos_ignora_usuario_inativo():
+    """buscar_ativos ignora usuário com ativo=False (linha 438 — continue)."""
+    from app.models_usuario import Usuario
+
+    u_inativo = MagicMock()
+    u_inativo.ativo = False
+    u_inativo.nome = "Maria Inativa"
+    u_inativo.email = "maria.i@dtx.aero"
+
+    with patch.object(Usuario, "get_all", return_value=[u_inativo]):
+        result = Usuario.buscar_ativos("maria")
+
+    assert result == []
+
+
 def test_usuario_to_dict_persiste_nivel_gestao():
     """to_dict inclui nivel_gestao para persistência no Firestore."""
     from app.models_usuario import Usuario

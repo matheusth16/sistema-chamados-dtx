@@ -15,6 +15,7 @@ from app.routes import main
 from app.services.chamados_criacao_service import criar_chamado
 from app.services.chamados_listagem_service import (
     _eh_erro_indice_firestore,
+    listar_chamados_como_observador,
     listar_meus_chamados,
     listar_meus_chamados_fallback,
 )
@@ -144,11 +145,13 @@ def meus_chamados() -> Response:
             pagina_atual=pagina_atual,
             itens_por_pagina=itens_por_pagina,
         )
+        chamados_em_copia = listar_chamados_como_observador(current_user.id)
         return render_template(
             "meus_chamados.html",
             itens_por_pagina=itens_por_pagina,
             status_filtro=status_filtro,
             rl_codigo=rl_codigo,
+            chamados_em_copia=chamados_em_copia,
             **resultado,
         )
     except Exception as e:
@@ -160,11 +163,13 @@ def meus_chamados() -> Response:
                 resultado = listar_meus_chamados_fallback(
                     current_user.id, status_filtro, itens_por_pagina, pagina_atual, rl_codigo
                 )
+                chamados_em_copia_fb = listar_chamados_como_observador(current_user.id)
                 return render_template(
                     "meus_chamados.html",
                     itens_por_pagina=itens_por_pagina,
                     status_filtro=status_filtro,
                     rl_codigo=rl_codigo,
+                    chamados_em_copia=chamados_em_copia_fb,
                     **resultado,
                 )
             except Exception as fallback_err:

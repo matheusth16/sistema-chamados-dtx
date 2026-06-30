@@ -123,3 +123,23 @@ def test_escalation_js_error_keys_all_languages():
         for key in error_keys:
             result = get_translation(key, lang)
             assert result != key, f"Chave '{key}' retornou fallback para idioma '{lang}'"
+
+
+@pytest.mark.parametrize(
+    "key,lang",
+    [
+        ("search_user_placeholder", "pt_BR"),
+        ("search_user_placeholder", "en"),
+        ("search_user_placeholder", "es"),
+        ("observers_hint", "pt_BR"),
+        ("observers_hint", "en"),
+        ("observers_hint", "es"),
+        ("observers_cc", "pt_BR"),
+        ("observers_cc", "en"),
+        ("observers_cc", "es"),
+    ],
+)
+def test_observer_form_i18n_keys_existem(key, lang):
+    """Chaves do bloco de observadores no formulário existem nos 3 idiomas e não retornam a própria chave."""
+    result = get_translation(key, lang)
+    assert result != key, f"Chave '{key}' retornou fallback para idioma '{lang}'"

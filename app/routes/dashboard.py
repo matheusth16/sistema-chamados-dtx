@@ -51,6 +51,7 @@ from app.services.permission_validation import (
     nivel_congelamento_chamado,
 )
 from app.services.permissions import usuario_pode_ver_chamado
+from app.services.solicitante_edicao_service import segundos_restantes_janela_edicao
 from app.services.status_service import atualizar_status_chamado
 from app.utils import formatar_data_para_excel
 from config import Config
@@ -227,6 +228,24 @@ def visualizar_detalhe_chamado(chamado_id: str) -> Response:
             else []
         )
         setores = [s for s in CategoriaSetor.get_all() if getattr(s, "ativo", True)]
+
+        _status_cancelaveis_sol = {"Aberto", "Em Atendimento", "Aguardando Informação"}
+        eh_dono_do_chamado = chamado.solicitante_id == current_user.id and not getattr(
+            current_user, "is_gestor_only", False
+        )
+        segundos_restantes = 0
+        pode_editar_descricao_solicitante = False
+        if eh_dono_do_chamado and chamado.status == "Aberto":
+            dt_ab = chamado._converter_timestamp(chamado.data_abertura)
+            if dt_ab:
+                segundos_restantes = segundos_restantes_janela_edicao(dt_ab)
+                pode_editar_descricao_solicitante = segundos_restantes > 0
+        pode_cancelar_solicitante = eh_dono_do_chamado and chamado.status in _status_cancelaveis_sol
+        _status_permitidos_anexo = {"Aberto", "Em Atendimento", "Aguardando Informação"}
+        pode_anexo_tardio_solicitante = (
+            eh_dono_do_chamado and chamado.status in _status_permitidos_anexo
+        )
+
         return render_template(
             "visualizar_chamado.html",
             chamado=chamado,
@@ -235,6 +254,10 @@ def visualizar_detalhe_chamado(chamado_id: str) -> Response:
             nivel_congelamento=nivel,
             supervisores_detalhados=supervisores_detalhados,
             setores=setores,
+            pode_editar_descricao_solicitante=pode_editar_descricao_solicitante,
+            segundos_restantes_edicao=segundos_restantes,
+            pode_cancelar_solicitante=pode_cancelar_solicitante,
+            pode_anexo_tardio_solicitante=pode_anexo_tardio_solicitante,
         )
     except Exception as e:
         logger.exception("Erro ao exibir chamado %s: %s", chamado_id, e)

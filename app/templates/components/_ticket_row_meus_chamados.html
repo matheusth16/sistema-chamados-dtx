@@ -10,6 +10,11 @@
             {{ t('rl_short') }} {{ chamado.rl_codigo }}
         </span>
         {% endif %}
+        {% if chamado.em_copia %}
+        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-700 mt-1 uppercase tracking-wider">
+            {{ t('observers_cc') }}
+        </span>
+        {% endif %}
     </td>
     <td class="hidden sm:table-cell px-5 py-4 whitespace-nowrap">
         <span class="px-2.5 py-1 inline-flex text-xs leading-5 font-bold rounded-dtx-sm border

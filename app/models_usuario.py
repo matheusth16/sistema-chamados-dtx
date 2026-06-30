@@ -421,6 +421,31 @@ class Usuario(UserMixin):
         pass
 
     @classmethod
+    def buscar_ativos(cls, q: str) -> list["Usuario"]:
+        """Busca usuários ativos cujo nome ou e-mail contém q (case-insensitive).
+
+        Usa get_all() com filtragem em Python para compatibilidade com PII encryption.
+        Máximo 200 candidatos lidos — busca interna de baixo volume.
+        """
+        q_low = (q or "").strip().lower()
+        if not q_low:
+            return []
+        try:
+            todos = cls.get_all()
+            resultado = []
+            for u in todos:
+                if not getattr(u, "ativo", True):
+                    continue
+                nome_low = (getattr(u, "nome", "") or "").lower()
+                email_low = (getattr(u, "email", "") or "").lower()
+                if q_low in nome_low or q_low in email_low:
+                    resultado.append(u)
+            return resultado
+        except Exception as exc:
+            logger.exception("Erro em buscar_ativos('%s'): %s", q, exc)
+            return []
+
+    @classmethod
     def get_supervisores_por_area(cls, area: str):
         """Retorna supervisores e admins de uma área específica.
 

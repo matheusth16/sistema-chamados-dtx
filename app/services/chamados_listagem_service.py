@@ -118,6 +118,70 @@ def listar_meus_chamados_fallback(
     }
 
 
+def listar_chamados_como_observador(
+    user_id: str,
+    limite: int = 200,
+) -> list:
+    """Retorna chamados onde user_id consta em observadores[*].usuario_id.
+
+    Usa array-contains query do Firestore com o campo de lookup desnormalizado
+    (observadores_ids — lista de IDs pura, para compatibilidade com índices).
+    Fallback: quando a query retorna vazio, escaneia os 200 docs mais recentes
+    e filtra em memória por observadores[*].usuario_id.
+
+    Returns:
+        Lista de objetos Chamado com atributo extra em_copia=True.
+    """
+    try:
+        q = (
+            db.collection("chamados")
+            .where(filter=FieldFilter("observadores_ids", "array_contains", user_id))
+            .limit(limite)
+        )
+        docs = list(q.stream())
+    except Exception as exc:
+        logger.debug("Query observadores_ids falhou (%s); usando fallback em memória.", exc)
+        docs = []
+
+    if not docs:
+        try:
+            raw = list(
+                db.collection("chamados")
+                .order_by("data_abertura", direction=firestore.Query.DESCENDING)
+                .limit(limite)
+                .stream()
+            )
+        except Exception as exc2:
+            logger.debug("Fallback scan observador falhou (%s).", exc2)
+            raw = []
+        docs = [
+            d
+            for d in raw
+            if any(
+                (
+                    obs.get("usuario_id")
+                    if isinstance(obs, dict)
+                    else getattr(obs, "usuario_id", None)
+                )
+                == user_id
+                for obs in (d.to_dict() or {}).get("observadores") or []
+            )
+        ]
+
+    chamados = []
+    for doc in docs:
+        try:
+            data = doc.to_dict()
+            if not data:
+                continue
+            c = Chamado.from_dict(data, doc.id)
+            c.em_copia = True
+            chamados.append(c)
+        except Exception as doc_err:
+            logger.warning("Chamado observador %s ignorado: %s", doc.id, doc_err)
+    return chamados
+
+
 def listar_meus_chamados(
     user_id: str,
     status_filtro: str = "",

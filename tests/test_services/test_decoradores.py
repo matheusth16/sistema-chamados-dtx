@@ -255,3 +255,80 @@ def test_requer_solicitante_bloqueia_perfil_invalido(app):
     ):
         resp = rota()
     assert resp.status_code == 302
+
+
+# ── requer_gestor ─────────────────────────────────────────────────────────────
+
+
+def test_requer_gestor_bloqueia_nao_autenticado(app):
+    from app.decoradores import requer_gestor
+
+    @requer_gestor
+    def rota():
+        return "ok"
+
+    with (
+        app.test_request_context("/"),
+        patch("app.decoradores.current_user", _usuario("qualquer", autenticado=False)),
+        patch("app.decoradores.flash_t"),
+    ):
+        resp = rota()
+    assert resp.status_code == 302
+    assert "login" in resp.location.lower()
+
+
+def test_requer_gestor_bloqueia_sem_nivel_gestao_solicitante(app):
+    from app.decoradores import requer_gestor
+
+    u = _usuario("solicitante")
+    u.is_gestor = False
+
+    @requer_gestor
+    def rota():
+        return "ok"
+
+    with (
+        app.test_request_context("/"),
+        patch("app.decoradores.current_user", u),
+        patch("app.decoradores.flash_t"),
+    ):
+        resp = rota()
+    assert resp.status_code == 302
+
+
+def test_requer_gestor_permite_is_gestor_true(app):
+    from app.decoradores import requer_gestor
+
+    u = _usuario("supervisor")
+    u.is_gestor = True
+
+    @requer_gestor
+    def rota():
+        return "gestor_ok"
+
+    with (
+        app.test_request_context("/"),
+        patch("app.decoradores.current_user", u),
+    ):
+        result = rota()
+    assert result == "gestor_ok"
+
+
+# ── requer_gestor_ou_admin — caminho não autenticado ─────────────────────────
+
+
+def test_requer_gestor_ou_admin_bloqueia_nao_autenticado(app):
+    from app.decoradores import requer_gestor_ou_admin
+
+    @requer_gestor_ou_admin
+    def rota():
+        return "ok"
+
+    with (
+        app.test_request_context("/"),
+        patch("app.decoradores.current_user", _usuario("qualquer", autenticado=False)),
+        patch("app.decoradores.flash_t"),
+    ):
+        resp = rota()
+    assert resp.status_code == 302
+    assert "login" in resp.location.lower()

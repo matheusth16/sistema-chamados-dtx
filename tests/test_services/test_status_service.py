@@ -410,6 +410,27 @@ def test_atualizar_status_transicao_concluido_para_aberto_valida():
     assert resultado["sucesso"] is True
 
 
+def test_fallback_runtime_error_chama_ambas_notificacoes():
+    """Lacuna E: except RuntimeError dispara _notificar_solicitante E _notificar_observadores_status."""
+    with (
+        patch("app.services.status_service.execute_with_retry"),
+        patch("app.services.status_service.Historico"),
+        patch("app.services.status_service.GamificationService"),
+        patch("app.services.status_service._notificar_solicitante") as mock_sol,
+        patch("app.services.status_service._notificar_observadores_status") as mock_obs,
+    ):
+        resultado = atualizar_status_chamado(
+            chamado_id="ch1",
+            novo_status="Em Atendimento",
+            usuario_id="u1",
+            usuario_nome="Test",
+            data_chamado={"status": "Aberto", "solicitante_id": "s1"},
+        )
+    assert resultado["sucesso"] is True
+    mock_sol.assert_called_once()
+    mock_obs.assert_called_once()
+
+
 def test_atualizar_status_mesmo_status_nao_rejeita_transicao():
     """F-63: Transição de um status para ele mesmo deve ser permitida."""
     with (
@@ -1041,3 +1062,46 @@ def test_notificar_solicitante_sem_sid_nao_cria_inapp(app):
         )
 
     mock_inapp.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# Lacuna 3 — Fan-out de status para observadores
+# ---------------------------------------------------------------------------
+
+
+def test_notificacao_observers_disparada_em_background(app):
+    """atualizar_status_chamado inclui _notificar_observadores_status na closure do thread."""
+    from app.services.status_service import atualizar_status_chamado
+
+    notif_closures = []
+
+    def fake_thread(target, daemon=True):
+        notif_closures.append(target)
+        m = MagicMock()
+        m.start = lambda: None
+        return m
+
+    with (
+        patch("app.services.status_service.execute_with_retry"),
+        patch("app.services.status_service.Historico"),
+        patch("app.services.status_service.GamificationService"),
+        patch("app.services.status_service.threading.Thread", side_effect=fake_thread),
+        app.app_context(),
+    ):
+        atualizar_status_chamado(
+            chamado_id="ch1",
+            novo_status="Em Atendimento",
+            usuario_id="u1",
+            usuario_nome="Test",
+            data_chamado={"status": "Aberto", "solicitante_id": "s1"},
+        )
+
+    assert len(notif_closures) == 1
+    # Execute the closure — verifies _notificar_observadores_status is invoked inside it
+    with (
+        patch("app.services.status_service._notificar_solicitante"),
+        patch("app.services.status_service._notificar_observadores_status") as mock_obs,
+    ):
+        notif_closures[0]()
+
+    mock_obs.assert_called_once()

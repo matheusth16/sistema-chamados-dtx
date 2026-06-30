@@ -38,6 +38,17 @@ from app.services.email_templates import (
 )
 
 _EMAIL_LANG = "en"
+_VALID_IMPORTANCE: frozenset[str] = frozenset({"high", "normal", "low"})
+_ALWAYS_HIGH_TIPOS: frozenset[str] = frozenset(
+    {
+        "prazo_24h",
+        "transferencia_area",
+        "escalonamento_colega",
+        "chamado_reaberto",
+        "escalada_resposta_gerencial",
+        "escalada_resolucao_gerencial",
+    }
+)
 
 
 def _tc(v: str) -> str:
@@ -67,12 +78,61 @@ def _config(key: str, default=None):
         return default
 
 
+def resolver_importance(
+    tipo_notificacao: str,
+    chamado_data: dict | None = None,
+    *,
+    destinatario_perfil: str | None = None,
+    marco_sla: int | None = None,
+    numero_lembrete: int | None = None,
+) -> str:
+    """Retorna 'high' | 'normal' | 'low' conforme tipo de notificação e contexto.
+
+    Regras:
+    - destinatario_perfil='solicitante' → sempre 'normal'
+    - tipo relatorio → 'low'
+    - tipos SLA/escalada/transferência/reabertura → 'high'
+    - aviso_resolucao_supervisor: marco=80 → 'high', marco=50 → 'normal'
+    - lembrete_confirmacao: lembrete>=2 → 'high', lembrete=1 → 'normal'
+    - novo_chamado_aprovador: Projetos ou prioridade=0 → 'high', demais → 'normal'
+    """
+    if destinatario_perfil == "solicitante":
+        return "normal"
+
+    if tipo_notificacao == "relatorio":
+        return "low"
+
+    if tipo_notificacao in _ALWAYS_HIGH_TIPOS:
+        return "high"
+
+    if tipo_notificacao == "aviso_resolucao_supervisor":
+        return "high" if marco_sla == 80 else "normal"
+
+    if tipo_notificacao == "lembrete_confirmacao":
+        return "high" if (numero_lembrete is not None and numero_lembrete >= 2) else "normal"
+
+    if tipo_notificacao == "novo_chamado_aprovador":
+        data = chamado_data or {}
+        if data.get("categoria") == "Projetos" or data.get("prioridade") == 0:
+            return "high"
+
+    return "normal"
+
+
+def _prefixar_assunto_high(assunto: str, contexto: str) -> str:
+    """Adiciona 'Action required: ' ao assunto para novo chamado Projetos/prioridade 0."""
+    if contexto == "novo_chamado_projetos":
+        return f"Action required: {assunto}"
+    return assunto
+
+
 def _enviar_via_graph(
     destinatario: str,
     assunto: str,
     corpo_html: str,
     corpo_texto: str | None,
     from_addr: str,
+    importance: str = "normal",
 ) -> tuple:
     """Send e-mail via Microsoft Graph API (client credentials)."""
     import json
@@ -123,6 +183,7 @@ def _enviar_via_graph(
                 "subject": assunto,
                 "body": {"contentType": "HTML", "content": corpo_html},
                 "toRecipients": [{"emailAddress": {"address": destinatario}}],
+                "importance": importance,
             },
             "saveToSentItems": False,
         }
@@ -163,8 +224,17 @@ def _email_envio_permitido() -> bool:
     return bool(_config("NOTIFY_EMAIL_ENABLED", False))
 
 
-def enviar_email(destinatario: str, assunto: str, corpo_html: str, corpo_texto: str = None):
+def enviar_email(
+    destinatario: str,
+    assunto: str,
+    corpo_html: str,
+    corpo_texto: str = None,
+    importance: str = "normal",
+):
     """Send e-mail via Microsoft Graph API. Returns (True, None) or (False, error)."""
+    if importance not in _VALID_IMPORTANCE:
+        logger.warning("Invalid importance '%s'; falling back to 'normal'", importance)
+        importance = "normal"
     if not destinatario or not destinatario.strip():
         logger.warning("Notification skipped: empty recipient")
         return (False, None)
@@ -178,7 +248,9 @@ def enviar_email(destinatario: str, assunto: str, corpo_html: str, corpo_texto: 
         )
         return (True, None)
     from_addr = os.getenv("GRAPH_SENDER_EMAIL", "").strip() or "noreply@localhost"
-    return _enviar_via_graph(destinatario.strip(), assunto, corpo_html, corpo_texto, from_addr)
+    return _enviar_via_graph(
+        destinatario.strip(), assunto, corpo_html, corpo_texto, from_addr, importance=importance
+    )
 
 
 def _base_url() -> str:
@@ -223,6 +295,7 @@ def notificar_aprovador_novo_chamado(
     solicitante_nome: str,
     responsavel_usuario,
     solicitante_email: str = None,
+    prioridade: int | None = None,
 ) -> None:
     """Notify the responsible that a new ticket has been assigned to them."""
     if not responsavel_usuario or not getattr(responsavel_usuario, "email", None):
@@ -240,7 +313,14 @@ def notificar_aprovador_novo_chamado(
     tipo_d = _ts(tipo_solicitacao)
     area_d = _ts(area)
 
+    importance = resolver_importance(
+        "novo_chamado_aprovador",
+        chamado_data={"categoria": categoria, "prioridade": prioridade},
+        destinatario_perfil="responsavel",
+    )
     assunto = f"New ticket assigned: {numero_chamado}"
+    if importance == "high":
+        assunto = _prefixar_assunto_high(assunto, "novo_chamado_projetos")
 
     detalhes_html = build_detail_table(
         [
@@ -277,7 +357,7 @@ def notificar_aprovador_novo_chamado(
         f"Summary: {resumo_truncado}"
     )
 
-    ok, err = enviar_email(email_dest, assunto, corpo_html, corpo_texto)
+    ok, err = enviar_email(email_dest, assunto, corpo_html, corpo_texto, importance=importance)
     if ok:
         logger.info("New ticket notification sent to %s", email_dest)
     else:
@@ -352,7 +432,13 @@ def notificar_responsavel_prazo_24h(
         f"Area: {area_d}\nRequester: {solicitante_nome}"
     )
 
-    ok, err = enviar_email(email_dest, assunto, corpo_html, corpo_texto)
+    ok, err = enviar_email(
+        email_dest,
+        assunto,
+        corpo_html,
+        corpo_texto,
+        importance=resolver_importance("prazo_24h"),
+    )
     if ok:
         logger.info("24h alert sent to %s (ticket %s)", email_dest, numero_chamado)
     else:
@@ -418,7 +504,7 @@ def notificar_novo_usuario_cadastrado(
         "If you do not recognize this account, contact support immediately."
     )
 
-    ok, err = enviar_email(email_dest, assunto, corpo_html, corpo_texto)
+    ok, err = enviar_email(email_dest, assunto, corpo_html, corpo_texto, importance="normal")
     if ok:
         logger.info("Registration e-mail sent to %s", email_dest)
     else:
@@ -494,7 +580,7 @@ def notificar_responsavel_setor_adicional(
         f"Type: {tipo_d}\nRequester: {solicitante_nome}"
     )
 
-    ok, err = enviar_email(email_dest, assunto, corpo_html, corpo_texto)
+    ok, err = enviar_email(email_dest, assunto, corpo_html, corpo_texto, importance="normal")
     if ok:
         logger.info(
             "Additional dept notification sent to %s (ticket %s)", email_dest, numero_chamado
@@ -585,7 +671,7 @@ def notificar_setores_adicionais_chamado(
             f"Added by: {quem_adicionou_nome}\nDepartments: {setores_str_d}"
         )
 
-        ok, err = enviar_email(email.strip(), assunto, corpo_html, corpo_texto)
+        ok, err = enviar_email(email.strip(), assunto, corpo_html, corpo_texto, importance="normal")
         if ok:
             logger.info("Dept added notification sent to %s (ticket %s)", email, numero_chamado)
         else:
@@ -652,7 +738,7 @@ def notificar_solicitante_status(
         + (f"\n\nView ticket: {link}" if link else "")
     )
 
-    ok, err = enviar_email(email, assunto, corpo_html, corpo_texto)
+    ok, err = enviar_email(email, assunto, corpo_html, corpo_texto, importance="normal")
     if ok:
         logger.info("Status e-mail (%s) sent to %s (ticket %s)", novo_status, email, numero_chamado)
     else:
@@ -709,7 +795,7 @@ def notificar_solicitante_confirmacao_pendente(
         + (f"\n\nOpen ticket: {link}" if link else "")
     )
 
-    ok, err = enviar_email(email, assunto, corpo_html, corpo_texto)
+    ok, err = enviar_email(email, assunto, corpo_html, corpo_texto, importance="normal")
     if ok:
         logger.info("Confirmation request sent to %s (ticket %s)", email, numero_chamado)
     else:
@@ -773,7 +859,13 @@ def notificar_solicitante_lembrete_confirmacao(
         + (f"\n\nOpen ticket: {link}" if link else "")
     )
 
-    ok, err = enviar_email(email, assunto, corpo_html, corpo_texto)
+    ok, err = enviar_email(
+        email,
+        assunto,
+        corpo_html,
+        corpo_texto,
+        importance=resolver_importance("lembrete_confirmacao", numero_lembrete=numero_lembrete),
+    )
     if ok:
         logger.info(
             "Confirmation reminder #%s sent to %s (ticket %s)",
@@ -854,7 +946,13 @@ def notificar_supervisor_chamado_reaberto(
         + (f"\n\nView ticket: {link}" if link else "")
     )
 
-    ok, err = enviar_email(email, assunto, corpo_html, corpo_texto)
+    ok, err = enviar_email(
+        email,
+        assunto,
+        corpo_html,
+        corpo_texto,
+        importance=resolver_importance("chamado_reaberto"),
+    )
     if ok:
         logger.info("Reopen notification sent to %s (ticket %s)", email, numero_chamado)
     else:
@@ -920,7 +1018,7 @@ def notificar_responsavel_chamado_confirmado(
         + (f"\n\nView ticket: {link}" if link else "")
     )
 
-    ok, err = enviar_email(email, assunto, corpo_html, corpo_texto)
+    ok, err = enviar_email(email, assunto, corpo_html, corpo_texto, importance="normal")
     if ok:
         logger.info("Confirmation notification sent to %s (ticket %s)", email, numero_chamado)
     else:
@@ -984,7 +1082,13 @@ def notificar_supervisor_transferencia_area(
         f"Reason: {motivo_truncado}" + (f"\n\nView ticket: {link}" if link else "")
     )
 
-    ok, err = enviar_email(email_dest, assunto, corpo_html, corpo_texto)
+    ok, err = enviar_email(
+        email_dest,
+        assunto,
+        corpo_html,
+        corpo_texto,
+        importance=resolver_importance("transferencia_area"),
+    )
     if ok:
         logger.info("Transfer notification sent to %s (ticket %s)", email_dest, numero_chamado)
     else:
@@ -1044,7 +1148,13 @@ def notificar_supervisor_escalonamento_colega(
         f"Reason: {motivo_truncado}" + (f"\n\nView ticket: {link}" if link else "")
     )
 
-    ok, err = enviar_email(email_dest, assunto, corpo_html, corpo_texto)
+    ok, err = enviar_email(
+        email_dest,
+        assunto,
+        corpo_html,
+        corpo_texto,
+        importance=resolver_importance("escalonamento_colega"),
+    )
     if ok:
         logger.info("Escalation notification sent to %s (ticket %s)", email_dest, numero_chamado)
     else:
@@ -1106,7 +1216,7 @@ def notificar_participante_incluido(
         "Please complete your part and mark it done." + (f"\n\nView ticket: {link}" if link else "")
     )
 
-    ok, err = enviar_email(email_dest, assunto, corpo_html, corpo_texto)
+    ok, err = enviar_email(email_dest, assunto, corpo_html, corpo_texto, importance="normal")
     if ok:
         logger.info(
             "Participant inclusion notification sent to %s (ticket %s)", email_dest, numero_chamado
@@ -1186,7 +1296,13 @@ def notificar_escalada_resposta_gerencial(
         f"Category: {cat_d}\nArea: {area_d}" + (f"\n\nView ticket: {link}" if link else "")
     )
 
-    ok, err = enviar_email(email_dest, assunto, corpo_html, corpo_texto)
+    ok, err = enviar_email(
+        email_dest,
+        assunto,
+        corpo_html,
+        corpo_texto,
+        importance=resolver_importance("escalada_resposta_gerencial"),
+    )
     if ok:
         logger.info(
             "SLA escalation (level %d) sent to %s (ticket %s)", nivel, email_dest, numero_chamado
@@ -1245,7 +1361,7 @@ def notificar_owner_todos_participantes_concluiram(
         "You can now close the ticket." + (f"\n\nView ticket: {link}" if link else "")
     )
 
-    ok, err = enviar_email(email_dest, assunto, corpo_html, corpo_texto)
+    ok, err = enviar_email(email_dest, assunto, corpo_html, corpo_texto, importance="normal")
     if ok:
         logger.info(
             "All-done owner notification sent to %s (ticket %s)", email_dest, numero_chamado
@@ -1355,7 +1471,13 @@ def notificar_aviso_resolucao_supervisor(
     )
 
     if email_dest:
-        ok, err = enviar_email(email_dest, assunto, corpo_html, corpo_texto)
+        ok, err = enviar_email(
+            email_dest,
+            assunto,
+            corpo_html,
+            corpo_texto,
+            importance=resolver_importance("aviso_resolucao_supervisor", marco_sla=marco),
+        )
         if ok:
             logger.info(
                 "SLA %d%% warning sent to %s (ticket %s)", marco, email_dest, numero_chamado
@@ -1430,7 +1552,13 @@ def notificar_escalada_resolucao_gerencial(
         f"Category: {cat_d}\nArea: {area_d}" + (f"\n\nView ticket: {link}" if link else "")
     )
 
-    ok, err = enviar_email(email_dest, assunto, corpo_html, corpo_texto)
+    ok, err = enviar_email(
+        email_dest,
+        assunto,
+        corpo_html,
+        corpo_texto,
+        importance=resolver_importance("escalada_resolucao_gerencial"),
+    )
     if ok:
         logger.info(
             "SLA resolution escalation (level %d) sent to %s (ticket %s)",

@@ -277,3 +277,74 @@ def test_obter_contexto_sem_filtro_retorna_todos():
 
     assert ctx["filtro_ativo"] == "todos"
     assert len(ctx["chamados"]) == 1
+
+
+# ---------------------------------------------------------------------------
+# _is_atrasado — linhas 42 e 46-51
+# ---------------------------------------------------------------------------
+
+
+def test_is_atrasado_status_finalizado_retorna_false():
+    """_is_atrasado retorna False quando status está em _STATUS_FINALIZADOS (linha 42)."""
+    from app.services.gestor_dashboard_service import _is_atrasado
+
+    c = MagicMock()
+    c.is_atrasado = None
+    c.status = "Concluído"
+    assert _is_atrasado(c) is False
+
+
+def test_is_atrasado_com_sla_e_data_abertura_dentro_do_prazo():
+    """_is_atrasado calcula minutos úteis quando sla_dias e data_abertura preenchidos (linhas 46-51)."""
+    from app.services.gestor_dashboard_service import _is_atrasado
+
+    c = MagicMock()
+    c.is_atrasado = None
+    c.status = "Em Atendimento"
+    c.sla_dias = 5
+    c.data_abertura = datetime(2024, 6, 3, 9, 0)
+
+    with patch("app.services.gestor_dashboard_service.minutos_uteis_entre", return_value=100):
+        result = _is_atrasado(c)
+
+    assert result is False  # 100 min < 5*24*60 = 7200 min
+
+
+# ---------------------------------------------------------------------------
+# _carregar_todos_chamados — linhas 81-91
+# ---------------------------------------------------------------------------
+
+
+def test_carregar_todos_chamados_retorna_lista_de_chamados():
+    """_carregar_todos_chamados executa query no Firestore e retorna lista (linhas 81-88)."""
+    from app.services.gestor_dashboard_service import _carregar_todos_chamados
+
+    doc = MagicMock()
+    doc.to_dict.return_value = {"status": "Aberto"}
+    doc.id = "ch_1"
+
+    with (
+        patch("app.services.gestor_dashboard_service.db") as mock_db,
+        patch("app.services.gestor_dashboard_service.Chamado") as mock_chamado_cls,
+    ):
+        mock_db.collection.return_value.order_by.return_value.limit.return_value.stream.return_value = [
+            doc
+        ]
+        mock_chamado_cls.from_dict.return_value = MagicMock()
+        result = _carregar_todos_chamados()
+
+    assert isinstance(result, list)
+    assert len(result) == 1
+
+
+def test_carregar_todos_chamados_retorna_vazio_em_excecao():
+    """_carregar_todos_chamados retorna [] em exceção do Firestore (linhas 89-91)."""
+    from app.services.gestor_dashboard_service import _carregar_todos_chamados
+
+    with patch("app.services.gestor_dashboard_service.db") as mock_db:
+        mock_db.collection.return_value.order_by.return_value.limit.return_value.stream.side_effect = Exception(
+            "db error"
+        )
+        result = _carregar_todos_chamados()
+
+    assert result == []

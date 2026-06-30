@@ -45,6 +45,17 @@ _TIPOS_SOLICITANTE = frozenset(
     }
 )
 
+_TIPOS_OBSERVADOR = frozenset(
+    {
+        "observador_edicao_descricao",
+        "observador_anexo_tardio",
+        "observador_cancelamento",
+        "observador_status_em_atendimento",
+        "observador_status_concluido",
+        "observador_incluido",
+    }
+)
+
 
 def localizar_notificacao(doc: dict, language: str = "en") -> dict:
     """
@@ -72,6 +83,53 @@ def localizar_notificacao(doc: dict, language: str = "en") -> dict:
         out["mensagem"] = get_translation(
             "notification_new_ticket_message", language, categoria=cat, solicitante=solicitante
         )
+
+    elif tipo in _TIPOS_OBSERVADOR:
+        numero = doc.get("numero_chamado") or ""
+        cat = get_translated_category(doc.get("categoria") or "", language)
+
+        if tipo == "observador_edicao_descricao":
+            out["titulo"] = get_translation(
+                "notification_obs_edicao_titulo", language, numero=numero
+            )
+            out["mensagem"] = get_translation(
+                "notification_obs_edicao_mensagem", language, categoria=cat
+            )
+        elif tipo == "observador_anexo_tardio":
+            out["titulo"] = get_translation(
+                "notification_obs_anexo_titulo", language, numero=numero
+            )
+            out["mensagem"] = get_translation(
+                "notification_obs_anexo_mensagem", language, categoria=cat
+            )
+        elif tipo == "observador_cancelamento":
+            out["titulo"] = get_translation(
+                "notification_obs_cancelamento_titulo", language, numero=numero
+            )
+            out["mensagem"] = get_translation(
+                "notification_obs_cancelamento_mensagem", language, categoria=cat
+            )
+        elif tipo == "observador_status_em_atendimento":
+            out["titulo"] = get_translation(
+                "notification_observer_status_in_progress_title", language, numero=numero
+            )
+            out["mensagem"] = get_translation(
+                "notification_observer_status_in_progress_message", language, categoria=cat
+            )
+        elif tipo == "observador_status_concluido":
+            out["titulo"] = get_translation(
+                "notification_observer_status_completed_title", language, numero=numero
+            )
+            out["mensagem"] = get_translation(
+                "notification_observer_status_completed_message", language, categoria=cat
+            )
+        elif tipo == "observador_incluido":
+            out["titulo"] = get_translation(
+                "notification_observer_added_title", language, numero=numero
+            )
+            out["mensagem"] = get_translation(
+                "notification_observer_added_message", language, categoria=cat
+            )
 
     elif tipo in _TIPOS_SOLICITANTE:
         numero = doc.get("numero_chamado") or ""

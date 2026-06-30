@@ -222,11 +222,13 @@ def atualizar_status_chamado(
                 def _notif():
                     with _app.app_context():
                         _notificar_solicitante(_cid, _data, _status)
+                        _notificar_observadores_status(_cid, _data, _status)
 
                 threading.Thread(target=_notif, daemon=True).start()
             except RuntimeError:
                 # Fora de contexto Flask (testes) — notifica de forma síncrona
                 _notificar_solicitante(chamado_id, data_chamado, novo_status)
+                _notificar_observadores_status(chamado_id, data_chamado, novo_status)
 
         # Gamificação: apenas para Em Atendimento / Concluído (não para Cancelado)
         if status_anterior != novo_status:
@@ -246,6 +248,24 @@ def atualizar_status_chamado(
     except Exception as e:
         logger.exception("Erro ao atualizar status do chamado %s: %s", chamado_id, e)
         return {"sucesso": False, "erro": "Erro interno. Tente novamente.", "codigo": 500}
+
+
+def _notificar_observadores_status(chamado_id: str, data_chamado: dict, novo_status: str) -> None:
+    """Notifica responsável + observadores sobre mudança de status via email + in-app."""
+    try:
+        from app.services.chamado_notificacao_service import notificar_observadores_mudanca_status
+
+        numero = data_chamado.get("numero_chamado") or "N/A"
+        categoria = data_chamado.get("categoria") or "Chamado"
+        notificar_observadores_mudanca_status(
+            chamado_id=chamado_id,
+            numero_chamado=numero,
+            categoria=categoria,
+            novo_status=novo_status,
+            dados_chamado=data_chamado,
+        )
+    except Exception as e:
+        logger.warning("Notificação de observadores de status não enviada: %s", e)
 
 
 def _notificar_solicitante(chamado_id: str, data_chamado: dict, novo_status: str):

@@ -240,6 +240,14 @@
         {"fieldPath": "responsavel", "order": "ASCENDING"},
         {"fieldPath": "data_abertura", "order": "DESCENDING"}
       ]
+    },
+    {
+      "collectionGroup": "chamados",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "observadores_ids", "arrayConfig": "CONTAINS"},
+        {"fieldPath": "data_abertura", "order": "DESCENDING"}
+      ]
     }
   ],
   "fieldOverrides": [
@@ -253,6 +261,13 @@
     {
       "collectionGroup": "chamados",
       "fieldPath": "supervisor_ids_com_acesso",
+      "indexes": [
+        {"arrayConfig": "CONTAINS", "queryScope": "COLLECTION"}
+      ]
+    },
+    {
+      "collectionGroup": "chamados",
+      "fieldPath": "observadores_ids",
       "indexes": [
         {"arrayConfig": "CONTAINS", "queryScope": "COLLECTION"}
       ]

@@ -123,7 +123,9 @@ def create_app():
         _iniciar_scheduler(app)
 
     # Aquece os caches estáticos em background para reduzir latência do primeiro request
-    if not app.testing:
+    # app.testing ainda é False aqui (conftest seta TESTING após create_app retornar),
+    # por isso também checamos FLASK_ENV para não disparar warmup em pytest.
+    if not app.testing and os.getenv("FLASK_ENV") != "testing":
         import threading
 
         def _warmup():

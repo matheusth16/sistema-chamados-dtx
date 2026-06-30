@@ -212,6 +212,47 @@
         </div>
         {% endif %}
     </div>
+
+    {% if chamados_em_copia %}
+    <!-- Chamados em que o usuário é observador -->
+    <div class="bg-surface-base border border-purple-200 rounded-dtx-md shadow-dtx-sm overflow-hidden p-1 gsap-scroll-reveal">
+        <div class="px-5 py-4 bg-purple-50 border-b border-purple-200 flex items-center gap-3">
+            <span class="p-2 bg-purple-100 text-purple-600 rounded-dtx-sm">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0zM2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                </svg>
+            </span>
+            <div>
+                <h3 class="text-sm font-black text-purple-900 uppercase tracking-widest">{{ t('observers_cc') }}</h3>
+                <p class="text-xs font-medium text-purple-600 mt-0.5">{{ t('observers_watching_hint') }}</p>
+            </div>
+            <span class="ml-auto inline-flex items-center px-2 py-1 rounded-dtx-sm text-xs font-black bg-purple-100 text-purple-700 border border-purple-200">
+                {{ chamados_em_copia | length }}
+            </span>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-surface-border">
+                <thead class="bg-purple-50/50">
+                    <tr>
+                        <th class="px-5 py-3 text-left text-[11px] font-black text-purple-500 uppercase tracking-widest">{{ t('id_ref') }}</th>
+                        <th class="hidden sm:table-cell px-5 py-3 text-left text-[11px] font-black text-purple-500 uppercase tracking-widest">{{ t('category') }}</th>
+                        <th class="hidden md:table-cell px-5 py-3 text-left text-[11px] font-black text-purple-500 uppercase tracking-widest">{{ t('type_sector') }}</th>
+                        <th class="px-5 py-3 text-left text-[11px] font-black text-purple-500 uppercase tracking-widest">{{ t('description') }}</th>
+                        <th class="hidden md:table-cell px-5 py-3 text-left text-[11px] font-black text-purple-500 uppercase tracking-widest">{{ t('assigned_to') }}</th>
+                        <th class="px-5 py-3 text-left text-[11px] font-black text-purple-500 uppercase tracking-widest">{{ t('status') }}</th>
+                        <th class="px-5 py-3 text-left text-[11px] font-black text-purple-500 uppercase tracking-widest">{{ t('date') }}</th>
+                        <th class="px-5 py-3 text-center text-[11px] font-black text-purple-500 uppercase tracking-widest">{{ t('actions') }}</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-surface-border">
+                    {% for chamado in chamados_em_copia %}
+                    {% include 'components/_ticket_row_meus_chamados.html' with context %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
 </div>
 {% endblock %}
 

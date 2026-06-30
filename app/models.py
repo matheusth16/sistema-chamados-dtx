@@ -48,6 +48,8 @@ class Chamado:
         escalacao_resolucao_nivel: int = 0,
         alerta_supervisor_50_enviado: bool = False,
         alerta_supervisor_80_enviado: bool = False,
+        # Nível 1 — Observadores (em cópia, read-only)
+        observadores: list = None,
     ):
         self.id = id
         self.numero_chamado = numero_chamado
@@ -97,6 +99,8 @@ class Chamado:
         )
         self.alerta_supervisor_50_enviado = bool(alerta_supervisor_50_enviado)
         self.alerta_supervisor_80_enviado = bool(alerta_supervisor_80_enviado)
+        # Nível 1 — Observadores (em cópia, read-only): [{usuario_id, nome, email}]
+        self.observadores = observadores if isinstance(observadores, list) else []
 
     def _converter_timestamp(self, ts):
         """Converte timestamp do Firestore para datetime em horário de Brasília.
@@ -182,6 +186,8 @@ class Chamado:
             "escalacao_resolucao_nivel": self.escalacao_resolucao_nivel,
             "alerta_supervisor_50_enviado": self.alerta_supervisor_50_enviado,
             "alerta_supervisor_80_enviado": self.alerta_supervisor_80_enviado,
+            # Nível 1 — Observadores (em cópia)
+            "observadores": self.observadores,
         }
 
     @classmethod
@@ -242,6 +248,10 @@ class Chamado:
             escalacao_resolucao_nivel=data.get("escalacao_resolucao_nivel", 0),
             alerta_supervisor_50_enviado=data.get("alerta_supervisor_50_enviado", False),
             alerta_supervisor_80_enviado=data.get("alerta_supervisor_80_enviado", False),
+            # Nível 1 — Observadores (em cópia)
+            observadores=data.get("observadores")
+            if isinstance(data.get("observadores"), list)
+            else [],
         )
 
     def __repr__(self):

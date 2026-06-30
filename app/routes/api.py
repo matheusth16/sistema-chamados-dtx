@@ -20,6 +20,7 @@ from app.models_usuario import Usuario
 from app.routes import main
 from app.services.analytics import obter_sla_para_exibicao
 from app.services.assignment import atribuidor  # noqa: F401  # usado em testes via patch
+from app.services.cancelamento_solicitante_service import cancelar_chamado_solicitante
 from app.services.filters import aplicar_filtros_dashboard_com_paginacao
 from app.services.notifications_inapp import (
     contar_nao_lidas,
@@ -32,7 +33,12 @@ from app.services.permission_validation import (
     verificar_permissao_mudanca_status,
 )
 from app.services.permissions import usuario_pode_ver_chamado
+from app.services.solicitante_edicao_service import (
+    adicionar_anexo_tardio,
+    editar_descricao_solicitante,
+)
 from app.services.status_service import atualizar_status_chamado
+from app.services.upload import salvar_anexo
 from app.services.webpush_service import salvar_inscricao
 from app.utils_areas import setor_para_area
 
@@ -889,6 +895,130 @@ def api_lista_supervisores():
                 "erro": ERRO_INTERNO_MSG,
             }
         ), 200
+
+
+# ---------------------------------------------------------------------------
+# Observadores — Nível 1 Requester
+# ---------------------------------------------------------------------------
+
+
+@main.route("/api/usuarios/buscar", methods=["GET"])
+@login_required
+def api_buscar_usuarios():
+    """Busca usuários ativos por nome/e-mail para seleção de observadores.
+
+    GET /api/usuarios/buscar?q=<termo>
+    Retorna máx. 10, exclui current_user, apenas usuários ativos.
+    """
+    q = request.args.get("q", "").strip()
+    if len(q) < 2:
+        return jsonify({"sucesso": True, "dados": []}), 200
+    try:
+        todos = Usuario.buscar_ativos(q)
+        dados = [
+            {"id": u.id, "nome": u.nome, "email": u.email} for u in todos if u.id != current_user.id
+        ][:10]
+        return jsonify({"sucesso": True, "dados": dados}), 200
+    except Exception as exc:
+        logger.exception("Erro em buscar_usuarios: %s", exc)
+        return jsonify({"sucesso": False, "erro": ERRO_INTERNO_MSG}), 500
+
+
+# ---------------------------------------------------------------------------
+# Edição pelo solicitante — Nível 1 Requester
+# ---------------------------------------------------------------------------
+
+DESCRICAO_MIN_CHARS = 3
+
+
+@main.route("/api/chamado/<chamado_id>/editar-solicitante", methods=["POST"])
+@login_required
+def api_editar_solicitante(chamado_id: str):
+    """
+    Edição de descrição pelo dono do chamado, dentro da janela de 30 min.
+    Qualquer perfil não-gestor pode usar; o service valida ownership (solicitante_id).
+    """
+    if getattr(current_user, "is_gestor_only", False):
+        return jsonify({"sucesso": False, "erro": "Acesso não autorizado."}), 403
+
+    payload = request.get_json(silent=True) or {}
+    descricao = (payload.get("descricao") or "").strip()
+    if len(descricao) < DESCRICAO_MIN_CHARS:
+        return (
+            jsonify(
+                {"sucesso": False, "erro": f"Descrição mínima de {DESCRICAO_MIN_CHARS} caracteres."}
+            ),
+            400,
+        )
+
+    resultado = editar_descricao_solicitante(
+        chamado_id=chamado_id,
+        novo_texto=descricao,
+        usuario=current_user,
+    )
+
+    codigo = resultado.pop("codigo", 200) if not resultado["sucesso"] else 200
+    return jsonify(resultado), codigo
+
+
+@main.route("/api/chamado/<chamado_id>/cancelar-solicitante", methods=["POST"])
+@login_required
+def api_cancelar_solicitante(chamado_id: str):
+    """
+    Cancelamento de chamado pelo dono do chamado.
+    Qualquer perfil não-gestor pode usar; o service valida ownership (solicitante_id).
+    """
+    if getattr(current_user, "is_gestor_only", False):
+        return jsonify({"sucesso": False, "erro": "Acesso não autorizado."}), 403
+
+    payload = request.get_json(silent=True) or {}
+    motivo = (payload.get("motivo") or "").strip()
+    if len(motivo) < 10:
+        return jsonify(
+            {"sucesso": False, "erro": "Motivo obrigatório (mínimo 10 caracteres)."}
+        ), 400
+
+    resultado = cancelar_chamado_solicitante(
+        chamado_id=chamado_id,
+        motivo=motivo,
+        usuario=current_user,
+    )
+
+    codigo = resultado.pop("codigo", 200) if not resultado["sucesso"] else 200
+    return jsonify(resultado), codigo
+
+
+@main.route("/api/chamado/<chamado_id>/anexo-solicitante", methods=["POST"])
+@login_required
+def api_anexo_solicitante(chamado_id: str):
+    """Anexo tardio enviado pelo dono do chamado (FormData). Qualquer perfil não-gestor."""
+    if getattr(current_user, "is_gestor_only", False):
+        return jsonify({"sucesso": False, "erro": "Acesso não autorizado."}), 403
+
+    motivo = (request.form.get("motivo") or "").strip()
+    if len(motivo) < 10:
+        return (
+            jsonify({"sucesso": False, "erro": "Motivo obrigatório (mínimo 10 caracteres)."}),
+            400,
+        )
+
+    arquivo = request.files.get("anexo")
+    if not arquivo or not arquivo.filename:
+        return jsonify({"sucesso": False, "erro": "Arquivo não enviado."}), 400
+
+    caminho = salvar_anexo(arquivo)
+    if not caminho:
+        return jsonify({"sucesso": False, "erro": "Tipo de arquivo não permitido."}), 400
+
+    resultado = adicionar_anexo_tardio(
+        chamado_id=chamado_id,
+        caminho_anexo=caminho,
+        motivo=motivo,
+        usuario=current_user,
+    )
+
+    codigo = resultado.pop("codigo", 200) if not resultado["sucesso"] else 200
+    return jsonify(resultado), codigo
 
 
 # ---------------------------------------------------------------------------
