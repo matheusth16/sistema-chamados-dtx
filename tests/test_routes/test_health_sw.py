@@ -13,8 +13,8 @@ def test_health_check_retorna_200_e_ok(client):
     assert data.get("status") == "ok"
 
 
-def test_health_nao_exige_autenticacao(client):
-    """GET /health não exige login."""
+def test_health_nao_exige_autenticacao_sem_secret(client):
+    """GET /health não exige token quando HEALTH_SECRET não está configurado (dev/CI)."""
     r = client.get("/health")
     assert r.status_code == 200
     assert r.get_json().get("status") == "ok"
@@ -114,10 +114,17 @@ def test_health_deep_com_token_correto_retorna_200(client):
     assert r.status_code == 200
 
 
-def test_health_shallow_nunca_exige_token(client):
-    """CT-HEALTH-09: GET /health (shallow) nunca exige token, mesmo com HEALTH_SECRET."""
+def test_health_shallow_exige_token_quando_secret_configurado(client):
+    """CT-HEALTH-09: GET /health (shallow) retorna 401 quando HEALTH_SECRET está configurado e token ausente."""
     with patch.dict(os.environ, {"HEALTH_SECRET": "supersecret"}):
         r = client.get("/health")
+    assert r.status_code == 401
+
+
+def test_health_shallow_com_token_correto_retorna_200(client):
+    """CT-HEALTH-09b: GET /health (shallow) com token correto retorna 200."""
+    with patch.dict(os.environ, {"HEALTH_SECRET": "supersecret"}):
+        r = client.get("/health", headers={"X-Health-Token": "supersecret"})
     assert r.status_code == 200
     assert r.get_json().get("status") == "ok"
 

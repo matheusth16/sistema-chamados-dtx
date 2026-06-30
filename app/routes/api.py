@@ -162,31 +162,35 @@ def health():
     Modo deep (?deep=1): verifica conectividade com Firestore — para UptimeRobot/BetterUptime.
 
     Autenticação (quando HEALTH_SECRET estiver configurado):
+      Exigida em AMBOS os modos (raso e deep) — impede mapeamento de liveness por atacantes.
       Canal primário  : header X-Health-Token: <secret>  ← não aparece em access logs
       Canal deprecado : query string ?token=<secret>     ← migrar para header
 
+    Sem HEALTH_SECRET (dev/CI): sem autenticação em nenhum modo.
+
     Configuração de monitoramento:
+      curl -H "X-Health-Token: $HEALTH_SECRET" "https://host/health"
       curl -H "X-Health-Token: $HEALTH_SECRET" "https://host/health?deep=1"
 
     Returns:
         200 {"status": "ok"}        — tudo saudável
-        401                         — token ausente ou inválido (modo deep com HEALTH_SECRET)
+        401                         — token ausente ou inválido (quando HEALTH_SECRET configurado)
         503 {"status": "degraded"}  — alguma dependência falhou (apenas no modo deep)
     """
     import time
 
-    shallow = request.args.get("deep") not in ("1", "true")
-
-    if shallow:
-        return jsonify({"status": "ok"}), 200
-
-    # Modo deep expõe quais dependências estão configuradas; proteger com token
-    # quando HEALTH_SECRET estiver definido (recomendado em produção).
+    # Quando HEALTH_SECRET estiver configurado, exige token em AMBOS os modos.
+    # Sem HEALTH_SECRET (dev/CI): sem autenticação.
     secret = os.getenv("HEALTH_SECRET", "").strip()
     if secret:
         provided = _obter_health_token_request()
         if not provided or not hmac.compare_digest(provided, secret):
             abort(401)
+
+    shallow = request.args.get("deep") not in ("1", "true")
+
+    if shallow:
+        return jsonify({"status": "ok"}), 200
 
     # checks críticos: impactam overall; checks opcionais: apenas informativos
     critical_checks: dict[str, str] = {}
