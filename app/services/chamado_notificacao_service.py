@@ -6,6 +6,7 @@ Fan-out centralizado de notificações de chamado.
 """
 
 import logging
+from html import escape
 
 from app.models_usuario import Usuario
 from app.services import webpush_service
@@ -72,8 +73,8 @@ def notificar_cancelamento_chamado(
             corpo_html = build_email_shell(
                 f"Chamado {numero_chamado} Cancelado",
                 "#dc2626",
-                f"<p>O chamado <strong>{numero_chamado}</strong> foi <strong>cancelado</strong>"
-                f" pelo solicitante <em>{solicitante_nome}</em>.</p>"
+                f"<p>O chamado <strong>{escape(numero_chamado)}</strong> foi <strong>cancelado</strong>"
+                f" pelo solicitante <em>{escape(solicitante_nome)}</em>.</p>"
                 + build_detail_table(
                     [
                         ("Chamado", numero_chamado),
@@ -153,8 +154,8 @@ def notificar_edicao_descricao_solicitante(
             corpo_html = build_email_shell(
                 f"Chamado {numero_chamado} — Descrição Editada",
                 "#2563eb",
-                f"<p>O solicitante <em>{solicitante_nome}</em> editou a descrição do chamado "
-                f"<strong>{numero_chamado}</strong> ({categoria}).</p>"
+                f"<p>O solicitante <em>{escape(solicitante_nome)}</em> editou a descrição do chamado "
+                f"<strong>{escape(numero_chamado)}</strong> ({escape(categoria)}).</p>"
                 + build_detail_table(
                     [
                         ("Chamado", numero_chamado),
@@ -218,18 +219,25 @@ def notificar_observadores_criacao(
     link = _link_chamado(chamado_id)
 
     for obs in observadores:
-        email = obs.get("email") if isinstance(obs, dict) else getattr(obs, "email", None)
-        nome = obs.get("nome") if isinstance(obs, dict) else getattr(obs, "nome", None)
         uid = obs.get("usuario_id") if isinstance(obs, dict) else getattr(obs, "usuario_id", None)
+        if not uid:
+            continue
+
+        usuario = Usuario.get_by_id(uid)
+        if not usuario:
+            continue
+
+        email = getattr(usuario, "email", None)
+        nome = getattr(usuario, "nome", None)
 
         if email:
             corpo_html = build_email_shell(
                 f"Chamado {numero_chamado} — Você é observador",
                 "#7c3aed",
-                f"<p>Olá{f' {nome}' if nome else ''},</p>"
+                f"<p>Olá{f' {escape(nome)}' if nome else ''},</p>"
                 f"<p>Você foi adicionado como <strong>observador</strong> do chamado "
-                f"<strong>{numero_chamado}</strong> ({categoria}) aberto por "
-                f"<em>{solicitante_nome}</em>.</p>"
+                f"<strong>{escape(numero_chamado)}</strong> ({escape(categoria)}) aberto por "
+                f"<em>{escape(solicitante_nome)}</em>.</p>"
                 "<p>Você receberá notificações das atualizações deste chamado.</p>"
                 + build_detail_table(
                     [
@@ -257,22 +265,21 @@ def notificar_observadores_criacao(
                     err,
                 )
 
-        if uid:
-            criar_notificacao(
-                usuario_id=uid,
-                chamado_id=chamado_id,
-                numero_chamado=numero_chamado,
-                titulo=f"Você é observador — Chamado {numero_chamado}",
-                mensagem=categoria,
-                tipo="observador_incluido",
-                categoria=categoria,
-            )
-            webpush_service.enviar_webpush_usuario(
-                uid,
-                titulo=assunto,
-                corpo=categoria,
-                url=link or "",
-            )
+        criar_notificacao(
+            usuario_id=uid,
+            chamado_id=chamado_id,
+            numero_chamado=numero_chamado,
+            titulo=f"Você é observador — Chamado {numero_chamado}",
+            mensagem=categoria,
+            tipo="observador_incluido",
+            categoria=categoria,
+        )
+        webpush_service.enviar_webpush_usuario(
+            uid,
+            titulo=assunto,
+            corpo=categoria,
+            url=link or "",
+        )
 
 
 def notificar_observadores_mudanca_status(
@@ -304,8 +311,8 @@ def notificar_observadores_mudanca_status(
             corpo_html = build_email_shell(
                 f"Chamado {numero_chamado}: {novo_status}",
                 "#2563eb",
-                f"<p>O status do chamado <strong>{numero_chamado}</strong> ({categoria}) "
-                f"foi atualizado para <strong>{novo_status}</strong>.</p>"
+                f"<p>O status do chamado <strong>{escape(numero_chamado)}</strong> ({escape(categoria)}) "
+                f"foi atualizado para <strong>{escape(novo_status)}</strong>.</p>"
                 + build_detail_table(
                     [
                         ("Chamado", numero_chamado),
@@ -385,8 +392,8 @@ def notificar_anexo_tardio_chamado(
             corpo_html = build_email_shell(
                 f"Chamado {numero_chamado} — Novo Anexo",
                 "#0891b2",
-                f"<p>O solicitante <em>{solicitante_nome}</em> adicionou um novo anexo ao chamado "
-                f"<strong>{numero_chamado}</strong> ({categoria}).</p>"
+                f"<p>O solicitante <em>{escape(solicitante_nome)}</em> adicionou um novo anexo ao chamado "
+                f"<strong>{escape(numero_chamado)}</strong> ({escape(categoria)}).</p>"
                 + build_detail_table(
                     [
                         ("Chamado", numero_chamado),

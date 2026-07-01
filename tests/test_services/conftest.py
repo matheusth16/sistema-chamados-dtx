@@ -4,6 +4,8 @@ Patches autouse — prevenção de chamadas reais ao Firestore em testes unitár
 - chamados_criacao_service.setor_para_area → identidade (retorna o próprio setor_nome)
 - assignment.setor_para_area → identidade
 - status_service.Usuario → Mock com get_by_id lançando Exception (graceful skip)
+- chamado_notificacao_service.Usuario → Mock com get_by_id retornando None
+  (destinatarios_do_chamado chama get_by_id; sem mock bate no Firestore real via gRPC)
 
 Atenção: o patch de Usuario.get_supervisores_por_area é feito no nível do módulo
 test_chamados_criacao_service.py (não aqui) para evitar interferir em
@@ -29,7 +31,10 @@ def _patch_firestore_defaults():
             side_effect=_passthrough,
         ),
         patch("app.services.status_service.Usuario") as _mock_ss_usuario,
+        patch("app.services.chamado_notificacao_service.Usuario") as _mock_cn_usuario,
     ):
         # get_by_id lança Exception — status_service captura e ignora graciosamente
         _mock_ss_usuario.get_by_id.side_effect = Exception("no Firestore in unit tests")
+        # destinatarios_do_chamado retorna [] quando get_by_id retorna None
+        _mock_cn_usuario.get_by_id.return_value = None
         yield

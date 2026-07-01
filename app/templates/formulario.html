@@ -743,7 +743,7 @@
         function _addObs(usuario) {
             if (observadores.length >= MAX_OBS) return;
             if (observadores.some(function(o) { return o.usuario_id === usuario.id; })) return;
-            observadores.push({usuario_id: usuario.id, nome: usuario.nome, email: usuario.email});
+            observadores.push({usuario_id: usuario.id, nome: usuario.nome});
             _renderTags();
             _syncHidden();
             busca.value = '';
@@ -764,8 +764,10 @@
                     filtrados.forEach(function(u) {
                         var li = document.createElement('li');
                         li.className = 'px-3 py-2 hover:bg-dtx-50 cursor-pointer flex flex-col';
-                        li.innerHTML = '<span class="font-medium text-gray-800">' + u.nome + '</span>' +
-                                       '<span class="text-gray-500 text-xs">' + u.email + '</span>';
+                        var spanNome = document.createElement('span');
+                        spanNome.className = 'font-medium text-gray-800';
+                        spanNome.textContent = u.nome;
+                        li.appendChild(spanNome);
                         li.addEventListener('mousedown', function(e) { e.preventDefault(); _addObs(u); });
                         sugs.appendChild(li);
                     });

@@ -877,7 +877,6 @@ def api_lista_supervisores():
             {
                 "id": u.id,
                 "nome": u.nome,
-                "email": u.email,
             }
             for u in supervisores
             if u.id != current_user.id
@@ -919,9 +918,7 @@ def api_buscar_usuarios():
         return jsonify({"sucesso": True, "dados": []}), 200
     try:
         todos = Usuario.buscar_ativos(q)
-        dados = [
-            {"id": u.id, "nome": u.nome, "email": u.email} for u in todos if u.id != current_user.id
-        ][:10]
+        dados = [{"id": u.id, "nome": u.nome} for u in todos if u.id != current_user.id][:10]
         return jsonify({"sucesso": True, "dados": dados}), 200
     except Exception as exc:
         logger.exception("Erro em buscar_usuarios: %s", exc)
@@ -1143,7 +1140,8 @@ def api_transferir_area(chamado_id: str):
         return jsonify(resultado), 200
 
     except ValueError as exc:
-        return jsonify({"sucesso": False, "erro": str(exc)}), 400
+        logger.debug("Validação transferir_area chamado=%s: %s", chamado_id, exc)
+        return jsonify({"sucesso": False, "erro": "Dados da requisição inválidos."}), 400
     except Exception as exc:
         logger.exception("Erro em api_transferir_area chamado=%s: %s", chamado_id, exc)
         return jsonify({"sucesso": False, "erro": ERRO_INTERNO_MSG}), 500
@@ -1217,7 +1215,8 @@ def api_escalonar_colega(chamado_id: str):
         return jsonify(resultado), 200
 
     except ValueError as exc:
-        return jsonify({"sucesso": False, "erro": str(exc)}), 400
+        logger.debug("Validação escalonar_colega chamado=%s: %s", chamado_id, exc)
+        return jsonify({"sucesso": False, "erro": "Dados da requisição inválidos."}), 400
     except Exception as exc:
         logger.exception("Erro em api_escalonar_colega chamado=%s: %s", chamado_id, exc)
         return jsonify({"sucesso": False, "erro": ERRO_INTERNO_MSG}), 500
@@ -1396,7 +1395,8 @@ def api_incluir_participantes(chamado_id: str):
         return jsonify(resultado), 200
 
     except ValueError as exc:
-        return jsonify({"sucesso": False, "erro": str(exc)}), 400
+        logger.debug("Validação incluir_participantes chamado=%s: %s", chamado_id, exc)
+        return jsonify({"sucesso": False, "erro": "Dados da requisição inválidos."}), 400
     except Exception as exc:
         logger.exception("Erro em api_incluir_participantes chamado=%s: %s", chamado_id, exc)
         return jsonify({"sucesso": False, "erro": ERRO_INTERNO_MSG}), 500

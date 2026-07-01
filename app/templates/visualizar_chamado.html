@@ -919,6 +919,10 @@ Object.assign(window.DTX_MSGS, {
         selSup.disabled = true;
     };
 
+    function _escapeHtml(s) {
+        return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
     function _renderizarListaPreview() {
         var container = document.getElementById('incluir-lista-preview');
         if (!container) return;
@@ -926,7 +930,7 @@ Object.assign(window.DTX_MSGS, {
         var html = '';
         _participantesSelecionados.forEach(function(p, i) {
             html += '<div class="flex items-center justify-between px-3 py-1.5 bg-teal-50 rounded-dtx-md border border-teal-100 text-sm">'
-                + '<span class="font-medium text-teal-800 truncate mr-2">' + p.nome + ' <span class="text-teal-500 text-xs">(' + p.area + ')</span></span>'
+                + '<span class="font-medium text-teal-800 truncate mr-2">' + _escapeHtml(p.nome) + ' <span class="text-teal-500 text-xs">(' + _escapeHtml(p.area) + ')</span></span>'
                 + '<button onclick="removerParticipanteDaLista(' + i + ')" class="text-rose-400 hover:text-rose-600 transition-colors flex-shrink-0" title="Remover">'
                 + '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>'
                 + '</button></div>';

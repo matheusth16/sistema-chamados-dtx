@@ -270,15 +270,26 @@ class TestNotificarEdicaoDescricaoSolicitante:
 
 class TestNotificarObservadoresCriacao:
     def test_email_enviado_a_cada_observador(self):
-        """notificar_observadores_criacao envia email para cada observador."""
+        """notificar_observadores_criacao envia email para cada observador (resolução via get_by_id)."""
         from app.services.chamado_notificacao_service import notificar_observadores_criacao
 
         obs_list = [
-            {"usuario_id": "obs_1", "email": "obs1@test.com", "nome": "Obs Um"},
-            {"usuario_id": "obs_2", "email": "obs2@test.com", "nome": "Obs Dois"},
+            {"usuario_id": "obs_1", "nome": "Obs Um"},
+            {"usuario_id": "obs_2", "nome": "Obs Dois"},
         ]
+        mock_u1 = _usuario_mock("obs_1", "Obs Um", "obs1@test.com")
+        mock_u2 = _usuario_mock("obs_2", "Obs Dois", "obs2@test.com")
 
-        with patch("app.services.chamado_notificacao_service.enviar_email") as mock_email:
+        with (
+            patch("app.services.chamado_notificacao_service.Usuario") as mock_uclass,
+            patch("app.services.chamado_notificacao_service.enviar_email") as mock_email,
+            patch("app.services.chamado_notificacao_service.criar_notificacao"),
+            patch("app.services.chamado_notificacao_service.webpush_service"),
+        ):
+            mock_uclass.get_by_id.side_effect = lambda uid: {
+                "obs_1": mock_u1,
+                "obs_2": mock_u2,
+            }.get(uid)
             mock_email.return_value = (True, None)
             notificar_observadores_criacao(
                 chamado_id="ch_1",
@@ -309,15 +320,26 @@ class TestNotificarObservadoresCriacao:
         mock_email.assert_not_called()
 
     def test_observador_sem_email_ignorado(self):
-        """Observador sem email na lista → não envia email para ele."""
+        """Observador sem email no banco → não envia email para ele."""
         from app.services.chamado_notificacao_service import notificar_observadores_criacao
 
         obs_list = [
-            {"usuario_id": "obs_1", "email": "", "nome": "Obs Sem Email"},
-            {"usuario_id": "obs_2", "email": "obs2@test.com", "nome": "Obs Com Email"},
+            {"usuario_id": "obs_1", "nome": "Obs Sem Email"},
+            {"usuario_id": "obs_2", "nome": "Obs Com Email"},
         ]
+        mock_u1 = _usuario_mock("obs_1", "Obs Sem Email", "")
+        mock_u2 = _usuario_mock("obs_2", "Obs Com Email", "obs2@test.com")
 
-        with patch("app.services.chamado_notificacao_service.enviar_email") as mock_email:
+        with (
+            patch("app.services.chamado_notificacao_service.Usuario") as mock_uclass,
+            patch("app.services.chamado_notificacao_service.enviar_email") as mock_email,
+            patch("app.services.chamado_notificacao_service.criar_notificacao"),
+            patch("app.services.chamado_notificacao_service.webpush_service"),
+        ):
+            mock_uclass.get_by_id.side_effect = lambda uid: {
+                "obs_1": mock_u1,
+                "obs_2": mock_u2,
+            }.get(uid)
             mock_email.return_value = (True, None)
             notificar_observadores_criacao(
                 chamado_id="ch_1",
@@ -853,13 +875,17 @@ class TestNotificarObservadoresCriacaoInApp:
         """notificar_observadores_criacao cria in-app para obs com usuario_id."""
         from app.services.chamado_notificacao_service import notificar_observadores_criacao
 
-        obs_list = [{"usuario_id": "obs_1", "nome": "Obs Um", "email": "obs1@test.com"}]
+        obs_list = [{"usuario_id": "obs_1", "nome": "Obs Um"}]
+        mock_u = _usuario_mock("obs_1", "Obs Um", "obs1@test.com")
         with (
+            patch("app.services.chamado_notificacao_service.Usuario") as mock_uclass,
             patch(
                 "app.services.chamado_notificacao_service.enviar_email", return_value=(True, None)
             ),
             patch("app.services.chamado_notificacao_service.criar_notificacao") as mock_inapp,
+            patch("app.services.chamado_notificacao_service.webpush_service"),
         ):
+            mock_uclass.get_by_id.return_value = mock_u
             notificar_observadores_criacao(
                 chamado_id="ch_1",
                 numero_chamado="CH-001",
@@ -874,15 +900,18 @@ class TestNotificarObservadoresCriacaoInApp:
         """notificar_observadores_criacao envia web push para obs com usuario_id."""
         from app.services.chamado_notificacao_service import notificar_observadores_criacao
 
-        obs_list = [{"usuario_id": "obs_1", "nome": "Obs Um", "email": "obs1@test.com"}]
+        obs_list = [{"usuario_id": "obs_1", "nome": "Obs Um"}]
+        mock_u = _usuario_mock("obs_1", "Obs Um", "obs1@test.com")
         with (
             app.app_context(),
+            patch("app.services.chamado_notificacao_service.Usuario") as mock_uclass,
             patch(
                 "app.services.chamado_notificacao_service.enviar_email", return_value=(True, None)
             ),
             patch("app.services.chamado_notificacao_service.criar_notificacao"),
             patch("app.services.webpush_service.enviar_webpush_usuario") as mock_push,
         ):
+            mock_uclass.get_by_id.return_value = mock_u
             notificar_observadores_criacao(
                 chamado_id="ch_1",
                 numero_chamado="CH-001",
@@ -893,14 +922,11 @@ class TestNotificarObservadoresCriacaoInApp:
         mock_push.assert_called_once()
 
     def test_obs_sem_usuario_id_nao_gera_inapp(self):
-        """Obs sem usuario_id não gera in-app (apenas email)."""
+        """Obs sem usuario_id é ignorado completamente (sem email e sem in-app)."""
         from app.services.chamado_notificacao_service import notificar_observadores_criacao
 
-        obs_list = [{"nome": "Obs Externo", "email": "ext@test.com"}]
+        obs_list = [{"nome": "Obs Externo"}]
         with (
-            patch(
-                "app.services.chamado_notificacao_service.enviar_email", return_value=(True, None)
-            ),
             patch("app.services.chamado_notificacao_service.criar_notificacao") as mock_inapp,
         ):
             notificar_observadores_criacao(

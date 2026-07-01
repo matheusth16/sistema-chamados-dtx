@@ -119,7 +119,13 @@ def create_app():
     # Agendamento: relatório semanal toda sexta-feira às 10h (Brasília)
     # Guard: Flask debug reloader spawns two processes; only the child (WERKZEUG_RUN_MAIN=true)
     # should run the scheduler to avoid duplicate emails.
-    if not app.testing and (not app.debug or os.getenv("WERKZEUG_RUN_MAIN") == "true"):
+    # app.testing ainda é False aqui (conftest seta TESTING após create_app retornar),
+    # por isso também checamos FLASK_ENV para não disparar o scheduler em pytest.
+    if (
+        not app.testing
+        and os.getenv("FLASK_ENV") != "testing"
+        and (not app.debug or os.getenv("WERKZEUG_RUN_MAIN") == "true")
+    ):
         _iniciar_scheduler(app)
 
     # Aquece os caches estáticos em background para reduzir latência do primeiro request

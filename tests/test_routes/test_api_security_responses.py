@@ -319,10 +319,10 @@ def test_atualizar_status_exception_em_service_nao_vaza_internals(client_logado_
 
 
 def test_api_supervisores_lista_nao_expoe_senha_hash(client_logado_solicitante):
-    """L4 / CWI 2.3 — GET /api/supervisores/lista não inclui senha_hash na resposta JSON.
+    """L4 / CWI 2.3 — GET /api/supervisores/lista não inclui senha_hash nem email na resposta JSON.
 
-    O endpoint serializa manualmente {id, nome, email} — garante que o campo
-    interno senha_hash não vaza mesmo que o modelo contenha o atributo.
+    O endpoint serializa apenas {id, nome} — email removido para evitar enumeração
+    de PII por solicitantes; senha_hash nunca deve vazar.
     """
     sup_com_hash = MagicMock()
     sup_com_hash.id = "sup_externo"
@@ -337,6 +337,7 @@ def test_api_supervisores_lista_nao_expoe_senha_hash(client_logado_solicitante):
     body = r.data.decode("utf-8", errors="replace")
     assert "senha_hash" not in body, "senha_hash não deve aparecer na resposta de supervisores"
     assert "HASH_SECRETO" not in body
+    assert "ext@dtx.aero" not in body, "email não deve ser exposto a solicitantes"
 
     data = r.get_json()
     assert data is not None
@@ -344,6 +345,4 @@ def test_api_supervisores_lista_nao_expoe_senha_hash(client_logado_solicitante):
     supervisores = data.get("supervisores", [])
     assert len(supervisores) == 1
     sup = supervisores[0]
-    assert set(sup.keys()) == {"id", "nome", "email"}, (
-        f"Campos inesperados na resposta: {set(sup.keys())}"
-    )
+    assert set(sup.keys()) == {"id", "nome"}, f"Campos inesperados na resposta: {set(sup.keys())}"
