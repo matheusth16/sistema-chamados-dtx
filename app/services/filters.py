@@ -55,10 +55,13 @@ if resultado['tem_proxima']:
 - Cursor vazio ou inválido reinicia do início
 """
 
+import logging
 from typing import Any
 
 from firebase_admin import firestore
 from google.cloud.firestore_v1.base_query import FieldFilter
+
+logger = logging.getLogger(__name__)
 
 
 def _construir_query_base(
@@ -196,15 +199,15 @@ def aplicar_filtros_dashboard_com_paginacao(
             cursor_ant_doc = col_ref.document(cursor_anterior).get()
             if cursor_ant_doc.exists:
                 q = q.end_before(cursor_ant_doc)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Cursor anterior inválido (%s): %s", cursor_anterior, e)
     elif cursor:
         try:
             cursor_doc = col_ref.document(cursor).get()
             if cursor_doc.exists:
                 q = q.start_after(cursor_doc)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Cursor inválido (%s): %s", cursor, e)
     if cursor_anterior:
         docs_stream = list(q.limit(limite + 1).stream())
         docs_stream.reverse()

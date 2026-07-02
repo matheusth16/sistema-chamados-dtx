@@ -44,8 +44,8 @@ def admin_global_dashboard() -> Response:
         try:
             docs = db.collection("chamados").get()
             total_chamados = len(docs)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Erro ao contar total de chamados (admin_global): %s", e)
 
         return render_template(
             "admin_global.html",

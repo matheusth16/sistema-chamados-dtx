@@ -130,7 +130,8 @@ class AtribuidorAutomatico:
             elif self.estrategia == "round_robin":
                 supervisor_escolhido = self._atribuir_round_robin(supervisores_com_carga, area)
             else:  # aleatorio
-                supervisor_escolhido = random.choice(supervisores_com_carga)
+                # Distribuição de carga de trabalho, não uso criptográfico/de segurança.
+                supervisor_escolhido = random.choice(supervisores_com_carga)  # nosec B311
 
             if not supervisor_escolhido:
                 return {

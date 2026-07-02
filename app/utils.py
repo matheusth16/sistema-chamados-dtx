@@ -2,6 +2,7 @@
 Funções utilitárias compartilhadas entre rotas.
 """
 
+import logging
 from datetime import datetime
 from typing import Any
 
@@ -9,6 +10,8 @@ from firebase_admin import firestore
 from flask import current_app, request
 
 from app.database import db
+
+logger = logging.getLogger(__name__)
 
 
 def mask_email_for_log(email: str | None) -> str:
@@ -24,8 +27,8 @@ def mask_email_for_log(email: str | None) -> str:
             if not local or not domain:
                 return "***@***"
             return f"{local[0]}***@{domain}"
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("Erro ao mascarar e-mail para log: %s", e)
     return email
 
 

@@ -573,8 +573,8 @@ def _configurar_seguranca(app: Flask) -> None:
                 server_origin = f"{request.scheme}://{request.host}".lower()
                 if server_origin not in origens_aceitas:
                     origens_aceitas.add(server_origin)
-            except Exception:
-                pass
+            except Exception as e:
+                app.logger.debug("Erro ao derivar origem do servidor (dev): %s", e)
 
         # Compara origem da requisição com as autorizadas
         if req_origin and req_origin not in origens_aceitas:

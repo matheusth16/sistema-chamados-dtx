@@ -13,9 +13,12 @@ Ordem fail-closed:
   4. qualquer outro perfil → False
 """
 
+import logging
 from typing import Any
 
 from app.models_usuario import Usuario
+
+logger = logging.getLogger(__name__)
 
 
 def calcular_supervisor_ids_com_acesso(
@@ -47,8 +50,9 @@ def calcular_supervisor_ids_com_acesso(
             for sup in supervisores:
                 if sup.id:
                     ids.add(sup.id)
-        except Exception:
-            pass  # fail-open na leitura; permissão real verificada por usuario_pode_ver_chamado
+        except Exception as e:
+            # fail-open na leitura; permissão real verificada por usuario_pode_ver_chamado
+            logger.debug("Erro ao buscar supervisores da área %s: %s", area, e)
 
     return sorted(ids)
 

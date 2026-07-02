@@ -173,8 +173,8 @@ def _validar_tamanho(arquivo: Any) -> tuple[bool, str]:
             if len(dados) > limite:
                 mb = limite // (1024 * 1024)
                 return False, f"{arquivo.filename}: excede {mb} MB por arquivo."
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("Erro ao medir tamanho do arquivo via stream: %s", e)
     return True, ""
 
 
@@ -225,8 +225,8 @@ def _log_ab_descricao_insuficiente(form: Any) -> None:
         from flask_login import current_user
 
         uid = getattr(current_user, "id", "")
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("Erro ao obter current_user para evento AB-001: %s", e)
     logger.info(
         "ab_event",
         extra={

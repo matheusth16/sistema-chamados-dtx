@@ -248,8 +248,8 @@ def listar_meus_chamados(
             from app.cache import cache_set
 
             cache_set(_status_cache_key, status_counts, 45)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Cache indisponível ao salvar status_counts: %s", e)
 
     total_paginas = max(1, (total_chamados + itens_por_pagina - 1) // itens_por_pagina)
     pagina_atual = max(1, min(pagina_atual, total_paginas))

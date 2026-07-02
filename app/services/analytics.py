@@ -164,8 +164,8 @@ class AnalisadorChamados:
                 cached = cache_get(cache_key)
                 if cached is not None:
                     return cached
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Cache indisponível (analytics): %s", e)
         try:
             data_limite = datetime.now() - timedelta(days=dias)
 
@@ -286,8 +286,8 @@ class AnalisadorChamados:
                     from app.cache import cache_set
 
                     cache_set(cache_key, resultado, _ANALYTICS_QUERY_TTL_SEC)
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug("Cache indisponível (analytics): %s", e)
             return resultado
 
         except Exception as e:
@@ -713,8 +713,8 @@ class AnalisadorChamados:
                 cached = cache_get(cache_key)
                 if cached is not None:
                     return cached
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Cache indisponível (analytics): %s", e)
         try:
             agora = datetime.now()
             data_inicio = agora - timedelta(days=60)
@@ -783,8 +783,8 @@ class AnalisadorChamados:
                     from app.cache import cache_set
 
                     cache_set(cache_key, resultado, _ANALYTICS_QUERY_TTL_SEC)
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug("Cache indisponível (analytics): %s", e)
             return resultado
         except Exception as e:
             logger.exception("Erro ao obter métricas do período anterior: %s", e)
@@ -824,16 +824,16 @@ class AnalisadorChamados:
             cached = cache_get(cache_key)
             if cached is not None:
                 return cached
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Cache indisponível (analytics): %s", e)
         docs = list(self.get_db().collection("chamados").limit(MAX_CHAMADOS_ANALYTICS).stream())
         chamados = [doc.to_dict() for doc in docs]
         try:
             from app.cache import cache_set
 
             cache_set(cache_key, chamados, _RELATORIO_CACHE_TTL_SEC)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Cache indisponível (analytics): %s", e)
         return chamados
 
     # ========== RELATÓRIOS DETALHADOS ==========
