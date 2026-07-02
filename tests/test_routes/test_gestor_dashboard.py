@@ -72,6 +72,34 @@ def test_gestor_acessa_dashboard(client_logado_gestor):
         },
         "chamados": [],
         "filtro_ativo": "todos",
+        "insights": {
+            "area_critica": None,
+            "tempo_medio_sem_resposta_min": None,
+            "saude_percentual": 100,
+        },
+        "grupos": [
+            {
+                "chave": "atrasados",
+                "titulo": "Atrasados",
+                "cor": "danger",
+                "total": 0,
+                "chamados": [],
+            },
+            {
+                "chave": "aberto_sem_resposta",
+                "titulo": "Sem resposta",
+                "cor": "warn",
+                "total": 0,
+                "chamados": [],
+            },
+            {
+                "chave": "multi_setor",
+                "titulo": "Multi-setor travado",
+                "cor": "purple",
+                "total": 0,
+                "chamados": [],
+            },
+        ],
     }
     with patch("app.routes.dashboard.obter_contexto_gestor_dashboard", return_value=ctx_mock):
         resp = client_logado_gestor.get("/gestor/dashboard")
@@ -90,6 +118,34 @@ def test_admin_acessa_gestor_dashboard(client_logado_admin_gestor):
         },
         "chamados": [],
         "filtro_ativo": "todos",
+        "insights": {
+            "area_critica": None,
+            "tempo_medio_sem_resposta_min": None,
+            "saude_percentual": 100,
+        },
+        "grupos": [
+            {
+                "chave": "atrasados",
+                "titulo": "Atrasados",
+                "cor": "danger",
+                "total": 0,
+                "chamados": [],
+            },
+            {
+                "chave": "aberto_sem_resposta",
+                "titulo": "Sem resposta",
+                "cor": "warn",
+                "total": 0,
+                "chamados": [],
+            },
+            {
+                "chave": "multi_setor",
+                "titulo": "Multi-setor travado",
+                "cor": "purple",
+                "total": 0,
+                "chamados": [],
+            },
+        ],
     }
     with patch("app.routes.dashboard.obter_contexto_gestor_dashboard", return_value=ctx_mock):
         resp = client_logado_admin_gestor.get("/gestor/dashboard")
@@ -119,6 +175,12 @@ def test_gestor_dashboard_filtro_atrasados(client_logado_gestor):
         },
         "chamados": [],
         "filtro_ativo": "atrasados",
+        "insights": {
+            "area_critica": None,
+            "tempo_medio_sem_resposta_min": None,
+            "saude_percentual": 100,
+        },
+        "grupos": [],
     }
     with patch(
         "app.routes.dashboard.obter_contexto_gestor_dashboard", return_value=ctx_mock

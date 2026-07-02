@@ -337,6 +337,176 @@ def test_carregar_todos_chamados_retorna_lista_de_chamados():
     assert len(result) == 1
 
 
+# ---------------------------------------------------------------------------
+# Insights de triagem (painel de risco)
+# ---------------------------------------------------------------------------
+
+
+def _make_chamado_atrasado_area(area: str):
+    c = MagicMock()
+    c.status = "Em Atendimento"
+    c.is_atrasado = True
+    c.area = area
+    c.data_abertura = datetime(2024, 6, 3, 10, 0)
+    c.participantes = []
+    return c
+
+
+def test_insights_area_critica_identifica_area_com_mais_atrasados():
+    chamados = [
+        _make_chamado_atrasado_area("TI"),
+        _make_chamado_atrasado_area("TI"),
+        _make_chamado_atrasado_area("Facilities"),
+    ]
+    with patch(
+        "app.services.gestor_dashboard_service._carregar_todos_chamados", return_value=chamados
+    ):
+        ctx = obter_contexto_gestor_dashboard(agora=_AGORA_FIXED)
+
+    assert ctx["insights"]["area_critica"] == {"nome": "TI", "qtd": 2}
+
+
+def test_insights_area_critica_none_quando_sem_atrasados():
+    with patch("app.services.gestor_dashboard_service._carregar_todos_chamados", return_value=[]):
+        ctx = obter_contexto_gestor_dashboard(agora=_AGORA_FIXED)
+
+    assert ctx["insights"]["area_critica"] is None
+
+
+def test_insights_tempo_medio_sem_resposta():
+    # 2h atrás → 120 min úteis sem resposta (dentro do expediente, sem almoço)
+    chamado = _make_chamado_aberto_antigo()
+    with patch(
+        "app.services.gestor_dashboard_service._carregar_todos_chamados",
+        return_value=[chamado],
+    ):
+        ctx = obter_contexto_gestor_dashboard(agora=_AGORA_FIXED)
+
+    assert ctx["insights"]["tempo_medio_sem_resposta_min"] == 120
+
+
+def test_insights_tempo_medio_none_quando_sem_chamados_pendentes():
+    with patch("app.services.gestor_dashboard_service._carregar_todos_chamados", return_value=[]):
+        ctx = obter_contexto_gestor_dashboard(agora=_AGORA_FIXED)
+
+    assert ctx["insights"]["tempo_medio_sem_resposta_min"] is None
+
+
+def test_insights_saude_percentual_100_quando_sem_riscos():
+    chamado_ok = MagicMock()
+    chamado_ok.status = "Concluído"
+    chamado_ok.is_atrasado = False
+    chamado_ok.participantes = []
+    with patch(
+        "app.services.gestor_dashboard_service._carregar_todos_chamados",
+        return_value=[chamado_ok],
+    ):
+        ctx = obter_contexto_gestor_dashboard(agora=_AGORA_FIXED)
+
+    assert ctx["insights"]["saude_percentual"] == 100
+
+
+def test_insights_saude_percentual_reflete_proporcao_em_risco():
+    atrasado = _make_chamado_atrasado()
+    ok1 = MagicMock(status="Concluído", is_atrasado=False, participantes=[])
+    ok2 = MagicMock(status="Concluído", is_atrasado=False, participantes=[])
+    ok3 = MagicMock(status="Concluído", is_atrasado=False, participantes=[])
+    with patch(
+        "app.services.gestor_dashboard_service._carregar_todos_chamados",
+        return_value=[atrasado, ok1, ok2, ok3],
+    ):
+        ctx = obter_contexto_gestor_dashboard(agora=_AGORA_FIXED)
+
+    # 1 de 4 em risco → 75% saudável
+    assert ctx["insights"]["saude_percentual"] == 75
+
+
+def test_insights_saude_percentual_100_quando_lista_vazia():
+    with patch("app.services.gestor_dashboard_service._carregar_todos_chamados", return_value=[]):
+        ctx = obter_contexto_gestor_dashboard(agora=_AGORA_FIXED)
+
+    assert ctx["insights"]["saude_percentual"] == 100
+
+
+# ---------------------------------------------------------------------------
+# Tagueamento de riscos por chamado (chamado.riscos)
+# ---------------------------------------------------------------------------
+
+
+def test_chamado_atrasado_recebe_tag_riscos():
+    atrasado = _make_chamado_atrasado()
+    with patch(
+        "app.services.gestor_dashboard_service._carregar_todos_chamados",
+        return_value=[atrasado],
+    ):
+        ctx = obter_contexto_gestor_dashboard(agora=_AGORA_FIXED)
+
+    assert "atrasado" in ctx["chamados"][0].riscos
+
+
+def test_chamado_sem_riscos_recebe_lista_vazia():
+    chamado_ok = MagicMock(status="Concluído", is_atrasado=False, participantes=[])
+    with patch(
+        "app.services.gestor_dashboard_service._carregar_todos_chamados",
+        return_value=[chamado_ok],
+    ):
+        ctx = obter_contexto_gestor_dashboard(agora=_AGORA_FIXED)
+
+    assert ctx["chamados"][0].riscos == []
+
+
+def test_chamado_pode_acumular_multiplos_riscos():
+    """Um chamado atrasado E multi-setor travado deve receber as duas tags."""
+    c = MagicMock()
+    c.status = "Em Atendimento"
+    c.is_atrasado = True
+    c.data_abertura = datetime(2024, 6, 3, 10, 0)
+    c.participantes = [{"supervisor_id": "s1", "status": "pendente"}]
+    with patch(
+        "app.services.gestor_dashboard_service._carregar_todos_chamados",
+        return_value=[c],
+    ):
+        ctx = obter_contexto_gestor_dashboard(agora=_AGORA_FIXED)
+
+    assert set(ctx["chamados"][0].riscos) == {"atrasado", "multi_setor"}
+
+
+# ---------------------------------------------------------------------------
+# Grupos (raias de triagem para a visão geral)
+# ---------------------------------------------------------------------------
+
+
+def test_grupos_contem_as_tres_raias_com_totais_corretos():
+    atrasado = _make_chamado_atrasado()
+    aberto_antigo = _make_chamado_aberto_antigo()
+    multi = _make_chamado_multi_travado()
+    with patch(
+        "app.services.gestor_dashboard_service._carregar_todos_chamados",
+        return_value=[atrasado, aberto_antigo, multi],
+    ):
+        ctx = obter_contexto_gestor_dashboard(agora=_AGORA_FIXED)
+
+    chaves = {g["chave"] for g in ctx["grupos"]}
+    assert chaves == {"atrasados", "aberto_sem_resposta", "multi_setor"}
+    por_chave = {g["chave"]: g for g in ctx["grupos"]}
+    assert por_chave["atrasados"]["total"] == 1
+    assert por_chave["aberto_sem_resposta"]["total"] == 1
+    assert por_chave["multi_setor"]["total"] == 1
+
+
+def test_grupos_limita_chamados_por_raia():
+    atrasados = [_make_chamado_atrasado() for _ in range(10)]
+    with patch(
+        "app.services.gestor_dashboard_service._carregar_todos_chamados",
+        return_value=atrasados,
+    ):
+        ctx = obter_contexto_gestor_dashboard(agora=_AGORA_FIXED)
+
+    grupo_atrasados = next(g for g in ctx["grupos"] if g["chave"] == "atrasados")
+    assert grupo_atrasados["total"] == 10
+    assert len(grupo_atrasados["chamados"]) == 6
+
+
 def test_carregar_todos_chamados_retorna_vazio_em_excecao():
     """_carregar_todos_chamados retorna [] em exceção do Firestore (linhas 89-91)."""
     from app.services.gestor_dashboard_service import _carregar_todos_chamados

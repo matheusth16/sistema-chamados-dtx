@@ -1,6 +1,31 @@
 {% extends "base.html" %}
 {% from 'components/_status_badge.html' import status_badge with context %}
 
+{% macro risk_card(chamado) %}
+{% set cor = 'danger' if 'atrasado' in chamado.riscos else ('warn' if 'sem_resposta' in chamado.riscos else ('purple' if 'multi_setor' in chamado.riscos else '')) %}
+<a href="{{ url_for('main.visualizar_detalhe_chamado', chamado_id=chamado.id) }}" class="bento-risk-card {{ cor }}">
+    <div class="num">{{ chamado.numero_chamado or chamado.id[:8] }}</div>
+    <div class="cat">{{ translate_category(chamado.categoria) if chamado.categoria else chamado.categoria }}</div>
+    {% if chamado.descricao %}<div class="desc">{{ chamado.descricao }}</div>{% endif %}
+    <div class="foot">
+        <span>{{ translate_sector(chamado.area) if chamado.area else '—' }}</span>
+        {{ status_badge(chamado.status or 'Aberto') }}
+    </div>
+    <div class="foot" style="margin-top:6px;">
+        <span>{{ chamado.data_abertura.strftime('%d/%m/%Y %H:%M') if chamado.data_abertura else '—' }}</span>
+    </div>
+    {% if chamado.riscos %}
+    <div class="chips">
+        {% for r in chamado.riscos %}
+        <span class="bento-risk-chip {{ r }}">
+            {% if r == 'atrasado' %}Atrasado{% elif r == 'sem_resposta' %}Sem resposta{% else %}Multi-setor{% endif %}
+        </span>
+        {% endfor %}
+    </div>
+    {% endif %}
+</a>
+{% endmacro %}
+
 {% block content %}
 <div class="space-y-4" data-testid="gestor-dashboard-container">
 
@@ -10,13 +35,13 @@
             <div style="display:flex; align-items:center; gap:14px;">
                 <span class="bento-chip-icon">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
                     </svg>
                 </span>
                 <div>
-                    <h1 class="font-display">{{ t('gestor_dashboard_title') if t else 'Painel Gerencial' }}</h1>
+                    <h1 class="font-display">{{ t('gestor_dashboard_title') if t else 'Painel de Triagem' }}</h1>
                     <p>
-                        Visão read-only
+                        Visão gerencial read-only, priorizada por risco
                         {% if current_user.is_authenticated and current_user.nivel_gestao %}
                         · <span class="bento-count-chip">{{ current_user.nivel_gestao | replace("_", " ") | title }}</span>
                         {% endif %}
@@ -27,7 +52,71 @@
         </div>
     </div>
 
-    <!-- Cards de contadores -->
+    <!-- Insights de triagem -->
+    <div class="gsap-scroll-reveal-stagger flex flex-wrap gap-4">
+        <div class="bento-insight-card {% if insights.area_critica %}warn{% else %}ok{% endif %} gsap-scroll-reveal-item">
+            <div class="flex items-start gap-3" style="margin-bottom:12px;">
+                <div class="bento-insight-icon {% if insights.area_critica %}warn{% else %}ok{% endif %}">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                </div>
+                <div class="min-w-0 flex-1">
+                    <h3 class="font-display" style="font-weight:800; font-size:15px;">Área mais crítica</h3>
+                    <span class="bento-insight-tag {% if insights.area_critica %}warn{% else %}ok{% endif %}">
+                        {% if insights.area_critica %}Atenção{% else %}Sem áreas críticas{% endif %}
+                    </span>
+                </div>
+            </div>
+            <p style="font-size:13px; color:var(--color-text-muted); flex:1;">
+                {% if insights.area_critica %}
+                {{ translate_sector(insights.area_critica.nome) }} concentra {{ insights.area_critica.qtd }} chamado{{ 's' if insights.area_critica.qtd != 1 else '' }} atrasado{{ 's' if insights.area_critica.qtd != 1 else '' }} — priorize esta área.
+                {% else %}
+                Nenhuma área com chamados atrasados no momento.
+                {% endif %}
+            </p>
+        </div>
+
+        <div class="bento-insight-card {% if insights.tempo_medio_sem_resposta_min %}warn{% else %}ok{% endif %} gsap-scroll-reveal-item">
+            <div class="flex items-start gap-3" style="margin-bottom:12px;">
+                <div class="bento-insight-icon {% if insights.tempo_medio_sem_resposta_min %}warn{% else %}ok{% endif %}">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                </div>
+                <div class="min-w-0 flex-1">
+                    <h3 class="font-display" style="font-weight:800; font-size:15px;">Tempo médio sem resposta</h3>
+                    <span class="bento-insight-tag {% if insights.tempo_medio_sem_resposta_min %}warn{% else %}ok{% endif %}">
+                        {% if insights.tempo_medio_sem_resposta_min %}Escada A{% else %}Em dia{% endif %}
+                    </span>
+                </div>
+            </div>
+            <p style="font-size:13px; color:var(--color-text-muted); flex:1;">
+                {% if insights.tempo_medio_sem_resposta_min %}
+                {% set h = (insights.tempo_medio_sem_resposta_min // 60) %}
+                {% set m = (insights.tempo_medio_sem_resposta_min % 60) %}
+                Chamados abertos sem atendimento aguardam em média {% if h > 0 %}{{ h }}h {{ m }}min{% else %}{{ m }} min{% endif %} (úteis).
+                {% else %}
+                Nenhum chamado aberto ultrapassou 1h útil sem atendimento.
+                {% endif %}
+            </p>
+        </div>
+
+        <div class="bento-insight-card {% if insights.saude_percentual >= 90 %}ok{% elif insights.saude_percentual >= 70 %}info{% else %}warn{% endif %} gsap-scroll-reveal-item">
+            <div class="flex items-start gap-3" style="margin-bottom:12px;">
+                <div class="bento-insight-icon {% if insights.saude_percentual >= 90 %}ok{% elif insights.saude_percentual >= 70 %}info{% else %}warn{% endif %}">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                </div>
+                <div class="min-w-0 flex-1">
+                    <h3 class="font-display" style="font-weight:800; font-size:15px;">Saúde da operação</h3>
+                    <span class="bento-insight-tag {% if insights.saude_percentual >= 90 %}ok{% elif insights.saude_percentual >= 70 %}info{% else %}warn{% endif %}">
+                        {{ insights.saude_percentual }}% saudável
+                    </span>
+                </div>
+            </div>
+            <p style="font-size:13px; color:var(--color-text-muted); flex:1;">
+                {{ contadores.total }} chamados carregados; {{ contadores.atrasados + contadores.aberto_sem_resposta + contadores.multi_setor_travado }} em algum estado de risco.
+            </p>
+        </div>
+    </div>
+
+    <!-- Cards de contadores / filtros -->
     <div class="bento-stats-row" style="grid-template-columns:repeat(4,1fr); margin-top:0;">
         <a href="{{ url_for('main.gestor_dashboard') }}" class="bento-stat-card accent{% if filtro_ativo == 'todos' %} active{% endif %}">
             <div><div class="val">{{ contadores.total }}</div><div class="lbl">{{ t('gestor_counter_total') if t else 'Total' }}</div></div>
@@ -52,61 +141,56 @@
         <span>{{ t('gestor_readonly_notice') if t else 'Visão somente leitura — ações de edição não estão disponíveis neste painel.' }}</span>
     </div>
 
-    <!-- Tabela de chamados -->
-    <div class="bento-card bento-table-scope gestor-table" style="padding:0; overflow:hidden;">
-        {% if chamados %}
-        <div style="overflow-x:auto;">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Nº</th>
-                        <th>Título / Descrição</th>
-                        <th>Área</th>
-                        <th>Status</th>
-                        <th>Abertura</th>
-                        <th>Ver</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for chamado in chamados %}
-                    <tr class="hoverable">
-                        <td style="font-family:var(--font-mono, monospace); font-size:12px; color:var(--color-text-muted);">
-                            {{ chamado.numero_chamado or chamado.id[:8] }}
-                        </td>
-                        <td>
-                            <div style="font-weight:700;">{{ chamado.categoria }}</div>
-                            <div style="font-size:12px; color:var(--color-text-muted); margin-top:2px;">{{ chamado.descricao[:80] if chamado.descricao else '' }}…</div>
-                        </td>
-                        <td style="font-size:12px;">{{ chamado.area or '—' }}</td>
-                        <td>{{ status_badge(chamado.status or 'Aberto') }}</td>
-                        <td style="font-size:12px; color:var(--color-text-muted);">
-                            {{ chamado.data_abertura.strftime('%d/%m/%Y %H:%M') if chamado.data_abertura else '—' }}
-                        </td>
-                        <td>
-                            <a href="{{ url_for('main.visualizar_detalhe_chamado', chamado_id=chamado.id) }}"
-                               class="bento-btn-ghost" style="padding:6px 12px; font-size:12px;"
-                               aria-label="Ver chamado {{ chamado.numero_chamado or chamado.id }}">
-                                <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0zM2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                </svg>
-                                Ver
-                            </a>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+    {% if filtro_ativo == 'todos' %}
+    <!-- Visão geral: raias de triagem por categoria de risco -->
+    {% for grupo in grupos %}
+    <div class="bento-triage-lane {{ grupo.cor }}">
+        <div class="bento-triage-lane-head">
+            <div class="bento-triage-lane-title">
+                <span class="bento-triage-lane-dot"></span>
+                {{ grupo.titulo }}
+                <span class="bento-triage-lane-count">{{ grupo.total }}</span>
+            </div>
+            {% if grupo.total > grupo.chamados|length %}
+            <a href="{{ url_for('main.gestor_dashboard', filtro=grupo.chave) }}" class="bento-triage-lane-more">
+                Ver todos ({{ grupo.total }}) →
+            </a>
+            {% endif %}
+        </div>
+        {% if grupo.chamados %}
+        <div class="bento-risk-grid">
+            {% for chamado in grupo.chamados %}
+            {{ risk_card(chamado) }}
+            {% endfor %}
         </div>
         {% else %}
-        <div style="text-align:center; padding:64px 16px; color:var(--color-surface-muted);">
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin:0 auto 12px; opacity:.5;">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-            </svg>
-            <p style="font-weight:700; font-size:14px;">Nenhum chamado nesta categoria</p>
-        </div>
+        <div class="bento-triage-empty">Nenhum chamado nesta categoria — tudo em dia.</div>
         {% endif %}
     </div>
+    {% endfor %}
+    {% else %}
+    <!-- Modo drill-in: lista completa de um único bucket de risco -->
+    <div class="bento-triage-lane">
+        <div class="bento-triage-lane-head">
+            <div class="bento-triage-lane-title">
+                <span class="bento-triage-lane-dot" style="background:var(--color-dtx-500);"></span>
+                {{ chamados|length }} chamado{{ 's' if chamados|length != 1 else '' }}
+            </div>
+            <a href="{{ url_for('main.gestor_dashboard') }}" class="bento-triage-lane-more">
+                ← Voltar à visão geral
+            </a>
+        </div>
+        {% if chamados %}
+        <div class="bento-risk-grid">
+            {% for chamado in chamados %}
+            {{ risk_card(chamado) }}
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="bento-triage-empty">Nenhum chamado nesta categoria — tudo em dia.</div>
+        {% endif %}
+    </div>
+    {% endif %}
 
 </div>
 {% endblock %}

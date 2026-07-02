@@ -28,6 +28,9 @@ _LIMIAR_ABERTO_MINUTOS = 60
 # Statuses que indicam chamado finalizado
 _STATUS_FINALIZADOS = {"Concluído", "Cancelado"}
 
+# Quantos chamados exibir por raia no modo visão geral (painel de triagem)
+_LIMITE_POR_RAIA = 6
+
 
 def _is_atrasado(chamado: Chamado) -> bool:
     """Classifica chamado como atrasado.
@@ -76,6 +79,68 @@ def _is_multi_setor_travado(chamado: Chamado) -> bool:
     return False
 
 
+def _marcar_riscos(chamado: Chamado, ids_atrasados: set, ids_sem_resp: set, ids_multi: set) -> None:
+    """Anota chamado.riscos com as categorias de risco que ele atende (para exibição em card)."""
+    riscos = []
+    if id(chamado) in ids_atrasados:
+        riscos.append("atrasado")
+    if id(chamado) in ids_sem_resp:
+        riscos.append("sem_resposta")
+    if id(chamado) in ids_multi:
+        riscos.append("multi_setor")
+    chamado.riscos = riscos
+
+
+def _calcular_insights(
+    todos: list[Chamado],
+    atrasados: list[Chamado],
+    abertos_sem_resp: list[Chamado],
+    multi_travados: list[Chamado],
+    agora: datetime,
+) -> dict:
+    """Calcula indicadores de triagem a partir dos chamados já carregados (sem queries extras).
+
+    Returns:
+        dict com area_critica (área com mais atrasados), tempo_medio_sem_resposta_min
+        (média de minutos úteis em aberto sem resposta) e saude_percentual (% do total
+        fora de qualquer bucket de risco).
+    """
+    area_critica = None
+    if atrasados:
+        contagem_por_area: dict[str, int] = {}
+        for c in atrasados:
+            area = getattr(c, "area", None) or "Sem área"
+            contagem_por_area[area] = contagem_por_area.get(area, 0) + 1
+        nome_area = max(contagem_por_area, key=contagem_por_area.get)
+        area_critica = {"nome": nome_area, "qtd": contagem_por_area[nome_area]}
+
+    tempo_medio_sem_resposta_min = None
+    if abertos_sem_resp:
+        total_min = 0
+        contados = 0
+        for c in abertos_sem_resp:
+            data_abertura = getattr(c, "data_abertura", None)
+            if data_abertura is None:
+                continue
+            total_min += minutos_uteis_entre(data_abertura, agora)
+            contados += 1
+        if contados:
+            tempo_medio_sem_resposta_min = round(total_min / contados)
+
+    ids_em_risco = (
+        {id(c) for c in atrasados}
+        | {id(c) for c in abertos_sem_resp}
+        | {id(c) for c in multi_travados}
+    )
+    saude_percentual = 100 if not todos else round(100 * (1 - len(ids_em_risco) / len(todos)))
+
+    return {
+        "area_critica": area_critica,
+        "tempo_medio_sem_resposta_min": tempo_medio_sem_resposta_min,
+        "saude_percentual": saude_percentual,
+    }
+
+
 def _carregar_todos_chamados() -> list[Chamado]:
     """Carrega chamados ativos do Firestore sem filtro de área."""
     try:
@@ -101,7 +166,8 @@ def obter_contexto_gestor_dashboard(
         agora: Instante de referência para cálculo de minutos úteis. None = now().
 
     Returns:
-        dict com contadores e lista paginada de chamados.
+        dict com contadores, insights de triagem, lista de chamados (filtrada pelo
+        filtro ativo) e grupos (raias por categoria de risco, usadas na visão geral).
     """
     _agora = agora or datetime.now(ZoneInfo(Config.SLA_TIMEZONE))
     todos = _carregar_todos_chamados()
@@ -109,6 +175,12 @@ def obter_contexto_gestor_dashboard(
     atrasados = [c for c in todos if _is_atrasado(c)]
     abertos_sem_resp = [c for c in todos if _is_aberto_sem_resposta(c, _agora)]
     multi_travados = [c for c in todos if _is_multi_setor_travado(c)]
+
+    ids_atrasados = {id(c) for c in atrasados}
+    ids_sem_resp = {id(c) for c in abertos_sem_resp}
+    ids_multi = {id(c) for c in multi_travados}
+    for c in todos:
+        _marcar_riscos(c, ids_atrasados, ids_sem_resp, ids_multi)
 
     contadores = {
         "total": len(todos),
@@ -127,8 +199,36 @@ def obter_contexto_gestor_dashboard(
     else:
         lista = todos
 
+    insights = _calcular_insights(todos, atrasados, abertos_sem_resp, multi_travados, _agora)
+
+    grupos = [
+        {
+            "chave": "atrasados",
+            "titulo": "Atrasados",
+            "cor": "danger",
+            "total": len(atrasados),
+            "chamados": atrasados[:_LIMITE_POR_RAIA],
+        },
+        {
+            "chave": "aberto_sem_resposta",
+            "titulo": "Sem resposta",
+            "cor": "warn",
+            "total": len(abertos_sem_resp),
+            "chamados": abertos_sem_resp[:_LIMITE_POR_RAIA],
+        },
+        {
+            "chave": "multi_setor",
+            "titulo": "Multi-setor travado",
+            "cor": "purple",
+            "total": len(multi_travados),
+            "chamados": multi_travados[:_LIMITE_POR_RAIA],
+        },
+    ]
+
     return {
         "contadores": contadores,
+        "insights": insights,
         "chamados": lista,
+        "grupos": grupos,
         "filtro_ativo": filtro_norm or "todos",
     }
