@@ -21,11 +21,9 @@ DTX Service Portal — sistema interno de chamados da DTX Aerospace (o nome "Dig
 
 **Confiança, controle, eficiência** — tema "Industrial Precision". Deve transmitir o rigor de uma operação aeroespacial, não a estética de um SaaS genérico.
 
-Dois arquétipos visuais mapeiam os dois públicos, e o sistema deve atender ambos sem sacrificar nenhum:
-- **Swiss Industrial Print** (light mode) — para supervisores/admins em escritório: hierarquia densa, tipografia bold, grid rígido.
-- **Tactical Telemetry** (dark mode) — para mecânicos/engenheiros em chão de fábrica: contraste extremo, leitura a distância, tipografia funcional (IDs de chamado em monospace).
+Um único arquétipo visual — **Swiss Industrial Print** — atende os dois públicos: hierarquia densa, tipografia bold, grid rígido, contraste alto o bastante para leitura rápida à distância no chão de fábrica sem depender de um tema separado.
 
-O toggle light/dark não é cosmético — é a principal feature de acessibilidade do sistema, dado o contexto físico dos dois públicos.
+Sistema é **light-only** (sem dark mode). Acessibilidade pro chão de fábrica vem de contraste alto e tipografia funcional dentro do próprio tema claro, não de um toggle de tema.
 
 Referências de estilo (não anti-referências): Linear.app (hierarquia densa), Vercel Dashboard (superfícies diferenciadas), Notion (profundidade real nos cards).
 
@@ -38,7 +36,7 @@ Não deve parecer um SaaS genérico — sem cards flutuantes sem propósito, sem
 1. **Contraste com propósito** — cada superfície existe por uma razão, nunca decorativa.
 2. **Cor como dado** — o azul DTX (e as cores de status) aparecem onde há ação ou significado, não como estilo.
 3. **Tipografia dominante e funcional** — hierarquia pesada nos headings; monospace para IDs/timestamps/metadados técnicos.
-4. **Dois públicos, um sistema** — toda decisão visual é testada contra escritório (light) E chão de fábrica (dark), nunca só uma.
+4. **Dois públicos, um sistema** — toda decisão visual é testada contra escritório E chão de fábrica, dentro do mesmo tema claro (sem variante dark).
 5. **Densidade equilibrada** — breathing room nas páginas de navegação, compacidade nas tabelas de dados.
 
 ## Accessibility & Inclusion
@@ -46,4 +44,3 @@ Não deve parecer um SaaS genérico — sem cards flutuantes sem propósito, sem
 - WCAG AA: contraste mínimo 4.5:1 (texto normal) e 3:1 (texto grande/UI).
 - Focus ring visível (`focus-visible:ring-2`) em todos os elementos interativos.
 - `prefers-reduced-motion` respeitado, especialmente nos badges pulsantes de status "Aberto".
-- Dark mode segue `prefers-color-scheme` na primeira visita; escolha explícita do usuário prevalece via `localStorage`.

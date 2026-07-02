@@ -3,95 +3,73 @@
 {% from 'components/_status_badge.html' import status_badge with context %}
 
 {% block content %}
-<div class="space-y-6">
+<div class="space-y-4">
 
-  {% call page_header(t('manage_users')) %}
-    <a href="{{ url_for('main.novo_usuario_form') }}"
-       class="inline-flex items-center gap-2 h-9 px-4 text-sm font-medium rounded-dtx-md bg-dtx-600 text-white hover:bg-dtx-700 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-dtx-600">
-      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-      </svg>
-      {{ t('new_user') }}
-    </a>
-    <a href="{{ url_for(dashboard_endpoint) }}"
-       class="inline-flex items-center gap-2 h-9 px-4 text-sm font-medium rounded-dtx-md bg-white text-gray-700 border border-surface-muted hover:bg-surface-raised transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-dtx-600">
-      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
-      </svg>
-      {{ t('back') }}
-    </a>
-  {% endcall %}
-
-  <p class="text-sm font-medium text-slate-500 -mt-4 mb-2">
-    <span class="font-bold text-dtx-700 bg-dtx-50 px-2 py-0.5 rounded-dtx-sm border border-dtx-100">{{ usuarios|length }}</span>
-    {{ t('users_registered_in_system') }}
-  </p>
+  <div class="bento-card">
+    {% call page_header(t('manage_users')) %}
+      <a href="{{ url_for('main.novo_usuario_form') }}" class="bento-btn-primary">
+        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+        </svg>
+        {{ t('new_user') }}
+      </a>
+      <a href="{{ url_for(dashboard_endpoint) }}" class="bento-btn-outline">
+        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+        </svg>
+        {{ t('back') }}
+      </a>
+    {% endcall %}
+    <p style="font-size:13px; color:var(--color-text-muted); margin-top:10px;">
+      <span class="bento-count-chip">{{ usuarios|length }}</span>
+      {{ t('users_registered_in_system') }}
+    </p>
+  </div>
 
   <!-- Tabela de Usuários -->
-  <div class="bg-surface-base border border-surface-border rounded-dtx-lg shadow-dtx-sm overflow-hidden">
-    <div class="overflow-x-auto max-w-full custom-scrollbar">
-      <table class="min-w-full divide-y divide-surface-border">
-        <thead class="bg-surface-raised">
+  <div class="bento-card bento-table-scope" style="padding:0; overflow:hidden;">
+    <div style="overflow-x:auto;">
+      <table>
+        <thead>
           <tr>
-            <th class="px-6 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">
-              {{ t('email') }}
-            </th>
-            <th class="px-6 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">
-              {{ t('name') }}
-            </th>
-            <th class="px-6 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">
-              {{ t('profile') }}
-            </th>
-            <th class="px-6 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">
-              {{ t('area_sector') }}
-            </th>
-            <th class="px-6 py-4 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">
-              {{ t('actions') }}
-            </th>
+            <th>{{ t('email') }}</th>
+            <th>{{ t('name') }}</th>
+            <th>{{ t('profile') }}</th>
+            <th>{{ t('area_sector') }}</th>
+            <th style="text-align:right;">{{ t('actions') }}</th>
           </tr>
         </thead>
-        <tbody class="divide-y divide-surface-border">
+        <tbody>
           {% if usuarios %}
           {% for usuario in usuarios %}
-          <tr class="hover:bg-surface-raised transition-colors">
-            <td class="px-6 py-4 whitespace-nowrap">
-              <span class="text-sm text-slate-600 font-medium font-mono bg-slate-50 px-2 py-1 rounded-dtx-sm">{{ usuario.email }}</span>
+          <tr class="hoverable">
+            <td>
+              <span style="font-family:var(--font-mono,monospace); font-size:12px; background:var(--color-surface-canvas); padding:4px 8px; border-radius:8px;">{{ usuario.email }}</span>
             </td>
-            <td class="px-6 py-4 whitespace-nowrap">
-              <span class="text-sm font-bold text-slate-700">{{ usuario.nome }}</span>
+            <td style="font-weight:800;">{{ usuario.nome }}</td>
+            <td>{{ status_badge(usuario.perfil) }}</td>
+            <td style="font-size:13px; color:var(--color-text-muted);">
+              {{ translate_sector_list(usuario.area) if usuario.area else '-' }}
             </td>
-            <td class="px-6 py-4 whitespace-nowrap">
-              {{ status_badge(usuario.perfil) }}
-            </td>
-            <td class="px-6 py-4 whitespace-nowrap">
-              <span class="text-sm font-medium text-slate-500">
-                {{ translate_sector_list(usuario.area) if usuario.area else '-' }}
-              </span>
-            </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-right align-middle">
-              <div class="flex gap-2 justify-end">
+            <td style="text-align:right;">
+              <div class="flex gap-2 justify-end flex-wrap">
                 {% if current_user.perfil == 'admin' %}
                 <form method="POST" action="{{ url_for('main.resetar_exp_usuario', usuario_id=usuario.id) }}" onsubmit="return confirm(`{{ t('confirm_reset_exp', nome=usuario.nome) }}`)">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                  <button type="submit"
-                          class="inline-flex items-center h-8 px-3 text-xs font-bold rounded-dtx-sm bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 transition-colors"
-                          title="{{ t('reset_exp_btn_title') }}">
+                  <button type="submit" class="bento-row-btn" style="background:var(--color-status-open-bg); color:#b45309;" title="{{ t('reset_exp_btn_title') }}">
                     {{ t('reset_exp_btn') }}
                   </button>
                 </form>
                 {% endif %}
 
-                <a href="{{ url_for('main.editar_usuario', usuario_id=usuario.id) }}"
-                   class="inline-flex items-center h-8 px-3 text-xs font-bold rounded-dtx-sm bg-dtx-50 hover:bg-dtx-100 text-dtx-700 border border-dtx-100 transition-colors">
+                <a href="{{ url_for('main.editar_usuario', usuario_id=usuario.id) }}" class="bento-row-btn edit">
                   {{ t('edit') }}
                 </a>
 
                 {% if usuario.id != current_user.id %}
                 <form method="POST" action="{{ url_for('main.resetar_senha_usuario', usuario_id=usuario.id) }}" onsubmit="return confirm(`{{ t('confirm_reset_password', nome=usuario.nome) }}`)">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                  <button type="submit"
-                          class="inline-flex items-center h-8 px-3 text-xs font-bold rounded-dtx-sm bg-orange-50 hover:bg-orange-100 text-orange-700 border border-orange-200 transition-colors"
-                          title="{{ t('reset_password_btn_title') }}">
+                  <button type="submit" class="bento-row-btn" style="background:#fff7ed; color:#c2410c;" title="{{ t('reset_password_btn_title') }}">
                     {{ t('reset_password_btn') }}
                   </button>
                 </form>
@@ -100,15 +78,12 @@
                 {% if usuario.id != current_user.id %}
                 <form method="POST" action="{{ url_for('main.deletar_usuario', usuario_id=usuario.id) }}" onsubmit="return confirm(`{{ t('confirm_delete_user', nome=usuario.nome) }}`)">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                  <button type="submit"
-                          class="inline-flex items-center h-8 px-3 text-xs font-bold rounded-dtx-sm bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 transition-colors">
+                  <button type="submit" class="bento-row-btn delete">
                     {{ t('delete') }}
                   </button>
                 </form>
                 {% else %}
-                <button type="button" disabled
-                        class="inline-flex items-center h-8 px-3 text-xs font-bold rounded-dtx-sm bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed"
-                        title="{{ t('cannot_delete_yourself') }}">
+                <button type="button" disabled class="bento-row-btn" style="background:var(--color-surface-canvas); color:var(--color-surface-muted); cursor:not-allowed;" title="{{ t('cannot_delete_yourself') }}">
                   {{ t('delete') }}
                 </button>
                 {% endif %}
@@ -118,10 +93,10 @@
           {% endfor %}
           {% else %}
           <tr>
-            <td colspan="5" class="px-6 py-16 text-center text-slate-500">
-              <p class="text-sm font-medium">
+            <td colspan="5" style="text-align:center; padding:56px 16px; color:var(--color-surface-muted);">
+              <p style="font-size:13px; font-weight:600;">
                 {{ t('no_users_registered') }}
-                <a href="{{ url_for('main.novo_usuario_form') }}" class="text-dtx-600 hover:text-dtx-700 font-bold transition-colors ml-1">{{ t('create_now') }}</a>
+                <a href="{{ url_for('main.novo_usuario_form') }}" style="color:var(--color-dtx-500); font-weight:800; margin-left:4px;">{{ t('create_now') }}</a>
               </p>
             </td>
           </tr>

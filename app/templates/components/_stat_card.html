@@ -8,16 +8,16 @@
 #}
 {% macro stat_card(label, value, sublabel="", variant="default") %}
 {%- if variant == "open" -%}
-  {%- set accent = "border-l-4 border-l-amber-400" -%}
+  {%- set accent = "border-t-4 border-t-amber-400" -%}
   {%- set value_color = "text-amber-700" -%}
 {%- elif variant == "active" -%}
-  {%- set accent = "border-l-4 border-l-blue-500" -%}
+  {%- set accent = "border-t-4 border-t-blue-500" -%}
   {%- set value_color = "text-blue-700" -%}
 {%- elif variant == "done" -%}
-  {%- set accent = "border-l-4 border-l-emerald-500" -%}
+  {%- set accent = "border-t-4 border-t-emerald-500" -%}
   {%- set value_color = "text-emerald-700" -%}
 {%- elif variant == "cancelled" -%}
-  {%- set accent = "border-l-4 border-l-rose-500" -%}
+  {%- set accent = "border-t-4 border-t-rose-500" -%}
   {%- set value_color = "text-rose-700" -%}
 {%- else -%}
   {%- set accent = "" -%}

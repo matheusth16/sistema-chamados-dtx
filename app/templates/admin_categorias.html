@@ -2,57 +2,43 @@
 {% from 'components/_page_header.html' import page_header %}
 
 {% block content %}
-<div class="space-y-6">
+<div class="space-y-4">
 
-  {{ page_header(t('category_administration'), subtitle=t('manage_categories_desc')) }}
+  <div class="bento-card">
+    {{ page_header(t('category_administration'), subtitle=t('manage_categories_desc')) }}
+  </div>
 
   <!-- Abas de navegação -->
-  <div class="bg-surface-raised p-1 rounded-dtx-md inline-flex flex-wrap gap-1">
-    <button type="button" onclick="mostrarAba('setores')" id="btn-setores"
-            class="px-5 py-2.5 rounded-dtx-md text-sm font-semibold transition-colors bg-white shadow-dtx-sm text-dtx-600 border border-surface-border">
+  <div class="bento-tabs">
+    <button type="button" onclick="mostrarAba('setores')" id="btn-setores" class="bento-tab active">
       {{ t('sectors') }}
     </button>
-    <button type="button" onclick="mostrarAba('gates')" id="btn-gates"
-            class="px-5 py-2.5 rounded-dtx-md text-sm font-semibold transition-colors text-gray-500 hover:bg-surface-base">
+    <button type="button" onclick="mostrarAba('gates')" id="btn-gates" class="bento-tab">
       {{ t('gates') }}
     </button>
-    <button type="button" onclick="mostrarAba('impactos')" id="btn-impactos"
-            class="px-5 py-2.5 rounded-dtx-md text-sm font-semibold transition-colors text-gray-500 hover:bg-surface-base">
+    <button type="button" onclick="mostrarAba('impactos')" id="btn-impactos" class="bento-tab">
       {{ t('impacts') }}
     </button>
   </div>
 
   <!-- BARRA DE AÇÕES EM LOTE (inline, aparece ao selecionar) -->
-  <div id="batch-bar" class="hidden rounded-dtx-lg border border-dtx-200 bg-dtx-50 px-5 py-3">
-    <div class="flex items-center gap-3 flex-wrap">
-      <svg class="w-4 h-4 text-dtx-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-              d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-      </svg>
-      <span id="batch-count" class="text-sm font-semibold text-dtx-700"></span>
-      <span class="text-dtx-400 text-sm hidden sm:inline">—</span>
-      <span class="text-sm text-dtx-600 hidden sm:inline">{{ t('select_action') }}</span>
-      <div class="flex items-center gap-2 ml-auto">
-        <button type="button" onclick="batchAction('ativar')"
-                class="inline-flex items-center h-8 px-3 text-xs font-bold rounded-dtx-sm bg-emerald-600 hover:bg-emerald-500 text-white transition-colors">
-          {{ t('active_label') }}
-        </button>
-        <button type="button" onclick="batchAction('desativar')"
-                class="inline-flex items-center h-8 px-3 text-xs font-bold rounded-dtx-sm bg-gray-500 hover:bg-gray-400 text-white transition-colors">
-          {{ t('inactive') }}
-        </button>
-        <button type="button" onclick="batchAction('excluir')"
-                class="inline-flex items-center h-8 px-3 text-xs font-bold rounded-dtx-sm bg-red-600 hover:bg-red-500 text-white transition-colors">
-          {{ t('delete') }}
-        </button>
-        <button type="button" onclick="batchClear()"
-                aria-label="Cancelar seleção"
-                class="ml-1 p-1.5 rounded-dtx-sm hover:bg-dtx-100 text-dtx-400 hover:text-dtx-700 transition-colors">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-          </svg>
-        </button>
-      </div>
+  <div id="batch-bar" class="hidden bento-batch-bar">
+    <svg width="16" height="16" style="color:var(--color-dtx-500); flex-shrink:0;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+    </svg>
+    <span id="batch-count" class="count"></span>
+    <span style="color:var(--color-surface-muted); font-size:13px;" class="hidden sm:inline">—</span>
+    <span style="color:var(--color-dtx-500); font-size:13px;" class="hidden sm:inline">{{ t('select_action') }}</span>
+    <div style="display:flex; align-items:center; gap:8px; margin-left:auto;">
+      <button type="button" onclick="batchAction('ativar')" class="bento-batch-btn ok">{{ t('active_label') }}</button>
+      <button type="button" onclick="batchAction('desativar')" class="bento-batch-btn off">{{ t('inactive') }}</button>
+      <button type="button" onclick="batchAction('excluir')" class="bento-batch-btn danger">{{ t('delete') }}</button>
+      <button type="button" onclick="batchClear()" aria-label="Cancelar seleção" class="bento-icon-btn" style="color:var(--color-dtx-500); min-width:32px; min-height:32px; padding:6px;">
+        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+      </button>
     </div>
     <form id="batch-form" method="POST" class="hidden">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -62,84 +48,74 @@
 
   <!-- ABA: SETORES -->
   <div id="aba-setores" class="tab-content">
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <div class="bg-surface-base border border-surface-border rounded-dtx-lg shadow-dtx-sm p-6 h-fit">
-        <h2 class="text-base font-semibold text-gray-900 mb-5 pb-3 border-b border-surface-border">
-          {{ t('new_sector') }}
-        </h2>
-        <form method="POST" action="{{ url_for('main.criar_setor') }}" class="space-y-4">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div class="bento-form-card">
+        <h2>{{ t('new_sector') }}</h2>
+        <form method="POST" action="{{ url_for('main.criar_setor') }}" class="bento-form space-y-4">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
           <div>
-            <label for="setor-nome" class="dtx-label">{{ t('name_portuguese') }}</label>
+            <label for="setor-nome" class="bento-field-label plain">{{ t('name_portuguese') }}</label>
             <input type="text" id="setor-nome" name="nome_pt" required
                    placeholder="{{ t('ex_maintenance') }}"
-                   class="dtx-input">
-            <p class="text-xs text-gray-400 mt-1.5">{{ t('auto_translated_note') }}</p>
+                   class="bento-form">
+            <p style="font-size:12px; color:var(--color-surface-muted); margin-top:6px;">{{ t('auto_translated_note') }}</p>
           </div>
           <div>
-            <label for="setor-descricao" class="dtx-label">{{ t('description_optional') }}</label>
+            <label for="setor-descricao" class="bento-field-label plain">{{ t('description_optional') }}</label>
             <textarea id="setor-descricao" name="descricao_pt"
                       placeholder="{{ t('ex_maintenance_desc') }}"
-                      rows="3" class="dtx-input resize-none"></textarea>
+                      rows="3" class="bento-form" style="resize:none;"></textarea>
           </div>
-          <button type="submit"
-                  class="w-full inline-flex items-center justify-center h-10 px-4 text-sm font-semibold rounded-dtx-md bg-dtx-600 text-white hover:bg-dtx-700 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-dtx-600 mt-2">
+          <button type="submit" class="bento-btn-primary" style="width:100%; justify-content:center;">
             {{ t('add_sector') }}
           </button>
         </form>
       </div>
 
       <div class="lg:col-span-2">
-        <div class="bg-surface-base border border-surface-border rounded-dtx-lg shadow-dtx-sm overflow-hidden">
-          <div class="px-6 py-4 border-b border-surface-border bg-surface-raised flex items-center gap-3">
-            <input type="checkbox" id="select-all-setores"
-                   class="h-4 w-4 rounded border-gray-300 text-dtx-600 focus:ring-dtx-500"
+        <div class="bento-list-card">
+          <div class="head">
+            <input type="checkbox" id="select-all-setores" class="bento-checkbox"
                    onchange="toggleSelectAll('setores')" aria-label="{{ t('select_all') }}">
-            <h2 class="text-base font-semibold text-gray-900">{{ t('registered_sectors') }}</h2>
+            <h2>{{ t('registered_sectors') }}</h2>
           </div>
-          <div class="divide-y divide-surface-border">
-            {% if setores %}
-            {% for setor in setores %}
-            <div class="p-6 hover:bg-surface-raised transition-colors flex gap-4 items-start">
-              <input type="checkbox" class="item-check mt-1 h-4 w-4 rounded border-gray-300 text-dtx-600 focus:ring-dtx-500 shrink-0"
-                     value="{{ setor.id }}" onchange="updateBatchBar()">
-              <div class="flex-1 min-w-0">
-                <div class="flex justify-between items-start mb-2">
-                  <div>
-                    <h3 class="font-semibold text-gray-900">{{ setor.nome_pt }}</h3>
-                    <p class="text-xs text-gray-400 mt-1">EN: {{ setor.nome_en }} <span class="mx-1 text-gray-300">|</span> ES: {{ setor.nome_es }}</p>
-                    {% if setor.descricao_pt %}
-                    <p class="text-sm text-gray-500 mt-2">{{ setor.descricao_pt }}</p>
-                    {% endif %}
-                  </div>
-                  <span class="inline-flex px-2.5 py-1 {% if setor.ativo %}bg-emerald-50 text-emerald-700 border-emerald-200{% else %}bg-gray-50 text-gray-500 border-gray-200{% endif %} text-[10px] font-bold uppercase tracking-wider rounded-dtx-sm border shrink-0 ml-3">
-                    {{ t('active') if setor.ativo else t('inactive') }}
-                  </span>
+          {% if setores %}
+          {% for setor in setores %}
+          <div class="bento-list-item">
+            <input type="checkbox" class="item-check bento-checkbox" style="margin-top:2px;"
+                   value="{{ setor.id }}" onchange="updateBatchBar()">
+            <div class="flex-1 min-w-0">
+              <div class="flex justify-between items-start mb-2" style="gap:12px;">
+                <div>
+                  <h3 style="font-weight:800;">{{ setor.nome_pt }}</h3>
+                  <p style="font-size:12px; color:var(--color-surface-muted); margin-top:4px;">EN: {{ setor.nome_en }} <span style="margin:0 4px;">|</span> ES: {{ setor.nome_es }}</p>
+                  {% if setor.descricao_pt %}
+                  <p style="font-size:13px; color:var(--color-text-muted); margin-top:8px;">{{ setor.descricao_pt }}</p>
+                  {% endif %}
                 </div>
-                <div class="mt-4 flex gap-2">
-                  <button type="button"
-                          onclick='abrirModalSetor({{ setor.id | tojson }}, {{ setor.nome_pt | tojson }}, {{ (setor.descricao_pt or "") | tojson }}, {{ setor.ativo | tojson }})'
-                          aria-label="{{ t('edit') }} {{ setor.nome_pt }}"
-                          class="inline-flex items-center h-8 px-3 text-xs font-bold rounded-dtx-sm bg-dtx-50 hover:bg-dtx-100 text-dtx-700 border border-dtx-100 transition-colors">
-                    {{ t('edit') }}
-                  </button>
-                  <form method="POST" action="{{ url_for('main.excluir_setor', setor_id=setor.id) }}" class="inline" onsubmit="return confirm(`{{ t('confirm_delete_sector') }}`);">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                    <button type="submit"
-                            class="inline-flex items-center h-8 px-3 text-xs font-bold rounded-dtx-sm bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 transition-colors">
-                      {{ t('delete') }}
-                    </button>
-                  </form>
-                </div>
+                <span class="bento-active-chip {{ 'on' if setor.ativo else 'off' }}">
+                  {{ t('active') if setor.ativo else t('inactive') }}
+                </span>
+              </div>
+              <div class="mt-3 flex gap-2">
+                <button type="button"
+                        onclick='abrirModalSetor({{ setor.id | tojson }}, {{ setor.nome_pt | tojson }}, {{ (setor.descricao_pt or "") | tojson }}, {{ setor.ativo | tojson }})'
+                        aria-label="{{ t('edit') }} {{ setor.nome_pt }}" class="bento-row-btn edit">
+                  {{ t('edit') }}
+                </button>
+                <form method="POST" action="{{ url_for('main.excluir_setor', setor_id=setor.id) }}" class="inline" onsubmit="return confirm(`{{ t('confirm_delete_sector') }}`);">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                  <button type="submit" class="bento-row-btn delete">{{ t('delete') }}</button>
+                </form>
               </div>
             </div>
-            {% endfor %}
-            {% else %}
-            <div class="p-8 text-center text-gray-400">
-              <p class="text-sm font-medium">{{ t('no_sectors_registered') }}</p>
-            </div>
-            {% endif %}
           </div>
+          {% endfor %}
+          {% else %}
+          <div style="padding:32px; text-align:center; color:var(--color-surface-muted);">
+            <p style="font-size:13px; font-weight:600;">{{ t('no_sectors_registered') }}</p>
+          </div>
+          {% endif %}
         </div>
       </div>
     </div>
@@ -147,16 +123,14 @@
 
   <!-- ABA: GATES -->
   <div id="aba-gates" class="tab-content hidden">
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <div class="bg-surface-base border border-surface-border rounded-dtx-lg shadow-dtx-sm p-6 h-fit">
-        <h2 class="text-base font-semibold text-gray-900 mb-5 pb-3 border-b border-surface-border">
-          {{ t('new_gate_substep') }}
-        </h2>
-        <form method="POST" action="{{ url_for('main.criar_gate') }}" class="space-y-4">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div class="bento-form-card">
+        <h2>{{ t('new_gate_substep') }}</h2>
+        <form method="POST" action="{{ url_for('main.criar_gate') }}" class="bento-form space-y-4">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
           <div>
-            <label for="gate-pai" class="dtx-label">{{ t('gate_parent_label') }}</label>
-            <select id="gate-pai" name="gate_pai" required class="dtx-select mt-1">
+            <label for="gate-pai" class="bento-field-label plain">{{ t('gate_parent_label') }}</label>
+            <select id="gate-pai" name="gate_pai" required class="bento-form">
               <option value="" disabled selected>{{ t('select_gate_parent') }}</option>
               {% for valor, label in gate_pai_opcoes %}
               {% if valor != 'N/A' %}
@@ -166,92 +140,82 @@
             </select>
           </div>
           <div>
-            <label for="gate-etapa" class="dtx-label">{{ t('gate_step_label') }}</label>
+            <label for="gate-etapa" class="bento-field-label plain">{{ t('gate_step_label') }}</label>
             <input type="text" id="gate-etapa" name="etapa" required
                    placeholder="{{ t('gate_step_input_placeholder') }}"
-                   class="dtx-input">
+                   class="bento-form">
           </div>
           <div>
-            <label for="gate-descricao" class="dtx-label">{{ t('description_optional') }}</label>
+            <label for="gate-descricao" class="bento-field-label plain">{{ t('description_optional') }}</label>
             <textarea id="gate-descricao" name="descricao_pt"
                       placeholder="{{ t('ex_validation_req') }}"
-                      rows="2" class="dtx-input resize-none"></textarea>
+                      rows="2" class="bento-form" style="resize:none;"></textarea>
           </div>
-          <p class="text-xs font-medium text-dtx-700 bg-dtx-50 border border-dtx-100 p-3 rounded-dtx-sm">
+          <p style="font-size:12px; font-weight:600; color:var(--color-dtx-500); background:var(--color-dtx-50); border:1px solid var(--color-dtx-100); padding:12px; border-radius:12px;">
             {{ t('gate_substep_note') }}
           </p>
-          <button type="submit"
-                  class="w-full inline-flex items-center justify-center h-10 px-4 text-sm font-semibold rounded-dtx-md bg-dtx-600 text-white hover:bg-dtx-700 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-dtx-600">
+          <button type="submit" class="bento-btn-primary" style="width:100%; justify-content:center;">
             {{ t('add_gate') }}
           </button>
         </form>
       </div>
 
       <div class="lg:col-span-2">
-        <div class="bg-surface-base border border-surface-border rounded-dtx-lg shadow-dtx-sm overflow-hidden">
-          <div class="px-6 py-4 border-b border-surface-border bg-surface-raised flex items-center gap-3">
-            <input type="checkbox" id="select-all-gates"
-                   class="h-4 w-4 rounded border-gray-300 text-dtx-600 focus:ring-dtx-500"
+        <div class="bento-list-card">
+          <div class="head">
+            <input type="checkbox" id="select-all-gates" class="bento-checkbox"
                    onchange="toggleSelectAll('gates')" aria-label="{{ t('select_all') }}">
-            <h2 class="text-base font-semibold text-gray-900">{{ t('registered_gates') }}</h2>
+            <h2>{{ t('registered_gates') }}</h2>
           </div>
-          <div class="divide-y divide-surface-border">
-            {% if gates %}
-            {% set ns = namespace(gate_pai_atual='') %}
-            {% for gate in gates %}
-            {% if gate.gate_pai and gate.gate_pai != ns.gate_pai_atual %}
-            {% set ns.gate_pai_atual = gate.gate_pai %}
-            <div class="px-6 py-2 bg-surface-raised border-b border-surface-border">
-              <span class="text-xs font-black uppercase tracking-widest text-dtx-600">{{ gate.gate_pai }}</span>
-            </div>
-            {% endif %}
-            <div class="p-6 hover:bg-surface-raised transition-colors flex gap-4 items-start">
-              <input type="checkbox" class="item-check mt-1 h-4 w-4 rounded border-gray-300 text-dtx-600 focus:ring-dtx-500 shrink-0"
-                     value="{{ gate.id }}" onchange="updateBatchBar()">
-              <div class="flex-1 min-w-0">
-                <div class="flex justify-between items-start mb-2">
-                  <div>
-                    <h3 class="font-semibold text-gray-900">
-                      {% if gate.gate_pai and gate.etapa %}
-                      <span class="bg-slate-100 text-slate-600 px-2 py-0.5 rounded-dtx-sm text-xs font-bold mr-2">{{ gate.etapa }}</span>
-                      {% else %}
-                      <span class="bg-slate-100 text-slate-600 px-2 py-0.5 rounded-dtx-sm text-xs font-bold mr-2">#{{ gate.ordem }}</span>
-                      {% endif %}
-                      {{ gate.nome_pt }}
-                    </h3>
-                    <p class="text-xs text-gray-400 mt-1">EN: {{ gate.nome_en }} <span class="mx-1 text-gray-300">|</span> ES: {{ gate.nome_es }}</p>
-                    {% if gate.descricao_pt %}
-                    <p class="text-sm text-gray-500 mt-2">{{ gate.descricao_pt }}</p>
+          {% if gates %}
+          {% set ns = namespace(gate_pai_atual='') %}
+          {% for gate in gates %}
+          {% if gate.gate_pai and gate.gate_pai != ns.gate_pai_atual %}
+          {% set ns.gate_pai_atual = gate.gate_pai %}
+          <div class="bento-list-group-label">{{ gate.gate_pai }}</div>
+          {% endif %}
+          <div class="bento-list-item">
+            <input type="checkbox" class="item-check bento-checkbox" style="margin-top:2px;"
+                   value="{{ gate.id }}" onchange="updateBatchBar()">
+            <div class="flex-1 min-w-0">
+              <div class="flex justify-between items-start mb-2" style="gap:12px;">
+                <div>
+                  <h3 style="font-weight:800;">
+                    {% if gate.gate_pai and gate.etapa %}
+                    <span class="bento-tag-chip">{{ gate.etapa }}</span>
+                    {% else %}
+                    <span class="bento-tag-chip">#{{ gate.ordem }}</span>
                     {% endif %}
-                  </div>
-                  <span class="inline-flex px-2.5 py-1 {% if gate.ativo %}bg-emerald-50 text-emerald-700 border-emerald-200{% else %}bg-gray-50 text-gray-500 border-gray-200{% endif %} text-[10px] font-bold uppercase tracking-wider rounded-dtx-sm border shrink-0 ml-3">
-                    {{ t('active') if gate.ativo else t('inactive') }}
-                  </span>
+                    {{ gate.nome_pt }}
+                  </h3>
+                  <p style="font-size:12px; color:var(--color-surface-muted); margin-top:4px;">EN: {{ gate.nome_en }} <span style="margin:0 4px;">|</span> ES: {{ gate.nome_es }}</p>
+                  {% if gate.descricao_pt %}
+                  <p style="font-size:13px; color:var(--color-text-muted); margin-top:8px;">{{ gate.descricao_pt }}</p>
+                  {% endif %}
                 </div>
-                <div class="mt-4 flex gap-2">
-                  <button type="button"
-                          onclick='abrirModalGate({{ gate.id | tojson }}, {{ (gate.gate_pai or "") | tojson }}, {{ (gate.etapa or gate.nome_pt or "") | tojson }}, {{ (gate.descricao_pt or "") | tojson }}, {{ gate.ativo | tojson }})'
-                          aria-label="{{ t('edit') }} {{ gate.nome_pt }}"
-                          class="inline-flex items-center h-8 px-3 text-xs font-bold rounded-dtx-sm bg-dtx-50 hover:bg-dtx-100 text-dtx-700 border border-dtx-100 transition-colors">
-                    {{ t('edit') }}
-                  </button>
-                  <form method="POST" action="{{ url_for('main.excluir_gate', gate_id=gate.id) }}" class="inline" onsubmit="return confirm(`{{ t('confirm_delete_gate') }}`);">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                    <button type="submit"
-                            class="inline-flex items-center h-8 px-3 text-xs font-bold rounded-dtx-sm bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 transition-colors">
-                      {{ t('delete') }}
-                    </button>
-                  </form>
-                </div>
+                <span class="bento-active-chip {{ 'on' if gate.ativo else 'off' }}">
+                  {{ t('active') if gate.ativo else t('inactive') }}
+                </span>
+              </div>
+              <div class="mt-3 flex gap-2">
+                <button type="button"
+                        onclick='abrirModalGate({{ gate.id | tojson }}, {{ (gate.gate_pai or "") | tojson }}, {{ (gate.etapa or gate.nome_pt or "") | tojson }}, {{ (gate.descricao_pt or "") | tojson }}, {{ gate.ativo | tojson }})'
+                        aria-label="{{ t('edit') }} {{ gate.nome_pt }}" class="bento-row-btn edit">
+                  {{ t('edit') }}
+                </button>
+                <form method="POST" action="{{ url_for('main.excluir_gate', gate_id=gate.id) }}" class="inline" onsubmit="return confirm(`{{ t('confirm_delete_gate') }}`);">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                  <button type="submit" class="bento-row-btn delete">{{ t('delete') }}</button>
+                </form>
               </div>
             </div>
-            {% endfor %}
-            {% else %}
-            <div class="p-8 text-center text-gray-400">
-              <p class="text-sm font-medium">{{ t('no_gates_registered') }}</p>
-            </div>
-            {% endif %}
           </div>
+          {% endfor %}
+          {% else %}
+          <div style="padding:32px; text-align:center; color:var(--color-surface-muted);">
+            <p style="font-size:13px; font-weight:600;">{{ t('no_gates_registered') }}</p>
+          </div>
+          {% endif %}
         </div>
       </div>
     </div>
@@ -259,84 +223,74 @@
 
   <!-- ABA: IMPACTOS -->
   <div id="aba-impactos" class="tab-content hidden">
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <div class="bg-surface-base border border-surface-border rounded-dtx-lg shadow-dtx-sm p-6 h-fit">
-        <h2 class="text-base font-semibold text-gray-900 mb-5 pb-3 border-b border-surface-border">
-          {{ t('new_impact') }}
-        </h2>
-        <form method="POST" action="{{ url_for('main.criar_impacto') }}" class="space-y-4">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div class="bento-form-card">
+        <h2>{{ t('new_impact') }}</h2>
+        <form method="POST" action="{{ url_for('main.criar_impacto') }}" class="bento-form space-y-4">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
           <div>
-            <label for="impacto-nome" class="dtx-label">{{ t('name_portuguese') }}</label>
+            <label for="impacto-nome" class="bento-field-label plain">{{ t('name_portuguese') }}</label>
             <input type="text" id="impacto-nome" name="nome_pt" required
                    placeholder="{{ t('ex_critical') }}"
-                   class="dtx-input">
-            <p class="text-xs text-gray-400 mt-1.5">{{ t('auto_translated_note') }}</p>
+                   class="bento-form">
+            <p style="font-size:12px; color:var(--color-surface-muted); margin-top:6px;">{{ t('auto_translated_note') }}</p>
           </div>
           <div>
-            <label for="impacto-descricao" class="dtx-label">{{ t('description_optional') }}</label>
+            <label for="impacto-descricao" class="bento-field-label plain">{{ t('description_optional') }}</label>
             <textarea id="impacto-descricao" name="descricao_pt"
                       placeholder="{{ t('ex_critical_desc') }}"
-                      rows="3" class="dtx-input resize-none"></textarea>
+                      rows="3" class="bento-form" style="resize:none;"></textarea>
           </div>
-          <button type="submit"
-                  class="w-full inline-flex items-center justify-center h-10 px-4 text-sm font-semibold rounded-dtx-md bg-dtx-600 text-white hover:bg-dtx-700 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-dtx-600">
+          <button type="submit" class="bento-btn-primary" style="width:100%; justify-content:center;">
             {{ t('add_impact') }}
           </button>
         </form>
       </div>
 
       <div class="lg:col-span-2">
-        <div class="bg-surface-base border border-surface-border rounded-dtx-lg shadow-dtx-sm overflow-hidden">
-          <div class="px-6 py-4 border-b border-surface-border bg-surface-raised flex items-center gap-3">
-            <input type="checkbox" id="select-all-impactos"
-                   class="h-4 w-4 rounded border-gray-300 text-dtx-600 focus:ring-dtx-500"
+        <div class="bento-list-card">
+          <div class="head">
+            <input type="checkbox" id="select-all-impactos" class="bento-checkbox"
                    onchange="toggleSelectAll('impactos')" aria-label="{{ t('select_all') }}">
-            <h2 class="text-base font-semibold text-gray-900">{{ t('registered_impacts') }}</h2>
+            <h2>{{ t('registered_impacts') }}</h2>
           </div>
-          <div class="divide-y divide-surface-border">
-            {% if impactos %}
-            {% for impacto in impactos %}
-            <div class="p-6 hover:bg-surface-raised transition-colors flex gap-4 items-start">
-              <input type="checkbox" class="item-check mt-1 h-4 w-4 rounded border-gray-300 text-dtx-600 focus:ring-dtx-500 shrink-0"
-                     value="{{ impacto.id }}" onchange="updateBatchBar()">
-              <div class="flex-1 min-w-0">
-                <div class="flex justify-between items-start mb-2">
-                  <div>
-                    <h3 class="font-semibold text-gray-900">{{ impacto.nome_pt }}</h3>
-                    <p class="text-xs text-gray-400 mt-1">EN: {{ impacto.nome_en }} <span class="mx-1 text-gray-300">|</span> ES: {{ impacto.nome_es }}</p>
-                    {% if impacto.descricao_pt %}
-                    <p class="text-sm text-gray-500 mt-2">{{ impacto.descricao_pt }}</p>
-                    {% endif %}
-                  </div>
-                  <span class="inline-flex px-2.5 py-1 {% if impacto.ativo %}bg-emerald-50 text-emerald-700 border-emerald-200{% else %}bg-gray-50 text-gray-500 border-gray-200{% endif %} text-[10px] font-bold uppercase tracking-wider rounded-dtx-sm border shrink-0 ml-3">
-                    {{ t('active') if impacto.ativo else t('inactive') }}
-                  </span>
+          {% if impactos %}
+          {% for impacto in impactos %}
+          <div class="bento-list-item">
+            <input type="checkbox" class="item-check bento-checkbox" style="margin-top:2px;"
+                   value="{{ impacto.id }}" onchange="updateBatchBar()">
+            <div class="flex-1 min-w-0">
+              <div class="flex justify-between items-start mb-2" style="gap:12px;">
+                <div>
+                  <h3 style="font-weight:800;">{{ impacto.nome_pt }}</h3>
+                  <p style="font-size:12px; color:var(--color-surface-muted); margin-top:4px;">EN: {{ impacto.nome_en }} <span style="margin:0 4px;">|</span> ES: {{ impacto.nome_es }}</p>
+                  {% if impacto.descricao_pt %}
+                  <p style="font-size:13px; color:var(--color-text-muted); margin-top:8px;">{{ impacto.descricao_pt }}</p>
+                  {% endif %}
                 </div>
-                <div class="mt-4 flex gap-2">
-                  <button type="button"
-                          onclick='abrirModalImpacto({{ impacto.id | tojson }}, {{ impacto.nome_pt | tojson }}, {{ (impacto.descricao_pt or "") | tojson }}, {{ impacto.ativo | tojson }})'
-                          aria-label="{{ t('edit') }} {{ impacto.nome_pt }}"
-                          class="inline-flex items-center h-8 px-3 text-xs font-bold rounded-dtx-sm bg-dtx-50 hover:bg-dtx-100 text-dtx-700 border border-dtx-100 transition-colors">
-                    {{ t('edit') }}
-                  </button>
-                  <form method="POST" action="{{ url_for('main.excluir_impacto', impacto_id=impacto.id) }}" class="inline" onsubmit="return confirm(`{{ t('confirm_delete_impact') }}`);">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                    <button type="submit"
-                            class="inline-flex items-center h-8 px-3 text-xs font-bold rounded-dtx-sm bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 transition-colors">
-                      {{ t('delete') }}
-                    </button>
-                  </form>
-                </div>
+                <span class="bento-active-chip {{ 'on' if impacto.ativo else 'off' }}">
+                  {{ t('active') if impacto.ativo else t('inactive') }}
+                </span>
+              </div>
+              <div class="mt-3 flex gap-2">
+                <button type="button"
+                        onclick='abrirModalImpacto({{ impacto.id | tojson }}, {{ impacto.nome_pt | tojson }}, {{ (impacto.descricao_pt or "") | tojson }}, {{ impacto.ativo | tojson }})'
+                        aria-label="{{ t('edit') }} {{ impacto.nome_pt }}" class="bento-row-btn edit">
+                  {{ t('edit') }}
+                </button>
+                <form method="POST" action="{{ url_for('main.excluir_impacto', impacto_id=impacto.id) }}" class="inline" onsubmit="return confirm(`{{ t('confirm_delete_impact') }}`);">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                  <button type="submit" class="bento-row-btn delete">{{ t('delete') }}</button>
+                </form>
               </div>
             </div>
-            {% endfor %}
-            {% else %}
-            <div class="p-8 text-center text-gray-400">
-              <p class="text-sm font-medium">{{ t('no_impacts_registered') }}</p>
-            </div>
-            {% endif %}
           </div>
+          {% endfor %}
+          {% else %}
+          <div style="padding:32px; text-align:center; color:var(--color-surface-muted);">
+            <p style="font-size:13px; font-weight:600;">{{ t('no_impacts_registered') }}</p>
+          </div>
+          {% endif %}
         </div>
       </div>
     </div>
@@ -346,36 +300,31 @@
 
 
 <!-- ══ MODAL DE EDIÇÃO ══════════════════════════════════════════════════════ -->
-<div id="modal-edicao" role="dialog" aria-modal="true" aria-labelledby="modal-titulo"
-     class="fixed inset-0 z-50 hidden">
-  <!-- Overlay -->
-  <div class="absolute inset-0 bg-black/50" onclick="fecharModal()"></div>
-  <!-- Card -->
+<div id="modal-edicao" role="dialog" aria-modal="true" aria-labelledby="modal-titulo" class="bento-modal-overlay hidden">
+  <div class="bento-modal-backdrop" onclick="fecharModal()"></div>
   <div class="relative z-10 flex items-center justify-center min-h-screen p-4">
-    <div class="bg-white rounded-dtx-lg shadow-dtx-sm w-full max-w-md border border-surface-border">
-      <div class="flex items-center justify-between px-6 py-4 border-b border-surface-border">
-        <h2 id="modal-titulo" class="text-base font-bold text-gray-900"></h2>
-        <button type="button" onclick="fecharModal()"
-                aria-label="{{ t('close_modal') }}"
-                class="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <div class="bento-modal-panel">
+      <div class="head">
+        <h2 id="modal-titulo"></h2>
+        <button type="button" onclick="fecharModal()" aria-label="{{ t('close_modal') }}" class="bento-modal-close">
+          <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
           </svg>
         </button>
       </div>
-      <form id="modal-form" method="POST" class="p-6 space-y-4">
+      <form id="modal-form" method="POST" class="bento-form space-y-4" style="padding:24px;">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
 
         <!-- Campos comuns: nome_pt (setor e impacto) -->
         <div id="campo-nome" class="hidden">
-          <label for="modal-nome-pt" class="dtx-label">{{ t('name_portuguese') }}</label>
-          <input type="text" id="modal-nome-pt" name="nome_pt" class="dtx-input mt-1">
+          <label for="modal-nome-pt" class="bento-field-label plain">{{ t('name_portuguese') }}</label>
+          <input type="text" id="modal-nome-pt" name="nome_pt" class="bento-form">
         </div>
 
         <!-- Campos específicos de gate: gate_pai + etapa -->
         <div id="campo-gate-pai" class="hidden">
-          <label for="modal-gate-pai" class="dtx-label">{{ t('gate_parent_label') }}</label>
-          <select id="modal-gate-pai" name="gate_pai" class="dtx-select mt-1">
+          <label for="modal-gate-pai" class="bento-field-label plain">{{ t('gate_parent_label') }}</label>
+          <select id="modal-gate-pai" name="gate_pai" class="bento-form">
             <option value="" disabled>{{ t('select_gate_parent') }}</option>
             {% for valor, label in gate_pai_opcoes %}
             {% if valor != 'N/A' %}
@@ -385,32 +334,28 @@
           </select>
         </div>
         <div id="campo-etapa" class="hidden">
-          <label for="modal-etapa" class="dtx-label">{{ t('gate_step_label') }}</label>
-          <input type="text" id="modal-etapa" name="etapa" class="dtx-input mt-1"
+          <label for="modal-etapa" class="bento-field-label plain">{{ t('gate_step_label') }}</label>
+          <input type="text" id="modal-etapa" name="etapa" class="bento-form"
                  placeholder="{{ t('gate_step_input_placeholder') }}">
         </div>
 
         <!-- Descrição (comum a todos) -->
         <div>
-          <label for="modal-descricao" class="dtx-label">{{ t('description_optional') }}</label>
-          <textarea id="modal-descricao" name="descricao_pt" rows="3"
-                    class="dtx-input mt-1 resize-none"></textarea>
+          <label for="modal-descricao" class="bento-field-label plain">{{ t('description_optional') }}</label>
+          <textarea id="modal-descricao" name="descricao_pt" rows="3" class="bento-form" style="resize:none;"></textarea>
         </div>
 
         <!-- Checkbox Ativo -->
         <div class="flex items-center gap-3 py-1">
-          <input type="checkbox" id="modal-ativo" name="ativo" value="on"
-                 class="h-4 w-4 rounded border-gray-300 text-dtx-600 focus:ring-dtx-600">
-          <label for="modal-ativo" class="text-sm font-medium text-gray-700">{{ t('active_label') }}</label>
+          <input type="checkbox" id="modal-ativo" name="ativo" value="on" class="bento-checkbox">
+          <label for="modal-ativo" style="font-size:13px; font-weight:600;">{{ t('active_label') }}</label>
         </div>
 
         <div class="pt-2 flex gap-3">
-          <button type="submit"
-                  class="flex-1 inline-flex items-center justify-center h-10 px-4 text-sm font-semibold rounded-dtx-md bg-dtx-600 text-white hover:bg-dtx-700 transition-colors">
+          <button type="submit" class="bento-btn-primary" style="flex:1; justify-content:center;">
             {{ t('save_changes') }}
           </button>
-          <button type="button" onclick="fecharModal()"
-                  class="flex-1 inline-flex items-center justify-center h-10 px-4 text-sm font-semibold rounded-dtx-md bg-white text-gray-700 border border-surface-border hover:bg-surface-raised transition-colors">
+          <button type="button" onclick="fecharModal()" class="bento-btn-outline" style="flex:1; justify-content:center;">
             {{ t('close_modal') }}
           </button>
         </div>
@@ -425,14 +370,9 @@ let currentTab = 'setores';
 function mostrarAba(abaName) {
     batchClear();
     document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
-    document.querySelectorAll('[id^="btn-"]').forEach(btn => {
-        btn.classList.remove('bg-white', 'shadow-dtx-sm', 'text-dtx-600', 'border', 'border-surface-border');
-        btn.classList.add('text-gray-500');
-    });
+    document.querySelectorAll('.bento-tab').forEach(btn => btn.classList.remove('active'));
     document.getElementById(`aba-${abaName}`).classList.remove('hidden');
-    const activeBtn = document.getElementById(`btn-${abaName}`);
-    activeBtn.classList.remove('text-gray-500');
-    activeBtn.classList.add('bg-white', 'shadow-dtx-sm', 'text-dtx-600', 'border', 'border-surface-border');
+    document.getElementById(`btn-${abaName}`).classList.add('active');
     sessionStorage.setItem('adminCategoriasAba', abaName);
     currentTab = abaName;
 }

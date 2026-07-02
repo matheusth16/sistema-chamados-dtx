@@ -498,3 +498,296 @@ class TestListarChamadosComoObservadorFallback:
 
         assert len(result) == 1
         mock_db.collection.return_value.order_by.assert_not_called()
+
+    def test_query_array_contains_falha_aciona_fallback(self):
+        """Exceção na query observadores_ids (linhas 142-144) força o scan em memória."""
+        from app.services.chamados_listagem_service import listar_chamados_como_observador
+
+        doc_match = _make_doc(
+            "ch1",
+            {"status": "Aberto", "observadores": [{"usuario_id": "obs_1"}]},
+        )
+
+        mock_db = MagicMock()
+        mock_db.collection.return_value.where.return_value.limit.return_value.stream.side_effect = (
+            Exception("índice ausente")
+        )
+        mock_db.collection.return_value.order_by.return_value.limit.return_value.stream.return_value = [
+            doc_match
+        ]
+
+        with (
+            patch("app.services.chamados_listagem_service.db", mock_db),
+            patch("app.services.chamados_listagem_service.Chamado") as mock_chamado_cls,
+        ):
+            mock_chamado_cls.from_dict.return_value = MagicMock()
+            result = listar_chamados_como_observador("obs_1")
+
+        assert len(result) == 1
+
+    def test_scan_fallback_tambem_falha_retorna_lista_vazia(self):
+        """Exceção no scan de fallback (linhas 154-156) retorna lista vazia sem propagar erro."""
+        from app.services.chamados_listagem_service import listar_chamados_como_observador
+
+        mock_db = MagicMock()
+        mock_db.collection.return_value.where.return_value.limit.return_value.stream.side_effect = (
+            Exception("índice ausente")
+        )
+        mock_db.collection.return_value.order_by.return_value.limit.return_value.stream.side_effect = Exception(
+            "scan falhou"
+        )
+
+        with patch("app.services.chamados_listagem_service.db", mock_db):
+            result = listar_chamados_como_observador("obs_1")
+
+        assert result == []
+
+    def test_fallback_ignora_doc_invalido_no_from_dict(self):
+        """Doc que gera exceção no from_dict (linhas 180-181) é ignorado, não propaga erro."""
+        from app.services.chamados_listagem_service import listar_chamados_como_observador
+
+        doc_invalido = _make_doc(
+            "invalido", {"status": "Aberto", "observadores": [{"usuario_id": "obs_1"}]}
+        )
+
+        mock_db = MagicMock()
+        mock_db.collection.return_value.where.return_value.limit.return_value.stream.return_value = []
+        mock_db.collection.return_value.order_by.return_value.limit.return_value.stream.return_value = [
+            doc_invalido,
+        ]
+
+        with (
+            patch("app.services.chamados_listagem_service.db", mock_db),
+            patch("app.services.chamados_listagem_service.Chamado") as mock_chamado_cls,
+        ):
+            mock_chamado_cls.from_dict.side_effect = ValueError("dado inválido")
+            result = listar_chamados_como_observador("obs_1")
+
+        assert result == []
+
+    def test_doc_com_to_dict_vazio_e_ignorado_no_path_direto(self):
+        """Doc com to_dict() vazio (linha 176) é ignorado quando a query direta já retorna docs."""
+        from app.services.chamados_listagem_service import listar_chamados_como_observador
+
+        doc_vazio = MagicMock()
+        doc_vazio.id = "vazio"
+        doc_vazio.to_dict.return_value = {}
+        doc_valido = _make_doc(
+            "valido", {"status": "Aberto", "observadores": [{"usuario_id": "obs_1"}]}
+        )
+
+        mock_db = MagicMock()
+        mock_db.collection.return_value.where.return_value.limit.return_value.stream.return_value = [
+            doc_vazio,
+            doc_valido,
+        ]
+
+        with (
+            patch("app.services.chamados_listagem_service.db", mock_db),
+            patch("app.services.chamados_listagem_service.Chamado") as mock_chamado_cls,
+        ):
+            mock_chamado_cls.from_dict.return_value = MagicMock()
+            result = listar_chamados_como_observador("obs_1")
+
+        assert len(result) == 1
+
+
+# ── _data_key (linhas 59-61) ──────────────────────────────────────────────────
+
+
+def test_data_key_usa_to_pydatetime_quando_disponivel():
+    """_data_key converte timestamp do Firestore via to_pydatetime (linha 60)."""
+    import datetime
+
+    from app.services.chamados_listagem_service import listar_meus_chamados_fallback
+
+    dt_esperado = datetime.datetime(2026, 1, 1, tzinfo=datetime.UTC)
+    data_mock = MagicMock()
+    data_mock.to_pydatetime.return_value = dt_esperado
+    doc = _make_doc("c1", {"status": "Aberto", "prioridade": 1, "data_abertura": data_mock})
+
+    with patch("app.services.chamados_listagem_service.db") as mock_db:
+        mock_db.collection.return_value.where.return_value.limit.return_value.stream.return_value = [
+            doc
+        ]
+        with patch("app.services.chamados_listagem_service.Chamado") as mock_chamado_cls:
+            mock_chamado_cls.from_dict.return_value = MagicMock(rl_codigo="", prioridade=1)
+            result = listar_meus_chamados_fallback("u1", "", 10, 1)
+
+    assert len(result["chamados"]) == 1
+
+
+def test_data_key_retorna_datetime_puro_sem_to_pydatetime():
+    """_data_key retorna o valor bruto quando não tem to_pydatetime (linha 61)."""
+    import datetime
+
+    from app.services.chamados_listagem_service import listar_meus_chamados_fallback
+
+    dt_puro = datetime.datetime(2026, 1, 1, tzinfo=datetime.UTC)
+    doc = _make_doc("c1", {"status": "Aberto", "prioridade": 1, "data_abertura": dt_puro})
+
+    with patch("app.services.chamados_listagem_service.db") as mock_db:
+        mock_db.collection.return_value.where.return_value.limit.return_value.stream.return_value = [
+            doc
+        ]
+        with patch("app.services.chamados_listagem_service.Chamado") as mock_chamado_cls:
+            mock_chamado_cls.from_dict.return_value = MagicMock(rl_codigo="", prioridade=1)
+            result = listar_meus_chamados_fallback("u1", "", 10, 1)
+
+    assert len(result["chamados"]) == 1
+
+
+# ── listar_meus_chamados: filtros status/rl_codigo e branches de erro ────────
+
+
+def test_listar_meus_chamados_aplica_filtro_status_e_rl(monkeypatch):
+    """status_filtro e rl_codigo aplicam .where() extras (linhas 204, 206, 212)."""
+    from app.services.chamados_listagem_service import listar_meus_chamados
+
+    with (
+        patch("app.services.chamados_listagem_service.db") as mock_db,
+        patch("app.services.chamados_listagem_service.obter_total_por_contagem", return_value=0),
+        patch("app.cache.cache_get", return_value=None),
+        patch("app.cache.cache_set"),
+    ):
+        mock_q = MagicMock()
+        mock_db.collection.return_value.where.return_value = mock_q
+        mock_q.where.return_value = mock_q
+        mock_q.order_by.return_value = mock_q
+        mock_q.limit.return_value = mock_q
+        mock_q.stream.return_value = []
+
+        result = listar_meus_chamados("u1", status_filtro="Aberto", rl_codigo="RL-1")
+
+    assert result["chamados"] == []
+    # .where() extra por status e por rl_codigo (2x no q + 1x no base_ref)
+    assert mock_q.where.call_count >= 2
+
+
+def test_listar_meus_chamados_cache_get_falha_recalcula_status_counts():
+    """Exceção em cache_get (linhas 222-223) faz status_counts ser recalculado do zero."""
+    from app.services.chamados_listagem_service import listar_meus_chamados
+
+    with (
+        patch("app.services.chamados_listagem_service.db") as mock_db,
+        patch("app.services.chamados_listagem_service.obter_total_por_contagem", return_value=2),
+        patch("app.services.chamados_listagem_service.Chamado") as mock_chamado_cls,
+        patch("app.cache.cache_get", side_effect=Exception("cache indisponível")),
+        patch("app.cache.cache_set"),
+    ):
+        mock_q = MagicMock()
+        mock_db.collection.return_value.where.return_value = mock_q
+        mock_q.where.return_value = mock_q
+        mock_q.order_by.return_value = mock_q
+        mock_q.limit.return_value = mock_q
+        mock_q.stream.return_value = []
+        mock_chamado_cls.from_dict.return_value = MagicMock(rl_codigo="", prioridade=1)
+
+        result = listar_meus_chamados("u1")
+
+    assert result["total_chamados"] == 2
+
+
+def test_listar_meus_chamados_cache_set_falha_nao_propaga(monkeypatch):
+    """Exceção em cache_set (linhas 251-252) é silenciada, não quebra a listagem."""
+    from app.services.chamados_listagem_service import listar_meus_chamados
+
+    with (
+        patch("app.services.chamados_listagem_service.db") as mock_db,
+        patch("app.services.chamados_listagem_service.obter_total_por_contagem", return_value=0),
+        patch("app.cache.cache_get", return_value=None),
+        patch("app.cache.cache_set", side_effect=Exception("cache indisponível")),
+    ):
+        mock_q = MagicMock()
+        mock_db.collection.return_value.where.return_value = mock_q
+        mock_q.where.return_value = mock_q
+        mock_q.order_by.return_value = mock_q
+        mock_q.limit.return_value = mock_q
+        mock_q.stream.return_value = []
+
+        result = listar_meus_chamados("u1")
+
+    assert result["total_chamados"] == 0
+
+
+def test_listar_meus_chamados_cursor_get_lanca_excecao_usa_limite_simples():
+    """Exceção ao buscar o doc do cursor (linhas 264-266) cai no limite simples sem propagar erro."""
+    from app.services.chamados_listagem_service import listar_meus_chamados
+
+    with (
+        patch("app.services.chamados_listagem_service.db") as mock_db,
+        patch("app.services.chamados_listagem_service.obter_total_por_contagem", return_value=0),
+        patch("app.cache.cache_get", return_value=None),
+        patch("app.cache.cache_set"),
+    ):
+        mock_q = MagicMock()
+        mock_db.collection.return_value.where.return_value = mock_q
+        mock_q.where.return_value = mock_q
+        mock_q.order_by.return_value = mock_q
+        mock_q.limit.return_value = mock_q
+        mock_q.stream.return_value = []
+        mock_db.collection.return_value.document.return_value.get.side_effect = Exception(
+            "cursor corrompido"
+        )
+
+        result = listar_meus_chamados("u1", cursor="cursor_corrompido")
+
+    assert result["chamados"] == []
+
+
+def test_listar_meus_chamados_ignora_doc_vazio_e_invalido():
+    """Doc sem dados (linha 282) e doc inválido no from_dict (284-285) são ignorados."""
+    from app.services.chamados_listagem_service import listar_meus_chamados
+
+    doc_vazio = MagicMock()
+    doc_vazio.id = "vazio"
+    doc_vazio.to_dict.return_value = {}
+    doc_invalido = _make_doc("invalido", {"status": "Aberto", "prioridade": 1})
+
+    with (
+        patch("app.services.chamados_listagem_service.db") as mock_db,
+        patch("app.services.chamados_listagem_service.obter_total_por_contagem", return_value=2),
+        patch("app.services.chamados_listagem_service.Chamado") as mock_chamado_cls,
+        patch("app.cache.cache_get", return_value=None),
+        patch("app.cache.cache_set"),
+    ):
+        mock_q = MagicMock()
+        mock_db.collection.return_value.where.return_value = mock_q
+        mock_q.where.return_value = mock_q
+        mock_q.order_by.return_value = mock_q
+        mock_q.limit.return_value = mock_q
+        mock_q.stream.return_value = [doc_vazio, doc_invalido]
+        mock_chamado_cls.from_dict.side_effect = ValueError("dado inválido")
+
+        result = listar_meus_chamados("u1")
+
+    assert result["chamados"] == []
+
+
+def test_listar_meus_chamados_prioridade_zero_define_grupo_projeto():
+    """Chamado com prioridade=0 marca _grupo_prio[rl]=0 (linha 294)."""
+    from app.services.chamados_listagem_service import listar_meus_chamados
+
+    doc = _make_doc("c1", {"status": "Aberto", "prioridade": 0})
+
+    with (
+        patch("app.services.chamados_listagem_service.db") as mock_db,
+        patch("app.services.chamados_listagem_service.obter_total_por_contagem", return_value=1),
+        patch("app.services.chamados_listagem_service.Chamado") as mock_chamado_cls,
+        patch("app.cache.cache_get", return_value=None),
+        patch("app.cache.cache_set"),
+    ):
+        mock_q = MagicMock()
+        mock_db.collection.return_value.where.return_value = mock_q
+        mock_q.where.return_value = mock_q
+        mock_q.order_by.return_value = mock_q
+        mock_q.limit.return_value = mock_q
+        mock_q.stream.return_value = [doc]
+        c = MagicMock()
+        c.rl_codigo = "RL-PROJ"
+        c.prioridade = 0
+        mock_chamado_cls.from_dict.return_value = c
+
+        result = listar_meus_chamados("u1")
+
+    assert result["chamados"][0].grupo_key == "0|RL-PROJ"

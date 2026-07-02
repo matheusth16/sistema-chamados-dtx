@@ -1,13 +1,13 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-06-30T19:05:16.620Z",
+  "generatedAt": "2026-07-01T09:30:00.000Z",
   "title": "Design System: DTX Service Portal",
   "extensions": {
     "colorMeta": {
       "dtx-700": { "role": "primary", "displayName": "Azul DTX", "canonical": "#13274b", "tonalRamp": ["#f4f6fb", "#e4eaf6", "#c1d0ec", "#81a0da", "#3f70ca", "#284e95", "#1d3b72", "#13274b", "#0c1931", "#070f1d"] },
       "dtx-500": { "role": "primary", "displayName": "Azul DTX — Ação", "canonical": "#284e95" },
       "dtx-600": { "role": "primary", "displayName": "Azul DTX — Hover", "canonical": "#1d3b72" },
-      "dtx-400": { "role": "primary", "displayName": "Azul DTX — Dark Action", "canonical": "#3f70ca" },
+      "dtx-400": { "role": "primary", "displayName": "Azul DTX — Acento", "canonical": "#3f70ca" },
       "status-open": { "role": "secondary", "displayName": "Âmbar Aberto", "canonical": "#78350F" },
       "status-active": { "role": "secondary", "displayName": "Azul Em Atendimento", "canonical": "#1E3A8A" },
       "status-done": { "role": "secondary", "displayName": "Verde Concluído", "canonical": "#065F46" },
@@ -20,9 +20,9 @@
       "surface-muted": { "role": "neutral", "displayName": "Muted", "canonical": "#8B9EC0" }
     },
     "typographyMeta": {
-      "display": { "displayName": "Display — Plus Jakarta Sans", "purpose": "Título de página (_page_header.html); escala maior e font-black apenas no hero do login." },
-      "body": { "displayName": "Body — Inter", "purpose": "Texto corrido, células de tabela, formulários." },
-      "label": { "displayName": "Label — Inter Black Uppercase", "purpose": "Badges de status, rótulos de navbar, cabeçalhos de coluna — micro-tipografia técnica." },
+      "display": { "displayName": "Display — Manrope", "purpose": "Título de página (_page_header.html); escala maior e font-black apenas no hero do login. Hierarquia vem de peso/tamanho, não de família — mesma fonte do body." },
+      "body": { "displayName": "Body — Manrope", "purpose": "Texto corrido, células de tabela, formulários. Substituiu Inter a partir do redesign de 2026-07 (primeira página: login)." },
+      "label": { "displayName": "Label — Manrope Black Uppercase", "purpose": "Badges de status, rótulos de navbar, cabeçalhos de coluna — micro-tipografia técnica." },
       "mono": { "displayName": "Mono — JetBrains Mono", "purpose": "Reservada para identificadores técnicos; carregada mas hoje subutilizada (ver Do's e Don'ts)." }
     },
     "shadows": [
@@ -95,29 +95,32 @@
     "northStar": "A Torre de Controle DTX",
     "overview": "O DTX Service Portal é o sistema de chamados internos da DTX Aerospace — uma operação aeroespacial, não uma startup de SaaS. O visual existe para transmitir confiança, controle e eficiência: cada chamado é um sinal que precisa ser visto, classificado e resolvido sem ambiguidade, por dois públicos com necessidades físicas opostas. No escritório (supervisores, admins, analistas), o sistema se comporta como um painel de controle Swiss-industrial: hierarquia densa, tipografia bold, grid rígido, modo claro. No chão de fábrica (mecânicos, engenheiros), vira telemetria tática: contraste extremo, leitura a distância, modo escuro como ferramenta de acessibilidade — não como preferência estética. O toggle claro/escuro não é um extra: é a principal adaptação de acessibilidade do produto. O sistema rejeita explicitamente a estética de SaaS genérico: nada de cards flutuantes sem propósito, paleta usada como decoração, ou flat design sem hierarquia. Cor é dado — o Azul DTX e as cores semânticas de status aparecem onde há ação ou significado, nunca como estilo gratuito.",
     "keyCharacteristics": [
-      "Ancorado em uma única cor de marca (#13274b, Azul DTX) expressa como escala completa de 9 tons, com tokens distintos para light e dark mode.",
-      "Tipografia dupla intencional: Plus Jakarta Sans para hierarquia de página, Inter para corpo e dados densos, JetBrains Mono reservado para identificadores técnicos.",
+      "Ancorado em uma única cor de marca (#13274b, Azul DTX) expressa como escala completa de 9 tons. Tema único light (dark mode removido em 2026-07-01).",
+      "Tipografia unificada: Manrope para hierarquia de página e corpo/dados densos (peso separa título de dado, não a família), JetBrains Mono reservado para identificadores técnicos.",
       "Elevação real (sombras + gradientes), não flat design — aplicada com critério: cards em repouso, gradiente reservado para a ação primária.",
       "Densidade alta nas tabelas de chamados (telemetria), respiro generoso nas páginas de navegação.",
-      "Dois conjuntos de tokens completos (:root e html.dark) compartilhando os mesmos nomes de variável — nenhum componente precisa de lógica condicional de tema."
+      "Tokens de cor vivem só em :root — nenhum componente precisa de lógica condicional de tema."
     ],
     "rules": [
       { "name": "A Regra da Cor-Como-Dado", "body": "O Azul DTX nunca decora — ele marca ação (botão primário), seleção (linha ativa, foco) ou estrutura de marca (navbar). Se uma cor não está comunicando estado ou hierarquia, ela é cinza neutro.", "section": "colors" },
-      { "name": "A Regra do Par Completo", "body": "Todo token de cor existe em dois valores — um para :root, um para html.dark — sob o mesmo nome de variável CSS. Nenhum componente decide cor por tema; ele só referencia o token.", "section": "colors" },
-      { "name": "A Regra Macro/Micro", "body": "Hierarquia de página usa peso (Plus Jakarta Sans bold/black); hierarquia de dado usa tamanho + tracking (Inter uppercase tracking-widest). As duas nunca se misturam no mesmo elemento.", "section": "typography" },
+      { "name": "A Regra do Token Único", "body": "Todo token de cor vive em :root sob um nome de variável CSS semântico. Nenhum componente hardcoda hex; ele só referencia o token.", "section": "colors" },
+      { "name": "A Regra Macro/Micro", "body": "Hierarquia de página usa peso (Manrope bold/black); hierarquia de dado usa tamanho + tracking (Manrope uppercase tracking-widest). As duas nunca se misturam no mesmo elemento.", "section": "typography" },
       { "name": "A Regra do Destaque Único", "body": "Gradiente é reservado para no máximo uma ação por tela — o botão primário. Cards, badges e navegação secundária permanecem em cor sólida.", "section": "elevation" }
     ],
     "dos": [
-      "Do usar o par de tokens :root / html.dark para qualquer cor nova — nunca um hex hardcoded que só funciona em um tema.",
+      "Do usar o token semântico em :root pra qualquer cor nova — nunca um hex hardcoded solto no template.",
       "Do reservar gradiente para uma única ação primária por tela (Regra do Destaque Único).",
-      "Do usar .dtx-card-raised (borda superior de 3px na cor do destaque) quando um card precisa de ênfase — esse é o padrão sancionado de card importante.",
+      "Do usar .dtx-card-raised (borda superior de 3-4px na cor do destaque, cantos superiores retos via rounded-t-none/rounded-b-*) quando um card ou callout precisa de ênfase.",
+      "Do usar fundo tintado (sem borda) para sinalizar uma linha de tabela (<tr>) — padrão em _ticket_row_dashboard.html, _ticket_row_meus_chamados.html e _rl_header.html.",
+      "Do usar a escala semântica de z-index (z-sticky:10, z-nav:20, z-dropdown:30, z-modal:40, z-toast:50) para qualquer elemento fixo/sticky/absoluto novo — nunca um z-[N] arbitrário. O skip-link é a única exceção deliberada, em z-[9999].",
       "Do manter alvos de toque ≥44×44px em qualquer elemento interativo da navbar e células de tabela com ação.",
-      "Do testar toda decisão visual nos dois temas — escritório (light) e chão de fábrica (dark) — antes de considerar um componente pronto."
+      "Do testar toda decisão visual pros dois públicos — escritório e chão de fábrica — dentro do único tema light, verificando contraste em condições de luz industrial."
     ],
     "donts": [
-      "Don't usar border-left/border-right colorido como faixa de destaque — está banido pelo sistema. Já existe em 8 arquivos (_stat_card.html, _ticket_row_dashboard.html e outros) como dívida visual herdada; substituir por fundo tintado, ícone líder ou a borda-superior já sancionada.",
+      "Don't reintroduzir dark mode (html.dark, toggle, prefers-color-scheme). Removido em 2026-07-01 por decisão de produto: sistema é light-only.",
+      "Don't usar border-left/border-right colorido como faixa de destaque — está banido pelo sistema. Resolvido em 2026-07-01: as 8 ocorrências foram migradas para borda-superior (boxes/cards) ou fundo tintado (linhas de tabela).",
       "Don't deixar a paleta conservadora demais — o Azul DTX hoje só aparece em dtx-600/navbar na maior parte das telas; cor de status deve carregar mais peso informativo nas tabelas e dashboards.",
-      "Don't usar valores de z-index arbitrários (z-[200], z-[210], z-[250]) quando a escala semântica já existe em tailwind.config.js (z-nav, z-dropdown, z-modal, z-toast) — migrar navbar/dropdown/toasts para os tokens.",
+      "Don't usar valores de z-index arbitrários (z-[N]) quando a escala semântica existe. Resolvido em 2026-07-01: navbar, dropdowns, toasts, banners, modais e cabeçalhos sticky migrados para os tokens; o banner de web push foi promovido de z-[190] para z-toast, corrigindo uma inconsistência real com as flash messages.",
       "Don't carregar JetBrains Mono sem aplicá-la de forma consistente — ou vira padrão para todo ID/timestamp técnico, ou o <link> deve ser removido.",
       "Don't referenciar o nome de produto Digital Andon em código novo — o nome oficial atual é DTX Service Portal; a navbar ainda exibe DIGITAL ANDON e precisa de atualização futura.",
       "Don't parecer um SaaS genérico: nada de cards flutuantes sem propósito, paleta usada como decoração, ou flat design sem hierarquia."

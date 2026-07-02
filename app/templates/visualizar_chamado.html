@@ -6,11 +6,11 @@
 {% set tem_participantes_pendentes = participantes_pendentes | length > 0 %}
 {% set participante_atual = (chamado.participantes | selectattr('supervisor_id', 'equalto', current_user.id) | list | first) if chamado.participantes else none %}
 {% set pode_concluir_parte = participante_atual is not none and participante_atual['status'] != 'concluido' %}
-<div class="max-w-5xl mx-auto space-y-3 -mt-2">
+<div class="max-w-5xl mx-auto space-y-3">
     <!-- Voltar: avisa a aba Gestão para atualizar o chamado, fecha a aba (ou redireciona se o navegador bloquear). -->
     <div>
-        <a href="{{ voltar_url | default(url_for(dashboard_endpoint)) }}" id="btn-voltar-detalhes" data-chamado-id="{{ chamado.id }}" class="inline-flex items-center text-sm font-medium text-gray-500 hover:text-dtx-600 transition-colors bg-white px-3 py-1.5 rounded-dtx-md shadow-dtx-sm border border-surface-border">
-            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+        <a href="{{ voltar_url | default(url_for(dashboard_endpoint)) }}" id="btn-voltar-detalhes" data-chamado-id="{{ chamado.id }}" class="bento-btn-outline">
+            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
             {{ t('back') if t else 'Voltar' }}
         </a>
     </div>
@@ -33,57 +33,57 @@
     </script>
 
     <!-- Ticket Card -->
-    <div class="gsap-animate bg-surface-base rounded-dtx-lg border border-surface-border shadow-dtx-sm flex flex-col overflow-hidden">
+    <div class="gsap-animate bento-card" style="padding:0; overflow:hidden;">
 
         <!-- Header -->
-        <div class="px-5 py-4 border-b border-surface-border flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white gap-3">
+        <div style="padding:20px 24px; border-bottom:1px solid var(--color-surface-border); display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:12px;">
             <div>
-                <div class="flex flex-wrap items-center gap-3 mb-1">
-                    <h3 class="font-display text-2xl font-black text-gray-800">{{ t('ticket_num') if t else 'Chamado ' }}{{ chamado.numero_chamado }}</h3>
-                    <div class="flex items-center space-x-2">
-                        <span class="px-2.5 py-1 {% if chamado.categoria == 'Projetos' %}bg-rose-100 text-rose-700{% else %}bg-dtx-50 text-dtx-700{% endif %} rounded-dtx-sm text-xs font-bold uppercase tracking-wider">
+                <div class="flex flex-wrap items-center gap-3" style="margin-bottom:6px;">
+                    <h1 class="font-display" style="font-size:1.4rem; font-weight:900;">{{ t('ticket_num') if t else 'Chamado ' }}{{ chamado.numero_chamado }}</h1>
+                    <div class="flex items-center gap-2">
+                        <span class="bento-header-chip {% if chamado.categoria == 'Projetos' %}rose{% else %}accent{% endif %}">
                             {{ translate_category(chamado.categoria) if chamado.categoria else chamado.categoria }}
                         </span>
                         {% if chamado.tipo_solicitacao %}
-                        <span class="px-2.5 py-1 bg-gray-100 text-gray-600 rounded-dtx-sm text-xs font-bold uppercase tracking-wider">
+                        <span class="bento-header-chip neutral">
                             {{ translate_sector(chamado.tipo_solicitacao) if chamado.tipo_solicitacao else chamado.tipo_solicitacao }}
                         </span>
                         {% endif %}
                         {% if chamado.rl_codigo %}
-                        <span class="px-2.5 py-1 bg-rose-50 text-rose-700 rounded-dtx-sm text-xs font-bold uppercase tracking-wider">
+                        <span class="bento-header-chip rose">
                             {{ t('rl_short') if t else 'RL ' }} {{ chamado.rl_codigo }}
                         </span>
                         {% endif %}
                     </div>
                 </div>
-                <p class="text-gray-500 text-sm font-medium">{{ t('complete_details') if t else 'Detalhes completos da solicitação' }}</p>
+                <p style="font-size:13px; color:var(--color-text-muted);">{{ t('complete_details') if t else 'Detalhes completos da solicitação' }}</p>
             </div>
 
             {% if current_user.perfil in ['admin', 'supervisor'] %}
-            <a href="{{ url_for('main.visualizar_historico', chamado_id=chamado.id) }}" class="inline-flex items-center text-sm font-bold text-dtx-600 bg-dtx-50 hover:bg-dtx-100 px-5 py-2.5 rounded-dtx-md transition-colors border border-dtx-100/50">
-                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            <a href="{{ url_for('main.visualizar_historico', chamado_id=chamado.id) }}" class="bento-btn-outline">
+                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                 {{ t('view_history') if t else 'Ver Histórico' }}
             </a>
             {% endif %}
         </div>
 
         <!-- Body -->
-        <div class="p-6 bg-surface-canvas">
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div style="padding:24px; background:var(--color-surface-canvas);">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
                 <!-- Coluna Principal (Esquerda) -->
-                <div class="lg:col-span-2 space-y-6">
+                <div class="lg:col-span-2 space-y-4">
 
                     <!-- Descrição -->
-                    <div class="bg-surface-base rounded-dtx-md border border-surface-border p-6">
-                        <label for="modal-descricao" class="block text-[11px] font-black text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2">
-                            <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"></path></svg>
+                    <div class="bento-panel">
+                        <label for="modal-descricao" class="bento-panel-label">
+                            <svg width="16" height="16" style="color:var(--color-surface-muted);" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"></path></svg>
                             {{ t('problem_description') if t else 'Descrição do Problema' }}
                         </label>
 
                         {% if pode_editar %}
                         <textarea id="modal-descricao" form="form-status" name="nova_descricao" rows="4"
-                            class="dtx-input resize-none overflow-hidden"
+                            class="bento-form" style="resize:none; overflow:hidden;"
                             placeholder="{{ t('edit_description_placeholder') if t else 'Descreva o chamado' }}"
                             oninput="this.style.height = ''; this.style.height = this.scrollHeight + 'px'">{{ chamado.descricao }}</textarea>
                         <script nonce="{{ csp_nonce }}">
@@ -96,18 +96,18 @@
                             });
                         </script>
                         {% else %}
-                        <div class="bg-surface-raised p-5 rounded-dtx-md text-sm text-gray-700 font-medium leading-relaxed border border-surface-border whitespace-pre-line">{{ chamado.descricao }}</div>
+                        <div style="background:var(--color-surface-canvas); padding:16px; border-radius:14px; font-size:13px; line-height:1.6; white-space:pre-line;">{{ chamado.descricao }}</div>
                         {% endif %}
                     </div>
 
                     <!-- Arquivos e Anexos -->
-                    <div class="bg-surface-base rounded-dtx-md border border-surface-border p-6">
-                        <label class="block text-[11px] font-black text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                            <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path></svg>
+                    <div class="bento-panel">
+                        <label class="bento-panel-label">
+                            <svg width="16" height="16" style="color:var(--color-surface-muted);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path></svg>
                             {% set _af = t('attached_file') %}{{ _af if _af != 'attached_file' else 'Anexos' }}
                         </label>
 
-                        <div class="space-y-4">
+                        <div class="space-y-3">
                             {% set tem_anexo = false %}
                             {% set anexos_brutos = chamado.anexos if (chamado.anexos and chamado.anexos|length > 0) else ([chamado.anexo] if chamado.anexo and chamado.anexo != 'None' else []) %}
 
@@ -150,16 +150,14 @@
                                             {% endif %}
 
                                             {% if is_onedrive %}
-                                            <a href="{{ href_anexo }}" target="_blank" rel="noopener noreferrer"
-                                                class="inline-flex max-w-fit items-center px-4 py-2 border border-blue-100 text-sm font-medium rounded-dtx-md text-blue-700 bg-blue-50 hover:bg-blue-100 hover:border-blue-200 transition-colors group">
-                                                <svg class="w-5 h-5 mr-2 flex-shrink-0 text-blue-500 group-hover:text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
-                                                <span class="truncate">{% set _ol = t('open_external_link') %}{{ _ol if _ol != 'open_external_link' else 'Open link' }} — OneDrive/SharePoint</span>
+                                            <a href="{{ href_anexo }}" target="_blank" rel="noopener noreferrer" class="bento-attach-link blue" style="width:fit-content;">
+                                                <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
+                                                <span>{% set _ol = t('open_external_link') %}{{ _ol if _ol != 'open_external_link' else 'Open link' }} — OneDrive/SharePoint</span>
                                             </a>
                                             {% else %}
-                                            <a href="{{ href_anexo }}" target="_blank"
-                                                class="inline-flex max-w-fit items-center px-4 py-2 border border-dtx-100 text-sm font-medium rounded-dtx-md text-dtx-700 bg-dtx-50 hover:bg-dtx-100 hover:border-dtx-200 transition-colors group">
-                                                <svg class="w-5 h-5 mr-2 flex-shrink-0 text-dtx-500 group-hover:text-dtx-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path></svg>
-                                                <span class="truncate">{{ nome_limpo }}</span>
+                                            <a href="{{ href_anexo }}" target="_blank" class="bento-attach-link accent" style="width:fit-content;">
+                                                <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path></svg>
+                                                <span>{{ nome_limpo }}</span>
                                             </a>
                                             {% endif %}
                                         {% endfor %}
@@ -168,23 +166,23 @@
                             {% endif %}
 
                             {% if not tem_anexo %}
-                            <p class="text-sm text-gray-500 italic mb-2">{% set _na = t('no_attachments_current') %}{{ _na if _na != 'no_attachments_current' else 'Sem anexos atuais.' }}</p>
+                            <p style="font-size:13px; color:var(--color-surface-muted); font-style:italic;">{% set _na = t('no_attachments_current') %}{{ _na if _na != 'no_attachments_current' else 'Sem anexos atuais.' }}</p>
                             {% endif %}
 
                             <!-- Dropzone para Novo Anexo (Apenas se puder editar) -->
                             {% if pode_editar %}
-                            <div class="pt-3 {% if tem_anexo %}border-t border-surface-border{% endif %}">
-                                <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">{% set _natt = t('new_attachment') %}{{ _natt if _natt != 'new_attachment' else 'Novo Anexo' }}</label>
-                                <label for="modal-input-anexo" class="relative border-2 border-dashed border-surface-muted hover:border-dtx-400 bg-gray-50 hover:bg-dtx-50/30 rounded-dtx-md p-4 transition-all group flex flex-col items-center justify-center cursor-pointer block" data-upload-placeholder="{% set _cu = t('click_to_upload_file') %}{{ _cu if _cu != 'click_to_upload_file' else 'Clique para enviar um arquivo' }}">
+                            <div style="padding-top:10px; {% if tem_anexo %}border-top:1px solid var(--color-surface-border);{% endif %}">
+                                <label class="bento-field-label" style="margin-bottom:8px;">{% set _natt = t('new_attachment') %}{{ _natt if _natt != 'new_attachment' else 'Novo Anexo' }}</label>
+                                <label for="modal-input-anexo" class="bento-dropzone block" style="padding:16px;" data-upload-placeholder="{% set _cu = t('click_to_upload_file') %}{{ _cu if _cu != 'click_to_upload_file' else 'Clique para enviar um arquivo' }}">
                                     <input type="file" id="modal-input-anexo" form="form-status" name="anexos_novos" class="sr-only" accept="{{ accept_anexo }}" multiple>
-                                    <span class="pointer-events-none flex flex-col items-center">
-                                        <svg class="w-6 h-6 text-gray-400 group-hover:text-dtx-500 mb-1 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <div class="icon" style="margin:0 auto 6px;">
+                                        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                                         </svg>
-                                        <p class="text-[13px] font-medium text-gray-600 group-hover:text-dtx-600 transition-colors" id="nome-arquivo-selecionado">{% set _cu2 = t('click_to_upload_file') %}{{ _cu2 if _cu2 != 'click_to_upload_file' else 'Clique para enviar um arquivo' }}</p>
-                                        <p class="text-[11px] text-gray-400">{% set _od = t('or_drag_drop') %}{{ _od if _od != 'or_drag_drop' else 'ou arraste e solte aqui' }}</p>
-                                        <p class="text-[10px] text-gray-400 mt-1" title="{{ extensoes_permitidas|join(', ') }}">{% set _ft = t('file_types_short') %}{{ _ft if _ft != 'file_types_short' else 'Imagens, PDF, Excel e Word. Máx. 10MB' }}</p>
-                                    </span>
+                                    </div>
+                                    <p style="font-size:13px; font-weight:600; color:var(--color-text-muted);" id="nome-arquivo-selecionado">{% set _cu2 = t('click_to_upload_file') %}{{ _cu2 if _cu2 != 'click_to_upload_file' else 'Clique para enviar um arquivo' }}</p>
+                                    <small>{% set _od = t('or_drag_drop') %}{{ _od if _od != 'or_drag_drop' else 'ou arraste e solte aqui' }}</small>
+                                    <small title="{{ extensoes_permitidas|join(', ') }}">{% set _ft = t('file_types_short') %}{{ _ft if _ft != 'file_types_short' else 'Imagens, PDF, Excel e Word. Máx. 10MB' }}</small>
                                 </label>
                             </div>
                             {% endif %}
@@ -194,47 +192,47 @@
                 </div>
 
                 <!-- Barra Lateral (Direita) -->
-                <div class="space-y-6">
+                <div class="space-y-4">
 
                     <!-- Info Abertura -->
-                    <div class="bg-surface-base p-6 rounded-dtx-md border border-surface-border border-l-4 border-l-dtx-600">
-                        <h4 class="font-black text-gray-900 text-xs mb-4 uppercase tracking-widest flex items-center">
-                            <svg class="w-4 h-4 mr-2 text-dtx-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    <div class="bento-panel accent-top">
+                        <h4 class="bento-panel-label">
+                            <svg width="16" height="16" style="color:var(--color-dtx-500);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                             {{ t('opening_info') if t else 'Informações de Abertura' }}
                         </h4>
-                        <div class="space-y-3.5 text-sm">
-                            <div class="flex flex-col border-b border-surface-border pb-2">
-                                <span class="text-[11px] text-gray-400 font-bold uppercase tracking-wider mb-0.5">{{ t('date') if t else 'Data de Abertura' }}</span>
-                                <span class="font-semibold text-gray-800">{{ chamado.data_abertura_formatada() }}</span>
+                        <div>
+                            <div class="bento-info-row">
+                                <span class="k">{{ t('date') if t else 'Data de Abertura' }}</span>
+                                <span class="v">{{ chamado.data_abertura_formatada() }}</span>
                             </div>
-                            <div class="flex flex-col border-b border-surface-border pb-2">
-                                <span class="text-[11px] text-gray-400 font-bold uppercase tracking-wider mb-0.5">{{ t('requester') if t else 'Solicitante' }}</span>
-                                <span class="font-semibold text-gray-800">{{ chamado.solicitante_nome or '—' }}</span>
+                            <div class="bento-info-row">
+                                <span class="k">{{ t('requester') if t else 'Solicitante' }}</span>
+                                <span class="v">{{ chamado.solicitante_nome or '—' }}</span>
                             </div>
                             {% if chamado.observadores %}
-                            <div class="flex flex-col border-b border-surface-border pb-2">
-                                <span class="text-[11px] text-gray-400 font-bold uppercase tracking-wider mb-1">{{ t('observers') if t else 'Em cópia' }}</span>
-                                <ul class="space-y-0.5">
+                            <div class="bento-info-row">
+                                <span class="k">{{ t('observers') if t else 'Em cópia' }}</span>
+                                <ul class="space-y-0.5" style="margin-top:2px;">
                                 {% for obs in chamado.observadores %}
-                                    <li class="text-sm text-gray-700 font-medium flex items-center gap-1.5">
-                                        <svg class="w-3 h-3 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+                                    <li style="font-size:13px; font-weight:600; display:flex; align-items:center; gap:6px;">
+                                        <svg width="12" height="12" style="color:var(--color-surface-muted); flex-shrink:0;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
                                         {{ obs.nome if obs is mapping else obs }}
                                     </li>
                                 {% endfor %}
                                 </ul>
                             </div>
                             {% endif %}
-                            <div class="flex flex-col">
-                                <span class="text-[11px] text-gray-400 font-bold uppercase tracking-wider mb-0.5">{{ t('completion_date') if t else 'Data de Conclusão' }}</span>
-                                <span class="font-semibold text-gray-800">{{ chamado.data_conclusao_formatada() or '—' }}</span>
+                            <div class="bento-info-row">
+                                <span class="k">{{ t('completion_date') if t else 'Data de Conclusão' }}</span>
+                                <span class="v">{{ chamado.data_conclusao_formatada() or '—' }}</span>
                             </div>
                         </div>
                     </div>
 
                     <!-- Formulário de Edição / Visualização do Status -->
-                    <div class="bg-surface-base p-6 rounded-dtx-md border border-surface-border">
-                        <h4 class="font-black text-gray-800 text-xs mb-4 uppercase tracking-widest flex items-center">
-                            <svg class="w-4 h-4 mr-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                    <div class="bento-panel">
+                        <h4 class="bento-panel-label">
+                            <svg width="16" height="16" style="color:var(--color-surface-muted);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
                             {{ t('ticket_details') if t else 'Detalhes do Chamado' }}
                         </h4>
 
@@ -243,12 +241,12 @@
                         {% set pode_cancelar = nivel_congelamento == 'pendente' and current_user.perfil in ['admin', 'admin_global', 'supervisor'] and not current_user.is_gestor_only %}
 
                         {% if nivel_congelamento is not none and current_user.perfil in ['admin', 'admin_global', 'supervisor'] and not current_user.is_gestor_only %}
-                        <div class="mb-4 {% if nivel_congelamento == 'confirmado' %}bg-gray-50 border-gray-200{% else %}bg-amber-50 border-amber-200{% endif %} border rounded-dtx-md p-4">
-                            <p class="text-[10px] font-black {% if nivel_congelamento == 'confirmado' %}text-gray-500{% else %}text-amber-600{% endif %} uppercase tracking-widest mb-1 flex items-center gap-1.5">
-                                <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+                        <div class="bento-frozen-notice {% if nivel_congelamento == 'confirmado' %}confirmed{% else %}pending{% endif %}" style="margin-bottom:16px;">
+                            <p class="title">
+                                <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
                                 {{ t('ticket_details') if t else 'Chamado Bloqueado' }}
                             </p>
-                            <p class="text-sm text-gray-700 font-medium">
+                            <p class="msg">
                                 {% if nivel_congelamento == 'confirmado' %}
                                     {{ t('ticket_frozen_confirmed') if t else 'Chamado encerrado e confirmado. Somente administradores podem reabrir.' }}
                                 {% else %}
@@ -257,16 +255,14 @@
                             </p>
                             <div class="mt-3 flex flex-wrap gap-2">
                             {% if pode_reabrir %}
-                            <button type="button" onclick="document.getElementById('modal-reabrir-admin').classList.remove('hidden')"
-                                class="inline-flex items-center gap-2 px-4 py-2 rounded-dtx-md text-sm font-bold bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                            <button type="button" onclick="document.getElementById('modal-reabrir-admin').classList.remove('hidden')" class="bento-btn-outline">
+                                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
                                 {{ t('ticket_reopen_admin_btn') if t else 'Reabrir chamado' }}
                             </button>
                             {% endif %}
                             {% if pode_cancelar %}
-                            <button type="button" onclick="document.getElementById('modal-cancelar-admin').classList.remove('hidden')"
-                                class="inline-flex items-center gap-2 px-4 py-2 rounded-dtx-md text-sm font-bold bg-white border border-red-300 text-red-700 hover:bg-red-50 transition-colors">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                            <button type="button" onclick="document.getElementById('modal-cancelar-admin').classList.remove('hidden')" class="bento-btn-outline" style="color:#be123c; border-color:#fecdd3;">
+                                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                                 {{ t('ticket_cancel_frozen_btn') if t else 'Cancelar chamado' }}
                             </button>
                             {% endif %}
@@ -275,75 +271,60 @@
                         {% endif %}
 
                         {% if pode_editar %}
-                        <form id="form-status" action="{{ url_for('main.editar_chamado_pagina') }}" method="POST" enctype="multipart/form-data" class="space-y-5">
+                        <form id="form-status" action="{{ url_for('main.editar_chamado_pagina') }}" method="POST" enctype="multipart/form-data" class="bento-form space-y-4">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
                             <input type="hidden" name="chamado_id" value="{{ chamado.id }}">
 
                             <div>
-                                <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">{{ t('current_status') if t else 'Status Atual' }}</label>
+                                <label class="bento-field-label">{{ t('current_status') if t else 'Status Atual' }}</label>
                                 <div>
                                     {{ status_badge(chamado.status) }}
                                 </div>
 
-                                <label for="select-novo-status" class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mt-5 mb-2">{{ t('change_status_to') if t else 'Alterar Status Para' }}</label>
-                                <div class="relative">
-                                    <select name="novo_status" id="select-novo-status"
-                                        class="dtx-select py-3 px-4 font-semibold appearance-none">
-                                        <option value="Aberto" {% if chamado.status == 'Aberto' %}selected{% endif %}>{{ t('option_open') if t else 'Aberto' }}</option>
-                                        <option value="Em Atendimento" {% if chamado.status == 'Em Atendimento' %}selected{% endif %}>{{ t('option_in_progress') if t else 'Em Atendimento' }}</option>
-                                        <option value="Concluído" {% if chamado.status == 'Concluído' %}selected{% endif %} {% if tem_participantes_pendentes %}disabled{% endif %}>{{ t('option_completed') if t else 'Concluído' }}</option>
-                                        <option value="Cancelado" {% if chamado.status == 'Cancelado' %}selected{% endif %}>{{ t('option_cancelled') if t else 'Cancelado' }}</option>
-                                    </select>
-                                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-gray-400">
-                                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-                                    </div>
-                                </div>
+                                <label for="select-novo-status" class="bento-field-label" style="margin-top:16px;">{{ t('change_status_to') if t else 'Alterar Status Para' }}</label>
+                                <select name="novo_status" id="select-novo-status">
+                                    <option value="Aberto" {% if chamado.status == 'Aberto' %}selected{% endif %}>{{ t('option_open') if t else 'Aberto' }}</option>
+                                    <option value="Em Atendimento" {% if chamado.status == 'Em Atendimento' %}selected{% endif %}>{{ t('option_in_progress') if t else 'Em Atendimento' }}</option>
+                                    <option value="Concluído" {% if chamado.status == 'Concluído' %}selected{% endif %} {% if tem_participantes_pendentes %}disabled{% endif %}>{{ t('option_completed') if t else 'Concluído' }}</option>
+                                    <option value="Cancelado" {% if chamado.status == 'Cancelado' %}selected{% endif %}>{{ t('option_cancelled') if t else 'Cancelado' }}</option>
+                                </select>
                                 {% if tem_participantes_pendentes %}
-                                <p class="text-xs text-amber-600 mt-1.5 font-medium flex items-center gap-1">
-                                    <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                                <p style="font-size:11px; color:#b45309; margin-top:6px; font-weight:600; display:flex; align-items:center; gap:5px;">
+                                    <svg width="14" height="14" style="flex-shrink:0;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
                                     {{ t('participantes_pendentes_aviso') if t else 'Há participantes com parte pendente — status Concluído bloqueado.' }}
                                 </p>
                                 {% endif %}
-                                <div id="wrap-motivo-cancelamento" class="mt-4 {% if chamado.status != 'Cancelado' %}hidden{% endif %}">
-                                    <label for="motivo_cancelamento" class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">{% set _cr = t('cancellation_reason') %}{{ _cr if _cr != 'cancellation_reason' else 'Motivo do cancelamento' }} <span class="text-rose-500">*</span></label>
+                                <div id="wrap-motivo-cancelamento" class="{% if chamado.status != 'Cancelado' %}hidden{% endif %}" style="margin-top:14px;">
+                                    <label for="motivo_cancelamento" class="bento-field-label">{% set _cr = t('cancellation_reason') %}{{ _cr if _cr != 'cancellation_reason' else 'Motivo do cancelamento' }} <span style="color:#e11d48;">*</span></label>
                                     <textarea id="motivo_cancelamento" form="form-status" name="motivo_cancelamento" rows="2" maxlength="500"
-                                        class="dtx-input px-4 py-3"
                                         placeholder="{% set _crp = t('cancellation_reason_placeholder') %}{{ _crp if _crp != 'cancellation_reason_placeholder' else 'Informe o motivo do cancelamento' }}">{{ chamado.motivo_cancelamento or '' }}</textarea>
                                 </div>
                             </div>
 
-                            <div class="pt-1">
-                                <label for="select-responsavel" class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">{{ t('responsible') if t else 'Responsável' }}</label>
-                                <div class="relative">
-                                    <select name="novo_responsavel_id" id="select-responsavel"
-                                        class="dtx-select py-3 px-4 font-semibold appearance-none">
-                                        <option value="">{{ t('no_change') if t else 'Sem alteração' }} ({{ t('current_label') if t else 'Atual' }}: {{ chamado.responsavel or '—' }})</option>
-                                        {% for sup in supervisores_detalhados %}
-                                        <option value="{{ sup.id }}">{{ sup.nome }} ({{ translate_sector_list(sup.area) if sup.area else '—' }})</option>
-                                        {% endfor %}
-                                    </select>
-                                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-gray-400">
-                                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-                                    </div>
-                                </div>
+                            <div>
+                                <label for="select-responsavel" class="bento-field-label">{{ t('responsible') if t else 'Responsável' }}</label>
+                                <select name="novo_responsavel_id" id="select-responsavel">
+                                    <option value="">{{ t('no_change') if t else 'Sem alteração' }} ({{ t('current_label') if t else 'Atual' }}: {{ chamado.responsavel or '—' }})</option>
+                                    {% for sup in supervisores_detalhados %}
+                                    <option value="{{ sup.id }}">{{ sup.nome }} ({{ translate_sector_list(sup.area) if sup.area else '—' }})</option>
+                                    {% endfor %}
+                                </select>
                             </div>
 
                             <!-- Setores adicionais: incluir outros setores no chamado -->
-                            <div class="pt-5 border-t border-surface-border">
-                                <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">{{ t('additional_sectors') if t else 'Setores adicionais' }}</label>
-                                <p class="text-[11px] font-medium text-gray-400 mb-2 leading-snug">{{ t('additional_sectors_help') if t else 'Marque os setores a incluir no chamado. Os supervisores desses setores receberão e-mail informando a abertura.' }}</p>
-                                <p class="text-[10px] font-medium text-amber-600 mb-3 leading-snug italic">{{ t('participants_use_include_hint') if t else 'Para colaboração com acompanhamento individual de status, use' }} <strong>{{ t('escalation_include_supervisors_btn') if t else 'Incluir supervisores' }}</strong> {{ t('participants_hint_suffix') if t else '(participantes) abaixo.' }}</p>
+                            <div style="padding-top:16px; border-top:1px solid var(--color-surface-border);">
+                                <label class="bento-field-label" style="margin-bottom:4px;">{{ t('additional_sectors') if t else 'Setores adicionais' }}</label>
+                                <p style="font-size:11px; color:var(--color-surface-muted); margin-bottom:8px; line-height:1.4;">{{ t('additional_sectors_help') if t else 'Marque os setores a incluir no chamado. Os supervisores desses setores receberão e-mail informando a abertura.' }}</p>
+                                <p style="font-size:10px; color:#b45309; margin-bottom:10px; line-height:1.4; font-style:italic;">{{ t('participants_use_include_hint') if t else 'Para colaboração com acompanhamento individual de status, use' }} <strong>{{ t('escalation_include_supervisors_btn') if t else 'Incluir supervisores' }}</strong> {{ t('participants_hint_suffix') if t else '(participantes) abaixo.' }}</p>
 
-                                <div class="flex flex-wrap gap-2.5 max-h-48 overflow-y-auto py-1 custom-scrollbar pr-2">
+                                <div class="flex flex-wrap gap-2 max-h-48 overflow-y-auto py-1 custom-scrollbar pr-2">
                                     {% for setor in setores %}
-                                    <label class="cursor-pointer group">
+                                    <label class="bento-pill-check">
                                         <input type="checkbox" name="setores_adicionais" value="{{ setor.nome_pt }}" form="form-status"
                                             {% if setor.nome_pt in (chamado.setores_adicionais or []) %}checked{% endif %}
                                             class="peer sr-only">
-                                        <span class="inline-flex px-3.5 py-2 rounded-dtx-md text-[12px] font-bold bg-white border border-surface-border text-gray-500 transition-all duration-200 peer-checked:bg-dtx-50 peer-checked:text-dtx-700 peer-checked:border-dtx-300 group-hover:border-dtx-200 flex items-center gap-2">
-                                            <div class="w-3.5 h-3.5 rounded bg-gray-100 border border-gray-300 flex items-center justify-center transition-colors">
-                                                <svg class="w-2.5 h-2.5 text-white opacity-0 peer-checked:opacity-100" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
-                                            </div>
+                                        <span class="bento-pill-check-inner peer-checked:bento-pill-check-inner">
+                                            <span class="box"><svg width="9" height="9" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg></span>
                                             {{ translate_sector(setor.nome_pt) if setor.nome_pt else setor.nome_pt }}
                                         </span>
                                     </label>
@@ -353,29 +334,28 @@
 
                             <!-- Participantes (Fase 4) — edição -->
                             {% if chamado.participantes %}
-                            <div class="pt-5 border-t border-surface-border">
-                                <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2">
-                                    <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                            <div style="padding-top:16px; border-top:1px solid var(--color-surface-border);">
+                                <label class="bento-field-label" style="margin-bottom:10px;">
                                     {{ t('participants_label') if t else 'Participantes' }}
                                 </label>
                                 <div class="space-y-2">
                                     {% for p in chamado.participantes %}
                                     {% set ns = namespace(p_nome='') %}
                                     {% for s in supervisores_detalhados %}{% if s.id == p.supervisor_id %}{% set ns.p_nome = s.nome %}{% endif %}{% endfor %}
-                                    <div class="flex items-center justify-between px-3 py-2 bg-surface-raised rounded-dtx-md border border-surface-border text-sm">
-                                        <span class="font-medium text-gray-700 truncate mr-2">
+                                    <div class="bento-participant-row">
+                                        <span style="font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
                                             {{ ns.p_nome if ns.p_nome else (p.supervisor_id[:8] ~ '…') }}
-                                            <span class="text-gray-400 text-xs">({{ p.area }})</span>
+                                            <span style="color:var(--color-surface-muted); font-size:11px;">({{ p.area }})</span>
                                         </span>
                                         {% if p.status == 'concluido' %}
-                                        <span class="flex-shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-700">
-                                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                                        <span class="bento-participant-status done">
+                                            <svg width="10" height="10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
                                             {{ t('participant_status_done') if t else 'Concluído' }}
                                         </span>
                                         {% elif p.status == 'em_atendimento' %}
-                                        <span class="flex-shrink-0 inline-flex px-2 py-0.5 rounded-full text-[11px] font-bold bg-blue-100 text-blue-700">{{ t('participant_status_in_progress') if t else 'Em atendimento' }}</span>
+                                        <span class="bento-participant-status progress">{{ t('participant_status_in_progress') if t else 'Em atendimento' }}</span>
                                         {% else %}
-                                        <span class="flex-shrink-0 inline-flex px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-700">{{ t('participant_status_pending') if t else 'Pendente' }}</span>
+                                        <span class="bento-participant-status pending">{{ t('participant_status_pending') if t else 'Pendente' }}</span>
                                         {% endif %}
                                     </div>
                                     {% endfor %}
@@ -383,24 +363,22 @@
                             </div>
                             {% endif %}
                             <!-- SLA Personalizado -->
-                            <div class="pt-5 border-t border-surface-border">
-                                <label for="input-sla-dias" class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 flex items-center">
+                            <div style="padding-top:16px; border-top:1px solid var(--color-surface-border);">
+                                <label for="input-sla-dias" class="bento-field-label" style="margin-bottom:4px; display:flex; align-items:center;">
                                     {{ t('sla_custom_label') if t else 'SLA Personalizado (dias)' }}
                                     {% if chamado.sla_dias %}
-                                    <span class="ml-2 px-2 py-0.5 rounded-full text-[9px] font-black bg-amber-100 text-amber-800 uppercase tracking-wider ring-1 ring-amber-200/50">{{ t('sla_custom_badge') if t else 'Ativo' }}</span>
+                                    <span class="bento-active-chip on" style="margin-left:8px;">{{ t('sla_custom_badge') if t else 'Ativo' }}</span>
                                     {% endif %}
                                 </label>
-                                <p class="text-[11px] font-medium text-gray-400 mb-3">{{ t('sla_custom_help') if t else 'Deixe em branco para manter. Digite 0 para voltar ao padrão.' }}</p>
+                                <p style="font-size:11px; color:var(--color-surface-muted); margin-bottom:10px;">{{ t('sla_custom_help') if t else 'Deixe em branco para manter. Digite 0 para voltar ao padrão.' }}</p>
                                 <input type="number" id="input-sla-dias" name="sla_dias" form="form-status" min="0" max="365"
                                     value="{{ chamado.sla_dias if chamado.sla_dias is not none else '' }}"
-                                    placeholder="{{ chamado.sla_dias if chamado.sla_dias else (t('sla_default_placeholder') if t else 'Padrão') }}"
-                                    class="dtx-input py-3 px-4 font-semibold focus:border-amber-400">
+                                    placeholder="{{ chamado.sla_dias if chamado.sla_dias else (t('sla_default_placeholder') if t else 'Padrão') }}">
                             </div>
 
-                            <div class="pt-4 mt-5 border-t border-surface-border pb-1">
-                                <button type="submit" id="btn-submit-status"
-                                    class="w-full flex justify-center py-3 px-4 rounded-dtx-md text-sm font-bold text-white bg-dtx-600 hover:bg-dtx-700 active:bg-dtx-800 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-dtx-600 transition-colors items-center">
-                                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            <div style="padding-top:16px; margin-top:4px; border-top:1px solid var(--color-surface-border);">
+                                <button type="submit" id="btn-submit-status" class="bento-btn-primary" style="width:100%; justify-content:center;">
+                                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
                                     {{ t('save_change') if t else 'Salvar Alteração' }}
                                 </button>
                             </div>
@@ -409,32 +387,32 @@
                         <!-- Visualização Somente Leitura -->
                         <div class="space-y-4">
                             <div>
-                                <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">{{ t('status') if t else 'Status' }}</label>
+                                <label class="bento-field-label" style="margin-bottom:6px;">{{ t('status') if t else 'Status' }}</label>
                                 <div>
                                     {{ status_badge(chamado.status, size="md") }}
                                 </div>
                             </div>
                             {% if chamado.status == 'Cancelado' and chamado.motivo_cancelamento %}
                             <div>
-                                <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">{% set _cr2 = t('cancellation_reason') %}{{ _cr2 if _cr2 != 'cancellation_reason' else 'Motivo do cancelamento' }}</label>
-                                <div class="text-sm font-medium text-gray-700 bg-rose-50 border border-rose-100 rounded-dtx-md p-4">{{ chamado.motivo_cancelamento }}</div>
+                                <label class="bento-field-label" style="margin-bottom:8px;">{% set _cr2 = t('cancellation_reason') %}{{ _cr2 if _cr2 != 'cancellation_reason' else 'Motivo do cancelamento' }}</label>
+                                <div style="font-size:13px; font-weight:600; background:#fff1f2; border:1px solid #fecdd3; border-radius:14px; padding:14px;">{{ chamado.motivo_cancelamento }}</div>
                                 {% if chamado.data_cancelamento_formatada() and chamado.data_cancelamento_formatada() != '-' %}
-                                <p class="text-[11px] text-gray-500 font-medium mt-2">{{ t('cancelled_on') if t else 'Cancelado em' }}: {{ chamado.data_cancelamento_formatada() }}</p>
+                                <p style="font-size:11px; color:var(--color-surface-muted); font-weight:600; margin-top:8px;">{{ t('cancelled_on') if t else 'Cancelado em' }}: {{ chamado.data_cancelamento_formatada() }}</p>
                                 {% endif %}
                             </div>
                             {% endif %}
                             <div>
-                                <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">{{ t('assigned_to') if t else 'Atribuído a' }}</label>
-                                <div class="text-sm font-semibold text-gray-800">
+                                <label class="bento-field-label" style="margin-bottom:6px;">{{ t('assigned_to') if t else 'Atribuído a' }}</label>
+                                <div style="font-size:14px; font-weight:700;">
                                     {{ chamado.responsavel or '—' }}
                                 </div>
                             </div>
                             {% if chamado.setores_adicionais %}
                             <div>
-                                <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">{{ t('additional_sectors') if t else 'Setores adicionais' }}</label>
+                                <label class="bento-field-label" style="margin-bottom:6px;">{{ t('additional_sectors') if t else 'Setores adicionais' }}</label>
                                 <div class="flex flex-wrap gap-1.5">
                                     {% for setor_nome in chamado.setores_adicionais %}
-                                    <span class="inline-flex px-2.5 py-1 rounded-dtx-sm text-xs font-medium bg-teal-100 text-teal-800">{{ translate_sector(setor_nome) if setor_nome else setor_nome }}</span>
+                                    <span class="bento-tag-chip" style="background:#f0fdfa; color:#0f766e;">{{ translate_sector(setor_nome) if setor_nome else setor_nome }}</span>
                                     {% endfor %}
                                 </div>
                             </div>
@@ -442,17 +420,17 @@
                             <!-- Participantes (Fase 4) — leitura -->
                             {% if chamado.participantes %}
                             <div>
-                                <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">{{ t('participants_label') if t else 'Participantes' }}</label>
+                                <label class="bento-field-label" style="margin-bottom:6px;">{{ t('participants_label') if t else 'Participantes' }}</label>
                                 <div class="space-y-1.5">
                                     {% for p in chamado.participantes %}
-                                    <div class="flex items-center justify-between px-3 py-1.5 bg-surface-raised rounded-dtx-md border border-surface-border text-sm">
-                                        <span class="font-medium text-gray-700 text-xs truncate mr-2">{{ p.area }}</span>
+                                    <div class="bento-participant-row">
+                                        <span style="font-size:12px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ p.area }}</span>
                                         {% if p.status == 'concluido' %}
-                                        <span class="flex-shrink-0 inline-flex px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-700">{{ t('participant_status_done') if t else 'Concluído' }}</span>
+                                        <span class="bento-participant-status done">{{ t('participant_status_done') if t else 'Concluído' }}</span>
                                         {% elif p.status == 'em_atendimento' %}
-                                        <span class="flex-shrink-0 inline-flex px-2 py-0.5 rounded-full text-[11px] font-bold bg-blue-100 text-blue-700">{{ t('participant_status_in_progress') if t else 'Em atendimento' }}</span>
+                                        <span class="bento-participant-status progress">{{ t('participant_status_in_progress') if t else 'Em atendimento' }}</span>
                                         {% else %}
-                                        <span class="flex-shrink-0 inline-flex px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-700">{{ t('participant_status_pending') if t else 'Pendente' }}</span>
+                                        <span class="bento-participant-status pending">{{ t('participant_status_pending') if t else 'Pendente' }}</span>
                                         {% endif %}
                                     </div>
                                     {% endfor %}
@@ -461,46 +439,43 @@
                             {% endif %}
                             {% if chamado.sla_dias %}
                             <div>
-                                <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">{{ t('sla_custom_label') if t else 'SLA' }}</label>
-                                <span class="inline-flex px-2.5 py-1 rounded-dtx-sm text-xs font-bold bg-amber-100 text-amber-700">
+                                <label class="bento-field-label" style="margin-bottom:6px;">{{ t('sla_custom_label') if t else 'SLA' }}</label>
+                                <span class="bento-active-chip on">
                                     {{ chamado.sla_dias }} {{ t('days') if t else 'dias' }}
-                                    <span class="ml-1 opacity-60">({{ t('sla_custom_badge') if t else 'personalizado' }})</span>
+                                    <span style="opacity:.7;">({{ t('sla_custom_badge') if t else 'personalizado' }})</span>
                                 </span>
                             </div>
                             {% endif %}
 
-                            <div class="bg-dtx-50 border border-dtx-100 rounded-dtx-md p-4 text-center mt-6">
-                                <p class="text-[10px] text-dtx-700 font-black uppercase tracking-widest">{{ t('responsible_for_ticket') if t else 'Contato' }}</p>
-                                <p class="text-gray-900 font-bold text-sm mt-2 bg-white inline-block px-3 py-1 rounded-dtx-sm border border-dtx-100">{{ chamado.responsavel or (t('responsible_team') if t else 'Equipe Responsável') }}</p>
+                            <div class="bento-contact-box">
+                                <p class="lbl">{{ t('responsible_for_ticket') if t else 'Contato' }}</p>
+                                <p class="val">{{ chamado.responsavel or (t('responsible_team') if t else 'Equipe Responsável') }}</p>
                             </div>
 
                             {% if chamado.solicitante_id == current_user.id and chamado.status == 'Concluído' and chamado.confirmacao_solicitante == 'pendente' %}
-                            <div id="bloco-confirmacao" class="mt-6 bg-amber-50 border border-amber-200 rounded-dtx-md p-5">
-                                <p class="text-[10px] font-black text-amber-600 uppercase tracking-widest mb-1">{{ t('awaiting_confirmation') if t else 'Aguardando sua confirmação' }}</p>
-                                <p class="text-sm font-medium text-gray-700 mb-4">{{ t('confirm_resolution_message') if t else 'O atendimento foi concluído. Confirme se o problema foi resolvido.' }}</p>
+                            <div id="bloco-confirmacao" class="bento-action-box amber">
+                                <p class="title">{{ t('awaiting_confirmation') if t else 'Aguardando sua confirmação' }}</p>
+                                <p>{{ t('confirm_resolution_message') if t else 'O atendimento foi concluído. Confirme se o problema foi resolvido.' }}</p>
 
-                                <div class="flex flex-col gap-3">
-                                    <button onclick="confirmarResolucao('confirmar')"
-                                        class="w-full py-2.5 rounded-dtx-md bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm transition-colors active:scale-95 inline-flex items-center justify-center gap-2">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                                <div class="flex flex-col gap-2">
+                                    <button onclick="confirmarResolucao('confirmar')" class="bento-btn-block solid-emerald">
+                                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
                                         {{ t('confirm_resolved_btn') if t else 'Sim, problema resolvido' }}
                                     </button>
-                                    <button onclick="document.getElementById('form-reabrir').classList.toggle('hidden')"
-                                        class="w-full py-2.5 rounded-dtx-md bg-rose-100 hover:bg-rose-200 text-rose-700 font-bold text-sm transition-colors active:scale-95 border border-rose-200 inline-flex items-center justify-center gap-2">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                                    <button onclick="document.getElementById('form-reabrir').classList.toggle('hidden')" class="bento-btn-block soft-rose">
+                                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                                         {{ t('reopen_ticket_btn') if t else 'Não, reabrir chamado' }}
                                     </button>
                                 </div>
 
-                                <div id="form-reabrir" class="hidden mt-4">
-                                    <label class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5">
-                                        {{ t('reopen_reason_label') if t else 'O que ainda precisa ser resolvido?' }} <span class="text-rose-500">*</span>
+                                <div id="form-reabrir" class="hidden" style="margin-top:14px;">
+                                    <label class="bento-field-label" style="margin-bottom:6px;">
+                                        {{ t('reopen_reason_label') if t else 'O que ainda precisa ser resolvido?' }} <span style="color:#e11d48;">*</span>
                                     </label>
                                     <textarea id="motivo-reabrir" rows="3" maxlength="500"
                                         placeholder="{{ t('reopen_reason_placeholder') if t else 'Descreva o que ficou pendente...' }}"
-                                        class="dtx-input resize-none"></textarea>
-                                    <button onclick="confirmarResolucao('reabrir')"
-                                        class="mt-2 w-full py-2.5 rounded-dtx-md bg-rose-600 hover:bg-rose-700 text-white font-bold text-sm transition-colors active:scale-95">
+                                        style="width:100%; background:var(--color-surface-canvas); border:1.5px solid transparent; border-radius:14px; padding:11px 14px; font-family:inherit; font-size:14px; resize:none;"></textarea>
+                                    <button onclick="confirmarResolucao('reabrir')" class="bento-btn-block solid-rose" style="margin-top:8px;">
                                         {{ t('reopen_ticket_btn') if t else 'Reabrir chamado' }}
                                     </button>
                                 </div>
@@ -508,55 +483,51 @@
                             {% endif %}
 
                             {% if pode_editar_descricao_solicitante or pode_cancelar_solicitante or pode_anexo_tardio_solicitante %}
-                            <div class="pt-5 border-t border-surface-border mt-2">
-                                <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+                            <div style="padding-top:16px; margin-top:6px; border-top:1px solid var(--color-surface-border);">
+                                <p class="bento-field-label" style="margin-bottom:14px;">
                                     {{ t('sol_actions_title') if t else 'Suas ações' }}
                                 </p>
 
                                 {% if pode_editar_descricao_solicitante %}
-                                <div id="bloco-editar-descricao" class="mb-4 bg-amber-50 border border-amber-200 rounded-dtx-md p-4">
-                                    <div class="flex items-center justify-between mb-2">
-                                        <p class="text-[10px] font-black text-amber-700 uppercase tracking-widest">{{ t('edit_description_sol_title') if t else 'Editar descrição' }}</p>
-                                        <span class="text-xs font-bold text-amber-600 bg-amber-100 px-2 py-0.5 rounded-full flex items-center gap-1">
-                                            <svg class="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                <div id="bloco-editar-descricao" class="bento-action-box amber">
+                                    <div class="flex items-center justify-between" style="margin-bottom:6px;">
+                                        <p class="title" style="margin-bottom:0;">{{ t('edit_description_sol_title') if t else 'Editar descrição' }}</p>
+                                        <span class="bento-active-chip on" style="background:var(--color-status-open-bg); color:#b45309; display:inline-flex; align-items:center; gap:4px;">
+                                            <svg width="10" height="10" style="flex-shrink:0;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                                             <span id="sol-countdown">--:--</span>
                                         </span>
                                     </div>
-                                    <p class="text-xs text-amber-600 mb-3">{{ t('edit_description_sol_hint') if t else 'Disponível por 30 minutos após a abertura.' }}</p>
+                                    <p>{{ t('edit_description_sol_hint') if t else 'Disponível por 30 minutos após a abertura.' }}</p>
                                     <textarea id="sol-nova-descricao" rows="4"
-                                        class="dtx-input resize-none w-full text-sm"
+                                        style="width:100%; background:#fff; border:1.5px solid transparent; border-radius:14px; padding:11px 14px; font-family:inherit; font-size:13px; resize:none;"
                                         placeholder="{{ t('edit_description_placeholder') if t else 'Descreva o chamado' }}">{{ chamado.descricao }}</textarea>
-                                    <div id="sol-edit-erro" class="hidden mt-2 text-xs font-medium text-rose-600 bg-rose-50 border border-rose-100 rounded-dtx-md px-3 py-2"></div>
-                                    <button onclick="salvarDescricaoSolicitante()"
-                                        class="mt-3 w-full py-2.5 rounded-dtx-md bg-amber-600 hover:bg-amber-700 text-white font-bold text-sm transition-colors active:scale-95 inline-flex items-center justify-center gap-2">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                                    <div id="sol-edit-erro" class="hidden bento-inline-notice error" style="margin-top:8px;"></div>
+                                    <button onclick="salvarDescricaoSolicitante()" class="bento-btn-block solid-amber" style="margin-top:10px;">
+                                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
                                         {{ t('edit_description_save_btn') if t else 'Salvar descrição' }}
                                     </button>
                                 </div>
                                 {% endif %}
 
                                 {% if pode_cancelar_solicitante %}
-                                <button onclick="document.getElementById('modal-cancelar-solicitante').showModal()"
-                                    class="w-full py-2.5 rounded-dtx-md bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-sm transition-colors active:scale-95 border border-rose-200 inline-flex items-center justify-center gap-2">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                                <button onclick="document.getElementById('modal-cancelar-solicitante').showModal()" class="bento-btn-block soft-rose" style="margin-top:12px;">
+                                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                                     {{ t('cancel_ticket_sol_title') if t else 'Cancelar chamado' }}
                                 </button>
                                 {% endif %}
 
                                 {% if pode_anexo_tardio_solicitante %}
-                                <div id="bloco-anexo-tardio" class="mt-4 bg-blue-50 border border-blue-200 rounded-dtx-md p-4">
-                                    <p class="text-[10px] font-black text-blue-700 uppercase tracking-widest mb-2">{{ t('late_attachment_title') if t else 'Adicionar Documento' }}</p>
-                                    <p class="text-xs text-blue-600 mb-3">{{ t('late_attachment_hint') if t else 'Informe o motivo e selecione o arquivo.' }}</p>
+                                <div id="bloco-anexo-tardio" class="bento-action-box blue">
+                                    <p class="title">{{ t('late_attachment_title') if t else 'Adicionar Documento' }}</p>
+                                    <p>{{ t('late_attachment_hint') if t else 'Informe o motivo e selecione o arquivo.' }}</p>
                                     <textarea id="sol-anexo-motivo" rows="2"
-                                        class="dtx-input resize-none w-full text-sm mb-2"
+                                        style="width:100%; background:#fff; border:1.5px solid transparent; border-radius:14px; padding:11px 14px; font-family:inherit; font-size:13px; resize:none; margin-bottom:8px;"
                                         placeholder="{{ t('late_attachment_motivo_placeholder') if t else 'Motivo (mínimo 10 caracteres)' }}"></textarea>
-                                    <input type="file" id="sol-anexo-file" class="block w-full text-xs text-gray-600 mb-2 file:mr-2 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-blue-100 file:text-blue-700 hover:file:bg-blue-200 cursor-pointer">
-                                    <div id="sol-anexo-erro" class="hidden mt-1 text-xs font-medium text-rose-600 bg-rose-50 border border-rose-100 rounded-dtx-md px-3 py-2"></div>
-                                    <div id="sol-anexo-ok" class="hidden mt-1 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-dtx-md px-3 py-2"></div>
-                                    <button onclick="enviarAnexoTardio('{{ chamado.id }}')"
-                                        class="mt-2 w-full py-2.5 rounded-dtx-md bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm transition-colors active:scale-95 inline-flex items-center justify-center gap-2">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                                    <input type="file" id="sol-anexo-file" class="bento-file-input-mini" style="margin-bottom:8px;">
+                                    <div id="sol-anexo-erro" class="hidden bento-inline-notice error" style="margin-top:4px;"></div>
+                                    <div id="sol-anexo-ok" class="hidden bento-inline-notice ok" style="margin-top:4px;"></div>
+                                    <button onclick="enviarAnexoTardio('{{ chamado.id }}')" class="bento-btn-block solid-blue" style="margin-top:8px;">
+                                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
                                         {{ t('late_attachment_send_btn') if t else 'Enviar documento' }}
                                     </button>
                                 </div>
@@ -579,25 +550,22 @@
 {% if pode_escalonar %}
 <!-- ── Ações de Escalonamento (Fase 3) ─────────────────────────────────── -->
 <div class="max-w-5xl mx-auto mt-4 mb-2">
-    <div class="bg-surface-base rounded-dtx-lg border border-surface-border shadow-dtx-sm p-5">
-        <h4 class="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-            <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>
+    <div class="bento-card">
+        <h4 class="bento-panel-label" style="margin-bottom:14px;">
+            <svg width="16" height="16" style="color:var(--color-surface-muted);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>
             {{ t('escalation_actions_title') if t else 'Ações de Escalonamento' }}
         </h4>
         <div class="flex flex-wrap gap-3">
-            <button onclick="document.getElementById('modal-transferir-area').classList.remove('hidden')"
-                class="inline-flex items-center gap-2 px-4 py-2.5 rounded-dtx-md text-sm font-bold bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition-colors">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+            <button onclick="document.getElementById('modal-transferir-area').classList.remove('hidden')" class="bento-escalation-btn amber">
+                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
                 {{ t('escalation_transfer_area_btn') if t else 'Transferir Área' }}
             </button>
-            <button onclick="carregarColegasEAbrirModal()"
-                class="inline-flex items-center gap-2 px-4 py-2.5 rounded-dtx-md text-sm font-bold bg-violet-50 text-violet-700 border border-violet-200 hover:bg-violet-100 transition-colors">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>
+            <button onclick="carregarColegasEAbrirModal()" class="bento-escalation-btn violet">
+                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>
                 {{ t('escalation_escalate_colleague_btn') if t else 'Escalonar para Colega' }}
             </button>
-            <button onclick="document.getElementById('modal-incluir-participantes').classList.remove('hidden')"
-                class="inline-flex items-center gap-2 px-4 py-2.5 rounded-dtx-md text-sm font-bold bg-teal-50 text-teal-700 border border-teal-200 hover:bg-teal-100 transition-colors">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+            <button onclick="document.getElementById('modal-incluir-participantes').classList.remove('hidden')" class="bento-escalation-btn teal">
+                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
                 {{ t('escalation_include_supervisors_btn') if t else 'Incluir supervisores' }}
             </button>
         </div>
@@ -605,19 +573,20 @@
 </div>
 
 <!-- Modal: Transferir Área -->
-<div id="modal-transferir-area" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-    <div class="bg-white rounded-dtx-lg shadow-lg w-full max-w-md border border-surface-border">
-        <div class="px-6 py-4 border-b border-surface-border flex items-center justify-between">
-            <h3 class="text-base font-black text-gray-800">{{ t('escalation_transfer_modal_title') if t else 'Transferir Área' }}</h3>
-            <button onclick="document.getElementById('modal-transferir-area').classList.add('hidden')" class="text-gray-400 hover:text-gray-600 transition-colors">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+<div id="modal-transferir-area" class="hidden bento-modal-overlay flex items-center justify-center p-4">
+    <div class="bento-modal-backdrop"></div>
+    <div class="bento-modal-panel" style="position:relative; z-index:1;">
+        <div class="head">
+            <h3 style="font-weight:800; font-size:15px;">{{ t('escalation_transfer_modal_title') if t else 'Transferir Área' }}</h3>
+            <button onclick="document.getElementById('modal-transferir-area').classList.add('hidden')" class="bento-modal-close">
+                <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
             </button>
         </div>
-        <div class="p-6 space-y-4">
+        <div class="space-y-4" style="padding:24px;">
             <div>
-                <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">{{ t('escalation_dest_area_label') if t else 'Área Destino' }} <span class="text-rose-500">*</span></label>
+                <label class="bento-field-label" style="margin-bottom:6px;">{{ t('escalation_dest_area_label') if t else 'Área Destino' }} <span style="color:#e11d48;">*</span></label>
                 <select id="transferir-area-select" onchange="carregarSupervisoresDestino(this.value)"
-                    class="dtx-select py-3 px-4 font-semibold w-full appearance-none">
+                    style="width:100%; background:var(--color-surface-canvas); border:1.5px solid transparent; border-radius:14px; padding:11px 14px; font-family:inherit; font-size:14px;">
                     <option value="">{{ t('escalation_select_area') if t else 'Selecione uma área...' }}</option>
                     {% for setor in setores %}
                     {% if setor.nome_pt != chamado.area %}
@@ -627,26 +596,25 @@
                 </select>
             </div>
             <div>
-                <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">{{ t('escalation_dest_responsible_label') if t else 'Responsável Destino' }} <span class="text-rose-500">*</span></label>
-                <select id="transferir-supervisor-select" class="dtx-select py-3 px-4 font-semibold w-full appearance-none" disabled>
+                <label class="bento-field-label" style="margin-bottom:6px;">{{ t('escalation_dest_responsible_label') if t else 'Responsável Destino' }} <span style="color:#e11d48;">*</span></label>
+                <select id="transferir-supervisor-select" disabled
+                    style="width:100%; background:var(--color-surface-canvas); border:1.5px solid transparent; border-radius:14px; padding:11px 14px; font-family:inherit; font-size:14px;">
                     <option value="">{{ t('escalation_select_area_first') if t else 'Selecione a área primeiro...' }}</option>
                 </select>
             </div>
             <div>
-                <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">{{ t('escalation_reason_label') if t else 'Motivo' }} <span class="text-rose-500">*</span></label>
+                <label class="bento-field-label" style="margin-bottom:6px;">{{ t('escalation_reason_label') if t else 'Motivo' }} <span style="color:#e11d48;">*</span></label>
                 <textarea id="transferir-motivo" rows="3" maxlength="500"
                     placeholder="{{ t('escalation_transfer_reason_placeholder') if t else 'Descreva o motivo da transferência...' }}"
-                    class="dtx-input resize-none w-full"></textarea>
+                    style="width:100%; background:var(--color-surface-canvas); border:1.5px solid transparent; border-radius:14px; padding:11px 14px; font-family:inherit; font-size:14px; resize:none;"></textarea>
             </div>
-            <div id="transferir-erro" class="hidden text-sm text-rose-600 font-medium bg-rose-50 border border-rose-100 rounded-dtx-md px-3 py-2"></div>
+            <div id="transferir-erro" class="hidden bento-inline-notice error"></div>
         </div>
-        <div class="px-6 pb-5 flex gap-3">
-            <button onclick="document.getElementById('modal-transferir-area').classList.add('hidden')"
-                class="flex-1 py-2.5 rounded-dtx-md border border-surface-border text-sm font-bold text-gray-600 hover:bg-gray-50 transition-colors">
+        <div class="flex gap-3" style="padding:0 24px 24px;">
+            <button onclick="document.getElementById('modal-transferir-area').classList.add('hidden')" class="bento-btn-outline" style="flex:1; justify-content:center;">
                 {{ t('cancel') if t else 'Cancelar' }}
             </button>
-            <button onclick="executarTransferirArea()"
-                class="flex-1 py-2.5 rounded-dtx-md bg-amber-600 hover:bg-amber-700 text-white text-sm font-bold transition-colors">
+            <button onclick="executarTransferirArea()" class="bento-btn-block solid-amber" style="flex:1;">
                 {{ t('escalation_transfer_confirm_btn') if t else 'Transferir' }}
             </button>
         </div>
@@ -654,36 +622,36 @@
 </div>
 
 <!-- Modal: Escalonar para Colega -->
-<div id="modal-escalonar-colega" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-    <div class="bg-white rounded-dtx-lg shadow-lg w-full max-w-md border border-surface-border">
-        <div class="px-6 py-4 border-b border-surface-border flex items-center justify-between">
-            <h3 class="text-base font-black text-gray-800">{{ t('escalation_escalate_modal_title') if t else 'Escalonar para Colega' }}</h3>
-            <button onclick="document.getElementById('modal-escalonar-colega').classList.add('hidden')" class="text-gray-400 hover:text-gray-600 transition-colors">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+<div id="modal-escalonar-colega" class="hidden bento-modal-overlay flex items-center justify-center p-4">
+    <div class="bento-modal-backdrop"></div>
+    <div class="bento-modal-panel" style="position:relative; z-index:1;">
+        <div class="head">
+            <h3 style="font-weight:800; font-size:15px;">{{ t('escalation_escalate_modal_title') if t else 'Escalonar para Colega' }}</h3>
+            <button onclick="document.getElementById('modal-escalonar-colega').classList.add('hidden')" class="bento-modal-close">
+                <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
             </button>
         </div>
-        <div class="p-6 space-y-4">
+        <div class="space-y-4" style="padding:24px;">
             <div>
-                <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">{{ t('escalation_colleague_label') if t else 'Colega' }} ({{ chamado.area }}) <span class="text-rose-500">*</span></label>
-                <select id="escalonar-supervisor-select" class="dtx-select py-3 px-4 font-semibold w-full appearance-none" disabled>
+                <label class="bento-field-label" style="margin-bottom:6px;">{{ t('escalation_colleague_label') if t else 'Colega' }} ({{ chamado.area }}) <span style="color:#e11d48;">*</span></label>
+                <select id="escalonar-supervisor-select" disabled
+                    style="width:100%; background:var(--color-surface-canvas); border:1.5px solid transparent; border-radius:14px; padding:11px 14px; font-family:inherit; font-size:14px;">
                     <option value="">{{ t('loading_generic') if t else 'Carregando...' }}</option>
                 </select>
             </div>
             <div>
-                <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">{{ t('escalation_reason_label') if t else 'Motivo' }} <span class="text-rose-500">*</span></label>
+                <label class="bento-field-label" style="margin-bottom:6px;">{{ t('escalation_reason_label') if t else 'Motivo' }} <span style="color:#e11d48;">*</span></label>
                 <textarea id="escalonar-motivo" rows="3" maxlength="500"
                     placeholder="{{ t('escalation_escalate_reason_placeholder') if t else 'Descreva o motivo do escalonamento...' }}"
-                    class="dtx-input resize-none w-full"></textarea>
+                    style="width:100%; background:var(--color-surface-canvas); border:1.5px solid transparent; border-radius:14px; padding:11px 14px; font-family:inherit; font-size:14px; resize:none;"></textarea>
             </div>
-            <div id="escalonar-erro" class="hidden text-sm text-rose-600 font-medium bg-rose-50 border border-rose-100 rounded-dtx-md px-3 py-2"></div>
+            <div id="escalonar-erro" class="hidden bento-inline-notice error"></div>
         </div>
-        <div class="px-6 pb-5 flex gap-3">
-            <button onclick="document.getElementById('modal-escalonar-colega').classList.add('hidden')"
-                class="flex-1 py-2.5 rounded-dtx-md border border-surface-border text-sm font-bold text-gray-600 hover:bg-gray-50 transition-colors">
+        <div class="flex gap-3" style="padding:0 24px 24px;">
+            <button onclick="document.getElementById('modal-escalonar-colega').classList.add('hidden')" class="bento-btn-outline" style="flex:1; justify-content:center;">
                 {{ t('cancel') if t else 'Cancelar' }}
             </button>
-            <button onclick="executarEscalonarColega()"
-                class="flex-1 py-2.5 rounded-dtx-md bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold transition-colors">
+            <button onclick="executarEscalonarColega()" class="bento-btn-block" style="flex:1; background:#7c3aed; color:#fff;">
                 {{ t('escalation_escalate_confirm_btn') if t else 'Escalonar' }}
             </button>
         </div>
@@ -691,19 +659,20 @@
 </div>
 
 <!-- Modal: Incluir Supervisores (Fase 4) -->
-<div id="modal-incluir-participantes" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-    <div class="bg-white rounded-dtx-lg shadow-lg w-full max-w-md border border-surface-border">
-        <div class="px-6 py-4 border-b border-surface-border flex items-center justify-between">
-            <h3 class="text-base font-black text-gray-800">{{ t('escalation_include_modal_title') if t else 'Incluir supervisores' }}</h3>
-            <button onclick="document.getElementById('modal-incluir-participantes').classList.add('hidden')" class="text-gray-400 hover:text-gray-600 transition-colors">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+<div id="modal-incluir-participantes" class="hidden bento-modal-overlay flex items-center justify-center p-4">
+    <div class="bento-modal-backdrop"></div>
+    <div class="bento-modal-panel" style="position:relative; z-index:1;">
+        <div class="head">
+            <h3 style="font-weight:800; font-size:15px;">{{ t('escalation_include_modal_title') if t else 'Incluir supervisores' }}</h3>
+            <button onclick="document.getElementById('modal-incluir-participantes').classList.add('hidden')" class="bento-modal-close">
+                <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
             </button>
         </div>
-        <div class="p-6 space-y-4">
+        <div class="space-y-4" style="padding:24px;">
             <div>
-                <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">{{ t('escalation_area_label') if t else 'Área' }} <span class="text-rose-500">*</span></label>
+                <label class="bento-field-label" style="margin-bottom:6px;">{{ t('escalation_area_label') if t else 'Área' }} <span style="color:#e11d48;">*</span></label>
                 <select id="incluir-area-select" onchange="carregarSupervisoresParaIncluir(this.value)"
-                    class="dtx-select py-3 px-4 font-semibold w-full appearance-none">
+                    style="width:100%; background:var(--color-surface-canvas); border:1.5px solid transparent; border-radius:14px; padding:11px 14px; font-family:inherit; font-size:14px;">
                     <option value="">{{ t('escalation_select_area') if t else 'Selecione uma área...' }}</option>
                     {% for setor in setores %}
                     <option value="{{ setor.nome_pt }}">{{ translate_sector(setor.nome_pt) if setor.nome_pt else setor.nome_pt }}</option>
@@ -711,27 +680,25 @@
                 </select>
             </div>
             <div>
-                <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">{{ t('escalation_supervisor_label') if t else 'Supervisor' }} <span class="text-rose-500">*</span></label>
+                <label class="bento-field-label" style="margin-bottom:6px;">{{ t('escalation_supervisor_label') if t else 'Supervisor' }} <span style="color:#e11d48;">*</span></label>
                 <div class="flex gap-2">
-                    <select id="incluir-supervisor-select" class="dtx-select py-3 px-4 font-semibold flex-1 appearance-none" disabled>
+                    <select id="incluir-supervisor-select" disabled
+                        style="flex:1; background:var(--color-surface-canvas); border:1.5px solid transparent; border-radius:14px; padding:11px 14px; font-family:inherit; font-size:14px;">
                         <option value="">{{ t('escalation_select_area_first') if t else 'Selecione a área primeiro...' }}</option>
                     </select>
-                    <button onclick="adicionarParticipanteNaLista()"
-                        class="px-4 py-2.5 rounded-dtx-md bg-teal-600 hover:bg-teal-700 text-white text-sm font-bold transition-colors flex-shrink-0">
+                    <button onclick="adicionarParticipanteNaLista()" class="bento-btn-block solid-teal" style="width:auto; flex-shrink:0; padding:0 16px;">
                         {{ t('escalation_add_btn') if t else '+ Adicionar' }}
                     </button>
                 </div>
             </div>
             <div id="incluir-lista-preview" class="space-y-1.5 max-h-36 overflow-y-auto"></div>
-            <div id="incluir-erro" class="hidden text-sm text-rose-600 font-medium bg-rose-50 border border-rose-100 rounded-dtx-md px-3 py-2"></div>
+            <div id="incluir-erro" class="hidden bento-inline-notice error"></div>
         </div>
-        <div class="px-6 pb-5 flex gap-3">
-            <button onclick="document.getElementById('modal-incluir-participantes').classList.add('hidden'); limparModalIncluir()"
-                class="flex-1 py-2.5 rounded-dtx-md border border-surface-border text-sm font-bold text-gray-600 hover:bg-gray-50 transition-colors">
+        <div class="flex gap-3" style="padding:0 24px 24px;">
+            <button onclick="document.getElementById('modal-incluir-participantes').classList.add('hidden'); limparModalIncluir()" class="bento-btn-outline" style="flex:1; justify-content:center;">
                 {{ t('cancel') if t else 'Cancelar' }}
             </button>
-            <button onclick="executarIncluirParticipantes()"
-                class="flex-1 py-2.5 rounded-dtx-md bg-teal-600 hover:bg-teal-700 text-white text-sm font-bold transition-colors">
+            <button onclick="executarIncluirParticipantes()" class="bento-btn-block solid-teal" style="flex:1;">
                 {{ t('escalation_include_confirm_btn') if t else 'Confirmar inclusão' }}
             </button>
         </div>
@@ -929,10 +896,10 @@ Object.assign(window.DTX_MSGS, {
         if (_participantesSelecionados.length === 0) { container.innerHTML = ''; return; }
         var html = '';
         _participantesSelecionados.forEach(function(p, i) {
-            html += '<div class="flex items-center justify-between px-3 py-1.5 bg-teal-50 rounded-dtx-md border border-teal-100 text-sm">'
-                + '<span class="font-medium text-teal-800 truncate mr-2">' + _escapeHtml(p.nome) + ' <span class="text-teal-500 text-xs">(' + _escapeHtml(p.area) + ')</span></span>'
-                + '<button onclick="removerParticipanteDaLista(' + i + ')" class="text-rose-400 hover:text-rose-600 transition-colors flex-shrink-0" title="Remover">'
-                + '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>'
+            html += '<div class="bento-participant-row" style="background:#f0fdfa; border-color:#99f6e4;">'
+                + '<span style="font-weight:600; color:#0f766e; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">' + _escapeHtml(p.nome) + ' <span style="color:#14b8a6; font-size:11px;">(' + _escapeHtml(p.area) + ')</span></span>'
+                + '<button onclick="removerParticipanteDaLista(' + i + ')" style="color:#fb7185; background:none; border:none; cursor:pointer; flex-shrink:0;" title="Remover">'
+                + '<svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>'
                 + '</button></div>';
         });
         container.innerHTML = html;
@@ -977,22 +944,21 @@ Object.assign(window.DTX_MSGS, {
 {% if pode_concluir_parte %}
 <!-- ── Concluir Minha Parte (Fase 4 — participante) ─────────────────────── -->
 <div class="max-w-5xl mx-auto mt-4 mb-2">
-    <div class="bg-teal-50 rounded-dtx-lg border border-teal-200 shadow-dtx-sm p-5">
+    <div class="bento-card" style="background:#f0fdfa; border-color:#99f6e4;">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-                <h4 class="text-sm font-black text-teal-800 flex items-center gap-2">
-                    <svg class="w-4 h-4 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                <h4 style="font-size:14px; font-weight:800; color:#0f766e; display:flex; align-items:center; gap:8px;">
+                    <svg width="16" height="16" style="color:#0d9488;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                     {{ t('participant_you_are_participant') if t else 'Você é participante deste chamado' }}
                 </h4>
-                <p class="text-[12px] text-teal-700 mt-1">{{ t('participant_finish_hint') if t else 'Quando terminar sua parte, clique em "Concluí minha parte" para notificar o responsável.' }}</p>
+                <p style="font-size:12px; color:#0f766e; margin-top:4px;">{{ t('participant_finish_hint') if t else 'Quando terminar sua parte, clique em "Concluí minha parte" para notificar o responsável.' }}</p>
             </div>
-            <button onclick="executarConcluirMinhaParte()"
-                class="flex-shrink-0 inline-flex items-center gap-2 px-5 py-2.5 rounded-dtx-md text-sm font-bold bg-teal-600 hover:bg-teal-700 text-white transition-colors active:scale-95">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+            <button onclick="executarConcluirMinhaParte()" class="bento-btn-block solid-teal" style="width:auto; flex-shrink:0; padding:11px 22px;">
+                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
                 {{ t('participant_finish_my_part_btn') if t else 'Concluí minha parte' }}
             </button>
         </div>
-        <div id="concluir-parte-msg" class="hidden mt-3 text-sm font-medium rounded-dtx-md px-3 py-2"></div>
+        <div id="concluir-parte-msg" class="hidden bento-inline-notice" style="margin-top:12px;"></div>
     </div>
 </div>
 <script nonce="{{ csp_nonce }}">
@@ -1022,12 +988,12 @@ Object.assign(window.DTX_MSGS, {
                 msg.textContent = data.dados && data.dados.pode_concluir_global
                     ? DTX_MSGS.participant_all_done_success
                     : DTX_MSGS.participant_part_done_success;
-                msg.className = 'mt-3 text-sm font-medium rounded-dtx-md px-3 py-2 bg-emerald-50 text-emerald-700 border border-emerald-100';
+                msg.className = 'bento-inline-notice ok';
                 msg.classList.remove('hidden');
                 setTimeout(function() { window.location.reload(); }, 2000);
             } else {
                 msg.textContent = data.erro || 'Erro ao concluir parte.';
-                msg.className = 'mt-3 text-sm font-medium rounded-dtx-md px-3 py-2 bg-rose-50 text-rose-600 border border-rose-100';
+                msg.className = 'bento-inline-notice error';
                 msg.classList.remove('hidden');
                 if (btn) btn.disabled = false;
             }
@@ -1035,7 +1001,7 @@ Object.assign(window.DTX_MSGS, {
         .catch(function() {
             var msg = document.getElementById('concluir-parte-msg');
             msg.textContent = DTX_MSGS.error_connection;
-            msg.className = 'mt-3 text-sm font-medium rounded-dtx-md px-3 py-2 bg-rose-50 text-rose-600 border border-rose-100';
+            msg.className = 'bento-inline-notice error';
             msg.classList.remove('hidden');
             if (btn) btn.disabled = false;
         });
@@ -1063,17 +1029,17 @@ Object.assign(window.DTX_MSGS, {
             var files = e.target.files;
             if(files.length === 1) {
                 nomeArquivoEl.textContent = files[0].name;
-                nomeArquivoEl.classList.remove('text-gray-600');
-                nomeArquivoEl.classList.add('text-dtx-600', 'font-bold');
+                nomeArquivoEl.style.color = 'var(--color-dtx-500)';
+                nomeArquivoEl.style.fontWeight = '800';
             } else if(files.length > 1) {
                 nomeArquivoEl.textContent = files.length + ' arquivo(s) selecionado(s)';
-                nomeArquivoEl.classList.remove('text-gray-600');
-                nomeArquivoEl.classList.add('text-dtx-600', 'font-bold');
+                nomeArquivoEl.style.color = 'var(--color-dtx-500)';
+                nomeArquivoEl.style.fontWeight = '800';
             } else {
                 var label = document.querySelector('[data-upload-placeholder]');
                 nomeArquivoEl.textContent = label ? label.getAttribute('data-upload-placeholder') : 'Clique para enviar um arquivo';
-                nomeArquivoEl.classList.add('text-gray-600');
-                nomeArquivoEl.classList.remove('text-dtx-600', 'font-bold');
+                nomeArquivoEl.style.color = '';
+                nomeArquivoEl.style.fontWeight = '';
             }
         });
     }
@@ -1082,28 +1048,27 @@ Object.assign(window.DTX_MSGS, {
 
 {% if pode_reabrir is defined and pode_reabrir %}
 <!-- ── Modal Reabertura Admin/Supervisor ─────────────────────────────────── -->
-<div id="modal-reabrir-admin" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-    <div class="bg-white rounded-dtx-lg shadow-dtx-sm w-full max-w-md border border-surface-border">
-        <div class="px-6 py-4 border-b border-surface-border flex items-center justify-between">
-            <h3 class="font-display font-bold text-gray-900">{{ t('ticket_reopen_admin_btn') if t else 'Reabrir chamado' }}</h3>
-            <button onclick="document.getElementById('modal-reabrir-admin').classList.add('hidden')" class="text-gray-400 hover:text-gray-600 transition-colors">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+<div id="modal-reabrir-admin" class="hidden bento-modal-overlay flex items-center justify-center p-4">
+    <div class="bento-modal-backdrop"></div>
+    <div class="bento-modal-panel" style="position:relative; z-index:1;">
+        <div class="head">
+            <h3 class="font-display" style="font-weight:800; font-size:15px;">{{ t('ticket_reopen_admin_btn') if t else 'Reabrir chamado' }}</h3>
+            <button onclick="document.getElementById('modal-reabrir-admin').classList.add('hidden')" class="bento-modal-close">
+                <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
             </button>
         </div>
-        <div class="p-6 space-y-4">
-            <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">
-                {{ t('reopen_reason_label') if t else 'Motivo da reabertura' }} <span class="text-rose-500">*</span>
+        <div class="space-y-4" style="padding:24px;">
+            <label class="bento-field-label" style="margin-bottom:6px;">
+                {{ t('reopen_reason_label') if t else 'Motivo da reabertura' }} <span style="color:#e11d48;">*</span>
             </label>
             <textarea id="motivo-reabrir-admin" rows="3" maxlength="500"
                 placeholder="{{ t('reopen_reason_placeholder') if t else 'Descreva o motivo para reabrir este chamado...' }}"
-                class="dtx-input resize-none w-full"></textarea>
+                style="width:100%; background:var(--color-surface-canvas); border:1.5px solid transparent; border-radius:14px; padding:11px 14px; font-family:inherit; font-size:14px; resize:none;"></textarea>
             <div class="flex gap-3 pt-2">
-                <button onclick="document.getElementById('modal-reabrir-admin').classList.add('hidden')"
-                    class="flex-1 py-2.5 rounded-dtx-md border border-surface-border text-gray-600 font-bold text-sm hover:bg-gray-50 transition-colors">
+                <button onclick="document.getElementById('modal-reabrir-admin').classList.add('hidden')" class="bento-btn-outline" style="flex:1; justify-content:center;">
                     {{ t('cancel') if t else 'Cancelar' }}
                 </button>
-                <button onclick="reabrirChamadoAdmin()"
-                    class="flex-1 py-2.5 rounded-dtx-md bg-dtx-600 hover:bg-dtx-700 text-white font-bold text-sm transition-colors">
+                <button onclick="reabrirChamadoAdmin()" class="bento-btn-primary" style="flex:1; justify-content:center;">
                     {{ t('ticket_reopen_admin_btn') if t else 'Reabrir' }}
                 </button>
             </div>
@@ -1133,28 +1098,27 @@ function reabrirChamadoAdmin() {
 
 {% if pode_cancelar is defined and pode_cancelar %}
 <!-- ── Modal Cancelamento (Nível 1) ───────────────────────────────────────── -->
-<div id="modal-cancelar-admin" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-    <div class="bg-white rounded-dtx-lg shadow-dtx-sm w-full max-w-md border border-surface-border">
-        <div class="px-6 py-4 border-b border-surface-border flex items-center justify-between">
-            <h3 class="font-display font-bold text-red-700">{{ t('ticket_cancel_frozen_btn') if t else 'Cancelar chamado' }}</h3>
-            <button onclick="document.getElementById('modal-cancelar-admin').classList.add('hidden')" class="text-gray-400 hover:text-gray-600 transition-colors">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+<div id="modal-cancelar-admin" class="hidden bento-modal-overlay flex items-center justify-center p-4">
+    <div class="bento-modal-backdrop"></div>
+    <div class="bento-modal-panel" style="position:relative; z-index:1;">
+        <div class="head">
+            <h3 class="font-display" style="font-weight:800; font-size:15px; color:#be123c;">{{ t('ticket_cancel_frozen_btn') if t else 'Cancelar chamado' }}</h3>
+            <button onclick="document.getElementById('modal-cancelar-admin').classList.add('hidden')" class="bento-modal-close">
+                <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
             </button>
         </div>
-        <div class="p-6 space-y-4">
-            <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">
-                {{ t('ticket_cancel_frozen_confirm') if t else 'Informe o motivo do cancelamento' }} <span class="text-rose-500">*</span>
+        <div class="space-y-4" style="padding:24px;">
+            <label class="bento-field-label" style="margin-bottom:6px;">
+                {{ t('ticket_cancel_frozen_confirm') if t else 'Informe o motivo do cancelamento' }} <span style="color:#e11d48;">*</span>
             </label>
             <textarea id="motivo-cancelar-admin" rows="3" maxlength="500"
                 placeholder="{{ t('ticket_cancel_frozen_confirm') if t else 'Descreva o motivo para cancelar este chamado...' }}"
-                class="dtx-input resize-none w-full"></textarea>
+                style="width:100%; background:var(--color-surface-canvas); border:1.5px solid transparent; border-radius:14px; padding:11px 14px; font-family:inherit; font-size:14px; resize:none;"></textarea>
             <div class="flex gap-3 pt-2">
-                <button onclick="document.getElementById('modal-cancelar-admin').classList.add('hidden')"
-                    class="flex-1 py-2.5 rounded-dtx-md border border-surface-border text-gray-600 font-bold text-sm hover:bg-gray-50 transition-colors">
+                <button onclick="document.getElementById('modal-cancelar-admin').classList.add('hidden')" class="bento-btn-outline" style="flex:1; justify-content:center;">
                     {{ t('cancel') if t else 'Fechar' }}
                 </button>
-                <button onclick="cancelarChamadoAdmin()"
-                    class="flex-1 py-2.5 rounded-dtx-md bg-red-600 hover:bg-red-700 text-white font-bold text-sm transition-colors">
+                <button onclick="cancelarChamadoAdmin()" class="bento-btn-block solid-rose" style="flex:1;">
                     {{ t('ticket_cancel_frozen_btn') if t else 'Cancelar chamado' }}
                 </button>
             </div>
@@ -1187,33 +1151,31 @@ function cancelarChamadoAdmin() {
 
 {% if pode_cancelar_solicitante %}
 <!-- ── Modal Cancelamento Solicitante ─────────────────────────────────────── -->
-<dialog id="modal-cancelar-solicitante" class="rounded-dtx-lg shadow-dtx-sm border border-surface-border w-full max-w-md p-0 backdrop:bg-black/50">
-    <div class="px-6 py-4 border-b border-surface-border flex items-center justify-between bg-white">
-        <h3 class="font-display font-bold text-gray-900">{{ t('cancel_ticket_sol_title') if t else 'Cancelar chamado' }}</h3>
-        <button onclick="document.getElementById('modal-cancelar-solicitante').close()" class="text-gray-400 hover:text-gray-600 transition-colors">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+<dialog id="modal-cancelar-solicitante" class="bento-modal" aria-labelledby="modal-cancelar-solicitante-titulo">
+    <div class="head" style="display:flex; align-items:center; justify-content:space-between; padding:20px 24px; border-bottom:1px solid var(--color-surface-border);">
+        <h3 id="modal-cancelar-solicitante-titulo" class="font-display" style="font-weight:800; font-size:15px;">{{ t('cancel_ticket_sol_title') if t else 'Cancelar chamado' }}</h3>
+        <button onclick="document.getElementById('modal-cancelar-solicitante').close()" class="bento-modal-close">
+            <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
         </button>
     </div>
-    <div class="p-6 space-y-4 bg-white">
-        <p class="text-sm font-medium text-gray-700">{{ t('cancel_ticket_sol_hint') if t else 'Informe o motivo do cancelamento (obrigatório).' }}</p>
+    <div class="space-y-4" style="padding:24px;">
+        <p style="font-size:13px; font-weight:600;">{{ t('cancel_ticket_sol_hint') if t else 'Informe o motivo do cancelamento (obrigatório).' }}</p>
         <div>
-            <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">
-                {% set _cr = t('cancellation_reason') %}{{ _cr if _cr != 'cancellation_reason' else 'Motivo' }} <span class="text-rose-500">*</span>
+            <label class="bento-field-label" style="margin-bottom:6px;">
+                {% set _cr = t('cancellation_reason') %}{{ _cr if _cr != 'cancellation_reason' else 'Motivo' }} <span style="color:#e11d48;">*</span>
             </label>
             <textarea id="sol-motivo-cancelar" rows="3" maxlength="500"
                 placeholder="{{ t('cancellation_reason_placeholder') if t else 'Informe o motivo do cancelamento' }}"
-                class="dtx-input resize-none w-full"></textarea>
-            <p class="text-[11px] text-gray-400 mt-1">{{ t('min_chars_hint') if t else 'Mínimo 10 caracteres.' }}</p>
+                style="width:100%; background:var(--color-surface-canvas); border:1.5px solid transparent; border-radius:14px; padding:11px 14px; font-family:inherit; font-size:14px; resize:none;"></textarea>
+            <p style="font-size:11px; color:var(--color-surface-muted); margin-top:6px;">{{ t('min_chars_hint') if t else 'Mínimo 10 caracteres.' }}</p>
         </div>
-        <div id="sol-cancelar-erro" class="hidden text-sm font-medium text-rose-600 bg-rose-50 border border-rose-100 rounded-dtx-md px-3 py-2"></div>
+        <div id="sol-cancelar-erro" class="hidden bento-inline-notice error"></div>
     </div>
-    <div class="px-6 pb-5 flex gap-3 bg-white">
-        <button onclick="document.getElementById('modal-cancelar-solicitante').close()"
-            class="flex-1 py-2.5 rounded-dtx-md border border-surface-border text-sm font-bold text-gray-600 hover:bg-gray-50 transition-colors">
+    <div class="flex gap-3" style="padding:0 24px 24px;">
+        <button onclick="document.getElementById('modal-cancelar-solicitante').close()" class="bento-btn-outline" style="flex:1; justify-content:center;">
             {{ t('cancel') if t else 'Fechar' }}
         </button>
-        <button onclick="executarCancelarSolicitante()"
-            class="flex-1 py-2.5 rounded-dtx-md bg-rose-600 hover:bg-rose-700 text-white text-sm font-bold transition-colors active:scale-95">
+        <button onclick="executarCancelarSolicitante()" class="bento-btn-block solid-rose" style="flex:1;">
             {{ t('cancel_ticket_confirm_btn') if t else 'Confirmar cancelamento' }}
         </button>
     </div>
@@ -1234,7 +1196,7 @@ function cancelarChamadoAdmin() {
 
     function _atualizarCountdown() {
         if (_segundosRestantes <= 0) {
-            if (_blocoEditar) { _blocoEditar.classList.add('opacity-50', 'pointer-events-none'); }
+            if (_blocoEditar) { _blocoEditar.style.opacity = '0.5'; _blocoEditar.style.pointerEvents = 'none'; }
             if (_countdownEl) { _countdownEl.textContent = '00:00'; }
             clearInterval(_solTimer);
             return;

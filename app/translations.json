@@ -224,6 +224,26 @@
     "en": "Fill in the details below. Projects have automatic priority.",
     "es": "Rellene los detalles a continuación. Los proyectos tienen prioridad automática."
   },
+  "form_section_classification": {
+    "pt_BR": "Classificação",
+    "en": "Classification",
+    "es": "Clasificación"
+  },
+  "form_section_details": {
+    "pt_BR": "Detalhes",
+    "en": "Details",
+    "es": "Detalles"
+  },
+  "form_section_notification": {
+    "pt_BR": "Notificação",
+    "en": "Notification",
+    "es": "Notificación"
+  },
+  "auto_tag": {
+    "pt_BR": "Auto",
+    "en": "Auto",
+    "es": "Auto"
+  },
   "rl_code_example": {
     "pt_BR": "Ex: 045, ABC-01, 123/2026",
     "en": "Ex: 045, ABC-01, 123/2026",
@@ -390,9 +410,9 @@
     "es": "Descripción del Problema"
   },
   "type_sector": {
-    "pt_BR": "Atribuir ao setor:",
-    "en": "Assign to sector:",
-    "es": "Asignar al sector:"
+    "pt_BR": "Setor",
+    "en": "Sector",
+    "es": "Sector"
   },
   "option_open": {
     "pt_BR": "Aberto",
@@ -633,6 +653,31 @@
     "pt_BR": "Manter-me conectado por 30 dias",
     "en": "Keep me signed in for 30 days",
     "es": "Mantenme conectado durante 30 días"
+  },
+  "login_hero_title": {
+    "pt_BR": "Portal de Serviços",
+    "en": "Service Portal",
+    "es": "Portal de Servicios"
+  },
+  "login_welcome_back": {
+    "pt_BR": "Bem-vindo de volta",
+    "en": "Welcome back",
+    "es": "Bienvenido de vuelta"
+  },
+  "login_form_subtitle": {
+    "pt_BR": "Entre com suas credenciais corporativas.",
+    "en": "Sign in with your corporate credentials.",
+    "es": "Ingrese con sus credenciales corporativas."
+  },
+  "login_hero_description": {
+    "pt_BR": "Controle e visibilidade de chamados em tempo real para toda a operação.",
+    "en": "Real-time ticket control and visibility for the whole operation.",
+    "es": "Control y visibilidad de tickets en tiempo real para toda la operación."
+  },
+  "login_hero_status": {
+    "pt_BR": "Todos os sistemas operacionais",
+    "en": "All systems operational",
+    "es": "Todos los sistemas operativos"
   },
   "login_temporarily_blocked": {
     "pt_BR": "Muitas tentativas de login. Tente novamente em {duration} minutos.",

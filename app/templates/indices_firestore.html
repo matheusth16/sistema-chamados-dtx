@@ -10,47 +10,49 @@
   {% endcall %}
 
   <!-- Resumo das otimizações -->
-  <div class="bg-blue-50 border border-blue-200 rounded-dtx-lg p-5">
-    <h2 class="text-sm font-semibold text-blue-900 mb-3">Resumo das Otimizações Implementadas</h2>
-    <ul class="space-y-1.5 text-sm text-blue-800">
-      <li><strong>Paginação por Cursor:</strong> Busca apenas 50 documentos por requisição</li>
-      <li><strong>Carregar Mais:</strong> Botão para carregar próximos registros sem reload</li>
-      <li><strong>Status AJAX:</strong> Atualiza status sem recarregar a página inteira</li>
-      <li class="text-blue-700"><strong>Índices Firestore:</strong> Faltam criar para máxima performance</li>
-    </ul>
+  <div class="bento-notice info">
+    <div style="width:100%;">
+      <h2 style="font-size:13px; font-weight:800; margin-bottom:10px;">Resumo das Otimizações Implementadas</h2>
+      <ul class="space-y-1.5" style="font-size:13px;">
+        <li><strong>Paginação por Cursor:</strong> Busca apenas 50 documentos por requisição</li>
+        <li><strong>Carregar Mais:</strong> Botão para carregar próximos registros sem reload</li>
+        <li><strong>Status AJAX:</strong> Atualiza status sem recarregar a página inteira</li>
+        <li><strong>Índices Firestore:</strong> Faltam criar para máxima performance</li>
+      </ul>
+    </div>
   </div>
 
   <!-- Tabela de índices recomendados -->
   <div>
-    <h2 class="text-lg font-semibold text-gray-900 mb-4">Índices Recomendados</h2>
-    <div class="bg-surface-base border border-surface-border rounded-dtx-lg shadow-dtx-sm overflow-hidden">
-      <table class="min-w-full divide-y divide-surface-border">
-        <thead class="bg-surface-raised">
+    <h2 class="bento-section-title">Índices Recomendados</h2>
+    <div class="bento-card bento-table-scope" style="padding:0; overflow:hidden;">
+      <table>
+        <thead>
           <tr>
-            <th class="px-5 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">#</th>
-            <th class="px-5 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Descrição</th>
-            <th class="px-5 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Campos</th>
-            <th class="px-5 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Uso</th>
+            <th>#</th>
+            <th>Descrição</th>
+            <th>Campos</th>
+            <th>Uso</th>
           </tr>
         </thead>
-        <tbody class="divide-y divide-surface-border">
+        <tbody>
           {% for indice in indices %}
-          <tr class="hover:bg-surface-raised transition-colors">
-            <td class="px-5 py-4 whitespace-nowrap">
-              <span class="bg-slate-100 text-slate-700 rounded-dtx-sm px-2 py-0.5 text-xs font-bold">{{ loop.index }}</span>
+          <tr class="hoverable">
+            <td>
+              <span class="bento-mini-badge">{{ loop.index }}</span>
             </td>
-            <td class="px-5 py-4 text-sm text-gray-700 font-medium">{{ indice.descricao }}</td>
-            <td class="px-5 py-4">
+            <td style="font-weight:600;">{{ indice.descricao }}</td>
+            <td>
               <div class="space-y-1">
                 {% for campo, ordem in indice.campos %}
                 <div class="flex items-center gap-2">
-                  <code class="bg-surface-raised px-1.5 py-0.5 rounded text-xs font-mono text-gray-700">{{ campo }}</code>
-                  <span class="bg-slate-100 text-slate-600 rounded-dtx-sm px-1.5 py-0.5 text-[10px] font-semibold">{{ ordem }}</span>
+                  <code style="background:var(--color-surface-canvas); padding:2px 6px; border-radius:6px; font-size:11px; font-family:var(--font-mono,monospace);">{{ campo }}</code>
+                  <span class="bento-mini-badge">{{ ordem }}</span>
                 </div>
                 {% endfor %}
               </div>
             </td>
-            <td class="px-5 py-4 text-sm text-gray-600">
+            <td style="font-size:13px; color:var(--color-text-muted);">
               {% if loop.index == 1 %}Filtrar por categoria + status
               {% elif loop.index == 2 %}Filtrar por status apenas
               {% elif loop.index == 3 %}Filtrar por categoria + prioridade
@@ -66,38 +68,38 @@
 
   <!-- Como criar os índices -->
   <div>
-    <h2 class="text-lg font-semibold text-gray-900 mb-4">Como Criar os Índices</h2>
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-      <div class="bg-surface-base border border-surface-border rounded-dtx-lg shadow-dtx-sm overflow-hidden">
-        <div class="bg-dtx-600 text-white px-5 py-3">
-          <h3 class="text-sm font-semibold">Opção 1: Firebase Console (Recomendado)</h3>
+    <h2 class="bento-section-title">Como Criar os Índices</h2>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div class="bento-card" style="padding:0; overflow:hidden;">
+        <div style="background:var(--color-dtx-500); color:#fff; padding:14px 20px;">
+          <h3 style="font-size:13px; font-weight:800;">Opção 1: Firebase Console (Recomendado)</h3>
         </div>
-        <div class="p-5">
-          <ol class="space-y-2 text-sm text-gray-700 list-decimal list-inside">
-            <li>Vá para: <a href="https://console.firebase.google.com" target="_blank" rel="noopener noreferrer" class="text-dtx-600 hover:text-dtx-700 underline">Firebase Console</a></li>
+        <div style="padding:20px;">
+          <ol class="space-y-2" style="font-size:13px; list-style:decimal; list-style-position:inside;">
+            <li>Vá para: <a href="https://console.firebase.google.com" target="_blank" rel="noopener noreferrer" style="color:var(--color-dtx-500); text-decoration:underline;">Firebase Console</a></li>
             <li>Firestore Database &rarr; <strong>Índices</strong></li>
             <li>Clique em <strong>Create Index</strong></li>
             <li>Preencha com os dados da tabela acima</li>
             <li>Espere ~5 minutos por índice</li>
           </ol>
-          <hr class="my-4 border-surface-border">
-          <p class="text-sm text-gray-600"><strong>Tempo total:</strong> ~20 minutos para 4 índices</p>
+          <hr style="margin:16px 0; border-color:var(--color-surface-border);">
+          <p style="font-size:13px; color:var(--color-text-muted);"><strong>Tempo total:</strong> ~20 minutos para 4 índices</p>
         </div>
       </div>
 
-      <div class="bg-surface-base border border-surface-border rounded-dtx-lg shadow-dtx-sm overflow-hidden">
-        <div class="bg-dtx-600 text-white px-5 py-3">
-          <h3 class="text-sm font-semibold">Opção 2: Firebase CLI (Mais rápido)</h3>
+      <div class="bento-card" style="padding:0; overflow:hidden;">
+        <div style="background:var(--color-dtx-500); color:#fff; padding:14px 20px;">
+          <h3 style="font-size:13px; font-weight:800;">Opção 2: Firebase CLI (Mais rápido)</h3>
         </div>
-        <div class="p-5">
-          <ol class="space-y-2 text-sm text-gray-700 list-decimal list-inside">
+        <div style="padding:20px;">
+          <ol class="space-y-2" style="font-size:13px; list-style:decimal; list-style-position:inside;">
             <li>Abra o Terminal na pasta do projeto</li>
-            <li><code class="bg-surface-raised px-1.5 py-0.5 rounded text-xs font-mono">firebase deploy --only firestore:indexes --project seu-projeto-id</code></li>
+            <li><code style="background:var(--color-surface-canvas); padding:2px 6px; border-radius:6px; font-size:11px; font-family:var(--font-mono,monospace);">firebase deploy --only firestore:indexes --project seu-projeto-id</code></li>
             <li>Espere concluir (~1–2 minutos)</li>
             <li>Pronto! Todos os índices criados de uma vez</li>
           </ol>
-          <hr class="my-4 border-surface-border">
-          <p class="text-sm text-gray-600"><strong>Tempo total:</strong> ~10 minutos</p>
+          <hr style="margin:16px 0; border-color:var(--color-surface-border);">
+          <p style="font-size:13px; color:var(--color-text-muted);"><strong>Tempo total:</strong> ~10 minutos</p>
         </div>
       </div>
     </div>
@@ -105,28 +107,28 @@
 
   <!-- Arquivo firestore.indexes.json -->
   <div>
-    <h2 class="text-lg font-semibold text-gray-900 mb-4">Arquivo firestore.indexes.json</h2>
-    <div class="bg-surface-base border border-surface-border rounded-dtx-lg shadow-dtx-sm overflow-hidden">
-      <div class="px-5 py-3 border-b border-surface-border bg-surface-raised">
-        <p class="text-sm text-gray-700"><strong>Localização:</strong> <code class="bg-surface-raised px-1.5 py-0.5 rounded text-sm font-mono">firestore.indexes.json</code> (raiz do projeto)</p>
+    <h2 class="bento-section-title">Arquivo firestore.indexes.json</h2>
+    <div class="bento-card" style="padding:0; overflow:hidden;">
+      <div style="padding:14px 20px; border-bottom:1px solid var(--color-surface-border); background:var(--color-surface-canvas);">
+        <p style="font-size:13px;"><strong>Localização:</strong> <code style="background:#fff; padding:2px 6px; border-radius:6px; font-size:12px; font-family:var(--font-mono,monospace);">firestore.indexes.json</code> (raiz do projeto)</p>
       </div>
-      <div class="p-5">
-        <p class="text-sm text-gray-600 mb-4"><strong>Status:</strong> Arquivo já criado. Pronto para deploy.</p>
-        <pre class="bg-surface-raised border border-surface-border rounded-dtx-md p-4 overflow-x-auto text-xs font-mono text-gray-700"><code>{{ script }}</code></pre>
+      <div style="padding:20px;">
+        <p style="font-size:13px; color:var(--color-text-muted); margin-bottom:16px;"><strong>Status:</strong> Arquivo já criado. Pronto para deploy.</p>
+        <pre style="background:var(--color-surface-canvas); border:1px solid var(--color-surface-border); border-radius:14px; padding:16px; overflow-x-auto; font-size:12px; font-family:var(--font-mono,monospace);"><code>{{ script }}</code></pre>
       </div>
     </div>
   </div>
 
   <!-- Impacto de performance -->
   <div>
-    <h2 class="text-lg font-semibold text-gray-900 mb-4">Impacto de Performance</h2>
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-      <div class="bg-surface-base border border-rose-200 rounded-dtx-lg shadow-dtx-sm overflow-hidden">
-        <div class="px-5 py-3 border-b border-rose-200 bg-rose-50">
-          <h3 class="text-sm font-semibold text-rose-800">Sem Índices</h3>
+    <h2 class="bento-section-title">Impacto de Performance</h2>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div class="bento-card" style="padding:0; overflow:hidden;">
+        <div style="padding:14px 20px; border-bottom:1px solid #fecdd3; background:#fff1f2;">
+          <h3 style="font-size:13px; font-weight:800; color:#be123c;">Sem Índices</h3>
         </div>
-        <div class="p-5">
-          <ul class="space-y-2 text-sm text-gray-700">
+        <div style="padding:20px;">
+          <ul class="space-y-2" style="font-size:13px;">
             <li>Query com 3 filtros: <strong>2–5 segundos</strong></li>
             <li>Leitura de documentos: <strong>1000+ ops</strong></li>
             <li>Custo Firestore: <strong>Alto</strong></li>
@@ -135,12 +137,12 @@
         </div>
       </div>
 
-      <div class="bg-surface-base border border-emerald-200 rounded-dtx-lg shadow-dtx-sm overflow-hidden">
-        <div class="px-5 py-3 border-b border-emerald-200 bg-emerald-50">
-          <h3 class="text-sm font-semibold text-emerald-800">Com Índices</h3>
+      <div class="bento-card" style="padding:0; overflow:hidden;">
+        <div style="padding:14px 20px; border-bottom:1px solid #a7f3d0; background:var(--color-status-done-bg);">
+          <h3 style="font-size:13px; font-weight:800; color:#047857;">Com Índices</h3>
         </div>
-        <div class="p-5">
-          <ul class="space-y-2 text-sm text-gray-700">
+        <div style="padding:20px;">
+          <ul class="space-y-2" style="font-size:13px;">
             <li>Query com 3 filtros: <strong>50–200ms</strong></li>
             <li>Leitura de documentos: <strong>50–100 ops</strong></li>
             <li>Custo Firestore: <strong>10x menor</strong></li>
@@ -153,28 +155,28 @@
 
   <!-- Checklist de implementação -->
   <div>
-    <h2 class="text-lg font-semibold text-gray-900 mb-4">Checklist de Implementação</h2>
-    <div class="bg-surface-base border border-surface-border rounded-dtx-lg shadow-dtx-sm p-5">
+    <h2 class="bento-section-title">Checklist de Implementação</h2>
+    <div class="bento-card">
       <div class="space-y-3">
         <div class="flex items-center gap-3">
-          <input type="checkbox" id="check1" class="rounded border-gray-300 text-dtx-600 focus:ring-dtx-500 w-4 h-4">
-          <label for="check1" class="text-sm text-gray-700">Criar <code class="bg-surface-raised px-1.5 py-0.5 rounded text-xs font-mono">firestore.indexes.json</code> (já feito)</label>
+          <input type="checkbox" id="check1" style="width:16px; height:16px;">
+          <label for="check1" style="font-size:13px;">Criar <code style="background:var(--color-surface-canvas); padding:2px 6px; border-radius:6px; font-size:11px; font-family:var(--font-mono,monospace);">firestore.indexes.json</code> (já feito)</label>
         </div>
         <div class="flex items-center gap-3">
-          <input type="checkbox" id="check2" class="rounded border-gray-300 text-dtx-600 focus:ring-dtx-500 w-4 h-4">
-          <label for="check2" class="text-sm text-gray-700">Deploy índices via Firebase Console ou CLI</label>
+          <input type="checkbox" id="check2" style="width:16px; height:16px;">
+          <label for="check2" style="font-size:13px;">Deploy índices via Firebase Console ou CLI</label>
         </div>
         <div class="flex items-center gap-3">
-          <input type="checkbox" id="check3" class="rounded border-gray-300 text-dtx-600 focus:ring-dtx-500 w-4 h-4">
-          <label for="check3" class="text-sm text-gray-700">Esperar ~15 minutos para índices ficarem "Ready"</label>
+          <input type="checkbox" id="check3" style="width:16px; height:16px;">
+          <label for="check3" style="font-size:13px;">Esperar ~15 minutos para índices ficarem "Ready"</label>
         </div>
         <div class="flex items-center gap-3">
-          <input type="checkbox" id="check4" class="rounded border-gray-300 text-dtx-600 focus:ring-dtx-500 w-4 h-4">
-          <label for="check4" class="text-sm text-gray-700">Testar paginação em /admin</label>
+          <input type="checkbox" id="check4" style="width:16px; height:16px;">
+          <label for="check4" style="font-size:13px;">Testar paginação em /admin</label>
         </div>
         <div class="flex items-center gap-3">
-          <input type="checkbox" id="check5" class="rounded border-gray-300 text-dtx-600 focus:ring-dtx-500 w-4 h-4">
-          <label for="check5" class="text-sm text-gray-700">Monitorar performance no Firestore Console</label>
+          <input type="checkbox" id="check5" style="width:16px; height:16px;">
+          <label for="check5" style="font-size:13px;">Monitorar performance no Firestore Console</label>
         </div>
       </div>
     </div>
@@ -182,24 +184,24 @@
 
   <!-- APIs Otimizadas -->
   <div>
-    <h2 class="text-lg font-semibold text-gray-900 mb-4">APIs Otimizadas Disponíveis</h2>
+    <h2 class="bento-section-title">APIs Otimizadas Disponíveis</h2>
     <div class="space-y-4">
 
-      <div class="bg-surface-base border border-surface-border rounded-dtx-lg shadow-dtx-sm overflow-hidden">
-        <div class="px-5 py-3 border-b border-surface-border bg-surface-raised">
-          <h3 class="text-sm font-semibold text-gray-800">1. GET /api/chamados/paginar</h3>
+      <div class="bento-card" style="padding:0; overflow:hidden;">
+        <div style="padding:14px 20px; border-bottom:1px solid var(--color-surface-border); background:var(--color-surface-canvas);">
+          <h3 style="font-size:13px; font-weight:800;">1. GET /api/chamados/paginar</h3>
         </div>
-        <div class="p-5 space-y-3">
-          <p class="text-sm text-gray-700"><strong>Descrição:</strong> Paginação com cursor — busca apenas 50 documentos</p>
-          <p class="text-sm font-medium text-gray-600">Query params:</p>
-          <pre class="bg-surface-raised border border-surface-border rounded-dtx-md p-4 overflow-x-auto text-xs font-mono text-gray-700"><code>cursor=abc123         # ID do último documento (opcional)
+        <div class="space-y-3" style="padding:20px;">
+          <p style="font-size:13px;"><strong>Descrição:</strong> Paginação com cursor — busca apenas 50 documentos</p>
+          <p style="font-size:13px; font-weight:700; color:var(--color-text-muted);">Query params:</p>
+          <pre style="background:var(--color-surface-canvas); border:1px solid var(--color-surface-border); border-radius:14px; padding:16px; overflow-x-auto; font-size:12px; font-family:var(--font-mono,monospace);"><code>cursor=abc123         # ID do último documento (opcional)
 limite=50             # Documentos por página (padrão: 50, máx: 100)
 status=Aberto         # Filtrar por status
 categoria=Projetos    # Filtrar por categoria
 gate=G1               # Filtrar por gate
 search=termo          # Busca full-text</code></pre>
-          <p class="text-sm font-medium text-gray-600">Response:</p>
-          <pre class="bg-surface-raised border border-surface-border rounded-dtx-md p-4 overflow-x-auto text-xs font-mono text-gray-700"><code>{
+          <p style="font-size:13px; font-weight:700; color:var(--color-text-muted);">Response:</p>
+          <pre style="background:var(--color-surface-canvas); border:1px solid var(--color-surface-border); border-radius:14px; padding:16px; overflow-x-auto; font-size:12px; font-family:var(--font-mono,monospace);"><code>{
   "sucesso": true,
   "chamados": [...],
   "paginacao": {
@@ -212,19 +214,19 @@ search=termo          # Busca full-text</code></pre>
         </div>
       </div>
 
-      <div class="bg-surface-base border border-surface-border rounded-dtx-lg shadow-dtx-sm overflow-hidden">
-        <div class="px-5 py-3 border-b border-surface-border bg-surface-raised">
-          <h3 class="text-sm font-semibold text-gray-800">2. POST /api/carregar-mais</h3>
+      <div class="bento-card" style="padding:0; overflow:hidden;">
+        <div style="padding:14px 20px; border-bottom:1px solid var(--color-surface-border); background:var(--color-surface-canvas);">
+          <h3 style="font-size:13px; font-weight:800;">2. POST /api/carregar-mais</h3>
         </div>
-        <div class="p-5 space-y-3">
-          <p class="text-sm text-gray-700"><strong>Descrição:</strong> Carregar mais registros (infinite scroll)</p>
-          <p class="text-sm font-medium text-gray-600">Body (JSON):</p>
-          <pre class="bg-surface-raised border border-surface-border rounded-dtx-md p-4 overflow-x-auto text-xs font-mono text-gray-700"><code>{
+        <div class="space-y-3" style="padding:20px;">
+          <p style="font-size:13px;"><strong>Descrição:</strong> Carregar mais registros (infinite scroll)</p>
+          <p style="font-size:13px; font-weight:700; color:var(--color-text-muted);">Body (JSON):</p>
+          <pre style="background:var(--color-surface-canvas); border:1px solid var(--color-surface-border); border-radius:14px; padding:16px; overflow-x-auto; font-size:12px; font-family:var(--font-mono,monospace);"><code>{
   "cursor": "abc123",
   "limite": 20
 }</code></pre>
-          <p class="text-sm font-medium text-gray-600">Response:</p>
-          <pre class="bg-surface-raised border border-surface-border rounded-dtx-md p-4 overflow-x-auto text-xs font-mono text-gray-700"><code>{
+          <p style="font-size:13px; font-weight:700; color:var(--color-text-muted);">Response:</p>
+          <pre style="background:var(--color-surface-canvas); border:1px solid var(--color-surface-border); border-radius:14px; padding:16px; overflow-x-auto; font-size:12px; font-family:var(--font-mono,monospace);"><code>{
   "sucesso": true,
   "chamados": [...],
   "cursor_proximo": "xyz789",
@@ -233,19 +235,19 @@ search=termo          # Busca full-text</code></pre>
         </div>
       </div>
 
-      <div class="bg-surface-base border border-surface-border rounded-dtx-lg shadow-dtx-sm overflow-hidden">
-        <div class="px-5 py-3 border-b border-surface-border bg-surface-raised">
-          <h3 class="text-sm font-semibold text-gray-800">3. POST /api/atualizar-status</h3>
+      <div class="bento-card" style="padding:0; overflow:hidden;">
+        <div style="padding:14px 20px; border-bottom:1px solid var(--color-surface-border); background:var(--color-surface-canvas);">
+          <h3 style="font-size:13px; font-weight:800;">3. POST /api/atualizar-status</h3>
         </div>
-        <div class="p-5 space-y-3">
-          <p class="text-sm text-gray-700"><strong>Descrição:</strong> Atualizar status sem recarregar a página</p>
-          <p class="text-sm font-medium text-gray-600">Body (JSON):</p>
-          <pre class="bg-surface-raised border border-surface-border rounded-dtx-md p-4 overflow-x-auto text-xs font-mono text-gray-700"><code>{
+        <div class="space-y-3" style="padding:20px;">
+          <p style="font-size:13px;"><strong>Descrição:</strong> Atualizar status sem recarregar a página</p>
+          <p style="font-size:13px; font-weight:700; color:var(--color-text-muted);">Body (JSON):</p>
+          <pre style="background:var(--color-surface-canvas); border:1px solid var(--color-surface-border); border-radius:14px; padding:16px; overflow-x-auto; font-size:12px; font-family:var(--font-mono,monospace);"><code>{
   "chamado_id": "abc123",
   "novo_status": "Concluído"
 }</code></pre>
-          <p class="text-sm font-medium text-gray-600">Response:</p>
-          <pre class="bg-surface-raised border border-surface-border rounded-dtx-md p-4 overflow-x-auto text-xs font-mono text-gray-700"><code>{
+          <p style="font-size:13px; font-weight:700; color:var(--color-text-muted);">Response:</p>
+          <pre style="background:var(--color-surface-canvas); border:1px solid var(--color-surface-border); border-radius:14px; padding:16px; overflow-x-auto; font-size:12px; font-family:var(--font-mono,monospace);"><code>{
   "sucesso": true,
   "mensagem": "Status alterado para Concluído",
   "novo_status": "Concluído"
@@ -258,12 +260,12 @@ search=termo          # Busca full-text</code></pre>
 
   <!-- Referências -->
   <div>
-    <h2 class="text-lg font-semibold text-gray-900 mb-4">Referências</h2>
-    <div class="bg-surface-base border border-surface-border rounded-dtx-lg shadow-dtx-sm p-5">
+    <h2 class="bento-section-title">Referências</h2>
+    <div class="bento-card">
       <ul class="space-y-2">
-        <li><a href="https://firebase.google.com/docs/firestore/query-data/indexing" target="_blank" rel="noopener noreferrer" class="text-dtx-600 hover:text-dtx-700 text-sm underline">Firestore Indexes Documentation</a></li>
-        <li><a href="https://firebase.google.com/docs/firestore/query-data/query-cursors" target="_blank" rel="noopener noreferrer" class="text-dtx-600 hover:text-dtx-700 text-sm underline">Query Cursors Guide</a></li>
-        <li><a href="https://firebase.google.com/docs/firestore/best-practices" target="_blank" rel="noopener noreferrer" class="text-dtx-600 hover:text-dtx-700 text-sm underline">Firestore Best Practices</a></li>
+        <li><a href="https://firebase.google.com/docs/firestore/query-data/indexing" target="_blank" rel="noopener noreferrer" style="color:var(--color-dtx-500); font-size:13px; text-decoration:underline;">Firestore Indexes Documentation</a></li>
+        <li><a href="https://firebase.google.com/docs/firestore/query-data/query-cursors" target="_blank" rel="noopener noreferrer" style="color:var(--color-dtx-500); font-size:13px; text-decoration:underline;">Query Cursors Guide</a></li>
+        <li><a href="https://firebase.google.com/docs/firestore/best-practices" target="_blank" rel="noopener noreferrer" style="color:var(--color-dtx-500); font-size:13px; text-decoration:underline;">Firestore Best Practices</a></li>
       </ul>
     </div>
   </div>

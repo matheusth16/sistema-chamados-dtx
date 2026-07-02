@@ -1,142 +1,65 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="space-y-6">
+<div class="space-y-4">
 
-    <!-- Header com Informações -->
-    <div class="flex flex-col md:flex-row justify-between items-center bg-surface-base p-6 rounded-dtx-lg border border-surface-border gap-4 mb-4 shadow-dtx-sm">
-        <div class="flex items-center gap-5">
-            <div class="bg-dtx-50 text-dtx-600 p-3.5 rounded-dtx-md hidden sm:block border border-dtx-100">
-                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
-            </div>
+    <!-- Header + stats (mesmo card, evita fragmentação) -->
+    <div class="bento-card">
+        <div class="bento-page-head">
             <div>
-                <h2 class="text-2xl font-black text-gray-900 tracking-tight">{{ t('my_tickets') }}</h2>
-                <div class="text-sm font-medium text-gray-500 flex items-center gap-2 mt-1.5">
-                    <span data-testid="total-chamados" class="font-bold text-dtx-700 bg-dtx-50 border border-dtx-100/50 px-2.5 py-0.5 rounded-dtx-sm">{{ total_chamados }}</span>
-                    <span>{{ t('track_tickets') }}</span>
-                </div>
+                <h1 class="font-display">{{ t('my_tickets') }} <span class="bento-count-chip" data-testid="total-chamados">{{ total_chamados }}</span></h1>
+                <p>{{ t('track_tickets') }}</p>
             </div>
-        </div>
-        <div class="flex gap-3 w-full md:w-auto flex-col md:flex-row justify-end">
-            <a href="/" data-testid="new-ticket-btn"
-                class="inline-flex items-center px-5 py-2.5 bg-dtx-600 hover:bg-dtx-700 active:bg-dtx-800 text-white font-bold rounded-dtx-md shadow-dtx-sm transition-colors justify-center text-sm">
-                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-                </svg>
+            <a href="/" data-testid="new-ticket-btn" class="bento-btn-primary">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
                 {{ t('new_ticket') }}
+            </a>
+        </div>
+
+        <div class="bento-stats-row gsap-stagger-container">
+            <a href="?status=" class="bento-stat-card gsap-stagger{% if not status_filtro %} active{% endif %}">
+                <span class="icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg></span>
+                <div><div class="val">{{ total_chamados }}</div><div class="lbl">{{ t('total_tickets') }}</div></div>
+            </a>
+            <a href="?status=Aberto" class="bento-stat-card aberto gsap-stagger{% if status_filtro == 'Aberto' %} active{% endif %}">
+                <span class="icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></span>
+                <div><div class="val">{{ status_counts['Aberto'] }}</div><div class="lbl">{{ t('open_tickets') }}</div></div>
+            </a>
+            <a href="?status=Em%20Atendimento" class="bento-stat-card atend gsap-stagger{% if status_filtro == 'Em Atendimento' %} active{% endif %}">
+                <span class="icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg></span>
+                <div><div class="val">{{ status_counts['Em Atendimento'] }}</div><div class="lbl">{{ t('in_progress_tickets') }}</div></div>
+            </a>
+            <a href="?status=Concluído" class="bento-stat-card concluido gsap-stagger{% if status_filtro == 'Concluído' %} active{% endif %}">
+                <span class="icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></span>
+                <div><div class="val">{{ status_counts['Concluído'] }}</div><div class="lbl">{{ t('completed_tickets') }}</div></div>
+            </a>
+            <a href="?status=Cancelado" class="bento-stat-card cancelado gsap-stagger{% if status_filtro == 'Cancelado' %} active{% endif %}">
+                <span class="icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></span>
+                <div><div class="val">{{ status_counts.get('Cancelado', 0) }}</div><div class="lbl">{{ t('cancelled_tickets') }}</div></div>
             </a>
         </div>
     </div>
 
-    <!-- Cards de Resumo de Status -->
-    <div class="grid grid-cols-2 md:grid-cols-5 gap-3 sm:gap-4 gsap-stagger-container">
-
-        <a href="?status=" class="gsap-stagger block bg-surface-base p-5 rounded-dtx-md border {% if not status_filtro %}border-dtx-400 bg-dtx-50/50 ring-2 ring-dtx-600/20 shadow-dtx{% else %}border-surface-border hover:border-dtx-200 hover:shadow-dtx-sm hover:-translate-y-0.5{% endif %} transition-all relative overflow-hidden group">
-            <div class="absolute right-0 top-0 bottom-0 w-1 {% if not status_filtro %}bg-dtx-500{% else %}bg-surface-border group-hover:bg-dtx-300{% endif %} transition-all"></div>
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">{{ t('total_tickets') }}</p>
-                    <p class="text-3xl font-black text-gray-800 mt-1">{{ total_chamados }}</p>
-                </div>
-                <div class="p-2.5 {% if not status_filtro %}bg-dtx-50 text-dtx-600 rounded-dtx-sm{% else %}bg-surface-raised text-gray-400 group-hover:bg-dtx-50 group-hover:text-dtx-500 rounded-dtx-sm{% endif %} transition-colors">
-                    <svg class="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                    </svg>
-                </div>
-            </div>
-        </a>
-
-        <a href="?status=Aberto" class="gsap-stagger block bg-surface-base p-5 rounded-dtx-md border {% if status_filtro == 'Aberto' %}border-gray-400 bg-gray-50/50 ring-2 ring-gray-500/20 shadow-dtx{% else %}border-surface-border hover:border-gray-200 hover:shadow-dtx-sm hover:-translate-y-0.5{% endif %} transition-all relative overflow-hidden group">
-            <div class="absolute right-0 top-0 bottom-0 w-1 {% if status_filtro == 'Aberto' %}bg-gray-500{% else %}bg-surface-border group-hover:bg-gray-300{% endif %} transition-all"></div>
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">{{ t('open_tickets') }}</p>
-                    <p class="text-3xl font-black text-gray-600 mt-1">{{ status_counts['Aberto'] }}</p>
-                </div>
-                <div class="p-2.5 {% if status_filtro == 'Aberto' %}bg-gray-200 text-gray-700 rounded-dtx-sm{% else %}bg-surface-raised text-gray-400 group-hover:bg-gray-100 group-hover:text-gray-600 rounded-dtx-sm{% endif %} transition-colors">
-                    <svg class="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                </div>
-            </div>
-        </a>
-
-        <a href="?status=Em%20Atendimento" class="gsap-stagger block bg-surface-base p-5 rounded-dtx-md border {% if status_filtro == 'Em Atendimento' %}border-amber-400 bg-amber-50/50 ring-2 ring-amber-500/20 shadow-dtx{% else %}border-surface-border hover:border-amber-200 hover:shadow-dtx-sm hover:-translate-y-0.5{% endif %} transition-all relative overflow-hidden group">
-            <div class="absolute right-0 top-0 bottom-0 w-1 {% if status_filtro == 'Em Atendimento' %}bg-amber-400{% else %}bg-surface-border group-hover:bg-amber-300{% endif %} transition-all"></div>
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-[10px] font-black text-amber-500/80 uppercase tracking-widest">{{ t('in_progress_tickets') }}</p>
-                    <p class="text-3xl font-black text-amber-500 mt-1">{{ status_counts['Em Atendimento'] }}</p>
-                </div>
-                <div class="p-2.5 {% if status_filtro == 'Em Atendimento' %}bg-amber-100 text-amber-600 rounded-dtx-sm{% else %}bg-surface-raised text-gray-400 group-hover:bg-amber-50 group-hover:text-amber-500 rounded-dtx-sm{% endif %} transition-colors">
-                    <svg class="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                    </svg>
-                </div>
-            </div>
-        </a>
-
-        <a href="?status=Concluído" class="gsap-stagger block bg-surface-base p-5 rounded-dtx-md border {% if status_filtro == 'Concluído' %}border-emerald-400 bg-emerald-50/50 ring-2 ring-emerald-500/20 shadow-dtx{% else %}border-surface-border hover:border-emerald-200 hover:shadow-dtx-sm hover:-translate-y-0.5{% endif %} transition-all relative overflow-hidden group">
-            <div class="absolute right-0 top-0 bottom-0 w-1 {% if status_filtro == 'Concluído' %}bg-emerald-400{% else %}bg-surface-border group-hover:bg-emerald-300{% endif %} transition-all"></div>
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-[10px] font-black text-emerald-500/80 uppercase tracking-widest">{{ t('completed_tickets') }}</p>
-                    <p class="text-3xl font-black text-emerald-600 mt-1">{{ status_counts['Concluído'] }}</p>
-                </div>
-                <div class="p-2.5 {% if status_filtro == 'Concluído' %}bg-emerald-100 text-emerald-600 rounded-dtx-sm{% else %}bg-surface-raised text-gray-400 group-hover:bg-emerald-50 group-hover:text-emerald-500 rounded-dtx-sm{% endif %} transition-colors">
-                    <svg class="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                </div>
-            </div>
-        </a>
-
-        <a href="?status=Cancelado" class="gsap-stagger block bg-surface-base p-5 rounded-dtx-md border {% if status_filtro == 'Cancelado' %}border-rose-400 bg-rose-50/50 ring-2 ring-rose-500/20 shadow-dtx{% else %}border-surface-border hover:border-rose-200 hover:shadow-dtx-sm hover:-translate-y-0.5{% endif %} transition-all relative overflow-hidden group">
-            <div class="absolute right-0 top-0 bottom-0 w-1 {% if status_filtro == 'Cancelado' %}bg-rose-500{% else %}bg-surface-border group-hover:bg-rose-300{% endif %} transition-all"></div>
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-[10px] font-black text-rose-400 uppercase tracking-widest">{{ t('cancelled_tickets') }}</p>
-                    <p class="text-3xl font-black text-rose-600 mt-1">{{ status_counts.get('Cancelado', 0) }}</p>
-                </div>
-                <div class="p-2.5 {% if status_filtro == 'Cancelado' %}bg-rose-100 text-rose-600 rounded-dtx-sm{% else %}bg-surface-raised text-gray-400 group-hover:bg-rose-50 group-hover:text-rose-500 rounded-dtx-sm{% endif %} transition-colors">
-                    <svg class="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                </div>
-            </div>
-        </a>
-    </div>
-
     {% include 'components/_filters_bar_meus_chamados.html' with context %}
 
-    <!-- Tabela de Chamados -->
-    <div class="bg-surface-base border border-surface-border rounded-dtx-md shadow-dtx-sm overflow-hidden p-1 gsap-scroll-reveal">
+    <!-- Tabela -->
+    <div class="bento-card bento-table-scope gsap-scroll-reveal" style="padding:0; overflow:hidden;">
         {% if chamados %}
-        <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-surface-border">
-                <thead class="bg-surface-raised">
+        <div style="overflow-x:auto;">
+            <table>
+                <thead>
                     <tr>
-                        <th class="px-5 py-4 text-left text-[11px] font-black text-gray-500 uppercase tracking-widest sortable hover:bg-surface-canvas transition-colors cursor-pointer group" data-column="0" onclick="sortTable(0, 'number')">
-                            {{ t('id_ref') }}<span class="sort-icon ml-1 text-gray-300 group-hover:text-dtx-600">↕</span>
-                        </th>
-                        <th class="hidden sm:table-cell px-5 py-4 text-left text-[11px] font-black text-gray-500 uppercase tracking-widest filterable cursor-pointer hover:bg-surface-canvas transition-colors" data-column="1" onclick="showFilterDropdown(1, this)">
-                            {{ t('category') }}
-                        </th>
-                        <th class="hidden md:table-cell px-5 py-4 text-left text-[11px] font-black text-gray-500 uppercase tracking-widest filterable cursor-pointer hover:bg-surface-canvas transition-colors" data-column="2" onclick="showFilterDropdown(2, this)">
-                            {{ t('type_sector') }}
-                        </th>
-                        <th class="px-5 py-4 text-left text-[11px] font-black text-gray-500 uppercase tracking-widest">{{ t('description') }}</th>
-                        <th class="hidden md:table-cell px-5 py-4 text-left text-[11px] font-black text-gray-500 uppercase tracking-widest filterable cursor-pointer hover:bg-surface-canvas transition-colors" data-column="4" onclick="showFilterDropdown(4, this)">{{ t('assigned_to') }}</th>
-                        <th class="px-5 py-4 text-left text-[11px] font-black text-gray-500 uppercase tracking-widest filterable cursor-pointer hover:bg-surface-canvas transition-colors" data-column="5" onclick="showFilterDropdown(5, this)">
-                            {{ t('status') }}
-                        </th>
-                        <th class="px-5 py-4 text-left text-[11px] font-black text-gray-500 uppercase tracking-widest sortable cursor-pointer hover:bg-surface-canvas transition-colors group" data-column="6" onclick="sortTable(6, 'date')">
-                            {{ t('date') }}<span class="sort-icon ml-1 text-gray-300 group-hover:text-dtx-600">↕</span>
-                        </th>
-                        <th class="px-5 py-4 text-center text-[11px] font-black text-gray-500 uppercase tracking-widest">{{ t('actions') }}</th>
+                        <th class="sortable" data-column="0" onclick="sortTable(0, 'number')">{{ t('id_ref') }}<span class="sort-icon ml-1" style="opacity:.4">↕</span></th>
+                        <th class="filterable" data-column="1" onclick="showFilterDropdown(1, this)">{{ t('category') }}</th>
+                        <th class="filterable" data-column="2" onclick="showFilterDropdown(2, this)">{{ t('type_sector') }}</th>
+                        <th>{{ t('description') }}</th>
+                        <th class="filterable" data-column="4" onclick="showFilterDropdown(4, this)">{{ t('assigned_to') }}</th>
+                        <th class="filterable" data-column="5" onclick="showFilterDropdown(5, this)">{{ t('status') }}</th>
+                        <th class="sortable" data-column="6" onclick="sortTable(6, 'date')">{{ t('date') }}<span class="sort-icon ml-1" style="opacity:.4">↕</span></th>
+                        <th style="text-align:center">{{ t('actions') }}</th>
                     </tr>
                 </thead>
-                <tbody class="bg-white divide-y divide-surface-border">
+                <tbody>
                 {% for grupo in chamados|groupby('grupo_key') %}
                 {% set rl = grupo.grouper.split('|')[1] %}
                 {% set colspan = 8 %}
@@ -145,41 +68,28 @@
                 {% include 'components/_ticket_row_meus_chamados.html' with context %}
                 {% endfor %}
                 {% endfor %}
-            </tbody>
-        </table>
+                </tbody>
+            </table>
         </div>
 
         <!-- Paginação (cursor-based: menos leituras no Firestore) -->
         {% if total_paginas > 1 %}
-        <div class="flex flex-col md:flex-row justify-between items-center bg-surface-raised p-5 rounded-b-dtx-md border-t border-surface-border gap-4 mt-2">
-            <div class="text-sm text-gray-500 font-medium">
-                {{ t('showing') }} <span class="font-bold text-gray-800">{{ (pagina_atual - 1) * itens_por_pagina + 1 }}</span> {{ t('to') }} <span class="font-bold text-gray-800">{{ [pagina_atual * itens_por_pagina, total_chamados]|min }}</span> {{ t('of') }} <span class="font-bold text-gray-800">{{ total_chamados }}</span>
-            </div>
-
-            <div class="flex items-center gap-1 bg-white border border-surface-border rounded-dtx-md p-1 shadow-dtx-sm">
+        <div class="bento-pagination">
+            <div class="info">{{ t('showing') }} <b>{{ (pagina_atual - 1) * itens_por_pagina + 1 }}</b> {{ t('to') }} <b>{{ [pagina_atual * itens_por_pagina, total_chamados]|min }}</b> {{ t('of') }} <b>{{ total_chamados }}</b></div>
+            <div class="bento-pager">
                 {% if pagina_atual > 1 %}
-                <a href="{{ url_for('main.meus_chamados', status=status_filtro, rl_codigo=rl_codigo) }}" class="w-8 h-8 flex items-center justify-center rounded-dtx-sm text-sm font-bold text-gray-500 hover:bg-surface-raised hover:text-gray-900 transition-colors" title="{{ t('first') }}">
-                    &laquo;
-                </a>
+                <a href="{{ url_for('main.meus_chamados', status=status_filtro, rl_codigo=rl_codigo) }}" title="{{ t('first') }}">&laquo;</a>
                 {% if cursor_prev %}
-                <a href="{{ url_for('main.meus_chamados', cursor=cursor_prev, status=status_filtro, rl_codigo=rl_codigo, pagina=pagina_atual-1) }}" class="w-8 h-8 flex items-center justify-center rounded-dtx-sm text-sm font-bold text-gray-500 hover:bg-surface-raised hover:text-gray-900 transition-colors" title="{{ t('previous') }}">
-                    &lsaquo;
-                </a>
+                <a href="{{ url_for('main.meus_chamados', cursor=cursor_prev, status=status_filtro, rl_codigo=rl_codigo, pagina=pagina_atual-1) }}" title="{{ t('previous') }}">&lsaquo;</a>
                 {% else %}
-                <a href="{{ url_for('main.meus_chamados', status=status_filtro, rl_codigo=rl_codigo) }}" class="w-8 h-8 flex items-center justify-center rounded-dtx-sm text-sm font-bold text-gray-500 hover:bg-surface-raised hover:text-gray-900 transition-colors" title="{{ t('previous') }}">
-                    &lsaquo;
-                </a>
+                <a href="{{ url_for('main.meus_chamados', status=status_filtro, rl_codigo=rl_codigo) }}" title="{{ t('previous') }}">&lsaquo;</a>
                 {% endif %}
                 {% endif %}
 
-                <span class="px-3 h-8 flex items-center justify-center rounded-dtx-sm text-sm font-bold text-white bg-dtx-600 shadow-dtx-sm">
-                    {{ pagina_atual }} / {{ total_paginas }}
-                </span>
+                <span class="current">{{ pagina_atual }}/{{ total_paginas }}</span>
 
                 {% if pagina_atual < total_paginas and cursor_next %}
-                <a href="{{ url_for('main.meus_chamados', cursor=cursor_next, cursor_prev=request.args.get('cursor') or '', status=status_filtro, rl_codigo=rl_codigo, pagina=pagina_atual+1) }}" class="w-8 h-8 flex items-center justify-center rounded-dtx-sm text-sm font-bold text-gray-500 hover:bg-surface-raised hover:text-gray-900 transition-colors" title="{{ t('next') }}">
-                    &rsaquo;
-                </a>
+                <a href="{{ url_for('main.meus_chamados', cursor=cursor_next, cursor_prev=request.args.get('cursor') or '', status=status_filtro, rl_codigo=rl_codigo, pagina=pagina_atual+1) }}" title="{{ t('next') }}">&rsaquo;</a>
                 {% endif %}
             </div>
         </div>
@@ -187,25 +97,23 @@
 
         {% else %}
         <!-- Estado Vazio -->
-        <div class="text-center py-16 px-4 bg-white">
-            <div class="w-16 h-16 mx-auto bg-surface-raised rounded-dtx-md flex items-center justify-center text-gray-400 mb-4 border border-surface-border">
+        <div class="text-center py-16 px-4">
+            <div class="w-16 h-16 mx-auto rounded-dtx-lg flex items-center justify-center mb-4" style="background:var(--color-surface-canvas); color:var(--color-surface-muted);">
                 <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 13.5h3.86a2.25 2.25 0 012.012 1.244l.256.512a2.25 2.25 0 002.013 1.244h3.218a2.25 2.25 0 002.013-1.244l.256-.512a2.25 2.25 0 012.013-1.244h3.859m-19.5.338V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18v-4.162c0-.224-.034-.447-.1-.661L19.24 5.338a2.25 2.25 0 00-2.15-1.588H6.911a2.25 2.25 0 00-2.15 1.588L2.35 13.177a2.25 2.25 0 00-.1.661z" />
                 </svg>
             </div>
             <h3 class="text-sm font-semibold text-gray-900">{{ t('no_tickets_message') }}</h3>
-            <p class="mt-1 text-sm font-medium text-gray-500 max-w-sm mx-auto">
+            <p class="mt-1 text-sm font-medium" style="color:var(--color-text-muted)">
                 {% if status_filtro %}
-                    {{ t('no_tickets_hint_with_filter') }} <a href="?status=" class="text-dtx-600 hover:text-dtx-700 font-bold transition-colors">{{ t('view_all') }}</a>
+                    {{ t('no_tickets_hint_with_filter') }} <a href="?status=" style="color:var(--color-dtx-500)" class="font-bold hover:underline">{{ t('view_all') }}</a>
                 {% else %}
                     {{ t('no_tickets_hint_default') }}
                 {% endif %}
             </p>
             <div class="mt-5">
-                <a href="/" class="inline-flex items-center gap-2 rounded-dtx-md bg-dtx-600 px-4 h-9 text-sm font-medium text-white hover:bg-dtx-700 active:bg-dtx-800 transition-colors">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-                    </svg>
+                <a href="/" class="bento-btn-primary" style="display:inline-flex;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
                     {{ t('new_ticket') }}
                 </a>
             </div>
@@ -215,36 +123,34 @@
 
     {% if chamados_em_copia %}
     <!-- Chamados em que o usuário é observador -->
-    <div class="bg-surface-base border border-purple-200 rounded-dtx-md shadow-dtx-sm overflow-hidden p-1 gsap-scroll-reveal">
-        <div class="px-5 py-4 bg-purple-50 border-b border-purple-200 flex items-center gap-3">
-            <span class="p-2 bg-purple-100 text-purple-600 rounded-dtx-sm">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0zM2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+    <div class="bento-card bento-table-scope bento-obs-card gsap-scroll-reveal" style="padding:0; overflow:hidden;">
+        <div class="head">
+            <span class="icon">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0zM2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
                 </svg>
             </span>
             <div>
-                <h3 class="text-sm font-black text-purple-900 uppercase tracking-widest">{{ t('observers_cc') }}</h3>
-                <p class="text-xs font-medium text-purple-600 mt-0.5">{{ t('observers_watching_hint') }}</p>
+                <h3>{{ t('observers_cc') }}</h3>
+                <p>{{ t('observers_watching_hint') }}</p>
             </div>
-            <span class="ml-auto inline-flex items-center px-2 py-1 rounded-dtx-sm text-xs font-black bg-purple-100 text-purple-700 border border-purple-200">
-                {{ chamados_em_copia | length }}
-            </span>
+            <span class="count">{{ chamados_em_copia | length }}</span>
         </div>
-        <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-surface-border">
-                <thead class="bg-purple-50/50">
+        <div style="overflow-x:auto;">
+            <table>
+                <thead>
                     <tr>
-                        <th class="px-5 py-3 text-left text-[11px] font-black text-purple-500 uppercase tracking-widest">{{ t('id_ref') }}</th>
-                        <th class="hidden sm:table-cell px-5 py-3 text-left text-[11px] font-black text-purple-500 uppercase tracking-widest">{{ t('category') }}</th>
-                        <th class="hidden md:table-cell px-5 py-3 text-left text-[11px] font-black text-purple-500 uppercase tracking-widest">{{ t('type_sector') }}</th>
-                        <th class="px-5 py-3 text-left text-[11px] font-black text-purple-500 uppercase tracking-widest">{{ t('description') }}</th>
-                        <th class="hidden md:table-cell px-5 py-3 text-left text-[11px] font-black text-purple-500 uppercase tracking-widest">{{ t('assigned_to') }}</th>
-                        <th class="px-5 py-3 text-left text-[11px] font-black text-purple-500 uppercase tracking-widest">{{ t('status') }}</th>
-                        <th class="px-5 py-3 text-left text-[11px] font-black text-purple-500 uppercase tracking-widest">{{ t('date') }}</th>
-                        <th class="px-5 py-3 text-center text-[11px] font-black text-purple-500 uppercase tracking-widest">{{ t('actions') }}</th>
+                        <th>{{ t('id_ref') }}</th>
+                        <th>{{ t('category') }}</th>
+                        <th>{{ t('type_sector') }}</th>
+                        <th>{{ t('description') }}</th>
+                        <th>{{ t('assigned_to') }}</th>
+                        <th>{{ t('status') }}</th>
+                        <th>{{ t('date') }}</th>
+                        <th style="text-align:center">{{ t('actions') }}</th>
                     </tr>
                 </thead>
-                <tbody class="bg-white divide-y divide-surface-border">
+                <tbody>
                     {% for chamado in chamados_em_copia %}
                     {% include 'components/_ticket_row_meus_chamados.html' with context %}
                     {% endfor %}

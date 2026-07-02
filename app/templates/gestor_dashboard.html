@@ -1,75 +1,51 @@
 {% extends "base.html" %}
+{% from 'components/_status_badge.html' import status_badge with context %}
 
 {% block content %}
-<div class="dashboard-page space-y-6" data-testid="gestor-dashboard-container">
+<div class="space-y-4" data-testid="gestor-dashboard-container">
 
     <!-- Header -->
-    <div class="dashboard-header flex flex-col md:flex-row justify-between items-center p-6 gap-4">
-        <div class="flex items-center gap-4">
-            <div class="bg-dtx-50 text-dtx-600 p-3 rounded-dtx-md hidden sm:block border border-dtx-100" aria-hidden="true">
-                <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                </svg>
-            </div>
-            <div>
-                <h2 class="font-display text-2xl sm:text-3xl font-extrabold text-slate-800 tracking-tight">
-                    {{ t('gestor_dashboard_title') if t else 'Painel Gerencial' }}
-                </h2>
-                <div class="text-sm font-medium text-slate-500 flex flex-wrap items-center gap-2 mt-1">
-                    <span>Visão read-only —</span>
-                    {% if current_user.is_authenticated and current_user.nivel_gestao %}
-                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-dtx-100 text-dtx-800">
-                        {{ current_user.nivel_gestao | replace("_", " ") | title }}
-                    </span>
-                    {% endif %}
-                    <span class="text-slate-300" aria-hidden="true">|</span>
-                    <span class="font-bold text-dtx-700">{{ current_user.nome }}</span>
+    <div class="bento-card">
+        <div class="bento-page-head" style="margin-bottom:0;">
+            <div style="display:flex; align-items:center; gap:14px;">
+                <span class="bento-chip-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
+                </span>
+                <div>
+                    <h1 class="font-display">{{ t('gestor_dashboard_title') if t else 'Painel Gerencial' }}</h1>
+                    <p>
+                        Visão read-only
+                        {% if current_user.is_authenticated and current_user.nivel_gestao %}
+                        · <span class="bento-count-chip">{{ current_user.nivel_gestao | replace("_", " ") | title }}</span>
+                        {% endif %}
+                        · {{ current_user.nome }}
+                    </p>
                 </div>
             </div>
         </div>
     </div>
 
     <!-- Cards de contadores -->
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 px-6">
-
-        <!-- Total -->
-        <a href="{{ url_for('main.gestor_dashboard') }}"
-           class="block p-4 rounded-dtx-lg border transition-all
-                  {% if filtro_ativo == 'todos' %}bg-dtx-50 border-dtx-300{% else %}bg-surface-base border-surface-border hover:bg-surface-raised{% endif %}">
-            <div class="text-2xl font-extrabold text-dtx-700">{{ contadores.total }}</div>
-            <div class="text-xs font-semibold text-slate-500 mt-1 uppercase tracking-wider">{{ t('gestor_counter_total') if t else 'Total' }}</div>
+    <div class="bento-stats-row" style="grid-template-columns:repeat(4,1fr); margin-top:0;">
+        <a href="{{ url_for('main.gestor_dashboard') }}" class="bento-stat-card accent{% if filtro_ativo == 'todos' %} active{% endif %}">
+            <div><div class="val">{{ contadores.total }}</div><div class="lbl">{{ t('gestor_counter_total') if t else 'Total' }}</div></div>
         </a>
-
-        <!-- Atrasados -->
-        <a href="{{ url_for('main.gestor_dashboard', filtro='atrasados') }}"
-           class="block p-4 rounded-dtx-lg border transition-all
-                  {% if filtro_ativo == 'atrasados' %}bg-red-50 border-red-300{% else %}bg-surface-base border-surface-border hover:bg-surface-raised{% endif %}">
-            <div class="text-2xl font-extrabold text-red-600">{{ contadores.atrasados }}</div>
-            <div class="text-xs font-semibold text-slate-500 mt-1 uppercase tracking-wider">{{ t('gestor_counter_atrasados') if t else 'Atrasados' }}</div>
+        <a href="{{ url_for('main.gestor_dashboard', filtro='atrasados') }}" class="bento-stat-card danger{% if filtro_ativo == 'atrasados' %} active{% endif %}">
+            <div><div class="val">{{ contadores.atrasados }}</div><div class="lbl">{{ t('gestor_counter_atrasados') if t else 'Atrasados' }}</div></div>
         </a>
-
-        <!-- Aberto sem resposta -->
-        <a href="{{ url_for('main.gestor_dashboard', filtro='aberto_sem_resposta') }}"
-           class="block p-4 rounded-dtx-lg border transition-all
-                  {% if filtro_ativo == 'aberto_sem_resposta' %}bg-amber-50 border-amber-300{% else %}bg-surface-base border-surface-border hover:bg-surface-raised{% endif %}">
-            <div class="text-2xl font-extrabold text-amber-600">{{ contadores.aberto_sem_resposta }}</div>
-            <div class="text-xs font-semibold text-slate-500 mt-1 uppercase tracking-wider">{{ t('gestor_counter_sem_resposta') if t else 'Sem resposta' }}</div>
+        <a href="{{ url_for('main.gestor_dashboard', filtro='aberto_sem_resposta') }}" class="bento-stat-card warn{% if filtro_ativo == 'aberto_sem_resposta' %} active{% endif %}">
+            <div><div class="val">{{ contadores.aberto_sem_resposta }}</div><div class="lbl">{{ t('gestor_counter_sem_resposta') if t else 'Sem resposta' }}</div></div>
         </a>
-
-        <!-- Multi-setor travado -->
-        <a href="{{ url_for('main.gestor_dashboard', filtro='multi_setor') }}"
-           class="block p-4 rounded-dtx-lg border transition-all
-                  {% if filtro_ativo in ('multi_setor', 'multi_setor_travado') %}bg-purple-50 border-purple-300{% else %}bg-surface-base border-surface-border hover:bg-surface-raised{% endif %}">
-            <div class="text-2xl font-extrabold text-purple-600">{{ contadores.multi_setor_travado }}</div>
-            <div class="text-xs font-semibold text-slate-500 mt-1 uppercase tracking-wider">{{ t('gestor_counter_multi_setor') if t else 'Multi-setor' }}</div>
+        <a href="{{ url_for('main.gestor_dashboard', filtro='multi_setor') }}" class="bento-stat-card purple{% if filtro_ativo in ('multi_setor', 'multi_setor_travado') %} active{% endif %}">
+            <div><div class="val">{{ contadores.multi_setor_travado }}</div><div class="lbl">{{ t('gestor_counter_multi_setor') if t else 'Multi-setor' }}</div></div>
         </a>
-
     </div>
 
     <!-- Aviso read-only -->
-    <div class="mx-6 p-3 rounded-dtx-md bg-amber-50 border border-amber-200 flex items-center gap-2 text-sm text-amber-800">
-        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <div class="bento-notice">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                 d="M15 12a3 3 0 11-6 0 3 3 0 016 0zM2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
         </svg>
@@ -77,42 +53,40 @@
     </div>
 
     <!-- Tabela de chamados -->
-    <div class="px-6 pb-6">
-        <div class="bg-surface-base rounded-dtx-lg border border-surface-border overflow-hidden shadow-dtx-sm">
-            {% if chamados %}
-            <table class="min-w-full divide-y divide-surface-border text-sm">
-                <thead class="bg-surface-raised">
+    <div class="bento-card bento-table-scope gestor-table" style="padding:0; overflow:hidden;">
+        {% if chamados %}
+        <div style="overflow-x:auto;">
+            <table>
+                <thead>
                     <tr>
-                        <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-slate-500">Nº</th>
-                        <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-slate-500">Título / Descrição</th>
-                        <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-slate-500">Área</th>
-                        <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-slate-500">Status</th>
-                        <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-slate-500">Abertura</th>
-                        <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-slate-500">Ver</th>
+                        <th>Nº</th>
+                        <th>Título / Descrição</th>
+                        <th>Área</th>
+                        <th>Status</th>
+                        <th>Abertura</th>
+                        <th>Ver</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-surface-border">
+                <tbody>
                     {% for chamado in chamados %}
-                    <tr class="hover:bg-surface-raised transition-colors">
-                        <td class="px-4 py-3 font-mono text-xs text-slate-500 whitespace-nowrap">
+                    <tr class="hoverable">
+                        <td style="font-family:var(--font-mono, monospace); font-size:12px; color:var(--color-text-muted);">
                             {{ chamado.numero_chamado or chamado.id[:8] }}
                         </td>
-                        <td class="px-4 py-3">
-                            <div class="font-semibold text-slate-800 line-clamp-1">{{ chamado.categoria }}</div>
-                            <div class="text-xs text-slate-500 line-clamp-1 mt-0.5">{{ chamado.descricao[:80] if chamado.descricao else '' }}…</div>
+                        <td>
+                            <div style="font-weight:700;">{{ chamado.categoria }}</div>
+                            <div style="font-size:12px; color:var(--color-text-muted); margin-top:2px;">{{ chamado.descricao[:80] if chamado.descricao else '' }}…</div>
                         </td>
-                        <td class="px-4 py-3 text-slate-600 whitespace-nowrap text-xs">{{ chamado.area or '—' }}</td>
-                        <td class="px-4 py-3 whitespace-nowrap">
-                            {% include "components/_status_badge.html" %}
-                        </td>
-                        <td class="px-4 py-3 text-xs text-slate-500 whitespace-nowrap">
+                        <td style="font-size:12px;">{{ chamado.area or '—' }}</td>
+                        <td>{{ status_badge(chamado.status or 'Aberto') }}</td>
+                        <td style="font-size:12px; color:var(--color-text-muted);">
                             {{ chamado.data_abertura.strftime('%d/%m/%Y %H:%M') if chamado.data_abertura else '—' }}
                         </td>
-                        <td class="px-4 py-3">
+                        <td>
                             <a href="{{ url_for('main.visualizar_detalhe_chamado', chamado_id=chamado.id) }}"
-                               class="inline-flex items-center gap-1 text-dtx-600 hover:text-dtx-800 font-semibold text-xs transition-colors"
+                               class="bento-btn-ghost" style="padding:6px 12px; font-size:12px;"
                                aria-label="Ver chamado {{ chamado.numero_chamado or chamado.id }}">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                         d="M15 12a3 3 0 11-6 0 3 3 0 016 0zM2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                                 </svg>
@@ -123,16 +97,15 @@
                     {% endfor %}
                 </tbody>
             </table>
-            {% else %}
-            <div class="py-16 text-center text-slate-400">
-                <svg class="w-12 h-12 mx-auto mb-3 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                        d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                </svg>
-                <p class="font-semibold text-sm">Nenhum chamado nesta categoria</p>
-            </div>
-            {% endif %}
         </div>
+        {% else %}
+        <div style="text-align:center; padding:64px 16px; color:var(--color-surface-muted);">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin:0 auto 12px; opacity:.5;">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+            </svg>
+            <p style="font-weight:700; font-size:14px;">Nenhum chamado nesta categoria</p>
+        </div>
+        {% endif %}
     </div>
 
 </div>

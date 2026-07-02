@@ -3,15 +3,15 @@
 {% block content %}
 <div class="max-w-3xl mx-auto">
 
-    <div class="bg-surface-base border border-surface-border shadow-dtx-sm rounded-dtx-lg overflow-hidden gsap-stagger-container">
+    <div class="bento-card overflow-hidden gsap-stagger-container">
 
-        <div class="gsap-stagger px-8 py-6 border-b border-surface-border flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div class="bento-page-head gsap-stagger">
             <div>
-                <h2 class="font-display text-2xl font-extrabold text-gray-900 tracking-tight">{{ t('ticket_opening') }}</h2>
-                <p class="text-gray-500 font-medium text-sm mt-1">{{ t('fill_details') }}</p>
+                <h1 class="font-display">{{ t('ticket_opening') }}</h1>
+                <p>{{ t('fill_details') }}</p>
             </div>
-            <div class="w-10 h-10 rounded-dtx-md bg-dtx-50 flex items-center justify-center text-dtx-600 shrink-0 border border-dtx-100">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+            <div class="bento-chip-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"></path></svg>
             </div>
         </div>
 
@@ -19,7 +19,7 @@
         {% if messages %}
             <div class="mb-4">
             {% for category, message in messages %}
-            <div class="p-4 rounded-dtx-md text-sm font-medium
+            <div class="p-4 rounded-dtx-lg text-sm font-medium
                 {% if category == 'danger' %} bg-red-50 text-red-700 border border-red-200
                 {% else %} bg-green-50 text-green-700 border border-green-200 {% endif %}">
                 {{ t(message) }}
@@ -31,37 +31,29 @@
 
         <!-- Card de Identificação do Solicitante -->
         {% if current_user.is_authenticated %}
-        <div class="gsap-stagger bg-surface-raised border border-surface-border p-5 rounded-dtx-md mb-4 mx-8 mt-6 shadow-dtx-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div class="flex items-center space-x-4">
-                <div class="flex-shrink-0 w-12 h-12 bg-dtx-50 text-dtx-600 rounded-dtx-md flex items-center justify-center border border-dtx-100">
-                    <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+        <div class="bento-id-card gsap-stagger">
+            <div class="who">
+                <div class="bento-avatar">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                     </svg>
                 </div>
                 <div>
-                    <h3 class="text-xs font-black uppercase tracking-widest text-gray-400">{{ t('identified_requester') }}</h3>
-                    <p class="text-lg font-bold text-gray-900 leading-tight">
-                        {{ current_user.nome }}
-                    </p>
+                    <div class="bento-eyebrow">{{ t('identified_requester') }}</div>
+                    <div class="bento-id-name">{{ current_user.nome }}</div>
                     {% if current_user.area %}
-                    <p class="text-xs font-medium text-gray-500 mt-0.5 flex items-center gap-1">
-                        <svg class="w-3 h-3 text-dtx-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+                    <p class="text-xs font-medium mt-0.5 flex items-center gap-1" style="color:var(--color-text-muted)">
+                        <svg class="w-3 h-3" style="color:var(--color-dtx-500)" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
                         {{ translate_sector(current_user.area) }}
                     </p>
                     {% endif %}
                 </div>
             </div>
-            <!-- Botão de Sair -->
-            <a href="{{ url_for('main.logout') }}" class="inline-flex items-center justify-center px-4 py-2 bg-white hover:bg-surface-raised border border-surface-border text-gray-600 hover:text-rose-600 font-medium rounded-dtx-md transition-colors text-sm">
-                <svg class="w-4 h-4 mr-2 text-gray-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
-                </svg>
-                {{ t('logout') }}
-            </a>
+            <a href="{{ url_for('main.logout') }}" class="bento-logout-link">{{ t('logout') }}</a>
         </div>
         {% else %}
         <!-- Mensagem se não autenticado (não deve acontecer, mas por segurança) -->
-        <div class="gsap-stagger bg-rose-50 border border-rose-200 p-5 rounded-dtx-md mb-3 mx-8 mt-6">
+        <div class="gsap-stagger bg-rose-50 border border-rose-200 p-5 rounded-dtx-lg mb-3">
             <p class="text-sm text-rose-800 flex items-center gap-2">
                 <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
                 <span><span class="font-bold">{{ t('attention') if t else 'Atenção' }}:</span> {{ t('must_be_logged') }}</span>
@@ -71,88 +63,50 @@
 
         <!-- Mini Resumo dos Chamados do Solicitante -->
         {% if current_user.is_authenticated and status_counts is defined %}
-        {% set total = status_counts.get('Aberto', 0) + status_counts.get('Em Atendimento', 0) + status_counts.get('Concluído', 0) %}
-        <div class="gsap-stagger bg-surface-base border border-surface-border rounded-dtx-md p-5 mb-2 mx-8 shadow-dtx-sm">
-            <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-2">
-                <h3 class="text-sm font-bold text-gray-700 flex items-center gap-2">
-                    <div class="p-1.5 bg-surface-raised text-gray-500 rounded-dtx-sm">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                        </svg>
-                    </div>
-                    {{ t('your_tickets_summary') }}
-                </h3>
-                <a href="{{ url_for('main.meus_chamados') }}" class="text-xs font-bold text-dtx-600 hover:text-dtx-700 transition-colors flex items-center opacity-80 hover:opacity-100">
-                    {{ t('my_tickets') }} <span class="ml-1 text-[10px]">→</span>
-                </a>
-            </div>
-            <div class="grid grid-cols-3 gap-3">
-                <div class="bg-surface-raised border border-surface-border rounded-dtx-md p-3 text-center sm:text-left flex flex-col sm:flex-row items-center gap-3 sm:gap-4 hover:-translate-y-0.5 transition-transform shadow-dtx-sm">
-                    <div class="w-10 h-10 rounded-full bg-gray-100 text-gray-500 flex items-center justify-center shrink-0 border border-gray-200">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z"></path></svg>
-                    </div>
-                    <div>
-                        <div class="font-display text-2xl font-extrabold text-gray-700 leading-none">{{ status_counts.get('Aberto', 0) }}</div>
-                        <div class="text-[10px] font-bold tracking-widest uppercase text-gray-400 mt-1">{{ t('open_tickets') }}</div>
-                    </div>
-                </div>
-                <div class="bg-amber-50 border border-amber-100 rounded-dtx-md p-3 text-center sm:text-left flex flex-col sm:flex-row items-center gap-3 sm:gap-4 hover:-translate-y-0.5 transition-transform shadow-dtx-sm">
-                    <div class="w-10 h-10 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center shrink-0 border border-amber-200">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                    </div>
-                    <div>
-                        <div class="font-display text-2xl font-extrabold text-amber-700 leading-none">{{ status_counts.get('Em Atendimento', 0) }}</div>
-                        <div class="text-[10px] font-bold tracking-widest uppercase text-amber-600/70 mt-1">{{ t('in_progress_tickets') }}</div>
-                    </div>
-                </div>
-                <div class="bg-emerald-50 border border-emerald-100 rounded-dtx-md p-3 text-center sm:text-left flex flex-col sm:flex-row items-center gap-3 sm:gap-4 hover:-translate-y-0.5 transition-transform shadow-dtx-sm">
-                    <div class="w-10 h-10 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-200">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-                    </div>
-                    <div>
-                        <div class="font-display text-2xl font-extrabold text-emerald-700 leading-none">{{ status_counts.get('Concluído', 0) }}</div>
-                        <div class="text-[10px] font-bold tracking-widest uppercase text-emerald-600/70 mt-1">{{ t('completed_tickets') }}</div>
-                    </div>
-                </div>
-            </div>
+        <div class="bento-stats gsap-stagger">
+            <div class="bento-stat open"><b>{{ status_counts.get('Aberto', 0) }}</b><span>{{ t('open_tickets') }}</span></div>
+            <div class="bento-stat progress"><b>{{ status_counts.get('Em Atendimento', 0) }}</b><span>{{ t('in_progress_tickets') }}</span></div>
+            <div class="bento-stat done"><b>{{ status_counts.get('Concluído', 0) }}</b><span>{{ t('completed_tickets') }}</span></div>
         </div>
+        <p class="gsap-stagger" style="margin:-16px 0 24px; text-align:right;">
+            <a href="{{ url_for('main.meus_chamados') }}" class="text-xs font-bold transition-colors" style="color:var(--color-dtx-500)">
+                {{ t('my_tickets') }} <span class="ml-1 text-[10px]">→</span>
+            </a>
+        </p>
         {% endif %}
 
-        <form id="form-chamado" data-testid="chamado-form" action="/?lang={{ current_language }}" method="POST" enctype="multipart/form-data" class="px-8 pb-8 pt-2 space-y-6 gsap-stagger">
+        <form id="form-chamado" data-testid="chamado-form" action="/?lang={{ current_language }}" method="POST" enctype="multipart/form-data" class="bento-form gsap-stagger">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
 
+            <div class="bento-section-head"><span class="dot"></span><span>{{ t('form_section_classification') }}</span></div>
+
             <div>
-                <label class="block text-xs font-black text-gray-500 uppercase tracking-widest mb-3">{{ t('request_category') }}</label>
-                <div class="flex flex-wrap gap-2 bg-surface-raised p-1.5 rounded-dtx-md border border-surface-border w-full sm:w-auto">
-                    <label for="cat_nao_aplicavel" class="flex items-center px-4 py-2 rounded-dtx-sm cursor-pointer transition-all duration-200 hover:bg-white has-[:checked]:bg-white has-[:checked]:shadow-dtx-sm has-[:checked]:ring-1 has-[:checked]:ring-surface-border">
-                        <input type="radio" id="cat_nao_aplicavel" name="categoria" value="Nao Aplicavel" checked onclick="toggleRL(false)"
-                               class="focus:ring-dtx-600 h-4 w-4 text-dtx-600 border-gray-300">
-                        <span class="ml-2 block text-sm font-bold text-gray-700">{{ t('not_applicable_routine') }}</span>
+                <label class="bento-field-label">{{ t('request_category') }}</label>
+                <div class="bento-pill-group">
+                    <label for="cat_nao_aplicavel" class="bento-pill">
+                        <input type="radio" id="cat_nao_aplicavel" name="categoria" value="Nao Aplicavel" checked onclick="toggleRL(false)" class="sr-only">
+                        {{ t('not_applicable_routine') }}
                     </label>
-                    <label for="cat_projetos" class="flex items-center px-4 py-2 rounded-dtx-sm cursor-pointer transition-all duration-200 hover:bg-white has-[:checked]:bg-rose-50 has-[:checked]:shadow-dtx-sm has-[:checked]:ring-1 has-[:checked]:ring-rose-200">
-                        <input type="radio" id="cat_projetos" name="categoria" value="Projetos" onclick="toggleRL(true)"
-                               class="focus:ring-rose-500 h-4 w-4 text-rose-600 border-gray-300">
-                        <span class="ml-2 block text-sm font-black text-rose-600">{{ t('projects_max_priority') }}</span>
+                    <label for="cat_projetos" class="bento-pill danger">
+                        <input type="radio" id="cat_projetos" name="categoria" value="Projetos" onclick="toggleRL(true)" class="sr-only">
+                        {{ t('projects_max_priority') }}
                     </label>
                 </div>
             </div>
 
-            <div id="div_rl" class="hidden transition-all duration-300 ease-in-out bg-rose-50 p-5 rounded-dtx-md border border-rose-100 shadow-dtx-sm relative">
-                <div class="absolute left-0 top-0 h-full w-1 bg-rose-400"></div>
-                <label for="rl_codigo" class="block text-xs font-black uppercase tracking-widest text-rose-800 mb-1">{{ t('rl_code_label') }} *</label>
-                <input type="text" name="rl_codigo" id="rl_codigo" maxlength="100" placeholder="{{ t('rl_code_example') }}"
-                       class="mt-1 block w-full max-w-md bg-white border border-rose-200 rounded-dtx-md shadow-dtx-sm focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 sm:text-sm p-2.5 transition-all outline-none">
-                <p class="text-[11px] font-bold text-rose-500 mt-2 flex items-center gap-1">
+            <div id="div_rl" class="bento-rl-field hidden">
+                <label for="rl_codigo">{{ t('rl_code_label') }} *</label>
+                <input type="text" name="rl_codigo" id="rl_codigo" maxlength="100" placeholder="{{ t('rl_code_example') }}">
+                <p class="text-[11px] font-bold mt-2 flex items-center gap-1" style="color:#e11d48">
                     <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                     {{ t('rl_required') }}
                 </p>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 pb-2 border-b border-surface-border">
+            <div class="bento-grid-2">
                 <div>
-                    <label for="tipo" class="dtx-label">{{ t('type_sector') }}</label>
-                    <select name="tipo" id="tipo" data-testid="tipo-select" required onchange="filtrarResponsaveis()"
-                            class="dtx-select mt-1">
+                    <label for="tipo" class="bento-field-label plain">{{ t('type_sector') }}</label>
+                    <select name="tipo" id="tipo" data-testid="tipo-select" required onchange="filtrarResponsaveis()">
                         <option value="" disabled selected>{{ t('select') }}</option>
                         {% for setor in setores %}
                         {% if current_language == 'en' %}{% set nome_display = setor.nome_en|default(setor.nome_pt) %}{% elif current_language == 'es' %}{% set nome_display = setor.nome_es|default(setor.nome_pt) %}{% else %}{% set nome_display = setor.nome_pt %}{% endif %}
@@ -162,9 +116,8 @@
                 </div>
 
                 <div>
-                    <label for="gate" class="dtx-label">{{ t('gate') }}</label>
-                    <select name="gate" id="gate" required
-                            class="dtx-select mt-1 cursor-pointer">
+                    <label for="gate" class="bento-field-label plain">{{ t('gate') }}</label>
+                    <select name="gate" id="gate" required>
                         <option value="" disabled selected>{{ t('select') }}</option>
                         <option value="N/A">{{ t('not_applicable_short') }}</option>
                         {% for gate_key, etapas in gate_subetapas.items() %}
@@ -179,136 +132,118 @@
             </div>
 
             <div>
-                <label class="block text-xs font-black text-gray-500 uppercase tracking-widest mb-3">{{ t('main_impact') }}</label>
-                <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <label class="bento-field-label">{{ t('main_impact') }}</label>
+                <div class="bento-impact-grid">
                     {% for impacto in impactos %}
-                    <label class="relative border border-surface-border rounded-dtx-md p-3 flex items-center cursor-pointer transition-all hover:bg-surface-raised hover:border-surface-muted has-[:checked]:bg-dtx-50 has-[:checked]:border-dtx-400 has-[:checked]:shadow-dtx-sm has-[:checked]:ring-2 has-[:checked]:ring-dtx-600/20 group">
-                        <input type="radio" name="impacto" value="{{ impacto.nome_pt }}" required class="h-4 w-4 text-dtx-600 focus:ring-dtx-600 border-gray-300">
+                    <label class="bento-impact">
+                        <input type="radio" name="impacto" value="{{ impacto.nome_pt }}" required>
                         {% if current_language == 'en' %}{% set imp_display = impacto.nome_en|default(impacto.nome_pt) %}{% elif current_language == 'es' %}{% set imp_display = impacto.nome_es|default(impacto.nome_pt) %}{% else %}{% set imp_display = impacto.nome_pt %}{% endif %}
-                        <span class="ml-2.5 text-sm font-bold text-gray-700 group-has-[:checked]:text-dtx-800">{{ imp_display }}</span>
+                        {{ imp_display }}
                     </label>
                     {% endfor %}
                 </div>
             </div>
 
+            <div class="bento-section-head"><span class="dot"></span><span>{{ t('form_section_details') }}</span></div>
+
             <div>
-                <label for="descricao" class="dtx-label">{{ t('detailed_description') }}</label>
+                <label for="descricao" class="bento-field-label plain">{{ t('detailed_description') }}</label>
                 <input type="hidden" name="ab_variante" value="{{ ab_variante|default('A') }}">
                 {% if ab_variante == 'B' %}
                 <textarea name="descricao" id="descricao" data-testid="descricao-textarea" rows="4" required
                           placeholder="Ex.: Impressora do 2º andar não liga desde ontem. Luz de power pisca 3x e apaga."
-                          maxlength="500"
-                          class="dtx-input mt-1 resize-y min-h-[100px]"></textarea>
-                <p class="text-sm text-gray-400 mt-1">
+                          maxlength="500"></textarea>
+                <p style="font-size:12px;color:var(--color-surface-muted);margin:6px 0 0">
                     <span id="desc-contador">0</span> / 500 {{ t('characters') if t('characters') != 'characters' else 'caracteres' }}
                 </p>
                 <script nonce="{{ csp_nonce }}">(function(){var ta=document.getElementById("descricao"),cnt=document.getElementById("desc-contador");if(ta&&cnt){ta.addEventListener("input",function(){cnt.textContent=ta.value.length;});}}());</script>
                 {% else %}
-                <textarea name="descricao" id="descricao" data-testid="descricao-textarea" rows="4" required placeholder="{{ t('describe_problem') }}"
-                          class="dtx-input mt-1 resize-y min-h-[100px]"></textarea>
+                <textarea name="descricao" id="descricao" data-testid="descricao-textarea" rows="4" required placeholder="{{ t('describe_problem') }}"></textarea>
                 {% endif %}
             </div>
 
             <div>
-                <label class="dtx-label">{{ t('attach_file') }}</label>
-                <label for="anexo_arquivo" class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-surface-muted border-dashed rounded-dtx-md hover:bg-dtx-50 hover:border-dtx-400 transition-all relative group cursor-pointer block">
+                <label class="bento-field-label">{{ t('attach_file') }}</label>
+                <label for="anexo_arquivo" class="bento-dropzone block">
                     <input id="anexo_arquivo" name="anexo" type="file" class="sr-only" accept="{{ accept_anexo }}" multiple>
-                    <div class="space-y-1 text-center pointer-events-none">
-                        <div class="w-12 h-12 mx-auto bg-gray-100 text-gray-400 rounded-full flex items-center justify-center group-hover:bg-dtx-50 group-hover:text-dtx-600 group-hover:scale-110 transition-all">
-                            <svg class="h-6 w-6" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
-                                <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                            </svg>
-                        </div>
-                        <div class="flex text-sm text-gray-600 justify-center mt-3">
-                            <span class="font-bold text-dtx-600 group-hover:text-dtx-700 underline underline-offset-2">{{ t('upload_file') }}</span>
-                            <p class="pl-1">{{ t('or_drag_drop') }}</p>
-                        </div>
-                        <p class="text-xs font-medium text-gray-500 bg-white inline-block px-2 mt-1 rounded" title="{{ extensoes_permitidas|join(', ') }}">{% set _ft = t('file_types_short') %}{{ _ft if _ft != 'file_types_short' else 'Imagens, PDF, Excel e Word. Máx. 10 MB por arquivo' }}</p>
+                    <div class="icon">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
                     </div>
+                    <span class="link">{{ t('upload_file') }}</span> {{ t('or_drag_drop') }}
+                    <small title="{{ extensoes_permitidas|join(', ') }}">{% set _ft = t('file_types_short') %}{{ _ft if _ft != 'file_types_short' else 'Imagens, PDF, Excel e Word. Máx. 10 MB por arquivo' }}</small>
                 </label>
                 <!-- Lista de anexos selecionados (gerenciada por JS) -->
-                <ul id="lista_anexos" aria-live="polite" aria-label="{{ t('attach_file') }}" class="mt-2 space-y-1"></ul>
+                <ul id="lista_anexos" aria-live="polite" aria-label="{{ t('attach_file') }}" class="bento-attach-list"></ul>
 
                 <!-- Campo link externo OneDrive/SharePoint (revelado por JS quando arquivo >10 MB) -->
-                <div id="bloco_link_externo" class="hidden mt-3 p-3 bg-amber-50 border border-amber-200 rounded-dtx-md">
-                    <p id="msg_arquivo_grande" class="text-sm font-medium text-amber-800 mb-2 flex items-center gap-1.5">
+                <div id="bloco_link_externo" class="bento-link-block hidden">
+                    <p id="msg_arquivo_grande">
                         <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                         <span>{{ t('file_too_large_use_link') }}</span>
                     </p>
-                    <div class="flex gap-2">
+                    <div class="bento-link-row">
                         <input type="text" id="input_link_externo"
                                placeholder="{{ t('external_link_placeholder') }}"
-                               class="dtx-input flex-1 text-sm"
                                autocomplete="off">
-                        <button type="button" id="btn_add_link"
-                                class="px-3 py-2 bg-dtx-600 text-white rounded-dtx-md text-sm font-medium hover:bg-dtx-700 active:bg-dtx-800 transition-colors shrink-0">
+                        <button type="button" id="btn_add_link" class="bento-btn-secondary">
                             {{ t('external_link_add_btn') }}
                         </button>
                     </div>
-                    <p id="msg_link_invalido" class="hidden text-xs text-rose-600 mt-1">{{ t('external_link_invalid') }}</p>
+                    <p id="msg_link_invalido" class="hidden text-xs mt-1" style="color:#e11d48">{{ t('external_link_invalid') }}</p>
                 </div>
                 <!-- Hidden inputs para links externos confirmados (inseridos por JS) -->
                 <div id="container_links_externos"></div>
             </div>
 
-            <div id="container_responsavel" class="bg-surface-raised p-4 rounded-dtx-md border border-surface-border">
-                <label for="responsavel_visual" class="dtx-label">{{ t('suggested_responsible') }}</label>
-                <div id="responsavel_visual_wrapper" class="mt-1 relative">
-                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <svg class="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
-                    </div>
-                    <input type="text" id="responsavel_visual" value="{{ t('select_sector_above') }}" disabled
-                           class="block w-full pl-9 bg-white border border-surface-muted rounded-dtx-md text-gray-500 sm:text-sm p-2.5 opacity-80 cursor-not-allowed">
-                    <select id="responsavel_select" class="hidden mt-1 dtx-select pl-9">
-                        <!-- Preenchido via JS quando há mais de um supervisor -->
-                    </select>
+            <div class="bento-section-head"><span class="dot"></span><span>{{ t('form_section_notification') }}</span></div>
+
+            <div id="container_responsavel" class="bento-resp-box">
+                <label for="responsavel_visual" class="bento-field-label plain">{{ t('suggested_responsible') }}</label>
+                <div id="responsavel_visual_wrapper" class="relative">
+                    <svg class="bento-resp-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+                    <input type="text" id="responsavel_visual" value="{{ t('select_sector_above') }}" disabled class="bento-resp-badge">
+                    <select id="responsavel_select" class="hidden mt-1"><!-- Preenchido via JS quando há mais de um supervisor --></select>
                 </div>
                 <input type="hidden" name="responsavel_id" id="responsavel_id" value="">
                 <input type="hidden" name="responsavel_nome" id="responsavel_nome" value="">
-                <p class="text-[10px] font-bold text-gray-400 mt-2 flex items-center gap-1 uppercase tracking-wider">
+                <p class="bento-resp-hint">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                     {{ t('defined_automatically') }}
                 </p>
             </div>
 
             <!-- Observadores (em cópia) -->
-            <div class="mt-4">
-                <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">
-                    {{ t('observers_cc') }}
-                </label>
+            <div>
+                <label class="bento-field-label">{{ t('observers_cc') }}</label>
                 {% set _obs_ph = t('search_user_placeholder') %}
                 {% set _obs_hint = t('observers_hint') %}
                 <div class="relative">
                     <input type="text" id="obs-busca"
                            placeholder="{{ _obs_ph if _obs_ph != 'search_user_placeholder' else 'Buscar por nome ou e-mail…' }}"
-                           autocomplete="off"
-                           class="block w-full border border-surface-muted rounded-dtx-md sm:text-sm p-2.5 focus:ring-dtx-600 focus:border-dtx-600">
-                    <ul id="obs-sugestoes" class="hidden absolute z-30 mt-1 w-full bg-white border border-surface-border rounded-dtx-md shadow-lg max-h-48 overflow-y-auto text-sm"></ul>
+                           autocomplete="off">
+                    <ul id="obs-sugestoes" class="hidden absolute z-dropdown mt-1 w-full bg-surface-base border border-surface-border rounded-dtx-lg shadow-lg max-h-48 overflow-y-auto text-sm"></ul>
                 </div>
-                <div id="obs-tags" class="flex flex-wrap gap-1.5 mt-2 min-h-[1.5rem]"></div>
+                <div id="obs-tags" class="bento-obs-tags"></div>
                 <input type="hidden" name="observadores_json" id="observadores_json" value="[]">
-                <p class="text-[10px] text-gray-400 mt-1">{{ _obs_hint if _obs_hint != 'observers_hint' else 'Máx. 5 observadores. Receberão notificações por e-mail.' }}</p>
+                <p style="font-size:11px;color:var(--color-surface-muted);margin:8px 0 0">{{ _obs_hint if _obs_hint != 'observers_hint' else 'Máx. 5 observadores. Receberão notificações por e-mail.' }}</p>
             </div>
 
-            <div class="pt-6 pb-2">
-                {# type="button" — interceptado por JS para abrir modal de pré-envio #}
-                <button id="btn-submit" data-testid="submit-btn" type="button"
-                        class="w-full flex justify-center items-center gap-2 py-3.5 px-4 rounded-dtx-md shadow-dtx text-sm font-bold text-white bg-dtx-600 hover:bg-dtx-700 active:bg-dtx-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-dtx-600 transition-colors">
-                    <svg id="btn-submit-icon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
-                    <svg id="btn-submit-spinner" class="w-5 h-5 hidden animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
-                    <span id="btn-submit-text">{{ t('submit_request') }}</span>
-                </button>
-            </div>
+            {# type="button" — interceptado por JS para abrir modal de pré-envio #}
+            <button id="btn-submit" data-testid="submit-btn" type="button" class="bento-submit-btn">
+                <svg id="btn-submit-icon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
+                <svg id="btn-submit-spinner" class="w-5 h-5 hidden animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                <span id="btn-submit-text">{{ t('submit_request') }}</span>
+            </button>
         </form>
 
         <!-- Modal de pré-envio (preview read-only antes do submit) -->
         <dialog id="modal-preview-chamado"
-                class="rounded-dtx-lg shadow-2xl border border-surface-border p-0 w-full max-w-lg backdrop:bg-gray-900/50"
+                class="rounded-dtx-xl shadow-2xl border border-surface-border p-0 w-full max-w-lg backdrop:bg-gray-900/50"
                 aria-labelledby="preview-modal-title"
                 aria-modal="true">
             <div class="p-6">
                 <div class="flex items-center gap-3 mb-5 border-b border-surface-border pb-4">
-                    <div class="w-9 h-9 rounded-dtx-md bg-dtx-50 border border-dtx-100 flex items-center justify-center text-dtx-600 shrink-0">
+                    <div class="w-9 h-9 rounded-dtx-lg bg-dtx-50 border border-dtx-100 flex items-center justify-center text-dtx-600 shrink-0">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                     </div>
                     <h2 id="preview-modal-title" class="font-display text-base font-extrabold text-gray-900">{{ t('preview_review_header') }}</h2>
@@ -328,7 +263,7 @@
                     </div>
                     <div class="flex flex-col gap-1">
                         <dt class="font-bold text-gray-500">{{ t('preview_description') }}</dt>
-                        <dd id="preview-descricao" class="text-gray-700 bg-surface-raised border border-surface-border rounded-dtx-sm px-3 py-2 text-xs leading-relaxed max-h-28 overflow-y-auto whitespace-pre-wrap break-words">—</dd>
+                        <dd id="preview-descricao" class="text-gray-700 bg-surface-raised rounded-dtx-sm px-3 py-2 text-xs leading-relaxed max-h-28 overflow-y-auto whitespace-pre-wrap break-words">—</dd>
                     </div>
                     <div class="flex justify-between gap-4">
                         <dt class="font-bold text-gray-500 shrink-0">{{ t('preview_attachments') }}</dt>
@@ -341,11 +276,11 @@
                 </dl>
                 <div class="flex flex-col sm:flex-row gap-3 mt-6 pt-4 border-t border-surface-border">
                     <button id="btn-preview-edit" type="button"
-                            class="flex-1 py-2.5 px-4 rounded-dtx-md border border-surface-border text-sm font-bold text-gray-700 bg-white hover:bg-surface-raised transition-colors">
+                            class="flex-1 py-2.5 px-4 rounded-dtx-lg border border-surface-border text-sm font-bold text-gray-700 bg-surface-base hover:bg-surface-raised transition-colors">
                         ← {{ t('preview_edit_btn') }}
                     </button>
                     <button id="btn-preview-confirm" type="button"
-                            class="flex-1 py-2.5 px-4 rounded-dtx-md text-sm font-bold text-white bg-dtx-600 hover:bg-dtx-700 active:bg-dtx-800 transition-colors">
+                            class="flex-1 py-2.5 px-4 rounded-dtx-lg text-sm font-bold text-white bg-dtx-600 hover:bg-dtx-700 active:bg-dtx-800 transition-colors">
                         {{ t('preview_confirm_btn') }} →
                     </button>
                 </div>
@@ -383,7 +318,7 @@
         selectResponsavel.innerHTML = '';
         selectResponsavel.classList.add('hidden');
         campoResponsavel.classList.remove('hidden');
-        campoResponsavel.classList.remove('bg-yellow-100', 'border-yellow-300', 'bg-red-100', 'border-red-300');
+        campoResponsavel.classList.remove('is-resolved', 'is-warning', 'is-error');
 
         if (!setor) {
             campoResponsavel.value = "{{ t('select_sector') }}";
@@ -409,10 +344,11 @@
                 if (data.sucesso && data.supervisores && data.supervisores.length > 0) {
                     const lista = data.supervisores;
                     if (lista.length === 1) {
-                        // Um só: mostra texto fixo e envia esse responsável
+                        // Um só: mostra badge resolvido e envia esse responsável
                         const s = lista[0];
                         campoResponsavel.value = s.nome;
                         campoResponsavel.classList.remove('hidden');
+                        campoResponsavel.classList.add('is-resolved');
                         hiddenId.value = s.id || '';
                         hiddenNome.value = s.nome || '';
                         selectResponsavel.removeAttribute('required');
@@ -440,14 +376,14 @@
                     }
                 } else {
                     campoResponsavel.value = "{{ t('no_supervisors') }}";
-                    campoResponsavel.classList.add('bg-yellow-100', 'border-yellow-300');
+                    campoResponsavel.classList.add('is-warning');
                     selectResponsavel.removeAttribute('required');
                 }
             })
             .catch(error => {
                 console.error('Erro ao carregar supervisores:', error);
                 campoResponsavel.classList.remove('opacity-50');
-                campoResponsavel.classList.add('bg-red-100', 'border-red-300');
+                campoResponsavel.classList.add('is-error');
                 campoResponsavel.value = "{{ t('error_loading') }}";
             });
     }
@@ -600,18 +536,17 @@
             containerLinks.appendChild(hidden);
 
             var li = document.createElement('li');
-            li.className = 'flex items-center justify-between bg-blue-50 text-blue-800 border border-blue-200 rounded-dtx-sm px-3 py-1.5 text-sm';
+            li.className = 'link';
             li.setAttribute('data-link-url', url);
             var span = document.createElement('span');
             span.className = 'flex items-center gap-2 truncate';
-            span.innerHTML = '<svg class="w-4 h-4 text-blue-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>';
+            span.innerHTML = '<svg class="w-4 h-4 shrink-0" style="color:#1e40af" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>';
             var nome = document.createElement('span');
             nome.className = 'font-medium truncate';
             nome.textContent = labelLinkAdicionado + ': ' + url.replace(/^https?:\/\//, '').substring(0, 50) + (url.length > 60 ? '…' : '');
             span.appendChild(nome);
             var btn = document.createElement('button');
             btn.type = 'button';
-            btn.className = 'ml-2 shrink-0 text-blue-600 hover:text-rose-600 font-bold text-xs transition-colors';
             btn.textContent = labelRemoverTexto;
             btn.addEventListener('click', function () {
                 var inputs = containerLinks.querySelectorAll('input[name="links_externos"]');
@@ -633,17 +568,15 @@
             for (var i = 0; i < arquivos.length; i++) {
                 (function (idx, arq) {
                     var li = document.createElement('li');
-                    li.className = 'flex items-center justify-between bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-dtx-sm px-3 py-1.5 text-sm';
                     var span = document.createElement('span');
                     span.className = 'flex items-center gap-2 truncate';
-                    span.innerHTML = '<svg class="w-4 h-4 text-emerald-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>';
+                    span.innerHTML = '<svg class="w-4 h-4 shrink-0" style="color:#047857" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>';
                     var nome = document.createElement('span');
                     nome.className = 'font-medium truncate';
                     nome.textContent = arq.name;
                     span.appendChild(nome);
                     var btn = document.createElement('button');
                     btn.type = 'button';
-                    btn.className = 'ml-2 shrink-0 text-emerald-600 hover:text-rose-600 font-bold text-xs transition-colors';
                     btn.setAttribute('aria-label', labelRemover.replace('{filename}', arq.name));
                     btn.textContent = labelRemoverTexto;
                     btn.addEventListener('click', function () {
@@ -722,10 +655,10 @@
             tags.innerHTML = '';
             observadores.forEach(function(obs) {
                 var tag = document.createElement('span');
-                tag.className = 'obs-tag inline-flex items-center gap-1 bg-dtx-100 text-dtx-800 text-xs font-medium px-2 py-0.5 rounded-full';
+                tag.className = 'bento-obs-tag';
                 tag.setAttribute('data-id', obs.usuario_id);
                 tag.innerHTML = '<span class="obs-tag-nome">' + obs.nome + '</span>' +
-                    '<button type="button" class="obs-tag-rm text-dtx-500 hover:text-dtx-800 leading-none" aria-label="Remover">×</button>';
+                    '<button type="button" class="obs-tag-rm" aria-label="Remover">×</button>';
                 tag.querySelector('.obs-tag-rm').addEventListener('click', function() {
                     observadores = observadores.filter(function(o) { return o.usuario_id !== obs.usuario_id; });
                     _renderTags();

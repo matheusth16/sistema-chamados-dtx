@@ -1,41 +1,35 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="min-h-[calc(100vh-5rem)] flex items-center justify-center bg-surface-canvas px-4 py-12">
-    <div id="login-card" class="w-full max-w-md bg-surface-base border border-surface-border rounded-dtx-lg shadow-dtx-sm p-8">
+<div style="min-height:calc(100vh - 5rem); display:flex; align-items:center; justify-content:center; padding:24px 16px;">
+    <div id="login-card" class="bento-card" style="width:100%; max-width:28rem;">
 
         <!-- Header -->
-        <div class="text-center mb-8">
-            <div class="inline-flex items-center justify-center h-12 w-12 rounded-dtx-lg bg-amber-50 border border-amber-200">
-                <svg class="h-6 w-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+        <div style="text-align:center; margin-bottom:24px;">
+            <div class="bento-chip-icon" style="margin:0 auto; background:var(--color-status-open-bg); color:#b45309;">
+                <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
                 </svg>
             </div>
-            <h2 class="font-display mt-6 text-3xl font-extrabold text-gray-900 tracking-tight">{{ t('password_change_required') }}</h2>
-            <p class="mt-2 text-sm text-gray-600">{{ t('password_change_explanation') }}</p>
+            <h1 class="font-display" style="margin-top:16px; font-size:1.5rem; font-weight:800;">{{ t('password_change_required') }}</h1>
+            <p style="margin-top:8px; font-size:13px; color:var(--color-text-muted);">{{ t('password_change_explanation') }}</p>
         </div>
 
         <!-- Alerta de Informação -->
-        <div class="mb-6 p-4 rounded-dtx-md bg-amber-50 border border-amber-200">
-            <div class="flex gap-3">
-                <div class="flex-shrink-0 mt-0.5">
-                    <svg class="h-5 w-5 text-amber-600" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
-                        <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
-                    </svg>
-                </div>
-                <p class="text-sm text-amber-800">
-                    {{ t('first_login_security_message') }}
-                </p>
-            </div>
+        <div class="bento-notice" style="margin-bottom:20px;">
+            <svg width="18" height="18" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true" style="flex-shrink:0;">
+                <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+            </svg>
+            <span>{{ t('first_login_security_message') }}</span>
         </div>
 
         <!-- Formulário de Alteração de Senha -->
-        <form method="POST" action="{{ url_for('main.alterar_senha_obrigatoria') }}" class="space-y-6">
+        <form method="POST" action="{{ url_for('main.alterar_senha_obrigatoria') }}" class="bento-form space-y-4">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
 
             <!-- Nova Senha -->
             <div>
-                <label for="nova_senha" class="dtx-label">{{ t('new_password') }}</label>
+                <label for="nova_senha" class="bento-field-label plain">{{ t('new_password') }}</label>
                 <div class="relative">
                     <input
                         id="nova_senha"
@@ -43,10 +37,10 @@
                         type="password"
                         required
                         minlength="8"
-                        class="dtx-input h-11 pr-10"
+                        style="padding-right:40px;"
                         placeholder="••••••••">
                     <button type="button" id="toggle-nova_senha" aria-label="{{ t('show_password') }}" title="{{ t('show_password') }}"
-                        class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600 focus:outline-none">
+                        class="absolute inset-y-0 right-0 flex items-center pr-3" style="color:var(--color-surface-muted);">
                         <svg id="icon-nova_senha-eye" class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
@@ -56,12 +50,12 @@
                         </svg>
                     </button>
                 </div>
-                <p class="mt-1 text-xs text-gray-500">{{ t('password_requirements') }}</p>
+                <p style="margin-top:6px; font-size:12px; color:var(--color-surface-muted);">{{ t('password_requirements') }}</p>
             </div>
 
             <!-- Confirmar Nova Senha -->
             <div>
-                <label for="confirmar_senha" class="dtx-label">{{ t('confirm_new_password') }}</label>
+                <label for="confirmar_senha" class="bento-field-label plain">{{ t('confirm_new_password') }}</label>
                 <div class="relative">
                     <input
                         id="confirmar_senha"
@@ -69,10 +63,10 @@
                         type="password"
                         required
                         minlength="8"
-                        class="dtx-input h-11 pr-10"
+                        style="padding-right:40px;"
                         placeholder="••••••••">
                     <button type="button" id="toggle-confirmar_senha" aria-label="{{ t('show_password') }}" title="{{ t('show_password') }}"
-                        class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600 focus:outline-none">
+                        class="absolute inset-y-0 right-0 flex items-center pr-3" style="color:var(--color-surface-muted);">
                         <svg id="icon-confirmar_senha-eye" class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
@@ -85,8 +79,7 @@
             </div>
 
             <!-- Botão de Submissão -->
-            <button type="submit"
-                class="w-full h-11 inline-flex items-center justify-center gap-2 text-sm font-medium rounded-dtx-md bg-dtx-600 text-white hover:bg-dtx-700 active:bg-dtx-800 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-dtx-600">
+            <button type="submit" class="bento-btn-primary" style="width:100%; justify-content:center;">
                 {{ t('change_password') }}
             </button>
         </form>
@@ -95,17 +88,20 @@
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
-                    <div class="mt-6 p-4 rounded-dtx-md {% if category == 'danger' %}bg-red-50 text-red-800 border border-red-200{% elif category == 'success' %}bg-green-50 text-green-800 border border-green-200{% else %}bg-dtx-50 text-dtx-700 border border-dtx-100{% endif %}">
-                        <p class="text-sm font-medium">{{ t(message) }}</p>
+                    <div class="mt-4 p-4 rounded-dtx-lg text-sm font-medium
+                        {% if category == 'danger' %} bg-red-50 text-red-700 border border-red-200
+                        {% elif category == 'success' %} bg-green-50 text-green-700 border border-green-200
+                        {% else %} bg-dtx-50 text-dtx-700 border border-dtx-100 {% endif %}">
+                        {{ t(message) }}
                     </div>
                 {% endfor %}
             {% endif %}
         {% endwith %}
 
         <!-- Rodapé -->
-        <div class="mt-8 pt-6 border-t border-surface-border text-center">
-            <p class="text-xs text-gray-500">{{ t('need_help') }}</p>
-            <a href="{{ url_for('main.logout') }}" class="mt-2 inline-block text-sm text-dtx-600 hover:text-dtx-700 transition-colors">
+        <div style="margin-top:24px; padding-top:20px; border-top:1px solid var(--color-surface-border); text-align:center;">
+            <p style="font-size:12px; color:var(--color-surface-muted);">{{ t('need_help') }}</p>
+            <a href="{{ url_for('main.logout') }}" style="margin-top:6px; display:inline-block; font-size:13px; font-weight:700; color:var(--color-dtx-500); text-decoration:none;">
                 {{ t('logout') }}
             </a>
         </div>

@@ -2,7 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ── CSS custom properties ── fonte única de verdade para light + dark ─── */
+/* ── CSS custom properties ── fonte única de verdade (light-only) ─── */
 @layer base {
   :root {
     /* DTX Blue — âncora da marca: #13274b em dtx-700 */
@@ -30,6 +30,7 @@
     --color-surface-raised: #E8ECF2;
     --color-surface-border: #C4CDD9;
     --color-surface-muted:  #8B9EC0;
+    --color-text-muted:     #697084;   /* texto secundário legível (labels, hints) — distinto de surface-muted (placeholder/disabled) */
 
     /* Status */
     --color-status-open-bg:          #FEF3C7;
@@ -52,72 +53,17 @@
     --gradient-dtx: linear-gradient(135deg, #070f1d 0%, #13274b 55%, #284e95 100%);
   }
 
-  /* ── Dark mode — Tactical Field Operations ───────────────────────────────── */
-  html.dark {
-    color-scheme: dark;
-
-    /* DTX Blue clareado para contrastar em fundo escuro */
-    --color-dtx-50:  #0d1f3c;
-    --color-dtx-100: #162740;
-    --color-dtx-200: #1e3554;
-    --color-dtx-300: #2a4a72;
-    --color-dtx-400: #3f70ca;   /* primary action no dark */
-    --color-dtx-500: #4a80d9;   /* hover */
-    --color-dtx-600: #60a5fa;   /* destaques, links */
-    --color-dtx-700: #93c5fd;
-    --color-dtx-800: #bfdbfe;
-    --color-dtx-900: #dbeafe;
-
-    /* Navbar no dark — funde com o canvas sem divisória dura */
-    --color-nav-bg:     #0d1117;
-    --color-nav-border: #1e2d3f;
-    --color-nav-text:   #6b8baa;
-    --color-nav-active: #e8edf5;
-    --color-nav-accent: #3f70ca;
-
-    /* Superfícies */
-    --color-surface-canvas: #0d1117;
-    --color-surface-base:   #131c27;
-    --color-surface-raised: #1e2d3f;
-    --color-surface-border: #2a3a50;
-    --color-surface-muted:  #3d5068;
-
-    /* Status no dark */
-    --color-status-open-bg:          #2d1d00;
-    --color-status-open-text:        #fde68a;
-    --color-status-open-border:      #78350f;
-    --color-status-active-bg:        #0d1f3c;
-    --color-status-active-text:      #93c5fd;
-    --color-status-active-border:    #1e3a5f;
-    --color-status-done-bg:          #052e16;
-    --color-status-done-text:        #86efac;
-    --color-status-done-border:      #14532d;
-    --color-status-cancelled-bg:     #2d0a0f;
-    --color-status-cancelled-text:   #fca5a5;
-    --color-status-cancelled-border: #7f1d1d;
-    --color-status-pending-bg:       #1c2028;
-    --color-status-pending-text:     #94a3b8;
-    --color-status-pending-border:   #334155;
-
-    /* Gradiente hero dark */
-    --gradient-dtx: linear-gradient(135deg, #020810 0%, #0d1117 55%, #13274b 100%);
-  }
-
   html {
-    color-scheme: light dark;
+    color-scheme: light;
   }
 
   body {
-    font-family: 'Inter', sans-serif;
+    font-family: 'Manrope', sans-serif;
     background-color: var(--color-surface-canvas);
     color: #1a1e2e;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     transition: background-color 0.2s ease, color 0.2s ease;
-  }
-
-  html.dark body {
-    color: #e8edf5;
   }
 
   /* Focus ring consistente */
@@ -128,7 +74,7 @@
   }
 
   h1, h2, h3 {
-    font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+    font-family: 'Manrope', sans-serif;
   }
 }
 
@@ -154,10 +100,6 @@
     color: #374151;
   }
 
-  html.dark .dtx-label {
-    color: var(--color-nav-text);
-  }
-
   .dtx-input {
     @apply block w-full rounded-dtx-md border bg-surface-base px-3 py-2 text-sm
            disabled:bg-surface-raised disabled:opacity-60;
@@ -176,7 +118,70 @@
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-dtx-400) 20%, transparent);
   }
 
+  /* Autofill do navegador ignora bg-*: força a cor do token via box-shadow inset */
+  .dtx-input:-webkit-autofill,
+  .dtx-input:-webkit-autofill:hover,
+  .dtx-input:-webkit-autofill:focus {
+    -webkit-text-fill-color: inherit;
+    -webkit-box-shadow: 0 0 0 1000px var(--color-surface-base) inset;
+    transition: background-color 9999s ease-in-out 0s;
+  }
+
   .dtx-select {
     @apply dtx-input appearance-none pr-8;
+  }
+
+  /* Variante "soft" — fundo sutil (surface-raised), usada nas telas do redesign visual (login, formulário) */
+  .dtx-input-soft {
+    @apply block w-full rounded-dtx-lg border border-transparent bg-surface-raised px-3.5 py-2.5 text-sm transition-colors;
+    color: inherit;
+  }
+
+  .dtx-input-soft::placeholder {
+    color: var(--color-surface-muted);
+  }
+
+  .dtx-input-soft:focus-visible {
+    outline: none;
+    border-color: var(--color-dtx-500);
+    background-color: var(--color-surface-base);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-dtx-400) 20%, transparent);
+  }
+
+  .dtx-input-soft:-webkit-autofill,
+  .dtx-input-soft:-webkit-autofill:hover,
+  .dtx-input-soft:-webkit-autofill:focus {
+    -webkit-text-fill-color: inherit;
+    -webkit-box-shadow: 0 0 0 1000px var(--color-surface-raised) inset;
+    transition: background-color 9999s ease-in-out 0s;
+  }
+
+  .dtx-select-soft {
+    @apply dtx-input-soft appearance-none pr-8;
+  }
+
+  /* Badge de "valor resolvido" — usado no campo Responsável do formulário: parece um valor
+     já resolvido pelo sistema, não um input travado (ver critique de formulario.html). */
+  .resp-badge {
+    @apply inline-flex items-center gap-2 rounded-full text-sm font-semibold px-4 py-2 transition-colors;
+    background: var(--color-surface-raised);
+    color: var(--color-surface-muted);
+    border: none;
+    cursor: not-allowed;
+  }
+
+  .resp-badge.is-resolved {
+    background: var(--color-dtx-100);
+    color: var(--color-dtx-700);
+  }
+
+  .resp-badge.is-warning {
+    background: var(--color-status-open-bg);
+    color: var(--color-status-open-text);
+  }
+
+  .resp-badge.is-error {
+    background: var(--color-status-cancelled-bg);
+    color: var(--color-status-cancelled-text);
   }
 }

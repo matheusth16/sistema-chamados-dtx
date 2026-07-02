@@ -1,78 +1,50 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="min-h-[calc(100vh-4rem)] flex">
+<div id="login-card" class="w-full max-w-4xl">
 
-    <!-- Hero (esquerdo) — some no mobile -->
-    <div class="hidden lg:flex lg:w-1/2 relative flex-col justify-between p-12 overflow-hidden"
-         style="background: var(--gradient-dtx)">
-
-        <!-- Decoração de fundo: grid sutil -->
-        <div class="absolute inset-0 opacity-[0.04]"
-             style="background-image: linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px); background-size: 48px 48px;"></div>
-
-        <!-- Decoração: círculo de profundidade -->
-        <div class="absolute -bottom-32 -right-32 w-96 h-96 rounded-full opacity-10"
-             style="background: radial-gradient(circle, #3f70ca, transparent 70%);"></div>
-        <div class="absolute -top-16 -left-16 w-64 h-64 rounded-full opacity-5"
-             style="background: radial-gradient(circle, #60a5fa, transparent 70%);"></div>
-
-        <!-- Logo e título -->
-        <div class="relative z-10 gsap-login-hero-top">
-            <img src="{{ url_for('static', filename='img/logo-full.png') }}"
-                 alt="DTX Aerospace"
-                 class="h-12 object-contain mb-8 brightness-0 invert opacity-90">
-            <h1 class="font-display text-4xl xl:text-5xl font-black text-white tracking-tight leading-tight">
-                DTX<br>Service Portal
-            </h1>
-            <p class="mt-4 text-base text-white/60 font-medium leading-relaxed max-w-xs">
-                Controle e visibilidade de chamados em tempo real para toda a operação.
-            </p>
-        </div>
-
-        <!-- Rodapé do hero -->
-        <div class="relative z-10 gsap-login-hero-bottom">
-            <div class="flex items-center gap-3 mb-6">
-                <div class="h-px flex-1 bg-white/10"></div>
-                <span class="text-[10px] font-black uppercase tracking-widest text-white/30">DTX Aerospace</span>
-                <div class="h-px flex-1 bg-white/10"></div>
-            </div>
-            <div class="grid grid-cols-3 gap-4 text-center">
-                <div>
-                    <div class="text-2xl font-black text-white">3</div>
-                    <div class="text-[10px] text-white/40 uppercase tracking-wider font-bold mt-0.5">Perfis</div>
-                </div>
-                <div>
-                    <div class="text-2xl font-black text-white">PT·EN·ES</div>
-                    <div class="text-[10px] text-white/40 uppercase tracking-wider font-bold mt-0.5">Idiomas</div>
-                </div>
-                <div>
-                    <div class="text-2xl font-black text-white">24/7</div>
-                    <div class="text-[10px] text-white/40 uppercase tracking-wider font-bold mt-0.5">Operação</div>
-                </div>
-            </div>
+    <!-- Language switcher -->
+    <div class="flex justify-end mb-3">
+        <div class="inline-flex gap-0.5 bg-surface-base border border-surface-border rounded-full p-1 shadow-dtx" role="group" aria-label="{{ t('select_language') }}">
+            <a href="?lang=pt_BR" class="px-3 py-1.5 text-xs font-bold rounded-full transition-colors {% if current_language == 'pt_BR' %}bg-dtx-500 text-white{% else %}text-surface-muted hover:text-gray-900 hover:bg-surface-raised{% endif %}">PT</a>
+            <a href="?lang=en" class="px-3 py-1.5 text-xs font-bold rounded-full transition-colors {% if current_language == 'en' %}bg-dtx-500 text-white{% else %}text-surface-muted hover:text-gray-900 hover:bg-surface-raised{% endif %}">EN</a>
+            <a href="?lang=es" class="px-3 py-1.5 text-xs font-bold rounded-full transition-colors {% if current_language == 'es' %}bg-dtx-500 text-white{% else %}text-surface-muted hover:text-gray-900 hover:bg-surface-raised{% endif %}">ES</a>
         </div>
     </div>
 
-    <!-- Formulário (direito) -->
-    <div class="w-full lg:w-1/2 flex items-center justify-center bg-surface-canvas px-6 py-12">
-        <div id="login-card" class="w-full max-w-sm">
+    <div class="grid grid-cols-1 lg:grid-cols-[1.05fr_1fr] gap-4">
 
-            <!-- Header mobile (logo só aparece no mobile) -->
-            <div class="gsap-login-header text-center mb-8 lg:mb-10">
-                <div class="lg:hidden mb-6">
-                    <img src="{{ url_for('static', filename='img/logo-full.png') }}"
-                         alt="DTX Aerospace"
-                         class="h-10 object-contain mx-auto">
-                </div>
-                <h2 class="font-display text-2xl font-extrabold tracking-tight" style="color: var(--color-dtx-700)">
-                    {{ t('login_title') }}
-                </h2>
-                <p class="mt-2 text-sm" style="color: var(--color-surface-muted)">{{ t('login_subtitle') }}</p>
+        <!-- Hero card -->
+        <div class="gsap-login-header relative overflow-hidden rounded-dtx-xl p-8 flex flex-col justify-between text-white bg-dtx-500"
+             style="background-image: radial-gradient(circle at 85% 15%, rgba(255,255,255,.18), transparent 55%);">
+
+            <span class="relative z-10 inline-flex self-start items-center text-[11px] font-bold tracking-widest uppercase bg-white/15 px-3 py-1.5 rounded-full">
+                DTX Aerospace
+            </span>
+
+            <div class="relative z-10 mt-6">
+                <h1 class="font-display text-3xl xl:text-4xl font-extrabold tracking-tight leading-[1.1]">
+                    {{ t('login_hero_title') }}
+                </h1>
+                <p class="mt-3 text-sm text-white/70 leading-relaxed max-w-xs">
+                    {{ t('login_hero_description') }}
+                </p>
             </div>
 
-            <!-- Formulário -->
-            <form method="POST" action="{{ url_for('main.login') }}" class="space-y-5" data-testid="login-form">
+            <div class="relative z-10 mt-8 pt-5 border-t border-white/15 flex items-center gap-2.5 text-xs text-white/65">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_0_4px_rgba(52,211,153,0.22)]"></span>
+                {{ t('login_hero_status') }}
+            </div>
+        </div>
+
+        <!-- Form card -->
+        <div class="dtx-card rounded-dtx-xl p-8 flex flex-col justify-center">
+            <h2 class="font-display text-xl font-extrabold tracking-tight" style="color: var(--color-dtx-700)">
+                {{ t('login_welcome_back') }}
+            </h2>
+            <p class="mt-1 text-sm mb-6" style="color: var(--color-surface-muted)">{{ t('login_form_subtitle') }}</p>
+
+            <form method="POST" action="{{ url_for('main.login') }}" class="space-y-4" data-testid="login-form">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
 
                 <div>
@@ -80,7 +52,7 @@
                     <input
                         id="email" name="email" type="email" required
                         data-testid="email-input"
-                        class="dtx-input h-11"
+                        class="dtx-input-soft"
                         placeholder="{{ t('ex_email') }}">
                 </div>
 
@@ -90,7 +62,7 @@
                         <input
                             id="senha" name="senha" type="password" required
                             data-testid="password-input"
-                            class="dtx-input h-11 pr-10"
+                            class="dtx-input-soft pr-10"
                             placeholder="••••••••">
                         <button type="button" id="toggle-senha"
                             aria-label="{{ t('show_password') }}" title="{{ t('show_password') }}"
@@ -112,13 +84,12 @@
                         class="h-4 w-4 rounded border-surface-border cursor-pointer transition-colors"
                         style="accent-color: var(--color-dtx-500)">
                     <label for="remember-me" class="ml-2 block text-sm font-medium cursor-pointer" style="color: var(--color-surface-muted)">
-                        {{ t('remember_me', default='Manter-me conectado por 30 dias') }}
+                        {{ t('remember_me') }}
                     </label>
                 </div>
 
                 <button type="submit" data-testid="login-submit-btn"
-                    class="w-full h-11 inline-flex items-center justify-center gap-2 text-sm font-bold rounded-dtx-md text-white transition-all duration-200 focus-visible:outline-2 focus-visible:outline-offset-2"
-                    style="background: linear-gradient(180deg, var(--color-dtx-400) 0%, var(--color-dtx-700) 100%); box-shadow: 0 1px 3px rgb(0 0 0 / 0.3), inset 0 1px 0 rgb(255 255 255 / 0.1);">
+                    class="w-full h-11 inline-flex items-center justify-center gap-2 text-sm font-bold rounded-dtx-lg text-white bg-[var(--color-nav-bg)] hover:bg-[var(--color-nav-border)] transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-offset-2">
                     {{ t('sign_in') }}
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
@@ -131,18 +102,19 @@
                 {% if messages %}
                     {% for category, message in messages %}
                         <div data-testid="flash-message" data-category="{{ category }}"
-                             class="mt-5 p-4 rounded-dtx-md {% if category == 'danger' %}bg-red-50 text-red-800 border border-red-200{% elif category == 'success' %}bg-green-50 text-green-800 border border-green-200{% else %}bg-dtx-50 text-dtx-700 border border-dtx-100{% endif %}">
-                            <p class="text-sm font-medium">{{ t(message) }}</p>
+                             class="mt-4 p-3.5 rounded-dtx-lg text-sm font-semibold {% if category == 'danger' %}bg-red-50 text-red-800 border border-red-200{% elif category == 'success' %}bg-green-50 text-green-800 border border-green-200{% else %}bg-dtx-50 text-dtx-700 border border-dtx-100{% endif %}">
+                            {{ t(message) }}
                         </div>
                     {% endfor %}
                 {% endif %}
             {% endwith %}
+        </div>
 
-            <!-- Rodapé -->
-            <div class="gsap-login-footer mt-8 pt-6 border-t border-surface-border text-center text-xs" style="color: var(--color-surface-muted)">
-                <p>{{ t('login_restricted') }}</p>
-                <p class="mt-2">{{ t('login_contact_admin') }}</p>
-            </div>
+        <!-- Foot bar -->
+        <div class="gsap-login-footer lg:col-span-2 rounded-dtx-xl px-6 py-4 bg-dtx-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 text-xs font-semibold"
+             style="color: var(--color-dtx-700)">
+            <span>{{ t('login_restricted') }}</span>
+            <span>{{ t('login_contact_admin') }}</span>
         </div>
     </div>
 </div>

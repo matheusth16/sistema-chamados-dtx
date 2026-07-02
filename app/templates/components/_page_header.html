@@ -7,17 +7,15 @@
                  {% endcall %}
 #}
 {% macro page_header(title, subtitle="") %}
-<div class="flex items-start justify-between mb-6 pb-5 border-b border-surface-border">
+<div class="bento-page-head" style="margin-bottom:0;">
   <div class="min-w-0">
-    <h1 class="text-2xl font-semibold text-gray-900 font-display tracking-tight">
-      {{- title -}}
-    </h1>
+    <h1 class="font-display">{{- title -}}</h1>
     {%- if subtitle %}
-    <p class="mt-1 text-sm text-gray-500">{{ subtitle }}</p>
+    <p>{{ subtitle }}</p>
     {%- endif %}
   </div>
   {%- if caller is defined %}
-  <div class="ml-4 flex shrink-0 items-center gap-2">
+  <div style="display:flex; flex-shrink:0; align-items:center; gap:8px; flex-wrap:wrap;">
     {{ caller() }}
   </div>
   {%- endif %}

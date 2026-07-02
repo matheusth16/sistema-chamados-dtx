@@ -2,62 +2,40 @@
 
 {% block content %}
 
-<div class="dashboard-page space-y-6" data-testid="dashboard-container">
+<div class="space-y-4" data-testid="dashboard-container">
 
     <!-- Header -->
-    <div class="dashboard-header flex flex-col md:flex-row justify-between items-center p-6 gap-4 gsap-stagger-container">
-
-        <div class="flex items-center gap-4 gsap-stagger">
-            <div class="bg-dtx-50 text-dtx-600 p-3 rounded-dtx-md hidden sm:block border border-dtx-100" aria-hidden="true">
-                <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
-            </div>
-            <div>
-                <h2 class="font-display text-2xl sm:text-3xl font-extrabold text-slate-800 tracking-tight">{{ t('dashboard_title') }}</h2>
-                <div class="text-sm font-medium text-slate-500 flex flex-wrap items-center gap-2 mt-2">
-                    <span class="font-bold text-dtx-700 bg-dtx-50 border border-dtx-100 px-3 py-1 rounded-dtx-sm">{{ total_chamados }}</span>
-                    <span>{{ t('found_tickets') }}{% if total_paginas %} ({{ t('page') }} {{ pagina_atual }} {{ t('of') }} {{ total_paginas }}){% endif %}</span>
-                    {% if current_user.is_authenticated %}
-                    <span class="text-slate-300 font-light mx-1" aria-hidden="true">|</span>
-                    <span class="inline-flex items-center text-slate-600 font-bold bg-slate-100 border border-surface-border px-3 py-1.5 rounded-dtx-sm text-xs">
-                        <svg class="w-3.5 h-3.5 mr-1.5 text-dtx-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
-                        {{ current_user.nome }}
-                    </span>
-                    {% endif %}
+    <div class="bento-card">
+        <div class="bento-page-head gsap-stagger-container">
+            <div class="gsap-stagger" style="display:flex; align-items:center; gap:14px;">
+                <span class="bento-chip-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+                </span>
+                <div>
+                    <h1 class="font-display">{{ t('dashboard_title') }} <span class="bento-count-chip">{{ total_chamados }}</span></h1>
+                    <p>
+                        {{ t('found_tickets') }}{% if total_paginas %} ({{ t('page') }} {{ pagina_atual }} {{ t('of') }} {{ total_paginas }}){% endif %}
+                        {% if current_user.is_authenticated %} · {{ current_user.nome }}{% endif %}
+                    </p>
                 </div>
             </div>
-        </div>
-        <div class="flex flex-wrap gap-3 w-full md:w-auto justify-end gsap-stagger">
-            <a href="{{ url_for('main.exportar', **request.args) }}"
-                class="inline-flex items-center min-h-[44px] px-4 py-2.5 bg-surface-base hover:bg-surface-raised text-slate-700 border border-surface-border font-bold rounded-dtx-md transition-colors shadow-dtx-sm text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-dtx-600"
-                aria-label="{{ t('export') }}">
-                <svg class="w-4 h-4 mr-2 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                </svg>
-                {{ t('export') }}
-            </a>
-            {% if current_user.is_authenticated and current_user.perfil in ['admin', 'supervisor'] %}
-            <a href="{{ url_for('main.exportar_avancado', **request.args) }}"
-                class="inline-flex items-center min-h-[44px] px-4 py-2.5 bg-surface-base hover:bg-surface-raised text-emerald-700 border border-emerald-200 font-bold rounded-dtx-md transition-colors shadow-dtx-sm text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-emerald-500"
-                title="Exportar relatório profissional com múltiplas abas">
-                <svg class="w-4 h-4 mr-2 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                {{ t('reports') }}
-            </a>
-            {% endif %}
-
-            {% if current_user.is_authenticated %}
-            <a href="{{ url_for('main.logout') }}"
-                class="inline-flex items-center min-h-[44px] px-3 py-2.5 text-slate-400 hover:text-red-600 hover:bg-red-50 border border-transparent hover:border-red-100 font-bold rounded-dtx-md transition-colors text-sm ml-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-red-400"
-                title="{{ t('logout') }}" aria-label="{{ t('logout') }}">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                </svg>
-            </a>
-            {% endif %}
+            <div class="gsap-stagger" style="display:flex; gap:8px; flex-wrap:wrap;">
+                <a href="{{ url_for('main.exportar', **request.args) }}" class="bento-btn-outline" aria-label="{{ t('export') }}">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                    {{ t('export') }}
+                </a>
+                {% if current_user.is_authenticated and current_user.perfil in ['admin', 'supervisor'] %}
+                <a href="{{ url_for('main.exportar_avancado', **request.args) }}" class="bento-btn-outline emerald" title="Exportar relatório profissional com múltiplas abas">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                    {{ t('reports') }}
+                </a>
+                {% endif %}
+                {% if current_user.is_authenticated %}
+                <a href="{{ url_for('main.logout') }}" class="bento-icon-btn" title="{{ t('logout') }}" aria-label="{{ t('logout') }}">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+                </a>
+                {% endif %}
+            </div>
         </div>
     </div>
 
@@ -101,145 +79,111 @@
         function translateStatus(statusName) {
             return statusMap[statusName] || statusName;
         }
-
-        // ========================================
-        // Animação modesta de status e loading
-        // ========================================
     </script>
 
     {% include 'components/_filters_bar_dashboard.html' %}
 
     <!-- Barra de ações em massa: touch-friendly (min 44px) -->
-    <div id="bulk-bar"
-        class="hidden mb-4 p-4 bg-surface-base border border-surface-border rounded-dtx-lg shadow-dtx-sm flex flex-wrap items-center justify-between gap-4 sticky top-[4.5rem] z-30 transition-all duration-300">
-        <div class="flex items-center gap-3">
-            <div class="p-2.5 bg-dtx-50 text-dtx-600 rounded-dtx-md shrink-0" aria-hidden="true">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
-            </div>
-            <span class="text-sm font-black text-slate-800 uppercase tracking-wide">{{ t('bulk_change_status') }}</span>
+    <div id="bulk-bar" class="hidden bento-card bento-bulk-bar" style="position:sticky; top:4.5rem; z-index:var(--z-sticky, 20);">
+        <div class="label">
+            <span class="icon">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+            </span>
+            <span>{{ t('bulk_change_status') }}</span>
         </div>
-        <div class="flex items-center gap-3 w-full sm:w-auto flex-wrap">
-            <span id="bulk-count" class="text-xs font-bold text-dtx-700 bg-dtx-50 border border-dtx-100 px-2.5 py-1.5 rounded-dtx-sm hidden sm:inline-block" aria-live="polite"></span>
-            <select id="bulk-status"
-                class="dtx-select flex-1 sm:flex-none min-h-[44px]"
-                aria-label="{{ t('status') }}">
+        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+            <span id="bulk-count" class="bento-count-chip" aria-live="polite"></span>
+            <select id="bulk-status" aria-label="{{ t('status') }}">
                 <option value="Aberto">{{ t('open') }}</option>
                 <option value="Em Atendimento">{{ t('in_progress') }}</option>
                 <option value="Concluído">{{ t('completed') }}</option>
             </select>
-            <button type="button" id="bulk-apply"
-                class="min-h-[44px] px-5 py-2.5 bg-dtx-600 hover:bg-dtx-700 text-white text-sm font-bold rounded-dtx-md shadow-dtx-sm transition-colors flex-none focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-dtx-600">{{
-                t('apply') }}</button>
+            <button type="button" id="bulk-apply" class="bento-btn-primary" style="padding:11px 20px;">{{ t('apply') }}</button>
         </div>
     </div>
 
-    <div class="dashboard-table-wrap overflow-hidden gsap-stagger-container">
-        <div class="table-scroll overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-100/80">
-                <thead class="bg-slate-50/80">
+    <div class="bento-card bento-table-scope dash-table gsap-stagger-container" style="padding:0; overflow:hidden;">
+        <div style="overflow-x:auto;">
+            <table>
+                <thead>
                     <tr>
-                        <th class="px-5 py-4 text-left">
-                            <input type="checkbox" id="bulk-select-all"
-                                class="rounded border-slate-300 text-dtx-600 focus:ring-dtx-500 cursor-pointer h-4 w-4"
-                                title="{{ t('select_all') }}">
+                        <th>
+                            <input type="checkbox" id="bulk-select-all" class="bento-checkbox" title="{{ t('select_all') }}">
                         </th>
-                        <th class="px-5 py-4 text-left text-[11px] font-black text-slate-500 uppercase tracking-widest sortable hover:bg-surface-raised transition-colors cursor-pointer group" data-column="1" onclick="sortTable(1, 'number')">
-                            {{ t('id_ref') }}<span class="sort-icon ml-1 text-slate-300 group-hover:text-dtx-500">↕</span>
-                        </th>
-                        <th class="px-5 py-4 text-left text-[11px] font-black text-slate-500 uppercase tracking-widest filterable cursor-pointer hover:bg-surface-raised transition-colors" data-column="2" onclick="showFilterDropdown(2, this)">
-                            {{ t('category') }}
-                        </th>
-                        <th class="px-5 py-4 text-left text-[11px] font-black text-slate-500 uppercase tracking-widest filterable cursor-pointer hover:bg-surface-raised transition-colors" data-column="3" onclick="showFilterDropdown(3, this)">
-                            {{ t('sector_gate') }}
-                        </th>
-                        <th class="px-5 py-4 text-left text-[11px] font-black text-slate-500 uppercase tracking-widest filterable cursor-pointer hover:bg-surface-raised transition-colors" data-column="4" onclick="showFilterDropdown(4, this)">{{ t('assigned_to') }}</th>
-                        <th class="px-5 py-4 text-left text-[11px] font-black text-slate-500 uppercase tracking-widest">{{ t('description') }}</th>
-                        <th class="px-5 py-4 text-left text-[11px] font-black text-slate-500 uppercase tracking-widest filterable cursor-pointer hover:bg-surface-raised transition-colors" data-column="6" onclick="showFilterDropdown(6, this)">
-                            {{ t('status') }}
-                        </th>
-                        <th class="px-5 py-4 text-center text-[11px] font-black text-slate-500 uppercase tracking-widest sortable hover:bg-surface-raised transition-colors cursor-pointer group" data-column="7" onclick="sortTable(7, 'text')">
-                            SLA<span class="sort-icon ml-1 text-slate-300 group-hover:text-dtx-500">↕</span>
-                        </th>
-                        <th class="px-5 py-4 text-center text-[11px] font-black text-slate-500 uppercase tracking-widest min-w-[7rem]">{{ t('actions') }}</th>
+                        <th class="sortable" data-column="1" onclick="sortTable(1, 'number')">{{ t('id_ref') }}<span class="sort-icon ml-1" style="opacity:.4">↕</span></th>
+                        <th class="filterable" data-column="2" onclick="showFilterDropdown(2, this)">{{ t('category') }}</th>
+                        <th class="filterable" data-column="3" onclick="showFilterDropdown(3, this)">{{ t('sector_gate') }}</th>
+                        <th class="filterable" data-column="4" onclick="showFilterDropdown(4, this)">{{ t('assigned_to') }}</th>
+                        <th>{{ t('description') }}</th>
+                        <th class="filterable" data-column="6" onclick="showFilterDropdown(6, this)">{{ t('status') }}</th>
+                        <th class="sortable" data-column="7" onclick="sortTable(7, 'text')" style="text-align:center">SLA<span class="sort-icon ml-1" style="opacity:.4">↕</span></th>
+                        <th style="text-align:center">{{ t('actions') }}</th>
                     </tr>
                 </thead>
-            <tbody class="bg-white divide-y divide-gray-50/80 gsap-stagger-container">
-                {% if chamados %}
-                {% for grupo in chamados|groupby('grupo_key') %}
-                {% set rl = grupo.grouper.split('|')[1] %}
-                {% include 'components/_rl_header.html' with context %}
-                {% for chamado in grupo.list %}
-                {% include 'components/_ticket_row_dashboard.html' with context %}
-                {% endfor %}
-                {% endfor %}
-                {% else %}
-                <tr>
-                    <td colspan="9" class="dashboard-empty-state text-center text-slate-500">
-                        <div class="flex flex-col items-center justify-center max-w-sm mx-auto">
-                            <div class="empty-icon flex items-center justify-center text-slate-400 mb-5">
-                                <svg class="w-10 h-10" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
+                <tbody class="gsap-stagger-container">
+                    {% if chamados %}
+                    {% for grupo in chamados|groupby('grupo_key') %}
+                    {% set rl = grupo.grouper.split('|')[1] %}
+                    {% set colspan = 9 %}
+                    {% include 'components/_rl_header.html' with context %}
+                    {% for chamado in grupo.list %}
+                    {% include 'components/_ticket_row_dashboard.html' with context %}
+                    {% endfor %}
+                    {% endfor %}
+                    {% else %}
+                    <tr>
+                        <td colspan="9" style="text-align:center; padding:64px 16px;">
+                            <div style="max-width:24rem; margin:0 auto; display:flex; flex-direction:column; align-items:center;">
+                                <div style="color:var(--color-surface-muted); margin-bottom:16px;">
+                                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                </div>
+                                <p class="font-display" style="font-size:1.25rem; font-weight:800;">{{ t('no_tickets') }}</p>
+                                <p style="font-size:14px; color:var(--color-text-muted); margin-top:8px;">{{ t('no_tickets_hint') }}</p>
                             </div>
-                            <p class="text-xl font-display font-extrabold text-slate-800 tracking-tight">{{ t('no_tickets') }}</p>
-                            <p class="text-sm font-medium text-slate-500 mt-2 leading-relaxed">{{ t('no_tickets_hint') }}</p>
-                        </div>
-                    </td>
-                </tr>
-                {% endif %}
-            </tbody>
-        </table>
+                        </td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
         </div>
     </div>
 
     <!-- Paginação: touch-friendly (min 44px), foco visível -->
     {% if tem_anterior or tem_proxima %}
-    <div class="dashboard-pagination flex flex-col md:flex-row justify-between items-center bg-slate-50/50 p-5 rounded-2xl border border-gray-100 gap-4 mt-2">
-        <div class="text-sm text-slate-500 font-medium">
-            {{ t('showing') }} <span class="font-bold text-slate-800">{{ total_chamados }}</span> {{ t('found_tickets') }}
-        </div>
-        <nav class="flex items-center gap-1 bg-white border border-slate-200/60 rounded-xl p-1.5 shadow-sm" aria-label="{{ t('pagination') if t('pagination') != 'pagination' else 'Paginação' }}">
+    <div class="bento-card bento-pagination" style="border-radius:24px;">
+        <div class="info">{{ t('showing') }} <b>{{ total_chamados }}</b> {{ t('found_tickets') }}</div>
+        <nav class="bento-pager" aria-label="{{ t('pagination') if t('pagination') != 'pagination' else 'Paginação' }}">
             {% if tem_anterior and cursor_anterior %}
             <a href="{{ url_for(dashboard_endpoint, cursor_prev=cursor_anterior, pagina=pagina_atual-1, search=request.args.get('search', ''), categoria=request.args.get('categoria', ''), status=request.args.get('status', ''), gate=request.args.get('gate', ''), responsavel=request.args.get('responsavel', ''), rl_codigo=request.args.get('rl_codigo', '')) }}"
-                class="rounded-xl text-sm font-bold text-slate-500 hover:bg-slate-100 hover:text-slate-900" title="{{ t('previous') }}" aria-label="{{ t('previous') }}">&lsaquo;</a>
+                title="{{ t('previous') }}" aria-label="{{ t('previous') }}">&lsaquo;</a>
             {% endif %}
             {% if tem_proxima and proximo_cursor %}
             <a href="{{ url_for(dashboard_endpoint, cursor=proximo_cursor, cursor_prev=request.args.get('cursor') or '', pagina=pagina_atual+1, search=request.args.get('search', ''), categoria=request.args.get('categoria', ''), status=request.args.get('status', ''), gate=request.args.get('gate', ''), responsavel=request.args.get('responsavel', ''), rl_codigo=request.args.get('rl_codigo', '')) }}"
-                class="rounded-xl text-sm font-bold text-slate-500 hover:bg-slate-100 hover:text-slate-900" title="{{ t('next') }}" aria-label="{{ t('next') }}">&rsaquo;</a>
+                title="{{ t('next') }}" aria-label="{{ t('next') }}">&rsaquo;</a>
             {% endif %}
         </nav>
     </div>
     {% endif %}
 
     <!-- Modal acessível para motivo de cancelamento (substitui window.prompt — F-33 / S2-05) -->
-    <dialog id="modal-cancelamento"
-        class="rounded-dtx-md border border-surface-border bg-white p-0 shadow-dtx-lg backdrop:bg-black/40 max-w-md w-[calc(100%-2rem)] open:animate-fade-in"
-        aria-labelledby="modal-cancelamento-titulo">
-        <div class="p-6 space-y-4">
-            <h2 id="modal-cancelamento-titulo" class="font-display text-lg font-bold text-slate-800">
-                {{ t('cancellation_reason') }}
-            </h2>
+    <dialog id="modal-cancelamento" class="bento-modal" aria-labelledby="modal-cancelamento-titulo">
+        <div class="body">
+            <h2 id="modal-cancelamento-titulo">{{ t('cancellation_reason') }}</h2>
             <div>
-                <label for="motivo-cancelamento-texto" class="dtx-label">{{ t('cancellation_reason') }}</label>
+                <label for="motivo-cancelamento-texto" class="bento-field-label">{{ t('cancellation_reason') }}</label>
                 <textarea id="motivo-cancelamento-texto" rows="4" required
-                    class="dtx-input mt-1 w-full resize-y min-h-[6rem]"
                     placeholder="{{ t('cancellation_reason_placeholder') }}"
                     aria-describedby="modal-cancelamento-erro"></textarea>
-                <p id="modal-cancelamento-erro" class="hidden mt-2 text-sm font-medium text-red-600" role="alert"></p>
+                <p id="modal-cancelamento-erro" class="hidden mt-2 text-sm font-medium" style="color:#e11d48;" role="alert"></p>
             </div>
-            <div class="flex flex-wrap justify-end gap-2 pt-2">
-                <button type="button" id="btn-voltar-cancelamento"
-                    class="min-h-[44px] px-4 py-2.5 text-sm font-bold text-slate-600 bg-surface-base border border-surface-border rounded-dtx-md hover:bg-surface-raised focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-dtx-600">
-                    {{ t('back') }}
-                </button>
-                <button type="button" id="btn-confirmar-cancelamento"
-                    class="min-h-[44px] px-4 py-2.5 text-sm font-bold text-white bg-red-600 border border-red-700 rounded-dtx-md hover:bg-red-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-red-500">
-                    {{ t('apply') }}
-                </button>
+            <div style="display:flex; justify-content:flex-end; gap:8px; flex-wrap:wrap;">
+                <button type="button" id="btn-voltar-cancelamento" class="bento-btn-ghost">{{ t('back') }}</button>
+                <button type="button" id="btn-confirmar-cancelamento" class="bento-btn-primary" style="background:#e11d48;">{{ t('apply') }}</button>
             </div>
         </div>
     </dialog>
 
+</div>
 {% endblock %}
 
 {% block page_scripts %}
@@ -271,24 +215,22 @@
     window.DTX_STATUS_VALIDOS = {{ status_validos | tojson }};
 
     function dtxStatusBadgeClasses(status) {
-        if (status === 'Concluído') return 'bg-status-done-bg text-status-done border-status-done-border';
-        if (status === 'Em Atendimento') return 'bg-status-active-bg text-status-active border-status-active-border';
-        if (status === 'Cancelado') return 'bg-status-cancelled-bg text-status-cancelled border-status-cancelled-border';
-        return 'bg-status-open-bg text-status-open border-status-open-border';
+        if (status === 'Concluído') return 'concluido';
+        if (status === 'Em Atendimento') return 'atendimento';
+        if (status === 'Cancelado') return 'cancelado';
+        return 'aberto';
     }
     function dtxStatusBadgeHtml(status, label) {
-        return '<span class="px-2.5 py-1 inline-flex items-center text-xs font-bold rounded-dtx-sm border ' + dtxStatusBadgeClasses(status) + '">' + label + '</span>';
+        return '<span class="bento-status-pill ' + dtxStatusBadgeClasses(status) + '"><span class="dot"></span>' + label + '</span>';
     }
     function dtxSlaHtml(sla) {
-        if (!sla) return '<span class="text-slate-300 text-xs font-bold">—</span>';
-        var cls = sla.dentro_prazo ? 'bg-status-done-bg text-status-done border-status-done-border'
-                 : sla.em_risco ? 'bg-status-open-bg text-status-open border-status-open-border'
-                 : 'bg-status-cancelled-bg text-status-cancelled border-status-cancelled-border';
+        if (!sla) return '<span class="bento-status-pill no-sla">—</span>';
+        var cls = sla.dentro_prazo ? 'on-time' : sla.em_risco ? 'at-risk' : 'delayed';
         var lbl = sla.label === 'No prazo' ? '{{ t("on_time") }}'
                 : sla.label === 'Atrasado' ? '{{ t("delayed") }}'
                 : sla.label === 'Em risco' ? '{{ t("at_risk") }}'
                 : sla.label;
-        return '<span class="px-2.5 py-1 inline-flex text-xs font-bold rounded-dtx-sm border ' + cls + '" title="{{ t("sla_tooltip") }}">' + lbl + '</span>';
+        return '<span class="bento-status-pill ' + cls + '" title="{{ t("sla_tooltip") }}">' + lbl + '</span>';
     }
 </script>
     <!-- As funções abrirModal e fecharModal já estão definidas inline acima -->
@@ -426,14 +368,14 @@
                     var el = row.querySelector('[data-cell="' + cell + '"]');
                     if (el) el.innerHTML = html;
                 };
-                set('numero', '<div class="text-sm font-black text-gray-800">' + (c.numero_chamado || '') + '</div>' +
-                    (c.rl_codigo ? '<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-pink-100 text-pink-700 mt-1 uppercase tracking-wider">{{ t("rl_short") }} ' + (c.rl_codigo || '') + '</span>' : ''));
-                set('categoria', '<span class="px-2.5 py-1 inline-flex text-xs leading-5 font-bold rounded ' + (c.categoria === 'Projetos' ? 'bg-rose-50 text-rose-700 border border-rose-100' : 'bg-dtx-50 text-dtx-700 border border-dtx-100') + '">' + cat + '</span>');
+                set('numero', '<div class="num">' + (c.numero_chamado || '') + '</div>' +
+                    (c.rl_codigo ? '<span class="bento-chip-badge rl">{{ t("rl_short") }} ' + (c.rl_codigo || '') + '</span>' : ''));
+                set('categoria', '<span class="bento-cat-pill' + (c.categoria === 'Projetos' ? ' projeto' : '') + '">' + cat + '</span>');
                 var setor = typeof translateSector === 'function' ? translateSector(c.tipo_solicitacao) : (sectorMap && sectorMap[c.tipo_solicitacao]) || c.tipo_solicitacao || '';
-                set('setor', '<div class="text-sm font-semibold text-gray-800">' + setor + '</div><div class="text-xs font-medium text-gray-400">' + (c.gate || '') + '</div>');
-                set('responsavel', '<div class="flex items-center">' + (c.responsavel ? '<div class="h-6 w-6 rounded-full bg-dtx-50 text-dtx-700 border border-dtx-100 flex items-center justify-center text-xs font-bold mr-2">' + (c.responsavel.charAt(0) || '') + '</div>' : '') + '<span class="text-sm font-medium text-gray-700">' + nomeCurto(c.responsavel) + '</span></div>');
-                var desc = (c.descricao || '').slice(0, 15) + ((c.descricao || '').length > 15 ? '...' : '');
-                set('descricao', '<div class="text-sm text-gray-700 truncate max-w-[120px] cursor-pointer group-hover:text-dtx-600 font-medium" title="{{ t("click_eye_full") }}">' + desc + '</div><div class="text-xs text-gray-400 font-medium mt-0.5">' + (c.data_abertura || '-') + '</div>');
+                set('setor', setor + (c.gate ? ' <span style="color:var(--color-surface-muted);">· ' + c.gate + '</span>' : ''));
+                set('responsavel', c.responsavel ? '<span class="bento-avatar-mini">' + (c.responsavel.charAt(0) || '') + '</span>' + nomeCurto(c.responsavel) : '—');
+                var desc = (c.descricao || '').slice(0, 50) + ((c.descricao || '').length > 50 ? '…' : '');
+                set('descricao', desc);
                 var statusLabel = typeof translateStatus === 'function' ? translateStatus(c.status || 'Aberto') : (statusMap && statusMap[c.status]) || c.status || 'Aberto';
                 set('status', dtxStatusBadgeHtml(c.status || 'Aberto', statusLabel));
                 set('sla', dtxSlaHtml(c.sla_info));

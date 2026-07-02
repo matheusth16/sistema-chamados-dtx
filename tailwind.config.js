@@ -1,6 +1,5 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
-  darkMode: 'class',
   content: [
     "./app/templates/**/*.html",
     "./app/static/js/**/*.js",
@@ -8,13 +7,13 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
-        sans:    ['Inter', 'sans-serif'],
-        display: ['"Plus Jakarta Sans"', 'sans-serif'],
+        sans:    ['Manrope', 'sans-serif'],
+        display: ['Manrope', 'sans-serif'],
         mono:    ['"JetBrains Mono"', 'monospace'],
       },
 
       colors: {
-        // Usando CSS vars: as classes Tailwind mudam automaticamente com html.dark {}
+        // Usando CSS vars definidas em input.css :root (fonte única de verdade, light-only)
         dtx: {
           50:  'var(--color-dtx-50)',
           100: 'var(--color-dtx-100)',
@@ -34,6 +33,7 @@ module.exports = {
           raised: 'var(--color-surface-raised)',
           border: 'var(--color-surface-border)',
           muted:  'var(--color-surface-muted)',
+          'muted-text': 'var(--color-text-muted)',
         },
 
         nav: {
@@ -74,16 +74,19 @@ module.exports = {
       },
 
       zIndex: {
-        nav:      '10',
-        dropdown: '20',
-        modal:    '30',
-        toast:    '50',
+        // Escala semântica única: nada de z-[200]/z-[9999] soltos nos templates.
+        sticky:   '10', // barras/cabeçalhos sticky dentro da página (abaixo da navbar)
+        nav:      '20', // navbar fixa no topo
+        dropdown: '30', // menus, autocomplete, dropdowns (navbar e formulários)
+        modal:    '40', // overlays de modal e loading full-page
+        toast:    '50', // flash messages e banners de notificação — sempre por cima
       },
 
       borderRadius: {
         'dtx-sm': '6px',
         'dtx-md': '8px',
         'dtx-lg': '12px',
+        'dtx-xl': '24px',
       },
 
       boxShadow: {

@@ -2,70 +2,55 @@
 {% from 'components/_status_badge.html' import status_badge, sla_badge with context %}
 <tr data-chamado-id="{{ chamado.id }}" data-testid="chamado-row" data-prioridade="{{ chamado.prioridade }}" data-rl-codigo="{{ chamado.rl_codigo or '' }}"
     data-detail-url="{{ url_for('main.visualizar_detalhe_chamado', chamado_id=chamado.id) }}"
-    class="gsap-stagger transition-colors duration-200 group cursor-default {% if chamado.categoria == 'Projetos' %}bg-rose-50/80 hover:bg-rose-100/90 border-l-2 border-l-rose-400{% else %}hover:bg-surface-raised{% endif %}">
-    <td class="px-5 py-4 whitespace-nowrap align-middle">
-        <label class="inline-flex items-center justify-center min-w-[44px] min-h-[44px] -m-2 cursor-pointer rounded-dtx-md hover:bg-surface-raised focus-within:ring-2 focus-within:ring-dtx-600/30 focus-within:ring-offset-1">
-            <input type="checkbox" class="bulk-cb rounded border-gray-300 text-dtx-600 focus:ring-dtx-500 cursor-pointer w-4 h-4"
+    class="hoverable{% if chamado.categoria == 'Projetos' %} bento-tr-projeto{% endif %}">
+    <td style="overflow:visible;">
+        <label style="display:inline-flex; align-items:center; justify-content:center; min-width:32px; min-height:32px; cursor:pointer;">
+            <input type="checkbox" class="bulk-cb bento-checkbox"
                 value="{{ chamado.id }}" data-id="{{ chamado.id }}" aria-label="{{ t('select_ticket') if t and t('select_ticket') != 'select_ticket' else 'Selecionar chamado' }}">
         </label>
     </td>
-    <td class="px-5 py-4 whitespace-nowrap" data-cell="numero">
-        <div class="text-sm font-black text-gray-800">{{ chamado.numero_chamado }}</div>
+    <td class="id-cell" data-cell="numero">
+        <div class="num">{{ chamado.numero_chamado }}</div>
         {% if chamado.rl_codigo %}
-        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-pink-100 text-pink-700 mt-1 uppercase tracking-wider">
-            {{ t('rl_short') }} {{ chamado.rl_codigo }}
-        </span>
+        <span class="bento-chip-badge rl">{{ t('rl_short') }} {{ chamado.rl_codigo }}</span>
         {% endif %}
     </td>
-    <td class="px-5 py-4 whitespace-nowrap" data-cell="categoria">
-        <span class="px-2.5 py-1 inline-flex text-xs leading-5 font-bold rounded-dtx-sm border
-                {% if chamado.categoria == 'Projetos' %}bg-rose-50 text-rose-700 border-rose-100{% else %}bg-dtx-50 text-dtx-700 border-dtx-100{% endif %}">
+    <td data-cell="categoria">
+        <span class="bento-cat-pill{% if chamado.categoria == 'Projetos' %} projeto{% endif %}">
             {{ translate_category(chamado.categoria) }}
         </span>
     </td>
-    <td class="px-5 py-4 whitespace-nowrap" data-cell="setor">
-        <div class="text-sm font-semibold text-gray-800">{{ translate_sector(chamado.tipo_solicitacao) }}</div>
-        <div class="text-xs font-medium text-gray-400">{{ translate_gate(chamado.gate) if chamado.gate else '' }}</div>
+    <td data-cell="setor">
+        {{ translate_sector(chamado.tipo_solicitacao) }}{% if chamado.gate %} <span style="color:var(--color-surface-muted);">· {{ translate_gate(chamado.gate) }}</span>{% endif %}
     </td>
-    <td class="px-5 py-4 whitespace-nowrap" data-cell="responsavel">
-        <div class="flex items-center">
-            {% if chamado.responsavel %}
-            <div class="h-7 w-7 rounded-full bg-dtx-50 text-dtx-700 flex items-center justify-center text-xs font-black mr-2.5 border border-dtx-100">
-                {{ chamado.responsavel[0] }}
-            </div>
-            {% endif %}
-            <span class="text-sm font-bold text-slate-700">{{ nome_curto(chamado.responsavel) or '—' }}</span>
-        </div>
+    <td data-cell="responsavel">
+        {% if chamado.responsavel %}
+        <span class="bento-avatar-mini">{{ chamado.responsavel[0] }}</span>{{ nome_curto(chamado.responsavel) }}
+        {% else %}
+        —
+        {% endif %}
     </td>
-    <td class="px-5 py-4" data-cell="descricao">
-        <div class="text-sm text-gray-700 truncate max-w-[120px] cursor-pointer group-hover:text-dtx-600 font-medium"
-            title="{{ t('click_eye_full') }}">
-            {{ chamado.descricao[:15] }}{% if chamado.descricao|length > 15 %}...{% endif %}
-        </div>
-        <div class="text-xs text-gray-400 font-medium mt-0.5">
-            {{ chamado.data_abertura_formatada() }}
-        </div>
+    <td data-cell="descricao" title="{{ chamado.descricao }}">
+        {{ chamado.descricao[:50] }}{% if chamado.descricao|length > 50 %}…{% endif %}
     </td>
-    <td class="px-5 py-4 whitespace-nowrap" data-cell="status">
+    <td data-cell="status">
         {{ status_badge(chamado.status or 'Aberto', size='md') }}
     </td>
-    <td class="px-5 py-4 whitespace-nowrap text-center" data-cell="sla">
+    <td data-cell="sla" style="text-align:center;">
         {{ sla_badge(chamado.sla_info, chamado.sla_dias, size='md') }}
     </td>
-    <td class="px-5 py-4 text-sm font-medium flex items-center justify-center gap-1 min-w-[7rem] shrink-0">
+    <td style="text-align:center; white-space:nowrap;">
         <a href="{{ url_for('main.visualizar_detalhe_chamado', chamado_id=chamado.id) }}" target="_blank" rel="opener"
-            class="inline-flex items-center justify-center min-w-[44px] min-h-[44px] p-2 text-slate-400 hover:text-dtx-600 hover:bg-dtx-50 rounded-dtx-md transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-dtx-600/30 focus-visible:ring-offset-1"
-            title="{{ t('view_details') }}" aria-label="{{ t('view_details') }}">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+            class="bento-action-btn" title="{{ t('view_details') }}" aria-label="{{ t('view_details') }}">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
             </svg>
         </a>
         <a href="{{ url_for('main.visualizar_historico', chamado_id=chamado.id) }}"
-            class="inline-flex items-center justify-center min-w-[44px] min-h-[44px] p-2 text-slate-400 hover:text-dtx-600 hover:bg-dtx-50 rounded-dtx-md transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-dtx-600/30 focus-visible:ring-offset-1"
-            title="{{ t('view_history') }}" aria-label="{{ t('view_history') }}">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            class="bento-action-btn" title="{{ t('view_history') }}" aria-label="{{ t('view_history') }}">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
         </a>
     </td>

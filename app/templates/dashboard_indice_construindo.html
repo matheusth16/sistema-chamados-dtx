@@ -2,16 +2,16 @@
 
 {% block content %}
 <div class="max-w-2xl mx-auto mt-12 px-4">
-    <div class="bg-amber-50 border border-amber-200 rounded-xl shadow-sm p-8 text-center">
-        <div class="inline-flex items-center justify-center w-14 h-14 rounded-full bg-amber-100 text-amber-600 mb-4">
-            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <div class="bento-card" style="background:var(--color-status-open-bg); border-color:#fde68a; text-align:center;">
+        <div class="bento-chip-icon" style="width:56px; height:56px; margin:0 auto 16px; background:#fde68a; color:#b45309;">
+            <svg width="28" height="28" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
         </div>
-        <h1 class="text-xl font-semibold text-gray-800 mb-2">Índice do banco em construção</h1>
-        <p class="text-gray-600 mb-2">O Firestore está finalizando um índice necessário para o dashboard. Isso costuma levar alguns minutos.</p>
-        <p class="text-sm text-gray-500 mb-6">Esta página será recarregada automaticamente em <span id="countdown">30</span>s.</p>
-        <a href="{{ url_for(dashboard_endpoint) }}" class="inline-flex items-center min-h-[44px] px-5 py-2.5 border border-transparent text-sm font-medium rounded-dtx-md text-white bg-dtx-600 hover:bg-dtx-700 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-dtx-600">
+        <h1 class="font-display" style="font-size:1.3rem; font-weight:800; margin-bottom:8px;">Índice do banco em construção</h1>
+        <p style="color:var(--color-text-muted); margin-bottom:8px;">O Firestore está finalizando um índice necessário para o dashboard. Isso costuma levar alguns minutos.</p>
+        <p style="font-size:13px; color:var(--color-surface-muted); margin-bottom:20px;">Esta página será recarregada automaticamente em <span id="countdown">30</span>s.</p>
+        <a href="{{ url_for(dashboard_endpoint) }}" class="bento-btn-primary" style="display:inline-flex;">
             Atualizar agora
         </a>
     </div>

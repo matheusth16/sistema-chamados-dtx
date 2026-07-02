@@ -18,14 +18,6 @@
       type="image/x-icon"
       href="{{ url_for('static', filename='favicon.ico') }}"
     />
-    <!-- Anti-flash: aplica tema antes de qualquer CSS ser renderizado -->
-    <script>
-      (function () {
-        var t = localStorage.getItem('dtx-theme');
-        var dark = t === 'dark' || (!t && window.matchMedia('(prefers-color-scheme: dark)').matches);
-        if (dark) document.documentElement.classList.add('dark');
-      })();
-    </script>
     <link
       rel="stylesheet"
       href="{{ url_for('static', filename='css/tailwind.min.css') }}"
@@ -33,7 +25,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap"
       rel="stylesheet"
     />
     <!-- CSS para filtros e ordenação de tabelas -->
@@ -49,11 +41,16 @@
       rel="stylesheet"
       href="{{ url_for('static', filename='css/relatorios.css') }}"
     />
+    <!-- Redesign visual (bento) — classes portadas literalmente dos mockups aprovados -->
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/bento.css') }}"
+    />
     {% block extra_css %}{% endblock %}
   </head>
 
   <body
-    class="bg-surface-canvas text-gray-900"
+    class="bg-surface-canvas text-gray-900 {% if request.endpoint == 'main.login' %}h-screen overflow-hidden{% endif %}"
     data-debug="{% if config.DEBUG %}true{% endif %}"
   >
     <a href="#main-content" class="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-[9999] focus:px-4 focus:py-2 focus:bg-white focus:text-dtx-600 focus:rounded-dtx-md focus:shadow-dtx focus:font-semibold">{{ t('skip_to_main_content') }}</a>
@@ -62,19 +59,19 @@
       window.DTX_DEBUG = document.body.getAttribute("data-debug") === "true";
     </script>
 
-    {% block body_overlay %}{% endblock %} {% include "components/navbar.html" %}
+    {% block body_overlay %}{% endblock %} {% if request.endpoint != 'main.login' %}{% include "components/navbar.html" %}{% endif %}
 
     {% if current_user.is_authenticated and not current_user.onboarding_completo and request.endpoint != 'main.alterar_senha_obrigatoria' %}
     {% include "components/onboarding.html" %}
     {% endif %}
 
-    <main id="main-content" class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+    <main id="main-content" class="{% if request.endpoint == 'main.login' %}h-screen w-full flex items-center justify-center p-5 overflow-hidden{% else %}max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8{% endif %}">
       {# Flash messages as floating toasts #} {% if request.endpoint !=
       'main.index' %} {% with messages =
       get_flashed_messages(with_categories=true) %} {% if messages %}
       <div
         id="flash-messages"
-        class="fixed top-20 right-4 z-[250] flex flex-col gap-3 pointer-events-none w-full max-w-sm"
+        class="fixed top-20 right-4 z-toast flex flex-col gap-3 pointer-events-none w-full max-w-sm"
       >
         {% for category, message in messages %} {% set border_color =
         'border-red-500' if category == 'danger' else 'border-green-500' if
@@ -84,7 +81,7 @@
         'success' else 'bg-blue-50 text-blue-800' if category == 'info' else
         'bg-gray-50 text-gray-800' %}
         <div
-          class="pointer-events-auto px-4 py-3 sm:px-5 sm:py-4 rounded-dtx-md shadow-dtx border-l-4 {{ border_color }} {{ bg_color }} transition-all flex items-start justify-between gap-3 flash-toast"
+          class="pointer-events-auto px-4 py-3 sm:px-5 sm:py-4 rounded-b-dtx-md shadow-dtx border-t-4 {{ border_color }} {{ bg_color }} transition-all flex items-start justify-between gap-3 flash-toast"
         >
           <div class="flex-1 text-sm font-medium">{{ t(message) }}</div>
           <button
@@ -129,6 +126,7 @@
       {% endif %} {% endwith %} {% endif %} {% block content %}{% endblock %}
     </main>
 
+    {% if request.endpoint != 'main.login' %}
     <footer class="bg-white border-t border-surface-border mt-12">
       <div class="max-w-7xl mx-auto py-6 px-4 overflow-hidden sm:px-6 lg:px-8">
         <p class="mt-8 text-center text-base text-gray-500">
@@ -137,6 +135,7 @@
         </p>
       </div>
     </footer>
+    {% endif %}
 
     <!-- GSAP: carregado no final do body para não bloquear renderização -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js?t=1" crossorigin="anonymous"></script>
@@ -418,7 +417,7 @@
       id="webpush-banner"
       role="region"
       aria-label="{{ t('webpush_banner_text') }}"
-      class="hidden fixed bottom-4 left-4 right-4 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 z-[190] bg-white border border-surface-border text-gray-900 px-4 py-3 rounded-dtx-lg shadow-dtx text-sm flex flex-col sm:flex-row sm:items-center gap-3 max-w-md sm:w-full"
+      class="hidden fixed bottom-4 left-4 right-4 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 z-toast bg-white border border-surface-border text-gray-900 px-4 py-3 rounded-dtx-lg shadow-dtx text-sm flex flex-col sm:flex-row sm:items-center gap-3 max-w-md sm:w-full"
     >
       <span class="flex-1 text-gray-700">{{ t('webpush_banner_text') }}</span>
       <div class="flex items-center gap-2 shrink-0">
@@ -451,7 +450,7 @@
         function mostrarToastSucesso() {
           var toast = document.createElement("div");
           toast.className =
-            "fixed bottom-24 left-1/2 -translate-x-1/2 z-[190] bg-white border border-green-200 text-green-800 rounded-dtx-lg shadow-dtx px-4 py-2 text-sm font-medium";
+            "fixed bottom-24 left-1/2 -translate-x-1/2 z-toast bg-white border border-green-200 text-green-800 rounded-dtx-lg shadow-dtx px-4 py-2 text-sm font-medium";
           toast.textContent = "{{ t('webpush_ativado') }}";
           document.body.appendChild(toast);
           setTimeout(function () {
@@ -609,30 +608,6 @@
     {% if current_user.is_authenticated and not current_user.onboarding_completo and request.endpoint != 'main.alterar_senha_obrigatoria' %}
     <script src="{{ url_for('static', filename='js/onboarding.js') }}"></script>
     {% endif %}
-
-    <!-- Toggle dark/light mode -->
-    <script nonce="{{ csp_nonce }}">
-      (function () {
-        var btn = document.getElementById('btn-theme-toggle');
-        var iconSun = document.getElementById('icon-theme-sun');
-        var iconMoon = document.getElementById('icon-theme-moon');
-        if (!btn) return;
-
-        function applyTheme(dark) {
-          document.documentElement.classList.toggle('dark', dark);
-          if (iconSun)  iconSun.classList.toggle('hidden', !dark);
-          if (iconMoon) iconMoon.classList.toggle('hidden', dark);
-          localStorage.setItem('dtx-theme', dark ? 'dark' : 'light');
-        }
-
-        // Sincroniza ícone com o estado atual
-        applyTheme(document.documentElement.classList.contains('dark'));
-
-        btn.addEventListener('click', function () {
-          applyTheme(!document.documentElement.classList.contains('dark'));
-        });
-      })();
-    </script>
 
     <!-- Bloco para scripts adicionais de páginas específicas -->
     {% block page_scripts %}{% endblock %}

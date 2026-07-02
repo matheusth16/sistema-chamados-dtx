@@ -1,6 +1,6 @@
 ---
 name: DTX Service Portal
-description: Sistema interno de chamados da DTX Aerospace — visibilidade em tempo real para escritório (light) e chão de fábrica (dark)
+description: Sistema interno de chamados da DTX Aerospace — visibilidade em tempo real para escritório e chão de fábrica, tema único light
 colors:
   dtx-900: "#070f1d"
   dtx-800: "#0c1931"
@@ -29,20 +29,20 @@ colors:
   surface-muted: "#8B9EC0"
 typography:
   display:
-    fontFamily: "Plus Jakarta Sans, Inter, sans-serif"
+    fontFamily: "Manrope, sans-serif"
     fontSize: "1.5rem"
-    fontWeight: 600
+    fontWeight: 700
     lineHeight: 1.25
     letterSpacing: "-0.01em"
   body:
-    fontFamily: "Inter, sans-serif"
+    fontFamily: "Manrope, sans-serif"
     fontSize: "0.875rem"
     fontWeight: 400
     lineHeight: 1.5
   label:
-    fontFamily: "Inter, sans-serif"
+    fontFamily: "Manrope, sans-serif"
     fontSize: "0.6875rem"
-    fontWeight: 900
+    fontWeight: 800
     letterSpacing: "0.08em"
   mono:
     fontFamily: "JetBrains Mono, monospace"
@@ -52,6 +52,7 @@ rounded:
   sm: "6px"
   md: "8px"
   lg: "12px"
+  xl: "24px"
   badge: "4px"
   full: "9999px"
 spacing:
@@ -91,16 +92,16 @@ components:
 
 **Norte Criativo: "A Torre de Controle DTX"**
 
-O DTX Service Portal é o sistema de chamados internos da DTX Aerospace — uma operação aeroespacial, não uma startup de SaaS. O visual existe para transmitir **confiança, controle e eficiência**: cada chamado é um sinal que precisa ser visto, classificado e resolvido sem ambiguidade, por dois públicos com necessidades físicas opostas. No escritório (supervisores, admins, analistas), o sistema se comporta como um painel de controle Swiss-industrial: hierarquia densa, tipografia bold, grid rígido, modo claro. No chão de fábrica (mecânicos, engenheiros), vira telemetria tática: contraste extremo, leitura a distância, modo escuro como ferramenta de acessibilidade — não como preferência estética. O toggle claro/escuro não é um extra: é a principal adaptação de acessibilidade do produto.
+O DTX Service Portal é o sistema de chamados internos da DTX Aerospace — uma operação aeroespacial, não uma startup de SaaS. O visual existe para transmitir **confiança, controle e eficiência**: cada chamado é um sinal que precisa ser visto, classificado e resolvido sem ambiguidade, por dois públicos com necessidades físicas opostas. No escritório (supervisores, admins, analistas) e no chão de fábrica (mecânicos, engenheiros), o sistema se comporta como um painel de controle Swiss-industrial: hierarquia densa, tipografia bold, grid rígido. Tema único, light — acessibilidade pro chão de fábrica vem de contraste alto e tipografia funcional dentro do próprio tema, não de um toggle de tema.
 
 O sistema rejeita explicitamente a estética de SaaS genérico: nada de cards flutuantes sem propósito, paleta usada como decoração, ou flat design sem hierarquia. Cor é dado — o Azul DTX e as cores semânticas de status aparecem onde há ação ou significado, nunca como estilo gratuito.
 
 **Key Characteristics:**
-- Ancorado em uma única cor de marca (#13274b, "Azul DTX") expressa como uma escala completa de 9 tons, com tokens distintos para light e dark mode.
-- Tipografia dupla intencional: Plus Jakarta Sans para hierarquia de página, Inter para corpo e dados densos, JetBrains Mono reservado para identificadores técnicos.
+- Ancorado em uma única cor de marca (#13274b, "Azul DTX") expressa como uma escala completa de 9 tons.
+- Tipografia unificada: Manrope para hierarquia de página e corpo/dados densos (peso é quem separa título de dado, não a família), JetBrains Mono reservado para identificadores técnicos.
 - Elevação real (sombras + gradientes), não flat design — mas aplicada com critério: cards em repouso, gradiente reservado para a ação primária.
 - Densidade alta nas tabelas de chamados (telemetria), respiro generoso nas páginas de navegação.
-- Dois conjuntos de tokens completos (`:root` e `html.dark`) compartilhando os mesmos nomes de variável — nenhum componente precisa de lógica condicional de tema.
+- Tema único light — tokens de cor em `:root`, sem variante dark, sem lógica condicional de tema nos componentes.
 
 ## 2. Colors
 
@@ -108,9 +109,9 @@ A paleta é Restrita por padrão: o Azul DTX domina apenas onde há ação ou ma
 
 ### Primary
 - **Azul DTX** (`#13274b` / dtx-700): a cor da marca. Reservada para elementos estruturais — fundo da navbar, divisórias de seção. 14.8:1 de contraste contra branco.
-- **Azul DTX — Ação** (`#284e95` / dtx-500): botão primário em light mode. 8:1 de contraste, AA garantido.
+- **Azul DTX — Ação** (`#284e95` / dtx-500): botão primário. 8:1 de contraste, AA garantido.
 - **Azul DTX — Hover** (`#1d3b72` / dtx-600): hover do botão primário e estado ativo de navegação. 10.9:1 de contraste.
-- **Azul DTX — Dark Action** (`#3f70ca` / dtx-400): botão primário em dark mode (4.79:1 contra fundo escuro — a escala inteira se inverte em luminância no dark mode para manter a legibilidade).
+- **Azul DTX — Acento** (`#3f70ca` / dtx-400): anéis de foco, hovers sutis, avatar/ícones — acento mais claro, não usado para texto de corpo.
 
 ### Secondary — Vocabulário Semântico de Status
 A segunda camada de cor não é decorativa: é o vocabulário de estado dos chamados, idêntico em ambos os temas (apenas a luminância muda).
@@ -130,25 +131,25 @@ A segunda camada de cor não é decorativa: é o vocabulário de estado dos cham
 ### Named Rules
 **A Regra da Cor-Como-Dado.** O Azul DTX nunca decora — ele marca ação (botão primário), seleção (linha ativa, foco) ou estrutura de marca (navbar). Se uma cor não está comunicando estado ou hierarquia, ela é cinza neutro.
 
-**A Regra do Par Completo.** Todo token de cor existe em dois valores — um para `:root`, um para `html.dark` — sob o mesmo nome de variável CSS. Nenhum componente decide cor por tema; ele só referencia o token.
+**A Regra do Token Único.** Todo token de cor vive em `:root` sob um nome de variável CSS semântico (`--color-dtx-*`, `--color-surface-*`, `--color-status-*`). Nenhum componente hardcoda hex; ele só referencia o token — isso mantém a paleta trocável num só lugar, mesmo sem variante de tema.
 
 ## 3. Typography
 
-**Fonte de Destaque:** Plus Jakarta Sans (com fallback Inter, sans-serif)
-**Fonte de Corpo:** Inter (com fallback sans-serif)
+**Fonte de Destaque:** Manrope, peso 700/800 (com fallback sans-serif)
+**Fonte de Corpo:** Manrope, peso 400/500 (com fallback sans-serif)
 **Fonte de Identificadores Técnicos:** JetBrains Mono (com fallback monospace) — carregada, mas hoje subutilizada (ver Do's e Don'ts)
 
-**Caráter:** o par Plus Jakarta Sans + Inter é geométrico contra humanista — títulos com peso e presença, corpo de texto altamente legível em densidade de tabela. JetBrains Mono existe para dar precisão técnica a IDs e timestamps, mas a aplicação ainda é inconsistente no código atual.
+**Caráter:** fonte única (Manrope), geométrica e arredondada nos terminais — hierarquia vem de peso e tamanho, não da troca de família. Substituiu o par Plus Jakarta Sans + Inter a partir do redesign visual iniciado em 2026-07 (primeira página convertida: login). JetBrains Mono existe para dar precisão técnica a IDs e timestamps, mas a aplicação ainda é inconsistente no código atual.
 
 ### Hierarchy
 - **Display** (font-semibold 600, `text-2xl`/24px, tracking-tight): título de página (`_page_header.html`). No hero do login, escala para `text-4xl`/`text-5xl` font-black — único lugar onde o sistema usa peso máximo, reservado para o momento de entrada.
 - **Title** (font-bold, `text-base`–`text-xl`): títulos de card, cabeçalhos de seção.
 - **Body** (font-normal/medium, `text-sm`/14px, line-height 1.5): texto corrido, células de tabela, formulários. Compatível com densidade alta — tabelas correm bem além de 75ch quando necessário.
 - **Label** (font-black 900, `text-[10px]`–`text-xs`, tracking-widest, uppercase): badges de status, rótulo "DIGITAL ANDON" na navbar, cabeçalhos de coluna. A camada "micro-tipografia" do sistema — precisão, não decoração.
-- **Mono** (font-medium, `text-xs`, JetBrains Mono): reservado para identificadores técnicos. Atualmente presente em 5 templates administrativos; **ainda não aplicado ao número do chamado na tabela do dashboard**, que hoje usa `font-black` em Inter.
+- **Mono** (font-medium, `text-xs`, JetBrains Mono): reservado para identificadores técnicos. Atualmente presente em 5 templates administrativos; **ainda não aplicado ao número do chamado na tabela do dashboard**, que hoje usa `font-black` em Manrope.
 
 ### Named Rules
-**A Regra Macro/Micro.** Hierarquia de página usa peso (Plus Jakarta Sans bold/black); hierarquia de dado usa tamanho + tracking (Inter uppercase tracking-widest). As duas nunca se misturam no mesmo elemento.
+**A Regra Macro/Micro.** Hierarquia de página usa peso (Manrope bold/black); hierarquia de dado usa tamanho + tracking (Manrope uppercase tracking-widest). As duas nunca se misturam no mesmo elemento.
 
 ## 4. Elevation
 
@@ -179,8 +180,9 @@ O sistema é **em camadas (layered)**, não flat. Sombras têm papel estrutural:
 - **Estado pendente de implementação:** o plano original previa um indicador pulsante (`animate-ping`) no badge "Aberto" para chamar atenção visual; **não está implementado no código atual**.
 
 ### Cards / Containers
-- **Canto:** `rounded-dtx-md` (8px).
-- **Fundo:** `surface-base` (branco / `#131C27` no dark).
+- **Canto:** `rounded-dtx-md` (8px) nas superfícies de densidade (tabelas, dashboards, formulários administrativos).
+- **Canto — superfícies "bento" (redesign visual):** `rounded-dtx-xl` (24px), com sub-blocos internos em `rounded-dtx-lg` (12px). Introduzido em 2026-07, hoje em `login.html` e `formulario.html`; demais páginas migram pra esse padrão conforme o rollout avança (ver plano de redesign).
+- **Fundo:** `surface-base` (branco).
 - **Sombra:** `dtx` em repouso; `.dtx-card-raised` adiciona `border-top: 3px solid dtx-500` + sombra `dtx-md` para cards de destaque/métrica.
 - **Borda:** 1px `surface-border`.
 - **Padding interno:** `1rem` (16px) como base.
@@ -191,27 +193,30 @@ O sistema é **em camadas (layered)**, não flat. Sombras têm papel estrutural:
 - **Placeholder:** cor `surface-muted`.
 
 ### Navigation
-- **Navbar:** fundo sólido `nav-bg` (`#13274b` light / `#0D1117` dark — funde com o canvas no escuro), sticky, `z-[200]`. Links inativos em `nav-text` (azul-acinzentado), ativos em branco sobre `bg-white/15` com borda `white/20`.
+- **Navbar:** fundo sólido `nav-bg` (`#13274b`), sticky, `z-nav`. Links inativos em `nav-text` (azul-acinzentado), ativos em branco sobre `bg-white/15` com borda `white/20`.
 - **Hover de link:** `bg-white/10`, sem mudança de cor abrupta.
-- **Mobile/dropdown:** menu hambúrguer volta a um fundo claro (`surface-base`) para legibilidade, mesmo com a navbar escura — transição intencional de contexto.
+- **Mobile/dropdown:** menu hambúrguer volta a um fundo claro (`surface-base`) para legibilidade, mesmo com a navbar escura — transição intencional de contexto (a navbar é estruturalmente escura por design, não é "dark mode").
 - **Toque:** todo alvo interativo da navbar tem `min-w-[44px] min-h-[44px]`.
 
 ### Tabelas (componente de assinatura)
-A tabela de chamados é o componente mais denso do sistema — funciona como telemetria, não como lista genérica. Cabeçalho `sticky` em `surface-raised`, linhas com hover em `dtx-accent-muted` (mix de 6% do azul sobre o fundo). Uma categoria (`Projetos`) recebe destaque visual via fundo rosa + faixa lateral — ver Do's e Don'ts sobre esse padrão.
+A tabela de chamados é o componente mais denso do sistema — funciona como telemetria, não como lista genérica. Cabeçalho `sticky` em `surface-raised`, linhas com hover em `dtx-accent-muted` (mix de 6% do azul sobre o fundo). Uma categoria (`Projetos`) recebe destaque visual via fundo rosa tintado (sem faixa lateral — ver Do's e Don'ts).
 
 ## 6. Do's and Don'ts
 
 ### Do:
-- **Do** usar o par de tokens `:root` / `html.dark` para qualquer cor nova — nunca um hex hardcoded que só funciona em um tema.
+- **Do** usar o token semântico em `:root` pra qualquer cor nova — nunca um hex hardcoded solto no template.
 - **Do** reservar gradiente para uma única ação primária por tela (Regra do Destaque Único).
-- **Do** usar `.dtx-card-raised` (borda superior de 3px na cor do destaque) quando um card precisa de ênfase — esse é o padrão sancionado de "card importante".
+- **Do** usar `.dtx-card-raised` (borda superior de 3–4px na cor do destaque, cantos superiores retos via `rounded-t-none`/`rounded-b-*`) quando um card ou callout precisa de ênfase — esse é o padrão sancionado de "card importante", aplicado em `_stat_card.html`, `_filter_panel.html`, `historico.html`, `visualizar_chamado.html` e no flash toast.
+- **Do** usar fundo tintado (sem borda) para sinalizar uma linha de tabela (`<tr>`) — é o padrão em `_ticket_row_dashboard.html`, `_ticket_row_meus_chamados.html` e `_rl_header.html` para a categoria "Projetos"/agrupamento RL.
+- **Do** usar a escala semântica de z-index do `tailwind.config.js` (`z-sticky: 10`, `z-nav: 20`, `z-dropdown: 30`, `z-modal: 40`, `z-toast: 50`) para qualquer elemento novo com posicionamento fixo/sticky/absoluto — nunca um valor `z-[N]` arbitrário. O link de skip-to-content é a única exceção deliberada, em `z-[9999]`, pois deve renderizar acima de absolutamente tudo, inclusive toasts.
 - **Do** manter alvos de toque ≥44×44px em qualquer elemento interativo da navbar e células de tabela com ação.
-- **Do** testar toda decisão visual nos dois temas — escritório (light) e chão de fábrica (dark) — antes de considerar um componente pronto.
+- **Do** testar toda decisão visual pros dois públicos — escritório e chão de fábrica — dentro do único tema light, verificando contraste em condições de luz industrial antes de considerar um componente pronto.
 
 ### Don't:
-- **Don't** usar `border-left`/`border-right` colorido como faixa de destaque — é a versão lateral do `.dtx-card-raised` e está banida pelo sistema. **Hoje esse padrão já existe em 8 arquivos** (`_stat_card.html`, `_ticket_row_dashboard.html` e outros, ex.: `border-l-4 border-l-amber-400`, `border-l-2 border-l-rose-400` para sinalizar a categoria "Projetos") — é dívida visual herdada do plano anterior, não um padrão a replicar. Substituir por fundo tintado, ícone líder ou a borda-superior já sancionada.
+- **Don't** reintroduzir dark mode (`html.dark`, toggle, `prefers-color-scheme`). *(Removido em 2026-07-01 por decisão de produto: sistema é light-only; acessibilidade pro chão de fábrica vem de contraste alto dentro do próprio tema claro — ver PRODUCT.md.)*
+- **Don't** usar `border-left`/`border-right` colorido como faixa de destaque — é a versão lateral do `.dtx-card-raised` e está banida pelo sistema. *(Resolvido em 2026-07-01: as 8 ocorrências foram migradas para borda-superior em boxes/cards ou fundo tintado em linhas de tabela — ver Do's acima.)*
 - **Don't** deixar a paleta "conservadora demais" — o Azul DTX hoje só aparece em `dtx-600`/navbar na maior parte das telas; cor de status deve carregar mais peso informativo nas tabelas e dashboards, não só nos badges.
-- **Don't** usar valores de z-index arbitrários (`z-[200]`, `z-[210]`, `z-[250]`) quando a escala semântica já existe em `tailwind.config.js` (`z-nav: 10`, `z-dropdown: 20`, `z-modal: 30`, `z-toast: 50`) — a navbar, o dropdown e os toasts hoje usam números mágicos em vez da escala configurada; migrar para os tokens semânticos.
+- **Don't** usar valores de z-index arbitrários (`z-[N]`) quando a escala semântica existe. *(Resolvido em 2026-07-01: navbar, dropdowns, toasts, banners, modais e cabeçalhos sticky de tabela foram migrados para `z-sticky`/`z-nav`/`z-dropdown`/`z-modal`/`z-toast`. Como parte do fix, os banners de web push — antes em `z-[190]`, abaixo dos dropdowns da navbar — foram promovidos para o mesmo nível `z-toast` das flash messages, corrigindo uma inconsistência real onde dois elementos igualmente "toast" tinham prioridades de empilhamento diferentes.)*
 - **Don't** carregar JetBrains Mono sem aplicá-la de forma consistente — hoje a fonte está no `<link>` do `base.html` e usada em apenas 5 templates administrativos; ou ela vira o padrão para todo ID/timestamp técnico (incluindo o número do chamado na tabela do dashboard), ou o `<link>` deve ser removido para não pagar o custo de carregamento de uma fonte não utilizada.
 - **Don't** referenciar o nome de produto "Digital Andon" em código novo — o nome foi descontinuado; o nome oficial atual é **DTX Service Portal**. A navbar (`components/navbar.html`) ainda exibe "DIGITAL ANDON" como rótulo da marca e precisa de atualização em um passo futuro.
 - **Don't** parecer um SaaS genérico: nada de cards flutuantes sem propósito, paleta usada como decoração, ou flat design sem hierarquia (anti-referência direta do PRODUCT.md).
