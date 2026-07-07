@@ -60,16 +60,18 @@ A organização que opera o sistema deve garantir os direitos previstos na LGPD,
 
 | Direito        | Art. LGPD | Como atender                                                                 |
 |----------------|-----------|-------------------------------------------------------------------------------|
-| **Acesso**     | Art. 18, I | Fornecer cópia dos dados pessoais do titular (exportação por usuário/admin). |
+| **Acesso**     | Art. 18, I | **Implementado** — página `/meus-dados` (`app/routes/auth.py:meus_dados`): qualquer usuário autenticado vê nome, e-mail, perfil, áreas, MFA e forma de login. |
 | **Correção**   | Art. 18, III | Permitir edição de dados incompletos/desatualizados (ex.: tela de edição de usuário). |
-| **Exclusão**   | Art. 18, VI | Excluir dados quando não houver base legal (ex.: remoção de usuário e anonimização de histórico). |
-| **Portabilidade** | Art. 18, V | Fornecer dados em formato estruturado (ex.: export em JSON/planilha).        |
+| **Exclusão**   | Art. 18, VI | **Implementado em duas etapas** — ver detalhe abaixo (desativação reversível → anonimização sob demanda). |
+| **Portabilidade** | Art. 18, V | Fornecer dados em formato estruturado (ex.: export em JSON/planilha) — não implementado; ver backlog. |
 | **Revogação do consentimento** | Art. 18, IX | Onde houver tratamento baseado em consentimento, permitir revogação.   |
 
-**Sugestão de implementação** (opcional no código):
+**Exclusão de dados — fluxo em duas etapas (implementado):**
 
-- Endpoint ou script para **exportação dos dados do titular** (por e-mail ou ID), em formato legível.
-- Processo de **exclusão/anonymização** de usuário e vínculos (chamados/histórico), com registro em log para auditoria.
+1. **Desativação** (`POST /admin/usuarios/<id>/desativar`) — reversível. Marca `ativo=False`, bloqueia login e invalida sessão ativa. Os dados pessoais (nome, e-mail) permanecem intactos, permitindo reverter via `/admin/usuarios/<id>/ativar`.
+2. **Anonimização** (`POST /admin/usuarios/<id>/anonimizar`) — **irreversível**, ação separada e deliberada do admin. Só é permitida para contas já desativadas. Sobrescreve `nome` para "Usuário Removido" e `email` para um valor sintético (`removido-<id>@anonimizado.invalid`), preservando o registro do chamado/histórico associado (sem dado pessoal identificável). Toda ação (criação, edição, desativação, ativação, exclusão, anonimização) fica registrada em `historico_usuarios` (`app/services/historico_usuario_service.py`) com admin responsável e timestamp, para auditoria.
+
+Não existe exclusão física imediata de linha no Firestore ao desativar — isso é intencional: a anonimização é o mecanismo de "esquecimento" real, e é acionada manualmente pelo admin quando desejado, não automaticamente ao desativar.
 
 ---
 

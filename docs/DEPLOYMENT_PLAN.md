@@ -1,8 +1,86 @@
 # Plano de Deployment — Sistema de Chamados DTX
 
-> **Modelo de deploy atual:** container Docker em servidor local/on-premise.
-> O projeto **não usa mais GCP/Cloud Run/Cloud Build**. Banco: Firestore.
-> Anexos: Cloudflare R2 (fallback Firebase Storage). E-mail: Microsoft Graph API.
+> **Dois caminhos documentados:** (A) container Docker em servidor próprio/on-premise
+> (seção "Passo 1" em diante) ou (B) **Azure Container Apps** — hospedagem gerenciada
+> gratuita (seção abaixo), sem precisar de servidor nem Docker instalado localmente.
+> Banco: Firestore. Anexos: Cloudflare R2 (fallback Firebase Storage). E-mail: Microsoft Graph API.
+
+---
+
+## Deploy no Azure Container Apps (free tier)
+
+Caminho recomendado quando não há servidor próprio disponível. Usa a mesma imagem
+Docker já existente no repo (`Dockerfile`), sem precisar de Docker instalado na
+máquina de desenvolvimento — o build acontece no GitHub Actions.
+
+**Por que Container Apps:** o plano Consumption tem cota **sempre gratuita mensal**
+(180.000 vCPU-segundos, 360.000 GiB-segundos de memória, 2 milhões de requisições/mês,
+por assinatura) — não é um trial de 30 dias. Com `min-replicas=0` (escala a zero
+quando ocioso), um sistema interno de baixo tráfego tende a ficar dentro da cota o
+mês inteiro. HTTPS gerenciado incluso no domínio `*.azurecontainerapps.io`.
+
+**Trade-off:** com `min-replicas=0` a primeira requisição após período ocioso sofre
+cold start (alguns segundos para o container subir). Para eliminar isso seria preciso
+`min-replicas=1`, o que sai da faixa gratuita (~US$10-15/mês estimado).
+
+### B.1 — Build automático da imagem (já configurado)
+
+O workflow `.github/workflows/cd-build-image.yml` builda a imagem a cada push em
+`main` e publica em `ghcr.io/matheusth16/sistema-chamados-dtx:latest` (repositório
+público — sem necessidade de token/PAT para o Azure puxar a imagem).
+
+### B.2 — Criar os recursos no Azure (via Portal, uma vez)
+
+1. **Criar um Container Apps Environment** (Portal → "Container Apps" → Create →
+   aba Environment: criar novo, região `Brazil South` se disponível).
+2. **Criar o Container App:**
+   - Imagem: `ghcr.io/matheusth16/sistema-chamados-dtx:latest` (registro "Docker Hub or other registries", sem credencial — imagem pública).
+   - Ingress: **Enabled**, **HTTPS only**, Traffic: **Accepting traffic from anywhere**, target port `8080`.
+   - Scale: **min replicas 0**, **max replicas 1** (subir depois se necessário).
+   - Recursos: 0.5 vCPU / 1 GiB costuma bastar para uso interno leve.
+3. **Variáveis de ambiente / secrets** (Container App → Settings → Secrets, depois referenciar nas Environment variables) — usar como base o `.env.example`:
+   - `FLASK_ENV=production`
+   - `SECRET_KEY` (gerar com `openssl rand -hex 32`)
+   - `HEALTH_SECRET` (gerar com `python -c "import secrets; print(secrets.token_urlsafe(32))"`)
+   - `GOOGLE_CREDENTIALS_JSON` (conteúdo do `credentials.json` em uma linha — usar como **secret**, não env var em texto plano)
+   - `GRAPH_TENANT_ID`, `GRAPH_CLIENT_ID`, `GRAPH_CLIENT_SECRET` (secret), `GRAPH_SENDER_EMAIL`
+   - `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` (secret), `R2_BUCKET_NAME`, `R2_PUBLIC_URL` (se usar R2 para anexos)
+   - `APP_BASE_URL` — só dá pra preencher **depois** de criar o app (passo B.3), pois depende do FQDN gerado.
+4. Criar o Container App. O Azure gera um FQDN do tipo `sistema-chamados.<sufixo>.<região>.azurecontainerapps.io`.
+
+### B.3 — Segunda passada: fechar o APP_BASE_URL
+
+1. Copiar o FQDN gerado.
+2. Voltar em Settings → Environment variables e definir `APP_BASE_URL=https://<fqdn>`.
+3. Salvar — isso cria uma nova revisão automaticamente.
+
+### B.4 — Validar
+
+```bash
+curl -I https://<fqdn>/login        # deve responder 200 (ou 302 se já tiver sessão)
+curl https://<fqdn>/health          # {"status": "ok"}
+```
+
+Rodar também o checklist funcional do "Passo 3" abaixo (login, dashboard, criar
+chamado, upload de anexo, exportação).
+
+### B.5 — Atualizações futuras
+
+Cada push em `main` gera uma nova imagem `:latest` no GHCR automaticamente. Para o
+Container App puxar a versão nova:
+- Portal → Container App → Revisions and replicas → Create new revision (mesma
+  imagem `:latest`, force pull), **ou**
+- instalar o Azure CLI localmente e rodar:
+  ```bash
+  az containerapp update -n sistema-chamados -g <resource-group> \
+    --image ghcr.io/matheusth16/sistema-chamados-dtx:latest
+  ```
+
+### B.6 — Índices Firestore e demais passos operacionais
+
+Os passos "Passo 4" (anexos), "Passo 5" (índices Firestore), criptografia PII e
+job de contadores de uso abaixo se aplicam igualmente a este caminho — são
+independentes de onde o container roda.
 
 ---
 

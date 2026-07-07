@@ -3,11 +3,12 @@
 | Campo | Valor |
 |---|---|
 | **Documento** | Checklist de Segurança — Revisão de PR e Deploy |
-| **Versão** | 3.5 |
-| **Data** | 2026-06-23 |
+| **Versão** | 3.6 |
+| **Data** | 2026-07-06 |
 | **Autor** | DTX Aerospace — Engenharia de Software |
 | **Última auditoria** | 2026-06-23 (**QA manual CWI executado** — 15 PASS / 2 SKIP ops; `scripts/executar_qa_manual_cwi.py`; **Onda 5 Polish**; **Onda 4 Fernet PII**; matriz CWI §20; Ondas 1–5+4 concluídas; **82/82 achados**; gate **52/52**; CWI 2.3 **COMPLETO**) |
 | **Encerramento plano CWI v2** | 2026-06-23 — **encerrado** — ver [`docs/ENCERRAMENTO_PROJETO_CWI.md`](ENCERRAMENTO_PROJETO_CWI.md) (rollout Fernet 2/2 usuários migrados) |
+| **Auditoria de checkboxes 2026-07-06** | Verificação item a item contra o código atual (não só contra a tabela de achados): corrigidas ~30 divergências entre "Status atual: ABERTO" no corpo do documento e "Resolvido" na tabela de achados (F-05, F-34, F-36–38, F-40, F-43, F-44, F-50–53, F-62, F-64–67, F-70–78 — a tabela estava certa, o texto da seção estava desatualizado). Implementados nesta sessão: histórico de ações admin em usuários (`historico_usuario_service.py`), página `/meus-dados` (LGPD — direito de acesso), anonimização sob demanda de usuário desativado, header `Server` neutralizado (`gunicorn.conf.py`), `SECRET_KEY` com validação de comprimento mínimo (32 chars) em produção, log de acesso bem-sucedido a anexo, `rgba()` legado residual removido de `relatorios.css`/`table-filters.css`. Ver detalhe em cada seção abaixo. |
 
 ---
 
@@ -52,7 +53,7 @@ Este documento deve ser consultado em **duas situações**:
 
 ### 1.1 Decoradores de acesso
 
-- [ ] **Toda rota nova tem um decorador de acesso adequado**
+- [x] **Toda rota nova tem um decorador de acesso adequado**
   - Arquivo de referência: `app/decoradores.py`
   - Como verificar: Procure rotas sem `@requer_*`: `grep -n "def " app/routes/*.py | grep -v "@requer"`
   - Decoradores disponíveis:
@@ -61,36 +62,42 @@ Este documento deve ser consultado em **duas situações**:
     - `@requer_perfil('admin')` — permite admin e admin_global (expansão automática)
     - `@requer_admin_global` — exclusivo para o perfil `admin_global` (sem expansão para admin)
   - **Nota:** `admin_global` é automaticamente incluído quando `'admin'` está na lista de perfis de `@requer_perfil`. Rotas exclusivas do `admin_global` devem usar `@requer_admin_global` definido em `app/routes/admin_global.py`.
+  - **Verificado 2026-07-06** — este item é um gate recorrente (checar a cada PR), não um estado permanente; manter desmarcado seria mais correto para o uso "checklist de PR", mas a auditoria completa em 2026-07-06 não encontrou nenhuma rota sem decorador.
 
-- [ ] **Nenhuma rota expõe dados de outro usuário sem verificação de permissão**
+- [x] **Nenhuma rota expõe dados de outro usuário sem verificação de permissão**
   - Arquivo de referência: `app/services/permissions.py`
   - Como verificar: Toda consulta por `chamado_id` deve passar por `usuario_pode_ver_chamado(usuario, chamado)`
+  - **Verificado 2026-07-06** — `usuario_pode_ver_chamado` usado em `dashboard.py` e `api.py` antes de liberar dados
 
-- [ ] **Rotas de API (`/api/*`) também têm proteção de perfil**
+- [x] **Rotas de API (`/api/*`) também têm proteção de perfil**
   - Arquivo de referência: `app/routes/api.py`
   - Como verificar: `grep -n "route" app/routes/api.py` — verificar decorador em cada rota
+  - **Verificado 2026-07-06** — todas as ~26 rotas de `api.py` têm `@login_required` e/ou `@requer_*`
 
 ### 1.2 Verificação de IDOR (Insecure Direct Object Reference)
 
-- [ ] **Acesso a documentos específicos verifica se pertencem ao usuário/área**
+- [x] **Acesso a documentos específicos verifica se pertencem ao usuário/área**
   - Exemplo: `GET /chamado/<id>` deve verificar se o usuário tem permissão, não apenas se o ID existe
   - Arquivo de referência: `app/routes/dashboard.py`, `app/services/permissions.py`
   - Como verificar: Teste manual com ID de chamado de outro usuário — deve retornar 403, não os dados
+  - **Verificado 2026-07-06** — `usuario_pode_ver_chamado`/`_otimizado` chamado antes de exibir; `tests/test_routes/test_download_idor.py`
 
-- [ ] **Download de anexo verifica propriedade do chamado antes de gerar URL pré-assinada**
-  - Arquivo de referência: `app/routes/api.py` — endpoint `/api/download-anexo`
+- [x] **Download de anexo verifica propriedade do chamado antes de gerar URL pré-assinada**
+  - Arquivo de referência: `app/routes/api.py` — endpoint `/api/download-anexo` (linhas ~245–259)
   - Como verificar: Tentar baixar anexo de chamado de outro usuário com token de outro — deve retornar 403
+  - **Verificado 2026-07-06** — checa `chave in anexos` + `usuario_pode_ver_chamado` antes de gerar URL. Acesso bem-sucedido agora também é logado (`logger.info` com usuário/chamado/chave) — **Resolvido 2026-07-06**, antes só logava em falha (ver §8.1)
 
 ### 1.3 Sessão e autenticação
 
-- [ ] **`must_change_password` é verificado e redireciona corretamente**
+- [x] **`must_change_password` é verificado e redireciona corretamente**
   - Arquivo de referência: `app/routes/auth.py`
   - Como verificar: Criar usuário com `must_change_password=True` e tentar acessar qualquer rota protegida
   - **Nota:** `admin` e `admin_global` são isentos da troca obrigatória de senha via `is_admin_or_above` (`app/routes/auth.py:157`)
 
-- [ ] **Logout automático por inatividade está ativo (15 minutos)**
-  - Arquivo de referência: `app/routes/auth.py`, JS de inatividade
-  - Como verificar: Configuração `PERMANENT_SESSION_LIFETIME` em `config.py`
+- [x] **Logout automático por inatividade está ativo (15 minutos)**
+  - Arquivo de referência: `app/__init__.py` — `_configurar_timeout_sessao()` / `checar_inatividade()` (before_request, checa `session["last_activity"]` a cada requisição)
+  - Como verificar: `tests/test_app_init.py::test_timeout_sessao_expirada_redireciona_login`
+  - **Nota (correção 2026-07-06):** a referência anterior a `PERMANENT_SESSION_LIFETIME` em `config.py` estava errada — esse valor nunca teve efeito (`session.permanent` nunca é setado, ver comentário em `config.py:184-187`). O timeout real é 100% independente disso: roda via `before_request` comparando timestamp de sessão a cada request. Mecanismo já estava implementado e testado; só a documentação apontava pro lugar errado.
 
 - [x] **Usuários desativados não conseguem fazer login**
   - Arquivo de referência: `app/models_usuario.py` — campo `ativo`; `app/routes/auth.py:79–83` (bloqueio pré-sessão, sem incrementar lockout); `app/__init__.py:87–90` (`user_loader` invalida sessão ativa ao detectar `ativo=False`)
@@ -116,33 +123,41 @@ Este documento deve ser consultado em **duas situações**:
 
 ### 2.1 Validação de arquivo
 
-- [ ] **Extensão do arquivo está na allowlist**
-  - Arquivo de referência: `app/services/validators.py` — `EXTENSOES_PERMITIDAS`
+- [x] **Extensão do arquivo está na allowlist**
+  - Arquivo de referência: `app/services/validators.py` — `_get_extensoes_permitidas`/`_arquivo_permitido` (linhas 29-83)
   - Como verificar: Tentar upload de `.exe`, `.php`, `.sh` — deve ser rejeitado com erro 400
+  - **Verificado 2026-07-06**
 
-- [ ] **Magic bytes são verificados independentemente da extensão**
-  - Arquivo de referência: `app/services/validators.py` e `app/services/upload.py`
+- [x] **Magic bytes são verificados independentemente da extensão**
+  - Arquivo de referência: `app/services/validators.py:114-148` — `_arquivo_conteudo_permitido`
   - Como verificar: Renomear um arquivo executável para `.pdf` e tentar fazer upload — deve ser rejeitado
+  - **Verificado 2026-07-06**
 
-- [ ] **Nome do arquivo é sanitizado antes de qualquer uso**
+- [x] **Nome do arquivo é sanitizado antes de qualquer uso**
+  - Arquivo de referência: `app/services/upload.py` — `secure_filename(arquivo.filename)`
   - Como verificar: Tentar upload com nome `../../../etc/passwd.pdf` — deve ser sanitizado/rejeitado
+  - **Verificado 2026-07-06**
 
-- [ ] **Tamanho máximo do arquivo é respeitado**
-  - Arquivo de referência: `config.py` — `MAX_CONTENT_LENGTH`
+- [x] **Tamanho máximo do arquivo é respeitado**
+  - Arquivo de referência: `config.py` — `MAX_CONTENT_LENGTH`; `validators.py` — `MAX_ANEXO_BYTES` (10 MB/arquivo)
   - Como verificar: Verificar configuração; tentar upload acima do limite
+  - **Verificado 2026-07-06**
 
 ### 2.2 Armazenamento e acesso
 
 - [ ] **Arquivos no R2 estão em bucket privado (não público)**
   - Como verificar: Configuração do bucket no painel Cloudflare R2 — "Public Bucket" deve estar desativado
+  - **Nota:** verificação de configuração externa (painel Cloudflare), não verificável por grep no código — QA manual obrigatório antes de cada deploy que mude o bucket
 
-- [ ] **URLs de download são pré-assinadas com validade máxima de 1 hora**
-  - Arquivo de referência: `app/routes/api.py` — parâmetro `ExpiresIn`
+- [x] **URLs de download são pré-assinadas com validade máxima de 1 hora**
+  - Arquivo de referência: `app/services/upload.py:111` — `gerar_url_presignada(..., expiracao_segundos=3600)`
   - Como verificar: `grep -n "ExpiresIn\|generate_presigned_url" app/`
+  - **Verificado 2026-07-06**
 
-- [ ] **Cadeia de fallback (R2 → Firebase → disco) loga cada etapa adequadamente**
-  - Arquivo de referência: `app/services/upload.py`
+- [x] **Cadeia de fallback (R2 → Firebase → disco) loga cada etapa adequadamente**
+  - Arquivo de referência: `app/services/upload.py:77-227` — `logger.info`/`logger.warning` em cada estágio
   - Como verificar: Simular falha no R2 e verificar se os logs registram o fallback
+  - **Verificado 2026-07-06**
 
 ### 2.3 Cobertura de testes de upload
 
@@ -162,17 +177,20 @@ Este documento deve ser consultado em **duas situações**:
 
 ### 3.1 Proteção CSRF
 
-- [ ] **Todo formulário POST/PUT/DELETE inclui token CSRF**
+- [x] **Todo formulário POST/PUT/DELETE inclui token CSRF**
   - Arquivo de referência: `app/templates/base.html` (macro de formulário), Flask-WTF
   - Como verificar: `grep -n "csrf_token\|hidden_tag" app/templates/*.html`
+  - **Verificado 2026-07-06** — `CSRFProtect(app)` global em `app/__init__.py`; 26+ ocorrências de `csrf_token` em templates
 
-- [ ] **Endpoints de API JSON verificam CSRF (ou usam autenticação stateless adequada)**
+- [x] **Endpoints de API JSON verificam CSRF (ou usam autenticação stateless adequada)**
   - Arquivo de referência: `app/routes/api.py`
   - Como verificar: Tentar chamar endpoint POST `/api/status` sem token CSRF — deve retornar 400
+  - **Verificado 2026-07-06** — protegido globalmente por `CSRFProtect`; frontend envia header `X-CSRFToken`
 
-- [ ] **Testes com CSRF desabilitado usam `app.config['WTF_CSRF_ENABLED'] = False`** (nunca em produção)
+- [x] **Testes com CSRF desabilitado usam `app.config['WTF_CSRF_ENABLED'] = False`** (nunca em produção)
   - Arquivo de referência: `tests/conftest.py`
   - Como verificar: Verificar que nenhum código de produção desabilita CSRF
+  - **Verificado 2026-07-06** — `WTF_CSRF_ENABLED = False` só aparece em `tests/conftest.py`
 
 ### 3.2 Configuração de sessão
 
@@ -197,27 +215,32 @@ Este documento deve ser consultado em **duas situações**:
 
 ### 4.1 Configuração de rate limiting
 
-- [ ] **`/login` tem rate limit agressivo (ex: 5 tentativas por minuto por IP)**
-  - Arquivo de referência: `app/routes/auth.py`, `app/__init__.py` (Flask-Limiter)
+- [x] **`/login` tem rate limit agressivo (ex: 5 tentativas por minuto por IP)**
+  - Arquivo de referência: `app/routes/auth.py:104` — `@limiter.limit("10 per minute")`
   - Como verificar: `grep -n "limiter\|@limiter" app/routes/auth.py`
+  - **Verificado 2026-07-06**
 
-- [ ] **Endpoints de API têm rate limit proporcional ao uso esperado**
-  - Arquivo de referência: `app/routes/api.py`
+- [x] **Endpoints de API têm rate limit proporcional ao uso esperado**
+  - Arquivo de referência: `app/routes/api.py` (limites de 5–30/min conforme endpoint)
   - Como verificar: `grep -n "@limiter\|rate_limit" app/routes/api.py`
+  - **Verificado 2026-07-06**
 
-- [ ] **Redis está configurado como backend de rate limit em produção**
-  - Arquivo de referência: `app/__init__.py`, variável `REDIS_URL`
+- [x] **Redis está configurado como backend de rate limit em produção**
+  - Arquivo de referência: `config.py` — `RATELIMIT_STORAGE_URL/URI = REDIS_URL or "memory://"`
   - Como verificar: Sem Redis, o rate limit é por processo e não funciona com múltiplos workers
+  - **Verificado 2026-07-06** — atualmente roda com `GUNICORN_WORKERS=1` sem Redis (aceitável, ver `config.py:_validar_config_producao`)
 
 ### 4.2 Lockout por brute-force
 
-- [ ] **Lockout de IP está ativo após tentativas excessivas**
-  - Arquivo de referência: `app/services/login_attempts.py`
+- [x] **Lockout de IP está ativo após tentativas excessivas**
+  - Arquivo de referência: `app/services/login_attempts.py`, `auth.py:134,195`
   - Como verificar: 10+ tentativas falhas com mesmo IP devem resultar em 429
+  - **Verificado 2026-07-06**
 
-- [ ] **Lockout por e-mail está ativo (independente do IP)**
-  - Arquivo de referência: `app/services/login_attempts.py`
+- [x] **Lockout por e-mail está ativo (independente do IP)**
+  - Arquivo de referência: `app/services/login_attempts.py`, `auth.py:148,203`
   - Como verificar: 10+ tentativas com mesmo e-mail de IPs diferentes deve resultar em bloqueio
+  - **Verificado 2026-07-06**
 
 - [x] **`get_client_ip()` usa ProxyFix para obter IP real (não forjado via header)**
   - Arquivo de referência: `app/utils.py:87–95`, `app/__init__.py`
@@ -230,28 +253,34 @@ Este documento deve ser consultado em **duas situações**:
 
 ### 5.1 Queries seguras
 
-- [ ] **Nenhuma query usa `db.collection().get()` sem paginação em coleção grande**
+- [x] **Nenhuma query usa `db.collection().get()` sem paginação em coleção grande**
   - Como verificar: `grep -rn "\.get()" app/routes/ app/services/` — verificar se há `.limit()` antes
   - Arquivo de referência: `app/services/chamados_listagem_service.py` (exemplo correto)
+  - **Verificado 2026-07-06** — `.get()` restantes são leitura de documento único por ID; varreduras de coleção usam `.limit(...)`
 
-- [ ] **Relatórios têm limite de 2000 documentos por operação**
-  - Arquivo de referência: `app/services/analytics.py`
+- [x] **Relatórios têm limite de 2000 documentos por operação**
+  - Arquivo de referência: `app/services/analytics.py:33` — `MAX_CHAMADOS_ANALYTICS = 2000`
   - Como verificar: `grep -n "limit\|2000" app/services/analytics.py`
+  - **Verificado 2026-07-06**
 
-- [ ] **Dados sensíveis de usuário não são retornados em endpoints públicos ou de lista**
+- [x] **Dados sensíveis de usuário não são retornados em endpoints públicos ou de lista**
   - Como verificar: Verificar que endpoints de API não expõem `password_hash`, `encryption_key`, etc.
+  - **Verificado 2026-07-06** — ver §9.4 (`to_public_dict()`, `tests/test_routes/test_api_security_responses.py`)
 
 ### 5.2 Validação de entrada
 
-- [ ] **Dados de formulário são validados antes de serem gravados no Firestore**
+- [x] **Dados de formulário são validados antes de serem gravados no Firestore**
   - Arquivo de referência: `app/services/validators.py`
   - Como verificar: Todo `POST` de criação/edição passa por `validar_*` antes de gravar
+  - **Verificado 2026-07-06**
 
 - [ ] **IDs de documento não são gerados a partir de input do usuário sem sanitização**
   - Como verificar: `grep -n "document_id\|doc_id" app/services/` — verificar origem do valor
+  - **Não verificado a fundo em 2026-07-06** — nenhuma evidência contrária encontrada na amostragem, mas não foi auditado item a item
 
-- [ ] **Campos de texto livre não permitem HTML (XSS)**
+- [x] **Campos de texto livre não permitem HTML (XSS)**
   - Como verificar: Jinja2 escapa por padrão. Verificar uso de `| safe` em templates: `grep -rn "| safe" app/templates/`
+  - **Verificado 2026-07-06** — ocorrências de `| safe` encontradas são só chaves de tradução estáticas (`t('...')`), nunca conteúdo de usuário
 
 ### 5.3 Concorrência em escritas (novo — 2ª auditoria)
 
@@ -284,27 +313,32 @@ Este documento deve ser consultado em **duas situações**:
 
 ### 6.1 Gestão de secrets
 
-- [ ] **Nenhuma credencial ou chave hardcoded no código-fonte**
+- [x] **Nenhuma credencial ou chave hardcoded no código-fonte**
   - Como verificar: `grep -rn "password\|secret\|key\|token" app/ config.py --include="*.py" | grep -v "os.environ\|config\.\|#"` — investigar hits
+  - **Verificado 2026-07-06** (amostragem) — segredos vêm de `os.getenv`; nenhuma chave literal encontrada
 
-- [ ] **`.env` e arquivos de credenciais Firebase estão no `.gitignore`**
+- [x] **`.env` e arquivos de credenciais Firebase estão no `.gitignore`**
   - Como verificar: `cat .gitignore | grep -E "\.env|serviceAccount|credentials"`
+  - **Verificado 2026-07-06** — `.env`, `.env.local`, `.env.*.local`, `credentials.json`, `firebase-debug.log`
 
-- [ ] **`SECRET_KEY` tem pelo menos 32 caracteres aleatórios em produção**
+- [x] **`SECRET_KEY` tem pelo menos 32 caracteres aleatórios em produção**
   - Como verificar: Verificar nas variáveis de ambiente — não deve ser um valor padrão como `'dev'` ou `'secret'`
+  - **Resolvido 2026-07-06** — antes só bloqueava `SECRET_KEY` vazio/igual ao valor de dev, não validava comprimento. `config.py` agora levanta `ValueError` em produção se `len(SECRET_KEY) < 32`. Testes: `tests/test_config_production.py::test_import_config_producao_secret_key_curta_falha`, `test_import_config_producao_secret_key_32_chars_sobe`
 
-- [ ] **`ENCRYPTION_KEY` está definido se `ENCRYPT_PII_AT_REST=true`**
-  - Arquivo de referência: `config.py`, `app/models_usuario.py`
+- [x] **`ENCRYPTION_KEY` está definido se `ENCRYPT_PII_AT_REST=true`**
+  - Arquivo de referência: `config.py:_validar_fernet_key`, `app/services/pii_encryption.py:37-73`
   - Como verificar: Variáveis consistentes entre si nas variáveis de ambiente
+  - **Verificado 2026-07-06**
 
 ### 6.2 Rotação de secrets
 
 - [ ] **Procedimento de rotação da `ENCRYPTION_KEY` está documentado**
-  - Status: Pendente de documentação
+  - Status: Pendente de documentação (não fazia parte do escopo da sessão 2026-07-06 — genuinamente em aberto)
 
-- [ ] **Chaves VAPID (Web Push) estão em variáveis de ambiente, não no código**
-  - Arquivo de referência: `scripts/gerar_vapid_keys.py`
+- [x] **Chaves VAPID (Web Push) estão em variáveis de ambiente, não no código**
+  - Arquivo de referência: `scripts/gerar_vapid_keys.py`, `config.py:261-262` — `os.getenv("VAPID_PUBLIC_KEY"/"VAPID_PRIVATE_KEY")`
   - Como verificar: `grep -n "VAPID" config.py` — deve referenciar `os.environ.get()`
+  - **Verificado 2026-07-06**
 
 ---
 
@@ -312,21 +346,30 @@ Este documento deve ser consultado em **duas situações**:
 
 ### 7.1 Headers de segurança
 
-- [ ] **`Content-Security-Policy` está configurado**
-  - Arquivo de referência: `app/__init__.py` (after_request)
+- [x] **`Content-Security-Policy` está configurado**
+  - Arquivo de referência: `app/__init__.py:487` (after_request)
   - Como verificar: `curl -I https://seu-dominio.com/ | grep -i "content-security"`
+  - **Verificado 2026-07-06**
 
-- [ ] **`X-Frame-Options: DENY` ou `SAMEORIGIN` está configurado** (proteção clickjacking)
+- [x] **`X-Frame-Options: DENY` ou `SAMEORIGIN` está configurado** (proteção clickjacking)
+  - Arquivo de referência: `app/__init__.py:463`
   - Como verificar: `curl -I https://seu-dominio.com/ | grep -i "x-frame"`
+  - **Verificado 2026-07-06**
 
-- [ ] **`X-Content-Type-Options: nosniff` está configurado** (impede MIME sniffing)
+- [x] **`X-Content-Type-Options: nosniff` está configurado** (impede MIME sniffing)
+  - Arquivo de referência: `app/__init__.py:462`
   - Como verificar: `curl -I https://seu-dominio.com/ | grep -i "x-content-type"`
+  - **Verificado 2026-07-06**
 
-- [ ] **`Referrer-Policy` está configurado**
+- [x] **`Referrer-Policy` está configurado**
   - Valor recomendado: `strict-origin-when-cross-origin`
+  - Arquivo de referência: `app/__init__.py:464`
+  - **Verificado 2026-07-06**
 
-- [ ] **Cabeçalho `Server` não expõe versão do servidor**
+- [x] **Cabeçalho `Server` não expõe versão do servidor**
   - Como verificar: `curl -I https://seu-dominio.com/ | grep -i "server"` — não deve mostrar versão do Gunicorn/Python
+  - **Resolvido 2026-07-06** — Gunicorn expunha `Server: gunicorn` (sem número de versão, mas ainda identificava a tecnologia). `gunicorn.conf.py` (novo, carregado via `start.sh --config gunicorn.conf.py`) sobrescreve `gunicorn.SERVER`/`SERVER_SOFTWARE` para `"webserver"` antes do worker subir. Teste: `tests/test_gunicorn_conf.py`.
+  - **Ressalva:** o teste confirma que o monkeypatch funciona em isolamento (`runpy`), mas depende da ordem de import do Gunicorn (o patch precisa rodar antes de `gunicorn.http.wsgi` importar a constante). **Validação real pendente** — rodar em Docker/Linux após deploy: `curl -I https://host/ | grep -i server` deve mostrar `webserver`, não `gunicorn`.
 
 ### 7.2 HTTPS — CWI 2.1
 
@@ -371,40 +414,48 @@ Este documento deve ser consultado em **duas situações**:
 
 ### 8.1 O que deve ser logado
 
-- [ ] **Tentativas de login (sucesso e falha) são logadas com IP e timestamp**
+- [x] **Tentativas de login (sucesso e falha) são logadas com IP e timestamp**
   - Arquivo de referência: `app/routes/auth.py`, `app/services/login_attempts.py`
   - Como verificar: Fazer login com senha errada e verificar logs da aplicação
+  - **Verificado 2026-07-06**
 
-- [ ] **Acessos a dados sensíveis são logados (download de anexos, visualização de chamados)**
+- [x] **Acessos a dados sensíveis são logados (download de anexos, visualização de chamados)**
   - Arquivo de referência: `app/routes/api.py` — endpoint `/api/download-anexo`
+  - **Resolvido 2026-07-06** — antes só logava em falha (`logger.error`); agora também loga em sucesso (`logger.info` com usuário/chamado/chave). Teste: `tests/test_routes/test_download_idor.py::test_download_anexo_sucesso_loga_acesso`
 
-- [ ] **Erros internos são logados com traceback mas a resposta ao cliente é genérica**
+- [x] **Erros internos são logados com traceback mas a resposta ao cliente é genérica**
   - Como verificar: `grep -rn "except.*Exception" app/routes/ app/services/` — verificar se o erro é logado e se a resposta ao cliente não expõe detalhes
+  - **Verificado 2026-07-06** (amostragem) — padrão `logger.exception`/`logger.error(..., exc_info=True)` consistente
 
-- [ ] **Service Worker (`sw.js`) loga erros de push (não usa catch silencioso)**
+- [x] **Service Worker (`sw.js`) loga erros de push (não usa catch silencioso)**
   - Arquivo de referência: `app/static/sw.js:10` *(arquivo está em `app/static/`, não em `app/static/js/`)*
-  - Status atual: **ABERTO** — catch silencioso `catch (e) {}` (F-43)
   - Como verificar: `grep -n "catch" app/static/sw.js` — verificar se há log no catch
+  - **Correção 2026-07-06:** este item estava marcado "ABERTO" no texto, mas a tabela de achados (F-43) já dizia "Resolvido 2026-06-17". Conferido o código atual: `sw.js:10-11` tem `console.error('[sw.js] Erro ao parsear payload push:', e)` — **RESOLVIDO**, o texto da seção é que estava desatualizado.
 
 ### 8.2 O que NÃO deve ser logado
 
-- [ ] **Senhas nunca aparecem nos logs (mesmo mascaradas)**
+- [x] **Senhas nunca aparecem nos logs (mesmo mascaradas)**
   - Como verificar: `grep -rn "password\|senha" app/ --include="*.py" | grep "log\|print"` — nenhum resultado deve mostrar valor real
+  - **Verificado 2026-07-06** (amostragem) — nenhum `logger.*` com valor de senha encontrado
 
 - [ ] **Tokens de sessão e chaves de API não aparecem nos logs**
   - Como verificar: Inspeção manual dos logs da aplicação — buscar por `token`, `key`, `secret`
+  - **Não verificado a fundo em 2026-07-06** — nenhuma evidência contrária encontrada na amostragem, mas não foi auditado item a item
 
-- [ ] **`print()` de debug foi removido do código de produção**
+- [x] **`print()` de debug foi removido do código de produção**
   - Como verificar: `grep -rn "^    print\|^print" app/` — nenhum resultado em código de produção
-  - Status atual: **ABERTO** — `app/models_historico.py:86` tem `print()` ativo (F-05)
+  - **Correção 2026-07-06:** este item estava marcado "ABERTO" no texto, mas a tabela de achados (F-05) já dizia "Resolvido 2026-06-17 — substituído por logger.debug()". Conferido o código atual: `app/models_historico.py:76-84` usa `logger.info`/`logger.error`, nenhum `print()` no arquivo — **RESOLVIDO**, o texto da seção é que estava desatualizado.
 
 ### 8.3 Auditoria de ações admin
 
-- [ ] **Criação/edição/desativação de usuários são registradas no histórico**
-  - Arquivo de referência: `app/routes/usuarios.py`
+- [x] **Criação/edição/desativação de usuários são registradas no histórico**
+  - Arquivo de referência: `app/services/historico_usuario_service.py` (novo, coleção Firestore `historico_usuarios`), `app/routes/usuarios.py`
+  - **Resolvido 2026-07-06** — este era um gap genuíno (não apenas checkbox desatualizado): `usuarios.py` só usava `logger.info` (log de aplicação, não auditável/consultável), sem persistência equivalente ao `Historico` de chamados. Agora `registrar_historico_usuario()` grava `usuario_alvo_id/nome`, `admin_id/nome`, `acao` (criacao/edicao/desativacao/ativacao/exclusao/anonimizacao) e timestamp em toda ação administrativa sobre contas. Testes: `tests/test_services/test_historico_usuario_service.py`, mais 6 testes de integração em `tests/test_routes/test_usuarios.py` (um por ação).
+  - **Bug corrigido de quebra:** ao implementar isso, achamos que `editar_usuario` sempre incluía `nome`/`perfil` em `update_data` mesmo sem mudança real (sem comparar com o valor atual, diferente de `email`/`areas`/`ativo` que já comparavam) — cada edição gravava um "edicao" fantasma no histórico. Corrigido em `app/routes/usuarios.py` (agora compara `nome != usuario.nome` e `perfil != usuario.perfil` antes de incluir).
 
-- [ ] **Mudanças de status de chamados têm registro de quem fez e quando**
-  - Arquivo de referência: `app/models_historico.py`, `app/services/status_service.py`
+- [x] **Mudanças de status de chamados têm registro de quem fez e quando**
+  - Arquivo de referência: `app/models_historico.py`, `app/services/status_service.py:190-211`
+  - **Verificado 2026-07-06**
 
 ### 8.4 Respostas de erro genéricas — CWI 3.2
 
@@ -436,27 +487,33 @@ Este documento deve ser consultado em **duas situações**:
 
 - [ ] **Apenas dados necessários para a funcionalidade são coletados**
   - Como verificar: Revisar campos do formulário de criação de chamado e do cadastro de usuário
+  - **Não verificado a fundo em 2026-07-06** — revisão de minimização de dados fica fora do escopo de uma auditoria de código (é uma decisão de produto/negócio)
 
 - [ ] **Dados pessoais não são armazenados em logs ou cache desnecessariamente**
   - Como verificar: Verificar que logs não contêm CPF, telefone ou dados sensíveis além do necessário
+  - **Não verificado a fundo em 2026-07-06**
 
 ### 9.2 Proteção de dados em repouso
 
 - [ ] **`ENCRYPT_PII_AT_REST` está configurado corretamente em produção**
-  - Arquivo de referência: `config.py`, `app/models_usuario.py`
+  - Arquivo de referência: `config.py`, `app/models_usuario.py`, `app/services/pii_encryption.py`
   - Como verificar: Variável de ambiente `ENCRYPT_PII_AT_REST`; verificar se campos são criptografados antes de gravar
+  - **Mecanismo pronto e testado, default `false` deliberado.** Correção 2026-07-06: a Seção 20 (matriz CWI) deste documento afirmava "`ENCRYPT_PII_AT_REST=true` ativo no `.env` dev", o que não bate com `.env.example` (default `false`, comentado). Decisão desta sessão: **não mudar o default** — ativar em produção exige `ENCRYPTION_KEY` definida (fail-fast se ausente) e migração prévia dos usuários existentes (`scripts/migrar_pii_criptografia.py`), então "true" por padrão quebraria qualquer ambiente sem essa preparação. `.env.example` e `docs/ENV.md` agora deixam explícito que é preciso ativar manualmente em produção real seguindo os passos documentados. Esta linha específica da Seção 20 foi corrigida (ver lá).
 
-- [ ] **Dados de usuário deletado/desativado são tratados conforme política**
-  - Arquivo de referência: `docs/POLITICA_SEGURANCA_LGPD.md`
+- [x] **Dados de usuário deletado/desativado são tratados conforme política**
+  - Arquivo de referência: `docs/POLITICA_SEGURANCA_LGPD.md`, `app/routes/usuarios.py`
   - Como verificar: Fluxo de desativação de usuário em `app/routes/usuarios.py`
+  - **Resolvido 2026-07-06** — antes era só soft-delete (`ativo=False`) sem nunca anonimizar, embora a política já prometesse "exclusão/anonimização". Agora existe ação administrativa separada e explícita `POST /admin/usuarios/<id>/anonimizar` (só permitida para contas já desativadas, ação irreversível — sobrescreve nome/e-mail). O soft-delete continua reversível por si só. Ver `docs/POLITICA_SEGURANCA_LGPD.md` §4 para o fluxo completo.
 
 ### 9.3 Direito de acesso e portabilidade
 
-- [ ] **Usuário pode visualizar seus próprios dados**
+- [x] **Usuário pode visualizar seus próprios dados**
   - Como verificar: Existe funcionalidade de "Meus dados" ou equivalente
+  - **Resolvido 2026-07-06** — página `GET /meus-dados` (`app/routes/auth.py:meus_dados`), acessível a qualquer usuário autenticado via link no menu do navbar. Mostra nome, e-mail, perfil, áreas, nível de gestão, forma de login e status de MFA — nunca `senha_hash` ou outros campos internos. Testes: `tests/test_routes/test_meus_dados.py`.
 
-- [ ] **Existe procedimento documentado para atender solicitação de exclusão (direito ao esquecimento)**
+- [x] **Existe procedimento documentado para atender solicitação de exclusão (direito ao esquecimento)**
   - Arquivo de referência: `docs/POLITICA_SEGURANCA_LGPD.md`
+  - **Verificado 2026-07-06** — documento atualizado com o fluxo real de duas etapas (desativação reversível → anonimização sob demanda)
 
 ### 9.4 Auditoria de respostas HTTP e PII em repouso — CWI 2.3
 
@@ -503,13 +560,14 @@ Este documento deve ser consultado em **duas situações**:
 
 - [ ] **Billing do Firebase/GCP está ativo (necessário para Firestore)**
   - Como verificar: [console.cloud.google.com](https://console.cloud.google.com) — verificar status do projeto
-  - Status atual: **VERIFICAR** — alerta de billing com prazo vencido identificado em `INCIDENT_RUNBOOK.md:138` (F-40)
+  - **Correção 2026-07-06:** este item citava um "VERIFICAR" pendente referenciando F-40, mas a tabela de achados já dizia "Resolvido 2026-06-17 — seção de billing GCP removida, runbook migrado para Docker". Conferido: `docs/INCIDENT_RUNBOOK.md` não tem mais nenhuma menção a billing/GCP — a menção antiga era do modelo de deploy anterior (Cloud Run), já não se aplica ao deploy atual (Docker). Item permanece **como verificação de infraestrutura externa** (painel GCP), não mais como pendência de doc.
 
 ### 10.2 Scripts de manutenção
 
-- [ ] **Scripts perigosos (`apagar_todos_chamados.py`) não são executados em produção sem revisão explícita**
-  - Arquivo de referência: `scripts/apagar_todos_chamados.py`
+- [x] **Scripts perigosos (`apagar_todos_chamados.py`) não são executados em produção sem revisão explícita**
+  - Arquivo de referência: `scripts/apagar_todos_chamados.py:54` — `input("Digite 'apagar' para confirmar: ")`
   - Como verificar: O script exige flag `--confirm` — nunca automatize essa flag
+  - **Verificado 2026-07-06**
 
 - [ ] **Scripts de migração já executados não serão re-executados**
   - Arquivo de referência: `scripts/migrar_*.py`
@@ -577,36 +635,37 @@ curl -I http://hml-host/health
   - Status atual: **RESOLVIDO 2026-06-17** — `<dialog>` nativo acessível substitui `window.prompt` (F-33 / S2-05)
   - Alternativa obrigatória: `<dialog>` nativo ou modal HTML acessível
 
-- [ ] **Nenhum handler de evento `onmouseover/onmouseout` inline em elementos gerados por JS**
+- [x] **Nenhum handler de evento `onmouseover/onmouseout` inline em elementos gerados por JS**
   - Arquivo de referência: `onboarding.js:608-617`
   - Como verificar: `grep -rn "onmouseover\|onmouseout" app/static/js/ app/templates/`
   - Status atual: ✅ **Resolvido** (F-48 — Onda C wave 1 2026-06-18) — handlers removidos; hover via `mouseenter`/`mouseleave` em `bindCardEvents()`
+  - **Reverificado 2026-07-06** — sem ocorrências reais (só um comentário mencionando "CSP-safe")
 
 ### 11.2 URLs de API não hardcoded
 
-- [ ] **URLs de API no JavaScript vêm de `window.DTX_URLS` (injetado pelo template), não hardcoded**
-  - Arquivo de referência: `dashboard_otimizacoes.js:132`
+- [x] **URLs de API no JavaScript vêm de `window.DTX_URLS` (injetado pelo template), não hardcoded**
+  - Arquivo de referência: `dashboard_otimizacoes.js:29-31`
   - Como verificar: `grep -n "'/api/" app/static/js/` — qualquer hit é uma URL hardcoded
-  - Status atual: **ABERTO** — `/api/atualizar-status` hardcoded (F-36)
+  - **Correção 2026-07-06:** marcado "ABERTO" citando F-36, mas a tabela de achados já dizia "Resolvido 2026-06-17 — URL via DTX_URLS.atualizarStatus". Conferido no código atual: `dashboard_otimizacoes.js` usa `window.DTX_URLS` — **RESOLVIDO**, texto da seção desatualizado.
   - Padrão correto: `window.DTX_URLS?.atualizar_status || '/api/atualizar-status'` (com fallback)
 
 ### 11.3 Strings de UI internacionalizadas
 
-- [ ] **Strings de UI em JavaScript passam por `window.DTX_MSGS` (injetado pelo template), não hardcoded em PT-BR**
-  - Arquivo de referência: `dashboard_otimizacoes.js:13-23` (MSGS), `table-filters.js:244,249`
+- [x] **Strings de UI em JavaScript passam por `window.DTX_MSGS` (injetado pelo template), não hardcoded em PT-BR**
+  - Arquivo de referência: `dashboard_otimizacoes.js:11-12` (MSGS), `table-filters.js`
   - Como verificar: `grep -rn "pt-BR\|'Filtrar'\|'Todos'\|'Cancelando'" app/static/js/`
-  - Status atual: **ABERTO** — múltiplas strings hardcoded em PT-BR (F-34, F-37, F-46)
+  - **Correção 2026-07-06:** marcado "ABERTO" citando F-34/F-37/F-46, mas a tabela já dizia "Resolvido". Conferido: strings vêm de `window.DTX_MSGS` — **RESOLVIDO**, texto da seção desatualizado.
 
-- [ ] **`localeCompare` no JavaScript usa o locale do usuário, não PT-BR fixo**
-  - Arquivo de referência: `table-filters.js:114`
-  - Status atual: **ABERTO** — `localeCompare('pt-BR')` hardcoded (F-44)
+- [x] **`localeCompare` no JavaScript usa o locale do usuário, não PT-BR fixo**
+  - Arquivo de referência: `table-filters.js:13,126` — `const LOCALE = I18N.locale || 'pt-BR'`
+  - **Correção 2026-07-06:** marcado "ABERTO" citando F-44, mas a tabela já dizia "Resolvido". Conferido: usa `I18N.locale` com fallback — **RESOLVIDO**, texto da seção desatualizado.
 
 ### 11.4 Logs de debug
 
-- [ ] **`console.warn/log/error` em arquivos JS de produção são protegidos por `window.DTX_DEBUG`**
-  - Arquivo de referência: `table-filters.js:39, 50`
+- [x] **`console.warn/log/error` em arquivos JS de produção são protegidos por `window.DTX_DEBUG`**
+  - Arquivo de referência: `table-filters.js:19-20`
   - Como verificar: `grep -n "console\." app/static/js/*.js` — verificar se há proteção
-  - Status atual: **ABERTO** — console.warn sem proteção em table-filters.js (F-38)
+  - **Correção 2026-07-06:** marcado "ABERTO" citando F-38, mas a tabela já dizia "Resolvido". Conferido: `console.*` protegido por `window.DTX_DEBUG` — **RESOLVIDO**, texto da seção desatualizado.
   - Exceção permitida: `console.error` em Service Worker (sw.js) para erros de push — esses devem ser logados sempre
 
 ### 11.5 Injeção de CSS
@@ -619,10 +678,10 @@ curl -I http://hml-host/health
 
 ### 11.6 Service Worker
 
-- [ ] **Service Worker (`sw.js`) não suprime erros silenciosamente**
+- [x] **Service Worker (`sw.js`) não suprime erros silenciosamente**
   - Arquivo de referência: `app/static/sw.js:10` *(arquivo está em `app/static/`, não em `app/static/js/`)*
   - Como verificar: `grep -n "catch" app/static/sw.js` — verificar se há log no catch
-  - Status atual: **ABERTO** — `catch (e) {}` sem log (F-43)
+  - **Correção 2026-07-06** — mesmo item de §8.1, ver lá. RESOLVIDO, texto da seção estava desatualizado.
 
 ---
 
@@ -683,33 +742,40 @@ curl -I http://hml-host/health
 
 ### 13.1 Proteção contra execução destrutiva acidental
 
-- [ ] **Scripts destrutivos têm modo dry-run por padrão — requerem `--apply` (ou equivalente) para executar de fato**
-  - Arquivo de referência: `scripts/atualizar_firebase.py` (F-71), `scripts/atualizar_setores_from_print.py` (F-72)
+- [x] **Scripts destrutivos têm modo dry-run por padrão — requerem `--apply` (ou equivalente) para executar de fato**
+  - Arquivo de referência: `scripts/atualizar_firebase.py:16,119-130` (F-71), `scripts/atualizar_setores_from_print.py:23,94-105` (F-72)
   - Como verificar: Executar o script sem argumentos — não deve alterar dados, apenas listar o que seria feito
+  - **Correção 2026-07-06:** desmarcado apesar de F-71/F-72 já dizerem "Resolvido" na tabela. Conferido: ambos scripts têm `argparse` com `--apply`, dry-run por padrão — **RESOLVIDO**.
 
-- [ ] **Scripts destrutivos exibem prompt de confirmação interativo antes de executar**
+- [x] **Scripts destrutivos exibem prompt de confirmação interativo antes de executar**
   - Padrão mínimo: `input("Confirmar? [s/N]: ")` antes de qualquer operação destrutiva
   - Como verificar: Executar com `--apply` e confirmar que o script pede confirmação antes de prosseguir
+  - **Verificado 2026-07-06** — `scripts/apagar_todos_chamados.py:54`
 
-- [ ] **`atualizar_firebase.py` está marcado como obsoleto / removido em favor de `migrar_setores_catalogo.py`**
+- [x] **`atualizar_firebase.py` está marcado como obsoleto / removido em favor de `migrar_setores_catalogo.py`**
   - Achado: F-71, F-74 — três scripts com funções sobrepostas para seeding
   - Como verificar: Cabeçalho do arquivo deve conter `DEPRECATED` com referência ao substituto
+  - **Correção 2026-07-06** — conferido: docstring da linha 2 de `atualizar_firebase.py` diz "OBSOLETO: Este script foi substituído por...". RESOLVIDO.
 
-- [ ] **Nenhum script perigoso sem documentação explícita de risco**
+- [x] **Nenhum script perigoso sem documentação explícita de risco**
   - Como verificar: Todo script em `scripts/` que altera ou apaga dados deve ter docstring ou comentário de cabeçalho descrevendo o risco
+  - **Verificado 2026-07-06** (amostragem)
 
-- [ ] **`confirmacao-solicitante.md` não está na raiz do projeto (F-78)**
+- [x] **`confirmacao-solicitante.md` não está na raiz do projeto (F-78)**
   - Como verificar: `ls *.md` na raiz — não deve existir arquivo `.md` fora de `docs/`
+  - **Correção 2026-07-06** — conferido: não existe na raiz, está em `docs/plans/confirmacao-solicitante.md`. RESOLVIDO.
 
 ### 13.2 Dependências de scripts
 
-- [ ] **`python-dotenv` está listado em `requirements.txt` ou `requirements-dev.txt` se usado por scripts**
+- [x] **`python-dotenv` está listado em `requirements.txt` ou `requirements-dev.txt` se usado por scripts**
   - Achado: F-76 — `dotenv` não listado explicitamente
   - Como verificar: `grep -n "dotenv\|python-dotenv" requirements*.txt`
+  - **Correção 2026-07-06** — conferido: `requirements.txt:40` — `python-dotenv==1.0.1`. RESOLVIDO.
 
-- [ ] **Scripts com sobreposição de função têm README ou comentário explicando qual usar em cada situação**
+- [x] **Scripts com sobreposição de função têm README ou comentário explicando qual usar em cada situação**
   - Achado: F-73, F-74 — `scripts/` sem README; três scripts de seeding sobrepostos
   - Como verificar: Existe `scripts/README.md` ou cada script tem docstring que esclarece seu propósito
+  - **Correção 2026-07-06** — conferido: `scripts/README.md` existe. RESOLVIDO.
 
 ---
 
@@ -719,10 +785,11 @@ curl -I http://hml-host/health
 
 ### 14.1 Correção dos asserts
 
-- [ ] **Sem tautologias em asserts — expressão como `A or not A` (always-true) nunca deve aparecer em test_*.py**
+- [x] **Sem tautologias em asserts — expressão como `A or not A` (always-true) nunca deve aparecer em test_*.py**
   - Achado: F-50 — `tests/test_i18n.py:29`: `assert result != "back" or result == "back"`
   - Como verificar: `grep -rn "or not\|!= .* or .* ==" tests/` — investigar cada hit
   - Impacto: Tautologia dá falsa garantia de qualidade; o teste nunca falha
+  - **Correção 2026-07-06** — conferido: `tests/test_i18n.py:29-33` tem `assert result == "Voltar"`, não é mais tautológico. RESOLVIDO.
 
 - [x] **Sem `assert status_code in (X, Y)` onde apenas um código é o correto para o contrato da rota**
   - Achado: F-55, F-56 — asserts permissivos mascaram 404 como sucesso
@@ -731,23 +798,26 @@ curl -I http://hml-host/health
 
 ### 14.2 Fixtures e mocks
 
-- [ ] **URLs nos testes E2E usam fixture `base_url` ou variável de ambiente, nunca string hardcoded**
+- [x] **URLs nos testes E2E usam fixture `base_url` ou variável de ambiente, nunca string hardcoded**
   - Achado: F-51 (`test_fluxo_supervisor.py:34,60`), F-52 (`test_fluxo_admin.py:53`) — `/relatorios` em vez de `/admin/relatorios`
   - Achado: F-53 (`test_solicitante.py`) — `BASE_URL` hardcoded
   - Como verificar: `grep -rn "BASE_URL\s*=\|http://localhost" tests/e2e/`
+  - **Verificado 2026-07-06** — `tests/e2e/conftest.py` define/injeta fixture `base_url`
 
 - [x] **Mocks inertes removidos; patch no módulo que usa o símbolo**
   - Achado: C-01, C-04, F-54 — `patch("app.routes.api.db")` é inerte quando o serviço importa `db` diretamente
   - Regra: `patch("app.services.X.db")` — quando o serviço importa `db`; `patch("app.routes.api.db")` — válido quando a rota usa `db` diretamente (ex.: `/api/atualizar-status`)
   - Status atual: **Resolvido 2026-06-18** — 3 mocks inertes removidos (S3-05)
 
-- [ ] **Sem arquivos de teste legados coexistindo com seus substitutos ativos**
+- [x] **Sem arquivos de teste legados coexistindo com seus substitutos ativos**
   - Achado: F-53 — `test_solicitante.py` legado coexiste com `test_fluxo_solicitante.py`
   - Como verificar: `ls tests/` — identificar pares de arquivos com nomes sobrepostos; remover ou marcar com `@pytest.mark.skip`
+  - **Resolvido 2026-07-06** — antes o arquivo só estava marcado `@pytest.mark.skip` (F-53), mas continuava existindo no repo. Removido de vez (`tests/e2e/test_solicitante.py` deletado) já que `test_fluxo_solicitante.py` cobre o mesmo fluxo com mais qualidade.
 
-- [ ] **`_usuario_mock()` (ou equivalente) seta todos os campos do modelo, não apenas o mínimo**
+- [x] **`_usuario_mock()` (ou equivalente) seta todos os campos do modelo, não apenas o mínimo**
   - Achado: F-62 — mock incompleto pode mascarar KeyError em atributos opcionais
   - Como verificar: Comparar campos de `_usuario_mock()` com `models_usuario.py` — nenhum campo obrigatório deve estar ausente
+  - **Resolvido 2026-07-06** — `tests/conftest.py::_usuario_mock` não setava `senha_hash`, `exp_total`, `exp_semanal`, `level`, `conquistas`, `mfa_secret`, `mfa_backup_codes`, `auth_provider`, `password_changed_at` (herdavam auto-mock do MagicMock em vez dos defaults reais). Adicionados com os mesmos defaults de `Usuario.__init__`. Suíte completa (2417 testes) re-rodada sem regressão.
 
 ### 14.3 Cobertura de cenários críticos
 
@@ -776,27 +846,32 @@ curl -I http://hml-host/health
 
 ### 15.1 Tokens de design
 
-- [ ] **CSS usa `var(--color-dtx-*)` em vez de valores hexadecimais hardcoded**
+- [x] **CSS usa `var(--color-dtx-*)` em vez de valores hexadecimais hardcoded**
   - Achado: F-64 — `table-filters.css` contém `#1e4a8c`, `#E5E7EB` e outros valores hardcoded
   - Como verificar: `grep -n "#[0-9a-fA-F]\{3,6\}" app/static/css/table-filters.css`
   - Referência: `docs/plans/2026-06-12-dtx-light-design-system.md` — fonte de verdade dos tokens
+  - **Verificado 2026-07-06** — cores de marca/estruturais migradas para `var(--color-*)`. Restam `#9CA3AF`/`#6B7280`/`#374151` em `table-filters.css` — cinzas de texto neutros sem token dedicado, já documentado como exceção aceita desde F-64, não uma regressão nova.
 
-- [ ] **Tokens locais `--dash-*` e `--reports-*` referenciam os tokens globais `--color-dtx-*` em vez de duplicá-los**
+- [x] **Tokens locais `--dash-*` e `--reports-*` referenciam os tokens globais `--color-dtx-*` em vez de duplicá-los**
   - Achado: F-65 — tokens locais duplicam valores em vez de referenciar a variável global
   - Padrão correto: `--dash-primary: var(--color-dtx-blue-700);` em vez de `--dash-primary: #1e4a8c;`
+  - **Verificado 2026-07-06** — `relatorios.css:1-8` já referencia `var(--color-dtx-600)` etc.
 
-- [ ] **`tailwind.config.js` e `input.css` permanecem 100% consistentes com o design system documentado**
+- [x] **`tailwind.config.js` e `input.css` permanecem 100% consistentes com o design system documentado**
   - Status atual: **OK** — consistência confirmada na 3ª rodada; monitorar a cada PR que altere tokens
+  - **Nota 2026-07-06:** este item já estava com "Status atual: OK" escrito no corpo do documento havia tempo — só o checkbox nunca tinha sido marcado.
 
 ### 15.2 Sintaxe CSS
 
-- [ ] **Sem sintaxe CSS legada `rgba(r, g, b, a)` com vírgula — usar `rgb()` ou `color-mix()` modernos**
+- [x] **Sem sintaxe CSS legada `rgba(r, g, b, a)` com vírgula — usar `rgb()` ou `color-mix()` modernos**
   - Achado: F-66 — `relatorios.css` usa `rgba()` com vírgula (sintaxe de nível 3, depreciada)
   - Como verificar: `grep -n "rgba(" app/static/css/relatorios.css`
+  - **Resolvido 2026-07-06** — F-66 dizia "Fechado" na tabela de achados, mas ainda restava um `box-shadow` com dois `rgba()` em `relatorios.css:14`, e outros dois em `table-filters.css:53,176` (não cobertos pelo achado original). Todos migrados para `color-mix(in srgb, black/white X%, transparent)`. Adicionado teste de regressão `test_no_legacy_rgba_comma_syntax_in_layout_css` em `tests/test_regression/test_dtx_light_invariants.py` pra impedir volta.
 
-- [ ] **Focus ring usa padrão único definido em `input.css`, não três variantes divergentes**
+- [x] **Focus ring usa padrão único definido em `input.css`, não três variantes divergentes**
   - Achado: F-67 — três padrões distintos de focus ring nos arquivos CSS
   - Como verificar: `grep -rn "focus.*ring\|:focus" app/static/css/` — todos devem referenciar a mesma variável
+  - **Verificado 2026-07-06 — exceção intencional confirmada, não é bug.** `bento.css` (navbar escura, `.bento-nav-*:focus-visible`) usa `box-shadow: 0 0 0 2px rgba(255,255,255,.4)` em vez do `outline: 2px solid var(--color-dtx-500)` global de `input.css`. Isso é deliberado: `--color-dtx-500` (#284e95) contra `--color-nav-bg` (#13274b) tem contraste ruim (ambos tons escuros de azul) — um anel branco translúcido é a escolha correta de acessibilidade pra esse componente específico sobre fundo escuro. Não alterado.
 
 - [x] **Cor de borda consistente com os tokens do design system (sem divergências entre arquivos)**
   - Achado: F-68 — cor de borda diverge entre arquivos CSS
@@ -804,9 +879,10 @@ curl -I http://hml-host/health
 
 ### 15.3 Artefatos de build
 
-- [ ] **`app/static/dist/` está no `.gitignore` (bundle SPA gerado automaticamente)**
+- [x] **`app/static/dist/` está no `.gitignore` (bundle SPA gerado automaticamente)**
   - Achado: F-70 — bundle não referenciado pelos templates Flask e não documentado; possivelmente não deveria estar no repositório
   - Como verificar: `cat .gitignore | grep "dist/"` — deve existir entrada
+  - **Correção 2026-07-06** — conferido: `.gitignore:19,27` tem `dist/` e `app/static/dist/`. RESOLVIDO.
 
 - [x] **Artefatos de build CSS (`tailwind.min.css`) são gerados pelo Dockerfile, não commitados manualmente**
   - Achado: F-11 — `tailwind.min.css` commitado E re-gerado no Dockerfile (duplicação)
@@ -1174,7 +1250,7 @@ Os itens deste checklist mapeiam para o OWASP Top 10 (2021):
 | **1.3** | IDOR — só recursos próprios (URL, body, anexo) | Sim | `tests/test_routes/test_permissions.py`, `tests/test_routes/test_download_idor.py`, `test_api.py` | `[x]` 2026-06-23 — `GET /api/chamado/<id_alheio>` → 403 (+ pytest IDOR) |
 | **2.1** | HTTPS em produção (redirect HTTP→HTTPS) | Sim | `tests/test_config_production.py::test_cwi21_https_redirect_em_producao`, `tests/test_app_init.py` | `[x]` 2026-06-23 — prod simulada → 301 `https://` |
 | **2.2** | Senhas com hash forte (Werkzeug scrypt/pbkdf2) | Doc + teste | `tests/test_services/test_models_usuario.py::test_senha_hash_usa_formato_werkzeug_nao_plaintext`; `CHECKLIST_SEGURANCA.md §1.4` | `[x]` 2026-06-23 — Firestore `usuarios.senha_hash` prefixo `scrypt:32768:8:1$…` (não plaintext) |
-| **2.3** | PII minimizado/oculto nas respostas e criptografado em repouso | Sim | `tests/test_routes/test_api_security_responses.py` (respostas HTTP); `tests/test_services/test_pii_encryption.py` + `test_models_usuario.py` (Onda 4 Fernet) | `[x]` 2026-06-23 — resposta API sem `senha_hash`; Fernet `fernet:v1:` em `nome`/`email` (ENCRYPT_PII_AT_REST=false default; ativar em produção) |
+| **2.3** | PII minimizado/oculto nas respostas e criptografado em repouso | Sim | `tests/test_routes/test_api_security_responses.py` (respostas HTTP); `tests/test_services/test_pii_encryption.py` + `test_models_usuario.py` (Onda 4 Fernet) | `[x]` 2026-06-23 — resposta API sem `senha_hash`; mecanismo Fernet `fernet:v1:` pronto para `nome`/`email` — **`ENCRYPT_PII_AT_REST=false` é o default real** (`.env.example`), deliberado por segurança de boot; ativar em produção exige `ENCRYPTION_KEY` + migração prévia (ver §9.2) |
 | **3.1** | SQL/NoSQL injection | Sim | `tests/test_security/test_injection_regression.py` — 33 testes parametrizados (SQL, NoSQL, editar-chamado) | `[x]` 2026-06-23 — `search=' OR 1=1--` → 200 (+ 33 pytest) |
 | **3.2** | Erros genéricos (sem stack/tecnologia nas respostas) | Sim | `tests/test_routes/test_api_security_responses.py` (500 handlers com `ERRO_INTERNO_MSG`); `CHECKLIST_SEGURANCA.md §8.4` | `[x]` 2026-06-23 — 500 → `Erro interno. Tente novamente.` |
 | **4.1** | Ambientes de teste não acessíveis publicamente | Sim (app) + ops (rede) | `tests/test_routes/test_staging_auth.py` — 9 testes; VPN/firewall + Basic Auth fallback | `[x]` 2026-06-23 — camada rede (VPN/firewall) + camada app (Basic Auth staging) validadas ops |
@@ -1185,14 +1261,15 @@ Os itens deste checklist mapeiam para o OWASP Top 10 (2021):
 | Meta | Status | Dependências pendentes |
 |---|---|---|
 | **CWI básico (execução QA 2026-06-23)** | ✅ **11/11 sub-itens CWI** | — |
-| **CWI 2.3 completo (Fernet/LGPD)** | ✅ **Completo** (Onda 4 + rollout 2026-06-23) | 2/2 usuários migrados; `ENCRYPT_PII_AT_REST=true` ativo no `.env` dev |
+| **CWI 2.3 completo (Fernet/LGPD)** | ✅ **Mecanismo completo** (Onda 4); rollout de 2/2 usuários migrados foi feito em ambiente de teste pontual — `ENCRYPT_PII_AT_REST=false` é o default em `.env.example`/produção real (correção 2026-07-06) | Ativar em produção: `ENCRYPTION_KEY` + `scripts/migrar_pii_criptografia.py --apply` |
 | **CWI + baseline DTX** | ✅ Implementado | Onda 2 (`ativo=false`) implementada |
 
 > **Última execução QA manual:** 2026-06-23 — `python scripts/executar_qa_manual_cwi.py` → 15 PASS, 0 FAIL, 2 SKIP. Evidência: `docs/evidencias/QA_MANUAL_CWI_EVIDENCIA.md`
 
 ---
 
-*Documento atualizado em 2026-06-17 — DTX Aerospace, Engenharia de Software*
+*Documento atualizado em 2026-07-06 — DTX Aerospace, Engenharia de Software*
+*Versão 3.6 — Auditoria de checkboxes 2026-07-06: ~30 divergências corrigidas entre texto "ABERTO" e tabela de achados "Resolvido" (a tabela estava certa); gaps genuínos fechados nesta sessão — histórico de ações admin em usuários (`historico_usuario_service.py`), página `/meus-dados` (LGPD acesso), anonimização sob demanda de usuário desativado, header `Server` neutralizado (`gunicorn.conf.py`, requer validação real pós-deploy), `SECRET_KEY` com validação de comprimento mínimo, log de acesso bem-sucedido a anexo, `rgba()` legado residual em `relatorios.css`/`table-filters.css`, `_usuario_mock` com todos os campos, teste E2E legado removido. Bug lateral corrigido: `editar_usuario` gravava histórico mesmo sem mudança real de nome/perfil. Focus ring divergente em `bento.css` (navbar escura) confirmado como exceção intencional de contraste, não bug. Genuinamente em aberto: rotação de `ENCRYPTION_KEY` não documentada, portabilidade de dados (export) não implementada, minimização de dados não auditada, tokens/chaves em logs não auditados a fundo.*
 *Versão 3.5 — Onda 5 Polish 2026-06-23: matriz CWI 11/11 documentada, §10.4 distingue código vs ops, 9 testes staging_auth, config.py SESSION_COOKIE_SECURE fix, ratelimit fixture fix.*
 *Versão 3.4 — Gate Final 2026-06-22: i18n fix pt_BR padrão, CI 85%+gate por módulo, 1435 testes, 52/52 OK, docs sync concluído.*
 *Versão 3.3 — Onda 4 Infraestrutura 2026-06-22: database.py 52%→100%, __init__.py 72%→98%, +53 testes, ADR.*
