@@ -122,6 +122,11 @@ if _env == "production" and (not os.getenv("SECRET_KEY") or _secret == _dev_secr
         "Em produção, defina SECRET_KEY no ambiente com um valor forte e único. "
         "Não use o valor padrão de desenvolvimento."
     )
+if _env == "production" and len(_secret) < 32:
+    raise ValueError(
+        f"Em produção, SECRET_KEY deve ter pelo menos 32 caracteres (atual: {len(_secret)}). "
+        'Gere com: python -c "import secrets; print(secrets.token_urlsafe(32))"'
+    )
 
 # Fail-fast para vars obrigatórias em produção (APP_BASE_URL, HEALTH_SECRET) e
 # warning/fail para Redis (ver ADR docs/adr/003-fail-fast-config-producao.md)
@@ -237,6 +242,15 @@ class Config:
     GRAPH_CLIENT_ID = os.getenv("GRAPH_CLIENT_ID", "").strip()
     GRAPH_CLIENT_SECRET = os.getenv("GRAPH_CLIENT_SECRET", "").strip()
     GRAPH_SENDER_EMAIL = os.getenv("GRAPH_SENDER_EMAIL", "").strip()
+
+    # Microsoft SSO (login "Entrar com Microsoft" — Authorization Code + PKCE, delegado).
+    # Por padrão reaproveita o mesmo App Registration do Graph acima; sobrescreva
+    # SSO_CLIENT_ID/SSO_CLIENT_SECRET/SSO_TENANT_ID apenas se usar um registro separado.
+    SSO_MICROSOFT_ENABLED = _to_bool(os.getenv("SSO_MICROSOFT_ENABLED"), default=True)
+    SSO_CLIENT_ID = os.getenv("SSO_CLIENT_ID", "").strip() or GRAPH_CLIENT_ID
+    SSO_CLIENT_SECRET = os.getenv("SSO_CLIENT_SECRET", "").strip() or GRAPH_CLIENT_SECRET
+    SSO_TENANT_ID = os.getenv("SSO_TENANT_ID", "").strip() or GRAPH_TENANT_ID
+    SSO_REDIRECT_URI = os.getenv("SSO_REDIRECT_URI", "").strip()
 
     # Relay monitorado pelo Power Automate (caixa de entrada que dispara os flows)
     NOTIFY_RELAY_EMAIL = os.getenv("NOTIFY_RELAY_EMAIL", "dtxls.support@dtx.aero").strip()

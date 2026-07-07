@@ -276,6 +276,32 @@ def test_import_config_producao_sem_health_secret_falha():
         _restaurar_config()
 
 
+def test_import_config_producao_secret_key_curta_falha():
+    """Boot real simulado: SECRET_KEY < 32 chars em prod → ValueError no import."""
+    config_mod = sys.modules["config"]
+    env = {**_PROD_ENV_VALIDO, "SECRET_KEY": "curta-demais"}
+    try:
+        with (
+            patch.dict(os.environ, env, clear=False),
+            pytest.raises(ValueError, match="SECRET_KEY"),
+        ):
+            importlib.reload(config_mod)
+    finally:
+        _restaurar_config()
+
+
+def test_import_config_producao_secret_key_32_chars_sobe():
+    """Boot real simulado: SECRET_KEY com exatamente 32 chars fortes → sem exceção."""
+    config_mod = sys.modules["config"]
+    env = {**_PROD_ENV_VALIDO, "SECRET_KEY": "a" * 32}
+    try:
+        with patch.dict(os.environ, env, clear=False):
+            importlib.reload(config_mod)
+        assert config_mod.Config.ENV == "production"
+    finally:
+        _restaurar_config()
+
+
 # ── _validar_fernet_key (unit tests — Onda 4 polish) ─────────────────────────
 
 

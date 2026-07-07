@@ -702,6 +702,27 @@ def _configurar_i18n(app: Flask) -> None:
         # Fonte única dos status canônicos para o JS (evita lista hardcoded no template)
         return {"dashboard_endpoint": endpoint, "status_validos": list(STATUS_VALIDOS)}
 
+    @app.context_processor
+    def inject_perfil_home_endpoint():
+        """Injeta a rota inicial (home) do perfil do usuário logado.
+
+        Usada pra decidir onde o tour de onboarding automático pode aparecer
+        (só na home de cada perfil) e como destino do botão de "Continuar"
+        após configurar o MFA — mesma regra de redirecionamento pós-login.
+        """
+        from flask_login import current_user
+
+        if not current_user.is_authenticated:
+            return {"perfil_home_endpoint": None}
+
+        if current_user.perfil == "solicitante":
+            endpoint = "main.index"
+        elif current_user.perfil == "supervisor":
+            endpoint = "main.gestor_dashboard" if current_user.is_gestor_only else "main.painel"
+        else:
+            endpoint = "main.admin"
+        return {"perfil_home_endpoint": endpoint}
+
     # Registra funções as Jinja filters (para usar com o pipe |)
     @app.template_filter("translate_sector")
     def filter_translate_sector(sector_name):
@@ -797,6 +818,30 @@ def _configurar_timeout_sessao(app: Flask) -> None:
             and request.endpoint not in rotas_isentas
         ):
             return redirect(url_for("main.alterar_senha_obrigatoria"))
+
+    @app.before_request
+    def verificar_mfa_obrigatorio():
+        """Intercepta requisições para forçar a configuração de MFA — obrigatório para todos os perfis."""
+        # Ignora rotas de arquivos estáticos
+        if request.endpoint and request.endpoint.startswith("static"):
+            return None
+
+        # Rotas isentas: troca de senha obrigatória tem prioridade sobre o MFA
+        rotas_isentas = [
+            "main.mfa_configurar",
+            "main.mfa_codigos_backup",
+            "main.alterar_senha_obrigatoria",
+            "main.logout",
+            "main.login",
+            "main.verificar_mfa",
+        ]
+
+        if (
+            current_user.is_authenticated
+            and current_user.mfa_enabled is not True
+            and request.endpoint not in rotas_isentas
+        ):
+            return redirect(url_for("main.mfa_configurar"))
 
 
 def _configurar_logging(app: Flask) -> None:

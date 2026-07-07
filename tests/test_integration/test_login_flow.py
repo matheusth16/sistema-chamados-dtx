@@ -34,7 +34,11 @@ def test_login_post_sucesso_redireciona_conforme_perfil(client):
     usuario.must_change_password = (
         False  # evita redirect para troca de senha; testa redirect por perfil
     )
-    with patch("app.routes.auth.Usuario.get_by_email", return_value=usuario):
+    usuario.mfa_enabled = True  # evita redirect para /mfa/configurar; testa redirect por perfil
+    with (
+        patch("app.routes.auth.Usuario.get_by_email", return_value=usuario),
+        patch("app.routes.auth._dispositivo_confiavel", return_value=True),
+    ):
         r = client.post(
             "/login", data={"email": "sol@test.com", "senha": "ok"}, follow_redirects=False
         )
@@ -43,7 +47,10 @@ def test_login_post_sucesso_redireciona_conforme_perfil(client):
 
     usuario.perfil = "supervisor"
     usuario.get_id = lambda: "sup_1"
-    with patch("app.routes.auth.Usuario.get_by_email", return_value=usuario):
+    with (
+        patch("app.routes.auth.Usuario.get_by_email", return_value=usuario),
+        patch("app.routes.auth._dispositivo_confiavel", return_value=True),
+    ):
         r2 = client.post(
             "/login", data={"email": "sup@test.com", "senha": "ok"}, follow_redirects=False
         )

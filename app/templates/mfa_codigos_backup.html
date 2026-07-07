@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div id="mfa-backup-codes-card" class="w-full max-w-lg mx-auto">
+    <div class="dtx-card rounded-dtx-xl p-8">
+        <h2 class="font-display text-xl font-extrabold tracking-tight" style="color: var(--color-dtx-700)">
+            {{ t('mfa_backup_codes_title') }}
+        </h2>
+        <p class="mt-1 text-sm mb-4" style="color: var(--color-surface-muted)">
+            {{ t('mfa_backup_codes_warning') }}
+        </p>
+
+        <div class="mt-4 p-3.5 rounded-dtx-lg text-sm font-semibold bg-amber-50 text-amber-800 border border-amber-200 mb-6">
+            {{ t('mfa_backup_codes_shown_once') }}
+        </div>
+
+        <div class="grid grid-cols-2 gap-2 mb-6" data-testid="mfa-backup-codes-list">
+            {% for codigo in codigos %}
+            <code class="text-sm font-mono px-3 py-2 rounded-dtx-lg bg-surface-raised border border-surface-border text-center tracking-wider">{{ codigo }}</code>
+            {% endfor %}
+        </div>
+
+        <a href="{{ url_for(perfil_home_endpoint) }}" data-testid="mfa-backup-codes-continue-btn"
+           class="w-full h-11 inline-flex items-center justify-center gap-2 text-sm font-bold rounded-dtx-lg text-white bg-[var(--color-nav-bg)] hover:bg-[var(--color-nav-border)] transition-colors duration-200">
+            {{ t('mfa_backup_codes_continue') }}
+        </a>
+    </div>
+</div>
+{% endblock %}

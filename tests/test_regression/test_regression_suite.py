@@ -56,7 +56,11 @@ def test_regression_login_solicitante_redireciona_para_raiz(client):
     usuario.check_password = MagicMock(return_value=True)
     usuario.get_id = lambda: "sol_1"
     usuario.must_change_password = False  # senão app redireciona para /alterar-senha-obrigatoria
-    with patch("app.routes.auth.Usuario.get_by_email", return_value=usuario):
+    usuario.mfa_enabled = True  # senão app redireciona para /mfa/configurar
+    with (
+        patch("app.routes.auth.Usuario.get_by_email", return_value=usuario),
+        patch("app.routes.auth._dispositivo_confiavel", return_value=True),
+    ):
         r = client.post(
             "/login", data={"email": "sol@test.com", "senha": "ok"}, follow_redirects=False
         )
@@ -73,7 +77,11 @@ def test_regression_login_supervisor_redireciona_para_painel(client):
     usuario.check_password = MagicMock(return_value=True)
     usuario.get_id = lambda: "sup_1"
     usuario.must_change_password = False  # senão app redireciona para /alterar-senha-obrigatoria
-    with patch("app.routes.auth.Usuario.get_by_email", return_value=usuario):
+    usuario.mfa_enabled = True  # senão app redireciona para /mfa/configurar
+    with (
+        patch("app.routes.auth.Usuario.get_by_email", return_value=usuario),
+        patch("app.routes.auth._dispositivo_confiavel", return_value=True),
+    ):
         r = client.post(
             "/login", data={"email": "sup@test.com", "senha": "ok"}, follow_redirects=False
         )
@@ -277,7 +285,7 @@ def test_regression_validacao_descricao_obrigatoria():
     from app.services.validators import validar_novo_chamado
 
     erros = validar_novo_chamado({"descricao": "", "tipo": "X", "categoria": "Chamado"})
-    assert any("descrição" in e.lower() for e in erros)
+    assert any("description" in e.lower() for e in erros)
 
 
 def test_regression_validacao_projetos_exige_rl():

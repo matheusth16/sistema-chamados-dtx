@@ -579,7 +579,7 @@ def test_user_loader_usuario_inativo_retorna_none(client, app):
     usuario_ativo.perfil = "solicitante"
     usuario_ativo.ativo = True
     usuario_ativo.must_change_password = False
-    usuario_ativo.onboarding_completo = True
+    usuario_ativo.onboarding_perfis_vistos = ["solicitante"]
     usuario_ativo.get_id = lambda: "u_loader_inativo"
     usuario_ativo.is_authenticated = True
     usuario_ativo.is_active = True
@@ -667,7 +667,7 @@ def test_login_funciona_quando_get_by_email_usa_hash_lookup(client):
     usuario.is_anonymous = False
     usuario.check_password = MagicMock(return_value=True)
     usuario.ativo = True
-    usuario.onboarding_completo = True
+    usuario.onboarding_perfis_vistos = ["solicitante"]
     usuario.onboarding_passo = 0
     usuario.is_admin_or_above = False
     usuario.is_supervisor_or_above = False
@@ -685,3 +685,209 @@ def test_login_funciona_quando_get_by_email_usa_hash_lookup(client):
 
     assert r.status_code == 302
     assert "/login" not in (r.location or "")
+
+
+# ── SSO Microsoft ──────────────────────────────────────────────────────────────
+
+
+class _FakeThread:
+    """Thread fake para executar target imediatamente nos testes."""
+
+    def __init__(self, target=None, daemon=None):
+        self._target = target
+        self.daemon = daemon
+
+    def start(self):
+        if self._target:
+            self._target()
+
+
+def _usuario_existente_mock(
+    uid="u_sso", email="sso@dtx.aero", perfil="solicitante", mfa_enabled=False, ativo=True
+):
+    u = MagicMock()
+    u.id = uid
+    u.email = email
+    u.nome = "SSO User"
+    u.perfil = perfil
+    u.must_change_password = False
+    u.mfa_enabled = mfa_enabled
+    u.ativo = ativo
+    u.is_authenticated = True
+    u.is_active = True
+    u.is_anonymous = False
+    u.get_id = lambda: str(uid)
+    u.is_admin_or_above = perfil in ("admin", "admin_global")
+    u.is_supervisor_or_above = perfil in ("supervisor", "admin", "admin_global")
+    u.is_gestor = False
+    return u
+
+
+def test_login_microsoft_redireciona_para_authorize_url(client):
+    """GET /login/microsoft redireciona para a authorize URL do MSAL e guarda o flow na sessão."""
+    fake_flow = {"state": "abc123"}
+    with patch(
+        "app.routes.auth.sso_microsoft_service.iniciar_fluxo_login",
+        return_value=("https://login.microsoftonline.com/authorize?x=1", fake_flow),
+    ):
+        r = client.get("/login/microsoft", follow_redirects=False)
+
+    assert r.status_code == 302
+    assert r.location == "https://login.microsoftonline.com/authorize?x=1"
+    with client.session_transaction() as sess:
+        assert sess.get("sso_flow") == fake_flow
+
+
+def test_login_microsoft_desabilitado_flash_e_redireciona(client, app):
+    """GET /login/microsoft com SSO_MICROSOFT_ENABLED=False redireciona para /login."""
+    app.config["SSO_MICROSOFT_ENABLED"] = False
+    r = client.get("/login/microsoft", follow_redirects=False)
+    assert r.status_code == 302
+    assert "/login" in r.location
+
+
+def test_callback_sem_flow_na_sessao_redireciona_login(client):
+    """GET callback sem flow salvo na sessão redireciona para /login."""
+    r = client.get("/login/microsoft/callback", follow_redirects=False)
+    assert r.status_code == 302
+    assert "/login" in r.location
+
+
+def test_callback_erro_query_param_redireciona_login(client):
+    """GET callback com ?error= (usuário cancelou) redireciona para /login."""
+    with client.session_transaction() as sess:
+        sess["sso_flow"] = {"state": "abc"}
+    r = client.get("/login/microsoft/callback?error=access_denied", follow_redirects=False)
+    assert r.status_code == 302
+    assert "/login" in r.location
+
+
+def test_callback_token_exchange_falha_redireciona_login(client):
+    """GET callback com falha na troca de token (MSAL retorna 'error') redireciona para /login."""
+    with client.session_transaction() as sess:
+        sess["sso_flow"] = {"state": "abc"}
+    with patch(
+        "app.routes.auth.sso_microsoft_service.concluir_fluxo_login",
+        return_value={"error": "invalid_grant", "error_description": "code expired"},
+    ):
+        r = client.get("/login/microsoft/callback?code=xyz&state=abc", follow_redirects=False)
+    assert r.status_code == 302
+    assert "/login" in r.location
+
+
+def test_callback_tenant_incorreto_rejeita_login_sem_tocar_firestore(client):
+    """Tenant mismatch rejeita login ANTES de qualquer acesso a Usuario (get_by_email/save)."""
+    with client.session_transaction() as sess:
+        sess["sso_flow"] = {"state": "abc"}
+    with (
+        patch(
+            "app.routes.auth.sso_microsoft_service.concluir_fluxo_login",
+            return_value={"id_token_claims": {"tid": "outro-tenant"}},
+        ),
+        patch("app.routes.auth.sso_microsoft_service.validar_tenant", return_value=False),
+        patch("app.routes.auth.Usuario.get_by_email") as mock_get_by_email,
+        patch("app.routes.auth.Usuario.save") as mock_save,
+    ):
+        r = client.get("/login/microsoft/callback?code=xyz&state=abc", follow_redirects=False)
+
+    assert r.status_code == 302
+    assert "/login" in r.location
+    mock_get_by_email.assert_not_called()
+    mock_save.assert_not_called()
+
+
+def test_callback_usuario_existente_faz_login_sem_duplicar(client):
+    """Usuário existente por e-mail faz login na MESMA conta — MFA gate ainda se aplica."""
+    usuario = _usuario_existente_mock(mfa_enabled=False)
+    with (
+        client.session_transaction() as sess,
+    ):
+        sess["sso_flow"] = {"state": "abc"}
+    with (
+        patch(
+            "app.routes.auth.sso_microsoft_service.concluir_fluxo_login",
+            return_value={
+                "id_token_claims": {"tid": "tenant-dtx", "preferred_username": usuario.email}
+            },
+        ),
+        patch("app.routes.auth.sso_microsoft_service.validar_tenant", return_value=True),
+        patch(
+            "app.routes.auth.sso_microsoft_service.extrair_identidade",
+            return_value=(usuario.email, usuario.nome),
+        ),
+        patch("app.routes.auth.Usuario.get_by_email", return_value=usuario) as mock_get_by_email,
+        patch("app.routes.auth.Usuario.save") as mock_save,
+        patch("app.models_usuario.Usuario.get_by_id", return_value=usuario),
+    ):
+        r = client.get("/login/microsoft/callback?code=xyz&state=abc", follow_redirects=False)
+
+    assert r.status_code == 302
+    assert "mfa" in (r.location or "").lower()
+    mock_get_by_email.assert_called_once()
+    mock_save.assert_not_called()
+
+
+def test_callback_usuario_desativado_bloqueia_login(client):
+    """Usuário existente com ativo=False é bloqueado, mesmo com token Microsoft válido."""
+    usuario = _usuario_existente_mock(ativo=False)
+    with client.session_transaction() as sess:
+        sess["sso_flow"] = {"state": "abc"}
+    with (
+        patch(
+            "app.routes.auth.sso_microsoft_service.concluir_fluxo_login",
+            return_value={"id_token_claims": {"tid": "tenant-dtx"}},
+        ),
+        patch("app.routes.auth.sso_microsoft_service.validar_tenant", return_value=True),
+        patch(
+            "app.routes.auth.sso_microsoft_service.extrair_identidade",
+            return_value=(usuario.email, usuario.nome),
+        ),
+        patch("app.routes.auth.Usuario.get_by_email", return_value=usuario),
+    ):
+        r = client.get("/login/microsoft/callback?code=xyz&state=abc", follow_redirects=False)
+
+    assert r.status_code == 302
+    assert "/login" in r.location
+
+
+def test_callback_usuario_novo_auto_provisiona_como_solicitante(client, app):
+    """E-mail sem Usuario existente auto-provisiona perfil solicitante e dispara notificações."""
+    from app.models_usuario import Usuario
+
+    admin_mock = _usuario_existente_mock(uid="admin_1", email="admin@dtx.aero", perfil="admin")
+
+    with client.session_transaction() as sess:
+        sess["sso_flow"] = {"state": "abc"}
+    with (
+        patch(
+            "app.routes.auth.sso_microsoft_service.concluir_fluxo_login",
+            return_value={"id_token_claims": {"tid": "tenant-dtx"}},
+        ),
+        patch("app.routes.auth.sso_microsoft_service.validar_tenant", return_value=True),
+        patch(
+            "app.routes.auth.sso_microsoft_service.extrair_identidade",
+            return_value=("novo.sso@dtx.aero", "Novo SSO"),
+        ),
+        patch("app.routes.auth.Usuario.get_by_email", return_value=None),
+        patch.object(Usuario, "save", autospec=True) as mock_save,
+        patch("app.routes.auth.Usuario.get_all", return_value=[admin_mock]),
+        patch("app.routes.auth.cache_delete"),
+        patch("app.routes.auth.notificar_novo_usuario_sso") as mock_notif_user,
+        patch("app.routes.auth.notificar_admins_novo_usuario_sso") as mock_notif_admins,
+        patch("app.routes.auth.threading.Thread", side_effect=_FakeThread),
+    ):
+        r = client.get("/login/microsoft/callback?code=xyz&state=abc", follow_redirects=False)
+
+    assert r.status_code == 302
+    assert "mfa" in (r.location or "").lower()
+
+    mock_save.assert_called_once()
+    novo_usuario = mock_save.call_args[0][0]
+    assert novo_usuario.email == "novo.sso@dtx.aero"
+    assert novo_usuario.perfil == "solicitante"
+    assert novo_usuario.auth_provider == "microsoft"
+
+    mock_notif_user.assert_called_once()
+    mock_notif_admins.assert_called_once()
+    admins_kwargs = mock_notif_admins.call_args.kwargs
+    assert admins_kwargs["admin_emails"] == ["admin@dtx.aero"]

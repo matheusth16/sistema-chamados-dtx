@@ -87,10 +87,12 @@ def _usuario_mock(uid, email, nome, perfil, area="Geral", areas=None):
     u.get_id = lambda: str(uid)
     # Para testes que assumem acesso após login (dashboard, API): sem obrigação de trocar senha
     u.must_change_password = False
+    # MFA já configurado por padrão nos testes — evita redirecionamento para /mfa/configurar
+    u.mfa_enabled = True
     u.is_admin_or_above = perfil in ("admin", "admin_global")
     u.is_supervisor_or_above = perfil in ("supervisor", "admin", "admin_global")
     # Onboarding concluído por padrão — evita injeção do tour em testes (F-62)
-    u.onboarding_completo = True
+    u.onboarding_perfis_vistos = [perfil]
     u.onboarding_passo = 0
     # Onda 2: conta ativa por padrão (ativo=False bloqueia login e sessão)
     u.ativo = True
@@ -98,6 +100,17 @@ def _usuario_mock(uid, email, nome, perfil, area="Geral", areas=None):
     u.nivel_gestao = None
     u.is_gestor = False
     u.is_gestor_only = False
+    # Demais campos reais de Usuario.__init__ (F-62) — valores default, evita
+    # que atributos "esquecidos" virem MagicMock truthy e mascarem bugs de lógica
+    u.senha_hash = None
+    u.password_changed_at = None
+    u.exp_total = 0
+    u.exp_semanal = 0
+    u.level = 1
+    u.conquistas = []
+    u.mfa_secret = None
+    u.mfa_backup_codes = []
+    u.auth_provider = "local"
     return u
 
 
@@ -110,6 +123,7 @@ def client_logado_solicitante(client, app):
     with (
         patch("app.routes.auth.Usuario.get_by_email", return_value=user),
         patch("app.models_usuario.Usuario.get_by_id", return_value=user),
+        patch("app.routes.auth._dispositivo_confiavel", return_value=True),
     ):
         client.post("/login", data={"email": "sol@test.com", "senha": "ok"}, follow_redirects=False)
         yield client
@@ -122,6 +136,7 @@ def client_logado_supervisor(client, app):
     with (
         patch("app.routes.auth.Usuario.get_by_email", return_value=user),
         patch("app.models_usuario.Usuario.get_by_id", return_value=user),
+        patch("app.routes.auth._dispositivo_confiavel", return_value=True),
     ):
         client.post("/login", data={"email": "sup@test.com", "senha": "ok"}, follow_redirects=False)
         yield client
@@ -134,6 +149,7 @@ def client_logado_admin(client, app):
     with (
         patch("app.routes.auth.Usuario.get_by_email", return_value=user),
         patch("app.models_usuario.Usuario.get_by_id", return_value=user),
+        patch("app.routes.auth._dispositivo_confiavel", return_value=True),
     ):
         client.post(
             "/login", data={"email": "admin@test.com", "senha": "ok"}, follow_redirects=False
@@ -148,6 +164,7 @@ def client_logado_admin_global(client, app):
     with (
         patch("app.routes.auth.Usuario.get_by_email", return_value=user),
         patch("app.models_usuario.Usuario.get_by_id", return_value=user),
+        patch("app.routes.auth._dispositivo_confiavel", return_value=True),
     ):
         client.post("/login", data={"email": "ag@test.com", "senha": "ok"}, follow_redirects=False)
         yield client
@@ -167,6 +184,7 @@ def client_logado_supervisor_sem_areas(client, app):
     with (
         patch("app.routes.auth.Usuario.get_by_email", return_value=user),
         patch("app.models_usuario.Usuario.get_by_id", return_value=user),
+        patch("app.routes.auth._dispositivo_confiavel", return_value=True),
     ):
         client.post(
             "/login", data={"email": "sup_sem@test.com", "senha": "ok"}, follow_redirects=False
@@ -184,6 +202,7 @@ def client_logado_gestor(client, app):
     with (
         patch("app.routes.auth.Usuario.get_by_email", return_value=user),
         patch("app.models_usuario.Usuario.get_by_id", return_value=user),
+        patch("app.routes.auth._dispositivo_confiavel", return_value=True),
     ):
         client.post(
             "/login", data={"email": "gestor@test.com", "senha": "ok"}, follow_redirects=False

@@ -26,7 +26,7 @@ def test_from_dict_campos_basicos():
         "exp_semanal": 5,
         "level": 2,
         "conquistas": ["badge1"],
-        "onboarding_completo": True,
+        "onboarding_perfis_vistos": ["supervisor"],
         "onboarding_passo": 3,
     }
     with patch("app.models_usuario.db"):
@@ -37,7 +37,7 @@ def test_from_dict_campos_basicos():
     assert u.perfil == "supervisor"
     assert u.areas == ["Manutencao"]
     assert u.level == 2
-    assert u.onboarding_completo is True
+    assert u.onboarding_perfis_vistos == ["supervisor"]
 
 
 def test_from_dict_migra_area_string_para_areas_lista():
@@ -101,7 +101,7 @@ def test_to_dict_contém_campos_esperados():
     assert d["areas"] == ["TI"]
     assert "senha_hash" in d
     assert "must_change_password" in d
-    assert "onboarding_completo" in d
+    assert "onboarding_perfis_vistos" in d
 
 
 # ── Senha ──────────────────────────────────────────────────────────────────────
@@ -993,3 +993,322 @@ def test_nivel_gestao_invalido_vira_none():
         u = Usuario.from_dict(data, "x_001")
 
     assert u.nivel_gestao is None
+
+
+# ── MFA ──────────────────────────────────────────────────────────────────────
+
+
+def test_usuario_mfa_desabilitado_por_padrao():
+    """Usuario recém-criado tem MFA desabilitado e sem secret/backup codes."""
+    from app.models_usuario import Usuario
+
+    with patch("app.models_usuario.db"):
+        u = Usuario(id="u1", email="x@dtx.aero", nome="X", perfil="solicitante")
+
+    assert u.mfa_enabled is False
+    assert u.mfa_secret is None
+    assert u.mfa_backup_codes == []
+
+
+def test_from_dict_popula_campos_mfa():
+    """from_dict carrega mfa_enabled, mfa_secret e mfa_backup_codes do Firestore."""
+    from app.models_usuario import Usuario
+
+    data = {
+        "email": "mfa@dtx.aero",
+        "nome": "Mfa User",
+        "perfil": "admin",
+        "mfa_enabled": True,
+        "mfa_secret": "JBSWY3DPEHPK3PXP",
+        "mfa_backup_codes": ["hash1", "hash2"],
+    }
+    with (
+        patch("app.models_usuario.db"),
+        patch("app.models_usuario.maybe_decrypt", side_effect=lambda x: x),
+    ):
+        u = Usuario.from_dict(data, "u_mfa")
+
+    assert u.mfa_enabled is True
+    assert u.mfa_secret == "JBSWY3DPEHPK3PXP"
+    assert u.mfa_backup_codes == ["hash1", "hash2"]
+
+
+def test_to_dict_inclui_campos_mfa_e_criptografa_secret():
+    """to_dict grava mfa_enabled/backup_codes e passa mfa_secret por maybe_encrypt."""
+    from app.models_usuario import Usuario
+
+    with (
+        patch("app.models_usuario.db"),
+        patch("app.models_usuario.is_pii_encryption_enabled", return_value=False),
+        patch("app.models_usuario.maybe_encrypt", side_effect=lambda x: x),
+    ):
+        u = Usuario(id="u1", email="x@dtx.aero", nome="X", perfil="solicitante")
+        u.mfa_enabled = True
+        u.mfa_secret = "SECRET123"
+        u.mfa_backup_codes = ["h1"]
+        d = u.to_dict()
+
+    assert d["mfa_enabled"] is True
+    assert d["mfa_secret"] == "SECRET123"
+    assert d["mfa_backup_codes"] == ["h1"]
+
+
+def test_to_dict_mfa_secret_none_nao_chama_encrypt():
+    """to_dict não tenta criptografar mfa_secret quando MFA está desabilitado (None)."""
+    from app.models_usuario import Usuario
+
+    with patch("app.models_usuario.db"):
+        u = Usuario(id="u1", email="x@dtx.aero", nome="X", perfil="solicitante")
+        d = u.to_dict()
+
+    assert d["mfa_secret"] is None
+
+
+def test_update_mfa_enabled_e_secret_persiste():
+    """update(mfa_enabled=True, mfa_secret=..., mfa_backup_codes=...) persiste no Firestore."""
+    from app.models_usuario import Usuario
+
+    with (
+        patch("app.models_usuario.db") as mock_db,
+        patch("app.models_usuario.maybe_encrypt", side_effect=lambda x: x),
+    ):
+        u = Usuario(id="u1", email="x@dtx.aero", nome="X", perfil="solicitante")
+        u.update(mfa_enabled=True, mfa_secret="NEWSECRET", mfa_backup_codes=["h1", "h2"])
+
+    call_args = mock_db.collection.return_value.document.return_value.update.call_args[0][0]
+    assert call_args["mfa_enabled"] is True
+    assert call_args["mfa_secret"] == "NEWSECRET"
+    assert call_args["mfa_backup_codes"] == ["h1", "h2"]
+    assert u.mfa_enabled is True
+    assert u.mfa_secret == "NEWSECRET"
+    assert u.mfa_backup_codes == ["h1", "h2"]
+
+
+def test_update_mfa_desativar_limpa_secret_e_backup_codes():
+    """update(mfa_enabled=False, mfa_secret=None, mfa_backup_codes=None) desativa o MFA."""
+    from app.models_usuario import Usuario
+
+    with (
+        patch("app.models_usuario.db") as mock_db,
+        patch("app.models_usuario.maybe_encrypt", side_effect=lambda x: x),
+    ):
+        u = Usuario(id="u1", email="x@dtx.aero", nome="X", perfil="solicitante")
+        u.mfa_enabled = True
+        u.mfa_secret = "OLDSECRET"
+        u.mfa_backup_codes = ["h1"]
+        u.update(mfa_enabled=False, mfa_secret=None, mfa_backup_codes=None)
+
+    call_args = mock_db.collection.return_value.document.return_value.update.call_args[0][0]
+    assert call_args["mfa_enabled"] is False
+    assert call_args["mfa_secret"] is None
+    assert call_args["mfa_backup_codes"] == []
+    assert u.mfa_enabled is False
+    assert u.mfa_secret is None
+    assert u.mfa_backup_codes == []
+
+
+# ── SSO Microsoft — auth_provider ─────────────────────────────────────────────
+
+
+def test_usuario_auth_provider_default_local():
+    """Usuario recém-criado sem auth_provider assume 'local' por padrão."""
+    from app.models_usuario import Usuario
+
+    with patch("app.models_usuario.db"):
+        u = Usuario(id="u_local", email="local@dtx.aero", nome="Local")
+
+    assert u.auth_provider == "local"
+
+
+def test_usuario_from_dict_com_auth_provider_microsoft():
+    """from_dict lê auth_provider quando presente no doc Firestore."""
+    from app.models_usuario import Usuario
+
+    data = {
+        "email": "sso@dtx.aero",
+        "nome": "SSO User",
+        "perfil": "solicitante",
+        "auth_provider": "microsoft",
+    }
+    with patch("app.models_usuario.db"):
+        u = Usuario.from_dict(data, "u_sso")
+
+    assert u.auth_provider == "microsoft"
+
+
+def test_usuario_from_dict_sem_auth_provider_default_local():
+    """from_dict em doc legado (sem auth_provider) assume 'local' — retrocompat."""
+    from app.models_usuario import Usuario
+
+    data = {"email": "legado@dtx.aero", "nome": "Legado", "perfil": "solicitante"}
+    with patch("app.models_usuario.db"):
+        u = Usuario.from_dict(data, "u_legado")
+
+    assert u.auth_provider == "local"
+
+
+def test_usuario_auth_provider_invalido_vira_local():
+    """auth_provider fora da lista fechada é normalizado para 'local' (fail-safe)."""
+    from app.models_usuario import Usuario
+
+    with patch("app.models_usuario.db"):
+        u = Usuario(id="u_x", email="x@dtx.aero", nome="X", auth_provider="google")
+
+    assert u.auth_provider == "local"
+
+
+def test_usuario_to_dict_persiste_auth_provider():
+    """to_dict inclui auth_provider para persistência no Firestore."""
+    from app.models_usuario import Usuario
+
+    with (
+        patch("app.models_usuario.db"),
+        patch("app.models_usuario.is_pii_encryption_enabled", return_value=False),
+        patch("app.models_usuario.maybe_encrypt", side_effect=lambda x: x),
+    ):
+        u = Usuario(
+            id="u_sso2",
+            email="sso2@dtx.aero",
+            nome="SSO2",
+            auth_provider="microsoft",
+        )
+        d = u.to_dict()
+
+    assert d["auth_provider"] == "microsoft"
+
+
+def test_usuario_update_auth_provider_persiste():
+    """update(auth_provider='microsoft') persiste o campo no Firestore."""
+    from app.models_usuario import Usuario
+
+    with (
+        patch("app.models_usuario.db") as mock_db,
+        patch("app.models_usuario.maybe_encrypt", side_effect=lambda x: x),
+    ):
+        u = Usuario(id="u_upd", email="upd@dtx.aero", nome="Upd")
+        u.update(auth_provider="microsoft")
+
+    call_args = mock_db.collection.return_value.document.return_value.update.call_args[0][0]
+    assert call_args["auth_provider"] == "microsoft"
+    assert u.auth_provider == "microsoft"
+
+
+def test_usuario_update_auth_provider_invalido_normaliza_para_local():
+    """update com valor fora da lista fechada normaliza para 'local'."""
+    from app.models_usuario import Usuario
+
+    with (
+        patch("app.models_usuario.db") as mock_db,
+        patch("app.models_usuario.maybe_encrypt", side_effect=lambda x: x),
+    ):
+        u = Usuario(id="u_upd2", email="upd2@dtx.aero", nome="Upd2")
+        u.update(auth_provider="github")
+
+    call_args = mock_db.collection.return_value.document.return_value.update.call_args[0][0]
+    assert call_args["auth_provider"] == "local"
+    assert u.auth_provider == "local"
+
+
+# ── Onboarding — onboarding_perfis_vistos ─────────────────────────────────────
+
+
+def test_usuario_onboarding_perfis_vistos_default_vazio():
+    """Usuario recém-criado tem onboarding_perfis_vistos vazio por padrão."""
+    from app.models_usuario import Usuario
+
+    with patch("app.models_usuario.db"):
+        u = Usuario(id="u_ob1", email="ob1@dtx.aero", nome="Ob1")
+
+    assert u.onboarding_perfis_vistos == []
+
+
+def test_usuario_from_dict_le_onboarding_perfis_vistos():
+    """from_dict lê onboarding_perfis_vistos quando presente no doc."""
+    from app.models_usuario import Usuario
+
+    data = {
+        "email": "ob2@dtx.aero",
+        "nome": "Ob2",
+        "perfil": "supervisor",
+        "onboarding_perfis_vistos": ["solicitante", "supervisor"],
+    }
+    with patch("app.models_usuario.db"):
+        u = Usuario.from_dict(data, "u_ob2")
+
+    assert u.onboarding_perfis_vistos == ["solicitante", "supervisor"]
+
+
+def test_usuario_from_dict_retrocompat_onboarding_completo_true_vira_perfil_atual():
+    """Doc legado com onboarding_completo=True (sem a lista nova) assume perfil atual como visto."""
+    from app.models_usuario import Usuario
+
+    data = {
+        "email": "legado@dtx.aero",
+        "nome": "Legado",
+        "perfil": "admin",
+        "onboarding_completo": True,
+    }
+    with patch("app.models_usuario.db"):
+        u = Usuario.from_dict(data, "u_legado")
+
+    assert u.onboarding_perfis_vistos == ["admin"]
+
+
+def test_usuario_from_dict_sem_onboarding_completo_nem_lista_fica_vazio():
+    """Doc sem onboarding_completo nem onboarding_perfis_vistos (nunca fez tour) fica vazio."""
+    from app.models_usuario import Usuario
+
+    data = {"email": "novo@dtx.aero", "nome": "Novo", "perfil": "solicitante"}
+    with patch("app.models_usuario.db"):
+        u = Usuario.from_dict(data, "u_novo")
+
+    assert u.onboarding_perfis_vistos == []
+
+
+def test_usuario_onboarding_perfis_vistos_filtra_valores_invalidos():
+    """Valores fora da lista fechada de perfis são descartados (fail-safe)."""
+    from app.models_usuario import Usuario
+
+    with patch("app.models_usuario.db"):
+        u = Usuario(
+            id="u_ob3",
+            email="ob3@dtx.aero",
+            nome="Ob3",
+            onboarding_perfis_vistos=["solicitante", "cargo_invalido"],
+        )
+
+    assert u.onboarding_perfis_vistos == ["solicitante"]
+
+
+def test_usuario_to_dict_inclui_onboarding_perfis_vistos():
+    """to_dict inclui onboarding_perfis_vistos para persistência."""
+    from app.models_usuario import Usuario
+
+    with (
+        patch("app.models_usuario.db"),
+        patch("app.models_usuario.is_pii_encryption_enabled", return_value=False),
+        patch("app.models_usuario.maybe_encrypt", side_effect=lambda x: x),
+    ):
+        u = Usuario(
+            id="u_ob4", email="ob4@dtx.aero", nome="Ob4", onboarding_perfis_vistos=["solicitante"]
+        )
+        d = u.to_dict()
+
+    assert d["onboarding_perfis_vistos"] == ["solicitante"]
+    assert "onboarding_completo" not in d
+
+
+def test_usuario_update_onboarding_perfis_vistos_persiste():
+    """update(onboarding_perfis_vistos=[...]) persiste a lista filtrada no Firestore."""
+    from app.models_usuario import Usuario
+
+    with (
+        patch("app.models_usuario.db") as mock_db,
+        patch("app.models_usuario.maybe_encrypt", side_effect=lambda x: x),
+    ):
+        u = Usuario(id="u_ob5", email="ob5@dtx.aero", nome="Ob5")
+        u.update(onboarding_perfis_vistos=["solicitante", "supervisor", "invalido"])
+
+    call_args = mock_db.collection.return_value.document.return_value.update.call_args[0][0]
+    assert call_args["onboarding_perfis_vistos"] == ["solicitante", "supervisor"]
+    assert u.onboarding_perfis_vistos == ["solicitante", "supervisor"]

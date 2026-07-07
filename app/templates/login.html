@@ -97,6 +97,24 @@
                 </button>
             </form>
 
+            <div class="flex items-center gap-3 my-4">
+                <span class="flex-1 h-px" style="background-color: var(--color-surface-border)"></span>
+                <span class="text-xs font-semibold" style="color: var(--color-surface-muted)">{{ t('or_divider') }}</span>
+                <span class="flex-1 h-px" style="background-color: var(--color-surface-border)"></span>
+            </div>
+
+            <a href="{{ url_for('main.login_microsoft') }}" data-testid="sso-microsoft-btn"
+                class="w-full h-11 inline-flex items-center justify-center gap-2 text-sm font-bold rounded-dtx-lg border transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-offset-2"
+                style="border-color: var(--color-surface-border); color: var(--color-dtx-700)">
+                <svg class="w-4 h-4" viewBox="0 0 21 21" aria-hidden="true">
+                    <rect x="1" y="1" width="9" height="9" fill="#f25022"/>
+                    <rect x="11" y="1" width="9" height="9" fill="#7fba00"/>
+                    <rect x="1" y="11" width="9" height="9" fill="#00a4ef"/>
+                    <rect x="11" y="11" width="9" height="9" fill="#ffb900"/>
+                </svg>
+                {{ t('sign_in_with_microsoft') }}
+            </a>
+
             <!-- Flash messages -->
             {% with messages = get_flashed_messages(with_categories=true) %}
                 {% if messages %}

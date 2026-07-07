@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div id="mfa-configurar-card" class="w-full max-w-lg mx-auto">
+    <div class="dtx-card rounded-dtx-xl p-8">
+        <h2 class="font-display text-xl font-extrabold tracking-tight" style="color: var(--color-dtx-700)">
+            {{ t('mfa_settings_title') }}
+        </h2>
+
+        {% if mfa_habilitado %}
+        <p class="mt-1 text-sm mb-6" style="color: var(--color-surface-muted)">
+            {{ t('mfa_already_enabled') }}
+        </p>
+
+        <form method="POST" action="{{ url_for('main.mfa_regenerar_backup_codes') }}" class="space-y-4 mb-6" data-testid="mfa-regen-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <div>
+                <label for="senha_atual_regen" class="dtx-label">{{ t('current_password') }}</label>
+                <input id="senha_atual_regen" name="senha_atual" type="password" required class="dtx-input-soft" placeholder="••••••••">
+            </div>
+            <button type="submit" class="bento-btn-ghost w-full justify-center">
+                {{ t('mfa_regenerate_backup_codes') }}
+            </button>
+        </form>
+
+        <div class="bento-nav-divider"></div>
+
+        <form method="POST" action="{{ url_for('main.mfa_desativar') }}" class="space-y-4 mt-6" data-testid="mfa-disable-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <div>
+                <label for="senha_atual_desativar" class="dtx-label">{{ t('current_password') }}</label>
+                <input id="senha_atual_desativar" name="senha_atual" type="password" required class="dtx-input-soft" placeholder="••••••••">
+            </div>
+            <button type="submit" data-testid="mfa-disable-submit-btn"
+                class="w-full h-11 inline-flex items-center justify-center gap-2 text-sm font-bold rounded-dtx-lg text-red-700 bg-red-50 hover:bg-red-100 transition-colors duration-200 border border-red-200">
+                {{ t('mfa_disable') }}
+            </button>
+        </form>
+
+        {% else %}
+        <p class="mt-1 text-sm mb-6" style="color: var(--color-surface-muted)">
+            {{ t('mfa_setup_intro') }}
+        </p>
+
+        <div class="flex flex-col items-center gap-3 mb-6">
+            <img src="{{ qr_data_uri }}" alt="{{ t('mfa_qr_alt') }}" class="w-48 h-48 rounded-dtx-lg border border-surface-border" data-testid="mfa-qr-image">
+            <p class="text-xs text-center" style="color: var(--color-surface-muted)">{{ t('mfa_manual_key_hint') }}</p>
+            <code class="text-xs font-mono px-3 py-1.5 rounded-dtx-lg bg-surface-raised border border-surface-border tracking-widest" data-testid="mfa-manual-secret">{{ secret_manual }}</code>
+        </div>
+
+        <form method="POST" action="{{ url_for('main.mfa_configurar') }}" class="space-y-4" data-testid="mfa-setup-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <div>
+                <label for="codigo" class="dtx-label">{{ t('mfa_code_label') }}</label>
+                <input
+                    id="codigo" name="codigo" type="text" inputmode="numeric" autocomplete="one-time-code" required
+                    data-testid="mfa-setup-code-input"
+                    class="dtx-input-soft text-center tracking-[0.3em] font-mono text-lg"
+                    maxlength="6"
+                    placeholder="000000">
+            </div>
+            <button type="submit" data-testid="mfa-setup-submit-btn"
+                class="w-full h-11 inline-flex items-center justify-center gap-2 text-sm font-bold rounded-dtx-lg text-white bg-[var(--color-nav-bg)] hover:bg-[var(--color-nav-border)] transition-colors duration-200">
+                {{ t('mfa_enable_submit') }}
+            </button>
+        </form>
+        {% endif %}
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div data-testid="flash-message" data-category="{{ category }}"
+                         class="mt-4 p-3.5 rounded-dtx-lg text-sm font-semibold {% if category == 'danger' %}bg-red-50 text-red-800 border border-red-200{% elif category == 'success' %}bg-green-50 text-green-800 border border-green-200{% else %}bg-dtx-50 text-dtx-700 border border-dtx-100{% endif %}">
+                        {{ t(message) }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+    </div>
+</div>
+{% endblock %}

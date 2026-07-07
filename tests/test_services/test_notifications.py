@@ -75,10 +75,108 @@ def test_notificar_novo_usuario_cadastrado_envia_direto(app):
     assert mock_enviar.called
     destinatario, assunto, corpo_html, _corpo_texto = mock_enviar.call_args[0]
     assert destinatario == "novo.usuario@dtx.aero"
-    assert assunto == "Welcome to DTX Service Portal — your access credentials"
+    assert assunto == "Welcome to Andon — your access credentials"
     assert "Role" in corpo_html or "Initial password" in corpo_html
     assert "SenhaTest99" in corpo_html
     assert "123456" not in corpo_html
+
+
+def test_notificar_novo_usuario_sso_envia_email_sem_senha(app):
+    """notificar_novo_usuario_sso avisa o novo usuário sem mencionar senha."""
+    from app.services.notifications import notificar_novo_usuario_sso
+
+    with (
+        app.app_context(),
+        patch("app.services.notifications.enviar_email") as mock_enviar,
+    ):
+        app.config["APP_BASE_URL"] = "https://example.test"
+        mock_enviar.return_value = (True, None)
+        notificar_novo_usuario_sso(
+            usuario_id="user_sso_1",
+            usuario_email="novo.sso@dtx.aero",
+            usuario_nome="Novo SSO",
+        )
+
+    assert mock_enviar.called
+    destinatario, assunto, corpo_html, corpo_texto = mock_enviar.call_args[0]
+    assert destinatario == "novo.sso@dtx.aero"
+    assert "Microsoft" in corpo_html
+    assert "Initial password" not in corpo_html
+    assert "Initial password" not in corpo_texto
+    assert assunto
+
+
+def test_notificar_admins_novo_usuario_sso_envia_para_cada_admin(app):
+    """notificar_admins_novo_usuario_sso envia um e-mail por admin da lista."""
+    from app.services.notifications import notificar_admins_novo_usuario_sso
+
+    admins = ["admin1@dtx.aero", "admin2@dtx.aero"]
+    with (
+        app.app_context(),
+        patch("app.services.notifications.enviar_email") as mock_enviar,
+    ):
+        app.config["APP_BASE_URL"] = "https://example.test"
+        mock_enviar.return_value = (True, None)
+        notificar_admins_novo_usuario_sso(
+            admin_emails=admins,
+            usuario_email="novo.sso@dtx.aero",
+            usuario_nome="Novo SSO",
+        )
+
+    assert mock_enviar.call_count == 2
+    destinatarios = {call.args[0] for call in mock_enviar.call_args_list}
+    assert destinatarios == set(admins)
+
+
+def test_notificar_admins_novo_usuario_sso_lista_vazia_nao_envia(app):
+    """notificar_admins_novo_usuario_sso não chama enviar_email com lista vazia."""
+    from app.services.notifications import notificar_admins_novo_usuario_sso
+
+    with (
+        app.app_context(),
+        patch("app.services.notifications.enviar_email") as mock_enviar,
+    ):
+        notificar_admins_novo_usuario_sso(
+            admin_emails=[], usuario_email="novo.sso@dtx.aero", usuario_nome="Novo SSO"
+        )
+
+    mock_enviar.assert_not_called()
+
+
+def test_notificar_mudanca_perfil_envia_email_com_novo_perfil(app):
+    """notificar_mudanca_perfil avisa o usuário sobre o novo perfil."""
+    from app.services.notifications import notificar_mudanca_perfil
+
+    with (
+        app.app_context(),
+        patch("app.services.notifications.enviar_email") as mock_enviar,
+    ):
+        app.config["APP_BASE_URL"] = "https://example.test"
+        mock_enviar.return_value = (True, None)
+        notificar_mudanca_perfil(
+            usuario_email="promovido@dtx.aero",
+            usuario_nome="Promovido",
+            novo_perfil="supervisor",
+        )
+
+    assert mock_enviar.called
+    destinatario, assunto, corpo_html, _corpo_texto = mock_enviar.call_args[0]
+    assert destinatario == "promovido@dtx.aero"
+    assert assunto
+    assert "Supervisor" in corpo_html or "supervisor" in corpo_html.lower()
+
+
+def test_notificar_mudanca_perfil_sem_email_nao_envia(app):
+    """notificar_mudanca_perfil não chama enviar_email quando e-mail é vazio."""
+    from app.services.notifications import notificar_mudanca_perfil
+
+    with (
+        app.app_context(),
+        patch("app.services.notifications.enviar_email") as mock_enviar,
+    ):
+        notificar_mudanca_perfil(usuario_email="", usuario_nome="X", novo_perfil="admin")
+
+    mock_enviar.assert_not_called()
 
 
 def test_notificar_responsavel_prazo_24h_envia_direto(app):

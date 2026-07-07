@@ -90,6 +90,7 @@ def test_atualizar_status_retorna_429_apos_exceder_limite(app_rl):
     usuario.nome = "RL User"
     usuario.perfil = "supervisor"
     usuario.must_change_password = False
+    usuario.mfa_enabled = True
     usuario.get_id = lambda: "u_rl"
     usuario.is_authenticated = True
     usuario.is_active = True
@@ -102,6 +103,7 @@ def test_atualizar_status_retorna_429_apos_exceder_limite(app_rl):
         patch("app.routes.auth.LoginAttemptTracker.is_locked_out", return_value=False),
         patch("app.routes.auth.LoginAttemptTracker.reset_attempts"),
         patch("app.routes.auth.LoginAttemptTracker.log_success_attempt"),
+        patch("app.routes.auth._dispositivo_confiavel", return_value=True),
     ):
         client = app_rl.test_client()
         client.post("/login", data={"email": "rl@test.com", "senha": "ok"})

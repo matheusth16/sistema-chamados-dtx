@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div style="max-width:36rem; margin:0 auto; padding:32px 16px;">
+    <div class="bento-card">
+
+        <div style="text-align:center; margin-bottom:28px;">
+            <div class="bento-chip-icon" style="margin:0 auto;">
+                <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                </svg>
+            </div>
+            <h1 class="font-display" style="margin-top:16px; font-size:1.5rem; font-weight:800;">{{ t('my_data_title') }}</h1>
+            <p style="margin-top:8px; font-size:13px; color:var(--color-text-muted);">{{ t('my_data_subtitle') }}</p>
+        </div>
+
+        <dl style="display:flex; flex-direction:column; gap:16px;">
+            <div>
+                <dt class="bento-field-label plain">{{ t('name') }}</dt>
+                <dd style="margin:4px 0 0; font-size:15px; font-weight:600;">{{ usuario.nome }}</dd>
+            </div>
+            <div>
+                <dt class="bento-field-label plain">{{ t('email') }}</dt>
+                <dd style="margin:4px 0 0; font-size:15px; font-weight:600;">{{ usuario.email }}</dd>
+            </div>
+            <div>
+                <dt class="bento-field-label plain">{{ t('profile') }}</dt>
+                <dd style="margin:4px 0 0; font-size:15px; font-weight:600;">
+                    {% if usuario.perfil in ('admin', 'admin_global') %}{{ t('profile_admin') }}
+                    {% elif usuario.perfil == 'supervisor' %}{{ t('supervisor') }}
+                    {% else %}{{ t('requester') }}{% endif %}
+                </dd>
+            </div>
+            {% if usuario.areas %}
+            <div>
+                <dt class="bento-field-label plain">{{ t('field_areas') }}</dt>
+                <dd style="margin:4px 0 0; font-size:15px; font-weight:600;">{{ usuario.areas|join(', ') }}</dd>
+            </div>
+            {% endif %}
+            {% if usuario.nivel_gestao %}
+            <div>
+                <dt class="bento-field-label plain">{{ t('management_level') }}</dt>
+                <dd style="margin:4px 0 0; font-size:15px; font-weight:600;">{{ usuario.nivel_gestao }}</dd>
+            </div>
+            {% endif %}
+            <div>
+                <dt class="bento-field-label plain">{{ t('auth_provider_label') }}</dt>
+                <dd style="margin:4px 0 0; font-size:15px; font-weight:600;">
+                    {% if usuario.auth_provider == 'microsoft' %}{{ t('auth_provider_microsoft') }}{% else %}{{ t('auth_provider_local') }}{% endif %}
+                </dd>
+            </div>
+            <div>
+                <dt class="bento-field-label plain">{{ t('mfa_status_label') }}</dt>
+                <dd style="margin:4px 0 0; font-size:15px; font-weight:600;">
+                    {% if usuario.mfa_enabled %}{{ t('active') }}{% else %}{{ t('inactive') }}{% endif %}
+                </dd>
+            </div>
+            <div>
+                <dt class="bento-field-label plain">{{ t('password_last_changed_label') }}</dt>
+                <dd style="margin:4px 0 0; font-size:15px; font-weight:600;">
+                    {% if usuario.password_changed_at %}{{ usuario.password_changed_at }}{% else %}{{ t('password_never_changed') }}{% endif %}
+                </dd>
+            </div>
+        </dl>
+
+        <div style="margin-top:28px;">
+            <a href="{{ url_for('main.index') }}" class="bento-btn-outline" style="width:100%; justify-content:center;">
+                {{ t('back') }}
+            </a>
+        </div>
+
+    </div>
+</div>
+{% endblock %}

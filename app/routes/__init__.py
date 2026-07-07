@@ -14,6 +14,7 @@ from app.routes import (  # noqa: E402
     categorias,  # noqa: E402, F401
     chamados,  # noqa: E402, F401
     dashboard,  # noqa: E402, F401
+    mfa,  # noqa: E402, F401
     usuarios,  # noqa: E402, F401
 )
 

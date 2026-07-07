@@ -22,6 +22,12 @@ CACHE_KEY_USUARIOS = "usuarios_list"
 # Valores válidos de nivel_gestao — lista fechada
 NIVEIS_GESTAO_VALIDOS = frozenset({"gestor_setor", "gerente_producao", "assistente_gm", "gm"})
 
+# Valores válidos de auth_provider — lista fechada
+AUTH_PROVIDERS_VALIDOS = frozenset({"local", "microsoft"})
+
+# Perfis válidos — usado para validar onboarding_perfis_vistos
+PERFIS_VALIDOS = frozenset({"solicitante", "supervisor", "admin", "admin_global"})
+
 
 class Usuario(UserMixin):
     """Representação de um usuário do sistema"""
@@ -39,10 +45,14 @@ class Usuario(UserMixin):
         conquistas: list = None,
         must_change_password: bool = False,
         password_changed_at=None,
-        onboarding_completo: bool = False,
+        onboarding_perfis_vistos: list | None = None,
         onboarding_passo: int = 0,
         ativo: bool = True,
         nivel_gestao: str | None = None,
+        mfa_enabled: bool = False,
+        mfa_secret: str | None = None,
+        mfa_backup_codes: list | None = None,
+        auth_provider: str = "local",
     ):
         self.id = id
         self.email = email
@@ -62,13 +72,27 @@ class Usuario(UserMixin):
         self.level = level
         self.conquistas = conquistas or []
 
-        # Onboarding
-        self.onboarding_completo = onboarding_completo
+        # Onboarding: perfis para os quais o tour já foi visto/pulado — não repete
+        # o tour de um perfil já visto (ex.: rebaixado de volta a um perfil anterior)
+        self.onboarding_perfis_vistos: list[str] = [
+            p for p in (onboarding_perfis_vistos or []) if p in PERFIS_VALIDOS
+        ]
         self.onboarding_passo = onboarding_passo
 
         # Gestão (Fase 5): valor fora da lista fechada → None (fail-safe)
         self.nivel_gestao: str | None = (
             nivel_gestao if nivel_gestao in NIVEIS_GESTAO_VALIDOS else None
+        )
+
+        # MFA (TOTP + códigos de backup)
+        self.mfa_enabled = mfa_enabled
+        self.mfa_secret = mfa_secret
+        self.mfa_backup_codes = mfa_backup_codes or []
+
+        # SSO: como o usuário autentica ('local' ou 'microsoft') — auditoria/exibição,
+        # nunca usado para controle de acesso (login por e-mail existente vale para os dois)
+        self.auth_provider: str = (
+            auth_provider if auth_provider in AUTH_PROVIDERS_VALIDOS else "local"
         )
 
     @property
@@ -122,10 +146,14 @@ class Usuario(UserMixin):
             "exp_semanal": self.exp_semanal,
             "level": self.level,
             "conquistas": self.conquistas,
-            "onboarding_completo": self.onboarding_completo,
+            "onboarding_perfis_vistos": self.onboarding_perfis_vistos,
             "onboarding_passo": self.onboarding_passo,
             "ativo": self.ativo,
             "nivel_gestao": self.nivel_gestao,
+            "mfa_enabled": self.mfa_enabled,
+            "mfa_secret": maybe_encrypt(self.mfa_secret) if self.mfa_secret else None,
+            "mfa_backup_codes": self.mfa_backup_codes,
+            "auth_provider": self.auth_provider,
         }
         if is_pii_encryption_enabled():
             d["email_lookup_hash"] = email_lookup_hash(self.email)
@@ -141,7 +169,7 @@ class Usuario(UserMixin):
             "areas": self.areas,
             "exp_total": self.exp_total,
             "level": self.level,
-            "onboarding_completo": self.onboarding_completo,
+            "onboarding_perfis_vistos": self.onboarding_perfis_vistos,
         }
 
     @classmethod
@@ -160,11 +188,20 @@ class Usuario(UserMixin):
             except ValueError:
                 password_changed_at = None
 
+        perfil = data.get("perfil", "solicitante")
+
+        # Retrocompat: docs antigos tinham só onboarding_completo (bool), sem a lista
+        # por perfil. Se a lista nova não existe mas o antigo flag era True, assume
+        # que o usuário já viu o tour do perfil atual (evita reaparecer do nada).
+        onboarding_perfis_vistos = data.get("onboarding_perfis_vistos")
+        if onboarding_perfis_vistos is None:
+            onboarding_perfis_vistos = [perfil] if data.get("onboarding_completo") else []
+
         usuario = cls(
             id=id,
             email=maybe_decrypt(data.get("email") or ""),
             nome=maybe_decrypt(data.get("nome") or ""),
-            perfil=data.get("perfil", "solicitante"),
+            perfil=perfil,
             areas=areas,
             exp_total=data.get("exp_total", 0),
             exp_semanal=data.get("exp_semanal", 0),
@@ -172,12 +209,16 @@ class Usuario(UserMixin):
             conquistas=data.get("conquistas", []),
             must_change_password=data.get("must_change_password", False),
             password_changed_at=password_changed_at,
-            onboarding_completo=data.get("onboarding_completo", False),
+            onboarding_perfis_vistos=onboarding_perfis_vistos,
             onboarding_passo=data.get("onboarding_passo", 0),
             # Docs sem campo ativo (legado) tratados como ativos — retrocompat.
             ativo=data.get("ativo", True),
             # Fase 5: nivel_gestao — valores inválidos normalizados para None pelo __init__
             nivel_gestao=data.get("nivel_gestao"),
+            mfa_enabled=data.get("mfa_enabled", False),
+            mfa_secret=(maybe_decrypt(data["mfa_secret"]) if data.get("mfa_secret") else None),
+            mfa_backup_codes=data.get("mfa_backup_codes", []),
+            auth_provider=data.get("auth_provider", "local"),
         )
         usuario.senha_hash = data.get("senha_hash")
         return usuario
@@ -292,9 +333,12 @@ class Usuario(UserMixin):
                     else None
                 )
 
-            if "onboarding_completo" in kwargs:
-                self.onboarding_completo = kwargs["onboarding_completo"]
-                update_data["onboarding_completo"] = kwargs["onboarding_completo"]
+            if "onboarding_perfis_vistos" in kwargs:
+                valor = [
+                    p for p in (kwargs["onboarding_perfis_vistos"] or []) if p in PERFIS_VALIDOS
+                ]
+                self.onboarding_perfis_vistos = valor
+                update_data["onboarding_perfis_vistos"] = valor
 
             if "onboarding_passo" in kwargs:
                 self.onboarding_passo = kwargs["onboarding_passo"]
@@ -309,6 +353,26 @@ class Usuario(UserMixin):
                 valor = raw if raw in NIVEIS_GESTAO_VALIDOS else None
                 self.nivel_gestao = valor
                 update_data["nivel_gestao"] = valor
+
+            if "mfa_enabled" in kwargs:
+                self.mfa_enabled = kwargs["mfa_enabled"]
+                update_data["mfa_enabled"] = kwargs["mfa_enabled"]
+
+            if "mfa_secret" in kwargs:
+                self.mfa_secret = kwargs["mfa_secret"]
+                update_data["mfa_secret"] = (
+                    maybe_encrypt(kwargs["mfa_secret"]) if kwargs["mfa_secret"] else None
+                )
+
+            if "mfa_backup_codes" in kwargs:
+                self.mfa_backup_codes = kwargs["mfa_backup_codes"] or []
+                update_data["mfa_backup_codes"] = self.mfa_backup_codes
+
+            if "auth_provider" in kwargs:
+                raw = kwargs["auth_provider"]
+                valor = raw if raw in AUTH_PROVIDERS_VALIDOS else "local"
+                self.auth_provider = valor
+                update_data["auth_provider"] = valor
 
             if "gamification" in kwargs:
                 g_data = kwargs["gamification"]

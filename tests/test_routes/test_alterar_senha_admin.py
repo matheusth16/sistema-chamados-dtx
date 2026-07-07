@@ -26,7 +26,8 @@ def _mock_usuario(perfil, check_ok=True, update_ok=True):
     u.is_active = True
     u.is_anonymous = False
     u.must_change_password = False
-    u.onboarding_completo = True
+    u.mfa_enabled = True
+    u.onboarding_perfis_vistos = [perfil]
     u.is_admin_or_above = perfil in ("admin", "admin_global")
     u.is_supervisor_or_above = perfil in ("supervisor", "admin", "admin_global")
     u.get_id = lambda: f"{perfil}_1"
@@ -39,6 +40,7 @@ def _login(client, usuario):
     with (
         patch("app.routes.auth.Usuario.get_by_email", return_value=usuario),
         patch("app.models_usuario.Usuario.get_by_id", return_value=usuario),
+        patch("app.routes.auth._dispositivo_confiavel", return_value=True),
     ):
         client.post("/login", data={"email": usuario.email, "senha": "ok"}, follow_redirects=False)
 
