@@ -164,6 +164,28 @@ def test_traduzir_via_mymemory_retorna_none_quando_limite_excedido():
     assert resultado is None
 
 
+def test_traduzir_via_mymemory_rejeita_resposta_sem_letras():
+    """_traduzir_via_mymemory descarta 'tradução' sem nenhuma letra (ex.: '&&', '...', '123').
+
+    Regressão: reproduzido em produção-like — MyMemory devolveu '&&' para o termo
+    'Planejamento' (fora do mapa estático) e o sistema aceitou e cacheou isso
+    permanentemente como o nome em inglês do setor.
+    """
+    with patch("urllib.request.urlopen", return_value=_mock_urlopen("&&")):
+        resultado = _traduzir_via_mymemory("Planejamento", "en")
+    assert resultado is None
+
+
+def test_traduzir_texto_nao_cacheia_garbage_da_api():
+    """traduzir_texto não cacheia/retorna lixo da API — cai no fallback (texto original)."""
+    chave = "TermoGarbageTest"
+    TRANSLATION_MAP["pt_BR"].pop(chave, None)
+    with patch("urllib.request.urlopen", return_value=_mock_urlopen("&&")):
+        resultado = traduzir_texto(chave, "en")
+    assert resultado == chave
+    assert chave not in TRANSLATION_MAP["pt_BR"]
+
+
 def test_traduzir_texto_usa_api_quando_nao_no_mapa():
     """traduzir_texto chama API para termos não presentes no mapa estático."""
     with patch(

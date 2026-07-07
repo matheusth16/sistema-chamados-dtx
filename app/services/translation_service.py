@@ -8,6 +8,7 @@ Prioridade: mapa estático → MyMemory API → texto original (fallback).
 import json
 import logging
 import os
+import re
 import threading
 import urllib.parse
 import urllib.request
@@ -17,6 +18,11 @@ logger = logging.getLogger(__name__)
 _translation_map_lock = threading.RLock()
 
 _MYMEMORY_TIMEOUT = 5  # segundos; falha silenciosa se API demorar
+
+# MyMemory às vezes devolve "tradução" sem nenhuma letra (ex.: "&&", "...", "123")
+# quando o termo é curto/ambíguo. Sem essa checagem, o lixo é aceito e cacheado
+# permanentemente em TRANSLATION_MAP.
+_RESPOSTA_TEM_LETRA = re.compile(r"[^\W\d_]", re.UNICODE)
 
 
 def _traduzir_via_mymemory(texto: str, idioma_destino: str) -> str | None:
@@ -32,7 +38,15 @@ def _traduzir_via_mymemory(texto: str, idioma_destino: str) -> str | None:
         if data.get("responseStatus") == 200:
             traduzido = data["responseData"].get("translatedText", "")
             if traduzido and "LIMIT" not in traduzido.upper():
-                return traduzido
+                if _RESPOSTA_TEM_LETRA.search(traduzido):
+                    return traduzido
+                logger.warning(
+                    "MyMemory devolveu tradução sem letras para '%s' → %s: %r",
+                    texto,
+                    idioma_destino,
+                    traduzido,
+                )
+                return None
         logger.warning(
             "MyMemory retornou status inesperado para '%s': %s", texto, data.get("responseStatus")
         )
