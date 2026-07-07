@@ -9,6 +9,18 @@ from app.models_usuario import Usuario
 # ---------------------------------------------------------------------------
 
 
+class _FakeThread:
+    """Thread fake para executar target imediatamente nos testes."""
+
+    def __init__(self, target=None, daemon=None):
+        self._target = target
+        self.daemon = daemon
+
+    def start(self):
+        if self._target:
+            self._target()
+
+
 def _usuario_mock(uid, perfil, email=None):
     u = MagicMock(spec=Usuario)
     u.id = uid
@@ -21,7 +33,8 @@ def _usuario_mock(uid, perfil, email=None):
     u.is_active = True
     u.is_anonymous = False
     u.must_change_password = False
-    u.onboarding_completo = True
+    u.mfa_enabled = True
+    u.onboarding_perfis_vistos = []
     u.get_id = lambda: str(uid)
     return u
 
@@ -300,7 +313,51 @@ def test_admin_global_rebaixar_admin_sucesso(client_logado_admin_global):
             "/admin-global/admins/sa_1/rebaixar", follow_redirects=False
         )
     assert r.status_code == 302
+    sub_admin.update.assert_called_once_with(perfil="supervisor", onboarding_passo=0)
+
+
+def test_admin_global_rebaixar_admin_perfil_ja_visto_nao_reseta_onboarding(
+    client_logado_admin_global,
+):
+    """Rebaixar pra um perfil já visto antes (ex.: já foi supervisor) não reseta onboarding_passo."""
+    sub_admin = _usuario_mock("sa_visto", "admin", email="subadmin.visto@test.com")
+    sub_admin.onboarding_perfis_vistos = ["solicitante", "supervisor", "admin"]
+    sub_admin.update = MagicMock()
+    ag_user = _usuario_mock("ag_1", "admin_global")
+
+    def _side(uid):
+        return sub_admin if uid == "sa_visto" else ag_user
+
+    with patch("app.models_usuario.Usuario.get_by_id", side_effect=_side):
+        r = client_logado_admin_global.post(
+            "/admin-global/admins/sa_visto/rebaixar", follow_redirects=False
+        )
+    assert r.status_code == 302
     sub_admin.update.assert_called_once_with(perfil="supervisor")
+
+
+def test_admin_global_rebaixar_admin_dispara_notificacao(client_logado_admin_global):
+    """POST rebaixar dispara notificar_mudanca_perfil para o usuário rebaixado."""
+    sub_admin = _usuario_mock("sa_notif", "admin", email="subadmin.notif@test.com")
+    sub_admin.update = MagicMock()
+    ag_user = _usuario_mock("ag_1", "admin_global")
+
+    def _side(uid):
+        return sub_admin if uid == "sa_notif" else ag_user
+
+    with (
+        patch("app.models_usuario.Usuario.get_by_id", side_effect=_side),
+        patch("app.routes.admin_global.notificar_mudanca_perfil") as mock_notificar,
+        patch("app.routes.admin_global.threading.Thread", side_effect=_FakeThread),
+    ):
+        r = client_logado_admin_global.post(
+            "/admin-global/admins/sa_notif/rebaixar", follow_redirects=False
+        )
+    assert r.status_code == 302
+    mock_notificar.assert_called_once()
+    kwargs = mock_notificar.call_args.kwargs
+    assert kwargs["usuario_email"] == "subadmin.notif@test.com"
+    assert kwargs["novo_perfil"] == "supervisor"
 
 
 def test_admin_global_rebaixar_usuario_nao_encontrado(client_logado_admin_global):
@@ -372,7 +429,51 @@ def test_admin_global_promover_supervisor_sucesso(client_logado_admin_global):
             "/admin-global/admins/sup_prm/promover", follow_redirects=False
         )
     assert r.status_code == 302
+    sup.update.assert_called_once_with(perfil="admin", onboarding_passo=0)
+
+
+def test_admin_global_promover_supervisor_perfil_ja_visto_nao_reseta_onboarding(
+    client_logado_admin_global,
+):
+    """Promover pra um perfil já visto antes não reseta onboarding_passo."""
+    sup = _usuario_mock("sup_visto", "supervisor", email="sup.visto@test.com")
+    sup.onboarding_perfis_vistos = ["solicitante", "admin"]
+    sup.update = MagicMock()
+    ag_user = _usuario_mock("ag_1", "admin_global")
+
+    def _side(uid):
+        return sup if uid == "sup_visto" else ag_user
+
+    with patch("app.models_usuario.Usuario.get_by_id", side_effect=_side):
+        r = client_logado_admin_global.post(
+            "/admin-global/admins/sup_visto/promover", follow_redirects=False
+        )
+    assert r.status_code == 302
     sup.update.assert_called_once_with(perfil="admin")
+
+
+def test_admin_global_promover_supervisor_dispara_notificacao(client_logado_admin_global):
+    """POST promover dispara notificar_mudanca_perfil para o usuário promovido."""
+    sup = _usuario_mock("sup_notif", "supervisor", email="sup.notif@test.com")
+    sup.update = MagicMock()
+    ag_user = _usuario_mock("ag_1", "admin_global")
+
+    def _side(uid):
+        return sup if uid == "sup_notif" else ag_user
+
+    with (
+        patch("app.models_usuario.Usuario.get_by_id", side_effect=_side),
+        patch("app.routes.admin_global.notificar_mudanca_perfil") as mock_notificar,
+        patch("app.routes.admin_global.threading.Thread", side_effect=_FakeThread),
+    ):
+        r = client_logado_admin_global.post(
+            "/admin-global/admins/sup_notif/promover", follow_redirects=False
+        )
+    assert r.status_code == 302
+    mock_notificar.assert_called_once()
+    kwargs = mock_notificar.call_args.kwargs
+    assert kwargs["usuario_email"] == "sup.notif@test.com"
+    assert kwargs["novo_perfil"] == "admin"
 
 
 def test_admin_global_promover_usuario_nao_encontrado(client_logado_admin_global):

@@ -100,6 +100,15 @@
           <span style="font-size:13px; font-weight:700;">{{ t('active_status_label') }}</span>
         </label>
         <p class="help" style="margin-left:26px;">{{ t('deactivate_account_help') }}</p>
+        {% if not usuario.ativo and not usuario.email.endswith('@anonimizado.invalid') %}
+        <form method="POST" action="{{ url_for('main.anonimizar_usuario', usuario_id=usuario.id) }}"
+              onsubmit="return confirm(`{{ t('anonymize_user_confirm') }}`)" style="margin-top:12px;">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+          <button type="submit" class="bento-btn-outline danger">
+            {{ t('anonymize_user') }}
+          </button>
+        </form>
+        {% endif %}
       </div>
       {% endif %}
 
@@ -122,10 +131,7 @@
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
         </svg>
         <div>
-          <p>
-            <strong>{{ t('password_info_header') }}</strong> {{ t('password_info_created_with') }} <code>123456</code>.
-            {{ t('password_info_first_login') }}
-          </p>
+          <p>{{ t('password_info_sent_by_email') }}</p>
           <p style="font-size:11px; opacity:.8; margin-top:6px;">{{ t('password_reset_hint') }}</p>
         </div>
       </div>

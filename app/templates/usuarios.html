@@ -29,7 +29,7 @@
   <!-- Tabela de Usuários -->
   <div class="bento-card bento-table-scope" style="padding:0; overflow:hidden;">
     <div style="overflow-x:auto;">
-      <table>
+      <table class="users-table">
         <thead>
           <tr>
             <th>{{ t('email') }}</th>
@@ -44,7 +44,7 @@
           {% for usuario in usuarios %}
           <tr class="hoverable">
             <td>
-              <span style="font-family:var(--font-mono,monospace); font-size:12px; background:var(--color-surface-canvas); padding:4px 8px; border-radius:8px;">{{ usuario.email }}</span>
+              <span title="{{ usuario.email }}" style="font-family:var(--font-mono,monospace); font-size:12px; background:var(--color-surface-canvas); padding:4px 8px; border-radius:8px;">{{ usuario.email.split('@')[0] }}</span>
             </td>
             <td style="font-weight:800;">{{ usuario.nome }}</td>
             <td>{{ status_badge(usuario.perfil) }}</td>
@@ -71,6 +71,15 @@
                   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                   <button type="submit" class="bento-row-btn" style="background:#fff7ed; color:#c2410c;" title="{{ t('reset_password_btn_title') }}">
                     {{ t('reset_password_btn') }}
+                  </button>
+                </form>
+                {% endif %}
+
+                {% if usuario.mfa_enabled %}
+                <form method="POST" action="{{ url_for('main.desativar_mfa_usuario', usuario_id=usuario.id) }}" onsubmit="return confirm(`{{ t('confirm_disable_mfa', nome=usuario.nome) }}`)">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                  <button type="submit" class="bento-row-btn" style="background:#eff6ff; color:#1d4ed8;" title="{{ t('disable_mfa_btn_title') }}">
+                    {{ t('disable_mfa_btn') }}
                   </button>
                 </form>
                 {% endif %}

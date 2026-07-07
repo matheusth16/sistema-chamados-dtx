@@ -15,8 +15,11 @@ from app.i18n import flash_t
 from app.models_categorias import CategoriaSetor
 from app.models_usuario import CACHE_KEY_USUARIOS, Usuario
 from app.routes import main
-from app.services.notifications import notificar_novo_usuario_cadastrado
+from app.services.historico_usuario_service import registrar_historico_usuario
+from app.services.notifications import notificar_mudanca_perfil, notificar_novo_usuario_cadastrado
 from app.services.notify_retry import executar_com_retry
+
+DOMINIO_EMAIL_PERMITIDO = "@dtx.aero"
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +55,8 @@ def gerenciar_usuarios() -> Response:
         erros = []
         if not email or "@" not in email:
             erros.append("invalid_email")
+        elif not email.endswith(DOMINIO_EMAIL_PERMITIDO):
+            erros.append("invalid_email_domain")
         elif Usuario.email_existe(email):
             erros.append("email_exists")
         if not nome or len(nome) < 3:
@@ -83,6 +88,14 @@ def gerenciar_usuarios() -> Response:
             u.save()
             cache_delete(CACHE_KEY_USUARIOS)
             Usuario.invalidar_cache_supervisores_por_area()
+            registrar_historico_usuario(
+                usuario_alvo_id=u.id,
+                usuario_alvo_nome=u.nome,
+                admin_id=current_user.id,
+                admin_nome=current_user.nome,
+                acao="criacao",
+                detalhe=f"perfil={perfil}",
+            )
 
             _app = current_app._get_current_object()
 
@@ -131,6 +144,9 @@ def editar_usuario(usuario_id: str) -> Response:
         if not usuario:
             flash_t("user_not_found", "danger")
             return redirect(url_for("main.gerenciar_usuarios"))
+        if usuario.perfil == "admin_global" and current_user.perfil != "admin_global":
+            flash_t("cannot_edit_admin_global", "danger")
+            return redirect(url_for("main.gerenciar_usuarios"))
         if request.method == "GET":
             setores = [s for s in CategoriaSetor.get_all() if getattr(s, "ativo", True)]
             setor_names = {s.nome_pt for s in setores}
@@ -141,12 +157,15 @@ def editar_usuario(usuario_id: str) -> Response:
             )
         email = request.form.get("email", "").strip().lower()
         nome = request.form.get("nome", "").strip()
+        perfil_original = usuario.perfil
         perfil = request.form.get("perfil", usuario.perfil)
         areas = [a.strip() for a in request.form.getlist("areas") if a.strip()]
         erros = []
         if email and email != usuario.email:
             if "@" not in email:
                 erros.append("invalid_email")
+            elif not email.endswith(DOMINIO_EMAIL_PERMITIDO):
+                erros.append("invalid_email_domain")
             elif Usuario.email_existe(email, usuario_id):
                 erros.append("email_exists")
         if not nome or len(nome) < 3:
@@ -165,9 +184,9 @@ def editar_usuario(usuario_id: str) -> Response:
         update_data = {}
         if email and email != usuario.email:
             update_data["email"] = email
-        if nome:
+        if nome and nome != usuario.nome:
             update_data["nome"] = nome
-        if perfil:
+        if perfil and perfil != usuario.perfil:
             update_data["perfil"] = perfil
         if set(areas) != set(usuario.areas):
             update_data["areas"] = areas
@@ -179,11 +198,41 @@ def editar_usuario(usuario_id: str) -> Response:
         novo_nivel_gestao = request.form.get("nivel_gestao", "").strip() or None
         if novo_nivel_gestao != getattr(usuario, "nivel_gestao", None):
             update_data["nivel_gestao"] = novo_nivel_gestao
+        perfil_mudou = "perfil" in update_data and perfil != perfil_original
+        # Perfil novo (nunca visto por essa conta) reinicia o tour — perfil
+        # já visto antes (ex.: rebaixado de volta) não precisa ver de novo.
+        if perfil_mudou and perfil not in (usuario.onboarding_perfis_vistos or []):
+            update_data["onboarding_passo"] = 0
         if update_data:
             usuario.update(**update_data)
             cache_delete(CACHE_KEY_USUARIOS)
             cache_delete(f"usuario_{usuario_id}")
             Usuario.invalidar_cache_supervisores_por_area()
+            registrar_historico_usuario(
+                usuario_alvo_id=usuario_id,
+                usuario_alvo_nome=nome or usuario.nome,
+                admin_id=current_user.id,
+                admin_nome=current_user.nome,
+                acao="edicao",
+                detalhe=f"campos={','.join(sorted(update_data.keys()))}",
+            )
+
+        if perfil_mudou:
+            _app = current_app._get_current_object()
+            email_notif = update_data.get("email", usuario.email)
+            nome_notif = update_data.get("nome", usuario.nome)
+
+            def _notificar_mudanca_perfil():
+                with _app.app_context():
+                    executar_com_retry(
+                        notificar_mudanca_perfil,
+                        usuario_email=email_notif,
+                        usuario_nome=nome_notif,
+                        novo_perfil=perfil,
+                    )
+
+            threading.Thread(target=_notificar_mudanca_perfil, daemon=True).start()
+
         flash_t("user_updated_success", "success", nome=nome)
         return redirect(url_for("main.gerenciar_usuarios"))
     except Exception as e:
@@ -195,7 +244,7 @@ def editar_usuario(usuario_id: str) -> Response:
 @main.route("/admin/usuarios/<usuario_id>/deletar", methods=["POST"])
 @requer_perfil("admin")
 def deletar_usuario(usuario_id: str) -> Response:
-    """Deleta usuário (exceto admin@dtx.aero)."""
+    """Deleta usuário (exceto matheus.costa@dtx.aero)."""
     try:
         usuario = Usuario.get_by_id(usuario_id)
         if not usuario:
@@ -204,10 +253,13 @@ def deletar_usuario(usuario_id: str) -> Response:
         if usuario_id == current_user.id:
             flash_t("cannot_delete_own_account", "warning")
             return redirect(url_for("main.gerenciar_usuarios"))
-        if usuario.email == "admin@dtx.aero":
+        if usuario.perfil == "admin_global" and current_user.perfil != "admin_global":
+            flash_t("cannot_delete_admin_global", "danger")
+            return redirect(url_for("main.gerenciar_usuarios"))
+        if usuario.email == "matheus.costa@dtx.aero":
             flash_t("cannot_delete_root_admin", "danger")
             logger.warning(
-                "Tentativa de deletar admin@dtx.aero por %s",
+                "Tentativa de deletar matheus.costa@dtx.aero por %s",
                 current_user.email,
             )
             return redirect(url_for("main.gerenciar_usuarios"))
@@ -216,6 +268,13 @@ def deletar_usuario(usuario_id: str) -> Response:
         cache_delete(CACHE_KEY_USUARIOS)
         cache_delete(f"usuario_{usuario_id}")
         Usuario.invalidar_cache_supervisores_por_area()
+        registrar_historico_usuario(
+            usuario_alvo_id=usuario_id,
+            usuario_alvo_nome=nome_usuario,
+            admin_id=current_user.id,
+            admin_nome=current_user.nome,
+            acao="exclusao",
+        )
         flash_t("user_deleted_success", "success", nome=nome_usuario)
         return redirect(url_for("main.gerenciar_usuarios"))
     except Exception as e:
@@ -289,6 +348,10 @@ def resetar_senha_usuario(usuario_id: str) -> Response:
             flash_t("cannot_reset_own_password", "warning")
             return redirect(url_for("main.gerenciar_usuarios"))
 
+        if usuario.perfil == "admin_global" and current_user.perfil != "admin_global":
+            flash_t("cannot_reset_password_admin_global", "danger")
+            return redirect(url_for("main.gerenciar_usuarios"))
+
         nome_usuario = usuario.nome
         senha_inicial = _gerar_senha_aleatoria()
         usuario.set_password(senha_inicial)
@@ -345,15 +408,27 @@ def desativar_usuario(usuario_id: str) -> Response:
         if usuario_id == current_user.id:
             flash_t("cannot_deactivate_own_account", "warning")
             return redirect(url_for("main.gerenciar_usuarios"))
-        if usuario.email == "admin@dtx.aero":
+        if usuario.perfil == "admin_global" and current_user.perfil != "admin_global":
+            flash_t("cannot_deactivate_admin_global", "danger")
+            return redirect(url_for("main.gerenciar_usuarios"))
+        if usuario.email == "matheus.costa@dtx.aero":
             flash_t("cannot_deactivate_root_admin", "danger")
-            logger.warning("Tentativa de desativar admin@dtx.aero por %s", current_user.email)
+            logger.warning(
+                "Tentativa de desativar matheus.costa@dtx.aero por %s", current_user.email
+            )
             return redirect(url_for("main.gerenciar_usuarios"))
         nome_usuario = usuario.nome
         usuario.update(ativo=False)
         cache_delete(CACHE_KEY_USUARIOS)
         cache_delete(f"usuario_{usuario_id}")
         Usuario.invalidar_cache_supervisores_por_area()
+        registrar_historico_usuario(
+            usuario_alvo_id=usuario_id,
+            usuario_alvo_nome=nome_usuario,
+            admin_id=current_user.id,
+            admin_nome=current_user.nome,
+            acao="desativacao",
+        )
         flash_t("user_deactivated_success", "success", nome=nome_usuario)
         return redirect(url_for("main.gerenciar_usuarios"))
     except Exception as e:
@@ -371,15 +446,101 @@ def ativar_usuario(usuario_id: str) -> Response:
         if not usuario:
             flash_t("user_not_found", "danger")
             return redirect(url_for("main.gerenciar_usuarios"))
+        if usuario.perfil == "admin_global" and current_user.perfil != "admin_global":
+            flash_t("cannot_activate_admin_global", "danger")
+            return redirect(url_for("main.gerenciar_usuarios"))
         nome_usuario = usuario.nome
         usuario.update(ativo=True)
         cache_delete(CACHE_KEY_USUARIOS)
         cache_delete(f"usuario_{usuario_id}")
         Usuario.invalidar_cache_supervisores_por_area()
+        registrar_historico_usuario(
+            usuario_alvo_id=usuario_id,
+            usuario_alvo_nome=nome_usuario,
+            admin_id=current_user.id,
+            admin_nome=current_user.nome,
+            acao="ativacao",
+        )
         flash_t("user_activated_success", "success", nome=nome_usuario)
         return redirect(url_for("main.gerenciar_usuarios"))
     except Exception as e:
         logger.exception("Erro ao reativar usuário: %s", e)
+        flash_t("error_editing_user", "danger", error=str(e))
+        return redirect(url_for("main.gerenciar_usuarios"))
+
+
+@main.route("/admin/usuarios/<usuario_id>/anonimizar", methods=["POST"])
+@requer_perfil("admin")
+def anonimizar_usuario(usuario_id: str) -> Response:
+    """Anonimiza nome/email de um usuário já desativado (LGPD — ação irreversível, sob demanda).
+
+    Só permitido para contas já desativadas (ativo=False): o soft-delete continua
+    reversível; anonimizar é um passo separado e deliberado que o admin aciona
+    quando quer de fato apagar os dados pessoais, não apenas bloquear o acesso.
+    """
+    try:
+        usuario = Usuario.get_by_id(usuario_id)
+        if not usuario:
+            flash_t("user_not_found", "danger")
+            return redirect(url_for("main.gerenciar_usuarios"))
+        if usuario_id == current_user.id:
+            flash_t("cannot_anonymize_own_account", "warning")
+            return redirect(url_for("main.gerenciar_usuarios"))
+        if usuario.perfil == "admin_global" and current_user.perfil != "admin_global":
+            flash_t("cannot_anonymize_admin_global", "danger")
+            return redirect(url_for("main.gerenciar_usuarios"))
+        if usuario.email == "matheus.costa@dtx.aero":
+            flash_t("cannot_anonymize_root_admin", "danger")
+            logger.warning(
+                "Tentativa de anonimizar matheus.costa@dtx.aero por %s", current_user.email
+            )
+            return redirect(url_for("main.gerenciar_usuarios"))
+        if getattr(usuario, "ativo", True):
+            flash_t("must_deactivate_before_anonymize", "danger")
+            return redirect(url_for("main.gerenciar_usuarios"))
+
+        nome_anonimizado = "Usuário Removido"
+        email_anonimizado = f"removido-{usuario_id}@anonimizado.invalid"
+        usuario.update(nome=nome_anonimizado, email=email_anonimizado)
+        cache_delete(CACHE_KEY_USUARIOS)
+        cache_delete(f"usuario_{usuario_id}")
+        Usuario.invalidar_cache_supervisores_por_area()
+        registrar_historico_usuario(
+            usuario_alvo_id=usuario_id,
+            usuario_alvo_nome=nome_anonimizado,
+            admin_id=current_user.id,
+            admin_nome=current_user.nome,
+            acao="anonimizacao",
+        )
+        flash_t("user_anonymized_success", "success")
+        return redirect(url_for("main.gerenciar_usuarios"))
+    except Exception as e:
+        logger.exception("Erro ao anonimizar usuário: %s", e)
+        flash_t("error_editing_user", "danger", error=str(e))
+        return redirect(url_for("main.gerenciar_usuarios"))
+
+
+@main.route("/admin/usuarios/<usuario_id>/desativar-mfa", methods=["POST"])
+@requer_perfil("admin")
+def desativar_mfa_usuario(usuario_id: str) -> Response:
+    """Desativa o MFA de um usuário — válvula de escape para conta travada sem backup codes."""
+    try:
+        usuario = Usuario.get_by_id(usuario_id)
+        if not usuario:
+            flash_t("user_not_found", "danger")
+            return redirect(url_for("main.gerenciar_usuarios"))
+        if usuario.perfil == "admin_global" and current_user.perfil != "admin_global":
+            flash_t("cannot_edit_admin_global", "danger")
+            return redirect(url_for("main.gerenciar_usuarios"))
+        nome_usuario = usuario.nome
+        usuario.update(mfa_enabled=False, mfa_secret=None, mfa_backup_codes=None)
+        logger.info(
+            "MFA desativado por admin: usuário %s por %s", usuario.email, current_user.email
+        )
+        flash_t("user_mfa_disabled_success", "success", nome=nome_usuario)
+        return redirect(url_for("main.gerenciar_usuarios"))
+    except Exception as e:
+        logger.exception("Erro ao desativar MFA do usuário: %s", e)
         flash_t("error_editing_user", "danger", error=str(e))
         return redirect(url_for("main.gerenciar_usuarios"))
 

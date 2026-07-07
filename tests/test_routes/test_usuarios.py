@@ -3,6 +3,16 @@
 import re
 from unittest.mock import MagicMock, patch
 
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def _mock_historico_usuario_db():
+    """Evita chamada real ao Firestore quando a rota registra histórico de auditoria
+    e o teste não mocka `registrar_historico_usuario` explicitamente."""
+    with patch("app.services.historico_usuario_service.db", MagicMock()):
+        yield
+
 
 class _FakeThread:
     """Thread fake para executar target imediatamente nos testes."""
@@ -117,6 +127,35 @@ def test_admin_cria_usuario_chama_notificacao_novo_usuario(client_logado_admin):
     assert len(kwargs["senha_inicial"]) >= 12
 
 
+def test_admin_cria_usuario_registra_historico(client_logado_admin):
+    """POST criar usuário registra auditoria no histórico de usuários."""
+    with (
+        patch("app.routes.usuarios.Usuario.email_existe", return_value=False),
+        patch("app.routes.usuarios.Usuario.save"),
+        patch("app.routes.usuarios.Usuario.invalidar_cache_supervisores_por_area"),
+        patch("app.routes.usuarios.notificar_novo_usuario_cadastrado"),
+        patch("app.routes.usuarios.threading.Thread", side_effect=_FakeThread),
+        patch("app.routes.usuarios.registrar_historico_usuario") as mock_hist,
+    ):
+        client_logado_admin.post(
+            "/admin/usuarios",
+            data={
+                "acao": "criar",
+                "email": "novo2.usuario@dtx.aero",
+                "nome": "Novo Usuario Dois",
+                "perfil": "solicitante",
+                "areas": ["Manutencao"],
+            },
+            follow_redirects=False,
+        )
+    mock_hist.assert_called_once()
+    kwargs = mock_hist.call_args.kwargs
+    assert kwargs["acao"] == "criacao"
+    assert kwargs["usuario_alvo_nome"] == "Novo Usuario Dois"
+    assert kwargs["admin_id"] == "admin_1"
+    assert kwargs["admin_nome"] == "Admin Teste"
+
+
 # ── Validação de criação ───────────────────────────────────────────────────────
 
 
@@ -134,6 +173,22 @@ def test_criar_usuario_email_invalido_redireciona_com_erro(client_logado_admin):
     )
     assert r.status_code == 302
     assert "/admin/usuarios" in (r.location or "")
+
+
+def test_criar_usuario_email_dominio_invalido_redireciona_com_erro(client_logado_admin):
+    """POST criar com email fora do domínio @dtx.aero redireciona com erro."""
+    r = client_logado_admin.post(
+        "/admin/usuarios",
+        data={
+            "acao": "criar",
+            "email": "fulano@gmail.com",
+            "nome": "Fulano Tal",
+            "perfil": "solicitante",
+        },
+        follow_redirects=True,
+    )
+    assert r.status_code == 200
+    assert b"dtx.aero" in r.data
 
 
 def test_criar_usuario_email_ja_existe_redireciona(client_logado_admin):
@@ -211,6 +266,8 @@ def _usuario_fake(
     u.areas = areas or []
     # Necessário para que o middleware de autenticação não redirecione para troca de senha
     u.must_change_password = False
+    # Necessário para que o middleware de autenticação não redirecione para /mfa/configurar
+    u.mfa_enabled = True
     u.is_authenticated = True
     u.get_id = lambda: str(uid)
     return u
@@ -226,6 +283,7 @@ def _admin_mock_para_flask_login():
     a.nome = "Admin Teste"
     a.perfil = "admin"
     a.must_change_password = False
+    a.mfa_enabled = True
     a.is_authenticated = True
     a.get_id = lambda: "admin_1"
     return a
@@ -284,6 +342,58 @@ def test_editar_usuario_post_sucesso(client_logado_admin):
     assert r.status_code == 302
 
 
+def test_editar_usuario_post_sucesso_registra_historico(client_logado_admin):
+    """POST editar com dados válidos registra auditoria no histórico de usuários."""
+    fake = _usuario_fake(uid="u2", email="u2@dtx.aero", nome="Usuario Dois", perfil="solicitante")
+    with (
+        patch(
+            "app.models_usuario.Usuario.get_by_id", side_effect=_get_by_id_side_effect("u2", fake)
+        ),
+        patch("app.routes.usuarios.Usuario.email_existe", return_value=False),
+        patch("app.routes.usuarios.Usuario.invalidar_cache_supervisores_por_area"),
+        patch("app.routes.usuarios.registrar_historico_usuario") as mock_hist,
+    ):
+        fake.update = lambda **kw: None
+        fake.areas = []
+        client_logado_admin.post(
+            "/admin/usuarios/u2/editar",
+            data={"email": "u2novo@dtx.aero", "nome": "Usuario Dois Novo", "perfil": "solicitante"},
+            follow_redirects=False,
+        )
+    mock_hist.assert_called_once()
+    kwargs = mock_hist.call_args.kwargs
+    assert kwargs["acao"] == "edicao"
+    assert kwargs["usuario_alvo_id"] == "u2"
+    assert kwargs["admin_id"] == "admin_1"
+
+
+def test_editar_usuario_post_sem_mudanca_nao_registra_historico(client_logado_admin):
+    """POST editar sem nenhum campo alterado não registra histórico (nada mudou)."""
+    fake = _usuario_fake(uid="u2", email="u2@dtx.aero", nome="Usuario Dois", perfil="solicitante")
+    fake.areas = []
+    fake.ativo = True
+    fake.nivel_gestao = None
+    with (
+        patch(
+            "app.models_usuario.Usuario.get_by_id", side_effect=_get_by_id_side_effect("u2", fake)
+        ),
+        patch("app.routes.usuarios.Usuario.email_existe", return_value=False),
+        patch("app.routes.usuarios.registrar_historico_usuario") as mock_hist,
+    ):
+        r = client_logado_admin.post(
+            "/admin/usuarios/u2/editar",
+            data={
+                "email": "u2@dtx.aero",
+                "nome": "Usuario Dois",
+                "perfil": "solicitante",
+                "ativo": "on",
+            },
+            follow_redirects=False,
+        )
+    assert r.status_code == 302
+    mock_hist.assert_not_called()
+
+
 def test_editar_usuario_post_nome_curto_redireciona(client_logado_admin):
     """POST editar com nome < 3 chars redireciona com erro."""
     fake = _usuario_fake()
@@ -300,7 +410,7 @@ def test_editar_usuario_post_nome_curto_redireciona(client_logado_admin):
 
 
 def test_deletar_usuario_sucesso(client_logado_admin):
-    """POST deletar com ID existente (não admin@dtx.aero) redireciona com sucesso."""
+    """POST deletar com ID existente (não matheus.costa@dtx.aero) redireciona com sucesso."""
     fake = _usuario_fake(uid="u3", email="u3@dtx.aero", nome="A Deletar")
     fake.delete = lambda: None
     with (
@@ -312,6 +422,24 @@ def test_deletar_usuario_sucesso(client_logado_admin):
         r = client_logado_admin.post("/admin/usuarios/u3/deletar", follow_redirects=False)
     assert r.status_code == 302
     assert "/admin/usuarios" in (r.location or "")
+
+
+def test_deletar_usuario_sucesso_registra_historico(client_logado_admin):
+    """POST deletar com sucesso registra auditoria no histórico de usuários."""
+    fake = _usuario_fake(uid="u3", email="u3@dtx.aero", nome="A Deletar")
+    fake.delete = lambda: None
+    with (
+        patch(
+            "app.models_usuario.Usuario.get_by_id", side_effect=_get_by_id_side_effect("u3", fake)
+        ),
+        patch("app.routes.usuarios.Usuario.invalidar_cache_supervisores_por_area"),
+        patch("app.routes.usuarios.registrar_historico_usuario") as mock_hist,
+    ):
+        client_logado_admin.post("/admin/usuarios/u3/deletar", follow_redirects=False)
+    mock_hist.assert_called_once()
+    kwargs = mock_hist.call_args.kwargs
+    assert kwargs["acao"] == "exclusao"
+    assert kwargs["usuario_alvo_id"] == "u3"
 
 
 def test_deletar_usuario_nao_encontrado_redireciona(client_logado_admin):
@@ -326,8 +454,8 @@ def test_deletar_usuario_nao_encontrado_redireciona(client_logado_admin):
 
 
 def test_deletar_usuario_root_admin_bloqueado(client_logado_admin):
-    """POST deletar admin@dtx.aero é bloqueado (cannot_delete_root_admin)."""
-    fake_root = _usuario_fake(uid="root", email="admin@dtx.aero", nome="Root Admin")
+    """POST deletar matheus.costa@dtx.aero é bloqueado (cannot_delete_root_admin)."""
+    fake_root = _usuario_fake(uid="root", email="matheus.costa@dtx.aero", nome="Root Admin")
     with patch(
         "app.models_usuario.Usuario.get_by_id",
         side_effect=_get_by_id_side_effect("root", fake_root),
@@ -624,6 +752,143 @@ def test_editar_usuario_post_sucesso_chama_update_e_cache(client_logado_admin):
     mock_inval.assert_called_once()
 
 
+def test_editar_usuario_post_perfil_alterado_dispara_notificacao(client_logado_admin):
+    """POST editar com perfil alterado dispara notificar_mudanca_perfil."""
+    fake = _usuario_fake(
+        uid="u_prom", email="prom@dtx.aero", nome="Usuario Prom", perfil="solicitante"
+    )
+    fake.areas = ["Manutencao"]
+    fake.update = MagicMock()
+    with (
+        patch(
+            "app.models_usuario.Usuario.get_by_id",
+            side_effect=_get_by_id_side_effect("u_prom", fake),
+        ),
+        patch("app.routes.usuarios.Usuario.email_existe", return_value=False),
+        patch("app.routes.usuarios.cache_delete"),
+        patch("app.routes.usuarios.Usuario.invalidar_cache_supervisores_por_area"),
+        patch("app.routes.usuarios.notificar_mudanca_perfil") as mock_notificar,
+        patch("app.routes.usuarios.threading.Thread", side_effect=_FakeThread),
+    ):
+        r = client_logado_admin.post(
+            "/admin/usuarios/u_prom/editar",
+            data={
+                "email": "prom@dtx.aero",
+                "nome": "Usuario Prom",
+                "perfil": "supervisor",
+                "areas": ["Manutencao"],
+            },
+            follow_redirects=False,
+        )
+
+    assert r.status_code == 302
+    mock_notificar.assert_called_once()
+    kwargs = mock_notificar.call_args.kwargs
+    assert kwargs["usuario_email"] == "prom@dtx.aero"
+    assert kwargs["novo_perfil"] == "supervisor"
+
+
+def test_editar_usuario_post_perfil_mantido_nao_notifica(client_logado_admin):
+    """POST editar sem mudar o perfil não dispara notificar_mudanca_perfil."""
+    fake = _usuario_fake(
+        uid="u_same", email="same@dtx.aero", nome="Usuario Same", perfil="solicitante"
+    )
+    fake.areas = []
+    fake.update = MagicMock()
+    with (
+        patch(
+            "app.models_usuario.Usuario.get_by_id",
+            side_effect=_get_by_id_side_effect("u_same", fake),
+        ),
+        patch("app.routes.usuarios.Usuario.email_existe", return_value=False),
+        patch("app.routes.usuarios.cache_delete"),
+        patch("app.routes.usuarios.Usuario.invalidar_cache_supervisores_por_area"),
+        patch("app.routes.usuarios.notificar_mudanca_perfil") as mock_notificar,
+        patch("app.routes.usuarios.threading.Thread", side_effect=_FakeThread),
+    ):
+        r = client_logado_admin.post(
+            "/admin/usuarios/u_same/editar",
+            data={
+                "email": "same@dtx.aero",
+                "nome": "Usuario Same Novo",
+                "perfil": "solicitante",
+            },
+            follow_redirects=False,
+        )
+
+    assert r.status_code == 302
+    mock_notificar.assert_not_called()
+
+
+def test_editar_usuario_post_perfil_novo_ainda_nao_visto_reseta_onboarding(client_logado_admin):
+    """POST editar promovendo pra perfil nunca visto reseta onboarding_passo=0."""
+    fake = _usuario_fake(
+        uid="u_prom2", email="prom2@dtx.aero", nome="Usuario Prom2", perfil="solicitante"
+    )
+    fake.areas = ["Manutencao"]
+    fake.onboarding_perfis_vistos = ["solicitante"]
+    fake.update = MagicMock()
+    with (
+        patch(
+            "app.models_usuario.Usuario.get_by_id",
+            side_effect=_get_by_id_side_effect("u_prom2", fake),
+        ),
+        patch("app.routes.usuarios.Usuario.email_existe", return_value=False),
+        patch("app.routes.usuarios.cache_delete"),
+        patch("app.routes.usuarios.Usuario.invalidar_cache_supervisores_por_area"),
+        patch("app.routes.usuarios.notificar_mudanca_perfil"),
+        patch("app.routes.usuarios.threading.Thread", side_effect=_FakeThread),
+    ):
+        r = client_logado_admin.post(
+            "/admin/usuarios/u_prom2/editar",
+            data={
+                "email": "prom2@dtx.aero",
+                "nome": "Usuario Prom2",
+                "perfil": "supervisor",
+                "areas": ["Manutencao"],
+            },
+            follow_redirects=False,
+        )
+
+    assert r.status_code == 302
+    _, kwargs = fake.update.call_args
+    assert kwargs["onboarding_passo"] == 0
+
+
+def test_editar_usuario_post_perfil_ja_visto_nao_reseta_onboarding(client_logado_admin):
+    """POST editar voltando pra um perfil já visto antes NÃO reseta onboarding_passo."""
+    fake = _usuario_fake(
+        uid="u_rebaixado", email="rebaixado@dtx.aero", nome="Usuario Rebaixado", perfil="supervisor"
+    )
+    fake.areas = ["Manutencao"]
+    fake.onboarding_perfis_vistos = ["solicitante", "supervisor"]
+    fake.update = MagicMock()
+    with (
+        patch(
+            "app.models_usuario.Usuario.get_by_id",
+            side_effect=_get_by_id_side_effect("u_rebaixado", fake),
+        ),
+        patch("app.routes.usuarios.Usuario.email_existe", return_value=False),
+        patch("app.routes.usuarios.cache_delete"),
+        patch("app.routes.usuarios.Usuario.invalidar_cache_supervisores_por_area"),
+        patch("app.routes.usuarios.notificar_mudanca_perfil"),
+        patch("app.routes.usuarios.threading.Thread", side_effect=_FakeThread),
+    ):
+        r = client_logado_admin.post(
+            "/admin/usuarios/u_rebaixado/editar",
+            data={
+                "email": "rebaixado@dtx.aero",
+                "nome": "Usuario Rebaixado",
+                "perfil": "solicitante",
+            },
+            follow_redirects=False,
+        )
+
+    assert r.status_code == 302
+    _, kwargs = fake.update.call_args
+    assert "onboarding_passo" not in kwargs
+
+
 def test_editar_usuario_post_email_invalido_redireciona(client_logado_admin):
     """POST editar com novo email sem @ redireciona com erro."""
     fake = _usuario_fake(uid="u_em", email="old@dtx.aero", nome="Usuario EM", perfil="solicitante")
@@ -785,6 +1050,27 @@ def test_desativar_usuario_sucesso(client_logado_admin):
     fake.update.assert_called_once_with(ativo=False)
 
 
+def test_desativar_usuario_sucesso_registra_historico(client_logado_admin):
+    """POST desativar com sucesso registra auditoria no histórico de usuários."""
+    fake = _usuario_fake(uid="u_desat", email="u_desat@dtx.aero", nome="A Desativar")
+    fake.ativo = True
+    fake.update = MagicMock(return_value=True)
+    with (
+        patch(
+            "app.models_usuario.Usuario.get_by_id",
+            side_effect=_get_by_id_side_effect("u_desat", fake),
+        ),
+        patch("app.routes.usuarios.Usuario.invalidar_cache_supervisores_por_area"),
+        patch("app.routes.usuarios.cache_delete"),
+        patch("app.routes.usuarios.registrar_historico_usuario") as mock_hist,
+    ):
+        client_logado_admin.post("/admin/usuarios/u_desat/desativar", follow_redirects=False)
+    mock_hist.assert_called_once()
+    kwargs = mock_hist.call_args.kwargs
+    assert kwargs["acao"] == "desativacao"
+    assert kwargs["usuario_alvo_id"] == "u_desat"
+
+
 def test_desativar_proprio_usuario_bloqueado(client_logado_admin):
     """Admin não pode desativar a própria conta (cannot_deactivate_own_account)."""
     admin_self = _usuario_fake(
@@ -800,8 +1086,8 @@ def test_desativar_proprio_usuario_bloqueado(client_logado_admin):
 
 
 def test_desativar_root_admin_bloqueado(client_logado_admin):
-    """Admin não pode desativar admin@dtx.aero (cannot_deactivate_root_admin)."""
-    fake_root = _usuario_fake(uid="root", email="admin@dtx.aero", nome="Root Admin")
+    """Admin não pode desativar matheus.costa@dtx.aero (cannot_deactivate_root_admin)."""
+    fake_root = _usuario_fake(uid="root", email="matheus.costa@dtx.aero", nome="Root Admin")
     fake_root.ativo = True
     fake_root.update = MagicMock()
     with patch(
@@ -845,6 +1131,227 @@ def test_ativar_usuario_sucesso(client_logado_admin):
     fake.update.assert_called_once_with(ativo=True)
 
 
+def test_ativar_usuario_sucesso_registra_historico(client_logado_admin):
+    """POST ativar com sucesso registra auditoria no histórico de usuários."""
+    fake = _usuario_fake(uid="u_reat", email="u_reat@dtx.aero", nome="A Reativar")
+    fake.ativo = False
+    fake.update = MagicMock(return_value=True)
+    with (
+        patch(
+            "app.models_usuario.Usuario.get_by_id",
+            side_effect=_get_by_id_side_effect("u_reat", fake),
+        ),
+        patch("app.routes.usuarios.Usuario.invalidar_cache_supervisores_por_area"),
+        patch("app.routes.usuarios.cache_delete"),
+        patch("app.routes.usuarios.registrar_historico_usuario") as mock_hist,
+    ):
+        client_logado_admin.post("/admin/usuarios/u_reat/ativar", follow_redirects=False)
+    mock_hist.assert_called_once()
+    kwargs = mock_hist.call_args.kwargs
+    assert kwargs["acao"] == "ativacao"
+    assert kwargs["usuario_alvo_id"] == "u_reat"
+
+
+def test_desativar_mfa_usuario_sucesso(client_logado_admin):
+    """POST /admin/usuarios/<id>/desativar-mfa chama update com os campos de MFA limpos."""
+    fake = _usuario_fake(uid="u_mfa_reset", email="u_mfa_reset@dtx.aero", nome="Trancado MFA")
+    fake.mfa_enabled = True
+    fake.update = MagicMock(return_value=True)
+    with patch(
+        "app.models_usuario.Usuario.get_by_id",
+        side_effect=_get_by_id_side_effect("u_mfa_reset", fake),
+    ):
+        r = client_logado_admin.post(
+            "/admin/usuarios/u_mfa_reset/desativar-mfa", follow_redirects=False
+        )
+    assert r.status_code == 302
+    assert "/admin/usuarios" in (r.location or "")
+    fake.update.assert_called_once_with(mfa_enabled=False, mfa_secret=None, mfa_backup_codes=None)
+
+
+def test_desativar_mfa_usuario_nao_encontrado_redireciona(client_logado_admin):
+    """POST /admin/usuarios/<id>/desativar-mfa com ID inexistente redireciona com erro."""
+    admin = _admin_mock_para_flask_login()
+    with patch(
+        "app.models_usuario.Usuario.get_by_id",
+        side_effect=lambda uid: None if uid == "naoexiste" else admin,
+    ):
+        r = client_logado_admin.post(
+            "/admin/usuarios/naoexiste/desativar-mfa", follow_redirects=False
+        )
+    assert r.status_code == 302
+    assert "/admin/usuarios" in (r.location or "")
+
+
+def test_desativar_mfa_admin_global_bloqueado_para_sub_admin(client_logado_admin):
+    """Sub-admin não pode resetar o MFA de uma conta admin_global."""
+    fake_ag = _usuario_fake(
+        uid="ag_mfa", email="ag_mfa@dtx.aero", nome="AG MFA", perfil="admin_global"
+    )
+    fake_ag.mfa_enabled = True
+    fake_ag.update = MagicMock()
+    with patch(
+        "app.models_usuario.Usuario.get_by_id",
+        side_effect=_get_by_id_side_effect("ag_mfa", fake_ag),
+    ):
+        r = client_logado_admin.post("/admin/usuarios/ag_mfa/desativar-mfa", follow_redirects=False)
+    assert r.status_code == 302
+    assert "/admin/usuarios" in (r.location or "")
+    fake_ag.update.assert_not_called()
+
+
+def test_editar_usuario_post_admin_global_bloqueado_para_sub_admin(client_logado_admin):
+    """Sub-admin não pode editar (POST) uma conta admin_global (cannot_edit_admin_global).
+
+    Submete perfil="supervisor" (valor válido e que não colide com a checagem existente
+    de "sub-admin não pode promover para admin") para garantir que o bloqueio vem da
+    checagem de alvo admin_global, e não de alguma outra validação já existente.
+    """
+    fake_ag = _usuario_fake(
+        uid="ag_target", email="ag_target@dtx.aero", nome="AG Alvo", perfil="admin_global"
+    )
+    fake_ag.update = MagicMock()
+    with patch(
+        "app.models_usuario.Usuario.get_by_id",
+        side_effect=_get_by_id_side_effect("ag_target", fake_ag),
+    ):
+        r = client_logado_admin.post(
+            "/admin/usuarios/ag_target/editar",
+            data={
+                "email": "ag_target@dtx.aero",
+                "nome": "AG Alvo Novo",
+                "perfil": "supervisor",
+                "areas": ["Geral"],
+            },
+            follow_redirects=False,
+        )
+    assert r.status_code == 302
+    assert "/admin/usuarios" in (r.location or "")
+    fake_ag.update.assert_not_called()
+
+
+def test_editar_usuario_get_admin_global_bloqueado_para_sub_admin(client_logado_admin):
+    """Sub-admin não pode nem ver o formulário de edição de uma conta admin_global."""
+    fake_ag = _usuario_fake(
+        uid="ag_target2", email="ag_target2@dtx.aero", nome="AG Alvo 2", perfil="admin_global"
+    )
+    with patch(
+        "app.models_usuario.Usuario.get_by_id",
+        side_effect=_get_by_id_side_effect("ag_target2", fake_ag),
+    ):
+        r = client_logado_admin.get("/admin/usuarios/ag_target2/editar", follow_redirects=False)
+    assert r.status_code == 302
+    assert "/admin/usuarios" in (r.location or "")
+
+
+def test_editar_usuario_post_admin_global_permitido_para_admin_global(
+    client_logado_admin_global,
+):
+    """admin_global pode editar outra conta admin_global normalmente.
+
+    O whitelist de perfil do formulário (solicitante/supervisor/admin) não inclui
+    "admin_global" — isso é uma limitação pré-existente e não relacionada a este
+    bloqueio, então o teste envia perfil="admin" (rebaixamento), um valor aceito
+    pelo whitelist, apenas para comprovar que a checagem nova não impede admin_global
+    de editar outro admin_global.
+    """
+    fake_ag = _usuario_fake(
+        uid="ag_target3", email="ag_target3@dtx.aero", nome="AG Alvo 3", perfil="admin_global"
+    )
+    fake_ag.update = MagicMock()
+    ag_mock = _usuario_fake(
+        uid="ag_1", email="ag@test.com", nome="Admin Global", perfil="admin_global"
+    )
+
+    def _side(uid):
+        return fake_ag if uid == "ag_target3" else ag_mock
+
+    with (
+        patch("app.models_usuario.Usuario.get_by_id", side_effect=_side),
+        patch("app.routes.usuarios.Usuario.email_existe", return_value=False),
+        patch("app.routes.usuarios.cache_delete"),
+        patch("app.routes.usuarios.Usuario.invalidar_cache_supervisores_por_area"),
+    ):
+        r = client_logado_admin_global.post(
+            "/admin/usuarios/ag_target3/editar",
+            data={
+                "email": "ag_target3@dtx.aero",
+                "nome": "AG Alvo 3 Novo",
+                "perfil": "admin",
+            },
+            follow_redirects=False,
+        )
+    assert r.status_code == 302
+    fake_ag.update.assert_called_once()
+
+
+def test_deletar_usuario_admin_global_bloqueado_para_sub_admin(client_logado_admin):
+    """Sub-admin não pode deletar uma conta admin_global (cannot_delete_admin_global)."""
+    fake_ag = _usuario_fake(
+        uid="ag_del", email="ag_del@dtx.aero", nome="AG A Deletar", perfil="admin_global"
+    )
+    fake_ag.delete = MagicMock()
+    with patch(
+        "app.models_usuario.Usuario.get_by_id",
+        side_effect=_get_by_id_side_effect("ag_del", fake_ag),
+    ):
+        r = client_logado_admin.post("/admin/usuarios/ag_del/deletar", follow_redirects=False)
+    assert r.status_code == 302
+    assert "/admin/usuarios" in (r.location or "")
+    fake_ag.delete.assert_not_called()
+
+
+def test_desativar_usuario_admin_global_bloqueado_para_sub_admin(client_logado_admin):
+    """Sub-admin não pode desativar uma conta admin_global (cannot_deactivate_admin_global)."""
+    fake_ag = _usuario_fake(
+        uid="ag_desat", email="ag_desat@dtx.aero", nome="AG A Desativar", perfil="admin_global"
+    )
+    fake_ag.ativo = True
+    fake_ag.update = MagicMock()
+    with patch(
+        "app.models_usuario.Usuario.get_by_id",
+        side_effect=_get_by_id_side_effect("ag_desat", fake_ag),
+    ):
+        r = client_logado_admin.post("/admin/usuarios/ag_desat/desativar", follow_redirects=False)
+    assert r.status_code == 302
+    assert "/admin/usuarios" in (r.location or "")
+    fake_ag.update.assert_not_called()
+
+
+def test_ativar_usuario_admin_global_bloqueado_para_sub_admin(client_logado_admin):
+    """Sub-admin não pode reativar uma conta admin_global."""
+    fake_ag = _usuario_fake(
+        uid="ag_ativ", email="ag_ativ@dtx.aero", nome="AG A Ativar", perfil="admin_global"
+    )
+    fake_ag.ativo = False
+    fake_ag.update = MagicMock()
+    with patch(
+        "app.models_usuario.Usuario.get_by_id",
+        side_effect=_get_by_id_side_effect("ag_ativ", fake_ag),
+    ):
+        r = client_logado_admin.post("/admin/usuarios/ag_ativ/ativar", follow_redirects=False)
+    assert r.status_code == 302
+    assert "/admin/usuarios" in (r.location or "")
+    fake_ag.update.assert_not_called()
+
+
+def test_resetar_senha_admin_global_bloqueado_para_sub_admin(client_logado_admin):
+    """Sub-admin não pode resetar a senha de uma conta admin_global."""
+    fake_ag = _usuario_fake(
+        uid="ag_pw", email="ag_pw@dtx.aero", nome="AG PW", perfil="admin_global"
+    )
+    fake_ag.set_password = MagicMock()
+    fake_ag.update = MagicMock()
+    with patch(
+        "app.models_usuario.Usuario.get_by_id",
+        side_effect=_get_by_id_side_effect("ag_pw", fake_ag),
+    ):
+        r = client_logado_admin.post("/admin/usuarios/ag_pw/resetar-senha", follow_redirects=False)
+    assert r.status_code == 302
+    assert "/admin/usuarios" in (r.location or "")
+    fake_ag.set_password.assert_not_called()
+
+
 def test_admin_global_cria_usuario_admin(client_logado_admin_global):
     """admin_global pode criar usuário com perfil=admin com sucesso."""
     ag_mock = _usuario_fake(
@@ -870,3 +1377,102 @@ def test_admin_global_cria_usuario_admin(client_logado_admin_global):
         )
     assert r.status_code == 302
     assert "/admin/usuarios" in (r.location or "")
+
+
+# ── Anonimizar dados de usuário (LGPD, sob demanda) ─────────────────────────────
+
+
+def test_anonimizar_usuario_desativado_sucesso(client_logado_admin):
+    """POST anonimizar em usuário já desativado sobrescreve nome/email e registra histórico."""
+    fake = _usuario_fake(uid="u_anon", email="u_anon@dtx.aero", nome="Pessoa Real")
+    fake.ativo = False
+    fake.update = MagicMock(return_value=True)
+    with (
+        patch(
+            "app.models_usuario.Usuario.get_by_id",
+            side_effect=_get_by_id_side_effect("u_anon", fake),
+        ),
+        patch("app.routes.usuarios.Usuario.invalidar_cache_supervisores_por_area"),
+        patch("app.routes.usuarios.cache_delete"),
+        patch("app.routes.usuarios.registrar_historico_usuario") as mock_hist,
+    ):
+        r = client_logado_admin.post("/admin/usuarios/u_anon/anonimizar", follow_redirects=False)
+    assert r.status_code == 302
+    assert "/admin/usuarios" in (r.location or "")
+    fake.update.assert_called_once()
+    kwargs = fake.update.call_args.kwargs
+    assert kwargs["nome"] != "Pessoa Real"
+    assert kwargs["email"] != "u_anon@dtx.aero"
+    assert "u_anon" in kwargs["email"]
+    mock_hist.assert_called_once()
+    assert mock_hist.call_args.kwargs["acao"] == "anonimizacao"
+
+
+def test_anonimizar_usuario_ativo_bloqueado(client_logado_admin):
+    """POST anonimizar em usuário ainda ativo é bloqueado — precisa desativar primeiro."""
+    fake = _usuario_fake(uid="u_ativo", email="u_ativo@dtx.aero", nome="Pessoa Ativa")
+    fake.ativo = True
+    fake.update = MagicMock()
+    with patch(
+        "app.models_usuario.Usuario.get_by_id",
+        side_effect=_get_by_id_side_effect("u_ativo", fake),
+    ):
+        r = client_logado_admin.post("/admin/usuarios/u_ativo/anonimizar", follow_redirects=False)
+    assert r.status_code == 302
+    assert "/admin/usuarios" in (r.location or "")
+    fake.update.assert_not_called()
+
+
+def test_anonimizar_proprio_usuario_bloqueado(client_logado_admin):
+    """Admin não pode anonimizar a própria conta."""
+    admin_self = _usuario_fake(
+        uid="admin_1", email="admin@test.com", nome="Admin Teste", perfil="admin"
+    )
+    admin_self.ativo = False
+    admin_self.update = MagicMock()
+    with patch("app.models_usuario.Usuario.get_by_id", return_value=admin_self):
+        r = client_logado_admin.post("/admin/usuarios/admin_1/anonimizar", follow_redirects=False)
+    assert r.status_code == 302
+    admin_self.update.assert_not_called()
+
+
+def test_anonimizar_root_admin_bloqueado(client_logado_admin):
+    """Admin não pode anonimizar matheus.costa@dtx.aero."""
+    fake_root = _usuario_fake(uid="root", email="matheus.costa@dtx.aero", nome="Root Admin")
+    fake_root.ativo = False
+    fake_root.update = MagicMock()
+    with patch(
+        "app.models_usuario.Usuario.get_by_id",
+        side_effect=_get_by_id_side_effect("root", fake_root),
+    ):
+        r = client_logado_admin.post("/admin/usuarios/root/anonimizar", follow_redirects=False)
+    assert r.status_code == 302
+    fake_root.update.assert_not_called()
+
+
+def test_anonimizar_usuario_nao_encontrado(client_logado_admin):
+    """POST anonimizar com ID inexistente redireciona com erro."""
+    admin = _admin_mock_para_flask_login()
+    with patch(
+        "app.models_usuario.Usuario.get_by_id",
+        side_effect=lambda uid: None if uid == "naoexiste" else admin,
+    ):
+        r = client_logado_admin.post("/admin/usuarios/naoexiste/anonimizar", follow_redirects=False)
+    assert r.status_code == 302
+    assert "/admin/usuarios" in (r.location or "")
+
+
+def test_anonimizar_admin_global_bloqueado_para_sub_admin(client_logado_admin):
+    """Sub-admin não pode anonimizar conta admin_global."""
+    fake_ag = _usuario_fake(
+        uid="ag_target", email="ag_target@dtx.aero", nome="AG Alvo", perfil="admin_global"
+    )
+    fake_ag.ativo = False
+    fake_ag.update = MagicMock()
+    with patch(
+        "app.models_usuario.Usuario.get_by_id",
+        side_effect=_get_by_id_side_effect("ag_target", fake_ag),
+    ):
+        r = client_logado_admin.post("/admin/usuarios/ag_target/anonimizar", follow_redirects=False)
+    assert r.status_code == 302
+    fake_ag.update.assert_not_called()

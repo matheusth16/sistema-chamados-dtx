@@ -1,8 +1,9 @@
 """Rotas exclusivas para o perfil admin_global — inacessíveis a qualquer sub-admin."""
 
 import logging
+import threading
 
-from flask import Response, redirect, render_template, url_for
+from flask import Response, current_app, redirect, render_template, url_for
 from flask_login import current_user, login_required
 
 from app.database import db
@@ -10,8 +11,35 @@ from app.decoradores import requer_perfil
 from app.i18n import flash_t
 from app.models_usuario import Usuario
 from app.routes import main
+from app.services.notifications import notificar_mudanca_perfil
+from app.services.notify_retry import executar_com_retry
 
 logger = logging.getLogger(__name__)
+
+
+def _disparar_notificacao_mudanca_perfil(usuario: Usuario, novo_perfil: str) -> None:
+    """Dispara em background o e-mail avisando o usuário sobre o novo perfil."""
+    _app = current_app._get_current_object()
+    email_notif = usuario.email
+    nome_notif = usuario.nome
+
+    def _notificar():
+        with _app.app_context():
+            executar_com_retry(
+                notificar_mudanca_perfil,
+                usuario_email=email_notif,
+                usuario_nome=nome_notif,
+                novo_perfil=novo_perfil,
+            )
+
+    threading.Thread(target=_notificar, daemon=True).start()
+
+
+def _kwargs_reset_onboarding(usuario: Usuario, novo_perfil: str) -> dict:
+    """{'onboarding_passo': 0} se o novo perfil ainda não foi visto pelo usuário; senão {}."""
+    if novo_perfil not in (usuario.onboarding_perfis_vistos or []):
+        return {"onboarding_passo": 0}
+    return {}
 
 
 def requer_admin_global(f):
@@ -74,7 +102,8 @@ def admin_global_rebaixar_admin(usuario_id: str) -> Response:
         if not usuario or usuario.perfil != "admin":
             flash_t("user_not_found", "danger")
             return redirect(url_for("main.admin_global_dashboard"))
-        usuario.update(perfil="supervisor")
+        usuario.update(perfil="supervisor", **_kwargs_reset_onboarding(usuario, "supervisor"))
+        _disparar_notificacao_mudanca_perfil(usuario, "supervisor")
         logger.info(
             "admin_global %s rebaixou %s para supervisor", current_user.email, usuario.email
         )
@@ -98,7 +127,8 @@ def admin_global_promover_supervisor(usuario_id: str) -> Response:
         if not usuario or usuario.perfil != "supervisor":
             flash_t("user_not_found", "danger")
             return redirect(url_for("main.admin_global_dashboard"))
-        usuario.update(perfil="admin")
+        usuario.update(perfil="admin", **_kwargs_reset_onboarding(usuario, "admin"))
+        _disparar_notificacao_mudanca_perfil(usuario, "admin")
         logger.info("admin_global %s promoveu %s para admin", current_user.email, usuario.email)
         flash_t("user_updated_success", "success", nome=usuario.nome)
     except Exception as e:
