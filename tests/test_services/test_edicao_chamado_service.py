@@ -12,6 +12,12 @@ def _make_usuario(perfil="admin", uid="admin1", areas=None):
     u.nome = "Admin Teste"
     u.perfil = perfil
     u.areas = areas or ["Manutencao"]
+    # MagicMock() é truthy por padrão — sem isso, is_admin_or_above/is_gestor_only
+    # "existem" como sub-mocks truthy e mascaram checagens reais de permissão
+    # (ex.: supervisor_pode_alterar_chamado usa usuario.is_admin_or_above de verdade).
+    u.is_admin_or_above = perfil in ("admin", "admin_global")
+    u.is_supervisor_or_above = perfil in ("supervisor", "admin", "admin_global")
+    u.is_gestor_only = False
     return u
 
 
@@ -106,6 +112,54 @@ def test_processar_edicao_supervisor_sem_permissao_retorna_403(app):
             usuario_atual=supervisor,
             chamado_id="ch1",
             novo_status="",
+            motivo_cancelamento="",
+            nova_descricao="",
+            novo_responsavel_id="",
+            novo_sla_str="",
+            arquivos_novos=[],
+            setores_adicionais_lista=[],
+        )
+    assert result["sucesso"] is False
+    assert result.get("codigo") == 403
+
+
+def test_processar_edicao_supervisor_observador_fora_da_area_retorna_403(app):
+    """Regressão: supervisor que só enxerga o chamado como OBSERVADOR (cc), fora da
+    própria área, não pode editar via processar_edicao_chamado.
+
+    A checagem de escrita usava usuario_pode_ver_chamado (leitura) em vez de
+    supervisor_pode_alterar_chamado (escrita, só área — já existia em
+    permission_validation.py mas nunca era chamada daqui). Isso deixava qualquer
+    supervisor adicionado como observador/cc num chamado de OUTRA área com acesso
+    total de edição (mudar status, reatribuir responsável, setores, SLA) — não só
+    visibilidade passiva como o recurso "Em cópia" promete.
+    """
+    from app.services.edicao_chamado_service import processar_edicao_chamado
+
+    supervisor_observador = _make_usuario(perfil="supervisor", uid="sup_obs", areas=["Qualidade"])
+    doc = _make_doc()  # area="Manutencao" — fora das áreas do supervisor
+
+    with (
+        app.app_context(),
+        patch("app.services.edicao_chamado_service.db") as mock_db,
+        patch("app.services.edicao_chamado_service.Chamado") as mock_chamado_cls,
+        patch("app.services.edicao_chamado_service.atualizar_status_chamado") as mock_status,
+        # Simula o que usuario_pode_ver_chamado retorna de verdade pra um observador:
+        # True (ele pode VER o chamado por estar em cópia), mesmo fora da área.
+        patch("app.services.permissions.usuario_pode_ver_chamado", return_value=True),
+    ):
+        mock_db.collection.return_value.document.return_value.get.return_value = doc
+        mock_chamado = MagicMock()
+        mock_chamado.status = "Aberto"
+        mock_chamado.confirmacao_solicitante = None
+        mock_chamado.area = "Manutencao"
+        mock_chamado_cls.from_dict.return_value = mock_chamado
+        mock_status.return_value = {"sucesso": True, "mensagem": "Status atualizado"}
+
+        result = processar_edicao_chamado(
+            usuario_atual=supervisor_observador,
+            chamado_id="ch_obs",
+            novo_status="Concluído",
             motivo_cancelamento="",
             nova_descricao="",
             novo_responsavel_id="",

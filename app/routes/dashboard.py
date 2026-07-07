@@ -49,6 +49,7 @@ from app.services.permission_validation import (
     chamado_aceita_transicao_status,
     filtrar_supervisores_por_area,
     nivel_congelamento_chamado,
+    supervisor_pode_alterar_chamado,
 )
 from app.services.permissions import usuario_pode_ver_chamado
 from app.services.solicitante_edicao_service import segundos_restantes_janela_edicao
@@ -207,11 +208,12 @@ def visualizar_detalhe_chamado(chamado_id: str) -> Response:
             )
         )
         nivel = nivel_congelamento_chamado(chamado)
-        pode_editar_base = current_user.perfil in (
-            "supervisor",
-            "admin",
-            "admin_global",
-        ) and not getattr(current_user, "is_gestor_only", False)
+        # Escrita é mais restritiva que leitura: usuario_pode_ver_chamado (já
+        # validado acima) libera dono/responsável/fila/participante/observador,
+        # mas só quem tem a área do chamado (ou admin) pode de fato editar — um
+        # supervisor que só enxerga o chamado como observador (cc) fica read-only.
+        # (supervisor_pode_alterar_chamado já bloqueia gestor_only internamente.)
+        pode_editar_base = supervisor_pode_alterar_chamado(current_user, chamado.area)
         # Chamado Concluído (qualquer nível) bloqueia edição operacional no formulário
         pode_editar = pode_editar_base and nivel is None
 

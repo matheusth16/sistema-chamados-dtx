@@ -58,16 +58,18 @@ def processar_edicao_chamado(
     data_chamado = doc_chamado.to_dict()
     chamado_obj = Chamado.from_dict(data_chamado, chamado_id)
 
-    # Validação de Permissão (exigida para supervisores)
-    if usuario_atual.perfil == "supervisor":
-        from app.services.permissions import usuario_pode_ver_chamado
+    # Validação de Permissão de ESCRITA — mais restritiva que a de leitura usada pra
+    # exibir o chamado. Leitura (usuario_pode_ver_chamado) libera dono/responsável/
+    # fila-da-área/participante/observador; um supervisor que só enxerga o chamado
+    # como observador (cc) não deve poder editá-lo, só acompanhar.
+    from app.services.permission_validation import supervisor_pode_alterar_chamado
 
-        if not usuario_pode_ver_chamado(usuario_atual, chamado_obj):
-            return {
-                "sucesso": False,
-                "erro": _t("ticket_out_of_area_no_permission"),
-                "codigo": 403,
-            }
+    if not supervisor_pode_alterar_chamado(usuario_atual, chamado_obj.area):
+        return {
+            "sucesso": False,
+            "erro": _t("ticket_out_of_area_no_permission"),
+            "codigo": 403,
+        }
 
     update_data = {}
     mensagens = []
