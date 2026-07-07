@@ -10,6 +10,7 @@ from datetime import datetime, timedelta
 import pytz
 
 from app.database import db
+from app.i18n import get_translation_session
 from app.models_historico import Historico
 
 logger = logging.getLogger(__name__)
@@ -19,6 +20,10 @@ _BRASILIA = pytz.timezone("America/Sao_Paulo")
 _STATUS_PERMITIDOS_ANEXO = {"Aberto", "Em Atendimento", "Aguardando Informação"}
 _STATUS_PERMITIDOS_EDICAO = {"Aberto"}
 _MOTIVO_MIN_CHARS = 10
+
+
+def _t(key, **kwargs):
+    return get_translation_session(key, **kwargs)
 
 
 def _get_chamado_doc(chamado_id: str):
@@ -63,7 +68,7 @@ def editar_descricao_solicitante(
     """
     doc = _get_chamado_doc(chamado_id)
     if not doc.exists:
-        return {"sucesso": False, "erro": "Chamado não encontrado.", "codigo": 404}
+        return {"sucesso": False, "erro": _t("ticket_not_found_dot"), "codigo": 404}
 
     data = doc.to_dict()
     solicitante_id = data.get("solicitante_id")
@@ -72,19 +77,19 @@ def editar_descricao_solicitante(
     data_abertura = data.get("data_abertura")
 
     if solicitante_id != usuario.id:
-        return {"sucesso": False, "erro": "Sem permissão para editar este chamado.", "codigo": 403}
+        return {"sucesso": False, "erro": _t("no_permission_edit_ticket"), "codigo": 403}
 
     if status not in _STATUS_PERMITIDOS_EDICAO:
         return {
             "sucesso": False,
-            "erro": f"Não é possível editar a descrição com status '{status}'.",
+            "erro": _t("cannot_edit_description_status", status=status),
             "codigo": 403,
         }
 
     if not _dentro_da_janela(data_abertura):
         return {
             "sucesso": False,
-            "erro": f"Janela de edição de {JANELA_EDICAO_TEXTO_MIN} minutos encerrada.",
+            "erro": _t("edit_window_closed", minutos=JANELA_EDICAO_TEXTO_MIN),
             "codigo": 403,
         }
 
@@ -113,7 +118,7 @@ def editar_descricao_solicitante(
 
     except Exception as exc:
         logger.exception("Erro ao editar descrição do chamado %s: %s", chamado_id, exc)
-        return {"sucesso": False, "erro": "Erro interno ao salvar edição.", "codigo": 500}
+        return {"sucesso": False, "erro": _t("internal_error_saving_edit"), "codigo": 500}
 
 
 def _notificar_edicao_descricao(
@@ -160,27 +165,27 @@ def adicionar_anexo_tardio(
     """
     doc = _get_chamado_doc(chamado_id)
     if not doc.exists:
-        return {"sucesso": False, "erro": "Chamado não encontrado.", "codigo": 404}
+        return {"sucesso": False, "erro": _t("ticket_not_found_dot"), "codigo": 404}
 
     data = doc.to_dict()
     solicitante_id = data.get("solicitante_id")
     status = data.get("status", "")
 
     if solicitante_id != usuario.id:
-        return {"sucesso": False, "erro": "Sem permissão para adicionar anexo.", "codigo": 403}
+        return {"sucesso": False, "erro": _t("no_permission_add_attachment"), "codigo": 403}
 
     motivo = (motivo or "").strip()
     if len(motivo) < _MOTIVO_MIN_CHARS:
         return {
             "sucesso": False,
-            "erro": f"Motivo obrigatório (mínimo {_MOTIVO_MIN_CHARS} caracteres).",
+            "erro": _t("reason_required_min_chars", min_chars=_MOTIVO_MIN_CHARS),
             "codigo": 400,
         }
 
     if status not in _STATUS_PERMITIDOS_ANEXO:
         return {
             "sucesso": False,
-            "erro": f"Não é possível adicionar anexo com status '{status}'.",
+            "erro": _t("cannot_add_attachment_status", status=status),
             "codigo": 403,
         }
 
@@ -214,7 +219,7 @@ def adicionar_anexo_tardio(
 
     except Exception as exc:
         logger.exception("Erro ao adicionar anexo tardio no chamado %s: %s", chamado_id, exc)
-        return {"sucesso": False, "erro": "Erro interno ao adicionar anexo.", "codigo": 500}
+        return {"sucesso": False, "erro": _t("internal_error_adding_attachment"), "codigo": 500}
 
 
 def _notificar_anexo_tardio(

@@ -99,7 +99,7 @@ def test_atualizar_status_chamado_inexistente_retorna_404(client_logado_supervis
     assert r.status_code == 404
     data = r.get_json()
     assert data.get("sucesso") is False
-    assert "não encontrado" in data.get("erro", "").lower()
+    assert "not found" in data.get("erro", "").lower()
 
 
 def test_bulk_status_como_solicitante_retorna_403(client_logado_solicitante):
@@ -113,13 +113,7 @@ def test_bulk_status_como_solicitante_retorna_403(client_logado_solicitante):
     data = r.get_json()
     assert data is not None and data.get("sucesso") is False
     erro = (data.get("erro") or "").lower()
-    assert (
-        "acesso negado" in erro
-        or "negado" in erro
-        or "origem" in erro
-        or "permissão" in erro
-        or "permissao" in erro
-    )
+    assert "access denied" in erro or "denied" in erro or "origem" in erro or "permission" in erro
 
 
 def test_bulk_status_chamado_ids_nao_lista_retorna_400(client_logado_supervisor):
@@ -264,7 +258,7 @@ def test_atualizar_status_reabrir_concluido_sem_motivo_retorna_400(client_logado
     assert r.status_code == 400
     data = r.get_json()
     assert data is not None and data.get("sucesso") is False
-    assert "motivo" in data.get("erro", "").lower() or "reabrir" in data.get("erro", "").lower()
+    assert "reason" in data.get("erro", "").lower() or "reopen" in data.get("erro", "").lower()
 
 
 def test_atualizar_status_reabrir_concluido_motivo_curto_retorna_400(client_logado_admin):

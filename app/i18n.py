@@ -6,7 +6,7 @@ Suporta: Português-BR, Inglês e Espanhol.
 import json
 import os
 
-from flask import flash
+from flask import flash, session
 
 # Cache do dicionário de traduções e caminho do arquivo
 _TRANSLATIONS_CACHE = None
@@ -290,6 +290,21 @@ def get_translation(key, language="pt_BR", **kwargs):
             return d["pt_BR"]
     # Retorna a chave só se a chave não existir no dicionário
     return key
+
+
+def get_translation_session(key, **kwargs):
+    """
+    Traduz uma chave usando o idioma da sessão Flask atual (session['language']).
+
+    Fora de um contexto de requisição (ex.: chamada direta de um serviço em
+    testes unitários), usa 'en' como fallback em vez de propagar o RuntimeError
+    do Werkzeug.
+    """
+    try:
+        language = session.get("language", "en")
+    except RuntimeError:
+        language = "en"
+    return get_translation(key, language, **kwargs)
 
 
 def flash_t(key, category="message", **kwargs):

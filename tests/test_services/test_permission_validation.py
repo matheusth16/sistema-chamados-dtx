@@ -79,7 +79,7 @@ def test_permissao_mudanca_solicitante_proprio_chamado_outro_status_negado():
     permitido, erro = verificar_permissao_mudanca_status(sol, chamado, "Em Atendimento")
     assert permitido is False
     assert erro is not None
-    assert "Cancelar" in erro or "cancelar" in erro.lower()
+    assert erro == "access_denied_requester_cancel_only"
 
 
 def test_permissao_mudanca_solicitante_chamado_de_outro_negado():
@@ -92,7 +92,7 @@ def test_permissao_mudanca_solicitante_chamado_de_outro_negado():
     permitido, erro = verificar_permissao_mudanca_status(sol, chamado, "Cancelado")
     assert permitido is False
     assert erro is not None
-    assert "próprios" in erro or "negado" in erro.lower()
+    assert erro == "access_denied_own_tickets_only"
 
 
 def test_permissao_mudanca_supervisor_area_correta_permitido():
@@ -130,7 +130,7 @@ def test_permissao_mudanca_supervisor_area_errada_negado():
 
     assert permitido is False
     assert erro is not None
-    assert "área" in erro.lower() or "permissão" in erro.lower()
+    assert erro == "access_denied_out_of_area"
 
 
 # ---------------------------------------------------------------------------

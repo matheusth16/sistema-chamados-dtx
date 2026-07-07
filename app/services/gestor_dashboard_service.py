@@ -204,21 +204,21 @@ def obter_contexto_gestor_dashboard(
     grupos = [
         {
             "chave": "atrasados",
-            "titulo": "Atrasados",
+            "titulo": "gestor_counter_atrasados",
             "cor": "danger",
             "total": len(atrasados),
             "chamados": atrasados[:_LIMITE_POR_RAIA],
         },
         {
             "chave": "aberto_sem_resposta",
-            "titulo": "Sem resposta",
+            "titulo": "gestor_counter_sem_resposta",
             "cor": "warn",
             "total": len(abertos_sem_resp),
             "chamados": abertos_sem_resp[:_LIMITE_POR_RAIA],
         },
         {
             "chave": "multi_setor",
-            "titulo": "Multi-setor travado",
+            "titulo": "gestor_lane_multi_setor_travado",
             "cor": "purple",
             "total": len(multi_travados),
             "chamados": multi_travados[:_LIMITE_POR_RAIA],

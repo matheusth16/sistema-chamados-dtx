@@ -16,6 +16,7 @@ from zoneinfo import ZoneInfo
 
 from app.database import db
 from app.firebase_retry import execute_with_retry
+from app.i18n import get_translation_session
 from app.models import Chamado
 from app.models_historico import Historico
 from app.models_usuario import Usuario
@@ -23,6 +24,10 @@ from app.services.permissions import calcular_supervisor_ids_com_acesso
 from config import Config
 
 logger = logging.getLogger(__name__)
+
+
+def _t(key, **kwargs):
+    return get_translation_session(key, **kwargs)
 
 
 # ── Helpers Fase 4 ─────────────────────────────────────────────────────────────
@@ -77,7 +82,7 @@ def transferir_area(
     # ── carrega chamado ──────────────────────────────────────────────────────
     doc = db.collection("chamados").document(chamado_id).get()
     if not doc.exists:
-        return {"sucesso": False, "erro": "Chamado não encontrado"}
+        return {"sucesso": False, "erro": _t("ticket_not_found")}
 
     dados = doc.to_dict() or {}
     chamado = Chamado.from_dict(dados, chamado_id)
@@ -89,7 +94,7 @@ def transferir_area(
             usuario.id,
             chamado_id,
         )
-        return {"sucesso": False, "erro": "Sem permissão para transferir este chamado"}
+        return {"sucesso": False, "erro": _t("no_permission_transfer_ticket")}
 
     # ── valida supervisor destino na área destino ────────────────────────────
     supervisores_destino = Usuario.get_supervisores_por_area(area)
@@ -97,7 +102,7 @@ def transferir_area(
     if not sup_destino:
         return {
             "sucesso": False,
-            "erro": "Supervisor destino não encontrado ou não pertence à área destino",
+            "erro": _t("target_supervisor_not_found_area"),
         }
 
     # ── recalcula supervisor_ids_com_acesso ──────────────────────────────────
@@ -172,7 +177,7 @@ def escalonar_colega(
     # ── carrega chamado ──────────────────────────────────────────────────────
     doc = db.collection("chamados").document(chamado_id).get()
     if not doc.exists:
-        return {"sucesso": False, "erro": "Chamado não encontrado"}
+        return {"sucesso": False, "erro": _t("ticket_not_found")}
 
     dados = doc.to_dict() or {}
     chamado = Chamado.from_dict(dados, chamado_id)
@@ -184,13 +189,13 @@ def escalonar_colega(
             usuario.id,
             chamado_id,
         )
-        return {"sucesso": False, "erro": "Sem permissão para escalonar este chamado"}
+        return {"sucesso": False, "erro": _t("no_permission_escalate_ticket")}
 
     # ── destino ≠ owner atual ────────────────────────────────────────────────
     if supervisor_id == chamado.responsavel_id:
         return {
             "sucesso": False,
-            "erro": "Destino igual ao responsável atual — selecione um colega diferente",
+            "erro": _t("target_same_as_current_responsible"),
         }
 
     # ── valida colega na mesma área ──────────────────────────────────────────
@@ -199,7 +204,7 @@ def escalonar_colega(
     if not colega:
         return {
             "sucesso": False,
-            "erro": "Supervisor destino não pertence à área do chamado",
+            "erro": _t("target_supervisor_wrong_area"),
         }
 
     # ── recalcula supervisor_ids_com_acesso ──────────────────────────────────
@@ -267,11 +272,11 @@ def incluir_participantes(
         ou {"sucesso": False, "erro": "..."}.
     """
     if not participantes_novos:
-        return {"sucesso": False, "erro": "Lista de participantes não pode ser vazia"}
+        return {"sucesso": False, "erro": _t("participants_list_cannot_be_empty")}
 
     doc = db.collection("chamados").document(chamado_id).get()
     if not doc.exists:
-        return {"sucesso": False, "erro": "Chamado não encontrado"}
+        return {"sucesso": False, "erro": _t("ticket_not_found")}
 
     dados = doc.to_dict() or {}
     chamado = Chamado.from_dict(dados, chamado_id)
@@ -282,7 +287,7 @@ def incluir_participantes(
             usuario.id,
             chamado_id,
         )
-        return {"sucesso": False, "erro": "Sem permissão para incluir participantes neste chamado"}
+        return {"sucesso": False, "erro": _t("no_permission_include_participants")}
 
     participantes_atuais = list(chamado.participantes or [])
     ids_existentes = {p["supervisor_id"] for p in participantes_atuais}
@@ -293,14 +298,14 @@ def incluir_participantes(
         area = (item.get("area") or "").strip()
 
         if not sup_id:
-            return {"sucesso": False, "erro": "supervisor_id é obrigatório em cada participante"}
+            return {"sucesso": False, "erro": _t("field_supervisor_id_required_each")}
         if not area:
-            return {"sucesso": False, "erro": "area é obrigatória em cada participante"}
+            return {"sucesso": False, "erro": _t("field_area_required_each")}
 
         if sup_id == chamado.responsavel_id:
             return {
                 "sucesso": False,
-                "erro": "Owner (responsável) não pode ser adicionado como participante",
+                "erro": _t("owner_cannot_be_participant"),
             }
 
         supervisores_area = Usuario.get_supervisores_por_area(area)
@@ -308,7 +313,7 @@ def incluir_participantes(
         if not sup_obj:
             return {
                 "sucesso": False,
-                "erro": f"Supervisor {sup_id} não encontrado ou não pertence à área {area}",
+                "erro": _t("supervisor_not_found_in_area", sup_id=sup_id, area=area),
             }
 
         if sup_id in ids_existentes:
@@ -328,7 +333,7 @@ def incluir_participantes(
     if not adicionados:
         return {
             "sucesso": False,
-            "erro": "Nenhum participante novo para incluir — todos já são participantes do chamado",
+            "erro": _t("no_new_participants_to_include"),
         }
 
     novos_ids = calcular_supervisor_ids_com_acesso(
@@ -389,7 +394,7 @@ def concluir_minha_parte(chamado_id: str, usuario) -> dict:
     """
     doc = db.collection("chamados").document(chamado_id).get()
     if not doc.exists:
-        return {"sucesso": False, "erro": "Chamado não encontrado"}
+        return {"sucesso": False, "erro": _t("ticket_not_found")}
 
     dados = doc.to_dict() or {}
     chamado = Chamado.from_dict(dados, chamado_id)
@@ -401,10 +406,10 @@ def concluir_minha_parte(chamado_id: str, usuario) -> dict:
     )
 
     if idx is None:
-        return {"sucesso": False, "erro": "Usuário não é participante deste chamado"}
+        return {"sucesso": False, "erro": _t("user_not_participant")}
 
     if participantes[idx].get("status") == "concluido":
-        return {"sucesso": False, "erro": "Você já concluiu sua parte neste chamado"}
+        return {"sucesso": False, "erro": _t("already_completed_own_part")}
 
     agora = datetime.now(ZoneInfo(Config.SLA_TIMEZONE))
     participantes[idx] = {**participantes[idx], "status": "concluido", "concluido_em": agora}

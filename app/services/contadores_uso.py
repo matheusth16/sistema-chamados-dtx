@@ -17,12 +17,17 @@ from firebase_admin import firestore
 from google.cloud.firestore_v1 import Increment
 
 from app.database import db
+from app.i18n import get_translation_session
 
 logger = logging.getLogger(__name__)
 
 COLLECTION = "contadores_uso"
 CAMPO_RELATORIO = "relatorio_geracoes"
 CAMPO_EXPORT = "export_excel_geracoes"
+
+
+def _t(key, **kwargs):
+    return get_translation_session(key, **kwargs)
 
 
 def _doc_id(user_id: str) -> str:
@@ -75,7 +80,7 @@ def verificar_e_incrementar_relatorio(user_id: str, limite_diario: int) -> tuple
         if not permitido:
             return (
                 False,
-                f"Você atingiu o limite de {limite_diario} atualizações de relatório por dia. Tente amanhã.",
+                _t("report_update_limit_reached", limite=limite_diario),
             )
         return (True, None)
     except Exception as e:
@@ -165,7 +170,7 @@ def verificar_e_incrementar_export(user_id: str, limite_diario: int) -> tuple[bo
         if not permitido:
             return (
                 False,
-                f"Você atingiu o limite de {limite_diario} exportações por dia. Tente amanhã.",
+                _t("export_limit_reached", limite=limite_diario),
             )
         return (True, None)
     except Exception as e:

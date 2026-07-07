@@ -108,7 +108,7 @@ def test_atualizar_status_cancelado_sem_motivo_retorna_400(client_logado_supervi
     assert r.status_code == 400
     data = r.get_json()
     assert data is not None and data.get("sucesso") is False
-    assert "motivo" in data.get("erro", "").lower()
+    assert "reason" in data.get("erro", "").lower()
 
 
 def test_atualizar_status_excecao_retorna_500(client_logado_supervisor):
@@ -123,7 +123,7 @@ def test_atualizar_status_excecao_retorna_500(client_logado_supervisor):
     assert r.status_code == 500
     data = r.get_json()
     assert data is not None and data.get("sucesso") is False
-    assert "interno" in data.get("erro", "").lower() or "Erro" in data.get("erro", "")
+    assert "internal" in data.get("erro", "").lower() or "Error" in data.get("erro", "")
 
 
 # ---------------------------------------------------------------------------
@@ -178,7 +178,7 @@ def test_bulk_status_ids_lista_vazia_apos_filtro_retorna_400(client_logado_super
     assert r.status_code == 400
     data = r.get_json()
     assert data is not None and data.get("sucesso") is False
-    assert "nenhum" in data.get("erro", "").lower() or "informado" in data.get("erro", "").lower()
+    assert "no ticket" in data.get("erro", "").lower() or "provided" in data.get("erro", "").lower()
 
 
 def test_bulk_status_chamado_nao_encontrado_vai_para_erros(client_logado_supervisor):
@@ -198,7 +198,7 @@ def test_bulk_status_chamado_nao_encontrado_vai_para_erros(client_logado_supervi
     assert data is not None and data.get("sucesso") is True
     assert data.get("atualizados") == 0
     assert len(data.get("erros", [])) == 1
-    assert data["erros"][0]["erro"] == "Não encontrado"
+    assert data["erros"][0]["erro"] == "Not found"
 
 
 def test_bulk_status_concluido_seta_data_conclusao(client_logado_supervisor):

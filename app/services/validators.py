@@ -16,7 +16,13 @@ from urllib.parse import urlparse
 
 from flask import current_app
 
+from app.i18n import get_translation_session
+
 logger = logging.getLogger(__name__)
+
+
+def _t(key, **kwargs):
+    return get_translation_session(key, **kwargs)
 
 
 # Fallback se config não estiver disponível (ex.: testes)
@@ -85,24 +91,24 @@ def _validar_csv(arquivo: Any) -> tuple[bool, str]:
     try:
         stream = getattr(arquivo, "stream", None)
         if not stream:
-            return False, "Arquivo CSV sem stream para leitura."
+            return False, _t("csv_no_stream")
         if hasattr(stream, "seek"):
             stream.seek(0)
         content = stream.read(65536)  # 64 KB é suficiente para validar estrutura
         if hasattr(stream, "seek"):
             stream.seek(0)
         if not content:
-            return False, "Arquivo CSV vazio."
+            return False, _t("csv_empty")
         text = content.decode("utf-8", errors="replace")
         reader = csv.reader(io.StringIO(text))
         next(reader)  # Lê pelo menos a primeira linha; lança StopIteration se vazio
         return True, ""
     except StopIteration:
-        return False, "Arquivo CSV vazio ou sem linhas válidas."
+        return False, _t("csv_empty_or_no_valid_rows")
     except csv.Error:
-        return False, "Arquivo CSV inválido ou corrompido."
+        return False, _t("csv_invalid_or_corrupted")
     except Exception:
-        return False, "Erro ao validar arquivo CSV."
+        return False, _t("csv_validation_error")
 
 
 def _arquivo_conteudo_permitido(arquivo: Any) -> tuple[bool, str]:
@@ -124,22 +130,22 @@ def _arquivo_conteudo_permitido(arquivo: Any) -> tuple[bool, str]:
     try:
         stream = getattr(arquivo, "stream", None)
         if not stream:
-            return False, "Arquivo não possui stream para leitura."
+            return False, _t("file_no_stream")
         if hasattr(stream, "seek"):
             stream.seek(0)
         header = stream.read(max(len(sig) for sig in expected_sigs))
         if hasattr(stream, "seek"):
             stream.seek(0)
         if not header:
-            return False, "Arquivo vazio ou não legível."
+            return False, _t("file_empty_or_unreadable")
         if not any(header.startswith(sig) for sig in expected_sigs):
             return (
                 False,
-                f"O conteúdo do arquivo não corresponde à extensão .{ext}. Envie um arquivo válido.",
+                _t("file_content_mismatch_ext", ext=ext),
             )
         return True, ""
     except Exception as e:
-        return False, f"Erro ao validar arquivo: {e}"
+        return False, _t("file_validation_error", error=e)
 
 
 def _get_max_anexo_bytes() -> int:
@@ -159,7 +165,7 @@ def _validar_tamanho(arquivo: Any) -> tuple[bool, str]:
     if isinstance(tamanho, int) and tamanho > 0:
         if tamanho > limite:
             mb = limite // (1024 * 1024)
-            return False, f"{arquivo.filename}: excede {mb} MB por arquivo."
+            return False, _t("file_exceeds_size_mb", filename=arquivo.filename, mb=mb)
         return True, ""
     # Fallback: lê o stream para medir
     try:
@@ -198,18 +204,15 @@ def validar_links_externos(links: list[str]) -> list[str]:
         if not link:
             continue
         if not link.startswith("https://"):
-            erros.append("Link externo deve começar com https://.")
+            erros.append(_t("external_link_https_required"))
             continue
         try:
             netloc = urlparse(link).netloc.lower()
         except Exception:
-            erros.append("Link externo com formato inválido.")
+            erros.append(_t("external_link_invalid_format"))
             continue
         if not any(netloc == d or netloc.endswith("." + d) for d in ALLOWED_EXTERNAL_LINK_DOMAINS):
-            erros.append(
-                "Link inválido. Use uma URL do SharePoint ou OneDrive "
-                "(sharepoint.com, onedrive.live.com ou 1drv.ms)."
-            )
+            erros.append(_t("external_link_sharepoint_only"))
     return erros
 
 
@@ -271,51 +274,50 @@ def validar_novo_chamado(
 
     if not descricao:
         _log_ab_descricao_insuficiente(form)
-        erros.append("A descrição do chamado é obrigatória.")
+        erros.append(_t("ticket_description_required"))
     elif len(descricao) < 3:
         _log_ab_descricao_insuficiente(form)
-        erros.append("A descrição deve ter no mínimo 3 caracteres.")
+        erros.append(_t("ticket_description_min_3"))
 
     if not tipo:
-        erros.append("É necessário atribuir um setor.")
+        erros.append(_t("sector_assignment_required"))
 
     if not categoria:
-        erros.append("A categoria do chamado é obrigatória.")
+        erros.append(_t("ticket_category_required"))
 
     if not gate:
-        erros.append("É necessário atribuir um gate.")
+        erros.append(_t("gate_assignment_required"))
     else:
         from app.services.gates_service import is_gate_valido
 
         if not is_gate_valido(gate):
-            erros.append(
-                "Gate inválido. Selecione N/A ou um gate com sub-etapa (ex: Gate 1 - Desmontagem)."
-            )
+            erros.append(_t("gate_invalid_selection"))
 
     if not impacto:
-        erros.append("O impacto do chamado é obrigatório.")
+        erros.append(_t("ticket_impact_required"))
 
     # 2. Validação Específica da DTX (Regra do RL)
     # Para Projetos: código RL obrigatório — letras, números e caracteres (1 a 100)
     if categoria == "Projetos":
         rl_codigo = (form.get("rl_codigo") or "").strip()
         if not rl_codigo:
-            erros.append("Para Projetos, o código RL é obrigatório.")
+            erros.append(_t("rl_code_required_projects"))
         elif len(rl_codigo) > 100:
-            erros.append("O código RL deve ter no máximo 100 caracteres.")
+            erros.append(_t("rl_code_max_100_chars"))
         # Caracteres permitidos: letras, números, espaços e símbolos comuns (evita controle/injeção)
         elif not re.match(r"^[\w\s\-./(),]+$", rl_codigo, re.UNICODE):
-            erros.append(
-                "O código RL permite letras, números e os caracteres: espaço, - _ . / ( ) ,"
-            )
+            erros.append(_t("rl_code_invalid_chars"))
 
     # 3. Validação de Arquivos (se houver uploads): extensão + magic bytes + tamanho
     lista_efetiva = [a for a in (arquivos or []) if a and getattr(a, "filename", "")]
     for arquivo in lista_efetiva:
         if not _arquivo_permitido(arquivo.filename):
             erros.append(
-                f"{arquivo.filename}: Formato de arquivo inválido. "
-                f"Permitidos: {', '.join(sorted(_get_extensoes_permitidas()))}"
+                _t(
+                    "file_invalid_format_allowed",
+                    filename=arquivo.filename,
+                    allowed=", ".join(sorted(_get_extensoes_permitidas())),
+                )
             )
             continue
         ok_tam, msg_tam = _validar_tamanho(arquivo)
@@ -324,7 +326,7 @@ def validar_novo_chamado(
             continue
         ok_cont, msg_cont = _arquivo_conteudo_permitido(arquivo)
         if not ok_cont:
-            erros.append(msg_cont or "Conteúdo do arquivo não corresponde ao formato declarado.")
+            erros.append(msg_cont or _t("file_content_format_mismatch"))
 
     # 4. Validação de links externos OneDrive/SharePoint
     if links_externos:
@@ -361,7 +363,7 @@ def validar_observadores(
     for obs in observadores:
         uid = (obs.get("usuario_id") if isinstance(obs, dict) else None) or ""
         if not uid:
-            erros.append("Observador sem usuario_id informado.")
+            erros.append(_t("observer_missing_usuario_id"))
             continue
         if uid in vistos:
             continue  # deduplicação silenciosa
@@ -369,9 +371,9 @@ def validar_observadores(
         ids_validos.append(uid)
 
     if solicitante_id in vistos:
-        erros.append("O solicitante não pode ser observador do próprio chamado.")
+        erros.append(_t("requester_cannot_be_observer"))
 
     if len(vistos) > MAX_OBSERVADORES:
-        erros.append(f"Máximo de {MAX_OBSERVADORES} observadores por chamado.")
+        erros.append(_t("max_observers_exceeded", max=MAX_OBSERVADORES))
 
     return erros

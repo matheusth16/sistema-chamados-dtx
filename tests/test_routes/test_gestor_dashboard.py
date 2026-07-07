@@ -22,11 +22,12 @@ def _mock_gestor(uid="gest_1", perfil="supervisor", nivel_gestao="gestor_setor")
     u.is_authenticated = True
     u.get_id = lambda: str(uid)
     u.must_change_password = False
+    u.mfa_enabled = True
     u.is_admin_or_above = perfil in ("admin", "admin_global")
     u.is_supervisor_or_above = perfil in ("supervisor", "admin", "admin_global")
     u.is_gestor = nivel_gestao is not None
     u.is_gestor_only = u.is_gestor and not u.is_admin_or_above
-    u.onboarding_completo = True
+    u.onboarding_perfis_vistos = [perfil]
     u.onboarding_passo = 0
     u.ativo = True
     return u
@@ -39,6 +40,7 @@ def client_logado_gestor(client, app):
     with (
         patch("app.routes.auth.Usuario.get_by_email", return_value=user),
         patch("app.models_usuario.Usuario.get_by_id", return_value=user),
+        patch("app.routes.auth._dispositivo_confiavel", return_value=True),
     ):
         client.post("/login", data={"email": user.email, "senha": "ok"}, follow_redirects=False)
         yield client
@@ -51,6 +53,7 @@ def client_logado_admin_gestor(client, app):
     with (
         patch("app.routes.auth.Usuario.get_by_email", return_value=user),
         patch("app.models_usuario.Usuario.get_by_id", return_value=user),
+        patch("app.routes.auth._dispositivo_confiavel", return_value=True),
     ):
         client.post("/login", data={"email": user.email, "senha": "ok"}, follow_redirects=False)
         yield client

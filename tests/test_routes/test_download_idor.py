@@ -127,3 +127,24 @@ def test_download_anexo_redireciona_usuario_autorizado(client_logado_solicitante
 
     assert r.status_code == 302
     assert "r2.example.com" in (r.location or "")
+
+
+def test_download_anexo_sucesso_loga_acesso(client_logado_solicitante, caplog):
+    """Download bem-sucedido de anexo gera log de auditoria (não só falha)."""
+    import logging
+
+    doc = _make_chamado_doc(chaves=["r2:arq.pdf"], solicitante_id="sol_1")
+
+    with (
+        patch("app.routes.api.db") as mock_db,
+        patch(
+            "app.services.upload.gerar_url_presignada",
+            return_value="https://r2.example.com/arq.pdf",
+        ),
+        caplog.at_level(logging.INFO, logger="app.routes.api"),
+    ):
+        mock_db.collection.return_value.document.return_value.get.return_value = doc
+        client_logado_solicitante.get("/api/download-anexo?chamado_id=ch1&chave=r2:arq.pdf")
+
+    mensagens = [r.message for r in caplog.records]
+    assert any("ch1" in m and "r2:arq.pdf" in m for m in mensagens)

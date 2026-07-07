@@ -8,6 +8,7 @@ Fan-out centralizado de notificações de chamado.
 import logging
 from html import escape
 
+from app.i18n import get_translated_status, get_translation
 from app.models_usuario import Usuario
 from app.services import webpush_service
 from app.services.email_templates import build_cta_button, build_detail_table, build_email_shell
@@ -59,10 +60,12 @@ def notificar_cancelamento_chamado(
     """Envia email, in-app e web push de cancelamento para responsável + observadores."""
     destinatarios = destinatarios_do_chamado(dados_chamado)
     if not destinatarios:
-        logger.info("Cancelamento CH %s: sem destinatários, nenhum e-mail enviado.", numero_chamado)
+        logger.info("Cancellation CH %s: no recipients, no e-mail sent.", numero_chamado)
         return
 
-    assunto = f"[Cancelado] Chamado {numero_chamado} — {categoria}"
+    assunto = get_translation(
+        "push_subject_cancelled", "en", numero=numero_chamado, categoria=categoria
+    )
     link = _link_chamado(chamado_id)
 
     for usuario in destinatarios:
@@ -71,33 +74,31 @@ def notificar_cancelamento_chamado(
 
         if email:
             corpo_html = build_email_shell(
-                f"Chamado {numero_chamado} Cancelado",
+                f"Ticket {numero_chamado} Cancelled",
                 "#dc2626",
-                f"<p>O chamado <strong>{escape(numero_chamado)}</strong> foi <strong>cancelado</strong>"
-                f" pelo solicitante <em>{escape(solicitante_nome)}</em>.</p>"
+                f"<p>Ticket <strong>{escape(numero_chamado)}</strong> was <strong>cancelled</strong>"
+                f" by the requester <em>{escape(solicitante_nome)}</em>.</p>"
                 + build_detail_table(
                     [
-                        ("Chamado", numero_chamado),
-                        ("Categoria", categoria),
-                        ("Motivo", motivo),
-                        ("Cancelado por", solicitante_nome),
+                        ("Ticket", numero_chamado),
+                        ("Category", categoria),
+                        ("Reason", motivo),
+                        ("Cancelled by", solicitante_nome),
                     ]
                 )
-                + (build_cta_button("Ver Chamado", link, "#2563eb") if link else ""),
+                + (build_cta_button("View ticket", link, "#2563eb") if link else ""),
             )
             corpo_texto = (
-                f"Chamado {numero_chamado} cancelado por {solicitante_nome}.\n"
-                f"Motivo: {motivo}\nCategoria: {categoria}"
-                + (f"\n\nVer chamado: {link}" if link else "")
+                f"Ticket {numero_chamado} cancelled by {solicitante_nome}.\n"
+                f"Reason: {motivo}\nCategory: {categoria}"
+                + (f"\n\nView ticket: {link}" if link else "")
             )
             ok, err = enviar_email(email, assunto, corpo_html, corpo_texto, importance="normal")
             if ok:
-                logger.info(
-                    "Cancelamento email enviado para %s (chamado %s)", email, numero_chamado
-                )
+                logger.info("Cancellation e-mail sent to %s (ticket %s)", email, numero_chamado)
             else:
                 logger.warning(
-                    "Falha ao enviar cancelamento para %s (chamado %s): %s",
+                    "Failed to send cancellation e-mail to %s (ticket %s): %s",
                     email,
                     numero_chamado,
                     err,
@@ -134,12 +135,10 @@ def notificar_edicao_descricao_solicitante(
     """Notifica responsável + observadores quando o solicitante edita a descrição."""
     destinatarios = destinatarios_do_chamado(dados_chamado)
     if not destinatarios:
-        logger.info(
-            "Edição descrição CH %s: sem destinatários, nenhum e-mail enviado.", numero_chamado
-        )
+        logger.info("Description edit CH %s: no recipients, no e-mail sent.", numero_chamado)
         return
 
-    assunto = f"[Atualizado] Chamado {numero_chamado} — descrição editada"
+    assunto = get_translation("push_subject_updated", "en", numero=numero_chamado)
     link = _link_chamado(chamado_id)
     _max_chars = 300
 
@@ -152,34 +151,32 @@ def notificar_edicao_descricao_solicitante(
 
         if email:
             corpo_html = build_email_shell(
-                f"Chamado {numero_chamado} — Descrição Editada",
+                f"Ticket {numero_chamado} — Description Edited",
                 "#2563eb",
-                f"<p>O solicitante <em>{escape(solicitante_nome)}</em> editou a descrição do chamado "
+                f"<p>The requester <em>{escape(solicitante_nome)}</em> edited the description of ticket "
                 f"<strong>{escape(numero_chamado)}</strong> ({escape(categoria)}).</p>"
                 + build_detail_table(
                     [
-                        ("Chamado", numero_chamado),
-                        ("Categoria", categoria),
-                        ("Editado por", solicitante_nome),
-                        ("Descrição anterior", anterior_trunc),
-                        ("Nova descrição", novo_trunc),
+                        ("Ticket", numero_chamado),
+                        ("Category", categoria),
+                        ("Edited by", solicitante_nome),
+                        ("Previous description", anterior_trunc),
+                        ("New description", novo_trunc),
                     ]
                 )
-                + (build_cta_button("Ver Chamado", link, "#2563eb") if link else ""),
+                + (build_cta_button("View ticket", link, "#2563eb") if link else ""),
             )
             corpo_texto = (
-                f"Chamado {numero_chamado} — descrição editada por {solicitante_nome}.\n"
-                f"Anterior: {anterior_trunc}\nNovo: {novo_trunc}"
-                + (f"\n\nVer chamado: {link}" if link else "")
+                f"Ticket {numero_chamado} — description edited by {solicitante_nome}.\n"
+                f"Previous: {anterior_trunc}\nNew: {novo_trunc}"
+                + (f"\n\nView ticket: {link}" if link else "")
             )
             ok, err = enviar_email(email, assunto, corpo_html, corpo_texto, importance="normal")
             if ok:
-                logger.info(
-                    "Edição descrição email enviado para %s (chamado %s)", email, numero_chamado
-                )
+                logger.info("Description edit e-mail sent to %s (ticket %s)", email, numero_chamado)
             else:
                 logger.warning(
-                    "Falha ao enviar edição descrição para %s (chamado %s): %s",
+                    "Failed to send description edit e-mail to %s (ticket %s): %s",
                     email,
                     numero_chamado,
                     err,
@@ -215,7 +212,7 @@ def notificar_observadores_criacao(
     if not observadores:
         return
 
-    assunto = f"[Em cópia] Chamado {numero_chamado} — {categoria}"
+    assunto = get_translation("push_subject_cc", "en", numero=numero_chamado, categoria=categoria)
     link = _link_chamado(chamado_id)
 
     for obs in observadores:
@@ -232,34 +229,34 @@ def notificar_observadores_criacao(
 
         if email:
             corpo_html = build_email_shell(
-                f"Chamado {numero_chamado} — Você é observador",
+                f"Ticket {numero_chamado} — You are an observer",
                 "#7c3aed",
-                f"<p>Olá{f' {escape(nome)}' if nome else ''},</p>"
-                f"<p>Você foi adicionado como <strong>observador</strong> do chamado "
-                f"<strong>{escape(numero_chamado)}</strong> ({escape(categoria)}) aberto por "
+                f"<p>Hello{f' {escape(nome)}' if nome else ''},</p>"
+                f"<p>You have been added as an <strong>observer</strong> of ticket "
+                f"<strong>{escape(numero_chamado)}</strong> ({escape(categoria)}) opened by "
                 f"<em>{escape(solicitante_nome)}</em>.</p>"
-                "<p>Você receberá notificações das atualizações deste chamado.</p>"
+                "<p>You will receive notifications about updates to this ticket.</p>"
                 + build_detail_table(
                     [
-                        ("Chamado", numero_chamado),
-                        ("Categoria", categoria),
-                        ("Aberto por", solicitante_nome),
+                        ("Ticket", numero_chamado),
+                        ("Category", categoria),
+                        ("Opened by", solicitante_nome),
                     ]
                 )
-                + (build_cta_button("Ver Chamado", link, "#2563eb") if link else ""),
+                + (build_cta_button("View ticket", link, "#2563eb") if link else ""),
             )
             corpo_texto = (
-                f"Você foi adicionado como observador do chamado {numero_chamado} ({categoria})"
-                f" aberto por {solicitante_nome}." + (f"\n\nVer chamado: {link}" if link else "")
+                f"You have been added as an observer of ticket {numero_chamado} ({categoria})"
+                f" opened by {solicitante_nome}." + (f"\n\nView ticket: {link}" if link else "")
             )
             ok, err = enviar_email(email, assunto, corpo_html, corpo_texto, importance="normal")
             if ok:
                 logger.info(
-                    "Inclusão observador email enviado para %s (chamado %s)", email, numero_chamado
+                    "Observer inclusion e-mail sent to %s (ticket %s)", email, numero_chamado
                 )
             else:
                 logger.warning(
-                    "Falha ao enviar inclusão observador para %s (chamado %s): %s",
+                    "Failed to send observer inclusion e-mail to %s (ticket %s): %s",
                     email,
                     numero_chamado,
                     err,
@@ -294,13 +291,20 @@ def notificar_observadores_mudanca_status(
     destinatarios = destinatarios_do_chamado(dados_chamado)
     if not destinatarios:
         logger.info(
-            "Status %s CH %s: sem destinatários, nenhuma notificação enviada.",
+            "Status %s CH %s: no recipients, no notification sent.",
             novo_status,
             numero_chamado,
         )
         return
 
-    assunto = f"[{novo_status}] Chamado {numero_chamado} — {categoria}"
+    status_en = get_translated_status(novo_status, "en")
+    assunto = get_translation(
+        "push_subject_status_change",
+        "en",
+        status=status_en,
+        numero=numero_chamado,
+        categoria=categoria,
+    )
     link = _link_chamado(chamado_id)
 
     for usuario in destinatarios:
@@ -309,34 +313,34 @@ def notificar_observadores_mudanca_status(
 
         if email:
             corpo_html = build_email_shell(
-                f"Chamado {numero_chamado}: {novo_status}",
+                f"Ticket {numero_chamado}: {status_en}",
                 "#2563eb",
-                f"<p>O status do chamado <strong>{escape(numero_chamado)}</strong> ({escape(categoria)}) "
-                f"foi atualizado para <strong>{escape(novo_status)}</strong>.</p>"
+                f"<p>The status of ticket <strong>{escape(numero_chamado)}</strong> ({escape(categoria)}) "
+                f"was updated to <strong>{escape(status_en)}</strong>.</p>"
                 + build_detail_table(
                     [
-                        ("Chamado", numero_chamado),
-                        ("Categoria", categoria),
-                        ("Novo status", novo_status),
+                        ("Ticket", numero_chamado),
+                        ("Category", categoria),
+                        ("New status", status_en),
                     ]
                 )
-                + (build_cta_button("Ver Chamado", link, "#2563eb") if link else ""),
+                + (build_cta_button("View ticket", link, "#2563eb") if link else ""),
             )
-            corpo_texto = f"Chamado {numero_chamado} — status atualizado para {novo_status}." + (
-                f"\n\nVer chamado: {link}" if link else ""
+            corpo_texto = f"Ticket {numero_chamado} — status updated to {status_en}." + (
+                f"\n\nView ticket: {link}" if link else ""
             )
             ok, err = enviar_email(email, assunto, corpo_html, corpo_texto, importance="normal")
             if ok:
                 logger.info(
-                    "Status %s email enviado para %s (chamado %s)",
-                    novo_status,
+                    "Status %s e-mail sent to %s (ticket %s)",
+                    status_en,
                     email,
                     numero_chamado,
                 )
             else:
                 logger.warning(
-                    "Falha ao enviar status %s para %s (chamado %s): %s",
-                    novo_status,
+                    "Failed to send status %s e-mail to %s (ticket %s): %s",
+                    status_en,
                     email,
                     numero_chamado,
                     err,
@@ -378,10 +382,10 @@ def notificar_anexo_tardio_chamado(
     """Notifica responsável + observadores quando solicitante adiciona anexo tardio."""
     destinatarios = destinatarios_do_chamado(dados_chamado)
     if not destinatarios:
-        logger.info("Anexo tardio CH %s: sem destinatários, nenhum e-mail enviado.", numero_chamado)
+        logger.info("Late attachment CH %s: no recipients, no e-mail sent.", numero_chamado)
         return
 
-    assunto = f"[Anexo] Chamado {numero_chamado} — novo documento adicionado"
+    assunto = get_translation("push_subject_attachment", "en", numero=numero_chamado)
     link = _link_chamado(chamado_id)
 
     for usuario in destinatarios:
@@ -390,34 +394,32 @@ def notificar_anexo_tardio_chamado(
 
         if email:
             corpo_html = build_email_shell(
-                f"Chamado {numero_chamado} — Novo Anexo",
+                f"Ticket {numero_chamado} — New Attachment",
                 "#0891b2",
-                f"<p>O solicitante <em>{escape(solicitante_nome)}</em> adicionou um novo anexo ao chamado "
+                f"<p>The requester <em>{escape(solicitante_nome)}</em> added a new attachment to ticket "
                 f"<strong>{escape(numero_chamado)}</strong> ({escape(categoria)}).</p>"
                 + build_detail_table(
                     [
-                        ("Chamado", numero_chamado),
-                        ("Categoria", categoria),
-                        ("Arquivo", nome_arquivo),
-                        ("Motivo", motivo),
-                        ("Adicionado por", solicitante_nome),
+                        ("Ticket", numero_chamado),
+                        ("Category", categoria),
+                        ("File", nome_arquivo),
+                        ("Reason", motivo),
+                        ("Added by", solicitante_nome),
                     ]
                 )
-                + (build_cta_button("Ver Chamado", link, "#2563eb") if link else ""),
+                + (build_cta_button("View ticket", link, "#2563eb") if link else ""),
             )
             corpo_texto = (
-                f"Chamado {numero_chamado} — novo anexo adicionado por {solicitante_nome}.\n"
-                f"Arquivo: {nome_arquivo}\nMotivo: {motivo}"
-                + (f"\n\nVer chamado: {link}" if link else "")
+                f"Ticket {numero_chamado} — new attachment added by {solicitante_nome}.\n"
+                f"File: {nome_arquivo}\nReason: {motivo}"
+                + (f"\n\nView ticket: {link}" if link else "")
             )
             ok, err = enviar_email(email, assunto, corpo_html, corpo_texto, importance="normal")
             if ok:
-                logger.info(
-                    "Anexo tardio email enviado para %s (chamado %s)", email, numero_chamado
-                )
+                logger.info("Late attachment e-mail sent to %s (ticket %s)", email, numero_chamado)
             else:
                 logger.warning(
-                    "Falha ao enviar anexo tardio para %s (chamado %s): %s",
+                    "Failed to send late attachment e-mail to %s (ticket %s): %s",
                     email,
                     numero_chamado,
                     err,

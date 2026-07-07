@@ -5,7 +5,7 @@ CWI 3.2 — Erros genéricos: 500 usa ERRO_INTERNO_MSG; bulk-status usa mensagem
 import json
 from unittest.mock import MagicMock, patch
 
-ERRO_INTERNO_MSG = "Erro interno. Tente novamente."
+ERRO_INTERNO_MSG = "Internal error. Please try again."
 
 CAMPOS_INTERNOS_PROIBIDOS = [
     "senha_hash",

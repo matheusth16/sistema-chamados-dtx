@@ -13,6 +13,7 @@ from flask import current_app
 
 from app.database import db
 from app.firebase_retry import execute_with_retry
+from app.i18n import get_translation_session
 from app.models import Chamado
 from app.models_grupo_rl import GrupoRL
 from app.models_historico import Historico
@@ -33,15 +34,21 @@ from app.utils_areas import setor_para_area
 logger = logging.getLogger(__name__)
 
 
+def _t(key, **kwargs):
+    return get_translation_session(key, **kwargs)
+
+
 def _resolver_responsavel(
     form: dict[str, Any],
     solicitante_id: str,
     solicitante_nome: str,
     area_solicitante: str | None,
-) -> tuple[str, str, str]:
+) -> tuple[str, str, str, bool]:
     """
-    Retorna (responsavel_nome, responsavel_id, motivo_atribuicao).
+    Retorna (responsavel_nome, responsavel_id, motivo_atribuicao, atribuicao_manual).
     Usa responsável escolhido no formulário ou atribuição automática.
+    atribuicao_manual indica se o chamado ficou aguardando atribuição manual
+    (sem depender do texto traduzido de motivo_atribuicao).
     """
     responsavel_id_form = (form.get("responsavel_id") or "").strip()
     responsavel_nome_form = (form.get("responsavel_nome") or "").strip()
@@ -52,7 +59,8 @@ def _resolver_responsavel(
             return (
                 responsavel_nome_form,
                 responsavel_id_form,
-                f"Escolhido pelo solicitante: {responsavel_nome_form}",
+                _t("assignment_chosen_by_requester", nome=responsavel_nome_form),
+                False,
             )
     tipo = form.get("tipo")
     categoria = form.get("categoria")
@@ -66,12 +74,14 @@ def _resolver_responsavel(
         return (
             resultado["supervisor"]["nome"],
             resultado["supervisor"]["id"],
-            f"Atribuído automaticamente a {resultado['supervisor']['nome']}",
+            _t("assignment_auto_assigned", nome=resultado["supervisor"]["nome"]),
+            False,
         )
     return (
         solicitante_nome,
         solicitante_id,
-        f"Aguardando atribuição manual: {resultado['motivo']}",
+        _t("assignment_awaiting_manual", motivo=resultado["motivo"]),
+        True,
     )
 
 
@@ -207,15 +217,15 @@ def criar_chamado(
             return (
                 None,
                 None,
-                "Selecione um supervisor responsável para esta área.",
+                _t("select_supervisor_for_area"),
                 None,
             )
     elif supervisores_da_area:
         ids_validos = {s.id for s in supervisores_da_area}
         if responsavel_id_form not in ids_validos:
-            return (None, None, "Supervisor inválido para esta área.", None)
+            return (None, None, _t("supervisor_invalid_for_area"), None)
 
-    responsavel, responsavel_id, motivo_atribuicao = _resolver_responsavel(
+    responsavel, responsavel_id, motivo_atribuicao, atribuicao_manual = _resolver_responsavel(
         form, solicitante_id, solicitante_nome, area_solicitante
     )
 
@@ -367,8 +377,8 @@ def criar_chamado(
         threading.Thread(target=_notificar, daemon=True, name=f"notif-{chamado_id[:8]}").start()
 
         logger.info("Chamado criado: %s (ID: %s)", numero_chamado, chamado_id)
-        aviso = motivo_atribuicao if "Aguardando atribuição" in motivo_atribuicao else None
+        aviso = motivo_atribuicao if atribuicao_manual else None
         return (chamado_id, numero_chamado, None, aviso)
     except Exception as e:
         logger.exception("Erro ao salvar chamado no Firestore: %s", e)
-        return (None, None, "Não foi possível salvar o chamado. Tente novamente.", None)
+        return (None, None, _t("error_saving_ticket"), None)

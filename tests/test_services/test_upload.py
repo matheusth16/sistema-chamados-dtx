@@ -304,7 +304,7 @@ def test_salvar_anexo_extensao_invalida_levanta_valueerror(app):
 
     with (
         patch("app.services.upload.current_app", app),
-        pytest.raises(ValueError, match="Formato de arquivo inválido"),
+        pytest.raises(ValueError, match="Invalid file format"),
     ):
         salvar_anexo(fake_file)
 

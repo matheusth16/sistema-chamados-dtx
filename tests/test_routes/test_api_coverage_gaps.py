@@ -517,7 +517,7 @@ def test_api_anexo_solicitante_tipo_nao_permitido_retorna_400(client_logado_soli
             content_type="multipart/form-data",
         )
     assert resp.status_code == 400
-    assert "não permitido" in resp.get_json()["erro"]
+    assert "not allowed" in resp.get_json()["erro"]
 
 
 # ── _notificar_escalonamento (thread body, 1036-1067) ────────────────────────

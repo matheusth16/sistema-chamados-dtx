@@ -269,6 +269,31 @@
     "en": "Sign In",
     "es": "Iniciar Sesión"
   },
+  "sign_in_with_microsoft": {
+    "pt_BR": "Entrar com Microsoft",
+    "en": "Sign in with Microsoft",
+    "es": "Iniciar sesión con Microsoft"
+  },
+  "or_divider": {
+    "pt_BR": "ou",
+    "en": "or",
+    "es": "o"
+  },
+  "sso_login_failed": {
+    "pt_BR": "Não foi possível concluir o login com a Microsoft. Tente novamente.",
+    "en": "We couldn't complete Microsoft sign-in. Please try again.",
+    "es": "No se pudo completar el inicio de sesión con Microsoft. Inténtalo de nuevo."
+  },
+  "sso_tenant_not_allowed": {
+    "pt_BR": "Esta conta Microsoft não pertence à DTX Aerospace. Acesso negado.",
+    "en": "This Microsoft account does not belong to DTX Aerospace. Access denied.",
+    "es": "Esta cuenta de Microsoft no pertenece a DTX Aerospace. Acceso denegado."
+  },
+  "sso_disabled": {
+    "pt_BR": "O login com Microsoft está temporariamente desativado.",
+    "en": "Sign in with Microsoft is temporarily disabled.",
+    "es": "El inicio de sesión con Microsoft está temporalmente deshabilitado."
+  },
   "change_status": {
     "pt_BR": "Clique para alterar status",
     "en": "Click to change status",
@@ -645,9 +670,9 @@
     "es": "Definido automáticamente por el sistema."
   },
   "login_title": {
-    "pt_BR": "DTX Portal de Serviços",
-    "en": "DTX Service Portal",
-    "es": "DTX Portal de Servicios"
+    "pt_BR": "Andon",
+    "en": "Andon",
+    "es": "Andon"
   },
   "remember_me": {
     "pt_BR": "Manter-me conectado por 30 dias",
@@ -655,9 +680,9 @@
     "es": "Mantenme conectado durante 30 días"
   },
   "login_hero_title": {
-    "pt_BR": "Portal de Serviços",
-    "en": "Service Portal",
-    "es": "Portal de Servicios"
+    "pt_BR": "Andon",
+    "en": "Andon",
+    "es": "Andon"
   },
   "login_welcome_back": {
     "pt_BR": "Bem-vindo de volta",
@@ -965,9 +990,9 @@
     "es": "DTX Aerospace. Todos los derechos reservados."
   },
   "footer_system_name": {
-    "pt_BR": "DTX Portal de Serviços",
-    "en": "DTX Service Portal",
-    "es": "DTX Portal de Servicios"
+    "pt_BR": "Andon",
+    "en": "Andon",
+    "es": "Andon"
   },
   "level_label": {
     "pt_BR": "Nível",
@@ -1629,6 +1654,11 @@
     "en": "Admin",
     "es": "Admin"
   },
+  "role_global": {
+    "pt_BR": "Global",
+    "en": "Global",
+    "es": "Global"
+  },
   "confirm_delete_user": {
     "pt_BR": "Tem certeza que deseja remover o usuário {nome}? Esta ação não pode ser desfeita!",
     "en": "Are you sure you want to remove user {nome}? This action cannot be undone!",
@@ -2014,6 +2044,11 @@
     "en": "Invalid email",
     "es": "Correo inválido"
   },
+  "invalid_email_domain": {
+    "pt_BR": "Email deve ser do domínio @dtx.aero",
+    "en": "Email must be from the @dtx.aero domain",
+    "es": "El correo debe ser del dominio @dtx.aero"
+  },
   "email_exists": {
     "pt_BR": "Email já existe no sistema",
     "en": "Email already exists in the system",
@@ -2075,9 +2110,34 @@
     "es": "¡No puedes eliminar tu propia cuenta!"
   },
   "cannot_delete_root_admin": {
-    "pt_BR": "O administrador raiz (admin@dtx.com) não pode ser deletado",
-    "en": "The root administrator (admin@dtx.com) cannot be deleted",
-    "es": "El administrador raíz (admin@dtx.com) no puede ser eliminado"
+    "pt_BR": "O administrador raiz (matheus.costa@dtx.aero) não pode ser deletado",
+    "en": "The root administrator (matheus.costa@dtx.aero) cannot be deleted",
+    "es": "El administrador raíz (matheus.costa@dtx.aero) no puede ser eliminado"
+  },
+  "cannot_delete_admin_global": {
+    "pt_BR": "Apenas o Admin Global pode excluir uma conta Admin Global.",
+    "en": "Only Admin Global can delete an Admin Global account.",
+    "es": "Solo el Admin Global puede eliminar una cuenta Admin Global."
+  },
+  "cannot_edit_admin_global": {
+    "pt_BR": "Apenas o Admin Global pode editar uma conta Admin Global.",
+    "en": "Only Admin Global can edit an Admin Global account.",
+    "es": "Solo el Admin Global puede editar una cuenta Admin Global."
+  },
+  "cannot_deactivate_admin_global": {
+    "pt_BR": "Apenas o Admin Global pode desativar uma conta Admin Global.",
+    "en": "Only Admin Global can deactivate an Admin Global account.",
+    "es": "Solo el Admin Global puede desactivar una cuenta Admin Global."
+  },
+  "cannot_activate_admin_global": {
+    "pt_BR": "Apenas o Admin Global pode reativar uma conta Admin Global.",
+    "en": "Only Admin Global can reactivate an Admin Global account.",
+    "es": "Solo el Admin Global puede reactivar una cuenta Admin Global."
+  },
+  "cannot_reset_password_admin_global": {
+    "pt_BR": "Apenas o Admin Global pode resetar a senha de uma conta Admin Global.",
+    "en": "Only Admin Global can reset the password of an Admin Global account.",
+    "es": "Solo el Admin Global puede restablecer la contraseña de una cuenta Admin Global."
   },
   "user_deleted_success": {
     "pt_BR": "Usuário {nome} foi removido do sistema",
@@ -2409,6 +2469,11 @@
     "en": "Change Password",
     "es": "Cambiar Contraseña"
   },
+  "nav_review_tour": {
+    "pt_BR": "Rever tour",
+    "en": "Review tour",
+    "es": "Repetir recorrido"
+  },
   "need_help": {
     "pt_BR": "Precisa de ajuda? Entre em contato com o administrador.",
     "en": "Need help? Contact the administrator.",
@@ -2489,20 +2554,10 @@
     "en": "Supervisors must be assigned to one or more areas. Administrators do not need specific areas.",
     "es": "Los supervisores deben ser asignados a una o más áreas. Los administradores no necesitan áreas específicas."
   },
-  "password_info_header": {
-    "pt_BR": "Sobre a senha:",
-    "en": "About the password:",
-    "es": "Sobre la contraseña:"
-  },
-  "password_info_created_with": {
-    "pt_BR": "Todos os usuários são criados com a senha padrão",
-    "en": "All users are created with the default password",
-    "es": "Todos los usuarios se crean con la contraseña predeterminada"
-  },
-  "password_info_first_login": {
-    "pt_BR": "Na primeira vez que fizerem login, serão obrigados a criar uma nova senha.",
-    "en": "On their first login, they will be required to create a new password.",
-    "es": "En su primer inicio de sesión, deberán crear una nueva contraseña."
+  "password_info_sent_by_email": {
+    "pt_BR": "Uma senha inicial será gerada automaticamente e enviada por e-mail ao usuário. No primeiro login, será obrigatório criar uma nova senha.",
+    "en": "An initial password will be generated automatically and sent to the user by email. On their first login, they will be required to create a new password.",
+    "es": "Se generará automáticamente una contraseña inicial y se enviará por correo electrónico al usuario. En su primer inicio de sesión, deberá crear una nueva contraseña."
   },
   "password_reset_hint": {
     "pt_BR": "Se precisar resetar a senha de um usuário existente, use o botão \"Resetar Senha\" na lista de usuários.",
@@ -3643,5 +3698,1385 @@
     "pt_BR": "{categoria}",
     "en": "{categoria}",
     "es": "{categoria}"
+  },
+  "webpush_activating": {
+    "pt_BR": "Ativando...",
+    "en": "Activating...",
+    "es": "Activando..."
+  },
+  "webpush_retry": {
+    "pt_BR": "Tente novamente",
+    "en": "Try again",
+    "es": "Inténtalo de nuevo"
+  },
+  "open_menu": {
+    "pt_BR": "Abrir menu",
+    "en": "Open menu",
+    "es": "Abrir menú"
+  },
+  "risk_chip_overdue": {
+    "pt_BR": "Atrasado",
+    "en": "Overdue",
+    "es": "Atrasado"
+  },
+  "risk_chip_no_response": {
+    "pt_BR": "Sem resposta",
+    "en": "No response",
+    "es": "Sin respuesta"
+  },
+  "risk_chip_multi_sector": {
+    "pt_BR": "Multi-setor",
+    "en": "Multi-sector",
+    "es": "Multisector"
+  },
+  "gestor_dashboard_subtitle": {
+    "pt_BR": "Visão gerencial read-only, priorizada por risco",
+    "en": "Read-only management view, prioritized by risk",
+    "es": "Vista gerencial de solo lectura, priorizada por riesgo"
+  },
+  "most_critical_area": {
+    "pt_BR": "Área mais crítica",
+    "en": "Most critical area",
+    "es": "Área más crítica"
+  },
+  "attention_label": {
+    "pt_BR": "Atenção",
+    "en": "Attention",
+    "es": "Atención"
+  },
+  "no_critical_areas": {
+    "pt_BR": "Sem áreas críticas",
+    "en": "No critical areas",
+    "es": "Sin áreas críticas"
+  },
+  "critical_area_summary": {
+    "pt_BR": "{area} concentra {qtd} chamado{plural} atrasado{plural} — priorize esta área.",
+    "en": "{area} has {qtd} overdue ticket{plural} — prioritize this area.",
+    "es": "{area} concentra {qtd} ticket{plural} atrasado{plural} — priorice esta área."
+  },
+  "no_overdue_areas_message": {
+    "pt_BR": "Nenhuma área com chamados atrasados no momento.",
+    "en": "No area with overdue tickets at the moment.",
+    "es": "Ninguna área con tickets atrasados en este momento."
+  },
+  "avg_time_no_response": {
+    "pt_BR": "Tempo médio sem resposta",
+    "en": "Average time with no response",
+    "es": "Tiempo medio sin respuesta"
+  },
+  "escalation_ladder_a": {
+    "pt_BR": "Escada A",
+    "en": "Ladder A",
+    "es": "Escalera A"
+  },
+  "on_track": {
+    "pt_BR": "Em dia",
+    "en": "On track",
+    "es": "Al día"
+  },
+  "avg_wait_time_summary": {
+    "pt_BR": "Chamados abertos sem atendimento aguardam em média {tempo} (úteis).",
+    "en": "Open tickets with no response wait an average of {tempo} (business hours).",
+    "es": "Los tickets abiertos sin atención esperan en promedio {tempo} (hábiles)."
+  },
+  "no_overdue_response_message": {
+    "pt_BR": "Nenhum chamado aberto ultrapassou 1h útil sem atendimento.",
+    "en": "No open ticket has exceeded 1 business hour without a response.",
+    "es": "Ningún ticket abierto superó 1 hora hábil sin atención."
+  },
+  "operation_health": {
+    "pt_BR": "Saúde da operação",
+    "en": "Operation health",
+    "es": "Salud de la operación"
+  },
+  "health_percent": {
+    "pt_BR": "{pct}% saudável",
+    "en": "{pct}% healthy",
+    "es": "{pct}% saludable"
+  },
+  "tickets_loaded_risk_summary": {
+    "pt_BR": "{total} chamados carregados; {risco} em algum estado de risco.",
+    "en": "{total} tickets loaded; {risco} in some risk state.",
+    "es": "{total} tickets cargados; {risco} en algún estado de riesgo."
+  },
+  "view_all_count": {
+    "pt_BR": "Ver todos ({total})",
+    "en": "View all ({total})",
+    "es": "Ver todos ({total})"
+  },
+  "no_tickets_in_category": {
+    "pt_BR": "Nenhum chamado nesta categoria — tudo em dia.",
+    "en": "No tickets in this category — all clear.",
+    "es": "Ningún ticket en esta categoría — todo en orden."
+  },
+  "back_to_overview": {
+    "pt_BR": "Voltar à visão geral",
+    "en": "Back to overview",
+    "es": "Volver a la vista general"
+  },
+  "ticket_count": {
+    "pt_BR": "{qtd} chamado{plural}",
+    "en": "{qtd} ticket{plural}",
+    "es": "{qtd} ticket{plural}"
+  },
+  "gestor_lane_multi_setor_travado": {
+    "pt_BR": "Multi-setor travado",
+    "en": "Locked multi-sector",
+    "es": "Multisector bloqueado"
+  },
+  "index_building_title": {
+    "pt_BR": "Índice do banco em construção",
+    "en": "Database index under construction",
+    "es": "Índice de la base de datos en construcción"
+  },
+  "index_building_message": {
+    "pt_BR": "O Firestore está finalizando um índice necessário para o dashboard. Isso costuma levar alguns minutos.",
+    "en": "Firestore is finishing an index required for the dashboard. This usually takes a few minutes.",
+    "es": "Firestore está terminando un índice necesario para el panel. Esto suele tardar unos minutos."
+  },
+  "index_building_countdown": {
+    "pt_BR": "Esta página será recarregada automaticamente em {countdown}s.",
+    "en": "This page will reload automatically in {countdown}s.",
+    "es": "Esta página se recargará automáticamente en {countdown}s."
+  },
+  "refresh_now": {
+    "pt_BR": "Atualizar agora",
+    "en": "Refresh now",
+    "es": "Actualizar ahora"
+  },
+  "idx_page_title": {
+    "pt_BR": "Índices Firestore — Status e Implementação",
+    "en": "Firestore Indexes — Status and Implementation",
+    "es": "Índices de Firestore — Estado e Implementación"
+  },
+  "idx_summary_title": {
+    "pt_BR": "Resumo das Otimizações Implementadas",
+    "en": "Summary of Implemented Optimizations",
+    "es": "Resumen de las Optimizaciones Implementadas"
+  },
+  "idx_summary_item_pagination": {
+    "pt_BR": "<strong>Paginação por Cursor:</strong> Busca apenas 50 documentos por requisição",
+    "en": "<strong>Cursor Pagination:</strong> Fetches only 50 documents per request",
+    "es": "<strong>Paginación por Cursor:</strong> Busca solo 50 documentos por solicitud"
+  },
+  "idx_summary_item_load_more": {
+    "pt_BR": "<strong>Carregar Mais:</strong> Botão para carregar próximos registros sem reload",
+    "en": "<strong>Load More:</strong> Button to load the next records without a reload",
+    "es": "<strong>Cargar Más:</strong> Botón para cargar los próximos registros sin recargar"
+  },
+  "idx_summary_item_ajax": {
+    "pt_BR": "<strong>Status AJAX:</strong> Atualiza status sem recarregar a página inteira",
+    "en": "<strong>AJAX Status:</strong> Updates status without reloading the whole page",
+    "es": "<strong>Estado AJAX:</strong> Actualiza el estado sin recargar toda la página"
+  },
+  "idx_summary_item_indexes": {
+    "pt_BR": "<strong>Índices Firestore:</strong> Faltam criar para máxima performance",
+    "en": "<strong>Firestore Indexes:</strong> Still need to be created for maximum performance",
+    "es": "<strong>Índices de Firestore:</strong> Faltan crear para máximo rendimiento"
+  },
+  "idx_recommended_title": {
+    "pt_BR": "Índices Recomendados",
+    "en": "Recommended Indexes",
+    "es": "Índices Recomendados"
+  },
+  "idx_col_description": {
+    "pt_BR": "Descrição",
+    "en": "Description",
+    "es": "Descripción"
+  },
+  "idx_col_fields": {
+    "pt_BR": "Campos",
+    "en": "Fields",
+    "es": "Campos"
+  },
+  "idx_col_usage": {
+    "pt_BR": "Uso",
+    "en": "Usage",
+    "es": "Uso"
+  },
+  "idx_usage_1": {
+    "pt_BR": "Filtrar por categoria + status",
+    "en": "Filter by category + status",
+    "es": "Filtrar por categoría + estado"
+  },
+  "idx_usage_2": {
+    "pt_BR": "Filtrar por status apenas",
+    "en": "Filter by status only",
+    "es": "Filtrar solo por estado"
+  },
+  "idx_usage_3": {
+    "pt_BR": "Filtrar por categoria + prioridade",
+    "en": "Filter by category + priority",
+    "es": "Filtrar por categoría + prioridad"
+  },
+  "idx_usage_4": {
+    "pt_BR": "Filtrar por gate + status",
+    "en": "Filter by gate + status",
+    "es": "Filtrar por gate + estado"
+  },
+  "idx_how_to_title": {
+    "pt_BR": "Como Criar os Índices",
+    "en": "How to Create the Indexes",
+    "es": "Cómo Crear los Índices"
+  },
+  "idx_option1_title": {
+    "pt_BR": "Opção 1: Firebase Console (Recomendado)",
+    "en": "Option 1: Firebase Console (Recommended)",
+    "es": "Opción 1: Firebase Console (Recomendado)"
+  },
+  "idx_go_to": {
+    "pt_BR": "Vá para:",
+    "en": "Go to:",
+    "es": "Ve a:"
+  },
+  "idx_firestore_db_step": {
+    "pt_BR": "Firestore Database &rarr; <strong>Índices</strong>",
+    "en": "Firestore Database &rarr; <strong>Indexes</strong>",
+    "es": "Firestore Database &rarr; <strong>Índices</strong>"
+  },
+  "idx_create_index_step": {
+    "pt_BR": "Clique em <strong>Create Index</strong>",
+    "en": "Click <strong>Create Index</strong>",
+    "es": "Haz clic en <strong>Create Index</strong>"
+  },
+  "idx_fill_table_step": {
+    "pt_BR": "Preencha com os dados da tabela acima",
+    "en": "Fill in with the data from the table above",
+    "es": "Completa con los datos de la tabla anterior"
+  },
+  "idx_wait_per_index_step": {
+    "pt_BR": "Espere ~5 minutos por índice",
+    "en": "Wait ~5 minutes per index",
+    "es": "Espera ~5 minutos por índice"
+  },
+  "idx_total_time_20min": {
+    "pt_BR": "<strong>Tempo total:</strong> ~20 minutos para 4 índices",
+    "en": "<strong>Total time:</strong> ~20 minutes for 4 indexes",
+    "es": "<strong>Tiempo total:</strong> ~20 minutos para 4 índices"
+  },
+  "idx_option2_title": {
+    "pt_BR": "Opção 2: Firebase CLI (Mais rápido)",
+    "en": "Option 2: Firebase CLI (Faster)",
+    "es": "Opción 2: Firebase CLI (Más rápido)"
+  },
+  "idx_open_terminal_step": {
+    "pt_BR": "Abra o Terminal na pasta do projeto",
+    "en": "Open the Terminal in the project folder",
+    "es": "Abre la Terminal en la carpeta del proyecto"
+  },
+  "idx_wait_finish_step": {
+    "pt_BR": "Espere concluir (~1–2 minutos)",
+    "en": "Wait for it to finish (~1–2 minutes)",
+    "es": "Espera a que termine (~1–2 minutos)"
+  },
+  "idx_ready_all_step": {
+    "pt_BR": "Pronto! Todos os índices criados de uma vez",
+    "en": "Done! All indexes created at once",
+    "es": "¡Listo! Todos los índices creados de una vez"
+  },
+  "idx_total_time_10min": {
+    "pt_BR": "<strong>Tempo total:</strong> ~10 minutos",
+    "en": "<strong>Total time:</strong> ~10 minutes",
+    "es": "<strong>Tiempo total:</strong> ~10 minutos"
+  },
+  "idx_file_section_title": {
+    "pt_BR": "Arquivo firestore.indexes.json",
+    "en": "firestore.indexes.json File",
+    "es": "Archivo firestore.indexes.json"
+  },
+  "idx_file_location_label": {
+    "pt_BR": "Localização:",
+    "en": "Location:",
+    "es": "Ubicación:"
+  },
+  "idx_project_root": {
+    "pt_BR": "(raiz do projeto)",
+    "en": "(project root)",
+    "es": "(raíz del proyecto)"
+  },
+  "idx_file_status": {
+    "pt_BR": "<strong>Status:</strong> Arquivo já criado. Pronto para deploy.",
+    "en": "<strong>Status:</strong> File already created. Ready to deploy.",
+    "es": "<strong>Estado:</strong> Archivo ya creado. Listo para desplegar."
+  },
+  "idx_performance_title": {
+    "pt_BR": "Impacto de Performance",
+    "en": "Performance Impact",
+    "es": "Impacto en el Rendimiento"
+  },
+  "idx_without_indexes": {
+    "pt_BR": "Sem Índices",
+    "en": "Without Indexes",
+    "es": "Sin Índices"
+  },
+  "idx_query_3_filters_slow": {
+    "pt_BR": "Query com 3 filtros: <strong>2–5 segundos</strong>",
+    "en": "Query with 3 filters: <strong>2–5 seconds</strong>",
+    "es": "Consulta con 3 filtros: <strong>2–5 segundos</strong>"
+  },
+  "idx_doc_reads_high": {
+    "pt_BR": "Leitura de documentos: <strong>1000+ ops</strong>",
+    "en": "Document reads: <strong>1000+ ops</strong>",
+    "es": "Lecturas de documentos: <strong>1000+ ops</strong>"
+  },
+  "idx_cost_high": {
+    "pt_BR": "Custo Firestore: <strong>Alto</strong>",
+    "en": "Firestore cost: <strong>High</strong>",
+    "es": "Costo de Firestore: <strong>Alto</strong>"
+  },
+  "idx_ux_slow": {
+    "pt_BR": "Experiência do usuário: <strong>Lenta</strong>",
+    "en": "User experience: <strong>Slow</strong>",
+    "es": "Experiencia de usuario: <strong>Lenta</strong>"
+  },
+  "idx_with_indexes": {
+    "pt_BR": "Com Índices",
+    "en": "With Indexes",
+    "es": "Con Índices"
+  },
+  "idx_query_3_filters_fast": {
+    "pt_BR": "Query com 3 filtros: <strong>50–200ms</strong>",
+    "en": "Query with 3 filters: <strong>50–200ms</strong>",
+    "es": "Consulta con 3 filtros: <strong>50–200ms</strong>"
+  },
+  "idx_doc_reads_low": {
+    "pt_BR": "Leitura de documentos: <strong>50–100 ops</strong>",
+    "en": "Document reads: <strong>50–100 ops</strong>",
+    "es": "Lecturas de documentos: <strong>50–100 ops</strong>"
+  },
+  "idx_cost_low": {
+    "pt_BR": "Custo Firestore: <strong>10x menor</strong>",
+    "en": "Firestore cost: <strong>10x lower</strong>",
+    "es": "Costo de Firestore: <strong>10x menor</strong>"
+  },
+  "idx_ux_fast": {
+    "pt_BR": "Experiência do usuário: <strong>Rápida</strong>",
+    "en": "User experience: <strong>Fast</strong>",
+    "es": "Experiencia de usuario: <strong>Rápida</strong>"
+  },
+  "idx_checklist_title": {
+    "pt_BR": "Checklist de Implementação",
+    "en": "Implementation Checklist",
+    "es": "Lista de Verificación de Implementación"
+  },
+  "idx_check1": {
+    "pt_BR": "Criar {file} (já feito)",
+    "en": "Create {file} (already done)",
+    "es": "Crear {file} (ya hecho)"
+  },
+  "idx_check2": {
+    "pt_BR": "Deploy índices via Firebase Console ou CLI",
+    "en": "Deploy indexes via Firebase Console or CLI",
+    "es": "Despliega índices vía Firebase Console o CLI"
+  },
+  "idx_check3": {
+    "pt_BR": "Esperar ~15 minutos para índices ficarem \"Ready\"",
+    "en": "Wait ~15 minutes for indexes to become \"Ready\"",
+    "es": "Esperar ~15 minutos para que los índices queden en estado \"Ready\""
+  },
+  "idx_check4": {
+    "pt_BR": "Testar paginação em /admin",
+    "en": "Test pagination at /admin",
+    "es": "Probar la paginación en /admin"
+  },
+  "idx_check5": {
+    "pt_BR": "Monitorar performance no Firestore Console",
+    "en": "Monitor performance in the Firestore Console",
+    "es": "Monitorear el rendimiento en Firestore Console"
+  },
+  "idx_apis_title": {
+    "pt_BR": "APIs Otimizadas Disponíveis",
+    "en": "Available Optimized APIs",
+    "es": "APIs Optimizadas Disponibles"
+  },
+  "idx_api1_desc": {
+    "pt_BR": "<strong>Descrição:</strong> Paginação com cursor — busca apenas 50 documentos",
+    "en": "<strong>Description:</strong> Cursor pagination — fetches only 50 documents",
+    "es": "<strong>Descripción:</strong> Paginación con cursor — busca solo 50 documentos"
+  },
+  "idx_query_params_label": {
+    "pt_BR": "Query params:",
+    "en": "Query params:",
+    "es": "Parámetros de consulta:"
+  },
+  "idx_response_label": {
+    "pt_BR": "Response:",
+    "en": "Response:",
+    "es": "Respuesta:"
+  },
+  "idx_api2_desc": {
+    "pt_BR": "<strong>Descrição:</strong> Carregar mais registros (infinite scroll)",
+    "en": "<strong>Description:</strong> Load more records (infinite scroll)",
+    "es": "<strong>Descripción:</strong> Cargar más registros (scroll infinito)"
+  },
+  "idx_body_json_label": {
+    "pt_BR": "Body (JSON):",
+    "en": "Body (JSON):",
+    "es": "Cuerpo (JSON):"
+  },
+  "idx_api3_desc": {
+    "pt_BR": "<strong>Descrição:</strong> Atualizar status sem recarregar a página",
+    "en": "<strong>Description:</strong> Update status without reloading the page",
+    "es": "<strong>Descripción:</strong> Actualizar el estado sin recargar la página"
+  },
+  "idx_references_title": {
+    "pt_BR": "Referências",
+    "en": "References",
+    "es": "Referencias"
+  },
+  "error_completing_part": {
+    "pt_BR": "Erro ao concluir parte.",
+    "en": "Error completing your part.",
+    "es": "Error al concluir la parte."
+  },
+  "files_selected_suffix": {
+    "pt_BR": "arquivo(s) selecionado(s)",
+    "en": "file(s) selected",
+    "es": "archivo(s) seleccionado(s)"
+  },
+  "description_min_3_chars": {
+    "pt_BR": "Descrição deve ter no mínimo 3 caracteres.",
+    "en": "Description must be at least 3 characters.",
+    "es": "La descripción debe tener al menos 3 caracteres."
+  },
+  "generic_save_error": {
+    "pt_BR": "Erro ao salvar.",
+    "en": "Error saving.",
+    "es": "Error al guardar."
+  },
+  "reason_min_10_chars": {
+    "pt_BR": "Motivo deve ter no mínimo 10 caracteres.",
+    "en": "Reason must be at least 10 characters.",
+    "es": "El motivo debe tener al menos 10 caracteres."
+  },
+  "generic_cancel_error": {
+    "pt_BR": "Erro ao cancelar.",
+    "en": "Error canceling.",
+    "es": "Error al cancelar."
+  },
+  "select_a_file": {
+    "pt_BR": "Selecione um arquivo.",
+    "en": "Select a file.",
+    "es": "Selecciona un archivo."
+  },
+  "document_sent_success": {
+    "pt_BR": "Documento enviado com sucesso.",
+    "en": "Document sent successfully.",
+    "es": "Documento enviado con éxito."
+  },
+  "error_sending_document": {
+    "pt_BR": "Erro ao enviar documento.",
+    "en": "Error sending document.",
+    "es": "Error al enviar el documento."
+  },
+  "error_processing_request": {
+    "pt_BR": "Erro ao processar solicitação.",
+    "en": "Error processing request.",
+    "es": "Error al procesar la solicitud."
+  },
+  "remove_action": {
+    "pt_BR": "Remover",
+    "en": "Remove",
+    "es": "Quitar"
+  },
+  "user_generic_label": {
+    "pt_BR": "Usuário",
+    "en": "User",
+    "es": "Usuario"
+  },
+  "tickets_in_workload_suffix": {
+    "pt_BR": "chamados em carga",
+    "en": "tickets in workload",
+    "es": "tickets en carga"
+  },
+  "cancel_selection": {
+    "pt_BR": "Cancelar seleção",
+    "en": "Cancel selection",
+    "es": "Cancelar selección"
+  },
+  "export_advanced_report_title": {
+    "pt_BR": "Exportar relatório profissional com múltiplas abas",
+    "en": "Export professional report with multiple tabs",
+    "es": "Exportar informe profesional con varias pestañas"
+  },
+  "ticket_description_placeholder_example": {
+    "pt_BR": "Ex.: Impressora do 2º andar não liga desde ontem. Luz de power pisca 3x e apaga.",
+    "en": "E.g.: The 2nd floor printer hasn't turned on since yesterday. Power light blinks 3x and turns off.",
+    "es": "Ej.: La impresora del 2.º piso no enciende desde ayer. La luz de encendido parpadea 3 veces y se apaga."
+  },
+  "internal_error_retry": {
+    "pt_BR": "Erro interno. Tente novamente.",
+    "en": "Internal error. Please try again.",
+    "es": "Error interno. Inténtalo de nuevo."
+  },
+  "invalid_or_empty_json": {
+    "pt_BR": "JSON inválido ou vazio",
+    "en": "Invalid or empty JSON",
+    "es": "JSON inválido o vacío"
+  },
+  "field_chamado_id_required": {
+    "pt_BR": "chamado_id é obrigatório",
+    "en": "chamado_id is required",
+    "es": "chamado_id es obligatorio"
+  },
+  "field_novo_status_required": {
+    "pt_BR": "novo_status é obrigatório",
+    "en": "novo_status is required",
+    "es": "novo_status es obligatorio"
+  },
+  "invalid_status_value": {
+    "pt_BR": "Status inválido \"{status}\"",
+    "en": "Invalid status \"{status}\"",
+    "es": "Estado inválido \"{status}\""
+  },
+  "cancellation_reason_required_field": {
+    "pt_BR": "Motivo do cancelamento é obrigatório",
+    "en": "Cancellation reason is required",
+    "es": "El motivo de cancelación es obligatorio"
+  },
+  "ticket_completed_no_status_transition": {
+    "pt_BR": "Chamado Concluído não permite esta transição de status",
+    "en": "Completed ticket does not allow this status transition",
+    "es": "El ticket Concluido no permite esta transición de estado"
+  },
+  "reopen_reason_min_3": {
+    "pt_BR": "Informe o motivo para reabrir o chamado (mínimo 3 caracteres).",
+    "en": "Enter the reason to reopen the ticket (minimum 3 characters).",
+    "es": "Indica el motivo para reabrir el ticket (mínimo 3 caracteres)."
+  },
+  "access_denied_generic": {
+    "pt_BR": "Acesso negado",
+    "en": "Access denied",
+    "es": "Acceso denegado"
+  },
+  "no_permission_generic": {
+    "pt_BR": "Sem permissão",
+    "en": "No permission",
+    "es": "Sin permiso"
+  },
+  "field_ticket_id_required": {
+    "pt_BR": "ID do chamado é obrigatório",
+    "en": "Ticket ID is required",
+    "es": "El ID del ticket es obligatorio"
+  },
+  "field_chamado_ids_list": {
+    "pt_BR": "chamado_ids deve ser uma lista",
+    "en": "chamado_ids must be a list",
+    "es": "chamado_ids debe ser una lista"
+  },
+  "invalid_new_status_generic": {
+    "pt_BR": "novo_status inválido",
+    "en": "invalid novo_status",
+    "es": "novo_status inválido"
+  },
+  "no_ticket_provided": {
+    "pt_BR": "Nenhum chamado informado",
+    "en": "No ticket provided",
+    "es": "Ningún ticket indicado"
+  },
+  "not_found_short": {
+    "pt_BR": "Não encontrado",
+    "en": "Not found",
+    "es": "No encontrado"
+  },
+  "no_permission_for_ticket": {
+    "pt_BR": "Sem permissão para este chamado",
+    "en": "No permission for this ticket",
+    "es": "Sin permiso para este ticket"
+  },
+  "ticket_completed_no_transition_short": {
+    "pt_BR": "Chamado Concluído não permite esta transição",
+    "en": "Completed ticket does not allow this transition",
+    "es": "El ticket Concluido no permite esta transición"
+  },
+  "error_processing_ticket": {
+    "pt_BR": "Erro ao processar chamado",
+    "en": "Error processing ticket",
+    "es": "Error al procesar el ticket"
+  },
+  "invalid_subscription": {
+    "pt_BR": "subscription inválida",
+    "en": "invalid subscription",
+    "es": "suscripción inválida"
+  },
+  "invalid_step": {
+    "pt_BR": "passo inválido",
+    "en": "invalid step",
+    "es": "paso inválido"
+  },
+  "ticket_not_awaiting_confirmation": {
+    "pt_BR": "Chamado não aguarda confirmação",
+    "en": "Ticket is not awaiting confirmation",
+    "es": "El ticket no está esperando confirmación"
+  },
+  "unauthorized_access": {
+    "pt_BR": "Acesso não autorizado.",
+    "en": "Unauthorized access.",
+    "es": "Acceso no autorizado."
+  },
+  "description_min_chars": {
+    "pt_BR": "Descrição mínima de {min_chars} caracteres.",
+    "en": "Minimum description of {min_chars} characters.",
+    "es": "Descripción mínima de {min_chars} caracteres."
+  },
+  "reason_required_min_10_parens": {
+    "pt_BR": "Motivo obrigatório (mínimo 10 caracteres).",
+    "en": "Reason required (minimum 10 characters).",
+    "es": "Motivo obligatorio (mínimo 10 caracteres)."
+  },
+  "file_not_sent": {
+    "pt_BR": "Arquivo não enviado.",
+    "en": "File not sent.",
+    "es": "Archivo no enviado."
+  },
+  "file_type_not_allowed": {
+    "pt_BR": "Tipo de arquivo não permitido.",
+    "en": "File type not allowed.",
+    "es": "Tipo de archivo no permitido."
+  },
+  "field_target_area_required": {
+    "pt_BR": "Área destino é obrigatória",
+    "en": "Target area is required",
+    "es": "El área destino es obligatoria"
+  },
+  "field_supervisor_id_required": {
+    "pt_BR": "supervisor_id é obrigatório",
+    "en": "supervisor_id is required",
+    "es": "supervisor_id es obligatorio"
+  },
+  "only_owner_or_admin_transfer": {
+    "pt_BR": "Apenas o responsável ou admin pode transferir",
+    "en": "Only the assignee or admin can transfer",
+    "es": "Solo el responsable o el admin puede transferir"
+  },
+  "invalid_request_data": {
+    "pt_BR": "Dados da requisição inválidos.",
+    "en": "Invalid request data.",
+    "es": "Datos de la solicitud inválidos."
+  },
+  "ticket_completed_no_operation": {
+    "pt_BR": "Chamado Concluído não permite esta operação",
+    "en": "Completed ticket does not allow this operation",
+    "es": "El ticket Concluido no permite esta operación"
+  },
+  "only_owner_or_admin_escalate": {
+    "pt_BR": "Apenas o responsável ou admin pode escalonar",
+    "en": "Only the assignee or admin can escalate",
+    "es": "Solo el responsable o el admin puede escalar"
+  },
+  "participants_must_be_nonempty_list": {
+    "pt_BR": "participantes deve ser lista não vazia",
+    "en": "participantes must be a non-empty list",
+    "es": "participantes debe ser una lista no vacía"
+  },
+  "only_owner_or_admin_participants": {
+    "pt_BR": "Apenas o responsável ou admin pode incluir participantes",
+    "en": "Only the assignee or admin can include participants",
+    "es": "Solo el responsable o el admin puede incluir participantes"
+  },
+  "ticket_already_completed": {
+    "pt_BR": "Chamado já está Concluído",
+    "en": "Ticket is already Completed",
+    "es": "El ticket ya está Concluido"
+  },
+  "user_not_participant": {
+    "pt_BR": "Usuário não é participante deste chamado",
+    "en": "User is not a participant of this ticket",
+    "es": "El usuario no es participante de este ticket"
+  },
+  "csv_no_stream": {
+    "pt_BR": "Arquivo CSV sem stream para leitura.",
+    "en": "CSV file has no readable stream.",
+    "es": "El archivo CSV no tiene stream para lectura."
+  },
+  "csv_empty": {
+    "pt_BR": "Arquivo CSV vazio.",
+    "en": "Empty CSV file.",
+    "es": "Archivo CSV vacío."
+  },
+  "csv_empty_or_no_valid_rows": {
+    "pt_BR": "Arquivo CSV vazio ou sem linhas válidas.",
+    "en": "Empty CSV file or no valid rows.",
+    "es": "Archivo CSV vacío o sin filas válidas."
+  },
+  "csv_invalid_or_corrupted": {
+    "pt_BR": "Arquivo CSV inválido ou corrompido.",
+    "en": "Invalid or corrupted CSV file.",
+    "es": "Archivo CSV inválido o corrupto."
+  },
+  "csv_validation_error": {
+    "pt_BR": "Erro ao validar arquivo CSV.",
+    "en": "Error validating CSV file.",
+    "es": "Error al validar el archivo CSV."
+  },
+  "file_no_stream": {
+    "pt_BR": "Arquivo não possui stream para leitura.",
+    "en": "File has no readable stream.",
+    "es": "El archivo no tiene stream para lectura."
+  },
+  "file_empty_or_unreadable": {
+    "pt_BR": "Arquivo vazio ou não legível.",
+    "en": "Empty or unreadable file.",
+    "es": "Archivo vacío o no legible."
+  },
+  "file_content_mismatch_ext": {
+    "pt_BR": "O conteúdo do arquivo não corresponde à extensão .{ext}. Envie um arquivo válido.",
+    "en": "The file content does not match the .{ext} extension. Please send a valid file.",
+    "es": "El contenido del archivo no corresponde a la extensión .{ext}. Envía un archivo válido."
+  },
+  "file_validation_error": {
+    "pt_BR": "Erro ao validar arquivo: {error}",
+    "en": "Error validating file: {error}",
+    "es": "Error al validar el archivo: {error}"
+  },
+  "file_exceeds_size_mb": {
+    "pt_BR": "{filename}: excede {mb} MB por arquivo.",
+    "en": "{filename}: exceeds {mb} MB per file.",
+    "es": "{filename}: supera {mb} MB por archivo."
+  },
+  "external_link_https_required": {
+    "pt_BR": "Link externo deve começar com https://.",
+    "en": "External link must start with https://.",
+    "es": "El enlace externo debe comenzar con https://."
+  },
+  "external_link_invalid_format": {
+    "pt_BR": "Link externo com formato inválido.",
+    "en": "External link has an invalid format.",
+    "es": "El enlace externo tiene un formato inválido."
+  },
+  "external_link_sharepoint_only": {
+    "pt_BR": "Link inválido. Use uma URL do SharePoint ou OneDrive (sharepoint.com, onedrive.live.com ou 1drv.ms).",
+    "en": "Invalid link. Use a SharePoint or OneDrive URL (sharepoint.com, onedrive.live.com or 1drv.ms).",
+    "es": "Enlace inválido. Usa una URL de SharePoint o OneDrive (sharepoint.com, onedrive.live.com o 1drv.ms)."
+  },
+  "ticket_description_required": {
+    "pt_BR": "A descrição do chamado é obrigatória.",
+    "en": "The ticket description is required.",
+    "es": "La descripción del ticket es obligatoria."
+  },
+  "ticket_description_min_3": {
+    "pt_BR": "A descrição deve ter no mínimo 3 caracteres.",
+    "en": "The description must be at least 3 characters.",
+    "es": "La descripción debe tener al menos 3 caracteres."
+  },
+  "sector_assignment_required": {
+    "pt_BR": "É necessário atribuir um setor.",
+    "en": "A sector must be assigned.",
+    "es": "Es necesario asignar un sector."
+  },
+  "ticket_category_required": {
+    "pt_BR": "A categoria do chamado é obrigatória.",
+    "en": "The ticket category is required.",
+    "es": "La categoría del ticket es obligatoria."
+  },
+  "gate_assignment_required": {
+    "pt_BR": "É necessário atribuir um gate.",
+    "en": "A gate must be assigned.",
+    "es": "Es necesario asignar un gate."
+  },
+  "gate_invalid_selection": {
+    "pt_BR": "Gate inválido. Selecione N/A ou um gate com sub-etapa (ex: Gate 1 - Desmontagem).",
+    "en": "Invalid gate. Select N/A or a gate with a sub-step (e.g. Gate 1 - Disassembly).",
+    "es": "Gate inválido. Selecciona N/A o un gate con subetapa (ej: Gate 1 - Desmontaje)."
+  },
+  "ticket_impact_required": {
+    "pt_BR": "O impacto do chamado é obrigatório.",
+    "en": "The ticket impact is required.",
+    "es": "El impacto del ticket es obligatorio."
+  },
+  "rl_code_required_projects": {
+    "pt_BR": "Para Projetos, o código RL é obrigatório.",
+    "en": "For Projects, the RL code is required.",
+    "es": "Para Proyectos, el código RL es obligatorio."
+  },
+  "rl_code_max_100_chars": {
+    "pt_BR": "O código RL deve ter no máximo 100 caracteres.",
+    "en": "The RL code must be at most 100 characters.",
+    "es": "El código RL debe tener como máximo 100 caracteres."
+  },
+  "rl_code_invalid_chars": {
+    "pt_BR": "O código RL permite letras, números e os caracteres: espaço, - _ . / ( ) ,",
+    "en": "The RL code allows letters, numbers and the characters: space, - _ . / ( ) ,",
+    "es": "El código RL permite letras, números y los caracteres: espacio, - _ . / ( ) ,"
+  },
+  "file_invalid_format_allowed": {
+    "pt_BR": "{filename}: Formato de arquivo inválido. Permitidos: {allowed}",
+    "en": "{filename}: Invalid file format. Allowed: {allowed}",
+    "es": "{filename}: Formato de archivo inválido. Permitidos: {allowed}"
+  },
+  "file_content_format_mismatch": {
+    "pt_BR": "Conteúdo do arquivo não corresponde ao formato declarado.",
+    "en": "File content does not match the declared format.",
+    "es": "El contenido del archivo no corresponde al formato declarado."
+  },
+  "observer_missing_usuario_id": {
+    "pt_BR": "Observador sem usuario_id informado.",
+    "en": "Observer without usuario_id provided.",
+    "es": "Observador sin usuario_id informado."
+  },
+  "requester_cannot_be_observer": {
+    "pt_BR": "O solicitante não pode ser observador do próprio chamado.",
+    "en": "The requester cannot be an observer of their own ticket.",
+    "es": "El solicitante no puede ser observador de su propio ticket."
+  },
+  "max_observers_exceeded": {
+    "pt_BR": "Máximo de {max} observadores por chamado.",
+    "en": "Maximum of {max} observers per ticket.",
+    "es": "Máximo de {max} observadores por ticket."
+  },
+  "upload_invalid_format_allowed": {
+    "pt_BR": "Formato de arquivo inválido. Permitidos: {allowed}.",
+    "en": "Invalid file format. Allowed: {allowed}.",
+    "es": "Formato de archivo inválido. Permitidos: {allowed}."
+  },
+  "upload_invalid_format_generic": {
+    "pt_BR": "Formato de arquivo inválido.",
+    "en": "Invalid file format.",
+    "es": "Formato de archivo inválido."
+  },
+  "select_supervisor_for_area": {
+    "pt_BR": "Selecione um supervisor responsável para esta área.",
+    "en": "Select a responsible supervisor for this area.",
+    "es": "Selecciona un supervisor responsable para esta área."
+  },
+  "supervisor_invalid_for_area": {
+    "pt_BR": "Supervisor inválido para esta área.",
+    "en": "Invalid supervisor for this area.",
+    "es": "Supervisor inválido para esta área."
+  },
+  "assignment_chosen_by_requester": {
+    "pt_BR": "Escolhido pelo solicitante: {nome}",
+    "en": "Chosen by the requester: {nome}",
+    "es": "Elegido por el solicitante: {nome}"
+  },
+  "assignment_auto_assigned": {
+    "pt_BR": "Atribuído automaticamente a {nome}",
+    "en": "Automatically assigned to {nome}",
+    "es": "Asignado automáticamente a {nome}"
+  },
+  "assignment_awaiting_manual": {
+    "pt_BR": "Aguardando atribuição manual: {motivo}",
+    "en": "Awaiting manual assignment: {motivo}",
+    "es": "Esperando asignación manual: {motivo}"
+  },
+  "assignment_invalid_area": {
+    "pt_BR": "Área inválida ou não informada",
+    "en": "Invalid or missing area",
+    "es": "Área inválida o no informada"
+  },
+  "assignment_no_supervisor_for_area": {
+    "pt_BR": "Nenhum supervisor disponível para a área \"{area}\"",
+    "en": "No supervisor available for the area \"{area}\"",
+    "es": "No hay supervisor disponible para el área \"{area}\""
+  },
+  "assignment_could_not_select_supervisor": {
+    "pt_BR": "Não foi possível selecionar um supervisor",
+    "en": "Could not select a supervisor",
+    "es": "No se pudo seleccionar un supervisor"
+  },
+  "assignment_success_strategy": {
+    "pt_BR": "Atribuído com sucesso (estratégia: {estrategia})",
+    "en": "Successfully assigned (strategy: {estrategia})",
+    "es": "Asignado con éxito (estrategia: {estrategia})"
+  },
+  "assignment_error": {
+    "pt_BR": "Erro ao atribuir: {error}",
+    "en": "Error assigning: {error}",
+    "es": "Error al asignar: {error}"
+  },
+  "invalid_status_generic": {
+    "pt_BR": "Status inválido: {status}",
+    "en": "Invalid status: {status}",
+    "es": "Estado inválido: {status}"
+  },
+  "invalid_status_transition": {
+    "pt_BR": "Transição inválida: {de} → {para}",
+    "en": "Invalid transition: {de} → {para}",
+    "es": "Transición inválida: {de} → {para}"
+  },
+  "participants_pending_wait": {
+    "pt_BR": "Existem participantes pendentes — aguarde 'Concluí minha parte' de todos",
+    "en": "There are pending participants — wait for everyone to confirm 'I finished my part'",
+    "es": "Hay participantes pendientes — espera a que todos confirmen 'Concluí mi parte'"
+  },
+  "ticket_out_of_area_no_permission": {
+    "pt_BR": "Sem permissão para este chamado ou fora da sua área",
+    "en": "No permission for this ticket or outside your area",
+    "es": "Sin permiso para este ticket o fuera de tu área"
+  },
+  "cancellation_reason_required_for_status": {
+    "pt_BR": "Motivo do cancelamento é obrigatório para alterar o status para Cancelado",
+    "en": "Cancellation reason is required to change the status to Cancelled",
+    "es": "El motivo de cancelación es obligatorio para cambiar el estado a Cancelado"
+  },
+  "error_updating_status_generic": {
+    "pt_BR": "Erro ao atualizar status",
+    "en": "Error updating status",
+    "es": "Error al actualizar el estado"
+  },
+  "sla_invalid_range": {
+    "pt_BR": "SLA inválido. Informe um número entre 1 e 365 dias, ou 0 para redefinir ao padrão.",
+    "en": "Invalid SLA. Enter a number between 1 and 365 days, or 0 to reset to the default.",
+    "es": "SLA inválido. Indica un número entre 1 y 365 días, o 0 para restablecer el valor predeterminado."
+  },
+  "internal_error_saving_changes": {
+    "pt_BR": "Erro interno ao salvar as modificações.",
+    "en": "Internal error saving the changes.",
+    "es": "Error interno al guardar los cambios."
+  },
+  "access_denied_gestor_readonly": {
+    "pt_BR": "Acesso negado: gestores têm visão read-only",
+    "en": "Access denied: managers have read-only access",
+    "es": "Acceso denegado: los gestores tienen acceso de solo lectura"
+  },
+  "access_denied_own_tickets_only": {
+    "pt_BR": "Acesso negado: Você só pode atualizar seus próprios chamados",
+    "en": "Access denied: You can only update your own tickets",
+    "es": "Acceso denegado: Solo puedes actualizar tus propios tickets"
+  },
+  "access_denied_requester_cancel_only": {
+    "pt_BR": "Acesso negado: Solicitantes só podem Cancelar chamados",
+    "en": "Access denied: Requesters can only Cancel tickets",
+    "es": "Acceso denegado: Los solicitantes solo pueden Cancelar tickets"
+  },
+  "access_denied_out_of_area": {
+    "pt_BR": "Acesso negado: Sem permissão ou fora da sua área",
+    "en": "Access denied: No permission or outside your area",
+    "es": "Acceso denegado: Sin permiso o fuera de tu área"
+  },
+  "report_update_limit_reached": {
+    "pt_BR": "Você atingiu o limite de {limite} atualizações de relatório por dia. Tente amanhã.",
+    "en": "You have reached the limit of {limite} report updates per day. Try again tomorrow.",
+    "es": "Alcanzaste el límite de {limite} actualizaciones de informe por día. Intenta mañana."
+  },
+  "export_limit_reached": {
+    "pt_BR": "Você atingiu o limite de {limite} exportações por dia. Tente amanhã.",
+    "en": "You have reached the limit of {limite} exports per day. Try again tomorrow.",
+    "es": "Alcanzaste el límite de {limite} exportaciones por día. Intenta mañana."
+  },
+  "ticket_not_found_dot": {
+    "pt_BR": "Chamado não encontrado.",
+    "en": "Ticket not found.",
+    "es": "Ticket no encontrado."
+  },
+  "no_permission_cancel_ticket": {
+    "pt_BR": "Sem permissão para cancelar este chamado.",
+    "en": "No permission to cancel this ticket.",
+    "es": "Sin permiso para cancelar este ticket."
+  },
+  "reason_required_min_chars": {
+    "pt_BR": "Motivo obrigatório (mínimo {min_chars} caracteres).",
+    "en": "Reason required (minimum {min_chars} characters).",
+    "es": "Motivo obligatorio (mínimo {min_chars} caracteres)."
+  },
+  "cannot_cancel_status": {
+    "pt_BR": "Não é possível cancelar chamado com status '{status}'.",
+    "en": "Cannot cancel a ticket with status '{status}'.",
+    "es": "No se puede cancelar un ticket con estado '{status}'."
+  },
+  "internal_error_canceling_ticket": {
+    "pt_BR": "Erro interno ao cancelar chamado.",
+    "en": "Internal error canceling the ticket.",
+    "es": "Error interno al cancelar el ticket."
+  },
+  "no_permission_edit_ticket": {
+    "pt_BR": "Sem permissão para editar este chamado.",
+    "en": "No permission to edit this ticket.",
+    "es": "Sin permiso para editar este ticket."
+  },
+  "cannot_edit_description_status": {
+    "pt_BR": "Não é possível editar a descrição com status '{status}'.",
+    "en": "Cannot edit the description with status '{status}'.",
+    "es": "No se puede editar la descripción con estado '{status}'."
+  },
+  "edit_window_closed": {
+    "pt_BR": "Janela de edição de {minutos} minutos encerrada.",
+    "en": "The {minutos}-minute edit window has closed.",
+    "es": "La ventana de edición de {minutos} minutos ha finalizado."
+  },
+  "internal_error_saving_edit": {
+    "pt_BR": "Erro interno ao salvar edição.",
+    "en": "Internal error saving the edit.",
+    "es": "Error interno al guardar la edición."
+  },
+  "no_permission_add_attachment": {
+    "pt_BR": "Sem permissão para adicionar anexo.",
+    "en": "No permission to add an attachment.",
+    "es": "Sin permiso para agregar un adjunto."
+  },
+  "cannot_add_attachment_status": {
+    "pt_BR": "Não é possível adicionar anexo com status '{status}'.",
+    "en": "Cannot add an attachment with status '{status}'.",
+    "es": "No se puede agregar un adjunto con estado '{status}'."
+  },
+  "internal_error_adding_attachment": {
+    "pt_BR": "Erro interno ao adicionar anexo.",
+    "en": "Internal error adding the attachment.",
+    "es": "Error interno al agregar el adjunto."
+  },
+  "no_permission_transfer_ticket": {
+    "pt_BR": "Sem permissão para transferir este chamado",
+    "en": "No permission to transfer this ticket",
+    "es": "Sin permiso para transferir este ticket"
+  },
+  "target_supervisor_not_found_area": {
+    "pt_BR": "Supervisor destino não encontrado ou não pertence à área destino",
+    "en": "Target supervisor not found or does not belong to the target area",
+    "es": "Supervisor destino no encontrado o no pertenece al área destino"
+  },
+  "no_permission_escalate_ticket": {
+    "pt_BR": "Sem permissão para escalonar este chamado",
+    "en": "No permission to escalate this ticket",
+    "es": "Sin permiso para escalar este ticket"
+  },
+  "target_same_as_current_responsible": {
+    "pt_BR": "Destino igual ao responsável atual — selecione um colega diferente",
+    "en": "Target is the same as the current assignee — select a different colleague",
+    "es": "El destino es igual al responsable actual — selecciona un colega diferente"
+  },
+  "target_supervisor_wrong_area": {
+    "pt_BR": "Supervisor destino não pertence à área do chamado",
+    "en": "Target supervisor does not belong to the ticket's area",
+    "es": "El supervisor destino no pertenece al área del ticket"
+  },
+  "participants_list_cannot_be_empty": {
+    "pt_BR": "Lista de participantes não pode ser vazia",
+    "en": "Participants list cannot be empty",
+    "es": "La lista de participantes no puede estar vacía"
+  },
+  "no_permission_include_participants": {
+    "pt_BR": "Sem permissão para incluir participantes neste chamado",
+    "en": "No permission to include participants in this ticket",
+    "es": "Sin permiso para incluir participantes en este ticket"
+  },
+  "field_supervisor_id_required_each": {
+    "pt_BR": "supervisor_id é obrigatório em cada participante",
+    "en": "supervisor_id is required for each participant",
+    "es": "supervisor_id es obligatorio en cada participante"
+  },
+  "field_area_required_each": {
+    "pt_BR": "area é obrigatória em cada participante",
+    "en": "area is required for each participant",
+    "es": "area es obligatoria en cada participante"
+  },
+  "owner_cannot_be_participant": {
+    "pt_BR": "Owner (responsável) não pode ser adicionado como participante",
+    "en": "Owner (assignee) cannot be added as a participant",
+    "es": "El owner (responsable) no puede agregarse como participante"
+  },
+  "supervisor_not_found_in_area": {
+    "pt_BR": "Supervisor {sup_id} não encontrado ou não pertence à área {area}",
+    "en": "Supervisor {sup_id} not found or does not belong to area {area}",
+    "es": "Supervisor {sup_id} no encontrado o no pertenece al área {area}"
+  },
+  "no_new_participants_to_include": {
+    "pt_BR": "Nenhum participante novo para incluir — todos já são participantes do chamado",
+    "en": "No new participants to include — everyone is already a participant of the ticket",
+    "es": "No hay participantes nuevos para incluir — todos ya son participantes del ticket"
+  },
+  "already_completed_own_part": {
+    "pt_BR": "Você já concluiu sua parte neste chamado",
+    "en": "You have already completed your part on this ticket",
+    "es": "Ya completaste tu parte en este ticket"
+  },
+  "push_subject_cancelled": {
+    "pt_BR": "[Cancelado] Chamado {numero} — {categoria}",
+    "en": "[Cancelled] Ticket {numero} — {categoria}",
+    "es": "[Cancelado] Ticket {numero} — {categoria}"
+  },
+  "push_subject_updated": {
+    "pt_BR": "[Atualizado] Chamado {numero} — descrição editada",
+    "en": "[Updated] Ticket {numero} — description edited",
+    "es": "[Actualizado] Ticket {numero} — descripción editada"
+  },
+  "push_subject_cc": {
+    "pt_BR": "[Em cópia] Chamado {numero} — {categoria}",
+    "en": "[CC] Ticket {numero} — {categoria}",
+    "es": "[En copia] Ticket {numero} — {categoria}"
+  },
+  "push_subject_status_change": {
+    "pt_BR": "[{status}] Chamado {numero} — {categoria}",
+    "en": "[{status}] Ticket {numero} — {categoria}",
+    "es": "[{status}] Ticket {numero} — {categoria}"
+  },
+  "push_subject_attachment": {
+    "pt_BR": "[Anexo] Chamado {numero} — novo documento adicionado",
+    "en": "[Attachment] Ticket {numero} — new document added",
+    "es": "[Adjunto] Ticket {numero} — nuevo documento agregado"
+  },
+  "notification_participant_included_title": {
+    "pt_BR": "Chamado {numero}: você foi incluído como participante",
+    "en": "Ticket {numero}: you were added as a participant",
+    "es": "Ticket {numero}: fuiste incluido como participante"
+  },
+  "notification_participant_included_message": {
+    "pt_BR": "Você foi adicionado como participante do chamado {numero} ({categoria}). Conclua sua parte quando finalizar.",
+    "en": "You were added as a participant of ticket {numero} ({categoria}). Complete your part when finished.",
+    "es": "Fuiste agregado como participante del ticket {numero} ({categoria}). Completa tu parte cuando termines."
+  },
+  "push_participant_included_title": {
+    "pt_BR": "Chamado {numero}: você foi incluído",
+    "en": "Ticket {numero}: you were added",
+    "es": "Ticket {numero}: fuiste incluido"
+  },
+  "push_participant_included_body": {
+    "pt_BR": "Você foi adicionado como participante. Conclua sua parte quando finalizar.",
+    "en": "You were added as a participant. Complete your part when finished.",
+    "es": "Fuiste agregado como participante. Completa tu parte cuando termines."
+  },
+  "notification_all_participants_done_title": {
+    "pt_BR": "Chamado {numero}: todos participantes concluíram",
+    "en": "Ticket {numero}: all participants have finished",
+    "es": "Ticket {numero}: todos los participantes concluyeron"
+  },
+  "notification_all_participants_done_message": {
+    "pt_BR": "Você pode fechar o chamado {numero} ({categoria})",
+    "en": "You can close ticket {numero} ({categoria})",
+    "es": "Puedes cerrar el ticket {numero} ({categoria})"
+  },
+  "push_all_participants_done_title": {
+    "pt_BR": "Chamado {numero}: pronto para fechar",
+    "en": "Ticket {numero}: ready to close",
+    "es": "Ticket {numero}: listo para cerrar"
+  },
+  "push_all_participants_done_body": {
+    "pt_BR": "Todos os participantes concluíram sua parte.",
+    "en": "All participants have completed their part.",
+    "es": "Todos los participantes completaron su parte."
+  },
+  "mfa_verify_title": {
+    "pt_BR": "Verificação em duas etapas",
+    "en": "Two-step verification",
+    "es": "Verificación en dos pasos"
+  },
+  "mfa_verify_subtitle": {
+    "pt_BR": "Digite o código do seu aplicativo autenticador para continuar.",
+    "en": "Enter the code from your authenticator app to continue.",
+    "es": "Ingrese el código de su aplicación autenticadora para continuar."
+  },
+  "mfa_code_label": {
+    "pt_BR": "Código de verificação",
+    "en": "Verification code",
+    "es": "Código de verificación"
+  },
+  "mfa_code_hint": {
+    "pt_BR": "Você também pode usar um código de backup.",
+    "en": "You can also use a backup code.",
+    "es": "También puede usar un código de respaldo."
+  },
+  "mfa_trust_device": {
+    "pt_BR": "Confiar neste dispositivo por 30 dias",
+    "en": "Trust this device for 30 days",
+    "es": "Confiar en este dispositivo por 30 días"
+  },
+  "mfa_verify_submit": {
+    "pt_BR": "Verificar",
+    "en": "Verify",
+    "es": "Verificar"
+  },
+  "mfa_back_to_login": {
+    "pt_BR": "Voltar para o login",
+    "en": "Back to login",
+    "es": "Volver al inicio de sesión"
+  },
+  "mfa_invalid_code": {
+    "pt_BR": "Código inválido. Tente novamente.",
+    "en": "Invalid code. Please try again.",
+    "es": "Código inválido. Inténtelo de nuevo."
+  },
+  "mfa_session_expired": {
+    "pt_BR": "Sessão de verificação expirada. Faça login novamente.",
+    "en": "Verification session expired. Please log in again.",
+    "es": "Sesión de verificación expirada. Inicie sesión nuevamente."
+  },
+  "mfa_settings_title": {
+    "pt_BR": "Autenticação em duas etapas (MFA)",
+    "en": "Two-factor authentication (MFA)",
+    "es": "Autenticación de dos factores (MFA)"
+  },
+  "mfa_setup_required_alert": {
+    "pt_BR": "Por segurança, você deve configurar a autenticação em duas etapas antes de continuar.",
+    "en": "For security, you must set up two-factor authentication before continuing.",
+    "es": "Por seguridad, debe configurar la autenticación de dos factores antes de continuar."
+  },
+  "mfa_already_enabled": {
+    "pt_BR": "MFA está ativado na sua conta. Você pode gerar novos códigos de backup ou desativar abaixo.",
+    "en": "MFA is enabled on your account. You can generate new backup codes or disable it below.",
+    "es": "MFA está activado en su cuenta. Puede generar nuevos códigos de respaldo o desactivarlo abajo."
+  },
+  "mfa_regenerate_backup_codes": {
+    "pt_BR": "Gerar novos códigos de backup",
+    "en": "Generate new backup codes",
+    "es": "Generar nuevos códigos de respaldo"
+  },
+  "mfa_disable": {
+    "pt_BR": "Desativar MFA",
+    "en": "Disable MFA",
+    "es": "Desactivar MFA"
+  },
+  "mfa_setup_intro": {
+    "pt_BR": "Escaneie o QR code com seu aplicativo autenticador (ex: Microsoft Authenticator, Google Authenticator) e digite o código gerado para confirmar.",
+    "en": "Scan the QR code with your authenticator app (e.g. Microsoft Authenticator, Google Authenticator) and enter the generated code to confirm.",
+    "es": "Escanee el código QR con su aplicación autenticadora (ej: Microsoft Authenticator, Google Authenticator) e ingrese el código generado para confirmar."
+  },
+  "mfa_qr_alt": {
+    "pt_BR": "QR code de configuração do MFA",
+    "en": "MFA setup QR code",
+    "es": "Código QR de configuración de MFA"
+  },
+  "mfa_manual_key_hint": {
+    "pt_BR": "Não consegue escanear? Digite esta chave manualmente:",
+    "en": "Can't scan? Enter this key manually:",
+    "es": "¿No puede escanear? Ingrese esta clave manualmente:"
+  },
+  "mfa_enable_submit": {
+    "pt_BR": "Ativar MFA",
+    "en": "Enable MFA",
+    "es": "Activar MFA"
+  },
+  "mfa_enabled_success": {
+    "pt_BR": "MFA ativado com sucesso! Guarde seus códigos de backup em um lugar seguro.",
+    "en": "MFA enabled successfully! Store your backup codes somewhere safe.",
+    "es": "¡MFA activado con éxito! Guarde sus códigos de respaldo en un lugar seguro."
+  },
+  "mfa_disabled_success": {
+    "pt_BR": "MFA desativado.",
+    "en": "MFA disabled.",
+    "es": "MFA desactivado."
+  },
+  "mfa_backup_codes_title": {
+    "pt_BR": "Seus códigos de backup",
+    "en": "Your backup codes",
+    "es": "Sus códigos de respaldo"
+  },
+  "mfa_backup_codes_warning": {
+    "pt_BR": "Use um destes códigos para entrar caso perca acesso ao seu aplicativo autenticador. Cada código funciona apenas uma vez.",
+    "en": "Use one of these codes to sign in if you lose access to your authenticator app. Each code works only once.",
+    "es": "Use uno de estos códigos para iniciar sesión si pierde acceso a su aplicación autenticadora. Cada código funciona solo una vez."
+  },
+  "mfa_backup_codes_shown_once": {
+    "pt_BR": "Estes códigos são exibidos apenas uma vez. Salve-os agora em um local seguro.",
+    "en": "These codes are shown only once. Save them now in a safe place.",
+    "es": "Estos códigos se muestran solo una vez. Guárdelos ahora en un lugar seguro."
+  },
+  "mfa_backup_codes_continue": {
+    "pt_BR": "Já salvei meus códigos, continuar",
+    "en": "I've saved my codes, continue",
+    "es": "Ya guardé mis códigos, continuar"
+  },
+  "confirm_disable_mfa": {
+    "pt_BR": "Desativar o MFA de {nome}? O usuário poderá entrar apenas com senha até configurar novamente.",
+    "en": "Disable MFA for {nome}? The user will be able to sign in with password only until they set it up again.",
+    "es": "¿Desactivar el MFA de {nome}? El usuario podrá iniciar sesión solo con contraseña hasta configurarlo nuevamente."
+  },
+  "disable_mfa_btn": {
+    "pt_BR": "Desativar MFA",
+    "en": "Disable MFA",
+    "es": "Desactivar MFA"
+  },
+  "disable_mfa_btn_title": {
+    "pt_BR": "Desativar o MFA deste usuário (conta travada sem código de backup)",
+    "en": "Disable this user's MFA (account locked out without a backup code)",
+    "es": "Desactivar el MFA de este usuario (cuenta bloqueada sin código de respaldo)"
+  },
+  "user_mfa_disabled_success": {
+    "pt_BR": "MFA de {nome} foi desativado.",
+    "en": "{nome}'s MFA has been disabled.",
+    "es": "El MFA de {nome} fue desactivado."
+  },
+  "nav_mfa_settings": {
+    "pt_BR": "Autenticação em duas etapas",
+    "en": "Two-factor authentication",
+    "es": "Autenticación de dos factores"
+  },
+  "nav_my_data": {
+    "pt_BR": "Meus dados",
+    "en": "My data",
+    "es": "Mis datos"
+  },
+  "my_data_title": {
+    "pt_BR": "Meus dados",
+    "en": "My data",
+    "es": "Mis datos"
+  },
+  "my_data_subtitle": {
+    "pt_BR": "Dados pessoais associados à sua conta (LGPD — direito de acesso)",
+    "en": "Personal data associated with your account (data protection — right of access)",
+    "es": "Datos personales asociados a su cuenta (protección de datos — derecho de acceso)"
+  },
+  "field_areas": {
+    "pt_BR": "Áreas",
+    "en": "Areas",
+    "es": "Áreas"
+  },
+  "management_level": {
+    "pt_BR": "Nível de gestão",
+    "en": "Management level",
+    "es": "Nivel de gestión"
+  },
+  "auth_provider_label": {
+    "pt_BR": "Forma de login",
+    "en": "Sign-in method",
+    "es": "Método de acceso"
+  },
+  "auth_provider_local": {
+    "pt_BR": "E-mail e senha",
+    "en": "Email and password",
+    "es": "Correo electrónico y contraseña"
+  },
+  "auth_provider_microsoft": {
+    "pt_BR": "Microsoft (Entra ID)",
+    "en": "Microsoft (Entra ID)",
+    "es": "Microsoft (Entra ID)"
+  },
+  "mfa_status_label": {
+    "pt_BR": "Autenticação em duas etapas",
+    "en": "Two-factor authentication",
+    "es": "Autenticación de dos factores"
+  },
+  "password_last_changed_label": {
+    "pt_BR": "Última troca de senha",
+    "en": "Last password change",
+    "es": "Último cambio de contraseña"
+  },
+  "password_never_changed": {
+    "pt_BR": "Nunca alterada",
+    "en": "Never changed",
+    "es": "Nunca cambiada"
+  },
+  "cannot_anonymize_own_account": {
+    "pt_BR": "Você não pode anonimizar a própria conta.",
+    "en": "You cannot anonymize your own account.",
+    "es": "No puede anonimizar su propia cuenta."
+  },
+  "cannot_anonymize_admin_global": {
+    "pt_BR": "Apenas um admin_global pode anonimizar outra conta admin_global.",
+    "en": "Only an admin_global can anonymize another admin_global account.",
+    "es": "Solo un admin_global puede anonimizar otra cuenta admin_global."
+  },
+  "cannot_anonymize_root_admin": {
+    "pt_BR": "A conta matheus.costa@dtx.aero não pode ser anonimizada.",
+    "en": "The matheus.costa@dtx.aero account cannot be anonymized.",
+    "es": "La cuenta matheus.costa@dtx.aero no puede ser anonimizada."
+  },
+  "must_deactivate_before_anonymize": {
+    "pt_BR": "Desative a conta antes de anonimizar os dados.",
+    "en": "Deactivate the account before anonymizing its data.",
+    "es": "Desactive la cuenta antes de anonimizar sus datos."
+  },
+  "user_anonymized_success": {
+    "pt_BR": "Dados do usuário anonimizados com sucesso.",
+    "en": "User data anonymized successfully.",
+    "es": "Datos del usuario anonimizados con éxito."
+  },
+  "anonymize_user": {
+    "pt_BR": "Anonimizar dados",
+    "en": "Anonymize data",
+    "es": "Anonimizar datos"
+  },
+  "anonymize_user_confirm": {
+    "pt_BR": "Isso vai apagar permanentemente o nome e e-mail deste usuário. A ação não pode ser desfeita. Continuar?",
+    "en": "This will permanently erase this user's name and email. This action cannot be undone. Continue?",
+    "es": "Esto borrará permanentemente el nombre y el correo de este usuario. Esta acción no se puede deshacer. ¿Continuar?"
   }
 }

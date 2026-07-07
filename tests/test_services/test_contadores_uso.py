@@ -72,7 +72,7 @@ def test_relatorio_limite_atingido_retorna_false():
         ok, err = verificar_e_incrementar_relatorio("user1", 5)
     assert ok is False
     assert err is not None
-    assert "limite" in (err or "").lower()
+    assert "limit" in (err or "").lower()
 
 
 def test_relatorio_excecao_firestore_retorna_true_fail_open():

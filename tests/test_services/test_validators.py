@@ -36,7 +36,7 @@ def test_validar_novo_chamado_descricao_obrigatoria():
         "impacto": "Impacto Baixo",
     }
     erros = validar_novo_chamado(form)
-    assert any("descrição" in e.lower() and "obrigatória" in e.lower() for e in erros)
+    assert any("description" in e.lower() and "required" in e.lower() for e in erros)
 
 
 def test_validar_novo_chamado_descricao_minimo_caracteres():
@@ -49,7 +49,7 @@ def test_validar_novo_chamado_descricao_minimo_caracteres():
         "impacto": "Impacto Baixo",
     }
     erros = validar_novo_chamado(form)
-    assert any("mínimo 3" in e for e in erros)
+    assert any("at least 3" in e for e in erros)
 
 
 def test_validar_novo_chamado_tipo_obrigatorio():
@@ -62,7 +62,7 @@ def test_validar_novo_chamado_tipo_obrigatorio():
         "impacto": "Impacto Baixo",
     }
     erros = validar_novo_chamado(form)
-    assert any("setor" in e.lower() or "atribuir" in e.lower() for e in erros)
+    assert any("sector" in e.lower() or "assigned" in e.lower() for e in erros)
 
 
 def test_validar_novo_chamado_gate_obrigatorio():
@@ -75,7 +75,7 @@ def test_validar_novo_chamado_gate_obrigatorio():
         "impacto": "Impacto Baixo",
     }
     erros = validar_novo_chamado(form)
-    assert any("gate" in e.lower() and "necess" in e.lower() for e in erros)
+    assert any("gate" in e.lower() and "must be assigned" in e.lower() for e in erros)
 
 
 def test_validar_novo_chamado_impacto_obrigatorio():
@@ -88,7 +88,7 @@ def test_validar_novo_chamado_impacto_obrigatorio():
         "impacto": "",
     }
     erros = validar_novo_chamado(form)
-    assert any("impacto" in e.lower() and "obrig" in e.lower() for e in erros)
+    assert any("impact" in e.lower() and "required" in e.lower() for e in erros)
 
 
 _FORM_PROJETOS_BASE = {
@@ -141,7 +141,7 @@ def test_validar_novo_chamado_arquivo_extensao_invalida():
     arquivo = MagicMock()
     arquivo.filename = "documento.exe"
     erros = validar_novo_chamado(form, [arquivo])
-    assert any("Formato de arquivo" in e or "inválido" in e.lower() for e in erros)
+    assert any("Invalid file format" in e or "invalid" in e.lower() for e in erros)
 
 
 def test_validar_novo_chamado_arquivo_extensao_permitida():
@@ -423,7 +423,7 @@ def test_arquivo_conteudo_permitido_header_vazio_retorna_erro():
     arquivo.stream = buf
     ok, msg = _arquivo_conteudo_permitido(arquivo)
     assert ok is False
-    assert "vazio" in msg.lower() or "legível" in msg.lower()
+    assert "empty" in msg.lower() or "unreadable" in msg.lower()
 
 
 def test_arquivo_conteudo_permitido_magic_errado_retorna_erro():
@@ -458,7 +458,7 @@ def test_validar_novo_chamado_categoria_vazia_retorna_erro():
         "impacto": "Impacto Baixo",
     }
     erros = validar_novo_chamado(form)
-    assert any("categoria" in e.lower() and "obrigatória" in e.lower() for e in erros)
+    assert any("category" in e.lower() and "required" in e.lower() for e in erros)
 
 
 # ── Gate com sub-etapas (valores canônicos) ───────────────────────────────────

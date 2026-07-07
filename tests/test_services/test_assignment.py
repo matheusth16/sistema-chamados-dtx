@@ -15,7 +15,7 @@ def test_atribuir_retorna_falha_quando_nao_ha_supervisores(mock_get_sup):
     r = atrib.atribuir(area="AreaVazia", categoria="Manutencao", prioridade=1)
     assert r["sucesso"] is False
     assert r["supervisor"] is None
-    assert "Nenhum supervisor" in r["motivo"] or "disponível" in r["motivo"]
+    assert "No supervisor" in r["motivo"] or "available" in r["motivo"]
 
 
 @patch("app.services.assignment.Usuario.get_supervisores_por_area")
@@ -252,7 +252,7 @@ def test_atribuir_excecao_retorna_falha(mock_get_sup):
     atrib = AtribuidorAutomatico()
     r = atrib.atribuir(area="TI")
     assert r["sucesso"] is False
-    assert "Erro ao atribuir" in r["motivo"]
+    assert "Error assigning" in r["motivo"]
 
 
 # ── obter_disponibilidade ─────────────────────────────────────────────────────
@@ -364,7 +364,7 @@ def test_atribuir_retorna_falha_quando_escolhido_none(mock_get_sup, mock_db):
     with patch.object(atrib, "_atribuir_balanceamento", return_value=None):
         r = atrib.atribuir(area="TI")
     assert r["sucesso"] is False
-    assert "Não foi possível selecionar" in r["motivo"]
+    assert "Could not select" in r["motivo"]
 
 
 # ── S4-08: Validação de área inválida em atribuir() ──────────────────────────
@@ -377,7 +377,7 @@ def test_atribuir_area_vazia_retorna_falha():
     atrib = AtribuidorAutomatico()
     r = atrib.atribuir(area="")
     assert r["sucesso"] is False
-    assert "inválida" in r["motivo"].lower() or "informada" in r["motivo"].lower()
+    assert "invalid" in r["motivo"].lower() or "missing" in r["motivo"].lower()
     assert "estrategia_usada" in r
 
 
@@ -398,7 +398,7 @@ def test_atribuir_area_valida_nao_afetada():
         atrib = AtribuidorAutomatico()
         r = atrib.atribuir(area="Manutencao")
     assert r["sucesso"] is False
-    assert "Nenhum supervisor" in r["motivo"]
+    assert "No supervisor" in r["motivo"]
 
 
 # ── F-20: estratégia aleatorio usa random.choice ──────────────────────────────

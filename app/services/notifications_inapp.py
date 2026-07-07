@@ -56,6 +56,13 @@ _TIPOS_OBSERVADOR = frozenset(
     }
 )
 
+_TIPOS_PARTICIPANTE = frozenset(
+    {
+        "participante_incluido",
+        "todos_participantes_concluidos",
+    }
+)
+
 
 def localizar_notificacao(doc: dict, language: str = "en") -> dict:
     """
@@ -129,6 +136,25 @@ def localizar_notificacao(doc: dict, language: str = "en") -> dict:
             )
             out["mensagem"] = get_translation(
                 "notification_observer_added_message", language, categoria=cat
+            )
+
+    elif tipo in _TIPOS_PARTICIPANTE:
+        numero = doc.get("numero_chamado") or ""
+        cat = get_translated_category(doc.get("categoria") or "", language)
+
+        if tipo == "participante_incluido":
+            out["titulo"] = get_translation(
+                "notification_participant_included_title", language, numero=numero
+            )
+            out["mensagem"] = get_translation(
+                "notification_participant_included_message", language, numero=numero, categoria=cat
+            )
+        else:
+            out["titulo"] = get_translation(
+                "notification_all_participants_done_title", language, numero=numero
+            )
+            out["mensagem"] = get_translation(
+                "notification_all_participants_done_message", language, numero=numero, categoria=cat
             )
 
     elif tipo in _TIPOS_SOLICITANTE:

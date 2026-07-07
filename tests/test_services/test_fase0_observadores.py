@@ -220,7 +220,7 @@ class TestValidarObservadores:
 
         obs = [{"usuario_id": "sol_1", "nome": "Sol", "email": "s@t.com"}]
         erros = validar_observadores(obs, solicitante_id="sol_1")
-        assert any("solicitante" in e.lower() or "próprio" in e.lower() for e in erros)
+        assert any("requester" in e.lower() or "own ticket" in e.lower() for e in erros)
 
     def test_deduplica_observadores(self):
         """validar_observadores remove duplicatas silenciosamente (sem erro)."""

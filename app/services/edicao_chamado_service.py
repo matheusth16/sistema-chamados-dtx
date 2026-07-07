@@ -34,18 +34,26 @@ def processar_edicao_chamado(
     Processa a edição completa de um chamado, registrando histórico e notificações.
     Retorna: {'sucesso': bool, 'mensagem': str, 'erro': str, 'dados': dict}
     """
+    try:
+        _lang = session.get("language", "en")
+    except RuntimeError:
+        _lang = "en"
+
+    def _t(key, **kwargs):
+        return get_translation(key, _lang, **kwargs)
+
     if not chamado_id:
-        return {"sucesso": False, "erro": "ID do chamado é obrigatório"}
+        return {"sucesso": False, "erro": _t("field_ticket_id_required")}
 
     from app.services.permission_validation import usuario_pode_mutar_chamado
 
     pode_mutar, msg_erro = usuario_pode_mutar_chamado(usuario_atual)
     if not pode_mutar:
-        return {"sucesso": False, "erro": msg_erro, "codigo": 403}
+        return {"sucesso": False, "erro": _t(msg_erro), "codigo": 403}
 
     doc_chamado = db.collection("chamados").document(chamado_id).get()
     if not doc_chamado.exists:
-        return {"sucesso": False, "erro": "Chamado não encontrado", "codigo": 404}
+        return {"sucesso": False, "erro": _t("ticket_not_found"), "codigo": 404}
 
     data_chamado = doc_chamado.to_dict()
     chamado_obj = Chamado.from_dict(data_chamado, chamado_id)
@@ -57,20 +65,13 @@ def processar_edicao_chamado(
         if not usuario_pode_ver_chamado(usuario_atual, chamado_obj):
             return {
                 "sucesso": False,
-                "erro": "Sem permissão para este chamado ou fora da sua área",
+                "erro": _t("ticket_out_of_area_no_permission"),
                 "codigo": 403,
             }
 
     update_data = {}
     mensagens = []
     historico_pendente = []  # acumula Historico para batch write único
-    try:
-        _lang = session.get("language", "en")
-    except RuntimeError:
-        _lang = "en"
-
-    def _t(key, **kwargs):
-        return get_translation(key, _lang, **kwargs)
 
     # Congelamento: Chamado Concluído é read-only para edição operacional.
     # Reabertura deve ser feita via /api/atualizar-status com chamado_aceita_transicao_status.
@@ -98,7 +99,7 @@ def processar_edicao_chamado(
             if novo_status == "Cancelado" and not motivo_cancelamento:
                 return {
                     "sucesso": False,
-                    "erro": "Motivo do cancelamento é obrigatório para alterar o status para Cancelado",
+                    "erro": _t("cancellation_reason_required_for_status"),
                 }
 
             resultado_status = atualizar_status_chamado(
@@ -112,7 +113,7 @@ def processar_edicao_chamado(
             if not resultado_status.get("sucesso"):
                 return {
                     "sucesso": False,
-                    "erro": resultado_status.get("erro", "Erro ao atualizar status"),
+                    "erro": resultado_status.get("erro") or _t("error_updating_status_generic"),
                 }
             mensagens.append(resultado_status.get("mensagem", _t("status_updated")))
 
@@ -183,7 +184,7 @@ def processar_edicao_chamado(
                 except ValueError:
                     return {
                         "sucesso": False,
-                        "erro": "SLA inválido. Informe um número entre 1 e 365 dias, ou 0 para redefinir ao padrão.",
+                        "erro": _t("sla_invalid_range"),
                     }
 
             if novo_sla != sla_atual:
@@ -314,4 +315,4 @@ def processar_edicao_chamado(
 
     except Exception as e:
         logger.exception("Erro processando edição do chamado %s: %s", chamado_id, e)
-        return {"sucesso": False, "erro": "Erro interno ao salvar as modificações."}
+        return {"sucesso": False, "erro": _t("internal_error_saving_changes")}

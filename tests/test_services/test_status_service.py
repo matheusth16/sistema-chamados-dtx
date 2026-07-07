@@ -20,7 +20,7 @@ def test_atualizar_status_chamado_nao_encontrado_retorna_erro():
             usuario_nome="Test",
         )
     assert resultado["sucesso"] is False
-    assert resultado["erro"] == "Chamado não encontrado"
+    assert resultado["erro"] == "Ticket not found"
 
 
 def test_atualizar_status_chamado_com_data_chamado_atualiza_e_retorna_sucesso():
@@ -137,7 +137,7 @@ def test_atualizar_cancelado_sem_motivo_retorna_erro():
         motivo_cancelamento="",
     )
     assert resultado["sucesso"] is False
-    assert "motivo" in resultado["erro"].lower() or "cancelamento" in resultado["erro"].lower()
+    assert "reason" in resultado["erro"].lower() or "cancel" in resultado["erro"].lower()
 
 
 def test_atualizar_cancelado_com_motivo_retorna_sucesso():
@@ -786,7 +786,7 @@ def test_owner_nao_conclui_com_participantes_pendentes():
         },
     )
     assert resultado["sucesso"] is False
-    assert "participante" in resultado["erro"].lower()
+    assert "participant" in resultado["erro"].lower()
 
 
 def test_owner_nao_conclui_com_participante_em_atendimento():

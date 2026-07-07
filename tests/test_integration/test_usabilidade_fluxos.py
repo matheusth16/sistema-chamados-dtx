@@ -243,7 +243,7 @@ def test_usabilidade_editar_sem_permissao_retorna_403_mensagem_clara(client_loga
     data = r.get_json()
     assert data is not None
     assert (
-        "acesso negado" in data.get("erro", "").lower() or "negado" in data.get("erro", "").lower()
+        "access denied" in data.get("erro", "").lower() or "denied" in data.get("erro", "").lower()
     )
 
 

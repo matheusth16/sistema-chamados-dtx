@@ -12,7 +12,7 @@ def test_api_editar_chamado_solicitante_recebe_403(client_logado_solicitante):
     )
     assert r.status_code == 403
     data = r.get_json()
-    assert data is not None and data.get("erro") == "Acesso negado"
+    assert data is not None and data.get("erro") == "Access denied"
 
 
 def test_api_editar_chamado_sem_chamado_id_retorna_400(client_logado_supervisor):
@@ -23,7 +23,7 @@ def test_api_editar_chamado_sem_chamado_id_retorna_400(client_logado_supervisor)
         content_type="multipart/form-data",
     )
     assert r.status_code == 400
-    assert r.get_json().get("erro") and "obrigatório" in r.get_json().get("erro", "").lower()
+    assert r.get_json().get("erro") and "required" in r.get_json().get("erro", "").lower()
 
 
 def test_api_editar_chamado_chamado_inexistente_retorna_404(client_logado_supervisor):
@@ -38,7 +38,7 @@ def test_api_editar_chamado_chamado_inexistente_retorna_404(client_logado_superv
             content_type="multipart/form-data",
         )
     assert r.status_code == 404
-    assert "não encontrado" in r.get_json().get("erro", "").lower()
+    assert "not found" in r.get_json().get("erro", "").lower()
 
 
 def test_api_editar_chamado_supervisor_outra_area_retorna_403(client_logado_supervisor):
@@ -78,7 +78,8 @@ def test_api_editar_chamado_supervisor_outra_area_retorna_403(client_logado_supe
     assert r.status_code == 403
     data = r.get_json()
     assert data is not None and (
-        "sua área" in data.get("erro", "").lower() or "área" in data.get("erro", "").lower()
+        "outside your area" in data.get("erro", "").lower()
+        or "area" in data.get("erro", "").lower()
     )
 
 
@@ -293,7 +294,7 @@ def test_api_chamado_por_id_solicitante_chamado_de_outro_retorna_403(client_loga
     data = r.get_json()
     assert data is not None and data.get("sucesso") is False
     erro = (data.get("erro") or "").lower()
-    assert "acesso negado" in erro or "negado" in erro or "permissão" in erro or "permissao" in erro
+    assert "access denied" in erro or "denied" in erro or "permission" in erro
 
 
 def test_api_chamado_por_id_supervisor_sua_area_retorna_200(client_logado_supervisor):
@@ -360,7 +361,7 @@ def test_post_editar_chamado_chamado_id_alheio_retorna_403(client_logado_solicit
     data = r.get_json()
     assert data is not None and data.get("sucesso") is False
     erro = (data.get("erro") or "").lower()
-    assert "acesso negado" in erro or "negado" in erro or "permissão" in erro or "permissao" in erro
+    assert "access denied" in erro or "denied" in erro or "permission" in erro
 
 
 # ── CSP report ────────────────────────────────────────────────────────────────

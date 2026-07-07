@@ -70,19 +70,27 @@ def atualizar_status_chamado(
             'erro': str (se falhar)
     """
     try:
+        _lang = session.get("language", "en")
+    except RuntimeError:
+        _lang = "en"
+
+    def _t(key, **kwargs):
+        return get_translation(key, _lang, **kwargs)
+
+    try:
         if novo_status not in STATUS_VALIDOS:
-            return {"sucesso": False, "erro": f"Status inválido: {novo_status}"}
+            return {"sucesso": False, "erro": _t("invalid_status_generic", status=novo_status)}
 
         if novo_status == "Cancelado":
             motivo = (motivo_cancelamento or "").strip()
             if not motivo:
-                return {"sucesso": False, "erro": "Motivo do cancelamento é obrigatório"}
+                return {"sucesso": False, "erro": _t("cancellation_reason_required_field")}
 
         # Busca dados do chamado se não fornecidos
         if data_chamado is None:
             doc = db.collection("chamados").document(chamado_id).get()
             if not doc.exists:
-                return {"sucesso": False, "erro": "Chamado não encontrado"}
+                return {"sucesso": False, "erro": _t("ticket_not_found"), "codigo": 404}
             data_chamado = doc.to_dict()
 
         status_anterior = data_chamado.get("status")
@@ -96,7 +104,7 @@ def atualizar_status_chamado(
         ):
             return {
                 "sucesso": False,
-                "erro": f"Transição inválida: {status_anterior} → {novo_status}",
+                "erro": _t("invalid_status_transition", de=status_anterior, para=novo_status),
                 "codigo": 400,
             }
 
@@ -117,7 +125,7 @@ def atualizar_status_chamado(
                 if not _pode:
                     return {
                         "sucesso": False,
-                        "erro": "Chamado Concluído não permite esta transição de status",
+                        "erro": _t("ticket_completed_no_status_transition"),
                         "codigo": 403,
                     }
 
@@ -128,7 +136,7 @@ def atualizar_status_chamado(
             if pendentes:
                 return {
                     "sucesso": False,
-                    "erro": "Existem participantes pendentes — aguarde 'Concluí minha parte' de todos",
+                    "erro": _t("participants_pending_wait"),
                 }
 
         # Monta dados de atualização
@@ -247,7 +255,7 @@ def atualizar_status_chamado(
 
     except Exception as e:
         logger.exception("Erro ao atualizar status do chamado %s: %s", chamado_id, e)
-        return {"sucesso": False, "erro": "Erro interno. Tente novamente.", "codigo": 500}
+        return {"sucesso": False, "erro": _t("internal_error_retry"), "codigo": 500}
 
 
 def _notificar_observadores_status(chamado_id: str, data_chamado: dict, novo_status: str) -> None:

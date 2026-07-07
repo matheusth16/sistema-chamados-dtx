@@ -767,9 +767,9 @@ def test_criar_chamado_atribuicao_manual_retorna_aviso_e_responsavel_fallback(ap
 
     assert erro is None
     assert chamado_id == "chamado_manual_001"
-    # Aviso deve conter "Aguardando atribuição"
+    # Aviso deve conter "Awaiting manual assignment"
     assert aviso is not None
-    assert "Aguardando" in aviso
+    assert "Awaiting manual assignment" in aviso
     # Responsável fallback = próprio solicitante
     assert chamado_capturado.get("responsavel_id") == "sol1"
 
@@ -1030,7 +1030,7 @@ def test_criacao_falha_quando_responsavel_id_invalido_para_area(app):
     assert chamado_id is None
     assert numero is None
     assert erro is not None
-    assert "inválido" in erro.lower() or "área" in erro.lower()
+    assert "invalid" in erro.lower() or "supervisor" in erro.lower()
 
 
 def test_criacao_grava_supervisor_ids_com_acesso(app):

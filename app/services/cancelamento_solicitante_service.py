@@ -10,6 +10,7 @@ import logging
 from firebase_admin import firestore
 
 from app.database import db
+from app.i18n import get_translation_session
 from app.models_historico import Historico
 
 logger = logging.getLogger(__name__)
@@ -18,11 +19,15 @@ _STATUS_CANCELAVEIS = {"Aberto", "Em Atendimento", "Aguardando Informação"}
 _MOTIVO_MIN_CHARS = 10
 
 
+def _t(key, **kwargs):
+    return get_translation_session(key, **kwargs)
+
+
 def cancelar_chamado_solicitante(chamado_id: str, motivo: str, usuario) -> dict:
     """Cancela um chamado a pedido do solicitante dono."""
     doc = db.collection("chamados").document(chamado_id).get()
     if not doc.exists:
-        return {"sucesso": False, "erro": "Chamado não encontrado.", "codigo": 404}
+        return {"sucesso": False, "erro": _t("ticket_not_found_dot"), "codigo": 404}
 
     data = doc.to_dict()
     solicitante_id = data.get("solicitante_id")
@@ -31,7 +36,7 @@ def cancelar_chamado_solicitante(chamado_id: str, motivo: str, usuario) -> dict:
     if solicitante_id != usuario.id:
         return {
             "sucesso": False,
-            "erro": "Sem permissão para cancelar este chamado.",
+            "erro": _t("no_permission_cancel_ticket"),
             "codigo": 403,
         }
 
@@ -39,14 +44,14 @@ def cancelar_chamado_solicitante(chamado_id: str, motivo: str, usuario) -> dict:
     if len(motivo) < _MOTIVO_MIN_CHARS:
         return {
             "sucesso": False,
-            "erro": f"Motivo obrigatório (mínimo {_MOTIVO_MIN_CHARS} caracteres).",
+            "erro": _t("reason_required_min_chars", min_chars=_MOTIVO_MIN_CHARS),
             "codigo": 400,
         }
 
     if status_atual not in _STATUS_CANCELAVEIS:
         return {
             "sucesso": False,
-            "erro": f"Não é possível cancelar chamado com status '{status_atual}'.",
+            "erro": _t("cannot_cancel_status", status=status_atual),
             "codigo": 403,
         }
 
@@ -76,7 +81,7 @@ def cancelar_chamado_solicitante(chamado_id: str, motivo: str, usuario) -> dict:
 
     except Exception as exc:
         logger.exception("Erro ao cancelar chamado %s: %s", chamado_id, exc)
-        return {"sucesso": False, "erro": "Erro interno ao cancelar chamado.", "codigo": 500}
+        return {"sucesso": False, "erro": _t("internal_error_canceling_ticket"), "codigo": 500}
 
 
 def _notificar_cancelamento(chamado_id: str, dados: dict, motivo: str, usuario) -> None:

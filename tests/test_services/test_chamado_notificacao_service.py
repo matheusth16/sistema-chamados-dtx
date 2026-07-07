@@ -676,7 +676,7 @@ class TestEmailShellEstrutura:
                 dados_chamado={"responsavel_id": "sup_1", "observadores": []},
             )
         corpo_html = mock_email.call_args[0][2]
-        assert 'role="presentation"' in corpo_html or "DTX Service Portal" in corpo_html
+        assert 'role="presentation"' in corpo_html or "Andon" in corpo_html
 
     def test_edicao_descricao_usa_email_shell(self):
         """notificar_edicao_descricao_solicitante → HTML contém estrutura do shell."""
@@ -702,7 +702,7 @@ class TestEmailShellEstrutura:
                 dados_chamado={"responsavel_id": "sup_1", "observadores": []},
             )
         corpo_html = mock_email.call_args[0][2]
-        assert 'role="presentation"' in corpo_html or "DTX Service Portal" in corpo_html
+        assert 'role="presentation"' in corpo_html or "Andon" in corpo_html
 
 
 class TestNotificarObservadoresMudancaStatus:
@@ -784,7 +784,7 @@ class TestNotificarObservadoresMudancaStatus:
 
         corpo_html = mock_email.call_args[0][2]
         assert "CH-042" in corpo_html
-        assert "Concluído" in corpo_html
+        assert "Completed" in corpo_html
 
 
 class TestNotificarObservadoresMudancaStatusLacunas:

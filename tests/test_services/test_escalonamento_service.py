@@ -236,7 +236,7 @@ class TestTransferirArea:
             )
 
         assert resultado["sucesso"] is False
-        assert "permissão" in resultado["erro"].lower() or "acesso" in resultado["erro"].lower()
+        assert "permission" in resultado["erro"].lower() or "access" in resultado["erro"].lower()
 
     def test_transferir_area_motivo_vazio_lanca_erro(self):
         """Motivo vazio (após strip) deve levantar ValueError."""
@@ -264,7 +264,7 @@ class TestTransferirArea:
             )
 
         assert resultado["sucesso"] is False
-        assert "encontrado" in resultado["erro"].lower()
+        assert "not found" in resultado["erro"].lower()
 
     def test_transferir_area_supervisor_destino_invalido(self):
         """Supervisor destino que não pertence à área destino retorna erro."""
@@ -450,9 +450,9 @@ class TestEscalonarColega:
 
         assert resultado["sucesso"] is False
         assert (
-            "destino" in resultado["erro"].lower()
-            or "mesmo" in resultado["erro"].lower()
-            or "igual" in resultado["erro"].lower()
+            "target" in resultado["erro"].lower()
+            or "same" in resultado["erro"].lower()
+            or "current" in resultado["erro"].lower()
         )
 
     def test_escalonar_colega_nao_owner_retorna_erro(self):
@@ -600,7 +600,7 @@ class TestIncluirParticipantes:
 
         # Todos duplicados → erro semântico (nenhum novo adicionado)
         assert resultado["sucesso"] is False
-        assert "nenhum participante novo" in resultado["erro"].lower()
+        assert "no new participants" in resultado["erro"].lower()
 
     def test_incluir_participantes_apenas_owner_ou_admin(self):
         """Supervisor que não é owner não pode incluir participantes."""
@@ -616,7 +616,7 @@ class TestIncluirParticipantes:
             )
 
         assert resultado["sucesso"] is False
-        assert "permissão" in resultado["erro"].lower()
+        assert "permission" in resultado["erro"].lower()
 
     def test_incluir_participantes_lista_vazia_retorna_erro(self):
         """Lista vazia de participantes retorna erro."""
@@ -807,7 +807,7 @@ class TestConcluirMinhaParte:
             resultado = concluir_minha_parte("id_chamado", FERNANDA)
 
         assert resultado["sucesso"] is False
-        assert "participante" in resultado["erro"].lower()
+        assert "participant" in resultado["erro"].lower()
 
     def test_concluir_minha_parte_ja_concluido_retorna_erro(self):
         """Participante que já concluiu não pode concluir novamente."""

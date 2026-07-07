@@ -18,10 +18,16 @@ import random
 from google.cloud.firestore_v1.base_query import FieldFilter
 
 from app.database import db
+from app.i18n import get_translation_session
 from app.models_usuario import Usuario
 from app.utils_areas import setor_para_area
 
 logger = logging.getLogger(__name__)
+
+
+def _t(key, **kwargs):
+    return get_translation_session(key, **kwargs)
+
 
 # Limite máximo de chamados varridos por chunk de supervisor (evita scan ilimitado)
 MAX_CHAMADOS_ATRIB = 500
@@ -97,7 +103,7 @@ class AtribuidorAutomatico:
                 return {
                     "sucesso": False,
                     "supervisor": None,
-                    "motivo": "Área inválida ou não informada",
+                    "motivo": _t("assignment_invalid_area"),
                     "estrategia_usada": self.estrategia,
                 }
             logger.debug(
@@ -115,7 +121,7 @@ class AtribuidorAutomatico:
                 return {
                     "sucesso": False,
                     "supervisor": None,
-                    "motivo": f'Nenhum supervisor disponível para a área "{area}"',
+                    "motivo": _t("assignment_no_supervisor_for_area", area=area),
                     "estrategia_usada": self.estrategia,
                 }
 
@@ -137,7 +143,7 @@ class AtribuidorAutomatico:
                 return {
                     "sucesso": False,
                     "supervisor": None,
-                    "motivo": "Não foi possível selecionar um supervisor",
+                    "motivo": _t("assignment_could_not_select_supervisor"),
                     "estrategia_usada": self.estrategia,
                 }
 
@@ -157,7 +163,7 @@ class AtribuidorAutomatico:
                     "area": supervisor_escolhido["usuario"].area,
                     "chamados_abertos": supervisor_escolhido["chamados_abertos"],
                 },
-                "motivo": f"Atribuído com sucesso (estratégia: {self.estrategia})",
+                "motivo": _t("assignment_success_strategy", estrategia=self.estrategia),
                 "estrategia_usada": self.estrategia,
             }
 
@@ -166,7 +172,7 @@ class AtribuidorAutomatico:
             return {
                 "sucesso": False,
                 "supervisor": None,
-                "motivo": f"Erro ao atribuir: {str(e)}",
+                "motivo": _t("assignment_error", error=str(e)),
                 "estrategia_usada": self.estrategia,
             }
 

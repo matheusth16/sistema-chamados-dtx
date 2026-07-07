@@ -13,6 +13,7 @@ from google.cloud.firestore_v1.base_query import FieldFilter
 from app.cache import cache_set
 from app.database import db
 from app.decoradores import requer_supervisor_area
+from app.i18n import get_translation
 from app.limiter import limiter
 from app.models import Chamado
 from app.models_historico import Historico
@@ -44,8 +45,10 @@ from app.utils_areas import setor_para_area
 
 logger = logging.getLogger(__name__)
 
-# Mensagem genérica em respostas 500 para não expor detalhes internos em produção
-ERRO_INTERNO_MSG = "Erro interno. Tente novamente."
+
+def _t(key, **kwargs):
+    """Traduz uma chave i18n para o idioma da sessão atual."""
+    return get_translation(key, session.get("language", "en"), **kwargs)
 
 
 def _dados_chamado_reaberto_valido(chamado_id: str) -> dict | None:
@@ -260,6 +263,12 @@ def download_anexo():
         logger.error("Falha ao gerar URL pré-assinada para chave %s", chave)
         abort(503)
 
+    logger.info(
+        "Acesso a anexo: usuario=%s chamado_id=%s chave=%s",
+        current_user.email,
+        chamado_id,
+        chave,
+    )
     return redirect(url)
 
 
@@ -271,22 +280,26 @@ def atualizar_status_ajax():
     try:
         dados = request.get_json()
         if not dados:
-            return jsonify({"sucesso": False, "erro": "JSON inválido ou vazio"}), 400
+            return jsonify({"sucesso": False, "erro": _t("invalid_or_empty_json")}), 400
         chamado_id = (dados.get("chamado_id") or "").strip()
         novo_status = (dados.get("novo_status") or "").strip()
         if not chamado_id:
-            return jsonify({"sucesso": False, "erro": "chamado_id é obrigatório"}), 400
+            return jsonify({"sucesso": False, "erro": _t("field_chamado_id_required")}), 400
         if not novo_status:
-            return jsonify({"sucesso": False, "erro": "novo_status é obrigatório"}), 400
+            return jsonify({"sucesso": False, "erro": _t("field_novo_status_required")}), 400
         if novo_status not in ["Aberto", "Em Atendimento", "Concluído", "Cancelado"]:
-            return jsonify({"sucesso": False, "erro": f'Status inválido "{novo_status}"'}), 400
+            return jsonify(
+                {"sucesso": False, "erro": _t("invalid_status_value", status=novo_status)}
+            ), 400
         motivo_cancelamento = (dados.get("motivo_cancelamento") or "").strip()
         if novo_status == "Cancelado" and not motivo_cancelamento:
-            return jsonify({"sucesso": False, "erro": "Motivo do cancelamento é obrigatório"}), 400
+            return jsonify(
+                {"sucesso": False, "erro": _t("cancellation_reason_required_field")}
+            ), 400
 
         doc_chamado = db.collection("chamados").document(chamado_id).get()
         if not doc_chamado.exists:
-            return jsonify({"sucesso": False, "erro": "Chamado não encontrado"}), 404
+            return jsonify({"sucesso": False, "erro": _t("ticket_not_found")}), 404
 
         chamado_obj = Chamado.from_dict(doc_chamado.to_dict(), chamado_id)
 
@@ -301,7 +314,10 @@ def atualizar_status_ajax():
         pode_trans, _ = chamado_aceita_transicao_status(current_user, chamado_obj, novo_status)
         if not pode_trans:
             return jsonify(
-                {"sucesso": False, "erro": "Chamado Concluído não permite esta transição de status"}
+                {
+                    "sucesso": False,
+                    "erro": _t("ticket_completed_no_status_transition"),
+                }
             ), 403
 
         motivo_reabertura = (dados.get("motivo_reabertura") or "").strip()
@@ -315,7 +331,7 @@ def atualizar_status_ajax():
             return jsonify(
                 {
                     "sucesso": False,
-                    "erro": "Informe o motivo para reabrir o chamado (mínimo 3 caracteres).",
+                    "erro": _t("reopen_reason_min_3"),
                 }
             ), 400
 
@@ -334,13 +350,11 @@ def atualizar_status_ajax():
             ), 200
         else:
             return jsonify(
-                {"sucesso": False, "erro": resultado.get("erro", "Erro desconhecido")}
-            ), resultado.get(
-                "codigo", 404 if resultado.get("erro") == "Chamado não encontrado" else 500
-            )
+                {"sucesso": False, "erro": resultado.get("erro") or _t("error_unknown")}
+            ), resultado.get("codigo", 500)
     except Exception as e:
         logger.exception("Erro em atualizar_status_ajax: %s", e)
-        return jsonify({"sucesso": False, "erro": ERRO_INTERNO_MSG}), 500
+        return jsonify({"sucesso": False, "erro": _t("internal_error_retry")}), 500
 
 
 @main.route("/api/editar-chamado", methods=["POST"])
@@ -348,9 +362,9 @@ def atualizar_status_ajax():
 def api_editar_chamado():
     """Edita chamado de forma completa via FormData (incluindo arquivo, status, responsavel, descricao). Apenas supervisor/admin."""
     if not current_user.is_supervisor_or_above:
-        return jsonify({"sucesso": False, "erro": "Acesso negado"}), 403
+        return jsonify({"sucesso": False, "erro": _t("access_denied_generic")}), 403
     if getattr(current_user, "is_gestor_only", None) is True:
-        return jsonify({"sucesso": False, "erro": "Acesso negado"}), 403
+        return jsonify({"sucesso": False, "erro": _t("access_denied_generic")}), 403
 
     try:
         chamado_id = request.form.get("chamado_id")
@@ -364,7 +378,7 @@ def api_editar_chamado():
         arquivos_novos = request.files.getlist("anexos_novos")
 
         if not chamado_id:
-            return jsonify({"sucesso": False, "erro": "ID do chamado é obrigatório"}), 400
+            return jsonify({"sucesso": False, "erro": _t("field_ticket_id_required")}), 400
 
         from app.services.edicao_chamado_service import processar_edicao_chamado
 
@@ -400,7 +414,7 @@ def api_editar_chamado():
 
     except Exception as e:
         logger.exception("Erro em api_editar_chamado: %s", e)
-        return jsonify({"sucesso": False, "erro": ERRO_INTERNO_MSG}), 500
+        return jsonify({"sucesso": False, "erro": _t("internal_error_retry")}), 500
 
 
 @main.route("/api/bulk-status", methods=["POST"])
@@ -409,23 +423,23 @@ def api_editar_chamado():
 def bulk_atualizar_status():
     """Atualiza status de múltiplos chamados em lote. Apenas supervisor/admin."""
     if not current_user.is_supervisor_or_above:
-        return jsonify({"sucesso": False, "erro": "Acesso negado"}), 403
+        return jsonify({"sucesso": False, "erro": _t("access_denied_generic")}), 403
     # Gestor read-only: bloqueio total antes do loop
     if getattr(current_user, "is_gestor_only", None) is True:
-        return jsonify({"sucesso": False, "erro": "Acesso negado"}), 403
+        return jsonify({"sucesso": False, "erro": _t("access_denied_generic")}), 403
     try:
         dados = request.get_json()
         if not dados:
-            return jsonify({"sucesso": False, "erro": "JSON inválido ou vazio"}), 400
+            return jsonify({"sucesso": False, "erro": _t("invalid_or_empty_json")}), 400
         ids = dados.get("chamado_ids")
         if not isinstance(ids, list):
-            return jsonify({"sucesso": False, "erro": "chamado_ids deve ser uma lista"}), 400
+            return jsonify({"sucesso": False, "erro": _t("field_chamado_ids_list")}), 400
         novo_status = (dados.get("novo_status") or "").strip()
         if novo_status not in ("Aberto", "Em Atendimento", "Concluído"):
-            return jsonify({"sucesso": False, "erro": "novo_status inválido"}), 400
+            return jsonify({"sucesso": False, "erro": _t("invalid_new_status_generic")}), 400
         ids = [str(i).strip() for i in ids if i][:50]
         if not ids:
-            return jsonify({"sucesso": False, "erro": "Nenhum chamado informado"}), 400
+            return jsonify({"sucesso": False, "erro": _t("no_ticket_provided")}), 400
 
         atualizados = 0
         erros = []
@@ -433,12 +447,12 @@ def bulk_atualizar_status():
             try:
                 doc = db.collection("chamados").document(chamado_id).get()
                 if not doc.exists:
-                    erros.append({"id": chamado_id, "erro": "Não encontrado"})
+                    erros.append({"id": chamado_id, "erro": _t("not_found_short")})
                     continue
                 doc_data = doc.to_dict()
                 chamado_obj = Chamado.from_dict(doc_data, chamado_id)
                 if not usuario_pode_ver_chamado(current_user, chamado_obj):
-                    erros.append({"id": chamado_id, "erro": "Sem permissão para este chamado"})
+                    erros.append({"id": chamado_id, "erro": _t("no_permission_for_ticket")})
                     continue
                 from app.services.permission_validation import chamado_aceita_transicao_status
 
@@ -447,7 +461,7 @@ def bulk_atualizar_status():
                 )
                 if not pode_trans:
                     erros.append(
-                        {"id": chamado_id, "erro": "Chamado Concluído não permite esta transição"}
+                        {"id": chamado_id, "erro": _t("ticket_completed_no_transition_short")}
                     )
                     continue
                 resultado = atualizar_status_chamado(
@@ -463,12 +477,12 @@ def bulk_atualizar_status():
                     erros.append(
                         {
                             "id": chamado_id,
-                            "erro": resultado.get("erro", "Erro ao processar chamado"),
+                            "erro": resultado.get("erro") or _t("error_processing_ticket"),
                         }
                     )
             except Exception as e:
                 logger.warning("Bulk status: falha em %s: %s", chamado_id, e)
-                erros.append({"id": chamado_id, "erro": "Erro ao processar chamado"})
+                erros.append({"id": chamado_id, "erro": _t("error_processing_ticket")})
         return jsonify(
             {
                 "sucesso": True,
@@ -479,7 +493,7 @@ def bulk_atualizar_status():
         ), 200
     except Exception as e:
         logger.exception("Erro em bulk_atualizar_status: %s", e)
-        return jsonify({"sucesso": False, "erro": ERRO_INTERNO_MSG}), 500
+        return jsonify({"sucesso": False, "erro": _t("internal_error_retry")}), 500
 
 
 @main.route("/api/notificacoes", methods=["GET"])
@@ -505,7 +519,12 @@ def api_notificacoes_listar():
     except Exception as e:
         logger.exception("Erro ao listar notificações: %s", e)
         return jsonify(
-            {"sucesso": False, "erro": ERRO_INTERNO_MSG, "notificacoes": [], "total_nao_lidas": 0}
+            {
+                "sucesso": False,
+                "erro": _t("internal_error_retry"),
+                "notificacoes": [],
+                "total_nao_lidas": 0,
+            }
         ), 500
 
 
@@ -530,7 +549,7 @@ def api_notificacoes_marcar_lida(notificacao_id):
         return jsonify({"sucesso": ok}), 200
     except Exception as e:
         logger.exception("Erro ao marcar notificação: %s", e)
-        return jsonify({"sucesso": False, "erro": ERRO_INTERNO_MSG}), 500
+        return jsonify({"sucesso": False, "erro": _t("internal_error_retry")}), 500
 
 
 @main.route("/api/notificacoes/ler-todas", methods=["POST"])
@@ -542,7 +561,7 @@ def api_notificacoes_ler_todas():
         return jsonify({"sucesso": True, "atualizadas": count}), 200
     except Exception as e:
         logger.exception("Erro ao marcar todas notificações: %s", e)
-        return jsonify({"sucesso": False, "erro": ERRO_INTERNO_MSG}), 500
+        return jsonify({"sucesso": False, "erro": _t("internal_error_retry")}), 500
 
 
 @main.route("/sw.js")
@@ -570,12 +589,12 @@ def api_push_subscribe():
         data = request.get_json() or {}
         subscription = data.get("subscription")
         if not subscription or not subscription.get("endpoint"):
-            return jsonify({"sucesso": False, "erro": "subscription inválida"}), 400
+            return jsonify({"sucesso": False, "erro": _t("invalid_subscription")}), 400
         ok = salvar_inscricao(current_user.id, subscription)
         return jsonify({"sucesso": ok}), 200
     except Exception as e:
         logger.exception("Erro ao salvar inscrição push: %s", e)
-        return jsonify({"sucesso": False, "erro": ERRO_INTERNO_MSG}), 500
+        return jsonify({"sucesso": False, "erro": _t("internal_error_retry")}), 500
 
 
 @main.route("/api/chamado/<chamado_id>", methods=["GET"])
@@ -585,10 +604,10 @@ def api_chamado_por_id(chamado_id: str):
     try:
         doc_chamado = db.collection("chamados").document(chamado_id).get()
         if not doc_chamado.exists:
-            return jsonify({"sucesso": False, "erro": "Chamado não encontrado"}), 404
+            return jsonify({"sucesso": False, "erro": _t("ticket_not_found")}), 404
         chamado = Chamado.from_dict(doc_chamado.to_dict(), chamado_id)
         if not usuario_pode_ver_chamado(current_user, chamado):
-            return jsonify({"sucesso": False, "erro": "Sem permissão"}), 403
+            return jsonify({"sucesso": False, "erro": _t("no_permission_generic")}), 403
         sla_info = obter_sla_para_exibicao(chamado)
         chamado_dict = {
             "id": chamado_id,
@@ -606,7 +625,7 @@ def api_chamado_por_id(chamado_id: str):
         return jsonify({"sucesso": True, "chamado": chamado_dict}), 200
     except Exception as e:
         logger.exception("Erro ao buscar chamado %s: %s", chamado_id, e)
-        return jsonify({"sucesso": False, "erro": ERRO_INTERNO_MSG}), 500
+        return jsonify({"sucesso": False, "erro": _t("internal_error_retry")}), 500
 
 
 def _aplicar_filtro_perfil(ref, user):
@@ -687,7 +706,7 @@ def api_chamados_paginar():
         ), 200
     except Exception as e:
         logger.exception("Erro em api_chamados_paginar: %s", e)
-        return jsonify({"sucesso": False, "erro": ERRO_INTERNO_MSG}), 500
+        return jsonify({"sucesso": False, "erro": _t("internal_error_retry")}), 500
 
 
 @main.route("/api/carregar-mais", methods=["POST"])
@@ -735,7 +754,7 @@ def carregar_mais():
         ), 200
     except Exception as e:
         logger.exception("Erro em carregar_mais: %s", e)
-        return jsonify({"sucesso": False, "erro": ERRO_INTERNO_MSG}), 500
+        return jsonify({"sucesso": False, "erro": _t("internal_error_retry")}), 500
 
 
 @main.route("/api/onboarding/avancar", methods=["POST"])
@@ -746,14 +765,14 @@ def api_onboarding_avancar():
         dados = request.get_json() or {}
         passo = dados.get("passo")
         if passo is None or not isinstance(passo, int) or passo < 0:
-            return jsonify({"sucesso": False, "erro": "passo inválido"}), 400
+            return jsonify({"sucesso": False, "erro": _t("invalid_step")}), 400
         from app.services.onboarding_service import avancar_passo
 
         ok = avancar_passo(current_user.id, passo)
         return jsonify({"sucesso": ok}), 200
     except Exception as e:
         logger.exception("Erro em api_onboarding_avancar: %s", e)
-        return jsonify({"sucesso": False, "erro": ERRO_INTERNO_MSG}), 500
+        return jsonify({"sucesso": False, "erro": _t("internal_error_retry")}), 500
 
 
 @main.route("/api/onboarding/concluir", methods=["POST"])
@@ -763,11 +782,11 @@ def api_onboarding_concluir():
     try:
         from app.services.onboarding_service import concluir_onboarding
 
-        ok = concluir_onboarding(current_user.id)
+        ok = concluir_onboarding(current_user.id, current_user.perfil)
         return jsonify({"sucesso": ok}), 200
     except Exception as e:
         logger.exception("Erro em api_onboarding_concluir: %s", e)
-        return jsonify({"sucesso": False, "erro": ERRO_INTERNO_MSG}), 500
+        return jsonify({"sucesso": False, "erro": _t("internal_error_retry")}), 500
 
 
 @main.route("/api/onboarding/pular", methods=["POST"])
@@ -777,11 +796,11 @@ def api_onboarding_pular():
     try:
         from app.services.onboarding_service import concluir_onboarding
 
-        ok = concluir_onboarding(current_user.id)
+        ok = concluir_onboarding(current_user.id, current_user.perfil)
         return jsonify({"sucesso": ok}), 200
     except Exception as e:
         logger.exception("Erro em api_onboarding_pular: %s", e)
-        return jsonify({"sucesso": False, "erro": ERRO_INTERNO_MSG}), 500
+        return jsonify({"sucesso": False, "erro": _t("internal_error_retry")}), 500
 
 
 @main.route("/api/chamado/<chamado_id>/confirmar-resolucao", methods=["POST"])
@@ -797,20 +816,20 @@ def api_confirmar_resolucao(chamado_id: str):
         return jsonify({"sucesso": False, "erro": "Ação inválida"}), 400
 
     if acao == "reabrir" and not motivo:
-        return jsonify({"sucesso": False, "erro": "Informe o motivo para reabrir o chamado"}), 400
+        return jsonify({"sucesso": False, "erro": _t("ticket_reopen_reason_required")}), 400
 
     try:
         doc = db.collection("chamados").document(chamado_id).get()
         if not doc.exists:
-            return jsonify({"sucesso": False, "erro": "Chamado não encontrado"}), 404
+            return jsonify({"sucesso": False, "erro": _t("ticket_not_found")}), 404
 
         data = doc.to_dict()
 
         if data.get("solicitante_id") != current_user.id:
-            return jsonify({"sucesso": False, "erro": "Acesso negado"}), 403
+            return jsonify({"sucesso": False, "erro": _t("access_denied_generic")}), 403
 
         if data.get("status") != "Concluído" or data.get("confirmacao_solicitante") != "pendente":
-            return jsonify({"sucesso": False, "erro": "Chamado não aguarda confirmação"}), 400
+            return jsonify({"sucesso": False, "erro": _t("ticket_not_awaiting_confirmation")}), 400
 
         if acao == "confirmar":
             db.collection("chamados").document(chamado_id).update(
@@ -862,7 +881,7 @@ def api_confirmar_resolucao(chamado_id: str):
 
     except Exception as e:
         logger.exception("Erro ao confirmar resolução do chamado %s: %s", chamado_id, e)
-        return jsonify({"sucesso": False, "erro": ERRO_INTERNO_MSG}), 500
+        return jsonify({"sucesso": False, "erro": _t("internal_error_retry")}), 500
 
 
 @main.route("/api/supervisores/lista", methods=["GET"])
@@ -895,7 +914,7 @@ def api_lista_supervisores():
                 "sucesso": False,
                 "area": area,
                 "supervisores": [],
-                "erro": ERRO_INTERNO_MSG,
+                "erro": _t("internal_error_retry"),
             }
         ), 200
 
@@ -922,7 +941,7 @@ def api_buscar_usuarios():
         return jsonify({"sucesso": True, "dados": dados}), 200
     except Exception as exc:
         logger.exception("Erro em buscar_usuarios: %s", exc)
-        return jsonify({"sucesso": False, "erro": ERRO_INTERNO_MSG}), 500
+        return jsonify({"sucesso": False, "erro": _t("internal_error_retry")}), 500
 
 
 # ---------------------------------------------------------------------------
@@ -940,14 +959,17 @@ def api_editar_solicitante(chamado_id: str):
     Qualquer perfil não-gestor pode usar; o service valida ownership (solicitante_id).
     """
     if getattr(current_user, "is_gestor_only", False):
-        return jsonify({"sucesso": False, "erro": "Acesso não autorizado."}), 403
+        return jsonify({"sucesso": False, "erro": _t("unauthorized_access")}), 403
 
     payload = request.get_json(silent=True) or {}
     descricao = (payload.get("descricao") or "").strip()
     if len(descricao) < DESCRICAO_MIN_CHARS:
         return (
             jsonify(
-                {"sucesso": False, "erro": f"Descrição mínima de {DESCRICAO_MIN_CHARS} caracteres."}
+                {
+                    "sucesso": False,
+                    "erro": _t("description_min_chars", min_chars=DESCRICAO_MIN_CHARS),
+                }
             ),
             400,
         )
@@ -970,14 +992,12 @@ def api_cancelar_solicitante(chamado_id: str):
     Qualquer perfil não-gestor pode usar; o service valida ownership (solicitante_id).
     """
     if getattr(current_user, "is_gestor_only", False):
-        return jsonify({"sucesso": False, "erro": "Acesso não autorizado."}), 403
+        return jsonify({"sucesso": False, "erro": _t("unauthorized_access")}), 403
 
     payload = request.get_json(silent=True) or {}
     motivo = (payload.get("motivo") or "").strip()
     if len(motivo) < 10:
-        return jsonify(
-            {"sucesso": False, "erro": "Motivo obrigatório (mínimo 10 caracteres)."}
-        ), 400
+        return jsonify({"sucesso": False, "erro": _t("reason_required_min_10_parens")}), 400
 
     resultado = cancelar_chamado_solicitante(
         chamado_id=chamado_id,
@@ -994,22 +1014,22 @@ def api_cancelar_solicitante(chamado_id: str):
 def api_anexo_solicitante(chamado_id: str):
     """Anexo tardio enviado pelo dono do chamado (FormData). Qualquer perfil não-gestor."""
     if getattr(current_user, "is_gestor_only", False):
-        return jsonify({"sucesso": False, "erro": "Acesso não autorizado."}), 403
+        return jsonify({"sucesso": False, "erro": _t("unauthorized_access")}), 403
 
     motivo = (request.form.get("motivo") or "").strip()
     if len(motivo) < 10:
         return (
-            jsonify({"sucesso": False, "erro": "Motivo obrigatório (mínimo 10 caracteres)."}),
+            jsonify({"sucesso": False, "erro": _t("reason_required_min_10_parens")}),
             400,
         )
 
     arquivo = request.files.get("anexo")
     if not arquivo or not arquivo.filename:
-        return jsonify({"sucesso": False, "erro": "Arquivo não enviado."}), 400
+        return jsonify({"sucesso": False, "erro": _t("file_not_sent")}), 400
 
     caminho = salvar_anexo(arquivo)
     if not caminho:
-        return jsonify({"sucesso": False, "erro": "Tipo de arquivo não permitido."}), 400
+        return jsonify({"sucesso": False, "erro": _t("file_type_not_allowed")}), 400
 
     resultado = adicionar_anexo_tardio(
         chamado_id=chamado_id,
@@ -1081,45 +1101,41 @@ def api_transferir_area(chamado_id: str):
     try:
         dados = request.get_json(silent=True)
         if not dados:
-            return jsonify({"sucesso": False, "erro": "JSON inválido ou vazio"}), 400
+            return jsonify({"sucesso": False, "erro": _t("invalid_or_empty_json")}), 400
 
         area = (dados.get("area") or "").strip()
         supervisor_id = (dados.get("supervisor_id") or "").strip()
         motivo = (dados.get("motivo") or "").strip()
 
         if not area:
-            return jsonify({"sucesso": False, "erro": "Área destino é obrigatória"}), 400
+            return jsonify({"sucesso": False, "erro": _t("field_target_area_required")}), 400
         if not supervisor_id:
-            return jsonify({"sucesso": False, "erro": "supervisor_id é obrigatório"}), 400
+            return jsonify({"sucesso": False, "erro": _t("field_supervisor_id_required")}), 400
         if not motivo:
-            return jsonify({"sucesso": False, "erro": "Motivo é obrigatório"}), 400
+            return jsonify({"sucesso": False, "erro": _t("error_reason_required")}), 400
 
         doc = db.collection("chamados").document(chamado_id).get()
         if not doc.exists:
-            return jsonify({"sucesso": False, "erro": "Chamado não encontrado"}), 404
+            return jsonify({"sucesso": False, "erro": _t("ticket_not_found")}), 404
 
         dados_chamado = doc.to_dict() or {}
         chamado = Chamado.from_dict(dados_chamado, chamado_id)
 
         if not usuario_pode_ver_chamado(current_user, chamado):
-            return jsonify({"sucesso": False, "erro": "Acesso negado"}), 403
+            return jsonify({"sucesso": False, "erro": _t("access_denied_generic")}), 403
 
         pode_mutar, _ = usuario_pode_mutar_chamado(current_user)
         if not pode_mutar:
-            return jsonify({"sucesso": False, "erro": "Acesso negado"}), 403
+            return jsonify({"sucesso": False, "erro": _t("access_denied_generic")}), 403
 
         from app.services.permission_validation import chamado_aceita_edicao_operacional
 
         _pode_op, _ = chamado_aceita_edicao_operacional(current_user, chamado)
         if not _pode_op:
-            return jsonify(
-                {"sucesso": False, "erro": "Chamado Concluído não permite esta operação"}
-            ), 403
+            return jsonify({"sucesso": False, "erro": _t("ticket_completed_no_operation")}), 403
 
         if not (chamado.responsavel_id == current_user.id or current_user.is_admin_or_above):
-            return jsonify(
-                {"sucesso": False, "erro": "Apenas o responsável ou admin pode transferir"}
-            ), 403
+            return jsonify({"sucesso": False, "erro": _t("only_owner_or_admin_transfer")}), 403
 
         from app.services.escalonamento_service import transferir_area
 
@@ -1141,10 +1157,10 @@ def api_transferir_area(chamado_id: str):
 
     except ValueError as exc:
         logger.debug("Validação transferir_area chamado=%s: %s", chamado_id, exc)
-        return jsonify({"sucesso": False, "erro": "Dados da requisição inválidos."}), 400
+        return jsonify({"sucesso": False, "erro": _t("invalid_request_data")}), 400
     except Exception as exc:
         logger.exception("Erro em api_transferir_area chamado=%s: %s", chamado_id, exc)
-        return jsonify({"sucesso": False, "erro": ERRO_INTERNO_MSG}), 500
+        return jsonify({"sucesso": False, "erro": _t("internal_error_retry")}), 500
 
 
 @main.route("/api/chamado/<chamado_id>/escalonar-colega", methods=["POST"])
@@ -1159,42 +1175,38 @@ def api_escalonar_colega(chamado_id: str):
     try:
         dados = request.get_json(silent=True)
         if not dados:
-            return jsonify({"sucesso": False, "erro": "JSON inválido ou vazio"}), 400
+            return jsonify({"sucesso": False, "erro": _t("invalid_or_empty_json")}), 400
 
         supervisor_id = (dados.get("supervisor_id") or "").strip()
         motivo = (dados.get("motivo") or "").strip()
 
         if not supervisor_id:
-            return jsonify({"sucesso": False, "erro": "supervisor_id é obrigatório"}), 400
+            return jsonify({"sucesso": False, "erro": _t("field_supervisor_id_required")}), 400
         if not motivo:
-            return jsonify({"sucesso": False, "erro": "Motivo é obrigatório"}), 400
+            return jsonify({"sucesso": False, "erro": _t("error_reason_required")}), 400
 
         doc = db.collection("chamados").document(chamado_id).get()
         if not doc.exists:
-            return jsonify({"sucesso": False, "erro": "Chamado não encontrado"}), 404
+            return jsonify({"sucesso": False, "erro": _t("ticket_not_found")}), 404
 
         dados_chamado = doc.to_dict() or {}
         chamado = Chamado.from_dict(dados_chamado, chamado_id)
 
         if not usuario_pode_ver_chamado(current_user, chamado):
-            return jsonify({"sucesso": False, "erro": "Acesso negado"}), 403
+            return jsonify({"sucesso": False, "erro": _t("access_denied_generic")}), 403
 
         pode_mutar, _ = usuario_pode_mutar_chamado(current_user)
         if not pode_mutar:
-            return jsonify({"sucesso": False, "erro": "Acesso negado"}), 403
+            return jsonify({"sucesso": False, "erro": _t("access_denied_generic")}), 403
 
         from app.services.permission_validation import chamado_aceita_edicao_operacional
 
         _pode_op, _ = chamado_aceita_edicao_operacional(current_user, chamado)
         if not _pode_op:
-            return jsonify(
-                {"sucesso": False, "erro": "Chamado Concluído não permite esta operação"}
-            ), 403
+            return jsonify({"sucesso": False, "erro": _t("ticket_completed_no_operation")}), 403
 
         if not (chamado.responsavel_id == current_user.id or current_user.is_admin_or_above):
-            return jsonify(
-                {"sucesso": False, "erro": "Apenas o responsável ou admin pode escalonar"}
-            ), 403
+            return jsonify({"sucesso": False, "erro": _t("only_owner_or_admin_escalate")}), 403
 
         from app.services.escalonamento_service import escalonar_colega
 
@@ -1216,10 +1228,10 @@ def api_escalonar_colega(chamado_id: str):
 
     except ValueError as exc:
         logger.debug("Validação escalonar_colega chamado=%s: %s", chamado_id, exc)
-        return jsonify({"sucesso": False, "erro": "Dados da requisição inválidos."}), 400
+        return jsonify({"sucesso": False, "erro": _t("invalid_request_data")}), 400
     except Exception as exc:
         logger.exception("Erro em api_escalonar_colega chamado=%s: %s", chamado_id, exc)
-        return jsonify({"sucesso": False, "erro": ERRO_INTERNO_MSG}), 500
+        return jsonify({"sucesso": False, "erro": _t("internal_error_retry")}), 500
 
 
 # ---------------------------------------------------------------------------
@@ -1262,16 +1274,25 @@ def _notificar_participante_incluido(
                         usuario_id=sup_id,
                         chamado_id=chamado_id,
                         numero_chamado=numero,
-                        titulo=f"Chamado {numero}: você foi incluído como participante",
-                        mensagem=f"Você foi adicionado como participante do chamado {numero} ({categoria}). Conclua sua parte quando finalizar.",
+                        titulo=get_translation(
+                            "notification_participant_included_title", "en", numero=numero
+                        ),
+                        mensagem=get_translation(
+                            "notification_participant_included_message",
+                            "en",
+                            numero=numero,
+                            categoria=categoria,
+                        ),
                         tipo="participante_incluido",
                         categoria=categoria,
                     )
 
                     enviar_webpush_usuario(
                         sup_id,
-                        titulo=f"Chamado {numero}: você foi incluído",
-                        corpo="Você foi adicionado como participante. Conclua sua parte quando finalizar.",
+                        titulo=get_translation(
+                            "push_participant_included_title", "en", numero=numero
+                        ),
+                        corpo=get_translation("push_participant_included_body", "en"),
                         url=url_chamado,
                     )
             except Exception as exc:
@@ -1309,8 +1330,15 @@ def _notificar_owner_todos_concluiram(
                     usuario_id=owner_id,
                     chamado_id=chamado_id,
                     numero_chamado=numero,
-                    titulo=f"Chamado {numero}: todos participantes concluíram",
-                    mensagem=f"Você pode fechar o chamado {numero} ({categoria})",
+                    titulo=get_translation(
+                        "notification_all_participants_done_title", "en", numero=numero
+                    ),
+                    mensagem=get_translation(
+                        "notification_all_participants_done_message",
+                        "en",
+                        numero=numero,
+                        categoria=categoria,
+                    ),
                     tipo="todos_participantes_concluidos",
                     categoria=categoria,
                 )
@@ -1319,8 +1347,8 @@ def _notificar_owner_todos_concluiram(
                 url = f"{base_url}/chamado/{chamado_id}/historico" if base_url else None
                 enviar_webpush_usuario(
                     owner_id,
-                    titulo=f"Chamado {numero}: pronto para fechar",
-                    corpo="Todos os participantes concluíram sua parte.",
+                    titulo=get_translation("push_all_participants_done_title", "en", numero=numero),
+                    corpo=get_translation("push_all_participants_done_body", "en"),
                     url=url,
                 )
             except Exception as exc:
@@ -1341,39 +1369,39 @@ def api_incluir_participantes(chamado_id: str):
     try:
         dados = request.get_json(silent=True)
         if not dados:
-            return jsonify({"sucesso": False, "erro": "JSON inválido ou vazio"}), 400
+            return jsonify({"sucesso": False, "erro": _t("invalid_or_empty_json")}), 400
 
         participantes_novos = dados.get("participantes")
         if not isinstance(participantes_novos, list) or not participantes_novos:
             return jsonify(
-                {"sucesso": False, "erro": "participantes deve ser lista não vazia"}
+                {"sucesso": False, "erro": _t("participants_must_be_nonempty_list")}
             ), 400
 
         doc = db.collection("chamados").document(chamado_id).get()
         if not doc.exists:
-            return jsonify({"sucesso": False, "erro": "Chamado não encontrado"}), 404
+            return jsonify({"sucesso": False, "erro": _t("ticket_not_found")}), 404
 
         dados_chamado = doc.to_dict() or {}
         chamado = Chamado.from_dict(dados_chamado, chamado_id)
 
         if not usuario_pode_ver_chamado(current_user, chamado):
-            return jsonify({"sucesso": False, "erro": "Acesso negado"}), 403
+            return jsonify({"sucesso": False, "erro": _t("access_denied_generic")}), 403
 
         pode_mutar, _ = usuario_pode_mutar_chamado(current_user)
         if not pode_mutar:
-            return jsonify({"sucesso": False, "erro": "Acesso negado"}), 403
+            return jsonify({"sucesso": False, "erro": _t("access_denied_generic")}), 403
 
         from app.services.permission_validation import chamado_aceita_edicao_operacional
 
         _pode_op, _ = chamado_aceita_edicao_operacional(current_user, chamado)
         if not _pode_op:
-            return jsonify({"sucesso": False, "erro": "Acesso negado"}), 403
+            return jsonify({"sucesso": False, "erro": _t("access_denied_generic")}), 403
 
         if not (chamado.responsavel_id == current_user.id or current_user.is_admin_or_above):
             return jsonify(
                 {
                     "sucesso": False,
-                    "erro": "Apenas o responsável ou admin pode incluir participantes",
+                    "erro": _t("only_owner_or_admin_participants"),
                 }
             ), 403
 
@@ -1396,10 +1424,10 @@ def api_incluir_participantes(chamado_id: str):
 
     except ValueError as exc:
         logger.debug("Validação incluir_participantes chamado=%s: %s", chamado_id, exc)
-        return jsonify({"sucesso": False, "erro": "Dados da requisição inválidos."}), 400
+        return jsonify({"sucesso": False, "erro": _t("invalid_request_data")}), 400
     except Exception as exc:
         logger.exception("Erro em api_incluir_participantes chamado=%s: %s", chamado_id, exc)
-        return jsonify({"sucesso": False, "erro": ERRO_INTERNO_MSG}), 500
+        return jsonify({"sucesso": False, "erro": _t("internal_error_retry")}), 500
 
 
 @main.route("/api/chamado/<chamado_id>/concluir-minha-parte", methods=["POST"])
@@ -1413,24 +1441,22 @@ def api_concluir_minha_parte(chamado_id: str):
     # Gestor read-only: bloqueado mesmo que seja participante (edge case fail-closed)
     pode_mutar, _ = usuario_pode_mutar_chamado(current_user)
     if not pode_mutar:
-        return jsonify({"sucesso": False, "erro": "Acesso negado"}), 403
+        return jsonify({"sucesso": False, "erro": _t("access_denied_generic")}), 403
     try:
         doc = db.collection("chamados").document(chamado_id).get()
         if not doc.exists:
-            return jsonify({"sucesso": False, "erro": "Chamado não encontrado"}), 404
+            return jsonify({"sucesso": False, "erro": _t("ticket_not_found")}), 404
 
         dados_chamado = doc.to_dict() or {}
         chamado = Chamado.from_dict(dados_chamado, chamado_id)
 
         if chamado.status == "Concluído":
-            return jsonify({"sucesso": False, "erro": "Chamado já está Concluído"}), 400
+            return jsonify({"sucesso": False, "erro": _t("ticket_already_completed")}), 400
 
         participantes = chamado.participantes or []
         ids_participantes = {p.get("supervisor_id") for p in participantes}
         if current_user.id not in ids_participantes:
-            return jsonify(
-                {"sucesso": False, "erro": "Usuário não é participante deste chamado"}
-            ), 403
+            return jsonify({"sucesso": False, "erro": _t("user_not_participant")}), 403
 
         from app.services.escalonamento_service import concluir_minha_parte
 
@@ -1452,7 +1478,7 @@ def api_concluir_minha_parte(chamado_id: str):
 
     except Exception as exc:
         logger.exception("Erro em api_concluir_minha_parte chamado=%s: %s", chamado_id, exc)
-        return jsonify({"sucesso": False, "erro": ERRO_INTERNO_MSG}), 500
+        return jsonify({"sucesso": False, "erro": _t("internal_error_retry")}), 500
 
 
 _csp_logger = logging.getLogger("app.csp")

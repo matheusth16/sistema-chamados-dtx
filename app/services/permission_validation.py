@@ -57,16 +57,16 @@ def verificar_permissao_mudanca_status(
 
     # Gestor read-only: bloqueio antes de qualquer outra verificação
     if getattr(usuario, "is_gestor_only", None) is True:
-        return False, "Acesso negado: gestores têm visão read-only"
+        return False, "access_denied_gestor_readonly"
 
     if usuario.perfil == "solicitante":
         if chamado.solicitante_id != usuario.id:
-            return False, "Acesso negado: Você só pode atualizar seus próprios chamados"
+            return False, "access_denied_own_tickets_only"
         if novo_status != "Cancelado":
-            return False, "Acesso negado: Solicitantes só podem Cancelar chamados"
+            return False, "access_denied_requester_cancel_only"
     elif usuario.perfil == "supervisor":
         if not usuario_pode_ver_chamado(usuario, chamado):
-            return False, "Acesso negado: Sem permissão ou fora da sua área"
+            return False, "access_denied_out_of_area"
     return True, None
 
 
@@ -85,7 +85,7 @@ def usuario_pode_mutar_chamado(usuario: Any, chamado=None) -> tuple[bool, str | 
         (permitido, mensagem_erro) — mensagem_erro é None quando permitido.
     """
     if getattr(usuario, "is_gestor_only", None) is True:
-        return False, "Acesso negado: gestores têm visão read-only"
+        return False, "access_denied_gestor_readonly"
     return True, None
 
 

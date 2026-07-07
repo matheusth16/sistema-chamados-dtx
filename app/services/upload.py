@@ -15,7 +15,13 @@ from typing import Any
 from flask import current_app
 from werkzeug.utils import secure_filename
 
+from app.i18n import get_translation_session
 from app.services.validators import _arquivo_conteudo_permitido, _arquivo_permitido
+
+
+def _t(key, **kwargs):
+    return get_translation_session(key, **kwargs)
+
 
 # MIME types derivados da extensão validada (não confia no Content-Type do cliente)
 _EXT_TO_MIME = {
@@ -183,13 +189,13 @@ def salvar_anexo(arquivo: Any) -> str | None:
 
     if not _arquivo_permitido(arquivo.filename):
         ext_list = ", ".join(sorted(current_app.config.get("EXTENSOES_UPLOAD_PERMITIDAS", set())))
-        raise ValueError(f"Formato de arquivo inválido. Permitidos: {ext_list}.")
+        raise ValueError(_t("upload_invalid_format_allowed", allowed=ext_list))
 
     # Validação por conteúdo (magic bytes) para evitar upload malicioso com extensão falsa
     ok, msg = _arquivo_conteudo_permitido(arquivo)
     if not ok:
         logger.warning("Upload rejeitado: conteúdo não corresponde à extensão: %s", msg)
-        raise ValueError(msg or "Formato de arquivo inválido.")
+        raise ValueError(msg or _t("upload_invalid_format_generic"))
 
     nome_seguro = secure_filename(arquivo.filename)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")

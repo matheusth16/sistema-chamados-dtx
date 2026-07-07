@@ -57,7 +57,7 @@ def test_processar_edicao_sem_chamado_id_retorna_erro(app):
             setores_adicionais_lista=[],
         )
     assert result["sucesso"] is False
-    assert "obrigatório" in result.get("erro", "").lower()
+    assert "required" in result.get("erro", "").lower()
 
 
 def test_processar_edicao_chamado_nao_encontrado_retorna_404(app):
@@ -287,10 +287,7 @@ def test_processar_edicao_cancelamento_sem_motivo_retorna_erro(app):
             setores_adicionais_lista=[],
         )
     assert result["sucesso"] is False
-    assert (
-        "motivo" in result.get("erro", "").lower()
-        or "cancelamento" in result.get("erro", "").lower()
-    )
+    assert "reason" in result.get("erro", "").lower() or "cancel" in result.get("erro", "").lower()
 
 
 def test_processar_edicao_cancelamento_com_motivo_chama_status(app):
