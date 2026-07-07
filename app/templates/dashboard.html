@@ -339,6 +339,16 @@
                         body: JSON.stringify({ chamado_ids: ids, novo_status: status })
                     }).then(function (r) { return r.json(); }).then(function (data) {
                         if (data.sucesso) {
+                            // "sucesso" só indica que o lote foi processado — itens sem
+                            // permissão ou com transição bloqueada caem em "erros" mesmo
+                            // assim. Sem checar isso, o usuário nunca sabe que parte (ou
+                            // tudo) do lote falhou silenciosamente.
+                            var falhas = (data.erros || []).length;
+                            if (falhas > 0) {
+                                alert(data.atualizados === 0
+                                    ? '{{ t("bulk_status_total_failure") }}'
+                                    : falhas + ' {{ t("bulk_status_partial_failure_prefix") }}');
+                            }
                             window.location.reload();
                         } else {
                             alert(data.erro || '{{ t("error_update") }}');
