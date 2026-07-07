@@ -161,6 +161,8 @@ def test_criar_chamado_com_setores_adicionais_dispara_notificacao_setores(app):
         patch(
             "app.services.chamados_criacao_service.notificar_setores_adicionais_chamado"
         ) as mock_notif_setores,
+        patch("app.services.chamados_criacao_service.criar_notificacao"),
+        patch("app.services.chamados_criacao_service.enviar_webpush_usuario"),
         patch("app.services.chamados_criacao_service.threading.Thread", side_effect=_FakeThread),
     ):
         mock_grupo.return_value = MagicMock(id="grupo_1")
@@ -215,6 +217,8 @@ def test_criar_chamado_nao_notifica_inapp_quando_responsavel_e_solicitante(app):
         patch("app.services.chamados_criacao_service.atribuidor") as mock_atr,
         patch("app.services.chamados_criacao_service.execute_with_retry") as mock_retry,
         patch("app.services.chamados_criacao_service.Historico"),
+        patch("app.services.chamados_criacao_service.Usuario.get_by_id", return_value=MagicMock()),
+        patch("app.services.chamados_criacao_service.notificar_aprovador_novo_chamado"),
         patch("app.services.chamados_criacao_service.criar_notificacao") as mock_criar_notif,
         patch("app.services.chamados_criacao_service.enviar_webpush_usuario") as mock_webpush,
         patch("app.services.chamados_criacao_service.threading.Thread", side_effect=_FakeThread),
