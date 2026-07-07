@@ -122,7 +122,7 @@
       "Don't deixar a paleta conservadora demais — o Azul DTX hoje só aparece em dtx-600/navbar na maior parte das telas; cor de status deve carregar mais peso informativo nas tabelas e dashboards.",
       "Don't usar valores de z-index arbitrários (z-[N]) quando a escala semântica existe. Resolvido em 2026-07-01: navbar, dropdowns, toasts, banners, modais e cabeçalhos sticky migrados para os tokens; o banner de web push foi promovido de z-[190] para z-toast, corrigindo uma inconsistência real com as flash messages.",
       "Don't carregar JetBrains Mono sem aplicá-la de forma consistente — ou vira padrão para todo ID/timestamp técnico, ou o <link> deve ser removido.",
-      "Don't referenciar o nome de produto Digital Andon em código novo — o nome oficial atual é DTX Service Portal; a navbar ainda exibe DIGITAL ANDON e precisa de atualização futura.",
+      "Don't referenciar o nome de produto Digital Andon em código novo — o nome oficial atual é DTX Service Portal. Resolvido: a navbar já exibe Service Portal.",
       "Don't parecer um SaaS genérico: nada de cards flutuantes sem propósito, paleta usada como decoração, ou flat design sem hierarquia."
     ]
   }

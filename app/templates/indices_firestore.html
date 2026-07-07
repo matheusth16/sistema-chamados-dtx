@@ -5,34 +5,34 @@
 {% block content %}
 <div class="space-y-8 max-w-5xl mx-auto">
 
-  {% call page_header("Índices Firestore — Status e Implementação") %}
-    {{ btn("Voltar ao dashboard", variant="secondary", href=url_for(dashboard_endpoint)) }}
+  {% call page_header(t('idx_page_title')) %}
+    {{ btn(t('back_to_dashboard'), variant="secondary", href=url_for(dashboard_endpoint)) }}
   {% endcall %}
 
   <!-- Resumo das otimizações -->
   <div class="bento-notice info">
     <div style="width:100%;">
-      <h2 style="font-size:13px; font-weight:800; margin-bottom:10px;">Resumo das Otimizações Implementadas</h2>
+      <h2 style="font-size:13px; font-weight:800; margin-bottom:10px;">{{ t('idx_summary_title') }}</h2>
       <ul class="space-y-1.5" style="font-size:13px;">
-        <li><strong>Paginação por Cursor:</strong> Busca apenas 50 documentos por requisição</li>
-        <li><strong>Carregar Mais:</strong> Botão para carregar próximos registros sem reload</li>
-        <li><strong>Status AJAX:</strong> Atualiza status sem recarregar a página inteira</li>
-        <li><strong>Índices Firestore:</strong> Faltam criar para máxima performance</li>
+        <li>{{ t('idx_summary_item_pagination') | safe }}</li>
+        <li>{{ t('idx_summary_item_load_more') | safe }}</li>
+        <li>{{ t('idx_summary_item_ajax') | safe }}</li>
+        <li>{{ t('idx_summary_item_indexes') | safe }}</li>
       </ul>
     </div>
   </div>
 
   <!-- Tabela de índices recomendados -->
   <div>
-    <h2 class="bento-section-title">Índices Recomendados</h2>
+    <h2 class="bento-section-title">{{ t('idx_recommended_title') }}</h2>
     <div class="bento-card bento-table-scope" style="padding:0; overflow:hidden;">
       <table>
         <thead>
           <tr>
             <th>#</th>
-            <th>Descrição</th>
-            <th>Campos</th>
-            <th>Uso</th>
+            <th>{{ t('idx_col_description') }}</th>
+            <th>{{ t('idx_col_fields') }}</th>
+            <th>{{ t('idx_col_usage') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -53,10 +53,10 @@
               </div>
             </td>
             <td style="font-size:13px; color:var(--color-text-muted);">
-              {% if loop.index == 1 %}Filtrar por categoria + status
-              {% elif loop.index == 2 %}Filtrar por status apenas
-              {% elif loop.index == 3 %}Filtrar por categoria + prioridade
-              {% else %}Filtrar por gate + status
+              {% if loop.index == 1 %}{{ t('idx_usage_1') }}
+              {% elif loop.index == 2 %}{{ t('idx_usage_2') }}
+              {% elif loop.index == 3 %}{{ t('idx_usage_3') }}
+              {% else %}{{ t('idx_usage_4') }}
               {% endif %}
             </td>
           </tr>
@@ -68,38 +68,38 @@
 
   <!-- Como criar os índices -->
   <div>
-    <h2 class="bento-section-title">Como Criar os Índices</h2>
+    <h2 class="bento-section-title">{{ t('idx_how_to_title') }}</h2>
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
       <div class="bento-card" style="padding:0; overflow:hidden;">
         <div style="background:var(--color-dtx-500); color:#fff; padding:14px 20px;">
-          <h3 style="font-size:13px; font-weight:800;">Opção 1: Firebase Console (Recomendado)</h3>
+          <h3 style="font-size:13px; font-weight:800;">{{ t('idx_option1_title') }}</h3>
         </div>
         <div style="padding:20px;">
           <ol class="space-y-2" style="font-size:13px; list-style:decimal; list-style-position:inside;">
-            <li>Vá para: <a href="https://console.firebase.google.com" target="_blank" rel="noopener noreferrer" style="color:var(--color-dtx-500); text-decoration:underline;">Firebase Console</a></li>
-            <li>Firestore Database &rarr; <strong>Índices</strong></li>
-            <li>Clique em <strong>Create Index</strong></li>
-            <li>Preencha com os dados da tabela acima</li>
-            <li>Espere ~5 minutos por índice</li>
+            <li>{{ t('idx_go_to') }} <a href="https://console.firebase.google.com" target="_blank" rel="noopener noreferrer" style="color:var(--color-dtx-500); text-decoration:underline;">Firebase Console</a></li>
+            <li>{{ t('idx_firestore_db_step') | safe }}</li>
+            <li>{{ t('idx_create_index_step') | safe }}</li>
+            <li>{{ t('idx_fill_table_step') }}</li>
+            <li>{{ t('idx_wait_per_index_step') }}</li>
           </ol>
           <hr style="margin:16px 0; border-color:var(--color-surface-border);">
-          <p style="font-size:13px; color:var(--color-text-muted);"><strong>Tempo total:</strong> ~20 minutos para 4 índices</p>
+          <p style="font-size:13px; color:var(--color-text-muted);">{{ t('idx_total_time_20min') | safe }}</p>
         </div>
       </div>
 
       <div class="bento-card" style="padding:0; overflow:hidden;">
         <div style="background:var(--color-dtx-500); color:#fff; padding:14px 20px;">
-          <h3 style="font-size:13px; font-weight:800;">Opção 2: Firebase CLI (Mais rápido)</h3>
+          <h3 style="font-size:13px; font-weight:800;">{{ t('idx_option2_title') }}</h3>
         </div>
         <div style="padding:20px;">
           <ol class="space-y-2" style="font-size:13px; list-style:decimal; list-style-position:inside;">
-            <li>Abra o Terminal na pasta do projeto</li>
+            <li>{{ t('idx_open_terminal_step') }}</li>
             <li><code style="background:var(--color-surface-canvas); padding:2px 6px; border-radius:6px; font-size:11px; font-family:var(--font-mono,monospace);">firebase deploy --only firestore:indexes --project seu-projeto-id</code></li>
-            <li>Espere concluir (~1–2 minutos)</li>
-            <li>Pronto! Todos os índices criados de uma vez</li>
+            <li>{{ t('idx_wait_finish_step') }}</li>
+            <li>{{ t('idx_ready_all_step') }}</li>
           </ol>
           <hr style="margin:16px 0; border-color:var(--color-surface-border);">
-          <p style="font-size:13px; color:var(--color-text-muted);"><strong>Tempo total:</strong> ~10 minutos</p>
+          <p style="font-size:13px; color:var(--color-text-muted);">{{ t('idx_total_time_10min') | safe }}</p>
         </div>
       </div>
     </div>
@@ -107,13 +107,13 @@
 
   <!-- Arquivo firestore.indexes.json -->
   <div>
-    <h2 class="bento-section-title">Arquivo firestore.indexes.json</h2>
+    <h2 class="bento-section-title">{{ t('idx_file_section_title') }}</h2>
     <div class="bento-card" style="padding:0; overflow:hidden;">
       <div style="padding:14px 20px; border-bottom:1px solid var(--color-surface-border); background:var(--color-surface-canvas);">
-        <p style="font-size:13px;"><strong>Localização:</strong> <code style="background:#fff; padding:2px 6px; border-radius:6px; font-size:12px; font-family:var(--font-mono,monospace);">firestore.indexes.json</code> (raiz do projeto)</p>
+        <p style="font-size:13px;"><strong>{{ t('idx_file_location_label') }}</strong> <code style="background:#fff; padding:2px 6px; border-radius:6px; font-size:12px; font-family:var(--font-mono,monospace);">firestore.indexes.json</code> {{ t('idx_project_root') }}</p>
       </div>
       <div style="padding:20px;">
-        <p style="font-size:13px; color:var(--color-text-muted); margin-bottom:16px;"><strong>Status:</strong> Arquivo já criado. Pronto para deploy.</p>
+        <p style="font-size:13px; color:var(--color-text-muted); margin-bottom:16px;">{{ t('idx_file_status') | safe }}</p>
         <pre style="background:var(--color-surface-canvas); border:1px solid var(--color-surface-border); border-radius:14px; padding:16px; overflow-x-auto; font-size:12px; font-family:var(--font-mono,monospace);"><code>{{ script }}</code></pre>
       </div>
     </div>
@@ -121,32 +121,32 @@
 
   <!-- Impacto de performance -->
   <div>
-    <h2 class="bento-section-title">Impacto de Performance</h2>
+    <h2 class="bento-section-title">{{ t('idx_performance_title') }}</h2>
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
       <div class="bento-card" style="padding:0; overflow:hidden;">
         <div style="padding:14px 20px; border-bottom:1px solid #fecdd3; background:#fff1f2;">
-          <h3 style="font-size:13px; font-weight:800; color:#be123c;">Sem Índices</h3>
+          <h3 style="font-size:13px; font-weight:800; color:#be123c;">{{ t('idx_without_indexes') }}</h3>
         </div>
         <div style="padding:20px;">
           <ul class="space-y-2" style="font-size:13px;">
-            <li>Query com 3 filtros: <strong>2–5 segundos</strong></li>
-            <li>Leitura de documentos: <strong>1000+ ops</strong></li>
-            <li>Custo Firestore: <strong>Alto</strong></li>
-            <li>Experiência do usuário: <strong>Lenta</strong></li>
+            <li>{{ t('idx_query_3_filters_slow') | safe }}</li>
+            <li>{{ t('idx_doc_reads_high') | safe }}</li>
+            <li>{{ t('idx_cost_high') | safe }}</li>
+            <li>{{ t('idx_ux_slow') | safe }}</li>
           </ul>
         </div>
       </div>
 
       <div class="bento-card" style="padding:0; overflow:hidden;">
         <div style="padding:14px 20px; border-bottom:1px solid #a7f3d0; background:var(--color-status-done-bg);">
-          <h3 style="font-size:13px; font-weight:800; color:#047857;">Com Índices</h3>
+          <h3 style="font-size:13px; font-weight:800; color:#047857;">{{ t('idx_with_indexes') }}</h3>
         </div>
         <div style="padding:20px;">
           <ul class="space-y-2" style="font-size:13px;">
-            <li>Query com 3 filtros: <strong>50–200ms</strong></li>
-            <li>Leitura de documentos: <strong>50–100 ops</strong></li>
-            <li>Custo Firestore: <strong>10x menor</strong></li>
-            <li>Experiência do usuário: <strong>Rápida</strong></li>
+            <li>{{ t('idx_query_3_filters_fast') | safe }}</li>
+            <li>{{ t('idx_doc_reads_low') | safe }}</li>
+            <li>{{ t('idx_cost_low') | safe }}</li>
+            <li>{{ t('idx_ux_fast') | safe }}</li>
           </ul>
         </div>
       </div>
@@ -155,28 +155,28 @@
 
   <!-- Checklist de implementação -->
   <div>
-    <h2 class="bento-section-title">Checklist de Implementação</h2>
+    <h2 class="bento-section-title">{{ t('idx_checklist_title') }}</h2>
     <div class="bento-card">
       <div class="space-y-3">
         <div class="flex items-center gap-3">
           <input type="checkbox" id="check1" style="width:16px; height:16px;">
-          <label for="check1" style="font-size:13px;">Criar <code style="background:var(--color-surface-canvas); padding:2px 6px; border-radius:6px; font-size:11px; font-family:var(--font-mono,monospace);">firestore.indexes.json</code> (já feito)</label>
+          <label for="check1" style="font-size:13px;">{{ t('idx_check1', file='<code style="background:var(--color-surface-canvas); padding:2px 6px; border-radius:6px; font-size:11px; font-family:var(--font-mono,monospace);">firestore.indexes.json</code>') | safe }}</label>
         </div>
         <div class="flex items-center gap-3">
           <input type="checkbox" id="check2" style="width:16px; height:16px;">
-          <label for="check2" style="font-size:13px;">Deploy índices via Firebase Console ou CLI</label>
+          <label for="check2" style="font-size:13px;">{{ t('idx_check2') }}</label>
         </div>
         <div class="flex items-center gap-3">
           <input type="checkbox" id="check3" style="width:16px; height:16px;">
-          <label for="check3" style="font-size:13px;">Esperar ~15 minutos para índices ficarem "Ready"</label>
+          <label for="check3" style="font-size:13px;">{{ t('idx_check3') }}</label>
         </div>
         <div class="flex items-center gap-3">
           <input type="checkbox" id="check4" style="width:16px; height:16px;">
-          <label for="check4" style="font-size:13px;">Testar paginação em /admin</label>
+          <label for="check4" style="font-size:13px;">{{ t('idx_check4') }}</label>
         </div>
         <div class="flex items-center gap-3">
           <input type="checkbox" id="check5" style="width:16px; height:16px;">
-          <label for="check5" style="font-size:13px;">Monitorar performance no Firestore Console</label>
+          <label for="check5" style="font-size:13px;">{{ t('idx_check5') }}</label>
         </div>
       </div>
     </div>
@@ -184,7 +184,7 @@
 
   <!-- APIs Otimizadas -->
   <div>
-    <h2 class="bento-section-title">APIs Otimizadas Disponíveis</h2>
+    <h2 class="bento-section-title">{{ t('idx_apis_title') }}</h2>
     <div class="space-y-4">
 
       <div class="bento-card" style="padding:0; overflow:hidden;">
@@ -192,15 +192,15 @@
           <h3 style="font-size:13px; font-weight:800;">1. GET /api/chamados/paginar</h3>
         </div>
         <div class="space-y-3" style="padding:20px;">
-          <p style="font-size:13px;"><strong>Descrição:</strong> Paginação com cursor — busca apenas 50 documentos</p>
-          <p style="font-size:13px; font-weight:700; color:var(--color-text-muted);">Query params:</p>
+          <p style="font-size:13px;">{{ t('idx_api1_desc') | safe }}</p>
+          <p style="font-size:13px; font-weight:700; color:var(--color-text-muted);">{{ t('idx_query_params_label') }}</p>
           <pre style="background:var(--color-surface-canvas); border:1px solid var(--color-surface-border); border-radius:14px; padding:16px; overflow-x-auto; font-size:12px; font-family:var(--font-mono,monospace);"><code>cursor=abc123         # ID do último documento (opcional)
 limite=50             # Documentos por página (padrão: 50, máx: 100)
 status=Aberto         # Filtrar por status
 categoria=Projetos    # Filtrar por categoria
 gate=G1               # Filtrar por gate
 search=termo          # Busca full-text</code></pre>
-          <p style="font-size:13px; font-weight:700; color:var(--color-text-muted);">Response:</p>
+          <p style="font-size:13px; font-weight:700; color:var(--color-text-muted);">{{ t('idx_response_label') }}</p>
           <pre style="background:var(--color-surface-canvas); border:1px solid var(--color-surface-border); border-radius:14px; padding:16px; overflow-x-auto; font-size:12px; font-family:var(--font-mono,monospace);"><code>{
   "sucesso": true,
   "chamados": [...],
@@ -219,13 +219,13 @@ search=termo          # Busca full-text</code></pre>
           <h3 style="font-size:13px; font-weight:800;">2. POST /api/carregar-mais</h3>
         </div>
         <div class="space-y-3" style="padding:20px;">
-          <p style="font-size:13px;"><strong>Descrição:</strong> Carregar mais registros (infinite scroll)</p>
-          <p style="font-size:13px; font-weight:700; color:var(--color-text-muted);">Body (JSON):</p>
+          <p style="font-size:13px;">{{ t('idx_api2_desc') | safe }}</p>
+          <p style="font-size:13px; font-weight:700; color:var(--color-text-muted);">{{ t('idx_body_json_label') }}</p>
           <pre style="background:var(--color-surface-canvas); border:1px solid var(--color-surface-border); border-radius:14px; padding:16px; overflow-x-auto; font-size:12px; font-family:var(--font-mono,monospace);"><code>{
   "cursor": "abc123",
   "limite": 20
 }</code></pre>
-          <p style="font-size:13px; font-weight:700; color:var(--color-text-muted);">Response:</p>
+          <p style="font-size:13px; font-weight:700; color:var(--color-text-muted);">{{ t('idx_response_label') }}</p>
           <pre style="background:var(--color-surface-canvas); border:1px solid var(--color-surface-border); border-radius:14px; padding:16px; overflow-x-auto; font-size:12px; font-family:var(--font-mono,monospace);"><code>{
   "sucesso": true,
   "chamados": [...],
@@ -240,8 +240,8 @@ search=termo          # Busca full-text</code></pre>
           <h3 style="font-size:13px; font-weight:800;">3. POST /api/atualizar-status</h3>
         </div>
         <div class="space-y-3" style="padding:20px;">
-          <p style="font-size:13px;"><strong>Descrição:</strong> Atualizar status sem recarregar a página</p>
-          <p style="font-size:13px; font-weight:700; color:var(--color-text-muted);">Body (JSON):</p>
+          <p style="font-size:13px;">{{ t('idx_api3_desc') | safe }}</p>
+          <p style="font-size:13px; font-weight:700; color:var(--color-text-muted);">{{ t('idx_body_json_label') }}</p>
           <pre style="background:var(--color-surface-canvas); border:1px solid var(--color-surface-border); border-radius:14px; padding:16px; overflow-x-auto; font-size:12px; font-family:var(--font-mono,monospace);"><code>{
   "chamado_id": "abc123",
   "novo_status": "Concluído"
@@ -260,7 +260,7 @@ search=termo          # Busca full-text</code></pre>
 
   <!-- Referências -->
   <div>
-    <h2 class="bento-section-title">Referências</h2>
+    <h2 class="bento-section-title">{{ t('idx_references_title') }}</h2>
     <div class="bento-card">
       <ul class="space-y-2">
         <li><a href="https://firebase.google.com/docs/firestore/query-data/indexing" target="_blank" rel="noopener noreferrer" style="color:var(--color-dtx-500); font-size:13px; text-decoration:underline;">Firestore Indexes Documentation</a></li>

@@ -311,3 +311,22 @@ def test_no_e5e7eb_in_layout_css():
         "Hex hardcoded #E5E7EB encontrado em CSS de layout — "
         "substituir por var(--color-surface-border):\n" + "\n".join(violations)
     )
+
+
+def test_no_legacy_rgba_comma_syntax_in_layout_css():
+    """rgba(r, g, b, a) com vírgula (sintaxe CSS nível 3, depreciada) não deve
+    aparecer em CSS de layout — usar color-mix() ou rgb() nível 4 (F-66)."""
+    violations: list[str] = []
+    layout_css = ["dashboard.css", "relatorios.css", "table-filters.css"]
+    for filename in layout_css:
+        path = os.path.join(_STATIC_CSS, filename)
+        if not os.path.isfile(path):
+            continue
+        with open(path, encoding="utf-8") as fh:
+            for i, line in enumerate(fh, 1):
+                if re.search(r"rgba\(", line):
+                    violations.append(f"{filename}:{i}: {line.strip()[:80]}")
+    assert violations == [], (
+        "rgba() legado (vírgula) encontrado em CSS de layout — "
+        "substituir por color-mix():\n" + "\n".join(violations)
+    )

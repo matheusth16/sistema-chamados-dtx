@@ -898,7 +898,7 @@ Object.assign(window.DTX_MSGS, {
         _participantesSelecionados.forEach(function(p, i) {
             html += '<div class="bento-participant-row" style="background:#f0fdfa; border-color:#99f6e4;">'
                 + '<span style="font-weight:600; color:#0f766e; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">' + _escapeHtml(p.nome) + ' <span style="color:#14b8a6; font-size:11px;">(' + _escapeHtml(p.area) + ')</span></span>'
-                + '<button onclick="removerParticipanteDaLista(' + i + ')" style="color:#fb7185; background:none; border:none; cursor:pointer; flex-shrink:0;" title="Remover">'
+                + '<button onclick="removerParticipanteDaLista(' + i + ')" style="color:#fb7185; background:none; border:none; cursor:pointer; flex-shrink:0;" title="' + _escapeHtml({{ t('remove_action') | tojson }}) + '">'
                 + '<svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>'
                 + '</button></div>';
         });
@@ -966,7 +966,8 @@ window.DTX_MSGS = window.DTX_MSGS || {};
 Object.assign(window.DTX_MSGS, {
     participant_all_done_success: {{ t('participant_all_done_success') | tojson }},
     participant_part_done_success: {{ t('participant_part_done_success') | tojson }},
-    error_connection: {{ t('error_connection') | tojson }}
+    error_connection: {{ t('error_connection') | tojson }},
+    error_completing_part: {{ t('error_completing_part') | tojson }}
 });
 </script>
 <script nonce="{{ csp_nonce }}">
@@ -992,7 +993,7 @@ Object.assign(window.DTX_MSGS, {
                 msg.classList.remove('hidden');
                 setTimeout(function() { window.location.reload(); }, 2000);
             } else {
-                msg.textContent = data.erro || 'Erro ao concluir parte.';
+                msg.textContent = data.erro || DTX_MSGS.error_completing_part;
                 msg.className = 'bento-inline-notice error';
                 msg.classList.remove('hidden');
                 if (btn) btn.disabled = false;
@@ -1032,12 +1033,12 @@ Object.assign(window.DTX_MSGS, {
                 nomeArquivoEl.style.color = 'var(--color-dtx-500)';
                 nomeArquivoEl.style.fontWeight = '800';
             } else if(files.length > 1) {
-                nomeArquivoEl.textContent = files.length + ' arquivo(s) selecionado(s)';
+                nomeArquivoEl.textContent = files.length + ' ' + {{ t('files_selected_suffix') | tojson }};
                 nomeArquivoEl.style.color = 'var(--color-dtx-500)';
                 nomeArquivoEl.style.fontWeight = '800';
             } else {
                 var label = document.querySelector('[data-upload-placeholder]');
-                nomeArquivoEl.textContent = label ? label.getAttribute('data-upload-placeholder') : 'Clique para enviar um arquivo';
+                nomeArquivoEl.textContent = label ? label.getAttribute('data-upload-placeholder') : {{ t('click_to_upload_file') | tojson }};
                 nomeArquivoEl.style.color = '';
                 nomeArquivoEl.style.fontWeight = '';
             }
@@ -1216,7 +1217,7 @@ function cancelarChamadoAdmin() {
         erroEl.classList.add('hidden');
         var novaDesc = (document.getElementById('sol-nova-descricao').value || '').trim();
         if (novaDesc.length < 3) {
-            erroEl.textContent = 'Descrição deve ter no mínimo 3 caracteres.';
+            erroEl.textContent = {{ t('description_min_3_chars') | tojson }};
             erroEl.classList.remove('hidden');
             return;
         }
@@ -1228,9 +1229,9 @@ function cancelarChamadoAdmin() {
         .then(function(r) { return r.json(); })
         .then(function(data) {
             if (data.sucesso) { window.location.reload(); }
-            else { erroEl.textContent = data.erro || 'Erro ao salvar.'; erroEl.classList.remove('hidden'); }
+            else { erroEl.textContent = data.erro || {{ t('generic_save_error') | tojson }}; erroEl.classList.remove('hidden'); }
         })
-        .catch(function() { erroEl.textContent = 'Erro de conexão.'; erroEl.classList.remove('hidden'); });
+        .catch(function() { erroEl.textContent = {{ t('error_connection') | tojson }}; erroEl.classList.remove('hidden'); });
     };
     {% endif %}
 
@@ -1240,7 +1241,7 @@ function cancelarChamadoAdmin() {
         erroEl.classList.add('hidden');
         var motivo = (document.getElementById('sol-motivo-cancelar').value || '').trim();
         if (motivo.length < 10) {
-            erroEl.textContent = 'Motivo deve ter no mínimo 10 caracteres.';
+            erroEl.textContent = {{ t('reason_min_10_chars') | tojson }};
             erroEl.classList.remove('hidden');
             return;
         }
@@ -1252,9 +1253,9 @@ function cancelarChamadoAdmin() {
         .then(function(r) { return r.json(); })
         .then(function(data) {
             if (data.sucesso) { window.location.reload(); }
-            else { erroEl.textContent = data.erro || 'Erro ao cancelar.'; erroEl.classList.remove('hidden'); }
+            else { erroEl.textContent = data.erro || {{ t('generic_cancel_error') | tojson }}; erroEl.classList.remove('hidden'); }
         })
-        .catch(function() { erroEl.textContent = 'Erro de conexão.'; erroEl.classList.remove('hidden'); });
+        .catch(function() { erroEl.textContent = {{ t('error_connection') | tojson }}; erroEl.classList.remove('hidden'); });
     };
     {% endif %}
 
@@ -1266,13 +1267,13 @@ function cancelarChamadoAdmin() {
         okEl.classList.add('hidden');
         var motivo = (document.getElementById('sol-anexo-motivo').value || '').trim();
         if (motivo.length < 10) {
-            erroEl.textContent = 'Motivo deve ter no mínimo 10 caracteres.';
+            erroEl.textContent = {{ t('reason_min_10_chars') | tojson }};
             erroEl.classList.remove('hidden');
             return;
         }
         var fileInput = document.getElementById('sol-anexo-file');
         if (!fileInput.files || !fileInput.files[0]) {
-            erroEl.textContent = 'Selecione um arquivo.';
+            erroEl.textContent = {{ t('select_a_file') | tojson }};
             erroEl.classList.remove('hidden');
             return;
         }
@@ -1287,16 +1288,16 @@ function cancelarChamadoAdmin() {
         .then(function(r) { return r.json(); })
         .then(function(data) {
             if (data.sucesso) {
-                okEl.textContent = 'Documento enviado com sucesso.';
+                okEl.textContent = {{ t('document_sent_success') | tojson }};
                 okEl.classList.remove('hidden');
                 fileInput.value = '';
                 document.getElementById('sol-anexo-motivo').value = '';
             } else {
-                erroEl.textContent = data.erro || 'Erro ao enviar documento.';
+                erroEl.textContent = data.erro || {{ t('error_sending_document') | tojson }};
                 erroEl.classList.remove('hidden');
             }
         })
-        .catch(function() { erroEl.textContent = 'Erro de conexão.'; erroEl.classList.remove('hidden'); });
+        .catch(function() { erroEl.textContent = {{ t('error_connection') | tojson }}; erroEl.classList.remove('hidden'); });
     };
     {% endif %}
 })();
@@ -1322,9 +1323,9 @@ function confirmarResolucao(acao) {
     .then(function(r) { return r.json(); })
     .then(function(data) {
         if (data.sucesso) { window.location.reload(); }
-        else { alert(data.erro || 'Erro ao processar solicitação.'); }
+        else { alert(data.erro || {{ t('error_processing_request') | tojson }}); }
     })
-    .catch(function() { alert('Erro de conexão. Tente novamente.'); });
+    .catch(function() { alert({{ t('error_connection') | tojson }}); });
 }
 </script>
 {% endif %}

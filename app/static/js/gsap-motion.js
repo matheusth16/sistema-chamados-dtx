@@ -1,5 +1,5 @@
 /**
- * GSAP Motion - Animações suaves no DTX Service Portal
+ * GSAP Motion - Animações suaves no Service Portal
  *
  * Plugins: ScrollTrigger (reveal ao rolar), ScrollToPlugin (scroll suave).
  *
@@ -94,12 +94,12 @@
         if (flash) {
             var items = flash.querySelectorAll(':scope > div');
             if (items.length) {
-                gsap.fromTo(items, { opacity: 0, y: -16 }, {
+                gsap.fromTo(items, { opacity: 0, x: 32 }, {
                     opacity: 1,
-                    y: 0,
-                    duration: 0.2,
-                    stagger: 0.05,
-                    ease: 'back.out(1.1)'
+                    x: 0,
+                    duration: 0.35,
+                    stagger: 0.07,
+                    ease: 'back.out(1.4)'
                 });
             }
         }

@@ -289,7 +289,7 @@
                 {% endif %}
 
                 <div class="bento-rank-avatar">{{ usuario.nome[0] if usuario.nome else '?' }}</div>
-                <h4 style="font-weight:800; font-size:14px; width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="{{ usuario.nome }}">{{ nome_curto(usuario.nome) if usuario.nome else 'Usuário' }}</h4>
+                <h4 style="font-weight:800; font-size:14px; width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="{{ usuario.nome }}">{{ nome_curto(usuario.nome) if usuario.nome else t('user_generic_label') }}</h4>
 
                 <div class="flex items-center gap-2 justify-center" style="margin-top:12px; padding-top:12px; border-top:1px solid var(--color-surface-border); width:100%;">
                     <span style="font-size:10px; font-weight:800; color:var(--color-surface-muted); text-transform:uppercase; letter-spacing:.06em;">
@@ -701,7 +701,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         tooltip: {
                             callbacks: {
                                 label: function(ctx) {
-                                    return (ctx.raw || 0) + ' chamados em carga';
+                                    return (ctx.raw || 0) + ' ' + {{ t('tickets_in_workload_suffix') | tojson }};
                                 }
                             }
                         }

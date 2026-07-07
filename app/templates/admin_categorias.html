@@ -34,7 +34,7 @@
       <button type="button" onclick="batchAction('ativar')" class="bento-batch-btn ok">{{ t('active_label') }}</button>
       <button type="button" onclick="batchAction('desativar')" class="bento-batch-btn off">{{ t('inactive') }}</button>
       <button type="button" onclick="batchAction('excluir')" class="bento-batch-btn danger">{{ t('delete') }}</button>
-      <button type="button" onclick="batchClear()" aria-label="Cancelar seleção" class="bento-icon-btn" style="color:var(--color-dtx-500); min-width:32px; min-height:32px; padding:6px;">
+      <button type="button" onclick="batchClear()" aria-label="{{ t('cancel_selection') }}" class="bento-icon-btn" style="color:var(--color-dtx-500); min-width:32px; min-height:32px; padding:6px;">
         <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
         </svg>
@@ -383,7 +383,7 @@ function updateBatchBar() {
     const bar = document.getElementById('batch-bar');
     const countEl = document.getElementById('batch-count');
     if (checked.length > 0) {
-        countEl.textContent = `${checked.length} selecionado${checked.length > 1 ? 's' : ''}`;
+        countEl.textContent = checked.length + ' {{ t("items_selected_suffix") }}';
         bar.classList.remove('hidden');
     } else {
         bar.classList.add('hidden');

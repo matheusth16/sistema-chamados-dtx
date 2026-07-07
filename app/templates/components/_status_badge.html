@@ -29,6 +29,9 @@
 {%- elif s == "cancelado" -%}
   {%- set cls = "cancelado" -%}
   {%- set label = translate_status(status) if translate_status is defined else "Cancelado" -%}
+{%- elif s == "admin_global" -%}
+  {%- set cls = "role-admin-global" -%}
+  {%- set label = t('role_global') if t is defined else "Global" -%}
 {%- elif s == "admin" -%}
   {%- set cls = "role-admin" -%}
   {%- set label = t('admin') if t is defined else "Admin" -%}

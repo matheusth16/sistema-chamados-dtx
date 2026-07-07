@@ -8,11 +8,11 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
         </div>
-        <h1 class="font-display" style="font-size:1.3rem; font-weight:800; margin-bottom:8px;">Índice do banco em construção</h1>
-        <p style="color:var(--color-text-muted); margin-bottom:8px;">O Firestore está finalizando um índice necessário para o dashboard. Isso costuma levar alguns minutos.</p>
-        <p style="font-size:13px; color:var(--color-surface-muted); margin-bottom:20px;">Esta página será recarregada automaticamente em <span id="countdown">30</span>s.</p>
+        <h1 class="font-display" style="font-size:1.3rem; font-weight:800; margin-bottom:8px;">{{ t('index_building_title') }}</h1>
+        <p style="color:var(--color-text-muted); margin-bottom:8px;">{{ t('index_building_message') }}</p>
+        <p style="font-size:13px; color:var(--color-surface-muted); margin-bottom:20px;">{{ t('index_building_countdown', countdown='<span id="countdown">30</span>') | safe }}</p>
         <a href="{{ url_for(dashboard_endpoint) }}" class="bento-btn-primary" style="display:inline-flex;">
-            Atualizar agora
+            {{ t('refresh_now') }}
         </a>
     </div>
 </div>

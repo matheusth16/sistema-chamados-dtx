@@ -151,7 +151,7 @@
                 <input type="hidden" name="ab_variante" value="{{ ab_variante|default('A') }}">
                 {% if ab_variante == 'B' %}
                 <textarea name="descricao" id="descricao" data-testid="descricao-textarea" rows="4" required
-                          placeholder="Ex.: Impressora do 2º andar não liga desde ontem. Luz de power pisca 3x e apaga."
+                          placeholder="{{ t('ticket_description_placeholder_example') }}"
                           maxlength="500"></textarea>
                 <p style="font-size:12px;color:var(--color-surface-muted);margin:6px 0 0">
                     <span id="desc-contador">0</span> / 500 {{ t('characters') if t('characters') != 'characters' else 'caracteres' }}
@@ -658,7 +658,7 @@
                 tag.className = 'bento-obs-tag';
                 tag.setAttribute('data-id', obs.usuario_id);
                 tag.innerHTML = '<span class="obs-tag-nome">' + obs.nome + '</span>' +
-                    '<button type="button" class="obs-tag-rm" aria-label="Remover">×</button>';
+                    '<button type="button" class="obs-tag-rm" aria-label="{{ t("remove_action") }}">×</button>';
                 tag.querySelector('.obs-tag-rm').addEventListener('click', function() {
                     observadores = observadores.filter(function(o) { return o.usuario_id !== obs.usuario_id; });
                     _renderTags();

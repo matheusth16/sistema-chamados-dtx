@@ -18,7 +18,7 @@
     <div class="chips">
         {% for r in chamado.riscos %}
         <span class="bento-risk-chip {{ r }}">
-            {% if r == 'atrasado' %}Atrasado{% elif r == 'sem_resposta' %}Sem resposta{% else %}Multi-setor{% endif %}
+            {% if r == 'atrasado' %}{{ t('risk_chip_overdue') }}{% elif r == 'sem_resposta' %}{{ t('risk_chip_no_response') }}{% else %}{{ t('risk_chip_multi_sector') }}{% endif %}
         </span>
         {% endfor %}
     </div>
@@ -41,7 +41,7 @@
                 <div>
                     <h1 class="font-display">{{ t('gestor_dashboard_title') if t else 'Painel de Triagem' }}</h1>
                     <p>
-                        Visão gerencial read-only, priorizada por risco
+                        {{ t('gestor_dashboard_subtitle') }}
                         {% if current_user.is_authenticated and current_user.nivel_gestao %}
                         · <span class="bento-count-chip">{{ current_user.nivel_gestao | replace("_", " ") | title }}</span>
                         {% endif %}
@@ -60,17 +60,17 @@
                     <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                 </div>
                 <div class="min-w-0 flex-1">
-                    <h3 class="font-display" style="font-weight:800; font-size:15px;">Área mais crítica</h3>
+                    <h3 class="font-display" style="font-weight:800; font-size:15px;">{{ t('most_critical_area') }}</h3>
                     <span class="bento-insight-tag {% if insights.area_critica %}warn{% else %}ok{% endif %}">
-                        {% if insights.area_critica %}Atenção{% else %}Sem áreas críticas{% endif %}
+                        {% if insights.area_critica %}{{ t('attention_label') }}{% else %}{{ t('no_critical_areas') }}{% endif %}
                     </span>
                 </div>
             </div>
             <p style="font-size:13px; color:var(--color-text-muted); flex:1;">
                 {% if insights.area_critica %}
-                {{ translate_sector(insights.area_critica.nome) }} concentra {{ insights.area_critica.qtd }} chamado{{ 's' if insights.area_critica.qtd != 1 else '' }} atrasado{{ 's' if insights.area_critica.qtd != 1 else '' }} — priorize esta área.
+                {{ t('critical_area_summary', area=translate_sector(insights.area_critica.nome), qtd=insights.area_critica.qtd, plural=('s' if insights.area_critica.qtd != 1 else '')) }}
                 {% else %}
-                Nenhuma área com chamados atrasados no momento.
+                {{ t('no_overdue_areas_message') }}
                 {% endif %}
             </p>
         </div>
@@ -81,9 +81,9 @@
                     <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                 </div>
                 <div class="min-w-0 flex-1">
-                    <h3 class="font-display" style="font-weight:800; font-size:15px;">Tempo médio sem resposta</h3>
+                    <h3 class="font-display" style="font-weight:800; font-size:15px;">{{ t('avg_time_no_response') }}</h3>
                     <span class="bento-insight-tag {% if insights.tempo_medio_sem_resposta_min %}warn{% else %}ok{% endif %}">
-                        {% if insights.tempo_medio_sem_resposta_min %}Escada A{% else %}Em dia{% endif %}
+                        {% if insights.tempo_medio_sem_resposta_min %}{{ t('escalation_ladder_a') }}{% else %}{{ t('on_track') }}{% endif %}
                     </span>
                 </div>
             </div>
@@ -91,9 +91,9 @@
                 {% if insights.tempo_medio_sem_resposta_min %}
                 {% set h = (insights.tempo_medio_sem_resposta_min // 60) %}
                 {% set m = (insights.tempo_medio_sem_resposta_min % 60) %}
-                Chamados abertos sem atendimento aguardam em média {% if h > 0 %}{{ h }}h {{ m }}min{% else %}{{ m }} min{% endif %} (úteis).
+                {{ t('avg_wait_time_summary', tempo=(h ~ 'h ' ~ m ~ 'min' if h > 0 else m ~ ' min')) }}
                 {% else %}
-                Nenhum chamado aberto ultrapassou 1h útil sem atendimento.
+                {{ t('no_overdue_response_message') }}
                 {% endif %}
             </p>
         </div>
@@ -104,14 +104,14 @@
                     <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                 </div>
                 <div class="min-w-0 flex-1">
-                    <h3 class="font-display" style="font-weight:800; font-size:15px;">Saúde da operação</h3>
+                    <h3 class="font-display" style="font-weight:800; font-size:15px;">{{ t('operation_health') }}</h3>
                     <span class="bento-insight-tag {% if insights.saude_percentual >= 90 %}ok{% elif insights.saude_percentual >= 70 %}info{% else %}warn{% endif %}">
-                        {{ insights.saude_percentual }}% saudável
+                        {{ t('health_percent', pct=insights.saude_percentual) }}
                     </span>
                 </div>
             </div>
             <p style="font-size:13px; color:var(--color-text-muted); flex:1;">
-                {{ contadores.total }} chamados carregados; {{ contadores.atrasados + contadores.aberto_sem_resposta + contadores.multi_setor_travado }} em algum estado de risco.
+                {{ t('tickets_loaded_risk_summary', total=contadores.total, risco=(contadores.atrasados + contadores.aberto_sem_resposta + contadores.multi_setor_travado)) }}
             </p>
         </div>
     </div>
@@ -148,12 +148,12 @@
         <div class="bento-triage-lane-head">
             <div class="bento-triage-lane-title">
                 <span class="bento-triage-lane-dot"></span>
-                {{ grupo.titulo }}
+                {{ t(grupo.titulo) }}
                 <span class="bento-triage-lane-count">{{ grupo.total }}</span>
             </div>
             {% if grupo.total > grupo.chamados|length %}
             <a href="{{ url_for('main.gestor_dashboard', filtro=grupo.chave) }}" class="bento-triage-lane-more">
-                Ver todos ({{ grupo.total }}) →
+                {{ t('view_all_count', total=grupo.total) }} →
             </a>
             {% endif %}
         </div>
@@ -164,7 +164,7 @@
             {% endfor %}
         </div>
         {% else %}
-        <div class="bento-triage-empty">Nenhum chamado nesta categoria — tudo em dia.</div>
+        <div class="bento-triage-empty">{{ t('no_tickets_in_category') }}</div>
         {% endif %}
     </div>
     {% endfor %}
@@ -174,10 +174,10 @@
         <div class="bento-triage-lane-head">
             <div class="bento-triage-lane-title">
                 <span class="bento-triage-lane-dot" style="background:var(--color-dtx-500);"></span>
-                {{ chamados|length }} chamado{{ 's' if chamados|length != 1 else '' }}
+                {{ t('ticket_count', qtd=chamados|length, plural=('s' if chamados|length != 1 else '')) }}
             </div>
             <a href="{{ url_for('main.gestor_dashboard') }}" class="bento-triage-lane-more">
-                ← Voltar à visão geral
+                ← {{ t('back_to_overview') }}
             </a>
         </div>
         {% if chamados %}
@@ -187,7 +187,7 @@
             {% endfor %}
         </div>
         {% else %}
-        <div class="bento-triage-empty">Nenhum chamado nesta categoria — tudo em dia.</div>
+        <div class="bento-triage-empty">{{ t('no_tickets_in_category') }}</div>
         {% endif %}
     </div>
     {% endif %}

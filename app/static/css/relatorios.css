@@ -11,7 +11,9 @@
     background: var(--reports-surface);
     border-radius: var(--reports-radius);
     border: 1px solid var(--reports-border);
-    box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+    box-shadow:
+        0 1px 3px color-mix(in srgb, black 6%, transparent),
+        0 1px 2px color-mix(in srgb, black 4%, transparent);
 }
 .reports-empty-state {
     padding: 3rem 1.5rem;

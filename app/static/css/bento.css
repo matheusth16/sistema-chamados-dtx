@@ -174,6 +174,7 @@
 .bento-status-pill.cancelado{ background:var(--color-status-cancelled-bg); color:#9f1239; }
 .bento-status-pill.pending{ background:var(--color-status-pending-bg); color:var(--color-status-pending-text); }
 .bento-status-pill.role-admin{ background:var(--color-dtx-100); color:var(--color-dtx-500); }
+.bento-status-pill.role-admin-global{ background:#fef3c7; color:#92400e; }
 .bento-status-pill.role-supervisor{ background:#f3e8ff; color:#7e22ce; }
 .bento-status-pill.role-solicitante{ background:var(--color-surface-canvas); color:var(--color-text-muted); }
 .bento-status-pill .dot{ width:6px; height:6px; border-radius:99px; background:currentColor; flex-shrink:0; }
@@ -203,6 +204,8 @@
 .bento-btn-outline:hover{ background:var(--color-surface-canvas); }
 .bento-btn-outline.emerald{ color:#047857; border-color:#a7f3d0; }
 .bento-btn-outline.emerald:hover{ background:var(--color-status-done-bg); }
+.bento-btn-outline.danger{ color:#be123c; border-color:#fecdd3; }
+.bento-btn-outline.danger:hover{ background:#fff1f2; }
 .bento-icon-btn{ width:40px; height:40px; border-radius:99px; display:inline-flex; align-items:center; justify-content:center; color:var(--color-text-muted); background:transparent; transition:all .15s; flex-shrink:0; }
 .bento-icon-btn:hover{ background:#fff1f2; color:#e11d48; }
 
@@ -239,6 +242,13 @@ dialog.bento-modal h2{ font-size:1.1rem; font-weight:800; margin:0; }
 dialog.bento-modal textarea{ width:100%; background:var(--color-surface-canvas); border:1.5px solid transparent; border-radius:14px; padding:11px 14px; font-family:inherit; font-size:14px; color:inherit; resize:vertical; min-height:96px; }
 dialog.bento-modal textarea:focus{ outline:none; border-color:var(--color-dtx-500); background:#fff; }
 
+/* usuarios.html — tabela de 5 colunas, ações com vários botões de texto precisa de mais espaço */
+.bento-table-scope table.users-table th:nth-child(1), .bento-table-scope table.users-table td:nth-child(1){ width:14%; }
+.bento-table-scope table.users-table th:nth-child(2), .bento-table-scope table.users-table td:nth-child(2){ width:16%; }
+.bento-table-scope table.users-table th:nth-child(3), .bento-table-scope table.users-table td:nth-child(3){ width:12%; overflow:visible; text-overflow:clip; }
+.bento-table-scope table.users-table th:nth-child(4), .bento-table-scope table.users-table td:nth-child(4){ width:20%; }
+.bento-table-scope table.users-table th:nth-child(5), .bento-table-scope table.users-table td:nth-child(5){ width:38%; white-space:normal; }
+
 /* Dashboard: tabela de 9 colunas (checkbox + 8) — larguras próprias, mais específicas que .bento-table-scope genérico */
 .bento-table-scope.dash-table th:nth-child(1), .bento-table-scope.dash-table td:nth-child(1){ width:4%; }
 .bento-table-scope.dash-table th:nth-child(2), .bento-table-scope.dash-table td:nth-child(2){ width:9%; }
@@ -264,7 +274,8 @@ dialog.bento-modal textarea:focus{ outline:none; border-color:var(--color-dtx-50
 .bento-nav-logo-chip{ display:inline-flex; align-items:center; font-size:10px; font-weight:900; letter-spacing:.15em; text-transform:uppercase; color:rgba(255,255,255,.7); background:rgba(255,255,255,.1); border-radius:99px; padding:8px 16px; transition:all .2s; }
 .bento-nav-logo:hover .bento-nav-logo-chip{ color:#fff; background:rgba(255,255,255,.2); }
 
-.bento-nav-links{ display:flex; align-items:center; gap:4px; overflow-x:auto; }
+.bento-nav-links{ display:flex; align-items:center; gap:4px; overflow-x:auto; scrollbar-width:none; -ms-overflow-style:none; }
+.bento-nav-links::-webkit-scrollbar{ display:none; }
 @media (min-width:640px){ .bento-nav-links{ gap:8px; } }
 .bento-nav-link{ position:relative; padding:8px 8px; border-radius:99px; font-size:13px; font-weight:600; color:var(--color-nav-text); border:1px solid transparent; display:flex; align-items:center; gap:6px; white-space:nowrap; flex-shrink:0; transition:all .2s; outline:none; text-decoration:none; }
 @media (min-width:640px){ .bento-nav-link{ padding:10px 16px; font-size:14px; } }
@@ -618,4 +629,23 @@ dialog.bento-modal textarea:focus{ outline:none; border-color:var(--color-dtx-50
 .bento-risk-chip{ font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:.04em; padding:2px 7px; border-radius:99px; }
 .bento-risk-chip.atrasado{ background:#fff1f2; color:#be123c; }
 .bento-risk-chip.sem_resposta{ background:var(--color-status-open-bg); color:#b45309; }
+
+/* ── Flash toasts ─────────────────────────────────────────────────────────── */
+.bento-toast{ position:relative; display:flex; align-items:flex-start; gap:12px; padding:14px 16px; border-radius:16px; background:var(--color-surface-base); box-shadow:0 12px 32px rgba(20,30,60,.14); overflow:hidden; }
+.bento-toast::before{ content:''; position:absolute; left:0; top:0; bottom:0; width:4px; background:var(--color-dtx-500); }
+.bento-toast .bento-toast-icon{ width:30px; height:30px; border-radius:10px; display:flex; align-items:center; justify-content:center; flex-shrink:0; background:var(--color-dtx-100); color:var(--color-dtx-500); }
+.bento-toast .bento-toast-icon svg{ width:16px; height:16px; }
+.bento-toast .bento-toast-msg{ flex:1; font-size:13px; font-weight:600; line-height:1.45; color:var(--color-text-strong,#1e293b); padding-top:4px; }
+.bento-toast .bento-toast-close{ flex-shrink:0; width:24px; height:24px; margin-top:2px; display:flex; align-items:center; justify-content:center; border-radius:8px; color:var(--color-surface-muted); opacity:.7; transition:opacity .15s, background .15s; }
+.bento-toast .bento-toast-close:hover{ opacity:1; background:var(--color-surface-canvas); }
+.bento-toast .bento-toast-close svg{ width:14px; height:14px; }
+
+.bento-toast.success::before{ background:#10b981; }
+.bento-toast.success .bento-toast-icon{ background:#d1fae5; color:#059669; }
+.bento-toast.danger::before{ background:#ef4444; }
+.bento-toast.danger .bento-toast-icon{ background:#fee2e2; color:#dc2626; }
+.bento-toast.warning::before{ background:#f59e0b; }
+.bento-toast.warning .bento-toast-icon{ background:#fef3c7; color:#d97706; }
+.bento-toast.info::before{ background:var(--color-dtx-500); }
+.bento-toast.info .bento-toast-icon{ background:var(--color-dtx-100); color:var(--color-dtx-500); }
 .bento-risk-chip.multi_setor{ background:#faf5ff; color:#7e22ce; }
