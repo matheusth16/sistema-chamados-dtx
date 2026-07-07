@@ -1,6 +1,6 @@
-/* Service Worker: Web Push - DTX Service Portal */
+/* Service Worker: Web Push - Andon */
 self.addEventListener('push', function(event) {
-    var data = { title: 'DTX Service Portal', body: '', url: '' };
+    var data = { title: 'Andon', body: '', url: '' };
     if (event.data) {
         try {
             var payload = event.data.json();

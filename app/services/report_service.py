@@ -207,7 +207,7 @@ def _corpo_supervisor(
         f'<span style="color:#dc2626;">Overdue: {len(atrasados)}</span> &nbsp;|&nbsp; '
         f"Others: {len(outros)}</p>"
         f"{secoes}{btn}"
-        '<p style="margin-top:24px;color:#9ca3af;font-size:11px;"><em>DTX Service Portal</em></p>'
+        '<p style="margin-top:24px;color:#9ca3af;font-size:11px;"><em>Andon</em></p>'
         "</div>"
     )
 
@@ -392,7 +392,7 @@ def _enviar_resumo_admins(
             else '<p style="color:#6b7280;">None.</p>'
         )
         + f"{btn}"
-        '<p style="margin-top:24px;color:#9ca3af;font-size:11px;"><em>DTX Service Portal</em></p>'
+        '<p style="margin-top:24px;color:#9ca3af;font-size:11px;"><em>Andon</em></p>'
         "</div>"
     )
 

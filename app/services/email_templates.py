@@ -74,7 +74,7 @@ def build_email_shell(header_title: str, header_color: str, body_html: str) -> s
         "</tr>"
         "<tr>"
         '<td style="padding:14px 24px;background:#f9fafb;color:#6b7280;font-size:12px;">'
-        "<em>DTX Service Portal</em>"
+        "<em>Andon</em>"
         "</td>"
         "</tr>"
         "</table>"

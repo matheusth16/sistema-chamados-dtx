@@ -44,7 +44,7 @@ def main():
         print("Informe o destinatário: python scripts/testar_email_smtp.py email@exemplo.com")
         sys.exit(1)
 
-    assunto = "[Teste] DTX Service Portal - SMTP"
+    assunto = "[Teste] Service Portal - SMTP"
     corpo = "Se você recebeu este e-mail, o SMTP está configurado corretamente."
 
     msg = MIMEMultipart("alternative")

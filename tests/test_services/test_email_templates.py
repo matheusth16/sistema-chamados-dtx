@@ -109,7 +109,7 @@ def test_build_email_shell_contem_footer_dtx():
     from app.services.email_templates import build_email_shell
 
     html = build_email_shell("T", "#000", "corpo")
-    assert "DTX Service Portal" in html
+    assert "Andon" in html
 
 
 def test_build_email_shell_escapa_titulo():

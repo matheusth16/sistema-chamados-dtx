@@ -24,7 +24,7 @@ def limpar_tela():
 def exibir_menu():
     """Exibe o menu principal"""
     print("\n" + "=" * 60)
-    print("  🔐 CRIAR NOVO USUÁRIO - DTX Service Portal")
+    print("  🔐 CRIAR NOVO USUÁRIO - Service Portal")
     print("=" * 60)
 
 
@@ -266,7 +266,7 @@ def menu_principal():
         limpar_tela()
 
         print("\n" + "=" * 60)
-        print("  🔐 GERENCIAR USUÁRIOS - DTX Service Portal")
+        print("  🔐 GERENCIAR USUÁRIOS - Service Portal")
         print("=" * 60)
         print("\n  1️⃣  Criar novo usuário (Modo Interativo)")
         print("  2️⃣  Criar novo usuário (Modo Rápido)")
