@@ -134,19 +134,23 @@ def test_service_avancar_persiste_passo():
 
 
 def test_service_concluir_persiste_flag():
-    """concluir_onboarding chama update com onboarding_completo=True e passo=0."""
+    """concluir_onboarding adiciona o perfil a onboarding_perfis_vistos (via ArrayUnion) e zera o passo."""
     from app.services.onboarding_service import concluir_onboarding
 
     with patch("app.services.onboarding_service.db") as mock_db:
         mock_update = mock_db.collection.return_value.document.return_value.update
-        concluir_onboarding("uid_test")
-        mock_update.assert_called_once_with({"onboarding_completo": True, "onboarding_passo": 0})
+        concluir_onboarding("uid_test", "solicitante")
+        call_args = mock_update.call_args[0][0]
+        assert call_args["onboarding_passo"] == 0
+        assert call_args["onboarding_perfis_vistos"].values == ["solicitante"]
 
 
-# ─── Template: componente injetado / omitido ──────────────────────────────────
+# ─── Template: componente injetado / omitido — só na home de cada perfil ──────
 
 
-def _usuario_com_onboarding(onboarding_completo, onboarding_passo=0, perfil="solicitante"):
+def _usuario_com_onboarding(
+    perfil="solicitante", onboarding_perfis_vistos=None, onboarding_passo=0, is_gestor_only=False
+):
     u = MagicMock()
     u.id = "uid_ob"
     u.email = "ob@test.com"
@@ -156,33 +160,65 @@ def _usuario_com_onboarding(onboarding_completo, onboarding_passo=0, perfil="sol
     u.areas = ["Geral"]
     u.is_authenticated = True
     u.must_change_password = False
-    u.onboarding_completo = onboarding_completo
+    u.mfa_enabled = True
+    u.onboarding_perfis_vistos = onboarding_perfis_vistos or []
     u.onboarding_passo = onboarding_passo
+    u.is_gestor_only = is_gestor_only
+    u.is_admin_or_above = perfil in ("admin", "admin_global")
+    u.is_supervisor_or_above = perfil in ("supervisor", "admin", "admin_global")
     u.get_id = lambda: "uid_ob"
     return u
 
 
-def test_template_inclui_onboarding_para_usuario_novo(client, app):
-    """HTML da página inclui #onboarding-root para usuário com onboarding_completo=False."""
-    novo = _usuario_com_onboarding(onboarding_completo=False, onboarding_passo=0)
+# home route de cada perfil, usada pra parametrizar os testes de allowlist
+_HOME_POR_PERFIL = [
+    ("solicitante", "/"),
+    ("supervisor", "/painel"),
+    ("admin", "/admin"),
+]
+
+
+@pytest.mark.parametrize("perfil,home_route", _HOME_POR_PERFIL)
+def test_template_inclui_onboarding_na_home_do_perfil_para_usuario_novo(
+    client, app, perfil, home_route
+):
+    """Usuário novo (perfil nunca visto) vê o tour ao acessar a home do SEU perfil."""
+    novo = _usuario_com_onboarding(perfil=perfil)
     with (
         patch("app.routes.auth.Usuario.get_by_email", return_value=novo),
         patch("app.models_usuario.Usuario.get_by_id", return_value=novo),
+        patch("app.routes.auth._dispositivo_confiavel", return_value=True),
     ):
         client.post("/login", data={"email": "ob@test.com", "senha": "ok"})
-        r = client.get("/meus-chamados")
+        r = client.get(home_route)
     assert b"onboarding-root" in r.data
 
 
-def test_template_omite_onboarding_para_usuario_que_ja_fez(client, app):
-    """HTML da página NÃO inclui #onboarding-root para usuário com onboarding_completo=True."""
-    veterano = _usuario_com_onboarding(onboarding_completo=True)
+def test_template_omite_onboarding_fora_da_home_mesmo_para_usuario_novo(client, app):
+    """Usuário novo NÃO vê o tour em página que não é a home dele (ex.: durante MFA/outras telas)."""
+    novo = _usuario_com_onboarding(perfil="solicitante")
     with (
-        patch("app.routes.auth.Usuario.get_by_email", return_value=veterano),
-        patch("app.models_usuario.Usuario.get_by_id", return_value=veterano),
+        patch("app.routes.auth.Usuario.get_by_email", return_value=novo),
+        patch("app.models_usuario.Usuario.get_by_id", return_value=novo),
+        patch("app.routes.auth._dispositivo_confiavel", return_value=True),
     ):
         client.post("/login", data={"email": "ob@test.com", "senha": "ok"})
         r = client.get("/meus-chamados")
+    assert b"onboarding-root" not in r.data
+
+
+def test_template_omite_onboarding_para_usuario_que_ja_fez(client, app):
+    """HTML da home NÃO inclui #onboarding-root pra quem já viu o tour desse perfil."""
+    veterano = _usuario_com_onboarding(
+        perfil="solicitante", onboarding_perfis_vistos=["solicitante"]
+    )
+    with (
+        patch("app.routes.auth.Usuario.get_by_email", return_value=veterano),
+        patch("app.models_usuario.Usuario.get_by_id", return_value=veterano),
+        patch("app.routes.auth._dispositivo_confiavel", return_value=True),
+    ):
+        client.post("/login", data={"email": "ob@test.com", "senha": "ok"})
+        r = client.get("/")
     assert b"onboarding-root" not in r.data
 
 
@@ -199,51 +235,88 @@ def test_template_omite_onboarding_para_usuario_que_ja_fez(client, app):
 )
 def test_template_emite_data_lang_correto(client, app, lang, expected):
     """O componente onboarding emite data-lang com o idioma da sessão."""
-    novo = _usuario_com_onboarding(onboarding_completo=False)
+    novo = _usuario_com_onboarding()
     with (
         patch("app.routes.auth.Usuario.get_by_email", return_value=novo),
         patch("app.models_usuario.Usuario.get_by_id", return_value=novo),
+        patch("app.routes.auth._dispositivo_confiavel", return_value=True),
     ):
         client.post("/login", data={"email": "ob@test.com", "senha": "ok"})
-        r = client.get("/meus-chamados?lang=" + lang)
+        r = client.get("/?lang=" + lang)
     assert expected in r.data
 
 
-# ─── Modelo: campos onboarding no from_dict / to_dict ────────────────────────
+# ─── Rever tour (?onboarding_replay=1) — funciona em qualquer página ──────────
 
 
-def test_model_from_dict_defaults_onboarding():
-    """from_dict retorna onboarding_completo=False e onboarding_passo=0 por padrão."""
-    from app.models_usuario import Usuario
-
-    u = Usuario.from_dict({"email": "x@x.com", "nome": "X", "senha_hash": None}, id="uid1")
-    assert u.onboarding_completo is False
-    assert u.onboarding_passo == 0
-
-
-def test_model_from_dict_persiste_onboarding_true():
-    """from_dict lê onboarding_completo=True quando presente."""
-    from app.models_usuario import Usuario
-
-    u = Usuario.from_dict(
-        {
-            "email": "x@x.com",
-            "nome": "X",
-            "senha_hash": None,
-            "onboarding_completo": True,
-            "onboarding_passo": 3,
-        },
-        id="uid1",
+def test_template_inclui_onboarding_com_replay_mesmo_ja_concluido(client, app):
+    """Com ?onboarding_replay=1, o tour aparece mesmo fora da home e mesmo já visto antes."""
+    veterano = _usuario_com_onboarding(
+        perfil="solicitante", onboarding_perfis_vistos=["solicitante"]
     )
-    assert u.onboarding_completo is True
-    assert u.onboarding_passo == 3
+    with (
+        patch("app.routes.auth.Usuario.get_by_email", return_value=veterano),
+        patch("app.models_usuario.Usuario.get_by_id", return_value=veterano),
+        patch("app.routes.auth._dispositivo_confiavel", return_value=True),
+    ):
+        client.post("/login", data={"email": "ob@test.com", "senha": "ok"})
+        r = client.get("/meus-chamados?onboarding_replay=1")
+    assert b"onboarding-root" in r.data
 
 
-def test_model_to_dict_inclui_onboarding():
-    """to_dict inclui onboarding_completo e onboarding_passo."""
-    from app.models_usuario import Usuario
+def test_template_omite_onboarding_sem_replay_quando_ja_concluido(client, app):
+    """Sem o query param, comportamento é preservado: tour continua omitido pra quem já viu."""
+    veterano = _usuario_com_onboarding(
+        perfil="solicitante", onboarding_perfis_vistos=["solicitante"]
+    )
+    with (
+        patch("app.routes.auth.Usuario.get_by_email", return_value=veterano),
+        patch("app.models_usuario.Usuario.get_by_id", return_value=veterano),
+        patch("app.routes.auth._dispositivo_confiavel", return_value=True),
+    ):
+        client.post("/login", data={"email": "ob@test.com", "senha": "ok"})
+        r = client.get("/")
+    assert b"onboarding-root" not in r.data
 
-    u = Usuario(id="uid", email="x@x.com", nome="X", onboarding_completo=True, onboarding_passo=5)
-    d = u.to_dict()
-    assert d["onboarding_completo"] is True
-    assert d["onboarding_passo"] == 5
+
+def test_template_data_modo_replay_quando_query_param_presente(client, app):
+    """data-modo="replay" é emitido quando ?onboarding_replay=1 está presente."""
+    veterano = _usuario_com_onboarding(
+        perfil="solicitante", onboarding_perfis_vistos=["solicitante"]
+    )
+    with (
+        patch("app.routes.auth.Usuario.get_by_email", return_value=veterano),
+        patch("app.models_usuario.Usuario.get_by_id", return_value=veterano),
+        patch("app.routes.auth._dispositivo_confiavel", return_value=True),
+    ):
+        client.post("/login", data={"email": "ob@test.com", "senha": "ok"})
+        r = client.get("/meus-chamados?onboarding_replay=1")
+    assert b'data-modo="replay"' in r.data
+
+
+def test_template_data_modo_inicial_no_primeiro_acesso(client, app):
+    """data-modo="inicial" é emitido no fluxo normal de primeiro acesso, na home."""
+    novo = _usuario_com_onboarding()
+    with (
+        patch("app.routes.auth.Usuario.get_by_email", return_value=novo),
+        patch("app.models_usuario.Usuario.get_by_id", return_value=novo),
+        patch("app.routes.auth._dispositivo_confiavel", return_value=True),
+    ):
+        client.post("/login", data={"email": "ob@test.com", "senha": "ok"})
+        r = client.get("/")
+    assert b'data-modo="inicial"' in r.data
+
+
+def test_template_data_passo_zero_em_replay_ignora_passo_persistido(client, app):
+    """Em replay, data-passo é sempre 0, mesmo que onboarding_passo persistido seja outro."""
+    veterano = _usuario_com_onboarding(
+        perfil="solicitante", onboarding_perfis_vistos=["solicitante"], onboarding_passo=4
+    )
+    with (
+        patch("app.routes.auth.Usuario.get_by_email", return_value=veterano),
+        patch("app.models_usuario.Usuario.get_by_id", return_value=veterano),
+        patch("app.routes.auth._dispositivo_confiavel", return_value=True),
+    ):
+        client.post("/login", data={"email": "ob@test.com", "senha": "ok"})
+        r = client.get("/meus-chamados?onboarding_replay=1")
+    assert b'data-passo="0"' in r.data

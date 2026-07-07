@@ -2,6 +2,8 @@
 
 import logging
 
+from google.cloud import firestore
+
 from app.database import db
 
 logger = logging.getLogger(__name__)
@@ -17,12 +19,16 @@ def avancar_passo(user_id: str, passo: int) -> bool:
         return False
 
 
-def concluir_onboarding(user_id: str) -> bool:
-    """Marca o onboarding como concluído para o usuário."""
+def concluir_onboarding(user_id: str, perfil: str) -> bool:
+    """Marca o tour do perfil atual como visto (concluído ou pulado) para o usuário.
+
+    Usa ArrayUnion para adicionar `perfil` a onboarding_perfis_vistos de forma
+    idempotente — não duplica se o usuário já tinha visto esse perfil antes.
+    """
     try:
         db.collection("usuarios").document(user_id).update(
             {
-                "onboarding_completo": True,
+                "onboarding_perfis_vistos": firestore.ArrayUnion([perfil]),
                 "onboarding_passo": 0,
             }
         )

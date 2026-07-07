@@ -1,8 +1,10 @@
 """
 Testes de regressão — F-48 e F-60: onboarding.js
 
-F-48: nenhum handler inline onmouseover/onmouseout no JS (incompatível com CSP strict-dynamic).
-F-60: TOURS deve ter exatamente 5/6/7 passos por perfil (solicitante/supervisor/admin) em todos os idiomas.
+F-48: nenhum handler inline onmouseover/onmouseout/onerror no JS (incompatível com CSP strict-dynamic).
+F-60: TOURS deve ter exatamente 9/8/8/9 passos por perfil (solicitante/supervisor/admin/admin_global)
+em todos os idiomas — atualizado no redesign do guia de onboarding (mais passos, mais detalhado,
+e correção do gap pré-existente onde admin_global não tinha tour nenhum).
 """
 
 import re
@@ -41,6 +43,16 @@ def test_onboarding_js_sem_onclick_inline():
     src = _js_source()
     # Permitido: não há onclick inline em strings template
     assert 'onclick="' not in src, "onboarding.js contém onclick= inline — use addEventListener"
+
+
+def test_onboarding_js_sem_onerror_inline():
+    """Nenhum onerror= deve existir em strings HTML geradas (bloqueado por CSP).
+
+    O fallback de imagem ausente (screenshot ainda não capturada) usa
+    addEventListener('error', ...) em bindCardEvents, não o atributo inline.
+    """
+    src = _js_source()
+    assert 'onerror="' not in src, "onboarding.js contém onerror= inline — use addEventListener"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -92,46 +104,71 @@ def _count_steps_for_profile(src: str, profile: str, lang: str) -> int:
     return len(re.findall(r"\btitulo\s*:", block))
 
 
-def test_tour_solicitante_tem_5_passos_pt():
+def test_tour_solicitante_tem_9_passos_pt():
     src = _js_source()
-    assert _count_steps_for_profile(src, "solicitante", "pt_BR") == 5
+    assert _count_steps_for_profile(src, "solicitante", "pt_BR") == 9
 
 
-def test_tour_solicitante_tem_5_passos_en():
+def test_tour_solicitante_tem_9_passos_en():
     src = _js_source()
-    assert _count_steps_for_profile(src, "solicitante", "en") == 5
+    assert _count_steps_for_profile(src, "solicitante", "en") == 9
 
 
-def test_tour_solicitante_tem_5_passos_es():
+def test_tour_solicitante_tem_9_passos_es():
     src = _js_source()
-    assert _count_steps_for_profile(src, "solicitante", "es") == 5
+    assert _count_steps_for_profile(src, "solicitante", "es") == 9
 
 
-def test_tour_supervisor_tem_6_passos_pt():
+def test_tour_supervisor_tem_8_passos_pt():
     src = _js_source()
-    assert _count_steps_for_profile(src, "supervisor", "pt_BR") == 6
+    assert _count_steps_for_profile(src, "supervisor", "pt_BR") == 8
 
 
-def test_tour_supervisor_tem_6_passos_en():
+def test_tour_supervisor_tem_8_passos_en():
     src = _js_source()
-    assert _count_steps_for_profile(src, "supervisor", "en") == 6
+    assert _count_steps_for_profile(src, "supervisor", "en") == 8
 
 
-def test_tour_supervisor_tem_6_passos_es():
+def test_tour_supervisor_tem_8_passos_es():
     src = _js_source()
-    assert _count_steps_for_profile(src, "supervisor", "es") == 6
+    assert _count_steps_for_profile(src, "supervisor", "es") == 8
 
 
-def test_tour_admin_tem_7_passos_pt():
+def test_tour_admin_tem_8_passos_pt():
     src = _js_source()
-    assert _count_steps_for_profile(src, "admin", "pt_BR") == 7
+    assert _count_steps_for_profile(src, "admin", "pt_BR") == 8
 
 
-def test_tour_admin_tem_7_passos_en():
+def test_tour_admin_tem_8_passos_en():
     src = _js_source()
-    assert _count_steps_for_profile(src, "admin", "en") == 7
+    assert _count_steps_for_profile(src, "admin", "en") == 8
 
 
-def test_tour_admin_tem_7_passos_es():
+def test_tour_admin_tem_8_passos_es():
     src = _js_source()
-    assert _count_steps_for_profile(src, "admin", "es") == 7
+    assert _count_steps_for_profile(src, "admin", "es") == 8
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# F-60 — admin_global (gap pré-existente corrigido no redesign)
+#
+# admin_global não é um literal estático em TOURS (é derivado do tour do admin
+# + 1 passo extra por buildAdminGlobalTours()), então não é possível contar seus
+# passos com a mesma heurística de colchetes usada acima. Em vez disso, valida
+# a presença estrutural da derivação e do passo extra nos 3 idiomas.
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def test_admin_global_tour_e_derivado_do_admin():
+    """A função que deriva o tour do admin_global a partir do admin deve existir."""
+    src = _js_source()
+    assert "buildAdminGlobalTours" in src
+    assert "TOURS.admin_global = result" in src
+
+
+def test_admin_global_passo_extra_presente_nos_3_idiomas():
+    """O passo extra do painel admin_global existe traduzido em pt_BR/en/es."""
+    src = _js_source()
+    assert "Painel Admin Global" in src
+    assert "Global Admin Panel" in src
+    assert "Panel de Administrador Global" in src

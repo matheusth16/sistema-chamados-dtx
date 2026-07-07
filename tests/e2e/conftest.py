@@ -90,8 +90,13 @@ def _stub_server() -> Generator[str | None, None, None]:
 
 
 def pytest_configure(config):
-    """Registra o marker e2e para evitar warnings."""
+    """Registra os markers customizados para evitar warnings."""
     config.addinivalue_line("markers", "e2e: testes end-to-end contra servidor ativo")
+    config.addinivalue_line(
+        "markers",
+        "capture: ferramenta de captura de screenshots (não é um teste de correção; "
+        "não roda em CI/pytest normal, apenas quando explicitamente selecionada)",
+    )
 
 
 @pytest.fixture(scope="session")
@@ -143,6 +148,15 @@ def creds_admin() -> dict:
     return {
         "email": os.environ.get("TEST_ADMIN_EMAIL", ""),
         "password": os.environ.get("TEST_ADMIN_PASSWORD", ""),
+    }
+
+
+@pytest.fixture(scope="session")
+def creds_admin_global() -> dict:
+    """Usado apenas pela captura de screenshots do onboarding (perfil admin_global)."""
+    return {
+        "email": os.environ.get("TEST_ADMIN_GLOBAL_EMAIL", ""),
+        "password": os.environ.get("TEST_ADMIN_GLOBAL_PASSWORD", ""),
     }
 
 
@@ -200,4 +214,13 @@ def logged_in_admin(page: Page, base_url: str, creds_admin: dict):
     if not creds_admin["email"]:
         pytest.skip("TEST_ADMIN_EMAIL não configurado")
     _do_login(page, base_url, creds_admin["email"], creds_admin["password"])
+    return page
+
+
+@pytest.fixture
+def logged_in_admin_global(page: Page, base_url: str, creds_admin_global: dict):
+    """Page já autenticada como admin_global (usado só na captura de screenshots)."""
+    if not creds_admin_global["email"]:
+        pytest.skip("TEST_ADMIN_GLOBAL_EMAIL não configurado")
+    _do_login(page, base_url, creds_admin_global["email"], creds_admin_global["password"])
     return page

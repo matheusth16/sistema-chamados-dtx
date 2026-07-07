@@ -1,13 +1,17 @@
 {#
-  Onboarding tour — injetado em base.html quando onboarding_completo == false.
+  Onboarding tour — injetado em base.html quando onboarding_completo == false,
+  ou a qualquer momento via ?onboarding_replay=1 ("Rever tour" no menu de perfil).
   O JS (onboarding.js) lê os data-attributes e monta toda a UI dinamicamente.
 #}
+{% set onboarding_replay = request.args.get('onboarding_replay') == '1' %}
 <div
   id="onboarding-root"
   data-perfil="{{ current_user.perfil }}"
   data-nome="{{ current_user.nome | e }}"
-  data-passo="{{ current_user.onboarding_passo }}"
+  data-passo="{{ 0 if onboarding_replay else current_user.onboarding_passo }}"
+  data-modo="{{ 'replay' if onboarding_replay else 'inicial' }}"
   data-lang="{{ current_language | default('pt_BR') }}"
+  data-img-base="{{ url_for('static', filename='img/onboarding/') }}"
   data-url-avancar="{{ url_for('main.api_onboarding_avancar') }}"
   data-url-concluir="{{ url_for('main.api_onboarding_concluir') }}"
   data-url-pular="{{ url_for('main.api_onboarding_pular') }}"

@@ -20,11 +20,13 @@
   var PERFIL       = root.dataset.perfil || '';
   var NOME         = (root.dataset.nome || '').split(' ')[0];
   var LANG         = root.dataset.lang || 'pt_BR';
+  var MODO         = root.dataset.modo || 'inicial';
+  var IMG_BASE     = root.dataset.imgBase || '';
   var CSRF         = (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
   var URL_AVANCAR  = root.dataset.urlAvancar;
   var URL_CONCLUIR = root.dataset.urlConcluir;
   var URL_PULAR    = root.dataset.urlPular;
-  var pasoAtual    = parseInt(root.dataset.passo, 10) || 0;
+  var pasoAtual    = MODO === 'replay' ? 0 : (parseInt(root.dataset.passo, 10) || 0);
 
   // ─── Textos da UI por idioma ───────────────────────────────────────────────
 
@@ -46,28 +48,68 @@
       pt_BR: [
         {
           icon: 'wave',
-          titulo: 'Bem-vindo ao DTX Portal de Serviços.',
-          descricao: 'Olá, {nome}! Este é o DTX Portal de Serviços da DTX Aerospace. ' +
-                     'Vamos te guiar pelos primeiros passos em menos de um minuto.',
+          titulo: 'Bem-vindo ao Portal de Serviços.',
+          descricao: 'Olá, {nome}! Este é o Portal de Serviços da DTX Aerospace, o canal único ' +
+                     'para abrir e acompanhar chamados de suporte na empresa. Vamos te mostrar tudo ' +
+                     'o que você pode fazer aqui em poucos passos.',
         },
         {
           icon: 'plus',
           titulo: 'Abrindo um Novo Chamado',
-          descricao: 'Por aqui você abre um novo chamado para suporte. ' +
-                     'Preencha as informações e nossa equipe entra em contato rapidamente.',
+          descricao: 'Por aqui você abre um novo chamado para qualquer área de suporte: TI, ' +
+                     'Manutenção, RH e outras. Escolha a categoria, descreva o problema com o ' +
+                     'máximo de detalhes e anexe arquivos se precisar — nossa equipe é notificada ' +
+                     'automaticamente.',
           selector: 'nav a[href="/"]',
+          image: 'solicitante/02-novo-chamado.png',
         },
         {
           icon: 'clipboard',
-          titulo: 'Acompanhe Seus Chamados',
-          descricao: 'Veja todos os chamados que você abriu e o status de cada um em tempo real.',
+          titulo: 'Acompanhando Seus Chamados',
+          descricao: 'Em "Meus Chamados" você vê todos os chamados que abriu, com status ' +
+                     'atualizado em tempo real: Aberto, Em Atendimento, Concluído ou Cancelado. ' +
+                     'Use os filtros para encontrar um chamado específico rapidamente.',
           selector: 'nav a[href="/meus-chamados"]',
+          image: 'solicitante/03-meus-chamados.png',
+        },
+        {
+          icon: 'eye',
+          titulo: 'Detalhes de um Chamado',
+          descricao: 'Clique em qualquer chamado para ver o histórico completo: quem está ' +
+                     'responsável, mudanças de status, comentários e anexos trocados durante o ' +
+                     'atendimento.',
+          image: 'solicitante/04-detalhe-chamado.png',
+        },
+        {
+          icon: 'edit',
+          titulo: 'Editando ou Cancelando um Chamado',
+          descricao: 'Errou algo na descrição? Você pode editar um chamado recém-aberto dentro ' +
+                     'dos primeiros 30 minutos. Mudou de ideia ou abriu por engano? É possível ' +
+                     'cancelar o chamado informando o motivo.',
+          image: 'solicitante/05-editar-cancelar.png',
+        },
+        {
+          icon: 'check',
+          titulo: 'Confirmando a Resolução',
+          descricao: 'Quando seu chamado for marcado como Concluído, você recebe uma notificação ' +
+                     'para confirmar se o problema foi realmente resolvido. Se não foi, você pode ' +
+                     'reabrir o chamado direto pela mesma tela.',
+          image: 'solicitante/06-confirmar-resolucao.png',
         },
         {
           icon: 'lightbulb',
           titulo: 'Dica: Mais detalhes = resposta mais rápida',
           descricao: 'Ao abrir um chamado, adicione uma descrição clara e anexos quando possível. ' +
                      'Quanto mais informação, mais rápida a resolução pela equipe!',
+        },
+        {
+          icon: 'bell',
+          titulo: 'Notificações e Idioma',
+          descricao: 'O sino no topo avisa sobre atualizações dos seus chamados em tempo real. ' +
+                     'Prefere outro idioma? Troque entre Português, Inglês e Espanhol a qualquer ' +
+                     'momento pelo seletor ao lado do sino.',
+          selector: '#btn-sino',
+          image: 'solicitante/08-notificacoes.png',
         },
         {
           icon: 'rocket',
@@ -80,28 +122,66 @@
       en: [
         {
           icon: 'wave',
-          titulo: 'Welcome to DTX Service Portal.',
-          descricao: 'Hello, {nome}! This is DTX Service Portal by DTX Aerospace. ' +
-                     'We\'ll guide you through the first steps in less than a minute.',
+          titulo: 'Welcome to Andon.',
+          descricao: 'Hello, {nome}! This is Andon by DTX Aerospace, the single ' +
+                     'channel to open and track support tickets across the company. Let\'s walk ' +
+                     'through everything you can do here in a few steps.',
         },
         {
           icon: 'plus',
           titulo: 'Opening a New Ticket',
-          descricao: 'Here you open a new support ticket. ' +
-                     'Fill in the details and our team will get in touch quickly.',
+          descricao: 'Here you open a new ticket for any support area: IT, Maintenance, HR and ' +
+                     'others. Choose the category, describe the issue in as much detail as ' +
+                     'possible, and attach files if needed — our team is notified automatically.',
           selector: 'nav a[href="/"]',
+          image: 'solicitante/02-novo-chamado.png',
         },
         {
           icon: 'clipboard',
-          titulo: 'Track Your Tickets',
-          descricao: 'View all the tickets you\'ve opened and the real-time status of each one.',
+          titulo: 'Tracking Your Tickets',
+          descricao: 'In "My Tickets" you see every ticket you\'ve opened, with real-time status: ' +
+                     'Open, In Progress, Completed or Cancelled. Use the filters to quickly find a ' +
+                     'specific ticket.',
           selector: 'nav a[href="/meus-chamados"]',
+          image: 'solicitante/03-meus-chamados.png',
+        },
+        {
+          icon: 'eye',
+          titulo: 'Ticket Details',
+          descricao: 'Click any ticket to see the full history: who\'s assigned, status changes, ' +
+                     'comments and attachments exchanged during handling.',
+          image: 'solicitante/04-detalhe-chamado.png',
+        },
+        {
+          icon: 'edit',
+          titulo: 'Editing or Cancelling a Ticket',
+          descricao: 'Made a mistake in the description? You can edit a ticket within the first ' +
+                     '30 minutes after opening it. Changed your mind or opened it by accident? ' +
+                     'You can cancel it and provide a reason.',
+          image: 'solicitante/05-editar-cancelar.png',
+        },
+        {
+          icon: 'check',
+          titulo: 'Confirming the Resolution',
+          descricao: 'When your ticket is marked Completed, you\'ll get a notification to confirm ' +
+                     'the issue was really solved. If not, you can reopen the ticket right from ' +
+                     'the same screen.',
+          image: 'solicitante/06-confirmar-resolucao.png',
         },
         {
           icon: 'lightbulb',
           titulo: 'Tip: More details = faster response',
           descricao: 'When opening a ticket, add a clear description and attachments when possible. ' +
                      'The more information you provide, the faster the resolution!',
+        },
+        {
+          icon: 'bell',
+          titulo: 'Notifications and Language',
+          descricao: 'The bell icon at the top alerts you about updates to your tickets in real ' +
+                     'time. Prefer another language? Switch between Portuguese, English and ' +
+                     'Spanish anytime using the selector next to the bell.',
+          selector: '#btn-sino',
+          image: 'solicitante/08-notificacoes.png',
         },
         {
           icon: 'rocket',
@@ -114,28 +194,68 @@
       es: [
         {
           icon: 'wave',
-          titulo: 'Bienvenido al DTX Portal de Servicios.',
-          descricao: '¡Hola, {nome}! Este es DTX Portal de Servicios de DTX Aerospace. ' +
-                     'Te guiaremos a través de los primeros pasos en menos de un minuto.',
+          titulo: 'Bienvenido al Portal de Servicios.',
+          descricao: '¡Hola, {nome}! Este es el Portal de Servicios de DTX Aerospace, el canal ' +
+                     'único para abrir y dar seguimiento a los tickets de soporte en la empresa. ' +
+                     'Te mostraremos todo lo que puedes hacer aquí en pocos pasos.',
         },
         {
           icon: 'plus',
           titulo: 'Abriendo un Nuevo Ticket',
-          descricao: 'Aquí puedes abrir un nuevo ticket de soporte. ' +
-                     'Completa la información y nuestro equipo se pondrá en contacto rápidamente.',
+          descricao: 'Aquí puedes abrir un nuevo ticket para cualquier área de soporte: TI, ' +
+                     'Mantenimiento, RRHH y otras. Elige la categoría, describe el problema con el ' +
+                     'mayor detalle posible y adjunta archivos si es necesario — nuestro equipo es ' +
+                     'notificado automáticamente.',
           selector: 'nav a[href="/"]',
+          image: 'solicitante/02-novo-chamado.png',
         },
         {
           icon: 'clipboard',
           titulo: 'Seguimiento de Tus Tickets',
-          descricao: 'Consulta todos los tickets que has abierto y el estado en tiempo real de cada uno.',
+          descricao: 'En "Mis Tickets" ves todos los tickets que has abierto, con el estado ' +
+                     'actualizado en tiempo real: Abierto, En Atención, Completado o Cancelado. ' +
+                     'Usa los filtros para encontrar un ticket específico rápidamente.',
           selector: 'nav a[href="/meus-chamados"]',
+          image: 'solicitante/03-meus-chamados.png',
+        },
+        {
+          icon: 'eye',
+          titulo: 'Detalles de un Ticket',
+          descricao: 'Haz clic en cualquier ticket para ver el historial completo: quién está a ' +
+                     'cargo, cambios de estado, comentarios y archivos adjuntos intercambiados ' +
+                     'durante la atención.',
+          image: 'solicitante/04-detalhe-chamado.png',
+        },
+        {
+          icon: 'edit',
+          titulo: 'Editando o Cancelando un Ticket',
+          descricao: '¿Te equivocaste en la descripción? Puedes editar un ticket recién abierto ' +
+                     'dentro de los primeros 30 minutos. ¿Cambiaste de opinión o lo abriste por ' +
+                     'error? Puedes cancelarlo indicando el motivo.',
+          image: 'solicitante/05-editar-cancelar.png',
+        },
+        {
+          icon: 'check',
+          titulo: 'Confirmando la Resolución',
+          descricao: 'Cuando tu ticket se marque como Completado, recibirás una notificación para ' +
+                     'confirmar si el problema realmente se resolvió. Si no fue así, puedes ' +
+                     'reabrir el ticket desde la misma pantalla.',
+          image: 'solicitante/06-confirmar-resolucao.png',
         },
         {
           icon: 'lightbulb',
           titulo: 'Consejo: Más detalles = respuesta más rápida',
           descricao: 'Al abrir un ticket, añade una descripción clara y archivos adjuntos cuando sea posible. ' +
                      '¡Cuanta más información proporciones, más rápida será la resolución!',
+        },
+        {
+          icon: 'bell',
+          titulo: 'Notificaciones e Idioma',
+          descricao: 'La campana en la parte superior te avisa sobre actualizaciones de tus ' +
+                     'tickets en tiempo real. ¿Prefieres otro idioma? Cambia entre Portugués, ' +
+                     'Inglés y Español en cualquier momento con el selector junto a la campana.',
+          selector: '#btn-sino',
+          image: 'solicitante/08-notificacoes.png',
         },
         {
           icon: 'rocket',
@@ -153,123 +273,182 @@
         {
           icon: 'wave',
           titulo: 'Bem-vindo, Supervisor!',
-          descricao: 'Olá, {nome}! Como supervisor, você gerencia chamados da sua área ' +
-                     'e acompanha o desempenho da equipe.',
+          descricao: 'Olá, {nome}! Como supervisor, você gerencia os chamados da sua área, ' +
+                     'acompanha o desempenho da equipe e garante que os prazos de atendimento ' +
+                     '(SLA) sejam cumpridos. Vamos conhecer as principais ferramentas.',
         },
         {
           icon: 'chart',
           titulo: 'Dashboard de Chamados',
-          descricao: 'Aqui você vê todos os chamados da sua área em tempo real, ' +
-                     'com filtros por status, prioridade e SLA.',
-          selector: 'nav a[href="/admin"]',
+          descricao: 'Aqui você vê todos os chamados da sua área em tempo real: quantidade por ' +
+                     'status, tempo médio de atendimento e chamados com SLA em risco — tudo em ' +
+                     'um só painel.',
+          selector: 'nav a[href="/painel"]',
+          image: 'supervisor/02-dashboard.png',
         },
         {
           icon: 'mouse',
           titulo: 'Interagindo com Chamados',
-          descricao: 'Clique em qualquer linha da tabela para abrir os detalhes do chamado ' +
-                     'em uma nova aba e atualizar o status.',
+          descricao: 'Clique em qualquer linha da tabela para abrir os detalhes do chamado em ' +
+                     'uma nova aba, atualizar o status, atribuir um responsável ou adicionar ' +
+                     'comentários.',
+        },
+        {
+          icon: 'filter',
+          titulo: 'Filtros de SLA e Prioridade',
+          descricao: 'Use os filtros no topo da tabela para isolar rapidamente chamados ' +
+                     'críticos: por status, prioridade, categoria ou SLA. Chamados com SLA em ' +
+                     'risco aparecem sinalizados em vermelho.',
+          image: 'supervisor/04-filtros-sla.png',
         },
         {
           icon: 'trend',
           titulo: 'Relatórios e Métricas',
-          descricao: 'Acesse métricas de SLA e relatórios semanais da sua área. ' +
-                     'Exporte em Excel quando precisar.',
+          descricao: 'Acesse métricas de SLA, volume de chamados por categoria e relatórios ' +
+                     'semanais da sua área — visualize tendências e identifique gargalos ' +
+                     'rapidamente.',
           selector: 'nav a[href*="relatorios"]',
+        },
+        {
+          icon: 'download',
+          titulo: 'Exportando Relatórios',
+          descricao: 'Precisa compartilhar os números com sua liderança? Exporte os dados da ' +
+                     'sua área em planilha Excel, pronta para apresentações e análises.',
+          image: 'supervisor/06-exportar.png',
         },
         {
           icon: 'alert',
           titulo: 'Atenção ao SLA!',
-          descricao: 'Use os filtros da tabela para encontrar chamados críticos. ' +
-                     'Chamados com SLA em risco são sinalizados em vermelho.',
+          descricao: 'Use os filtros da tabela para encontrar chamados críticos rapidamente. ' +
+                     'Chamados com SLA em risco são sinalizados em vermelho — priorize-os para ' +
+                     'não descumprir prazos.',
         },
         {
           icon: 'check',
           titulo: 'Tudo pronto!',
           descricao: 'Comece revisando os chamados em aberto na sua área.',
-          selector: 'nav a[href="/admin"]',
-          cta: { label: 'Ir para o Dashboard', href: '/admin' },
+          selector: 'nav a[href="/painel"]',
+          cta: { label: 'Ir para o Dashboard', href: '/painel' },
         },
       ],
       en: [
         {
           icon: 'wave',
           titulo: 'Welcome, Supervisor!',
-          descricao: 'Hello, {nome}! As a supervisor, you manage tickets for your area ' +
-                     'and track team performance.',
+          descricao: 'Hello, {nome}! As a supervisor, you manage tickets for your area, track ' +
+                     'team performance, and make sure service-level agreements (SLA) are met. ' +
+                     'Let\'s tour the main tools.',
         },
         {
           icon: 'chart',
           titulo: 'Ticket Dashboard',
-          descricao: 'Here you see all tickets for your area in real time, ' +
-                     'with filters by status, priority and SLA.',
-          selector: 'nav a[href="/admin"]',
+          descricao: 'Here you see all tickets for your area in real time: counts by status, ' +
+                     'average handling time, and tickets with SLA at risk — all in one panel.',
+          selector: 'nav a[href="/painel"]',
+          image: 'supervisor/02-dashboard.png',
         },
         {
           icon: 'mouse',
           titulo: 'Interacting with Tickets',
-          descricao: 'Click any row in the table to open the ticket details in a new tab ' +
-                     'and update its status.',
+          descricao: 'Click any row in the table to open the ticket details in a new tab, ' +
+                     'update its status, assign an owner, or add comments.',
+        },
+        {
+          icon: 'filter',
+          titulo: 'SLA and Priority Filters',
+          descricao: 'Use the filters at the top of the table to quickly isolate critical ' +
+                     'tickets: by status, priority, category or SLA. Tickets with SLA at risk ' +
+                     'are flagged in red.',
+          image: 'supervisor/04-filtros-sla.png',
         },
         {
           icon: 'trend',
           titulo: 'Reports and Metrics',
-          descricao: 'Access SLA metrics and weekly reports for your area. ' +
-                     'Export to Excel whenever you need.',
+          descricao: 'Access SLA metrics, ticket volume by category, and weekly reports for ' +
+                     'your area — spot trends and bottlenecks quickly.',
           selector: 'nav a[href*="relatorios"]',
+        },
+        {
+          icon: 'download',
+          titulo: 'Exporting Reports',
+          descricao: 'Need to share the numbers with leadership? Export your area\'s data to an ' +
+                     'Excel spreadsheet, ready for presentations and analysis.',
+          image: 'supervisor/06-exportar.png',
         },
         {
           icon: 'alert',
           titulo: 'Keep an eye on SLA!',
-          descricao: 'Use the table filters to find critical tickets quickly. ' +
-                     'Tickets with SLA at risk are flagged in red.',
+          descricao: 'Use the table filters to quickly find critical tickets. Tickets with SLA ' +
+                     'at risk are flagged in red — prioritize them to avoid missing deadlines.',
         },
         {
           icon: 'check',
           titulo: 'All set!',
           descricao: 'Start by reviewing the open tickets in your area.',
-          selector: 'nav a[href="/admin"]',
-          cta: { label: 'Go to Dashboard', href: '/admin' },
+          selector: 'nav a[href="/painel"]',
+          cta: { label: 'Go to Dashboard', href: '/painel' },
         },
       ],
       es: [
         {
           icon: 'wave',
           titulo: '¡Bienvenido, Supervisor!',
-          descricao: '¡Hola, {nome}! Como supervisor, gestionas los tickets de tu área ' +
-                     'y realizas el seguimiento del rendimiento del equipo.',
+          descricao: '¡Hola, {nome}! Como supervisor, gestionas los tickets de tu área, das ' +
+                     'seguimiento al rendimiento del equipo y garantizas que los plazos de ' +
+                     'atención (SLA) se cumplan. Vamos a conocer las principales herramientas.',
         },
         {
           icon: 'chart',
           titulo: 'Panel de Tickets',
-          descricao: 'Aquí ves todos los tickets de tu área en tiempo real, ' +
-                     'con filtros por estado, prioridad y SLA.',
-          selector: 'nav a[href="/admin"]',
+          descricao: 'Aquí ves todos los tickets de tu área en tiempo real: cantidad por estado, ' +
+                     'tiempo promedio de atención y tickets con SLA en riesgo — todo en un solo ' +
+                     'panel.',
+          selector: 'nav a[href="/painel"]',
+          image: 'supervisor/02-dashboard.png',
         },
         {
           icon: 'mouse',
           titulo: 'Interactuando con Tickets',
-          descricao: 'Haz clic en cualquier fila de la tabla para abrir los detalles ' +
-                     'del ticket en una nueva pestaña y actualizar su estado.',
+          descricao: 'Haz clic en cualquier fila de la tabla para abrir los detalles del ticket ' +
+                     'en una nueva pestaña, actualizar su estado, asignar un responsable o ' +
+                     'agregar comentarios.',
+        },
+        {
+          icon: 'filter',
+          titulo: 'Filtros de SLA y Prioridad',
+          descricao: 'Usa los filtros en la parte superior de la tabla para aislar rápidamente ' +
+                     'tickets críticos: por estado, prioridad, categoría o SLA. Los tickets con ' +
+                     'SLA en riesgo aparecen marcados en rojo.',
+          image: 'supervisor/04-filtros-sla.png',
         },
         {
           icon: 'trend',
           titulo: 'Informes y Métricas',
-          descricao: 'Accede a las métricas de SLA e informes semanales de tu área. ' +
-                     'Exporta a Excel cuando lo necesites.',
+          descricao: 'Accede a métricas de SLA, volumen de tickets por categoría e informes ' +
+                     'semanales de tu área — identifica tendencias y cuellos de botella ' +
+                     'rápidamente.',
           selector: 'nav a[href*="relatorios"]',
+        },
+        {
+          icon: 'download',
+          titulo: 'Exportando Informes',
+          descricao: '¿Necesitas compartir los números con tu liderazgo? Exporta los datos de tu ' +
+                     'área en una hoja de Excel, lista para presentaciones y análisis.',
+          image: 'supervisor/06-exportar.png',
         },
         {
           icon: 'alert',
           titulo: '¡Atención al SLA!',
           descricao: 'Usa los filtros de la tabla para encontrar tickets críticos rápidamente. ' +
-                     'Los tickets con SLA en riesgo están marcados en rojo.',
+                     'Los tickets con SLA en riesgo están marcados en rojo — priorízalos para no ' +
+                     'incumplir los plazos.',
         },
         {
           icon: 'check',
           titulo: '¡Todo listo!',
           descricao: 'Comienza revisando los tickets abiertos en tu área.',
-          selector: 'nav a[href="/admin"]',
-          cta: { label: 'Ir al Panel', href: '/admin' },
+          selector: 'nav a[href="/painel"]',
+          cta: { label: 'Ir al Panel', href: '/painel' },
         },
       ],
     },
@@ -280,36 +459,51 @@
         {
           icon: 'wave',
           titulo: 'Bem-vindo, Administrador!',
-          descricao: 'Olá, {nome}! Você tem acesso completo ao sistema. ' +
-                     'Vamos apresentar as principais funcionalidades.',
+          descricao: 'Olá, {nome}! Você tem acesso completo ao sistema: chamados de todas as ' +
+                     'áreas, usuários, categorias e relatórios. Vamos apresentar as principais ' +
+                     'funcionalidades.',
         },
         {
           icon: 'chart',
           titulo: 'Dashboard Geral',
-          descricao: 'Visão consolidada de todos os chamados de todas as áreas, ' +
-                     'com métricas de SLA e status em tempo real.',
+          descricao: 'Visão consolidada de todos os chamados de todas as áreas, com métricas de ' +
+                     'SLA, status em tempo real e distribuição por setor.',
           selector: 'nav a[href="/admin"]',
+          image: 'admin/02-dashboard.png',
         },
         {
           icon: 'trend',
           titulo: 'Relatórios Avançados',
-          descricao: 'Exporte dados em Excel e gere relatórios semanais automáticos. ' +
-                     'Monitore a performance de toda a operação.',
+          descricao: 'Exporte dados em Excel, gere relatórios semanais automáticos e monitore a ' +
+                     'performance de toda a operação, comparando áreas e períodos.',
           selector: 'nav a[href*="relatorios"]',
+          image: 'admin/03-relatorios.png',
         },
         {
           icon: 'users',
           titulo: 'Gestão de Usuários',
-          descricao: 'Crie, edite e gerencie os perfis de acesso de todos os colaboradores. ' +
-                     'Acesse pelo link de Usuários no menu de navegação.',
+          descricao: 'Crie, edite e gerencie os perfis de acesso de todos os colaboradores: ' +
+                     'solicitante, supervisor ou admin. Defina a área de cada supervisor e ' +
+                     'redefina senhas quando necessário.',
           selector: 'nav a[href*="admin/usuarios"]',
+          image: 'admin/04-usuarios.png',
         },
         {
           icon: 'tag',
           titulo: 'Categorias',
-          descricao: 'Configure as categorias dos chamados. ' +
-                     'Acesse pelo link de Categorias no menu de navegação.',
+          descricao: 'Configure a estrutura de categorias dos chamados: setores, gates e níveis ' +
+                     'de impacto. Essa estrutura organiza como os chamados são classificados e ' +
+                     'roteados.',
           selector: 'nav a[href*="admin/categorias"]',
+          image: 'admin/05-categorias.png',
+        },
+        {
+          icon: 'download',
+          titulo: 'Exportando Relatórios Avançados',
+          descricao: 'Exporte relatórios detalhados de toda a organização em Excel, com ' +
+                     'múltiplas abas por área, categoria e período — ideal para apresentações ' +
+                     'à diretoria.',
+          image: 'admin/06-exportar.png',
         },
         {
           icon: 'settings',
@@ -332,36 +526,48 @@
         {
           icon: 'wave',
           titulo: 'Welcome, Administrator!',
-          descricao: 'Hello, {nome}! You have full access to the system. ' +
-                     'Let\'s walk through the main features.',
+          descricao: 'Hello, {nome}! You have full access to the system: tickets from every ' +
+                     'area, users, categories and reports. Let\'s walk through the main features.',
         },
         {
           icon: 'chart',
           titulo: 'General Dashboard',
-          descricao: 'Consolidated view of all tickets from all areas, ' +
-                     'with SLA metrics and real-time status.',
+          descricao: 'Consolidated view of all tickets from all areas, with SLA metrics, ' +
+                     'real-time status, and distribution by sector.',
           selector: 'nav a[href="/admin"]',
+          image: 'admin/02-dashboard.png',
         },
         {
           icon: 'trend',
           titulo: 'Advanced Reports',
-          descricao: 'Export data to Excel and generate automatic weekly reports. ' +
-                     'Monitor the performance of the entire operation.',
+          descricao: 'Export data to Excel, generate automatic weekly reports, and monitor the ' +
+                     'performance of the entire operation, comparing areas and periods.',
           selector: 'nav a[href*="relatorios"]',
+          image: 'admin/03-relatorios.png',
         },
         {
           icon: 'users',
           titulo: 'User Management',
-          descricao: 'Create, edit and manage access profiles for all employees. ' +
-                     'Access via the Users link in the navigation menu.',
+          descricao: 'Create, edit and manage access profiles for all employees: requester, ' +
+                     'supervisor or admin. Set each supervisor\'s area and reset passwords when ' +
+                     'needed.',
           selector: 'nav a[href*="admin/usuarios"]',
+          image: 'admin/04-usuarios.png',
         },
         {
           icon: 'tag',
           titulo: 'Categories',
-          descricao: 'Configure ticket categories. ' +
-                     'Access via the Categories link in the navigation menu.',
+          descricao: 'Configure the ticket category structure: sectors, gates and impact ' +
+                     'levels. This structure organizes how tickets are classified and routed.',
           selector: 'nav a[href*="admin/categorias"]',
+          image: 'admin/05-categorias.png',
+        },
+        {
+          icon: 'download',
+          titulo: 'Exporting Advanced Reports',
+          descricao: 'Export detailed organization-wide reports to Excel, with multiple tabs ' +
+                     'per area, category and period — ideal for leadership presentations.',
+          image: 'admin/06-exportar.png',
         },
         {
           icon: 'settings',
@@ -384,36 +590,51 @@
         {
           icon: 'wave',
           titulo: '¡Bienvenido, Administrador!',
-          descricao: '¡Hola, {nome}! Tienes acceso completo al sistema. ' +
-                     'Vamos a presentar las principales funcionalidades.',
+          descricao: '¡Hola, {nome}! Tienes acceso completo al sistema: tickets de todas las ' +
+                     'áreas, usuarios, categorías e informes. Vamos a presentar las principales ' +
+                     'funcionalidades.',
         },
         {
           icon: 'chart',
           titulo: 'Panel General',
-          descricao: 'Vista consolidada de todos los tickets de todas las áreas, ' +
-                     'con métricas de SLA y estado en tiempo real.',
+          descricao: 'Vista consolidada de todos los tickets de todas las áreas, con métricas ' +
+                     'de SLA, estado en tiempo real y distribución por sector.',
           selector: 'nav a[href="/admin"]',
+          image: 'admin/02-dashboard.png',
         },
         {
           icon: 'trend',
           titulo: 'Informes Avanzados',
-          descricao: 'Exporta datos a Excel y genera informes semanales automáticos. ' +
-                     'Monitorea el rendimiento de toda la operación.',
+          descricao: 'Exporta datos a Excel, genera informes semanales automáticos y monitorea ' +
+                     'el rendimiento de toda la operación, comparando áreas y períodos.',
           selector: 'nav a[href*="relatorios"]',
+          image: 'admin/03-relatorios.png',
         },
         {
           icon: 'users',
           titulo: 'Gestión de Usuarios',
-          descricao: 'Crea, edita y gestiona los perfiles de acceso de todos los colaboradores. ' +
-                     'Accede mediante el enlace de Usuarios en el menú de navegación.',
+          descricao: 'Crea, edita y gestiona los perfiles de acceso de todos los colaboradores: ' +
+                     'solicitante, supervisor o admin. Define el área de cada supervisor y ' +
+                     'restablece contraseñas cuando sea necesario.',
           selector: 'nav a[href*="admin/usuarios"]',
+          image: 'admin/04-usuarios.png',
         },
         {
           icon: 'tag',
           titulo: 'Categorías',
-          descricao: 'Configura las categorías de los tickets. ' +
-                     'Accede mediante el enlace de Categorías en el menú de navegación.',
+          descricao: 'Configura la estructura de categorías de los tickets: sectores, gates y ' +
+                     'niveles de impacto. Esta estructura organiza cómo se clasifican y ' +
+                     'enrutan los tickets.',
           selector: 'nav a[href*="admin/categorias"]',
+          image: 'admin/05-categorias.png',
+        },
+        {
+          icon: 'download',
+          titulo: 'Exportando Informes Avanzados',
+          descricao: 'Exporta informes detallados de toda la organización en Excel, con ' +
+                     'múltiples pestañas por área, categoría y período — ideal para ' +
+                     'presentaciones a la dirección.',
+          image: 'admin/06-exportar.png',
         },
         {
           icon: 'settings',
@@ -433,7 +654,57 @@
         },
       ],
     },
+
+    // ── ADMIN GLOBAL ─────────────────────────────────────────────────────────
+    // Corrige gap pré-existente: antes desta versão, admin_global não tinha tour
+    // nenhum (TOURS não tinha essa chave e o guard de perfil desconhecido saía
+    // silenciosamente). O tour é derivado do admin logo abaixo (buildAdminGlobalTours),
+    // então não é definido aqui.
   };
+
+  // Deriva o tour do admin_global a partir do tour do admin (mesmos passos +
+  // 1 passo extra sobre o painel consolidado entre áreas), para as 3 línguas.
+  (function buildAdminGlobalTours() {
+    var extra = {
+      pt_BR: {
+        icon: 'globe',
+        titulo: 'Painel Admin Global',
+        descricao: 'Como Admin Global, você também acompanha e promove ou rebaixa outros ' +
+                   'administradores entre as áreas, com uma visão consolidada de todas as ' +
+                   'unidades da DTX Aerospace.',
+        selector: 'nav a[href="/admin-global"]',
+        image: 'admin_global/dashboard.png',
+      },
+      en: {
+        icon: 'globe',
+        titulo: 'Global Admin Panel',
+        descricao: 'As a Global Admin, you can also review and promote or demote other ' +
+                   'administrators across areas, with a consolidated view of all DTX Aerospace ' +
+                   'units.',
+        selector: 'nav a[href="/admin-global"]',
+        image: 'admin_global/dashboard.png',
+      },
+      es: {
+        icon: 'globe',
+        titulo: 'Panel de Administrador Global',
+        descricao: 'Como Administrador Global, también puedes revisar y promover o degradar a ' +
+                   'otros administradores entre áreas, con una vista consolidada de todas las ' +
+                   'unidades de DTX Aerospace.',
+        selector: 'nav a[href="/admin-global"]',
+        image: 'admin_global/dashboard.png',
+      },
+    };
+    var langs = ['pt_BR', 'en', 'es'];
+    var result = {};
+    for (var i = 0; i < langs.length; i++) {
+      var lang = langs[i];
+      var adminSteps = TOURS.admin[lang];
+      var lastStep = adminSteps[adminSteps.length - 1];
+      var beforeLast = adminSteps.slice(0, adminSteps.length - 1);
+      result[lang] = beforeLast.concat([extra[lang], lastStep]);
+    }
+    TOURS.admin_global = result;
+  })();
 
   // ─── Mapa semântico → SVG ─────────────────────────────────────────────────
 
@@ -451,6 +722,12 @@
     users:     '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>',
     tag:       '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z"></path><path d="M7 7h.01"></path></svg>',
     settings:  '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg>',
+    bell:      '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"></path></svg>',
+    filter:    '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>',
+    download:  '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>',
+    edit:      '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg>',
+    eye:       '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z"></path><circle cx="12" cy="12" r="3"></circle></svg>',
+    globe:     '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10Z"></path></svg>',
   };
 
   // Seleciona o tour pelo perfil e idioma (fallback: pt_BR)
@@ -612,7 +889,21 @@
       'background:#1e4a8c">' +
       escHtml(isLast ? ui.finish : ui.next) + '</button>';
 
+    // Screenshot ilustrativo do passo (opcional) — some silenciosamente se o arquivo
+    // ainda não foi capturado (ver scripts/seed_dados_demo_onboarding.py e
+    // tests/e2e/test_capture_onboarding_screenshots.py), para o tour nunca quebrar.
+    // Sem handler inline (onerror=) — CSP bloqueia; o listener é anexado em
+    // bindCardEvents via addEventListener (ver F-48 em tests/test_regression).
+    var imageHTML = step.image
+      ? '<div style="width:100%;aspect-ratio:16/9;overflow:hidden;background:#f3f4f6" ' +
+        'id="ob-image-wrap">' +
+        '<img id="ob-image" src="' + IMG_BASE + step.image + '" alt="" loading="lazy" ' +
+        'style="width:100%;height:100%;object-fit:cover;display:block">' +
+        '</div>'
+      : '';
+
     return (
+      imageHTML +
       '<div style="padding:20px 20px 0;display:flex;align-items:flex-start;justify-content:space-between;gap:12px">' +
         '<div style="display:flex;align-items:center;gap:12px">' +
           '<div style="width:44px;height:44px;border-radius:12px;flex-shrink:0;' +
@@ -650,11 +941,21 @@
     var next = document.getElementById('ob-next');
     var prev = document.getElementById('ob-prev');
     var cta = document.getElementById('ob-cta');
+    var image = document.getElementById('ob-image');
 
     close.addEventListener('click', skipTour);
     skip.addEventListener('click', skipTour);
     next.addEventListener('click', isLast ? completeTour : nextStep);
     if (prev) prev.addEventListener('click', prevStep);
+
+    // Some o wrapper da screenshot se o arquivo ainda não foi capturado
+    // (CSP-safe — no inline onerror=)
+    if (image) {
+      image.addEventListener('error', function () {
+        var wrap = document.getElementById('ob-image-wrap');
+        if (wrap) wrap.style.display = 'none';
+      });
+    }
 
     // Hover effects (CSP-safe — no inline onmouseover/onmouseout)
     next.addEventListener('mouseenter', function() { next.style.opacity = '0.88'; });
@@ -814,6 +1115,9 @@
   function saveStep(passo) { apiCall(URL_AVANCAR, { passo: passo }, null); }
 
   function apiCall(url, body, callback) {
+    // Em modo replay ("Rever tour"), não persiste progresso/conclusão no Firestore —
+    // é uma reexibição puramente visual do tour já concluído anteriormente.
+    if (MODO === 'replay') { if (callback) callback(); return; }
     fetch(url, {
       method: 'POST', credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },

@@ -28,16 +28,18 @@ def test_avancar_passo_excecao_retorna_false():
 
 
 def test_concluir_onboarding_sucesso_retorna_true():
-    """concluir_onboarding chama Firestore com onboarding_completo=True e retorna True."""
+    """concluir_onboarding chama Firestore adicionando o perfil a onboarding_perfis_vistos."""
     from app.services.onboarding_service import concluir_onboarding
 
     with patch("app.services.onboarding_service.db") as mock_db:
-        result = concluir_onboarding("u1")
+        result = concluir_onboarding("u1", "solicitante")
 
     assert result is True
     call_kwargs = mock_db.collection.return_value.document.return_value.update.call_args[0][0]
-    assert call_kwargs["onboarding_completo"] is True
     assert call_kwargs["onboarding_passo"] == 0
+    # ArrayUnion garante idempotência (sem duplicar) — verificamos o valor encapsulado
+    array_union = call_kwargs["onboarding_perfis_vistos"]
+    assert array_union.values == ["solicitante"]
 
 
 def test_concluir_onboarding_excecao_retorna_false():
@@ -46,6 +48,6 @@ def test_concluir_onboarding_excecao_retorna_false():
 
     with patch("app.services.onboarding_service.db") as mock_db:
         mock_db.collection.return_value.document.return_value.update.side_effect = Exception("err")
-        result = concluir_onboarding("u1")
+        result = concluir_onboarding("u1", "solicitante")
 
     assert result is False
