@@ -354,8 +354,7 @@ def resetar_senha_usuario(usuario_id: str) -> Response:
 
         nome_usuario = usuario.nome
         senha_inicial = _gerar_senha_aleatoria()
-        usuario.set_password(senha_inicial)
-        usuario.update(must_change_password=True)
+        usuario.update(senha=senha_inicial, must_change_password=True)
 
         cache_delete(CACHE_KEY_USUARIOS)
         cache_delete(f"usuario_{usuario_id}")

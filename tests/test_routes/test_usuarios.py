@@ -471,8 +471,8 @@ def test_deletar_usuario_root_admin_bloqueado(client_logado_admin):
 def test_resetar_senha_sucesso(client_logado_admin):
     """POST resetar-senha de outro usuário dispara thread e redireciona."""
     fake = _usuario_fake(uid="u4", email="u4@dtx.aero", nome="Usuario Quatro")
-    fake.set_password = lambda s: None
-    fake.update = lambda **kw: None
+    fake.set_password = MagicMock()
+    fake.update = MagicMock()
     fake.areas = []
     with (
         patch(
@@ -483,6 +483,12 @@ def test_resetar_senha_sucesso(client_logado_admin):
         r = client_logado_admin.post("/admin/usuarios/u4/resetar-senha", follow_redirects=False)
     assert r.status_code == 302
     assert mock_thread.return_value.start.call_count >= 1
+    # Regressão: reset precisa persistir o hash da senha nova, não só marcar
+    # must_change_password (bug real: update() sem "senha" nunca grava senha_hash).
+    fake.update.assert_called_once()
+    update_kwargs = fake.update.call_args.kwargs
+    assert update_kwargs.get("senha")
+    assert update_kwargs.get("must_change_password") is True
 
 
 def test_resetar_senha_usuario_nao_encontrado(client_logado_admin):
