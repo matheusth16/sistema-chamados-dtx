@@ -28,6 +28,24 @@ EMAILS_ADMIN_RAIZ_PROTEGIDOS = frozenset({"matheus.costa@dtx.aero", "admin@dtx.a
 logger = logging.getLogger(__name__)
 
 
+def _bloquear_se_admin_raiz(usuario: Usuario, usuario_id: str, translation_key: str, acao: str):
+    """Bloqueia ação sobre um admin raiz protegido — exceto quando a própria conta age
+    sobre si mesma (a proteção é contra terceiros, não contra auto-gerenciamento).
+
+    Retorna a Response de redirect se bloqueado, ou None se a ação pode prosseguir.
+    """
+    if usuario.email in EMAILS_ADMIN_RAIZ_PROTEGIDOS and usuario_id != current_user.id:
+        flash_t(translation_key, "danger")
+        logger.warning(
+            "Tentativa de %s admin raiz protegido (%s) por %s",
+            acao,
+            usuario.email,
+            current_user.email,
+        )
+        return redirect(url_for("main.gerenciar_usuarios"))
+    return None
+
+
 def _gerar_senha_aleatoria(tamanho: int = 12) -> str:
     """Gera senha aleatória segura com maiúsculas, minúsculas, dígitos e símbolos.
     Garante ao menos 1 char de cada classe para satisfazer políticas de complexidade."""
@@ -151,6 +169,9 @@ def editar_usuario(usuario_id: str) -> Response:
         if usuario.perfil == "admin_global" and current_user.perfil != "admin_global":
             flash_t("cannot_edit_admin_global", "danger")
             return redirect(url_for("main.gerenciar_usuarios"))
+        bloqueio = _bloquear_se_admin_raiz(usuario, usuario_id, "cannot_edit_root_admin", "editar")
+        if bloqueio:
+            return bloqueio
         if request.method == "GET":
             setores = [s for s in CategoriaSetor.get_all() if getattr(s, "ativo", True)]
             setor_names = {s.nome_pt for s in setores}
@@ -260,14 +281,11 @@ def deletar_usuario(usuario_id: str) -> Response:
         if usuario.perfil == "admin_global" and current_user.perfil != "admin_global":
             flash_t("cannot_delete_admin_global", "danger")
             return redirect(url_for("main.gerenciar_usuarios"))
-        if usuario.email in EMAILS_ADMIN_RAIZ_PROTEGIDOS:
-            flash_t("cannot_delete_root_admin", "danger")
-            logger.warning(
-                "Tentativa de deletar admin raiz protegido (%s) por %s",
-                usuario.email,
-                current_user.email,
-            )
-            return redirect(url_for("main.gerenciar_usuarios"))
+        bloqueio = _bloquear_se_admin_raiz(
+            usuario, usuario_id, "cannot_delete_root_admin", "deletar"
+        )
+        if bloqueio:
+            return bloqueio
         nome_usuario = usuario.nome
         usuario.delete()
         cache_delete(CACHE_KEY_USUARIOS)
@@ -415,14 +433,11 @@ def desativar_usuario(usuario_id: str) -> Response:
         if usuario.perfil == "admin_global" and current_user.perfil != "admin_global":
             flash_t("cannot_deactivate_admin_global", "danger")
             return redirect(url_for("main.gerenciar_usuarios"))
-        if usuario.email in EMAILS_ADMIN_RAIZ_PROTEGIDOS:
-            flash_t("cannot_deactivate_root_admin", "danger")
-            logger.warning(
-                "Tentativa de desativar admin raiz protegido (%s) por %s",
-                usuario.email,
-                current_user.email,
-            )
-            return redirect(url_for("main.gerenciar_usuarios"))
+        bloqueio = _bloquear_se_admin_raiz(
+            usuario, usuario_id, "cannot_deactivate_root_admin", "desativar"
+        )
+        if bloqueio:
+            return bloqueio
         nome_usuario = usuario.nome
         usuario.update(ativo=False)
         cache_delete(CACHE_KEY_USUARIOS)
@@ -495,14 +510,11 @@ def anonimizar_usuario(usuario_id: str) -> Response:
         if usuario.perfil == "admin_global" and current_user.perfil != "admin_global":
             flash_t("cannot_anonymize_admin_global", "danger")
             return redirect(url_for("main.gerenciar_usuarios"))
-        if usuario.email in EMAILS_ADMIN_RAIZ_PROTEGIDOS:
-            flash_t("cannot_anonymize_root_admin", "danger")
-            logger.warning(
-                "Tentativa de anonimizar admin raiz protegido (%s) por %s",
-                usuario.email,
-                current_user.email,
-            )
-            return redirect(url_for("main.gerenciar_usuarios"))
+        bloqueio = _bloquear_se_admin_raiz(
+            usuario, usuario_id, "cannot_anonymize_root_admin", "anonimizar"
+        )
+        if bloqueio:
+            return bloqueio
         if getattr(usuario, "ativo", True):
             flash_t("must_deactivate_before_anonymize", "danger")
             return redirect(url_for("main.gerenciar_usuarios"))

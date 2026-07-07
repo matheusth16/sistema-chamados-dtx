@@ -466,6 +466,86 @@ def test_deletar_usuario_root_admin_bloqueado(client_logado_admin, email_raiz):
     assert "/admin/usuarios" in (r.location or "")
 
 
+def _admin_global_mock_para_flask_login():
+    """Cria um mock do admin_global com o mesmo UID usado no conftest (ag_1)."""
+    from unittest.mock import MagicMock
+
+    a = MagicMock()
+    a.id = "ag_1"
+    a.email = "admin_global@test.com"
+    a.nome = "Admin Global Teste"
+    a.perfil = "admin_global"
+    a.must_change_password = False
+    a.mfa_enabled = True
+    a.is_authenticated = True
+    a.get_id = lambda: "ag_1"
+    return a
+
+
+def _get_by_id_side_effect_admin_global(target_uid, target_user):
+    """Retorna side_effect: admin_global mock para o Flask-Login, fake para a rota."""
+    admin_global = _admin_global_mock_para_flask_login()
+
+    def _side_effect(uid):
+        return target_user if uid == target_uid else admin_global
+
+    return _side_effect
+
+
+@pytest.mark.parametrize("email_raiz", ["matheus.costa@dtx.aero", "admin@dtx.aero"])
+def test_editar_usuario_root_admin_bloqueado_para_admin_global(
+    client_logado_admin_global, email_raiz
+):
+    """POST editar de qualquer admin raiz protegido é bloqueado mesmo vindo de admin_global.
+
+    Regressão: a proteção de admin raiz (EMAILS_ADMIN_RAIZ_PROTEGIDOS) só existia em
+    deletar/desativar/anonimizar. Um admin_global conseguia rebaixar perfil, trocar
+    nome/e-mail e desativar (via checkbox "ativo" ausente) a conta raiz inteira via
+    /admin/usuarios/<id>/editar, contornando a proteção por completo.
+    """
+    fake_root = _usuario_fake(
+        uid="root", email=email_raiz, nome="Root Admin", perfil="admin_global"
+    )
+    fake_root.update = MagicMock()
+    with patch(
+        "app.models_usuario.Usuario.get_by_id",
+        side_effect=_get_by_id_side_effect_admin_global("root", fake_root),
+    ):
+        r = client_logado_admin_global.post(
+            "/admin/usuarios/root/editar",
+            data={"email": email_raiz, "nome": "Root Admin Hackeado", "perfil": "solicitante"},
+            follow_redirects=False,
+        )
+    assert r.status_code == 302
+    assert "/admin/usuarios" in (r.location or "")
+    fake_root.update.assert_not_called()
+
+
+@pytest.mark.parametrize("email_raiz", ["matheus.costa@dtx.aero", "admin@dtx.aero"])
+def test_editar_usuario_root_admin_pode_editar_a_si_mesmo(client_logado_admin_global, email_raiz):
+    """Regressão: a proteção de admin raiz bloqueia edição feita por OUTROS, não auto-edição.
+
+    O admin raiz logado (ex.: matheus.costa@dtx.aero) precisa continuar conseguindo
+    editar o próprio nome/áreas via /admin/usuarios/<próprio_id>/editar. Perfil
+    "admin" no payload só serve pra passar da whitelist do formulário
+    (solicitante/supervisor/admin — não inclui admin_global, limitação
+    pré-existente e não relacionada a este teste; ver
+    test_editar_usuario_post_admin_global_permitido_para_admin_global).
+    """
+    root_self = _usuario_fake(
+        uid="ag_1", email=email_raiz, nome="Root Admin", perfil="admin_global"
+    )
+    root_self.update = MagicMock()
+    with patch("app.models_usuario.Usuario.get_by_id", return_value=root_self):
+        r = client_logado_admin_global.post(
+            "/admin/usuarios/ag_1/editar",
+            data={"email": email_raiz, "nome": "Root Admin Renomeado", "perfil": "admin"},
+            follow_redirects=False,
+        )
+    assert r.status_code == 302
+    root_self.update.assert_called_once()
+
+
 # ── Resetar senha ──────────────────────────────────────────────────────────────
 
 
