@@ -55,6 +55,7 @@ def test_criar_setor_sucesso(client_logado_admin):
         patch("app.routes.categorias.static_cache_delete"),
         patch("app.routes.categorias.adicionar_traducao_customizada"),
     ):
+        mock_cls.nome_existe.return_value = False
         mock_setor = mock_cls.return_value
         mock_setor.nome_pt = "Qualidade"
         mock_setor.nome_en = "Quality"
@@ -78,6 +79,22 @@ def test_criar_setor_sem_nome_redireciona_com_erro(client_logado_admin):
     assert r.status_code == 302
 
 
+def test_criar_setor_nome_duplicado_redireciona_sem_criar(client_logado_admin):
+    """POST criar_setor com nome já existente (case-insensitive) é rejeitado, sem chamar save()."""
+    with (
+        patch("app.routes.categorias.CategoriaSetor.nome_existe", return_value=True) as mock_existe,
+        patch("app.routes.categorias.CategoriaSetor.save") as mock_save,
+    ):
+        r = client_logado_admin.post(
+            "/admin/categorias/setor/nova",
+            data={"nome_pt": "qualidade", "descricao_pt": ""},
+            follow_redirects=False,
+        )
+    assert r.status_code == 302
+    mock_existe.assert_called_once_with("qualidade")
+    mock_save.assert_not_called()
+
+
 def test_editar_setor_sucesso(client_logado_admin):
     """POST editar_setor com setor existente atualiza e redireciona."""
     from unittest.mock import MagicMock
@@ -87,6 +104,7 @@ def test_editar_setor_sucesso(client_logado_admin):
     mock_setor.descricao_pt = ""
     with (
         patch("app.routes.categorias.CategoriaSetor.get_by_id", return_value=mock_setor),
+        patch("app.routes.categorias.CategoriaSetor.nome_existe", return_value=False),
         patch("app.routes.categorias.cache_delete"),
     ):
         r = client_logado_admin.post(
@@ -95,6 +113,28 @@ def test_editar_setor_sucesso(client_logado_admin):
             follow_redirects=False,
         )
     assert r.status_code == 302
+
+
+def test_editar_setor_renomear_para_nome_duplicado_redireciona_sem_salvar(client_logado_admin):
+    """POST editar_setor renomeando pra um nome já usado por OUTRO setor é rejeitado."""
+    from unittest.mock import MagicMock
+
+    mock_setor = MagicMock()
+    mock_setor.nome_pt = "TI"
+    mock_setor.descricao_pt = ""
+    with (
+        patch("app.routes.categorias.CategoriaSetor.get_by_id", return_value=mock_setor),
+        patch("app.routes.categorias.CategoriaSetor.nome_existe", return_value=True) as mock_existe,
+        patch("app.routes.categorias.cache_delete"),
+    ):
+        r = client_logado_admin.post(
+            "/admin/categorias/setor/s1/editar",
+            data={"nome_pt": "Qualidade", "descricao_pt": "Desc", "ativo": "on"},
+            follow_redirects=False,
+        )
+    assert r.status_code == 302
+    mock_existe.assert_called_once_with("Qualidade", id_atual="s1")
+    mock_setor.save.assert_not_called()
 
 
 def test_editar_setor_nao_encontrado_redireciona(client_logado_admin):
@@ -144,6 +184,7 @@ def test_criar_gate_sucesso(client_logado_admin):
     with (
         patch("app.routes.categorias.CategoriaGate") as mock_cls,
         patch("app.routes.categorias.CategoriaGate.get_all", return_value=[]),
+        patch("app.routes.categorias.CategoriaGate.nome_existe", return_value=False),
         patch("app.routes.categorias.cache_delete"),
         patch("app.routes.categorias.static_cache_delete"),
         patch("app.routes.categorias.adicionar_traducao_customizada"),
@@ -160,6 +201,62 @@ def test_criar_gate_sucesso(client_logado_admin):
         )
     assert r.status_code == 302
     assert "/admin/categorias" in (r.location or "")
+
+
+def test_criar_gate_primeiro_gate_semeia_16_padroes(client_logado_admin):
+    """Regressão: quando a coleção de gates está vazia, criar o 1º gate customizado
+    semeia os 16 valores padrão de gates_config.py antes — sem isso, o fallback
+    estático desaparecia por completo e só o gate novo do admin ficava visível.
+    """
+    from unittest.mock import MagicMock
+
+    with (
+        patch("app.routes.categorias.CategoriaGate") as mock_cls,
+        patch("app.routes.categorias.CategoriaGate.get_all", return_value=[]),
+        patch("app.routes.categorias.CategoriaGate.nome_existe", return_value=False),
+        patch("app.routes.categorias.cache_delete"),
+        patch("app.routes.categorias.static_cache_delete"),
+        patch("app.routes.categorias.adicionar_traducao_customizada"),
+    ):
+        mock_gate = MagicMock()
+        mock_gate.nome_pt = "Gate 1 - Teste QA"
+        mock_cls.return_value = mock_gate
+        r = client_logado_admin.post(
+            "/admin/categorias/gate/nova",
+            data={"gate_pai": "Gate 1", "etapa": "Teste QA", "descricao_pt": ""},
+            follow_redirects=False,
+        )
+    assert r.status_code == 302
+    # 16 valores padrão semeados + 1 gate pedido pelo admin = 17 construções/saves
+    assert mock_cls.call_count == 17
+    assert mock_gate.save.call_count == 17
+
+
+def test_criar_gate_com_gates_existentes_nao_semeia_de_novo(client_logado_admin):
+    """Se já existem gates no Firestore, criar um novo NÃO deve re-semear os padrões."""
+    from unittest.mock import MagicMock
+
+    gate_existente = MagicMock(gate_pai="Gate 1", ordem=1)
+    with (
+        patch("app.routes.categorias.CategoriaGate") as mock_cls,
+        patch("app.routes.categorias.CategoriaGate.get_all", return_value=[gate_existente]),
+        patch("app.routes.categorias.CategoriaGate.nome_existe", return_value=False),
+        patch("app.routes.categorias.cache_delete"),
+        patch("app.routes.categorias.static_cache_delete"),
+        patch("app.routes.categorias.adicionar_traducao_customizada"),
+    ):
+        mock_gate = MagicMock()
+        mock_gate.nome_pt = "Gate 1 - Teste QA"
+        mock_cls.return_value = mock_gate
+        r = client_logado_admin.post(
+            "/admin/categorias/gate/nova",
+            data={"gate_pai": "Gate 1", "etapa": "Teste QA", "descricao_pt": ""},
+            follow_redirects=False,
+        )
+    assert r.status_code == 302
+    # só o gate pedido pelo admin — nenhum seed, já tinha gate_existente no banco
+    assert mock_cls.call_count == 1
+    assert mock_gate.save.call_count == 1
 
 
 def test_criar_gate_sem_etapa_redireciona(client_logado_admin):
@@ -192,6 +289,22 @@ def test_criar_gate_gate_pai_invalido_redireciona(client_logado_admin):
     assert r.status_code == 302
 
 
+def test_criar_gate_nome_duplicado_redireciona_sem_criar(client_logado_admin):
+    """POST criar_gate com gate_pai+etapa que já existe é rejeitado, sem chamar save()."""
+    with (
+        patch("app.routes.categorias.CategoriaGate.nome_existe", return_value=True) as mock_existe,
+        patch("app.routes.categorias.CategoriaGate.save") as mock_save,
+    ):
+        r = client_logado_admin.post(
+            "/admin/categorias/gate/nova",
+            data={"gate_pai": "Gate 1", "etapa": "Desmontagem"},
+            follow_redirects=False,
+        )
+    assert r.status_code == 302
+    mock_existe.assert_called_once_with("Gate 1 - Desmontagem")
+    mock_save.assert_not_called()
+
+
 def test_editar_gate_sucesso(client_logado_admin):
     """POST editar_gate com gate_pai + etapa válidos atualiza e redireciona."""
     from unittest.mock import MagicMock
@@ -203,6 +316,7 @@ def test_editar_gate_sucesso(client_logado_admin):
     mock_gate.etapa = "Desmontagem"
     with (
         patch("app.routes.categorias.CategoriaGate.get_by_id", return_value=mock_gate),
+        patch("app.routes.categorias.CategoriaGate.nome_existe", return_value=False),
         patch("app.routes.categorias.cache_delete"),
         patch("app.routes.categorias.static_cache_delete"),
     ):
@@ -261,6 +375,7 @@ def test_criar_impacto_sucesso(client_logado_admin):
     ):
         from unittest.mock import MagicMock
 
+        mock_cls.nome_existe.return_value = False
         mock_imp = MagicMock()
         mock_imp.nome_en = "High"
         mock_imp.nome_es = "Alto"
@@ -283,6 +398,24 @@ def test_criar_impacto_sem_nome_redireciona(client_logado_admin):
     assert r.status_code == 302
 
 
+def test_criar_impacto_nome_duplicado_redireciona_sem_criar(client_logado_admin):
+    """POST criar_impacto com nome já existente é rejeitado, sem chamar save()."""
+    with (
+        patch(
+            "app.routes.categorias.CategoriaImpacto.nome_existe", return_value=True
+        ) as mock_existe,
+        patch("app.routes.categorias.CategoriaImpacto.save") as mock_save,
+    ):
+        r = client_logado_admin.post(
+            "/admin/categorias/impacto/nova",
+            data={"nome_pt": "Alto", "descricao_pt": ""},
+            follow_redirects=False,
+        )
+    assert r.status_code == 302
+    mock_existe.assert_called_once_with("Alto")
+    mock_save.assert_not_called()
+
+
 def test_editar_impacto_sucesso(client_logado_admin):
     """POST editar_impacto com impacto existente atualiza e redireciona."""
     from unittest.mock import MagicMock
@@ -292,6 +425,7 @@ def test_editar_impacto_sucesso(client_logado_admin):
     mock_imp.descricao_pt = ""
     with (
         patch("app.routes.categorias.CategoriaImpacto.get_by_id", return_value=mock_imp),
+        patch("app.routes.categorias.CategoriaImpacto.nome_existe", return_value=False),
         patch("app.routes.categorias.cache_delete"),
     ):
         r = client_logado_admin.post(

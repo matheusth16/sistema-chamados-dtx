@@ -6,7 +6,7 @@ from flask import Response, redirect, render_template, request, url_for
 
 from app.cache import cache_delete, static_cache_delete
 from app.decoradores import requer_perfil
-from app.gates_config import GATE_PAI_OPCOES
+from app.gates_config import GATE_PAI_OPCOES, GATE_SUBETAPAS
 from app.i18n import flash_t
 from app.models_categorias import (
     CACHE_KEY_GATES,
@@ -37,6 +37,24 @@ def _invalidar_cache_gates():
     cache_delete(CACHE_KEY_GATES)
     static_cache_delete(STATIC_CACHE_KEY_GATES)
     static_cache_delete("gates_validos_set")
+
+
+def _seed_gates_padroes_se_vazio() -> None:
+    """Semeia os 16 gates padrão (gates_config.py) no Firestore na primeira criação.
+
+    build_gate_subetapas() só usa o fallback estático de gates_config.py quando a
+    coleção categorias_gates está vazia — assim que existe QUALQUER gate real no
+    Firestore, os 16 valores padrão desaparecem do formulário de chamado por
+    completo (o fallback não complementa, substitui). Sem isso, o primeiro admin a
+    cadastrar um gate customizado apagaria os outros 15 do dropdown sem perceber.
+    """
+    if CategoriaGate.get_all():
+        return
+    for gate_pai, valores in GATE_SUBETAPAS.items():
+        for ordem, nome_pt in enumerate(valores, start=1):
+            etapa = nome_pt.split(" - ", 1)[1]
+            CategoriaGate(nome_pt=nome_pt, gate_pai=gate_pai, etapa=etapa, ordem=ordem).save()
+    logger.info("Gates padrão semeados no Firestore na primeira configuração da tela")
 
 
 def _invalidar_cache_impactos():
@@ -78,6 +96,10 @@ def criar_setor() -> Response:
             flash_t("sector_name_required", "danger")
             return redirect(url_for("main.admin_categorias"))
 
+        if CategoriaSetor.nome_existe(nome_pt):
+            flash_t("sector_name_already_exists", "danger")
+            return redirect(url_for("main.admin_categorias"))
+
         setor = CategoriaSetor(
             nome_pt=nome_pt,
             descricao_pt=descricao_pt,
@@ -111,6 +133,12 @@ def criar_gate() -> Response:
             return redirect(url_for("main.admin_categorias"))
 
         nome_pt = f"{gate_pai} - {etapa}"
+
+        _seed_gates_padroes_se_vazio()
+
+        if CategoriaGate.nome_existe(nome_pt):
+            flash_t("gate_name_already_exists", "danger")
+            return redirect(url_for("main.admin_categorias"))
 
         # Calcula próxima ordem dentro do gate pai
         gates_existentes = CategoriaGate.get_all()
@@ -147,6 +175,10 @@ def criar_impacto() -> Response:
             flash_t("impact_name_required", "danger")
             return redirect(url_for("main.admin_categorias"))
 
+        if CategoriaImpacto.nome_existe(nome_pt):
+            flash_t("impact_name_already_exists", "danger")
+            return redirect(url_for("main.admin_categorias"))
+
         impacto = CategoriaImpacto(
             nome_pt=nome_pt,
             descricao_pt=descricao_pt,
@@ -174,6 +206,9 @@ def editar_setor(setor_id: str) -> Response:
 
         novo_nome = request.form.get("nome_pt", setor.nome_pt).strip()
         if novo_nome != setor.nome_pt:
+            if CategoriaSetor.nome_existe(novo_nome, id_atual=setor_id):
+                flash_t("sector_name_already_exists", "danger")
+                return redirect(url_for("main.admin_categorias"))
             traducao = traduzir_categoria(novo_nome)
             setor.nome_pt = novo_nome
             setor.nome_en = traducao["en"]
@@ -232,6 +267,11 @@ def editar_gate(gate_id: str) -> Response:
                 flash_t("gate_pai_invalido", "danger")
                 return redirect(url_for("main.admin_categorias"))
             novo_nome_pt = f"{gate_pai} - {etapa}"
+            if novo_nome_pt != gate.nome_pt and CategoriaGate.nome_existe(
+                novo_nome_pt, id_atual=gate_id
+            ):
+                flash_t("gate_name_already_exists", "danger")
+                return redirect(url_for("main.admin_categorias"))
             traducao = traduzir_categoria(novo_nome_pt)
             gate.gate_pai = gate_pai
             gate.etapa = etapa
@@ -286,6 +326,9 @@ def editar_impacto(impacto_id: str) -> Response:
 
         novo_nome = request.form.get("nome_pt", impacto.nome_pt).strip()
         if novo_nome != impacto.nome_pt:
+            if CategoriaImpacto.nome_existe(novo_nome, id_atual=impacto_id):
+                flash_t("impact_name_already_exists", "danger")
+                return redirect(url_for("main.admin_categorias"))
             traducao = traduzir_categoria(novo_nome)
             impacto.nome_pt = novo_nome
             impacto.nome_en = traducao["en"]

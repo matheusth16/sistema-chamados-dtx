@@ -137,6 +137,29 @@ class CategoriaSetor:
             logger.error("Erro ao buscar setor: %s", e)
             return None
 
+    @classmethod
+    def nome_existe(cls, nome_pt: str, id_atual: str = None) -> bool:
+        """Verifica se já existe outro setor com esse nome (case-insensitive, ativo ou não).
+
+        Args:
+            nome_pt: nome a verificar
+            id_atual: ID do setor sendo editado, pra não comparar consigo mesmo
+        """
+        nome_norm = (nome_pt or "").strip().lower()
+        if not nome_norm:
+            return False
+        try:
+            docs = db.collection("categorias_setores").stream()
+            for doc in docs:
+                if id_atual and doc.id == id_atual:
+                    continue
+                if (doc.to_dict().get("nome_pt") or "").strip().lower() == nome_norm:
+                    return True
+            return False
+        except Exception as e:
+            logger.error("Erro ao verificar nome do setor: %s", e)
+            return False
+
 
 class CategoriaGate:
     """Representa um Gate do sistema (gate pai + sub-etapa).
@@ -266,6 +289,29 @@ class CategoriaGate:
             logger.error("Erro ao buscar gate: %s", e)
             return None
 
+    @classmethod
+    def nome_existe(cls, nome_pt: str, id_atual: str = None) -> bool:
+        """Verifica se já existe outro gate com esse nome_pt (case-insensitive, ativo ou não).
+
+        nome_pt aqui é o valor composto "{gate_pai} - {etapa}" — duas combinações
+        gate_pai/etapa iguais resultam no mesmo nome_pt, então checar nome_pt já
+        cobre a checagem de duplicidade da combinação.
+        """
+        nome_norm = (nome_pt or "").strip().lower()
+        if not nome_norm:
+            return False
+        try:
+            docs = db.collection("categorias_gates").stream()
+            for doc in docs:
+                if id_atual and doc.id == id_atual:
+                    continue
+                if (doc.to_dict().get("nome_pt") or "").strip().lower() == nome_norm:
+                    return True
+            return False
+        except Exception as e:
+            logger.error("Erro ao verificar nome do gate: %s", e)
+            return False
+
 
 class CategoriaImpacto:
     """Representa um Impacto/Severidade do sistema"""
@@ -385,3 +431,26 @@ class CategoriaImpacto:
         except Exception as e:
             logger.error("Erro ao buscar impacto: %s", e)
             return None
+
+    @classmethod
+    def nome_existe(cls, nome_pt: str, id_atual: str = None) -> bool:
+        """Verifica se já existe outro impacto com esse nome (case-insensitive, ativo ou não).
+
+        Args:
+            nome_pt: nome a verificar
+            id_atual: ID do impacto sendo editado, pra não comparar consigo mesmo
+        """
+        nome_norm = (nome_pt or "").strip().lower()
+        if not nome_norm:
+            return False
+        try:
+            docs = db.collection("categorias_impactos").stream()
+            for doc in docs:
+                if id_atual and doc.id == id_atual:
+                    continue
+                if (doc.to_dict().get("nome_pt") or "").strip().lower() == nome_norm:
+                    return True
+            return False
+        except Exception as e:
+            logger.error("Erro ao verificar nome do impacto: %s", e)
+            return False
