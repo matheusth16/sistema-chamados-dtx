@@ -411,8 +411,8 @@ def meus_dados() -> Response:
 @login_required
 def alterar_senha_obrigatoria() -> Response:
     """Força o usuário a alterar a senha no primeiro acesso."""
-    # Se o usuário já trocou a senha ou é admin, redireciona
-    if not current_user.must_change_password or current_user.is_admin_or_above:
+    # Se o usuário já trocou a senha, redireciona — nenhum perfil é isento
+    if not current_user.must_change_password:
         if current_user.perfil == "solicitante":
             return redirect(url_for("main.index"))
         if current_user.perfil == "supervisor":

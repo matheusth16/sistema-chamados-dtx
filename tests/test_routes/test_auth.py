@@ -2,6 +2,8 @@
 
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 
 def test_login_get_retorna_200(client):
     """GET /login retorna 200 e página de login."""
@@ -103,6 +105,25 @@ def test_alterar_senha_obrigatoria_get_retorna_200(client, app):
     with (
         patch("app.routes.auth.Usuario.get_by_email", return_value=usuario),
         patch("app.models_usuario.Usuario.get_by_id", return_value=usuario),
+    ):
+        client.post(
+            "/login", data={"email": "change@test.com", "senha": "ok"}, follow_redirects=False
+        )
+        r = client.get("/alterar-senha-obrigatoria", follow_redirects=False)
+    assert r.status_code == 200
+
+
+@pytest.mark.parametrize("perfil", ["admin", "admin_global"])
+def test_alterar_senha_obrigatoria_admin_nao_e_isento(client, app, perfil):
+    """Admin e admin_global com must_change_password=True também veem o formulário
+    (nenhum perfil é isento de trocar a senha no primeiro acesso)."""
+    usuario = _create_client_must_change_password(client, app)
+    usuario.perfil = perfil
+    usuario.is_admin_or_above = True
+    with (
+        patch("app.routes.auth.Usuario.get_by_email", return_value=usuario),
+        patch("app.models_usuario.Usuario.get_by_id", return_value=usuario),
+        patch("app.routes.auth._dispositivo_confiavel", return_value=True),
     ):
         client.post(
             "/login", data={"email": "change@test.com", "senha": "ok"}, follow_redirects=False

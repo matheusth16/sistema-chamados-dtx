@@ -810,10 +810,10 @@ def _configurar_timeout_sessao(app: Flask) -> None:
         # Lista de rotas isentas da verificação
         rotas_isentas = ["main.alterar_senha_obrigatoria", "main.logout", "main.login"]
 
-        # Verifica se usuário está autenticado e precisa trocar senha
+        # Verifica se usuário está autenticado e precisa trocar senha — nenhum
+        # perfil é isento (admin e admin_global incluídos)
         if (
             current_user.is_authenticated
-            and current_user.perfil != "admin"
             and current_user.must_change_password
             and request.endpoint not in rotas_isentas
         ):

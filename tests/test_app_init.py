@@ -586,6 +586,7 @@ def test_must_change_password_redireciona(app, client):
     user = MagicMock()
     user.is_authenticated = True
     user.perfil = "solicitante"
+    user.is_admin_or_above = False
     user.must_change_password = True
     user.get_id = lambda: "u2"
 
@@ -601,11 +602,34 @@ def test_must_change_password_redireciona(app, client):
     assert "alterar" in r.location
 
 
+@pytest.mark.parametrize("perfil", ["admin", "admin_global"])
+def test_must_change_password_redireciona_tambem_para_admin(app, client, perfil):
+    """Admin e admin_global também são forçados a trocar a senha — sem isenção por perfil."""
+    user = MagicMock()
+    user.is_authenticated = True
+    user.perfil = perfil
+    user.is_admin_or_above = True
+    user.must_change_password = True
+    user.get_id = lambda: "u_admin_mcp"
+
+    with app.test_client() as c:
+        with c.session_transaction() as sess:
+            sess["_user_id"] = "u_admin_mcp"
+            sess["language"] = "en"
+
+        with patch("app.models_usuario.Usuario.get_by_id", return_value=user):
+            r = c.get("/admin/usuarios")
+
+    assert r.status_code == 302
+    assert "alterar" in r.location
+
+
 def test_must_change_password_rota_static_ignorada(app, client):
     """Rota estática ignora verificar_troca_senha_obrigatoria."""
     user = MagicMock()
     user.is_authenticated = True
     user.perfil = "solicitante"
+    user.is_admin_or_above = False
     user.must_change_password = True
     user.get_id = lambda: "u3"
 
