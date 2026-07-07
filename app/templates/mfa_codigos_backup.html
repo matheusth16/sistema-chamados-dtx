@@ -1,24 +1,52 @@
 {% extends "base.html" %}
 
 {% block content %}
+<style>
+    @media print {
+        body * {
+            visibility: hidden;
+        }
+        #mfa-backup-codes-print-area,
+        #mfa-backup-codes-print-area * {
+            visibility: visible;
+        }
+        #mfa-backup-codes-print-area {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+        }
+    }
+</style>
 <div id="mfa-backup-codes-card" class="w-full max-w-lg mx-auto">
     <div class="dtx-card rounded-dtx-xl p-8">
-        <h2 class="font-display text-xl font-extrabold tracking-tight" style="color: var(--color-dtx-700)">
-            {{ t('mfa_backup_codes_title') }}
-        </h2>
-        <p class="mt-1 text-sm mb-4" style="color: var(--color-surface-muted)">
-            {{ t('mfa_backup_codes_warning') }}
-        </p>
+        <div id="mfa-backup-codes-print-area">
+            <h2 class="font-display text-xl font-extrabold tracking-tight" style="color: var(--color-dtx-700)">
+                {{ t('mfa_backup_codes_title') }}
+            </h2>
+            <p class="mt-1 text-sm mb-4" style="color: var(--color-surface-muted)">
+                {{ t('mfa_backup_codes_warning') }}
+            </p>
 
-        <div class="mt-4 p-3.5 rounded-dtx-lg text-sm font-semibold bg-amber-50 text-amber-800 border border-amber-200 mb-6">
-            {{ t('mfa_backup_codes_shown_once') }}
+            <div class="mt-4 p-3.5 rounded-dtx-lg text-sm font-semibold bg-amber-50 text-amber-800 border border-amber-200 mb-6">
+                {{ t('mfa_backup_codes_shown_once') }}
+            </div>
+
+            <div class="grid grid-cols-2 gap-2 mb-6" data-testid="mfa-backup-codes-list">
+                {% for codigo in codigos %}
+                <code class="text-sm font-mono px-3 py-2 rounded-dtx-lg bg-surface-raised border border-surface-border text-center tracking-wider">{{ codigo }}</code>
+                {% endfor %}
+            </div>
         </div>
 
-        <div class="grid grid-cols-2 gap-2 mb-6" data-testid="mfa-backup-codes-list">
-            {% for codigo in codigos %}
-            <code class="text-sm font-mono px-3 py-2 rounded-dtx-lg bg-surface-raised border border-surface-border text-center tracking-wider">{{ codigo }}</code>
-            {% endfor %}
-        </div>
+        <button type="button" onclick="window.print()" data-testid="mfa-backup-codes-print-btn"
+           class="w-full h-11 inline-flex items-center justify-center gap-2 text-sm font-bold rounded-dtx-lg border transition-colors duration-200 mb-3"
+           style="border-color: var(--color-surface-border); color: var(--color-dtx-700)">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a1 1 0 001-1v-4a1 1 0 00-1-1H9a1 1 0 00-1 1v4a1 1 0 001 1zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
+            </svg>
+            {{ t('mfa_backup_codes_print') }}
+        </button>
 
         <a href="{{ url_for(perfil_home_endpoint) }}" data-testid="mfa-backup-codes-continue-btn"
            class="w-full h-11 inline-flex items-center justify-center gap-2 text-sm font-bold rounded-dtx-lg text-white bg-[var(--color-nav-bg)] hover:bg-[var(--color-nav-border)] transition-colors duration-200">

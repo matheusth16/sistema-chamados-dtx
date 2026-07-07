@@ -4964,6 +4964,11 @@
     "en": "I've saved my codes, continue",
     "es": "Ya guardé mis códigos, continuar"
   },
+  "mfa_backup_codes_print": {
+    "pt_BR": "Imprimir códigos",
+    "en": "Print codes",
+    "es": "Imprimir códigos"
+  },
   "confirm_disable_mfa": {
     "pt_BR": "Desativar o MFA de {nome}? O usuário poderá entrar apenas com senha até configurar novamente.",
     "en": "Disable MFA for {nome}? The user will be able to sign in with password only until they set it up again.",

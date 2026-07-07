@@ -164,6 +164,24 @@ def test_mfa_codigos_backup_exibe_uma_unica_vez(client):
     assert "configurar" in r2.location
 
 
+def test_mfa_codigos_backup_tem_botao_imprimir(client):
+    """Tela de backup codes tem botão de imprimir (window.print())."""
+    usuario = _usuario_mock()
+    codigos = mfa_service.gerar_codigos_backup(3)
+    with (
+        patch("app.routes.auth.Usuario.get_by_email", return_value=usuario),
+        patch("app.models_usuario.Usuario.get_by_id", return_value=usuario),
+    ):
+        client.post("/login", data={"email": usuario.email, "senha": "ok"})
+        with client.session_transaction() as sess:
+            sess["mfa_backup_codes_display"] = codigos
+        r = client.get("/mfa/codigos-backup")
+
+    assert r.status_code == 200
+    assert b'data-testid="mfa-backup-codes-print-btn"' in r.data
+    assert b"window.print()" in r.data
+
+
 def test_mfa_codigos_backup_botao_continuar_solicitante_vai_para_index(client):
     """Botão 'Continuar' da tela de backup codes leva solicitante para / (não de volta ao setup)."""
     usuario = _usuario_mock()
