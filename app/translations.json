@@ -2110,9 +2110,9 @@
     "es": "¡No puedes eliminar tu propia cuenta!"
   },
   "cannot_delete_root_admin": {
-    "pt_BR": "O administrador raiz (matheus.costa@dtx.aero) não pode ser deletado",
-    "en": "The root administrator (matheus.costa@dtx.aero) cannot be deleted",
-    "es": "El administrador raíz (matheus.costa@dtx.aero) no puede ser eliminado"
+    "pt_BR": "Esta conta é um administrador raiz protegido e não pode ser deletada",
+    "en": "This account is a protected root administrator and cannot be deleted",
+    "es": "Esta cuenta es un administrador raíz protegido y no puede ser eliminada"
   },
   "cannot_delete_admin_global": {
     "pt_BR": "Apenas o Admin Global pode excluir uma conta Admin Global.",
@@ -5055,9 +5055,9 @@
     "es": "Solo un admin_global puede anonimizar otra cuenta admin_global."
   },
   "cannot_anonymize_root_admin": {
-    "pt_BR": "A conta matheus.costa@dtx.aero não pode ser anonimizada.",
-    "en": "The matheus.costa@dtx.aero account cannot be anonymized.",
-    "es": "La cuenta matheus.costa@dtx.aero no puede ser anonimizada."
+    "pt_BR": "Esta conta é um administrador raiz protegido e não pode ser anonimizada.",
+    "en": "This account is a protected root administrator and cannot be anonymized.",
+    "es": "Esta cuenta es un administrador raíz protegido y no puede ser anonimizada."
   },
   "must_deactivate_before_anonymize": {
     "pt_BR": "Desative a conta antes de anonimizar os dados.",

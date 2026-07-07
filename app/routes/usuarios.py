@@ -21,6 +21,10 @@ from app.services.notify_retry import executar_com_retry
 
 DOMINIO_EMAIL_PERMITIDO = "@dtx.aero"
 
+# Contas de admin raiz protegidas contra exclusão/desativação/anonimização —
+# nunca ficam sem pelo menos um admin_global de acesso garantido ao sistema.
+EMAILS_ADMIN_RAIZ_PROTEGIDOS = frozenset({"matheus.costa@dtx.aero", "admin@dtx.aero"})
+
 logger = logging.getLogger(__name__)
 
 
@@ -244,7 +248,7 @@ def editar_usuario(usuario_id: str) -> Response:
 @main.route("/admin/usuarios/<usuario_id>/deletar", methods=["POST"])
 @requer_perfil("admin")
 def deletar_usuario(usuario_id: str) -> Response:
-    """Deleta usuário (exceto matheus.costa@dtx.aero)."""
+    """Deleta usuário (exceto admins raiz protegidos)."""
     try:
         usuario = Usuario.get_by_id(usuario_id)
         if not usuario:
@@ -256,10 +260,11 @@ def deletar_usuario(usuario_id: str) -> Response:
         if usuario.perfil == "admin_global" and current_user.perfil != "admin_global":
             flash_t("cannot_delete_admin_global", "danger")
             return redirect(url_for("main.gerenciar_usuarios"))
-        if usuario.email == "matheus.costa@dtx.aero":
+        if usuario.email in EMAILS_ADMIN_RAIZ_PROTEGIDOS:
             flash_t("cannot_delete_root_admin", "danger")
             logger.warning(
-                "Tentativa de deletar matheus.costa@dtx.aero por %s",
+                "Tentativa de deletar admin raiz protegido (%s) por %s",
+                usuario.email,
                 current_user.email,
             )
             return redirect(url_for("main.gerenciar_usuarios"))
@@ -410,10 +415,12 @@ def desativar_usuario(usuario_id: str) -> Response:
         if usuario.perfil == "admin_global" and current_user.perfil != "admin_global":
             flash_t("cannot_deactivate_admin_global", "danger")
             return redirect(url_for("main.gerenciar_usuarios"))
-        if usuario.email == "matheus.costa@dtx.aero":
+        if usuario.email in EMAILS_ADMIN_RAIZ_PROTEGIDOS:
             flash_t("cannot_deactivate_root_admin", "danger")
             logger.warning(
-                "Tentativa de desativar matheus.costa@dtx.aero por %s", current_user.email
+                "Tentativa de desativar admin raiz protegido (%s) por %s",
+                usuario.email,
+                current_user.email,
             )
             return redirect(url_for("main.gerenciar_usuarios"))
         nome_usuario = usuario.nome
@@ -488,10 +495,12 @@ def anonimizar_usuario(usuario_id: str) -> Response:
         if usuario.perfil == "admin_global" and current_user.perfil != "admin_global":
             flash_t("cannot_anonymize_admin_global", "danger")
             return redirect(url_for("main.gerenciar_usuarios"))
-        if usuario.email == "matheus.costa@dtx.aero":
+        if usuario.email in EMAILS_ADMIN_RAIZ_PROTEGIDOS:
             flash_t("cannot_anonymize_root_admin", "danger")
             logger.warning(
-                "Tentativa de anonimizar matheus.costa@dtx.aero por %s", current_user.email
+                "Tentativa de anonimizar admin raiz protegido (%s) por %s",
+                usuario.email,
+                current_user.email,
             )
             return redirect(url_for("main.gerenciar_usuarios"))
         if getattr(usuario, "ativo", True):

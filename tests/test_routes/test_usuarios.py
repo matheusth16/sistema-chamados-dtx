@@ -453,9 +453,10 @@ def test_deletar_usuario_nao_encontrado_redireciona(client_logado_admin):
     assert r.status_code == 302
 
 
-def test_deletar_usuario_root_admin_bloqueado(client_logado_admin):
-    """POST deletar matheus.costa@dtx.aero é bloqueado (cannot_delete_root_admin)."""
-    fake_root = _usuario_fake(uid="root", email="matheus.costa@dtx.aero", nome="Root Admin")
+@pytest.mark.parametrize("email_raiz", ["matheus.costa@dtx.aero", "admin@dtx.aero"])
+def test_deletar_usuario_root_admin_bloqueado(client_logado_admin, email_raiz):
+    """POST deletar de qualquer admin raiz protegido é bloqueado (cannot_delete_root_admin)."""
+    fake_root = _usuario_fake(uid="root", email=email_raiz, nome="Root Admin")
     with patch(
         "app.models_usuario.Usuario.get_by_id",
         side_effect=_get_by_id_side_effect("root", fake_root),
@@ -1091,9 +1092,10 @@ def test_desativar_proprio_usuario_bloqueado(client_logado_admin):
     admin_self.update.assert_not_called()
 
 
-def test_desativar_root_admin_bloqueado(client_logado_admin):
-    """Admin não pode desativar matheus.costa@dtx.aero (cannot_deactivate_root_admin)."""
-    fake_root = _usuario_fake(uid="root", email="matheus.costa@dtx.aero", nome="Root Admin")
+@pytest.mark.parametrize("email_raiz", ["matheus.costa@dtx.aero", "admin@dtx.aero"])
+def test_desativar_root_admin_bloqueado(client_logado_admin, email_raiz):
+    """Admin não pode desativar nenhum admin raiz protegido (cannot_deactivate_root_admin)."""
+    fake_root = _usuario_fake(uid="root", email=email_raiz, nome="Root Admin")
     fake_root.ativo = True
     fake_root.update = MagicMock()
     with patch(
@@ -1442,9 +1444,10 @@ def test_anonimizar_proprio_usuario_bloqueado(client_logado_admin):
     admin_self.update.assert_not_called()
 
 
-def test_anonimizar_root_admin_bloqueado(client_logado_admin):
-    """Admin não pode anonimizar matheus.costa@dtx.aero."""
-    fake_root = _usuario_fake(uid="root", email="matheus.costa@dtx.aero", nome="Root Admin")
+@pytest.mark.parametrize("email_raiz", ["matheus.costa@dtx.aero", "admin@dtx.aero"])
+def test_anonimizar_root_admin_bloqueado(client_logado_admin, email_raiz):
+    """Admin não pode anonimizar nenhum admin raiz protegido."""
+    fake_root = _usuario_fake(uid="root", email=email_raiz, nome="Root Admin")
     fake_root.ativo = False
     fake_root.update = MagicMock()
     with patch(
