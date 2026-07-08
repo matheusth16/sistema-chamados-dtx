@@ -470,8 +470,16 @@ def _configurar_seguranca(app: Flask) -> None:
         )
         is_https = request.is_secure or request.headers.get("X-Forwarded-Proto") == "https"
         if is_https and current_app.config.get("ENV") == "production":
-            # HSTS força HTTPS em conexões futuras (31536000 = 1 ano)
-            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+            # HSTS força HTTPS em conexões futuras (31536000 = 1 ano).
+            # preload exige max-age >= 1 ano + includeSubDomains — requisito do
+            # hstspreload.org. A diretiva por si só não coloca o domínio na lista
+            # pré-carregada dos navegadores: isso exige submissão manual em
+            # https://hstspreload.org depois do deploy com HTTPS já funcionando.
+            # Reversão é lenta (ciclo de release dos navegadores) — só habilitar
+            # quando HTTPS for garantidamente permanente no domínio e subdomínios.
+            response.headers["Strict-Transport-Security"] = (
+                "max-age=31536000; includeSubDomains; preload"
+            )
             # CSP em produção: nonce para scripts/estilos inline (sem 'unsafe-inline')
             nonce = g.get("csp_nonce", "")
             csp = (

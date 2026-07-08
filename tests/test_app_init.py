@@ -331,7 +331,11 @@ def test_headers_hsts_csp_em_producao_https(app, client):
     r = client.get("/login", headers={"X-Forwarded-Proto": "https"})
     assert "Strict-Transport-Security" in r.headers
     assert "Content-Security-Policy" in r.headers
-    assert "max-age=31536000" in r.headers["Strict-Transport-Security"]
+    hsts = r.headers["Strict-Transport-Security"]
+    assert "max-age=31536000" in hsts
+    assert "includeSubDomains" in hsts
+    # preload exige max-age >= 1 ano + includeSubDomains (requisitos do hstspreload.org)
+    assert "preload" in hsts
 
 
 def test_validar_origin_rota_nao_critica_passa(app, client):
