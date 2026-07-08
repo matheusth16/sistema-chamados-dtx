@@ -47,6 +47,45 @@ NIVEL_PARA_CHAVE_GESTOR: dict[int, str] = {
     4: "gm",
 }
 
+
+def _construir_mapa_gestor_setor() -> dict[str, str]:
+    """Monta {nome_setor: email} uma vez por execução do job (evita N leituras).
+
+    O gestor de cada setor é sempre um usuário real do sistema: marcado com
+    nivel_gestao == 'gestor_setor' e com as áreas que gerencia em .areas
+    (mesmos campos já usados pelo cadastro de usuário / Gestor Dashboard).
+    Usuários inativos ou sem nivel_gestao='gestor_setor' são ignorados. Se
+    duas pessoas cobrirem a mesma área (config inconsistente), mantém a
+    primeira encontrada e loga warning — não é motivo para travar o job.
+    Setores sem gestor mapeado caem no fallback flat em
+    _processar_chamado_escada_a/_b.
+    """
+    from app.models_usuario import Usuario
+
+    try:
+        mapa: dict[str, str] = {}
+        for usuario in Usuario.get_all():
+            if getattr(usuario, "nivel_gestao", None) != "gestor_setor":
+                continue
+            if not getattr(usuario, "ativo", True) or not getattr(usuario, "email", None):
+                continue
+            for area in usuario.areas or []:
+                if area in mapa:
+                    logger.warning(
+                        "Escada: mais de um gestor_setor para a área '%s' — mantendo %s, "
+                        "ignorando %s.",
+                        area,
+                        mapa[area],
+                        usuario.email,
+                    )
+                    continue
+                mapa[area] = usuario.email
+        return mapa
+    except Exception as exc:
+        logger.warning("Falha ao montar mapa gestor_setor: %s. Usando fallback flat.", exc)
+        return {}
+
+
 # Thresholds em minutos úteis derivados de SLA_ESCALADA_A_HORAS_UTEIS = [1, 2, 3, 4]
 _MINUTOS_THRESHOLDS: list[int] = [h * 60 for h in Config.SLA_ESCALADA_A_HORAS_UTEIS]
 
@@ -96,6 +135,8 @@ def processar_escada_a(agora: datetime | None = None) -> dict:
         "pulados_fora_janela": 0,
     }
 
+    mapa_gestor_setor = _construir_mapa_gestor_setor()
+
     try:
         docs = (
             db.collection("chamados")
@@ -112,7 +153,7 @@ def processar_escada_a(agora: datetime | None = None) -> dict:
     for doc in docs:
         stats["processados"] += 1
         try:
-            _processar_chamado_escada_a(doc, agora, stats)
+            _processar_chamado_escada_a(doc, agora, stats, mapa_gestor_setor)
         except Exception as exc:
             logger.exception("Escada A: erro ao processar chamado %s: %s", doc.id, exc)
             stats["erros"] += 1
@@ -120,7 +161,9 @@ def processar_escada_a(agora: datetime | None = None) -> dict:
     return stats
 
 
-def _processar_chamado_escada_a(doc, agora: datetime, stats: dict) -> None:
+def _processar_chamado_escada_a(
+    doc, agora: datetime, stats: dict, mapa_gestor_setor: dict[str, str]
+) -> None:
     """Avalia e (se aplicável) escala um único chamado na Escada A."""
     data = doc.to_dict()
 
@@ -149,7 +192,13 @@ def _processar_chamado_escada_a(doc, agora: datetime, stats: dict) -> None:
 
     novo_nivel = nivel_atual + 1
     chave_gestor = NIVEL_PARA_CHAVE_GESTOR.get(novo_nivel)
-    email_dest = Config.get_gestor_email(chave_gestor) if chave_gestor else None
+    if chave_gestor == "gestor_setor":
+        categoria = data.get("categoria") or ""
+        email_dest = mapa_gestor_setor.get(categoria) or Config.get_gestor_email("gestor_setor")
+    elif chave_gestor:
+        email_dest = Config.get_gestor_email(chave_gestor)
+    else:
+        email_dest = None
 
     if email_dest:
         try:
@@ -397,6 +446,8 @@ def processar_escada_b(agora: datetime | None = None) -> dict:
         "pulados_fora_janela": 0,
     }
 
+    mapa_gestor_setor = _construir_mapa_gestor_setor()
+
     try:
         docs = (
             db.collection("chamados")
@@ -413,7 +464,7 @@ def processar_escada_b(agora: datetime | None = None) -> dict:
     for doc in docs:
         stats["processados"] += 1
         try:
-            _processar_chamado_escada_b(doc, agora, stats)
+            _processar_chamado_escada_b(doc, agora, stats, mapa_gestor_setor)
         except Exception as exc:
             logger.exception("Escada B: erro ao processar chamado %s: %s", doc.id, exc)
             stats["erros"] += 1
@@ -421,7 +472,9 @@ def processar_escada_b(agora: datetime | None = None) -> dict:
     return stats
 
 
-def _processar_chamado_escada_b(doc, agora: datetime, stats: dict) -> None:
+def _processar_chamado_escada_b(
+    doc, agora: datetime, stats: dict, mapa_gestor_setor: dict[str, str]
+) -> None:
     """Avalia e (se aplicável) escala um único chamado na Escada B."""
     data = doc.to_dict()
 
@@ -455,7 +508,13 @@ def _processar_chamado_escada_b(doc, agora: datetime, stats: dict) -> None:
 
     novo_nivel = nivel_atual + 1
     chave_gestor = NIVEL_PARA_CHAVE_GESTOR.get(novo_nivel)
-    email_dest = Config.get_gestor_email(chave_gestor) if chave_gestor else None
+    if chave_gestor == "gestor_setor":
+        categoria = data.get("categoria") or ""
+        email_dest = mapa_gestor_setor.get(categoria) or Config.get_gestor_email("gestor_setor")
+    elif chave_gestor:
+        email_dest = Config.get_gestor_email(chave_gestor)
+    else:
+        email_dest = None
 
     if email_dest:
         try:
