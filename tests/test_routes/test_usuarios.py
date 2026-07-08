@@ -312,6 +312,36 @@ def test_editar_usuario_get_retorna_200(client_logado_admin):
     assert r.status_code == 200
 
 
+def test_editar_usuario_form_anonimizar_nao_fica_aninhado_no_form_de_edicao(client_logado_admin):
+    """Regressão: o <form> de anonimizar não pode ficar dentro do <form> de editar.
+
+    <form> aninhado é HTML inválido — o navegador descarta a tag interna e o
+    clique no botão "Anonymize data" acaba submetendo o form de EDIÇÃO por
+    engano (redireciona pra 'usuário atualizado', nunca chama
+    anonimizar_usuario). Só reproduz num browser real; aqui garantimos via
+    posição das tags no HTML renderizado: o </form> de edição deve fechar
+    ANTES do <form> de anonimizar abrir.
+    """
+    fake = _usuario_fake(uid="u1")
+    fake.ativo = False
+    with (
+        patch(
+            "app.models_usuario.Usuario.get_by_id", side_effect=_get_by_id_side_effect("u1", fake)
+        ),
+        patch("app.routes.usuarios.CategoriaSetor.get_all", return_value=[]),
+    ):
+        r = client_logado_admin.get("/admin/usuarios/u1/editar", follow_redirects=False)
+    assert r.status_code == 200
+    html = r.data.decode("utf-8")
+
+    idx_form_edicao_abre = html.index("/admin/usuarios/u1/editar")
+    idx_form_edicao_fecha = html.index("</form>", idx_form_edicao_abre)
+    idx_form_anonimizar_abre = html.index("/admin/usuarios/u1/anonimizar")
+    assert idx_form_edicao_fecha < idx_form_anonimizar_abre, (
+        "form de anonimizar aparece antes do </form> de edição fechar — voltou a ficar aninhado"
+    )
+
+
 def test_editar_usuario_nao_encontrado_redireciona(client_logado_admin):
     """GET editar com ID inexistente redireciona com erro user_not_found."""
     admin = _admin_mock_para_flask_login()

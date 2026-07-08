@@ -100,15 +100,6 @@
           <span style="font-size:13px; font-weight:700;">{{ t('active_status_label') }}</span>
         </label>
         <p class="help" style="margin-left:26px;">{{ t('deactivate_account_help') }}</p>
-        {% if not usuario.ativo and not usuario.email.endswith('@anonimizado.invalid') %}
-        <form method="POST" action="{{ url_for('main.anonimizar_usuario', usuario_id=usuario.id) }}"
-              onsubmit="return confirm(`{{ t('anonymize_user_confirm') }}`)" style="margin-top:12px;">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-          <button type="submit" class="bento-btn-outline danger">
-            {{ t('anonymize_user') }}
-          </button>
-        </form>
-        {% endif %}
       </div>
       {% endif %}
 
@@ -146,6 +137,19 @@
         </button>
       </div>
     </form>
+
+    {# Fora do <form> de edição (linha 26) de propósito: <form> aninhado é HTML
+       inválido — o navegador ignora a tag interna e o clique acaba submetendo
+       o form de edição por engano, em vez de acionar anonimizar_usuario. #}
+    {% if usuario and not usuario.ativo and not usuario.email.endswith('@anonimizado.invalid') %}
+    <form method="POST" action="{{ url_for('main.anonimizar_usuario', usuario_id=usuario.id) }}"
+          onsubmit="return confirm(`{{ t('anonymize_user_confirm') }}`)" style="padding:0 24px 24px;">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+      <button type="submit" class="bento-btn-outline danger">
+        {{ t('anonymize_user') }}
+      </button>
+    </form>
+    {% endif %}
   </div>
 </div>
 
