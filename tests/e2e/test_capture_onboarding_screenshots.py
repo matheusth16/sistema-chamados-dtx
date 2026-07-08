@@ -61,12 +61,13 @@ def test_capturar_screenshots_supervisor(logged_in_supervisor: Page, base_url: s
     page.goto(f"{base_url}/painel")
     _salvar(page, "supervisor", "02-dashboard.png")
     _salvar(page, "supervisor", "04-filtros-sla.png")
+    # Botão "Relatórios" (exportação avançada) fica no cabeçalho do dashboard —
+    # não navegar para /exportar-avancado, que é um download direto (sem HTML
+    # para renderizar) e derruba o Page.goto do Playwright.
+    _salvar(page, "supervisor", "06-exportar.png")
 
     page.goto(f"{base_url}/admin/relatorios")
     _salvar(page, "supervisor", "05-relatorios.png")
-
-    page.goto(f"{base_url}/exportar-avancado")
-    _salvar(page, "supervisor", "06-exportar.png")
 
 
 @pytest.mark.capture
@@ -75,6 +76,10 @@ def test_capturar_screenshots_admin(logged_in_admin: Page, base_url: str) -> Non
 
     page.goto(f"{base_url}/admin")
     _salvar(page, "admin", "02-dashboard.png")
+    # Botão "Relatórios" (exportação avançada) fica no cabeçalho do dashboard —
+    # não navegar para /exportar-avancado, que é um download direto (sem HTML
+    # para renderizar) e derruba o Page.goto do Playwright.
+    _salvar(page, "admin", "06-exportar.png")
 
     page.goto(f"{base_url}/admin/relatorios")
     _salvar(page, "admin", "03-relatorios.png")
@@ -84,9 +89,6 @@ def test_capturar_screenshots_admin(logged_in_admin: Page, base_url: str) -> Non
 
     page.goto(f"{base_url}/admin/categorias")
     _salvar(page, "admin", "05-categorias.png")
-
-    page.goto(f"{base_url}/exportar-avancado")
-    _salvar(page, "admin", "06-exportar.png")
 
 
 @pytest.mark.capture

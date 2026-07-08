@@ -127,7 +127,7 @@ def _upsert_usuario(dados: dict) -> None:
     usuario.perfil = dados["perfil"]
     usuario.areas = dados["areas"]
     usuario.must_change_password = False
-    usuario.onboarding_completo = True
+    usuario.onboarding_perfis_vistos = [dados["perfil"]]
     usuario.onboarding_passo = 0
     usuario.set_password(SENHA_DEMO)
     usuario.save()
