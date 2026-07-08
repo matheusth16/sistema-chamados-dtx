@@ -4,7 +4,8 @@
 {% block content %}
 {% set participantes_pendentes = (chamado.participantes | rejectattr('status', 'equalto', 'concluido') | list) if chamado.participantes else [] %}
 {% set tem_participantes_pendentes = participantes_pendentes | length > 0 %}
-{% set participante_atual = (chamado.participantes | selectattr('supervisor_id', 'equalto', current_user.id) | list | first) if chamado.participantes else none %}
+{% set _participantes_atuais = (chamado.participantes | selectattr('supervisor_id', 'equalto', current_user.id) | list) if chamado.participantes else [] %}
+{% set participante_atual = _participantes_atuais[0] if _participantes_atuais else none %}
 {% set pode_concluir_parte = participante_atual is not none and participante_atual['status'] != 'concluido' %}
 <div class="max-w-5xl mx-auto space-y-3">
     <!-- Voltar: avisa a aba Gestão para atualizar o chamado, fecha a aba (ou redireciona se o navegador bloquear). -->

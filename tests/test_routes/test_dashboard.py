@@ -327,6 +327,34 @@ def test_visualizar_chamado_admin_com_permissao_retorna_200(client_logado_admin)
     assert r.status_code == 200
 
 
+def test_visualizar_chamado_com_participantes_sem_usuario_atual_retorna_200(client_logado_admin):
+    """GET /chamado/<id> com participantes cadastrados, nenhum deles o usuário logado.
+
+    Regressão: o template calcula `participante_atual` filtrando
+    chamado.participantes pelo supervisor_id do usuário atual e aplicando
+    `| first`. Se a lista tiver itens mas nenhum bater com o usuário logado
+    (ex.: um admin olhando um chamado com participantes de outras pessoas),
+    o filtro resulta em lista vazia e `| first` lança
+    jinja2.exceptions.UndefinedError — capturado pelo except genérico da rota
+    e mascarado como um redirect com flash de erro, sem 500 visível.
+    """
+    dados = _chamado_dict_fake()
+    dados["participantes"] = [{"supervisor_id": "outra_pessoa", "area": "TI", "status": "pendente"}]
+    with patch("app.routes.dashboard.db") as mock_db:
+        mock_doc = MagicMock()
+        mock_doc.exists = True
+        mock_doc.to_dict.return_value = dados
+        mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
+        with (
+            patch("app.routes.dashboard.usuario_pode_ver_chamado", return_value=True),
+            patch("app.routes.dashboard.Usuario.get_all", return_value=[]),
+            patch("app.routes.dashboard.filtrar_supervisores_por_area", return_value=[]),
+            patch("app.routes.dashboard.CategoriaSetor.get_all", return_value=[]),
+        ):
+            r = client_logado_admin.get("/chamado/ch1", follow_redirects=False)
+    assert r.status_code == 200
+
+
 def test_visualizar_chamado_supervisor_sem_permissao_redireciona(client_logado_supervisor):
     """GET /chamado/<id> com supervisor sem permissão na área redireciona."""
     with patch("app.routes.dashboard.db") as mock_db:
