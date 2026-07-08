@@ -5113,5 +5113,50 @@
     "pt_BR": "Isso vai apagar permanentemente o nome e e-mail deste usuário. A ação não pode ser desfeita. Continuar?",
     "en": "This will permanently erase this user's name and email. This action cannot be undone. Continue?",
     "es": "Esto borrará permanentemente el nombre y el correo de este usuario. Esta acción no se puede deshacer. ¿Continuar?"
+  },
+  "login_page_title": {
+    "pt_BR": "Login — Andon",
+    "en": "Login — Andon",
+    "es": "Iniciar sesión — Andon"
+  },
+  "attention": {
+    "pt_BR": "Atenção",
+    "en": "Attention",
+    "es": "Atención"
+  },
+  "characters": {
+    "pt_BR": "caracteres",
+    "en": "characters",
+    "es": "caracteres"
+  },
+  "observers": {
+    "pt_BR": "Em cópia",
+    "en": "CC",
+    "es": "En copia"
+  },
+  "min_chars_hint": {
+    "pt_BR": "Mínimo 10 caracteres.",
+    "en": "Minimum 10 characters.",
+    "es": "Mínimo 10 caracteres."
+  },
+  "late_attachment_title": {
+    "pt_BR": "Adicionar Documento",
+    "en": "Add Document",
+    "es": "Agregar Documento"
+  },
+  "late_attachment_hint": {
+    "pt_BR": "Informe o motivo e selecione o arquivo.",
+    "en": "Enter the reason and select the file.",
+    "es": "Indique el motivo y seleccione el archivo."
+  },
+  "late_attachment_motivo_placeholder": {
+    "pt_BR": "Motivo (mínimo 10 caracteres)",
+    "en": "Reason (minimum 10 characters)",
+    "es": "Motivo (mínimo 10 caracteres)"
+  },
+  "late_attachment_send_btn": {
+    "pt_BR": "Enviar documento",
+    "en": "Send document",
+    "es": "Enviar documento"
   }
 }

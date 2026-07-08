@@ -1,5 +1,9 @@
 """Testes do módulo de internacionalização (i18n)."""
 
+import glob
+import os
+import re
+
 import pytest
 
 from app.i18n import (
@@ -143,3 +147,38 @@ def test_observer_form_i18n_keys_existem(key, lang):
     """Chaves do bloco de observadores no formulário existem nos 3 idiomas e não retornam a própria chave."""
     result = get_translation(key, lang)
     assert result != key, f"Chave '{key}' retornou fallback para idioma '{lang}'"
+
+
+def _chaves_t_usadas_nos_templates() -> dict[str, set[str]]:
+    """Varre app/templates/**/*.html e extrai toda chave literal usada em t('chave').
+
+    Ignora chamadas com variável (t(alguma_var)) e o formato especial de flash
+    '_t_:chave|arg=val' (contém caracteres fora de [a-zA-Z0-9_], não casa o regex).
+    """
+    raiz = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    padrao = re.compile(r"""\bt\(\s*['"]([a-zA-Z_][a-zA-Z0-9_]*)['"]""")
+    chaves: dict[str, set[str]] = {}
+    for caminho in glob.glob(
+        os.path.join(raiz, "app", "templates", "**", "*.html"), recursive=True
+    ):
+        with open(caminho, encoding="utf-8") as f:
+            conteudo = f.read()
+        for m in padrao.finditer(conteudo):
+            chaves.setdefault(m.group(1), set()).add(os.path.relpath(caminho, raiz))
+    return chaves
+
+
+def test_todas_chaves_t_usadas_nos_templates_existem_em_translations_json():
+    """Regressão: nenhum template deve chamar t('chave') com chave ausente em translations.json.
+
+    Sem essa checagem, uma chave esquecida renderiza o NOME LITERAL da chave na
+    tela pro usuário final (ex.: 'late_attachment_title' em vez de 'Adicionar
+    Documento') em vez de dar erro — passa despercebido em review visual rápida.
+    """
+    usadas = _chaves_t_usadas_nos_templates()
+    faltando = {
+        chave: sorted(arqs) for chave, arqs in usadas.items() if get_translation(chave) == chave
+    }
+    assert not faltando, (
+        f"Chaves de tradução usadas em templates mas ausentes em translations.json: {faltando}"
+    )
