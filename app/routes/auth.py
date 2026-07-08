@@ -4,6 +4,7 @@ import logging
 import threading
 import uuid
 from datetime import UTC, datetime
+from urllib.parse import urlparse
 
 from flask import Response, current_app, redirect, render_template, request, session, url_for
 from flask_login import current_user, login_required, login_user, logout_user
@@ -272,6 +273,16 @@ def login_microsoft() -> Response:
     if not current_app.config.get("SSO_MICROSOFT_ENABLED", True):
         flash_t("sso_disabled", "warning")
         return redirect(url_for("main.login"))
+
+    # O callback da Microsoft sempre volta para o host de SSO_REDIRECT_URI. Se o
+    # login foi iniciado em outro host (ex.: 127.0.0.1 vs localhost em dev), o
+    # cookie de sessão com "sso_flow" fica no host errado e some no callback,
+    # falhando o login. Normaliza o host ANTES de gravar o flow na sessão.
+    redirect_host = urlparse(current_app.config.get("SSO_REDIRECT_URI", "")).netloc
+    if redirect_host and request.host != redirect_host:
+        redirect_scheme = urlparse(current_app.config["SSO_REDIRECT_URI"]).scheme or request.scheme
+        return redirect(f"{redirect_scheme}://{redirect_host}{url_for('main.login_microsoft')}")
+
     auth_uri, flow = sso_microsoft_service.iniciar_fluxo_login()
     session["sso_flow"] = flow
     return redirect(auth_uri)

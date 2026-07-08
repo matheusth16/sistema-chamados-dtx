@@ -767,6 +767,23 @@ def test_login_microsoft_desabilitado_flash_e_redireciona(client, app):
     assert "/login" in r.location
 
 
+def test_login_microsoft_host_diferente_do_redirect_uri_normaliza_antes_do_flow(client, app):
+    """Acessar via host != host do SSO_REDIRECT_URI (ex: 127.0.0.1 vs localhost) deve
+    redirecionar para o host correto ANTES de iniciar o flow OAuth — caso contrário o
+    cookie de sessão com 'sso_flow' é gravado no host errado e o callback (que sempre
+    volta para o host de SSO_REDIRECT_URI) chega sem sessão, falhando o login.
+    """
+    app.config["SSO_REDIRECT_URI"] = "http://localhost:5000/login/microsoft/callback"
+    with patch("app.routes.auth.sso_microsoft_service.iniciar_fluxo_login") as mock_iniciar:
+        r = client.get("/login/microsoft", base_url="http://127.0.0.1:5000", follow_redirects=False)
+
+    assert r.status_code == 302
+    assert r.location.startswith("http://localhost:5000/login/microsoft")
+    mock_iniciar.assert_not_called()
+    with client.session_transaction() as sess:
+        assert "sso_flow" not in sess
+
+
 def test_callback_sem_flow_na_sessao_redireciona_login(client):
     """GET callback sem flow salvo na sessão redireciona para /login."""
     r = client.get("/login/microsoft/callback", follow_redirects=False)

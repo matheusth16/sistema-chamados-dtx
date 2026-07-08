@@ -54,6 +54,10 @@ def app():
     # Testes de segurança da validação de Origin estão em test_security_origin.py,
     # onde APP_BASE_URL é definida explicitamente por fixture.
     app.config["APP_BASE_URL"] = ""
+    # Idem para SSO_REDIRECT_URI: o test client usa host "localhost" (sem porta) por
+    # padrão, que não bate com o valor do .env local (ex.: http://localhost:5000/...).
+    # Testes do fluxo de SSO definem SSO_REDIRECT_URI explicitamente quando precisam.
+    app.config["SSO_REDIRECT_URI"] = ""
     return app
 
 
