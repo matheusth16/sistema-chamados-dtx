@@ -1163,6 +1163,82 @@ def api_transferir_area(chamado_id: str):
         return jsonify({"sucesso": False, "erro": _t("internal_error_retry")}), 500
 
 
+@main.route("/api/chamado/<chamado_id>/previsao-atendimento", methods=["POST"])
+@login_required
+@requer_supervisor_area
+def api_definir_previsao_atendimento(chamado_id: str):
+    """Define até quando o chamado fica sem escalar e-mail pros gestores (Escada A/B).
+
+    Body JSON: {"previsao": "2026-07-15T16:00", "motivo": str}
+    Acesso: owner (responsavel_id == current_user.id) ou admin, e supervisor+.
+    """
+    try:
+        from datetime import datetime
+
+        dados = request.get_json(silent=True)
+        if not dados:
+            return jsonify({"sucesso": False, "erro": _t("invalid_or_empty_json")}), 400
+
+        previsao_raw = (dados.get("previsao") or "").strip()
+        motivo = (dados.get("motivo") or "").strip()
+
+        if not previsao_raw:
+            return jsonify(
+                {"sucesso": False, "erro": _t("field_attendance_forecast_required")}
+            ), 400
+        if not motivo:
+            return jsonify({"sucesso": False, "erro": _t("error_reason_required")}), 400
+
+        try:
+            previsao = datetime.fromisoformat(previsao_raw)
+        except ValueError:
+            return jsonify({"sucesso": False, "erro": _t("invalid_request_data")}), 400
+
+        doc = db.collection("chamados").document(chamado_id).get()
+        if not doc.exists:
+            return jsonify({"sucesso": False, "erro": _t("ticket_not_found")}), 404
+
+        dados_chamado = doc.to_dict() or {}
+        chamado = Chamado.from_dict(dados_chamado, chamado_id)
+
+        if not usuario_pode_ver_chamado(current_user, chamado):
+            return jsonify({"sucesso": False, "erro": _t("access_denied_generic")}), 403
+
+        pode_mutar, _ = usuario_pode_mutar_chamado(current_user)
+        if not pode_mutar:
+            return jsonify({"sucesso": False, "erro": _t("access_denied_generic")}), 403
+
+        from app.services.permission_validation import chamado_aceita_edicao_operacional
+
+        _pode_op, _ = chamado_aceita_edicao_operacional(current_user, chamado)
+        if not _pode_op:
+            return jsonify({"sucesso": False, "erro": _t("ticket_completed_no_operation")}), 403
+
+        eh_supervisor_ou_acima = current_user.perfil in ("supervisor", "admin", "admin_global")
+        eh_owner_ou_admin = (
+            chamado.responsavel_id == current_user.id or current_user.is_admin_or_above
+        )
+        if not (eh_supervisor_ou_acima and eh_owner_ou_admin):
+            return jsonify(
+                {"sucesso": False, "erro": _t("no_permission_set_attendance_forecast")}
+            ), 403
+
+        from app.services.escalonamento_service import definir_previsao_atendimento
+
+        resultado = definir_previsao_atendimento(chamado_id, previsao, motivo, current_user)
+        if not resultado["sucesso"]:
+            return jsonify(resultado), 400
+
+        return jsonify(resultado), 200
+
+    except ValueError as exc:
+        logger.debug("Validação previsao_atendimento chamado=%s: %s", chamado_id, exc)
+        return jsonify({"sucesso": False, "erro": _t("invalid_request_data")}), 400
+    except Exception as exc:
+        logger.exception("Erro em api_definir_previsao_atendimento chamado=%s: %s", chamado_id, exc)
+        return jsonify({"sucesso": False, "erro": _t("internal_error_retry")}), 500
+
+
 @main.route("/api/chamado/<chamado_id>/escalonar-colega", methods=["POST"])
 @login_required
 @requer_supervisor_area

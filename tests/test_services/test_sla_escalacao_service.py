@@ -1279,3 +1279,127 @@ def test_escada_b_firestore_erro_retorna_stats_com_erro():
 
     assert resultado["erros"] == 1
     assert resultado["escalados"] == 0
+
+
+# ── Previsão de atendimento — gate nas Escadas A e B ───────────────────────────
+
+
+def test_escada_a_com_previsao_atendimento_futura_nao_escala():
+    """Chamado Aberto há 3h úteis (nível esperado 3) mas com previsao_atendimento
+    no futuro deve ser pulado inteiro: sem incrementar nível, sem e-mail."""
+    from app.services.sla_escalacao_service import processar_escada_a
+
+    agora = _dt(2024, 6, 3, 12, 0)  # segunda 12h -> 3h uteis desde abertura 09h (almoco 11:30-13)
+    doc = _make_doc(
+        chamado_id="ch_previsao_a",
+        status="Aberto",
+        nivel=0,
+        data_abertura=_dt(2024, 6, 3, 9, 0),
+    )
+    doc.to_dict.return_value["previsao_atendimento"] = _dt(2024, 6, 5, 9, 0)  # quarta, futuro
+
+    with (
+        patch("app.services.sla_escalacao_service.db") as mock_db,
+        patch(
+            "app.services.sla_escalacao_service.notificar_escalada_resposta_gerencial"
+        ) as mock_notif,
+    ):
+        _setup_query(mock_db, [doc])
+        resultado = processar_escada_a(agora=agora)
+
+    assert resultado["adiados"] == 1
+    assert resultado["escalados"] == 0
+    mock_notif.assert_not_called()
+    mock_db.collection.return_value.document.return_value.update.assert_not_called()
+
+
+def test_escada_a_com_previsao_atendimento_ja_vencida_escala_normal():
+    """previsao_atendimento no passado não deve impedir a escalada normal."""
+    from app.services.sla_escalacao_service import processar_escada_a
+
+    agora = _dt(2024, 6, 3, 14, 0)  # tarde (fora do almoço 11:30-13:00)
+    doc = _make_doc(
+        chamado_id="ch_previsao_a_vencida",
+        status="Aberto",
+        nivel=0,
+        data_abertura=_dt(2024, 6, 3, 9, 0),
+    )
+    doc.to_dict.return_value["previsao_atendimento"] = _dt(2024, 6, 1, 9, 0)  # sábado, passado
+
+    with (
+        patch("app.services.sla_escalacao_service.db") as mock_db,
+        patch("app.services.sla_escalacao_service.notificar_escalada_resposta_gerencial"),
+        patch(
+            "app.services.sla_escalacao_service.Config.get_gestor_email",
+            return_value="gestor@dtx.aero",
+        ),
+    ):
+        _setup_query(mock_db, [doc])
+        resultado = processar_escada_a(agora=agora)
+
+    assert resultado["adiados"] == 0
+    assert resultado["escalados"] == 1
+
+
+def test_escada_b_com_previsao_atendimento_futura_nao_escala():
+    """Chamado com prazo de resolução vencido, mas previsao_atendimento no futuro
+    deve ser pulado inteiro: sem incrementar nível, sem e-mail."""
+    from app.services.sla_escalacao_service import processar_escada_b
+
+    segunda_09h = _dt(2024, 6, 3, 9, 0)
+    agora = _dt(2024, 6, 5, 10, 0)  # quarta 10:00, deadline (Projetos: 2 dias uteis) ja vencido
+
+    doc = _make_doc_atendimento(
+        chamado_id="ch_previsao_b",
+        data_em_atendimento=segunda_09h,
+        categoria="Projetos",
+        nivel_b=0,
+    )
+    doc.to_dict.return_value["previsao_atendimento"] = _dt(2024, 6, 10, 9, 0)  # semana seguinte
+
+    with (
+        patch("app.services.sla_escalacao_service.db") as mock_db,
+        patch(
+            "app.services.sla_escalacao_service.notificar_escalada_resolucao_gerencial"
+        ) as mock_notif,
+    ):
+        _setup_query(mock_db, [doc])
+        resultado = processar_escada_b(agora=agora)
+
+    assert resultado["adiados"] == 1
+    assert resultado["escalados"] == 0
+    mock_notif.assert_not_called()
+    mock_db.collection.return_value.document.return_value.update.assert_not_called()
+
+
+def test_escada_b_com_previsao_atendimento_ja_vencida_escala_normal():
+    """previsao_atendimento no passado não deve impedir a escalada normal da Escada B."""
+    from app.services.sla_escalacao_service import processar_escada_b
+
+    segunda_09h = _dt(2024, 6, 3, 9, 0)
+    agora = _dt(2024, 6, 5, 10, 0)
+
+    doc = _make_doc_atendimento(
+        chamado_id="ch_previsao_b_vencida",
+        data_em_atendimento=segunda_09h,
+        categoria="Projetos",
+        nivel_b=0,
+    )
+    doc.to_dict.return_value["previsao_atendimento"] = _dt(2024, 6, 4, 9, 0)  # terça, passado
+
+    with (
+        patch("app.services.sla_escalacao_service.db") as mock_db,
+        patch(
+            "app.services.sla_escalacao_service.notificar_escalada_resolucao_gerencial"
+        ) as mock_notif,
+        patch(
+            "app.services.sla_escalacao_service.Config.get_gestor_email",
+            return_value="gestor@dtx.aero",
+        ),
+    ):
+        _setup_query(mock_db, [doc])
+        resultado = processar_escada_b(agora=agora)
+
+    assert resultado["adiados"] == 0
+    assert resultado["escalados"] == 1
+    mock_notif.assert_called_once()

@@ -442,3 +442,98 @@ def concluir_minha_parte(chamado_id: str, usuario) -> dict:
         todos_ok,
     )
     return {"sucesso": True, "dados": {"pode_concluir_global": todos_ok}}
+
+
+# ── Previsão de atendimento ───────────────────────────────────────────────────
+
+
+def definir_previsao_atendimento(
+    chamado_id: str,
+    previsao,
+    motivo: str,
+    usuario,
+) -> dict:
+    """Define até quando o chamado fica sem escalar e-mail pros gestores (Escada A/B).
+
+    Não mexe no relógio do SLA nem mascara atraso em relatórios — só suspende
+    a notificação de escalonamento até `previsao` (ver sla_escalacao_service.py,
+    gate no topo de _processar_chamado_escada_a/_processar_chamado_escada_b).
+    Sem teto máximo de quanto pode adiar.
+
+    Args:
+        chamado_id: ID do documento no Firestore.
+        previsao: datetime até quando a escalada fica em silêncio — obrigatória, futura.
+        motivo: Razão do adiamento — obrigatório e não vazio.
+        usuario: Usuário que executa a ação — precisa ser owner ou admin, E supervisor+
+            (perfil in {supervisor, admin, admin_global}; solicitante nunca pode,
+            mesmo sendo o responsavel_id do chamado).
+
+    Returns:
+        {"sucesso": True, "dados": {...}} ou {"sucesso": False, "erro": "..."}.
+
+    Raises:
+        ValueError: Para campos obrigatórios nulos/vazios (previsao, motivo).
+    """
+    if previsao is None:
+        raise ValueError("previsao_atendimento obrigatória")
+
+    motivo = (motivo or "").strip()
+    if not motivo:
+        raise ValueError("motivo obrigatório")
+
+    # ── carrega chamado ──────────────────────────────────────────────────────
+    doc = db.collection("chamados").document(chamado_id).get()
+    if not doc.exists:
+        return {"sucesso": False, "erro": _t("ticket_not_found")}
+
+    dados = doc.to_dict() or {}
+    chamado = Chamado.from_dict(dados, chamado_id)
+
+    # ── verifica permissão (owner ou admin, E supervisor+) ────────────────────
+    eh_supervisor_ou_acima = getattr(usuario, "perfil", None) in (
+        "supervisor",
+        "admin",
+        "admin_global",
+    )
+    eh_owner_ou_admin = chamado.responsavel_id == usuario.id or usuario.is_admin_or_above
+    if not (eh_supervisor_ou_acima and eh_owner_ou_admin):
+        logger.warning(
+            "definir_previsao_atendimento negado: usuário %s sem permissão no chamado %s",
+            usuario.id,
+            chamado_id,
+        )
+        return {"sucesso": False, "erro": _t("no_permission_set_attendance_forecast")}
+
+    if previsao <= datetime.now():
+        return {"sucesso": False, "erro": _t("attendance_forecast_must_be_future")}
+
+    # ── update atômico ───────────────────────────────────────────────────────
+    execute_with_retry(
+        db.collection("chamados").document(chamado_id).update,
+        {
+            "previsao_atendimento": previsao,
+            "motivo_previsao_atendimento": motivo[:500],
+        },
+        max_retries=3,
+    )
+
+    # ── histórico ────────────────────────────────────────────────────────────
+    hist = Historico(
+        chamado_id=chamado_id,
+        usuario_id=usuario.id,
+        usuario_nome=usuario.nome,
+        acao="definicao_previsao_atendimento",
+        campo_alterado="previsao_atendimento",
+        valor_anterior=None,
+        valor_novo=str(previsao),
+        detalhe=f"Previsão de atendimento definida para {previsao} — {motivo[:500]}",
+    )
+    hist.save()
+
+    logger.info(
+        "Chamado %s: previsão de atendimento definida para %s por %s",
+        chamado_id,
+        previsao,
+        usuario.id,
+    )
+    return {"sucesso": True, "dados": {"previsao_atendimento": str(previsao)}}

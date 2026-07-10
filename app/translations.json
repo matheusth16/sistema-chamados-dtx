@@ -3399,6 +3399,11 @@
     "en": "Error escalating.",
     "es": "Error al escalar."
   },
+  "error_forecast_set": {
+    "pt_BR": "Erro ao definir previsão de atendimento.",
+    "en": "Error setting attendance forecast.",
+    "es": "Error al definir la previsión de atención."
+  },
   "error_include_participants": {
     "pt_BR": "Erro ao incluir participantes.",
     "en": "Error including participants.",
@@ -4383,6 +4388,41 @@
     "pt_BR": "Apenas o responsável ou admin pode transferir",
     "en": "Only the assignee or admin can transfer",
     "es": "Solo el responsable o el admin puede transferir"
+  },
+  "field_attendance_forecast_required": {
+    "pt_BR": "Previsão de atendimento é obrigatória",
+    "en": "Attendance forecast is required",
+    "es": "La previsión de atención es obligatoria"
+  },
+  "no_permission_set_attendance_forecast": {
+    "pt_BR": "Apenas o responsável (supervisor) ou admin pode definir a previsão de atendimento",
+    "en": "Only the assignee (supervisor) or admin can set the attendance forecast",
+    "es": "Solo el responsable (supervisor) o el admin puede definir la previsión de atención"
+  },
+  "attendance_forecast_must_be_future": {
+    "pt_BR": "A previsão de atendimento precisa ser uma data futura",
+    "en": "The attendance forecast must be a future date",
+    "es": "La previsión de atención debe ser una fecha futura"
+  },
+  "attendance_forecast_label": {
+    "pt_BR": "Previsão de atendimento",
+    "en": "Attendance forecast",
+    "es": "Previsión de atención"
+  },
+  "attendance_forecast_btn": {
+    "pt_BR": "Definir previsão de atendimento",
+    "en": "Set attendance forecast",
+    "es": "Definir previsión de atención"
+  },
+  "attendance_forecast_reason_placeholder": {
+    "pt_BR": "Ex: combinei com o gestor, preciso de mais tempo antes de atender",
+    "en": "E.g: agreed with the manager, I need more time before attending",
+    "es": "Ej: acordado con el gestor, necesito más tiempo antes de atender"
+  },
+  "attendance_forecast_set_success": {
+    "pt_BR": "Previsão de atendimento definida com sucesso",
+    "en": "Attendance forecast set successfully",
+    "es": "Previsión de atención definida con éxito"
   },
   "invalid_request_data": {
     "pt_BR": "Dados da requisição inválidos.",

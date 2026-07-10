@@ -569,6 +569,12 @@
                 <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
                 {{ t('escalation_include_supervisors_btn') if t else 'Incluir supervisores' }}
             </button>
+            {% if current_user.perfil in ('supervisor', 'admin', 'admin_global') %}
+            <button onclick="document.getElementById('modal-previsao-atendimento').classList.remove('hidden')" class="bento-escalation-btn amber">
+                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                {{ t('attendance_forecast_btn') if t else 'Definir previsão de atendimento' }}
+            </button>
+            {% endif %}
         </div>
     </div>
 </div>
@@ -706,6 +712,41 @@
     </div>
 </div>
 
+<!-- Modal: Previsão de Atendimento -->
+<div id="modal-previsao-atendimento" class="hidden bento-modal-overlay flex items-center justify-center p-4">
+    <div class="bento-modal-backdrop"></div>
+    <div class="bento-modal-panel" style="position:relative; z-index:1;">
+        <div class="head">
+            <h3 style="font-weight:800; font-size:15px;">{{ t('attendance_forecast_btn') if t else 'Definir previsão de atendimento' }}</h3>
+            <button onclick="document.getElementById('modal-previsao-atendimento').classList.add('hidden')" class="bento-modal-close">
+                <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+        </div>
+        <div class="space-y-4" style="padding:24px;">
+            <div>
+                <label class="bento-field-label" style="margin-bottom:6px;">{{ t('attendance_forecast_label') if t else 'Previsão de atendimento' }} <span style="color:#e11d48;">*</span></label>
+                <input type="datetime-local" id="previsao-atendimento-data"
+                    style="width:100%; background:var(--color-surface-canvas); border:1.5px solid transparent; border-radius:14px; padding:11px 14px; font-family:inherit; font-size:14px;">
+            </div>
+            <div>
+                <label class="bento-field-label" style="margin-bottom:6px;">{{ t('escalation_reason_label') if t else 'Motivo' }} <span style="color:#e11d48;">*</span></label>
+                <textarea id="previsao-atendimento-motivo" rows="3" maxlength="500"
+                    placeholder="{{ t('attendance_forecast_reason_placeholder') if t else 'Ex: combinei com o gestor, preciso de mais tempo antes de atender' }}"
+                    style="width:100%; background:var(--color-surface-canvas); border:1.5px solid transparent; border-radius:14px; padding:11px 14px; font-family:inherit; font-size:14px; resize:none;"></textarea>
+            </div>
+            <div id="previsao-atendimento-erro" class="hidden bento-inline-notice error"></div>
+        </div>
+        <div class="flex gap-3" style="padding:0 24px 24px;">
+            <button onclick="document.getElementById('modal-previsao-atendimento').classList.add('hidden')" class="bento-btn-outline" style="flex:1; justify-content:center;">
+                {{ t('cancel') if t else 'Cancelar' }}
+            </button>
+            <button onclick="executarDefinirPrevisaoAtendimento()" class="bento-btn-block solid-amber" style="flex:1;">
+                {{ t('attendance_forecast_btn') if t else 'Definir previsão de atendimento' }}
+            </button>
+        </div>
+    </div>
+</div>
+
 <script nonce="{{ csp_nonce }}">
 window.DTX_MSGS = window.DTX_MSGS || {};
 Object.assign(window.DTX_MSGS, {
@@ -730,7 +771,9 @@ Object.assign(window.DTX_MSGS, {
     error_supervisor_already_in_list: {{ t('error_supervisor_already_in_list') | tojson }},
     error_connection: {{ t('error_connection') | tojson }},
     participant_all_done_success: {{ t('participant_all_done_success') | tojson }},
-    participant_part_done_success: {{ t('participant_part_done_success') | tojson }}
+    participant_part_done_success: {{ t('participant_part_done_success') | tojson }},
+    error_forecast_required: {{ t('field_attendance_forecast_required') | tojson }},
+    error_forecast_set: {{ t('error_forecast_set') | tojson }}
 });
 </script>
 <script nonce="{{ csp_nonce }}">
@@ -839,6 +882,25 @@ Object.assign(window.DTX_MSGS, {
             else { mostrarErro('escalonar-erro', data.erro || DTX_MSGS.error_escalate); }
         })
         .catch(function() { mostrarErro('escalonar-erro', DTX_MSGS.error_connection); });
+    };
+
+    window.executarDefinirPrevisaoAtendimento = function() {
+        esconderErro('previsao-atendimento-erro');
+        var dataLocal = document.getElementById('previsao-atendimento-data').value;
+        var motivo = (document.getElementById('previsao-atendimento-motivo').value || '').trim();
+        if (!dataLocal) { mostrarErro('previsao-atendimento-erro', DTX_MSGS.error_forecast_required); return; }
+        if (!motivo) { mostrarErro('previsao-atendimento-erro', DTX_MSGS.error_reason_required); return; }
+        fetch('/api/chamado/' + CHAMADO_ID + '/previsao-atendimento', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
+            body: JSON.stringify({ previsao: dataLocal, motivo: motivo })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.sucesso) { window.location.reload(); }
+            else { mostrarErro('previsao-atendimento-erro', data.erro || DTX_MSGS.error_forecast_set); }
+        })
+        .catch(function() { mostrarErro('previsao-atendimento-erro', DTX_MSGS.error_connection); });
     };
 
     // ── Incluir Participantes (Fase 4) ──────────────────────────────────────

@@ -85,6 +85,21 @@ def test_to_dict_contem_todos_campos_esperados():
         assert chave in d, f"Campo ausente em to_dict: {chave}"
 
 
+def test_to_dict_previsao_atendimento_padrao_none():
+    d = _chamado().to_dict()
+    assert d["previsao_atendimento"] is None
+    assert d["motivo_previsao_atendimento"] is None
+
+
+def test_to_dict_previsao_atendimento_customizada():
+    previsao = datetime(2026, 7, 15, 16, 0, tzinfo=pytz.timezone("America/Sao_Paulo"))
+    d = _chamado(
+        previsao_atendimento=previsao, motivo_previsao_atendimento="Combinado com o gestor"
+    ).to_dict()
+    assert d["previsao_atendimento"] == previsao
+    assert d["motivo_previsao_atendimento"] == "Combinado com o gestor"
+
+
 # ── from_dict ─────────────────────────────────────────────────────────────────
 
 
@@ -140,6 +155,34 @@ def test_from_dict_none_levanta_validacao_error():
 
     with pytest.raises(ValidacaoChamadoError):
         Chamado.from_dict(None)
+
+
+def test_from_dict_previsao_atendimento_padrao_none():
+    from app.models import Chamado
+
+    c = Chamado.from_dict(
+        {"categoria": "TI", "tipo_solicitacao": "S", "descricao": "D", "responsavel": "R"}
+    )
+    assert c.previsao_atendimento is None
+    assert c.motivo_previsao_atendimento is None
+
+
+def test_from_dict_previsao_atendimento_customizada():
+    from app.models import Chamado
+
+    previsao = datetime(2026, 7, 15, 16, 0, tzinfo=pytz.timezone("America/Sao_Paulo"))
+    c = Chamado.from_dict(
+        {
+            "categoria": "TI",
+            "tipo_solicitacao": "S",
+            "descricao": "D",
+            "responsavel": "R",
+            "previsao_atendimento": previsao,
+            "motivo_previsao_atendimento": "Combinado com o gestor",
+        }
+    )
+    assert c.previsao_atendimento == previsao
+    assert c.motivo_previsao_atendimento == "Combinado com o gestor"
 
 
 def test_from_dict_preserva_id():

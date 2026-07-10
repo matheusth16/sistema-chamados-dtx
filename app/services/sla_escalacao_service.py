@@ -134,6 +134,7 @@ def processar_escada_a(agora: datetime | None = None) -> dict:
         "emails": 0,
         "erros": 0,
         "pulados_fora_janela": 0,
+        "adiados": 0,
     }
 
     mapa_gestor_setor = _construir_mapa_gestor_setor()
@@ -170,6 +171,13 @@ def _processar_chamado_escada_a(
 
     # Guard: só processa Abertos (a query filtra, mas defensivo contra dados inconsistentes)
     if data.get("status") != "Aberto":
+        return
+
+    # Previsão de atendimento: supervisor/admin combinou mais tempo com o gestor —
+    # silencia a escalada inteira (nível não muda) até a data passar.
+    previsao = data.get("previsao_atendimento")
+    if previsao is not None and agora.replace(tzinfo=None) < previsao.replace(tzinfo=None):
+        stats["adiados"] += 1
         return
 
     nivel_atual = int(data.get("escalacao_resposta_nivel") or 0)
@@ -454,6 +462,7 @@ def processar_escada_b(agora: datetime | None = None) -> dict:
         "emails": 0,
         "erros": 0,
         "pulados_fora_janela": 0,
+        "adiados": 0,
     }
 
     mapa_gestor_setor = _construir_mapa_gestor_setor()
@@ -487,6 +496,13 @@ def _processar_chamado_escada_b(
 ) -> None:
     """Avalia e (se aplicável) escala um único chamado na Escada B."""
     data = doc.to_dict()
+
+    # Previsão de atendimento: silencia a escalada inteira até a data passar
+    # (mesma regra da Escada A — ver _processar_chamado_escada_a).
+    previsao = data.get("previsao_atendimento")
+    if previsao is not None and agora.replace(tzinfo=None) < previsao.replace(tzinfo=None):
+        stats["adiados"] += 1
+        return
 
     nivel_atual = int(data.get("escalacao_resolucao_nivel") or 0)
 

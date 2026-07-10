@@ -964,3 +964,176 @@ class TestPodeConcluirGlobal:
             }
         )
         assert pode_concluir_global(c) is False
+
+
+# ── Previsão de atendimento — definir_previsao_atendimento ─────────────────────
+
+
+class TestDefinirPrevisaoAtendimento:
+    """Testes da função definir_previsao_atendimento.
+
+    Regra: só owner (responsavel_id == usuario.id) ou admin, E usuario precisa
+    ser supervisor+ (perfil in {supervisor, admin, admin_global}). Motivo
+    obrigatório. previsao precisa ser no futuro. Sem teto máximo. Só grava os
+    campos — não dispara e-mail nenhum (o silêncio é feito pelo motor de SLA
+    lendo o campo, não aqui).
+    """
+
+    def test_definir_previsao_grava_campos_no_firestore(self):
+        from datetime import datetime, timedelta
+
+        from app.services.escalonamento_service import definir_previsao_atendimento
+
+        mock_db, updated = _make_db_mock(
+            _chamado_dict(area="Engenharia", responsavel_id="id_julia")
+        )
+        previsao = datetime.now() + timedelta(days=2)
+
+        with (
+            patch("app.services.escalonamento_service.db", mock_db),
+            patch("app.services.escalonamento_service.Historico"),
+        ):
+            resultado = definir_previsao_atendimento(
+                "id_chamado", previsao, "Combinado com o gestor, preciso de mais tempo", JULIA
+            )
+
+        assert resultado["sucesso"] is True
+        assert updated["previsao_atendimento"] == previsao
+        assert (
+            updated["motivo_previsao_atendimento"]
+            == "Combinado com o gestor, preciso de mais tempo"
+        )
+
+    def test_definir_previsao_registra_historico(self):
+        from datetime import datetime, timedelta
+
+        from app.services.escalonamento_service import definir_previsao_atendimento
+
+        mock_db, _ = _make_db_mock(_chamado_dict(area="Engenharia", responsavel_id="id_julia"))
+        hist_instancia = MagicMock()
+        previsao = datetime.now() + timedelta(days=1)
+
+        with (
+            patch("app.services.escalonamento_service.db", mock_db),
+            patch("app.services.escalonamento_service.Historico") as mock_hist_cls,
+        ):
+            mock_hist_cls.return_value = hist_instancia
+            definir_previsao_atendimento("id_chamado", previsao, "motivo", JULIA)
+
+        args, kwargs = mock_hist_cls.call_args
+        assert kwargs.get("acao") == "definicao_previsao_atendimento"
+        assert kwargs.get("campo_alterado") == "previsao_atendimento"
+        hist_instancia.save.assert_called_once()
+
+    def test_definir_previsao_motivo_obrigatorio(self):
+        from datetime import datetime, timedelta
+
+        from app.services.escalonamento_service import definir_previsao_atendimento
+
+        previsao = datetime.now() + timedelta(days=1)
+        with pytest.raises(ValueError, match="motivo"):
+            definir_previsao_atendimento("id_chamado", previsao, "", JULIA)
+
+    def test_definir_previsao_data_obrigatoria(self):
+        from app.services.escalonamento_service import definir_previsao_atendimento
+
+        with pytest.raises(ValueError, match="previsao"):
+            definir_previsao_atendimento("id_chamado", None, "motivo", JULIA)
+
+    def test_definir_previsao_no_passado_retorna_erro(self):
+        from datetime import datetime, timedelta
+
+        from app.services.escalonamento_service import definir_previsao_atendimento
+
+        mock_db, _ = _make_db_mock(_chamado_dict(area="Engenharia", responsavel_id="id_julia"))
+        previsao_passada = datetime.now() - timedelta(hours=1)
+
+        with patch("app.services.escalonamento_service.db", mock_db):
+            resultado = definir_previsao_atendimento(
+                "id_chamado", previsao_passada, "motivo", JULIA
+            )
+
+        assert resultado["sucesso"] is False
+
+    def test_definir_previsao_nao_owner_retorna_erro(self):
+        from datetime import datetime, timedelta
+
+        from app.services.escalonamento_service import definir_previsao_atendimento
+
+        mock_db, _ = _make_db_mock(_chamado_dict(area="Engenharia", responsavel_id="id_julia"))
+        previsao = datetime.now() + timedelta(days=1)
+
+        with patch("app.services.escalonamento_service.db", mock_db):
+            resultado = definir_previsao_atendimento("id_chamado", previsao, "motivo", NAO_OWNER)
+
+        assert resultado["sucesso"] is False
+
+    def test_definir_previsao_owner_solicitante_negado(self):
+        """Owner que não é supervisor+ (perfil solicitante) não pode definir previsão,
+        mesmo sendo o responsavel_id do chamado — regra exige perfil supervisor+."""
+        from datetime import datetime, timedelta
+
+        from app.services.escalonamento_service import definir_previsao_atendimento
+
+        mock_db, _ = _make_db_mock(_chamado_dict(area="Engenharia", responsavel_id=SOLICITANTE.id))
+        previsao = datetime.now() + timedelta(days=1)
+
+        with patch("app.services.escalonamento_service.db", mock_db):
+            resultado = definir_previsao_atendimento("id_chamado", previsao, "motivo", SOLICITANTE)
+
+        assert resultado["sucesso"] is False
+
+    def test_definir_previsao_admin_nao_owner_permitido(self):
+        """Admin pode definir mesmo não sendo o owner."""
+        from datetime import datetime, timedelta
+
+        from app.services.escalonamento_service import definir_previsao_atendimento
+
+        mock_db, updated = _make_db_mock(
+            _chamado_dict(area="Engenharia", responsavel_id="id_julia")
+        )
+        previsao = datetime.now() + timedelta(days=1)
+
+        with (
+            patch("app.services.escalonamento_service.db", mock_db),
+            patch("app.services.escalonamento_service.Historico"),
+        ):
+            resultado = definir_previsao_atendimento("id_chamado", previsao, "motivo", ADMIN)
+
+        assert resultado["sucesso"] is True
+        assert updated["previsao_atendimento"] == previsao
+
+    def test_definir_previsao_sem_teto_maximo(self):
+        """Não há limite de dias — previsão bem distante no futuro é aceita."""
+        from datetime import datetime, timedelta
+
+        from app.services.escalonamento_service import definir_previsao_atendimento
+
+        mock_db, updated = _make_db_mock(
+            _chamado_dict(area="Engenharia", responsavel_id="id_julia")
+        )
+        previsao_distante = datetime.now() + timedelta(days=90)
+
+        with (
+            patch("app.services.escalonamento_service.db", mock_db),
+            patch("app.services.escalonamento_service.Historico"),
+        ):
+            resultado = definir_previsao_atendimento(
+                "id_chamado", previsao_distante, "motivo", JULIA
+            )
+
+        assert resultado["sucesso"] is True
+        assert updated["previsao_atendimento"] == previsao_distante
+
+    def test_definir_previsao_chamado_nao_encontrado(self):
+        from datetime import datetime, timedelta
+
+        from app.services.escalonamento_service import definir_previsao_atendimento
+
+        mock_db, _ = _make_db_mock(doc_exists=False)
+        previsao = datetime.now() + timedelta(days=1)
+
+        with patch("app.services.escalonamento_service.db", mock_db):
+            resultado = definir_previsao_atendimento("id_chamado", previsao, "motivo", JULIA)
+
+        assert resultado["sucesso"] is False

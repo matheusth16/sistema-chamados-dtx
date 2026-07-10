@@ -50,6 +50,9 @@ class Chamado:
         alerta_supervisor_80_enviado: bool = False,
         # Nível 1 — Observadores (em cópia, read-only)
         observadores: list = None,
+        # Previsão de atendimento — suspende e-mails de escalonamento (Escada A/B) até a data
+        previsao_atendimento=None,
+        motivo_previsao_atendimento: str = None,
     ):
         self.id = id
         self.numero_chamado = numero_chamado
@@ -101,6 +104,9 @@ class Chamado:
         self.alerta_supervisor_80_enviado = bool(alerta_supervisor_80_enviado)
         # Nível 1 — Observadores (em cópia, read-only): [{usuario_id, nome, email}]
         self.observadores = observadores if isinstance(observadores, list) else []
+        # Previsão de atendimento — suspende e-mails de escalonamento (Escada A/B) até a data
+        self.previsao_atendimento = previsao_atendimento
+        self.motivo_previsao_atendimento = motivo_previsao_atendimento
 
     def _converter_timestamp(self, ts):
         """Converte timestamp do Firestore para datetime em horário de Brasília.
@@ -188,6 +194,9 @@ class Chamado:
             "alerta_supervisor_80_enviado": self.alerta_supervisor_80_enviado,
             # Nível 1 — Observadores (em cópia)
             "observadores": self.observadores,
+            # Previsão de atendimento
+            "previsao_atendimento": self.previsao_atendimento,
+            "motivo_previsao_atendimento": self.motivo_previsao_atendimento,
         }
 
     @classmethod
@@ -252,6 +261,9 @@ class Chamado:
             observadores=data.get("observadores")
             if isinstance(data.get("observadores"), list)
             else [],
+            # Previsão de atendimento
+            previsao_atendimento=data.get("previsao_atendimento"),
+            motivo_previsao_atendimento=data.get("motivo_previsao_atendimento"),
         )
 
     def __repr__(self):
