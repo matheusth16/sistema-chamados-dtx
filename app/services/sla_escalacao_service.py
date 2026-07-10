@@ -19,7 +19,7 @@ Decisão de design (sem e-mail configurado):
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from google.cloud.firestore_v1.base_query import FieldFilter
@@ -27,6 +27,7 @@ from google.cloud.firestore_v1.base_query import FieldFilter
 from app.database import db
 from app.services.business_time import (
     adicionar_dias_uteis,
+    minutos_corridos_entre,
     minutos_uteis_entre,
     percentual_prazo_resolucao,
     pode_enviar_notificacao_agora,
@@ -247,11 +248,14 @@ def _processar_chamado_escada_a(
 
 
 def calcular_deadline_resolucao(data_em_atendimento: datetime, categoria: str) -> datetime:
-    """Calcula o deadline de resolução em tempo útil.
+    """Calcula o deadline de resolução.
 
+    AOG      → SLA_AOG_MINUTOS_RESOLUCAO_DEADLINE minutos corridos (calendário, 24/7).
     Projetos → SLA_DIAS_RESOLUCAO_PROJETOS dias úteis.
     Demais   → SLA_DIAS_RESOLUCAO_PADRAO dias úteis.
     """
+    if categoria == "AOG":
+        return data_em_atendimento + timedelta(minutes=Config.SLA_AOG_MINUTOS_RESOLUCAO_DEADLINE)
     dias = (
         Config.SLA_DIAS_RESOLUCAO_PROJETOS
         if categoria == "Projetos"
@@ -260,18 +264,24 @@ def calcular_deadline_resolucao(data_em_atendimento: datetime, categoria: str) -
     return adicionar_dias_uteis(data_em_atendimento, dias)
 
 
-def calcular_nivel_esperado_escada_b(minutos_uteis_apos_deadline: int) -> int:
-    """Retorna 1–4 conforme minutos úteis decorridos APÓS o deadline de resolução.
+def calcular_nivel_esperado_escada_b(
+    minutos_apos_deadline: int, thresholds: list[int] | None = None
+) -> int:
+    """Retorna 1–4 conforme minutos decorridos APÓS o deadline de resolução.
 
-    Thresholds B (SLA_ESCALADA_B_HORAS_UTEIS = [0, 4, 8, 12]):
+    Thresholds padrão (SLA_ESCALADA_B_HORAS_UTEIS = [0, 4, 8, 12], minutos úteis):
       0 min  → nível 1 (deadline ultrapassado)
       240 min → nível 2 (4h úteis após deadline)
       480 min → nível 3 (8h úteis após deadline)
       720 min → nível 4 (12h úteis após deadline)
+
+    `thresholds` customizado (ex: Config.SLA_AOG_MINUTOS_RESOLUCAO_ESCALADA) permite
+    reusar a mesma função para a escada AOG, em minutos corridos.
     """
+    limites = thresholds if thresholds is not None else _MINUTOS_THRESHOLDS_B
     nivel = 0
-    for threshold in _MINUTOS_THRESHOLDS_B:
-        if minutos_uteis_apos_deadline >= threshold:
+    for threshold in limites:
+        if minutos_apos_deadline >= threshold:
             nivel += 1
         else:
             break
@@ -486,6 +496,7 @@ def _processar_chamado_escada_b(
         return
 
     categoria = data.get("categoria") or ""
+    is_aog = categoria == "AOG"
     deadline = calcular_deadline_resolucao(data_em_atendimento, categoria)
 
     # Normaliza para naive a fim de comparar de forma segura (datetimes BRT naive em testes)
@@ -495,14 +506,20 @@ def _processar_chamado_escada_b(
     if agora_naive <= deadline_naive:
         return  # Prazo ainda não vencido
 
-    minutos_apos = minutos_uteis_entre(deadline, agora)
-    nivel_esperado = calcular_nivel_esperado_escada_b(minutos_apos)
+    if is_aog:
+        minutos_apos = minutos_corridos_entre(deadline, agora)
+        nivel_esperado = calcular_nivel_esperado_escada_b(
+            minutos_apos, thresholds=Config.SLA_AOG_MINUTOS_RESOLUCAO_ESCALADA
+        )
+    else:
+        minutos_apos = minutos_uteis_entre(deadline, agora)
+        nivel_esperado = calcular_nivel_esperado_escada_b(minutos_apos)
 
     if nivel_esperado <= nivel_atual:
         return  # Já no nível correto
 
-    # Threshold atingido: verificar janela de notificação
-    if not pode_enviar_notificacao_agora(agora):
+    # Threshold atingido: verificar janela de notificação (AOG é 24/7, não espera expediente)
+    if not is_aog and not pode_enviar_notificacao_agora(agora):
         stats["pulados_fora_janela"] += 1
         return
 

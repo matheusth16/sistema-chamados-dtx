@@ -377,3 +377,50 @@ def test_adicionar_minutos_uteis_negativo_levanta_erro():
 
     with pytest.raises(ValueError, match="minutos"):
         adicionar_minutos_uteis(datetime(2026, 6, 22, 9, 0), -1)
+
+
+# ---------------------------------------------------------------------------
+# minutos_corridos_entre — tempo calendário (sem filtro de expediente), uso AOG
+# ---------------------------------------------------------------------------
+
+
+def test_minutos_corridos_dentro_do_expediente():
+    from app.services.business_time import minutos_corridos_entre
+
+    assert minutos_corridos_entre(datetime(2026, 6, 22, 9, 0), datetime(2026, 6, 22, 10, 0)) == 60
+
+
+def test_minutos_corridos_ignora_almoco():
+    from app.services.business_time import minutos_corridos_entre
+
+    # 11:00 -> 13:30 corrido = 150 min (não desconta almoço, ao contrário de minutos_uteis_entre)
+    assert (
+        minutos_corridos_entre(datetime(2026, 6, 22, 11, 0), datetime(2026, 6, 22, 13, 30)) == 150
+    )
+
+
+def test_minutos_corridos_ignora_fim_de_semana():
+    from app.services.business_time import minutos_corridos_entre
+
+    # sábado 09:00 -> sábado 17:00 = 480 min corridos (minutos_uteis_entre seria 0)
+    assert minutos_corridos_entre(datetime(2026, 6, 20, 9, 0), datetime(2026, 6, 20, 17, 0)) == 480
+
+
+def test_minutos_corridos_cruzando_madrugada():
+    from app.services.business_time import minutos_corridos_entre
+
+    # 23:00 -> 01:00 do dia seguinte = 120 min, fora de qualquer janela útil
+    assert minutos_corridos_entre(datetime(2026, 6, 22, 23, 0), datetime(2026, 6, 23, 1, 0)) == 120
+
+
+def test_minutos_corridos_inicio_igual_fim():
+    from app.services.business_time import minutos_corridos_entre
+
+    dt = datetime(2026, 6, 22, 9, 0)
+    assert minutos_corridos_entre(dt, dt) == 0
+
+
+def test_minutos_corridos_fim_antes_inicio_retorna_zero():
+    from app.services.business_time import minutos_corridos_entre
+
+    assert minutos_corridos_entre(datetime(2026, 6, 22, 10, 0), datetime(2026, 6, 22, 9, 0)) == 0

@@ -321,3 +321,10 @@ class Config:
     SLA_ESCALADA_B_HORAS_UTEIS = [0, 4, 8, 12]
     SLA_INCLUI_FIM_DE_SEMANA = os.getenv("SLA_INCLUI_FIM_DE_SEMANA", "false").lower() == "true"
     SLA_TIMEZONE = os.getenv("SLA_TIMEZONE", "America/Sao_Paulo")
+
+    # SLA AOG (Aircraft On Ground): tempo corrido (calendário), não útil — 24/7.
+    # Abertura já notifica os 4 níveis de gestor de uma vez (ver notifications.py);
+    # a escalada abaixo cobre só a resolução (prazo vencido), sequencial como um
+    # chamado normal.
+    SLA_AOG_MINUTOS_RESOLUCAO_DEADLINE = int(os.getenv("SLA_AOG_MINUTOS_RESOLUCAO_DEADLINE", "240"))
+    SLA_AOG_MINUTOS_RESOLUCAO_ESCALADA = [0, 30, 60, 120]

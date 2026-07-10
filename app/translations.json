@@ -189,6 +189,11 @@
     "en": "Not Applicable (Routine)",
     "es": "No Aplicable (Rutina)"
   },
+  "aog_max_priority": {
+    "pt_BR": "AOG (Aeronave em Solo — Emergência)",
+    "en": "AOG (Aircraft On Ground — Emergency)",
+    "es": "AOG (Aeronave en Tierra — Emergencia)"
+  },
   "error_loading": {
     "pt_BR": "Erro ao carregar - Será atribuído manualmente",
     "en": "Error loading - Will be assigned manually",

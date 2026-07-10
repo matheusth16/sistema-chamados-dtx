@@ -1087,3 +1087,118 @@ def test_criacao_grava_supervisor_ids_com_acesso(app):
 
     assert erro is None
     assert "id_julia" in chamado_capturado.get("supervisor_ids_com_acesso", [])
+
+
+# ── AOG — abertura já grava nível 4 e dispara broadcast pros 4 gestores ────────────────────────
+
+
+def test_criar_chamado_aog_grava_nivel_4_e_notifica_todos_gestores(app):
+    """categoria='AOG': escalacao_resposta_nivel=4 direto (Escada A já esgotada) e
+    dispara notificar_abertura_aog_todos_gestores pros 4 níveis, síncrono na criação."""
+    form = {
+        "categoria": "AOG",
+        "tipo": "Manutencao",
+        "descricao": "Aeronave PR-XYZ em solo, hidráulica falhou.",
+        "rl_codigo": "",
+        "impacto": "",
+        "gate": "",
+    }
+    files = MagicMock()
+    files.get.return_value = None
+    files.getlist.return_value = []
+
+    with (
+        patch("app.services.chamados_criacao_service.salvar_anexo", return_value=None),
+        patch(
+            "app.services.chamados_criacao_service.gerar_numero_chamado", return_value="2026-300"
+        ),
+        patch("app.services.chamados_criacao_service.atribuidor") as mock_atr,
+        patch("app.services.chamados_criacao_service.execute_with_retry") as mock_retry,
+        patch("app.services.chamados_criacao_service.Historico"),
+        patch("app.services.chamados_criacao_service.Usuario.get_by_id", return_value=None),
+        patch("app.services.chamados_criacao_service.notificar_aprovador_novo_chamado"),
+        patch(
+            "app.services.chamados_criacao_service.notificar_abertura_aog_todos_gestores"
+        ) as mock_notif_aog,
+        patch("app.services.chamados_criacao_service.threading.Thread", side_effect=_FakeThread),
+    ):
+        mock_atr.atribuir.return_value = {
+            "sucesso": True,
+            "supervisor": {"id": "sup1", "nome": "Supervisor Teste"},
+            "motivo": "",
+        }
+        mock_ref = MagicMock()
+        mock_ref.id = "chamado_id_300"
+        mock_retry.return_value = (None, mock_ref)
+
+        with app.app_context():
+            chamado_id, numero, erro, _ = criar_chamado(
+                form=form,
+                files=files,
+                solicitante_id="sol1",
+                solicitante_nome="Solicitante Teste",
+                area_solicitante="Manutencao",
+                solicitante_email="sol@test.com",
+            )
+
+    assert erro is None
+    assert chamado_id == "chamado_id_300"
+    chamado_dict_salvo = mock_retry.call_args[0][1]
+    assert chamado_dict_salvo["escalacao_resposta_nivel"] == 4
+    mock_notif_aog.assert_called_once()
+    kwargs = mock_notif_aog.call_args.kwargs
+    assert kwargs["chamado_id"] == "chamado_id_300"
+    assert kwargs["chamado_data"]["numero_chamado"] == "2026-300"
+
+
+def test_criar_chamado_normal_nao_grava_nivel_4_nem_notifica_aog(app):
+    """categoria normal (não-AOG) mantém escalacao_resposta_nivel=0 e não dispara broadcast AOG."""
+    form = {
+        "categoria": "Manutencao",
+        "tipo": "Manutencao",
+        "descricao": "Descrição normal, não é AOG.",
+        "rl_codigo": "",
+        "impacto": "",
+        "gate": "",
+    }
+    files = MagicMock()
+    files.get.return_value = None
+    files.getlist.return_value = []
+
+    with (
+        patch("app.services.chamados_criacao_service.salvar_anexo", return_value=None),
+        patch(
+            "app.services.chamados_criacao_service.gerar_numero_chamado", return_value="2026-301"
+        ),
+        patch("app.services.chamados_criacao_service.atribuidor") as mock_atr,
+        patch("app.services.chamados_criacao_service.execute_with_retry") as mock_retry,
+        patch("app.services.chamados_criacao_service.Historico"),
+        patch("app.services.chamados_criacao_service.Usuario.get_by_id", return_value=None),
+        patch("app.services.chamados_criacao_service.notificar_aprovador_novo_chamado"),
+        patch(
+            "app.services.chamados_criacao_service.notificar_abertura_aog_todos_gestores"
+        ) as mock_notif_aog,
+        patch("app.services.chamados_criacao_service.threading.Thread", side_effect=_FakeThread),
+    ):
+        mock_atr.atribuir.return_value = {
+            "sucesso": True,
+            "supervisor": {"id": "sup1", "nome": "Supervisor Teste"},
+            "motivo": "",
+        }
+        mock_ref = MagicMock()
+        mock_ref.id = "chamado_id_301"
+        mock_retry.return_value = (None, mock_ref)
+
+        with app.app_context():
+            criar_chamado(
+                form=form,
+                files=files,
+                solicitante_id="sol1",
+                solicitante_nome="Solicitante Teste",
+                area_solicitante="Manutencao",
+                solicitante_email="sol@test.com",
+            )
+
+    chamado_dict_salvo = mock_retry.call_args[0][1]
+    assert chamado_dict_salvo["escalacao_resposta_nivel"] == 0
+    mock_notif_aog.assert_not_called()

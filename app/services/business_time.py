@@ -93,6 +93,20 @@ def adicionar_minutos_uteis(inicio: datetime, minutos: int) -> datetime:
     return local
 
 
+def minutos_corridos_entre(inicio: datetime, fim: datetime) -> int:
+    """Conta minutos corridos (calendário) entre dois instantes, sem filtro de expediente.
+
+    Uso exclusivo AOG (Config.SLA_AOG_*): aeronave parada não espera expediente —
+    diferente de minutos_uteis_entre, não desconta fim de semana, almoço nem fora
+    da janela DTX.
+    """
+    inicio_local = _as_local(inicio)
+    fim_local = _as_local(fim)
+    if fim_local <= inicio_local:
+        return 0
+    return int((fim_local - inicio_local).total_seconds() // 60)
+
+
 def adicionar_dias_uteis(inicio: datetime, n: int) -> datetime:
     """Retorna o N-ésimo dia útil a partir de `inicio` (inclusive), às 16:30 (teto DTX).
 

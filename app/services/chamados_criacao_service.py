@@ -20,6 +20,7 @@ from app.models_historico import Historico
 from app.models_usuario import Usuario
 from app.services.assignment import atribuidor
 from app.services.notifications import (
+    notificar_abertura_aog_todos_gestores,
     notificar_aprovador_novo_chamado,
     notificar_setores_adicionais_chamado,
 )
@@ -267,6 +268,9 @@ def criar_chamado(
             setores_adicionais=setores_adicionais_lista,
             supervisor_ids_com_acesso=ids_com_acesso,
             observadores=observadores_list,
+            # AOG já avisa todos os 4 níveis de gestor na abertura (ver notificar_abertura_aog_
+            # todos_gestores abaixo) — Escada A normal (escalada gradual) não se aplica mais.
+            escalacao_resposta_nivel=4 if categoria == "AOG" else 0,
         )
         chamado_dict = novo_chamado.to_dict()
         chamado_dict["observadores_ids"] = [
@@ -303,6 +307,18 @@ def criar_chamado(
             """Envia todas as notificações em background para não bloquear o request."""
             try:
                 with _app.app_context():
+                    if categoria == "AOG":
+                        try:
+                            notificar_abertura_aog_todos_gestores(
+                                chamado_data=chamado_dict,
+                                chamado_id=chamado_id,
+                            )
+                        except Exception as exc:
+                            logger.warning(
+                                "AOG: broadcast pros gestores falhou (chamado %s): %s",
+                                chamado_id,
+                                exc,
+                            )
                     responsavel_usuario = (
                         Usuario.get_by_id(responsavel_id) if responsavel_id else None
                     )

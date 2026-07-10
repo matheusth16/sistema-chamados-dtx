@@ -36,6 +36,7 @@ from app.services.email_templates import (
     build_email_shell,
     build_two_ctas,
 )
+from config import Config
 
 _EMAIL_LANG = "en"
 _VALID_IMPORTANCE: frozenset[str] = frozenset({"high", "normal", "low"})
@@ -47,6 +48,7 @@ _ALWAYS_HIGH_TIPOS: frozenset[str] = frozenset(
         "chamado_reaberto",
         "escalada_resposta_gerencial",
         "escalada_resolucao_gerencial",
+        "abertura_aog",
     }
 )
 
@@ -1445,6 +1447,103 @@ def notificar_escalada_resposta_gerencial(
         )
     else:
         logger.warning("Failed to send SLA escalation notification to %s: %s", email_dest, err)
+
+
+_NIVEIS_GESTOR_AOG: tuple[str, ...] = ("gestor_setor", "gerente_producao", "assistente_gm", "gm")
+
+
+def notificar_abertura_aog_todos_gestores(chamado_data: dict, chamado_id: str) -> None:
+    """Notifica os 4 níveis de gestão simultaneamente na abertura de um chamado AOG.
+
+    Diferente da Escada A normal (escalada gradual, 1 nível por vez conforme o tempo
+    passa), AOG (Aircraft On Ground) é emergência imediata — avisa todo mundo de uma
+    vez na abertura, sem esperar o job de escalonamento nem a janela de expediente.
+    Gestor sem e-mail configurado é pulado (log warning), não impede os demais.
+    """
+    numero_chamado = chamado_data.get("numero_chamado") or "N/A"
+    categoria = chamado_data.get("categoria") or ""
+    area = chamado_data.get("area") or ""
+    tipo_solicitacao = chamado_data.get("tipo_solicitacao") or ""
+    descricao_resumo = (chamado_data.get("descricao") or "")[:500]
+    cat_d = _tc(categoria)
+    area_d = _ts(area)
+    tipo_d = _ts(tipo_solicitacao)
+
+    link = _link_chamado(chamado_id)
+    link_dash = _link_dashboard()
+
+    assunto = f"[AOG] Ticket {numero_chamado} — aircraft on ground, immediate action required"
+
+    detalhes_html = build_detail_table(
+        [
+            ("Number", numero_chamado),
+            ("Category", cat_d),
+            ("Type", tipo_d),
+            ("Area", area_d),
+        ]
+    )
+    summary_html = (
+        f'<p style="margin: 12px 0;">{escape(descricao_resumo)}</p>' if descricao_resumo else ""
+    )
+
+    ctas = []
+    if link:
+        ctas.append(("View ticket history", link, "#dc2626"))
+    if link_dash:
+        ctas.append(("View all tickets", link_dash, "#6b7280"))
+    botoes_html = build_two_ctas(ctas) if ctas else ""
+
+    corpo_html = build_email_shell(
+        header_title=f"AOG — Ticket {escape(numero_chamado)} needs immediate attention",
+        header_color="#dc2626",
+        body_html=(
+            "<p>An <strong>Aircraft On Ground (AOG)</strong> ticket was just opened. "
+            "This notification was sent to all management levels at once.</p>"
+            + detalhes_html
+            + summary_html
+            + botoes_html
+        ),
+    )
+    corpo_texto = (
+        f"AOG — Ticket {numero_chamado} needs immediate attention.\n"
+        f"Category: {cat_d}\nArea: {area_d}" + (f"\n\nView ticket: {link}" if link else "")
+    )
+
+    importance = resolver_importance("abertura_aog")
+    for chave_gestor in _NIVEIS_GESTOR_AOG:
+        email_dest = Config.get_gestor_email(chave_gestor)
+        if not email_dest:
+            logger.warning(
+                "AOG abertura: gestor '%s' sem e-mail configurado (chamado %s).",
+                chave_gestor,
+                numero_chamado,
+            )
+            continue
+        try:
+            ok, err = enviar_email(
+                email_dest, assunto, corpo_html, corpo_texto, importance=importance
+            )
+            if ok:
+                logger.info(
+                    "AOG abertura: e-mail enviado pro nível '%s' (%s), chamado %s",
+                    chave_gestor,
+                    email_dest,
+                    numero_chamado,
+                )
+            else:
+                logger.warning(
+                    "AOG abertura: falha ao enviar pro nível '%s' (%s): %s",
+                    chave_gestor,
+                    email_dest,
+                    err,
+                )
+        except Exception as exc:
+            logger.warning(
+                "AOG abertura: exceção ao notificar nível '%s' (%s): %s",
+                chave_gestor,
+                email_dest,
+                exc,
+            )
 
 
 def notificar_owner_todos_participantes_concluiram(

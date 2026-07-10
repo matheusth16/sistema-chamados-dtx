@@ -1025,6 +1025,56 @@ def test_escada_b_padrao_deadline_3_dias_uteis():
     mock_db.collection.return_value.document.return_value.update.assert_not_called()
 
 
+def test_calcular_deadline_resolucao_aog_usa_minutos_corridos():
+    """AOG: deadline = data_em_atendimento + SLA_AOG_MINUTOS_RESOLUCAO_DEADLINE minutos
+    corridos (calendário), não dias úteis — aeronave parada não espera expediente."""
+    from datetime import timedelta
+
+    from app.services.sla_escalacao_service import calcular_deadline_resolucao
+    from config import Config
+
+    inicio = _dt(2024, 6, 3, 9, 0)  # segunda 09:00
+    resultado = calcular_deadline_resolucao(inicio, "AOG")
+
+    assert resultado == inicio + timedelta(minutes=Config.SLA_AOG_MINUTOS_RESOLUCAO_DEADLINE)
+
+
+def test_escada_b_aog_escala_fora_da_janela_de_expediente():
+    """AOG: prazo (240min corridos) vencido num sábado de madrugada ainda deve escalar —
+    ignora pode_enviar_notificacao_agora, ao contrário de um chamado normal."""
+    from app.services.sla_escalacao_service import processar_escada_b
+
+    # sábado 00:00 em atendimento -> deadline AOG = sábado 04:00 (240 min corridos)
+    sabado_00h = _dt(2024, 6, 8, 0, 0)
+    agora = _dt(2024, 6, 8, 5, 0)  # sábado 05:00, 1h após deadline — fora de qualquer expediente
+
+    doc = _make_doc_atendimento(
+        chamado_id="ch_aog_1",
+        data_em_atendimento=sabado_00h,
+        categoria="AOG",
+        nivel_b=0,
+    )
+
+    with (
+        patch("app.services.sla_escalacao_service.db") as mock_db,
+        patch(
+            "app.services.sla_escalacao_service.notificar_escalada_resolucao_gerencial"
+        ) as mock_notif,
+        patch(
+            "app.services.sla_escalacao_service.Config.get_gestor_email",
+            return_value="gestor@dtx.aero",
+        ),
+    ):
+        _setup_query(mock_db, [doc])
+        resultado = processar_escada_b(agora=agora)
+
+    assert resultado["pulados_fora_janela"] == 0
+    assert resultado["escalados"] == 1
+    mock_notif.assert_called_once()
+    payload = mock_db.collection.return_value.document.return_value.update.call_args[0][0]
+    assert payload["escalacao_resolucao_nivel"] == 1
+
+
 def test_escada_b_idempotente_nao_reescala_mesmo_nivel():
     """Nível 1 já gravado e minutos_uteis_apos_deadline == 100 → nivel_esperado=1 → skip."""
     from app.services.sla_escalacao_service import processar_escada_b

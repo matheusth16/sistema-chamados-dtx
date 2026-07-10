@@ -1156,6 +1156,97 @@ def test_notificar_escalada_resposta_gerencial_falha_nao_levanta(app):
         )  # não deve levantar
 
 
+# ── AOG — notificar_abertura_aog_todos_gestores ────────────────────────────────────────────────
+
+
+def test_notificar_abertura_aog_todos_gestores_envia_para_os_4_niveis(app):
+    """Abertura de AOG dispara e-mail simultâneo pros 4 níveis de gestor, não sequencial."""
+    from app.services.notifications import notificar_abertura_aog_todos_gestores
+
+    chamado_data = {
+        "numero_chamado": "CHM-AOG-01",
+        "categoria": "AOG",
+        "area": "Manutenção",
+        "tipo_solicitacao": "Corretiva",
+        "descricao": "Aeronave PR-XYZ em solo, hidráulica falhou.",
+    }
+
+    emails_por_nivel = {
+        "gestor_setor": "setor@dtx.aero",
+        "gerente_producao": "producao@dtx.aero",
+        "assistente_gm": "assistente@dtx.aero",
+        "gm": "gm@dtx.aero",
+    }
+
+    with (
+        app.app_context(),
+        patch("app.services.notifications.enviar_email", return_value=(True, None)) as mock_send,
+        patch(
+            "app.services.notifications.Config.get_gestor_email",
+            side_effect=lambda chave: emails_por_nivel.get(chave),
+        ),
+    ):
+        notificar_abertura_aog_todos_gestores(chamado_data=chamado_data, chamado_id="ch_aog_1")
+
+    assert mock_send.call_count == 4
+    destinatarios = {call.args[0] for call in mock_send.call_args_list}
+    assert destinatarios == set(emails_por_nivel.values())
+    # Todos de alta importância (emergência) e mencionam o número do chamado
+    for call in mock_send.call_args_list:
+        _dest, assunto, _html, _txt = call.args
+        assert "CHM-AOG-01" in assunto
+        assert call.kwargs.get("importance") == "high"
+
+
+def test_notificar_abertura_aog_pula_gestor_sem_email_configurado(app):
+    """Gestor sem e-mail configurado é pulado (log warning), não impede os outros 3."""
+    from app.services.notifications import notificar_abertura_aog_todos_gestores
+
+    chamado_data = {"numero_chamado": "CHM-AOG-02", "categoria": "AOG"}
+
+    emails_parciais = {
+        "gestor_setor": None,
+        "gerente_producao": "producao@dtx.aero",
+        "assistente_gm": "assistente@dtx.aero",
+        "gm": "gm@dtx.aero",
+    }
+
+    with (
+        app.app_context(),
+        patch("app.services.notifications.enviar_email", return_value=(True, None)) as mock_send,
+        patch(
+            "app.services.notifications.Config.get_gestor_email",
+            side_effect=lambda chave: emails_parciais.get(chave),
+        ),
+    ):
+        notificar_abertura_aog_todos_gestores(chamado_data=chamado_data, chamado_id="ch_aog_2")
+
+    assert mock_send.call_count == 3  # gestor_setor pulado, sem exception
+
+
+def test_notificar_abertura_aog_falha_de_envio_nao_levanta(app):
+    """Falha no envio de um nível não deve impedir a tentativa dos outros nem propagar exceção."""
+    from app.services.notifications import notificar_abertura_aog_todos_gestores
+
+    chamado_data = {"numero_chamado": "CHM-AOG-03", "categoria": "AOG"}
+
+    with (
+        app.app_context(),
+        patch(
+            "app.services.notifications.enviar_email", return_value=(False, "timeout")
+        ) as mock_send,
+        patch(
+            "app.services.notifications.Config.get_gestor_email",
+            return_value="gestor@dtx.aero",
+        ),
+    ):
+        notificar_abertura_aog_todos_gestores(
+            chamado_data=chamado_data, chamado_id="ch_aog_3"
+        )  # não deve levantar
+
+    assert mock_send.call_count == 4
+
+
 # ── Fase 7 — notificar_aviso_resolucao_supervisor / notificar_escalada_resolucao_gerencial ────
 
 
