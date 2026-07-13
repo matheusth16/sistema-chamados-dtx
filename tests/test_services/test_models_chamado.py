@@ -44,6 +44,12 @@ def test_chamado_projetos_forcam_prioridade_zero():
     assert c.prioridade == 0
 
 
+def test_chamado_aog_forca_prioridade_menos_um():
+    """AOG é prioridade máxima e fica acima de Projetos (0) na ordenação."""
+    c = _chamado(categoria="AOG", prioridade=3)
+    assert c.prioridade == -1
+
+
 def test_chamado_prioridade_none_vira_1():
     c = _chamado(prioridade=None)
     assert c.prioridade == 1

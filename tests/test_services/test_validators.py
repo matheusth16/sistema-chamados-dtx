@@ -129,6 +129,29 @@ def test_validar_rl_codigo(rl_codigo, espera_erro):
         assert erros == []
 
 
+_FORM_AOG_BASE = {
+    "descricao": "Aeronave em solo",
+    "tipo": "Manutencao",
+    "categoria": "AOG",
+    "gate": "N/A",
+    "impacto": "Impacto Alto",
+}
+
+
+def test_validar_rl_codigo_aog_obrigatorio():
+    """AOG, assim como Projetos, exige rl_codigo preenchido."""
+    form = {**_FORM_AOG_BASE, "rl_codigo": ""}
+    erros = validar_novo_chamado(form)
+    assert any("RL" in e for e in erros)
+
+
+def test_validar_rl_codigo_aog_valido_sem_erro():
+    """AOG com rl_codigo válido não gera erro de RL."""
+    form = {**_FORM_AOG_BASE, "rl_codigo": "AOG-001"}
+    erros = validar_novo_chamado(form)
+    assert erros == []
+
+
 def test_validar_novo_chamado_arquivo_extensao_invalida():
     """Arquivo com extensão não permitida retorna erro."""
     form = {

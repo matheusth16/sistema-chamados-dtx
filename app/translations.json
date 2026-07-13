@@ -190,9 +190,9 @@
     "es": "No Aplicable (Rutina)"
   },
   "aog_max_priority": {
-    "pt_BR": "AOG (Aeronave em Solo — Emergência)",
-    "en": "AOG (Aircraft On Ground — Emergency)",
-    "es": "AOG (Aeronave en Tierra — Emergencia)"
+    "pt_BR": "AOG (Emergência — Prioridade Máxima)",
+    "en": "AOG (Emergency — Maximum Priority)",
+    "es": "AOG (Emergencia — Prioridad Máxima)"
   },
   "error_loading": {
     "pt_BR": "Erro ao carregar - Será atribuído manualmente",
@@ -240,9 +240,14 @@
     "es": "Detalles"
   },
   "form_section_notification": {
-    "pt_BR": "Notificação",
-    "en": "Notification",
-    "es": "Notificación"
+    "pt_BR": "Quem mais será avisado",
+    "en": "Who else gets notified",
+    "es": "Quién más será notificado"
+  },
+  "form_section_destination": {
+    "pt_BR": "Destino do Chamado",
+    "en": "Ticket Destination",
+    "es": "Destino del Ticket"
   },
   "auto_tag": {
     "pt_BR": "Auto",
@@ -329,15 +334,25 @@
     "en": "Complete details of the request",
     "es": "Detalles completos de la solicitud"
   },
-  "projects_max_priority": {
-    "pt_BR": "Projetos (Prioridade Máxima)",
-    "en": "Projects (Maximum Priority)",
-    "es": "Proyectos (Prioridad Máxima)"
+  "projects_high_priority": {
+    "pt_BR": "Projetos (Prioridade Alta)",
+    "en": "Projects (High Priority)",
+    "es": "Proyectos (Prioridad Alta)"
   },
   "gate": {
     "pt_BR": "Gate",
     "en": "Gate",
     "es": "Gate"
+  },
+  "gate_hint": {
+    "pt_BR": "Etapa do processo em que o problema foi identificado.",
+    "en": "Process stage where the issue was identified.",
+    "es": "Etapa del proceso en la que se identificó el problema."
+  },
+  "sector_hint": {
+    "pt_BR": "Setor que vai atender o chamado.",
+    "en": "Sector that will handle the ticket.",
+    "es": "Sector que atenderá el ticket."
   },
   "suggested_responsible": {
     "pt_BR": "Responsável Sugerido",
@@ -348,6 +363,16 @@
     "pt_BR": "Exportar",
     "en": "Export",
     "es": "Exportar"
+  },
+  "period": {
+    "pt_BR": "Período",
+    "en": "Period",
+    "es": "Período"
+  },
+  "retry": {
+    "pt_BR": "Tentar novamente",
+    "en": "Try again",
+    "es": "Intentar de nuevo"
   },
   "download_attachment": {
     "pt_BR": "Baixar Anexo",
@@ -409,6 +434,11 @@
     "en": "Request Category",
     "es": "Categoría de la Solicitud"
   },
+  "category_priority_hint": {
+    "pt_BR": "Projetos e AOG exigem código RL e têm atendimento prioritário.",
+    "en": "Projects and AOG require an RL code and get priority handling.",
+    "es": "Proyectos y AOG requieren código RL y tienen atención prioritaria."
+  },
   "found_tickets": {
     "pt_BR": "chamados encontrados",
     "en": "tickets found",
@@ -440,9 +470,9 @@
     "es": "Descripción del Problema"
   },
   "type_sector": {
-    "pt_BR": "Setor",
-    "en": "Sector",
-    "es": "Sector"
+    "pt_BR": "Setor Responsável",
+    "en": "Responsible Sector",
+    "es": "Sector Responsable"
   },
   "option_open": {
     "pt_BR": "Aberto",
@@ -540,9 +570,9 @@
     "es": "ID / Referencia"
   },
   "select_sector": {
-    "pt_BR": "Selecione um setor...",
-    "en": "Select a sector...",
-    "es": "Seleccione un sector..."
+    "pt_BR": "Selecione o setor que vai atender...",
+    "en": "Select the sector that will handle it...",
+    "es": "Seleccione el sector que atenderá..."
   },
   "english": {
     "pt_BR": "English",
@@ -553,6 +583,11 @@
     "pt_BR": "Meus Chamados",
     "en": "My Tickets",
     "es": "Mis Tickets"
+  },
+  "your_tickets_summary_title": {
+    "pt_BR": "Seus chamados",
+    "en": "Your tickets",
+    "es": "Sus tickets"
   },
   "manage_users": {
     "pt_BR": "Gerenciar usuários do sistema",
@@ -615,9 +650,9 @@
     "es": "Impacto Principal"
   },
   "select_sector_above": {
-    "pt_BR": "Selecione um setor acima...",
-    "en": "Select a sector above...",
-    "es": "Seleccione un sector anterior..."
+    "pt_BR": "Selecione o setor responsável acima",
+    "en": "Select the responsible sector above",
+    "es": "Seleccione el sector responsable arriba"
   },
   "ticket_details": {
     "pt_BR": "Detalhes do Chamado",
@@ -763,6 +798,11 @@
     "pt_BR": "Projetos",
     "en": "Projects",
     "es": "Proyectos"
+  },
+  "aog_short": {
+    "pt_BR": "AOG",
+    "en": "AOG",
+    "es": "AOG"
   },
   "reports": {
     "pt_BR": "Relatórios",
@@ -4559,10 +4599,10 @@
     "en": "The ticket impact is required.",
     "es": "El impacto del ticket es obligatorio."
   },
-  "rl_code_required_projects": {
-    "pt_BR": "Para Projetos, o código RL é obrigatório.",
-    "en": "For Projects, the RL code is required.",
-    "es": "Para Proyectos, el código RL es obligatorio."
+  "rl_code_required": {
+    "pt_BR": "Para Projetos e AOG, o código RL é obrigatório.",
+    "en": "For Projects and AOG, the RL code is required.",
+    "es": "Para Proyectos y AOG, el código RL es obligatorio."
   },
   "rl_code_max_100_chars": {
     "pt_BR": "O código RL deve ter no máximo 100 caracteres.",
@@ -4598,6 +4638,11 @@
     "pt_BR": "Máximo de {max} observadores por chamado.",
     "en": "Maximum of {max} observers per ticket.",
     "es": "Máximo de {max} observadores por ticket."
+  },
+  "admin_cannot_be_observer": {
+    "pt_BR": "Administradores não podem ser adicionados como observadores (CC).",
+    "en": "Administrators cannot be added as observers (CC).",
+    "es": "Los administradores no pueden ser agregados como observadores (CC)."
   },
   "upload_invalid_format_allowed": {
     "pt_BR": "Formato de arquivo inválido. Permitidos: {allowed}.",

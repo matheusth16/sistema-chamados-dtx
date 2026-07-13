@@ -106,6 +106,38 @@ def test_relatorios_com_admin_retorna_200(client_logado_admin):
     assert b"relat" in r.data.lower() or b"report" in r.data.lower() or b"anal" in r.data.lower()
 
 
+def test_relatorios_propaga_dias_valido_para_analisador(client_logado_admin):
+    """GET /admin/relatorios?dias=7 repassa dias=7 pro analisador (seletor de período)."""
+    with patch("app.routes.dashboard.analisador") as mock_anal:
+        mock_anal.obter_relatorio_completo.return_value = {
+            "data_geracao": None,
+            "metricas_gerais": {},
+            "metricas_supervisores": [],
+            "metricas_areas": [],
+            "insights": [],
+        }
+        with patch("app.routes.dashboard.Usuario.get_all", return_value=[]):
+            r = client_logado_admin.get("/admin/relatorios?dias=7", follow_redirects=False)
+    assert r.status_code == 200
+    assert mock_anal.obter_relatorio_completo.call_args.kwargs["dias"] == 7
+
+
+def test_relatorios_dias_invalido_normaliza_para_30(client_logado_admin):
+    """GET /admin/relatorios?dias=999 (fora de 7/30/90) cai para o padrão 30."""
+    with patch("app.routes.dashboard.analisador") as mock_anal:
+        mock_anal.obter_relatorio_completo.return_value = {
+            "data_geracao": None,
+            "metricas_gerais": {},
+            "metricas_supervisores": [],
+            "metricas_areas": [],
+            "insights": [],
+        }
+        with patch("app.routes.dashboard.Usuario.get_all", return_value=[]):
+            r = client_logado_admin.get("/admin/relatorios?dias=999", follow_redirects=False)
+    assert r.status_code == 200
+    assert mock_anal.obter_relatorio_completo.call_args.kwargs["dias"] == 30
+
+
 def test_supervisor_pode_ver_relatorios(client_logado_supervisor):
     """GET /admin/relatorios com supervisor retorna 200."""
     with patch("app.routes.dashboard.analisador") as mock_anal:
@@ -278,7 +310,7 @@ def test_admin_post_exception_redireciona(client_logado_admin):
 # ── GET /chamado/<chamado_id> ─────────────────────────────────────────────────
 
 
-def _chamado_dict_fake(solicitante_id="sol_x", area="Manutencao"):
+def _chamado_dict_fake(solicitante_id="sol_x", area="Manutencao", status="Aberto"):
     return {
         "numero_chamado": "001",
         "categoria": "TI",
@@ -289,7 +321,7 @@ def _chamado_dict_fake(solicitante_id="sol_x", area="Manutencao"):
         "solicitante_id": solicitante_id,
         "solicitante_nome": "Fulano",
         "responsavel_id": None,
-        "status": "Aberto",
+        "status": status,
         "gate": None,
         "rl_codigo": None,
         "data_abertura": None,
@@ -353,6 +385,35 @@ def test_visualizar_chamado_com_participantes_sem_usuario_atual_retorna_200(clie
         ):
             r = client_logado_admin.get("/chamado/ch1", follow_redirects=False)
     assert r.status_code == 200
+
+
+def test_visualizar_chamado_traduz_status_para_ingles(client_logado_admin):
+    """GET /chamado/<id> com idioma=en não deve mostrar status cru em PT-BR.
+
+    Regressão: components/_status_badge.html importado sem 'with context' em
+    visualizar_chamado.html — a macro perde acesso a translate_status()/t()
+    do context_processor, cai no fallback hardcoded em português
+    independente do idioma escolhido pelo usuário.
+    """
+    with patch("app.routes.dashboard.db") as mock_db:
+        mock_doc = MagicMock()
+        mock_doc.exists = True
+        mock_doc.to_dict.return_value = _chamado_dict_fake(status="Em Atendimento")
+        mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
+        with (
+            patch("app.routes.dashboard.usuario_pode_ver_chamado", return_value=True),
+            patch("app.routes.dashboard.Usuario.get_all", return_value=[]),
+            patch("app.routes.dashboard.filtrar_supervisores_por_area", return_value=[]),
+            patch("app.routes.dashboard.CategoriaSetor.get_all", return_value=[]),
+        ):
+            with client_logado_admin.session_transaction() as sess:
+                sess["language"] = "en"
+            r = client_logado_admin.get("/chamado/ch1")
+    body = r.data.decode("utf-8")
+    assert "In Progress" in body
+    # value="Em Atendimento" no <option> é o valor canônico do form (correto,
+    # não é texto visível) — só o texto exibido não pode vazar em PT-BR.
+    assert ">Em Atendimento<" not in body
 
 
 def test_visualizar_chamado_supervisor_sem_permissao_redireciona(client_logado_supervisor):
@@ -580,6 +641,113 @@ def test_exportar_neutraliza_formula_injection_em_xlsx(client_logado_supervisor)
     )
 
 
+# ── Regressão de segurança: /exportar e /exportar-avancado vazando outras áreas ──
+# Achado em QA manual: supervisor da área "Demo" baixou /exportar e recebeu linhas
+# de chamados da área "Manutencao"; /exportar-avancado trouxe métricas de
+# supervisores de outras áreas na aba "Performance". Causa raiz: essas duas rotas
+# consultavam db.collection("chamados") sem o mesmo filtro
+# supervisor_ids_com_acesso array_contains que obter_contexto_admin já aplica
+# pro /painel — a query saía sem escopo e só era filtrada depois, em memória,
+# por _filtrar_chamados_por_permissao (que escopa os chamados, mas não as
+# métricas agregadas por supervisor).
+
+
+def test_exportar_escopa_query_por_supervisor_ids_com_acesso(client_logado_supervisor):
+    """/exportar deve escopar a query por área do supervisor ANTES da paginação,
+    mesmo padrão usado em obter_contexto_admin para o /painel."""
+    with (
+        patch("app.routes.dashboard.aplicar_filtros_dashboard_com_paginacao") as mock_filtros,
+        patch("app.routes.dashboard._filtrar_chamados_por_permissao", return_value=[]),
+        patch("app.routes.dashboard.db") as mock_db,
+        patch("app.routes.dashboard.verificar_e_incrementar_export", return_value=(True, None)),
+    ):
+        mock_filtros.return_value = {"docs": []}
+
+        client_logado_supervisor.get("/exportar", follow_redirects=False)
+
+        colecao = mock_db.collection.return_value
+        assert colecao.where.call_count >= 1, (
+            "A query de /exportar não foi escopada por área — supervisor pode "
+            "exportar chamados de áreas que não são dele."
+        )
+        filtro = colecao.where.call_args.kwargs.get("filter")
+        assert filtro is not None
+        assert filtro.field_path == "supervisor_ids_com_acesso"
+        assert filtro.op_string == "array_contains"
+        assert filtro.value == "sup_1"
+
+        query_passada = mock_filtros.call_args[0][0]
+        assert query_passada is colecao.where.return_value, (
+            "aplicar_filtros_dashboard_com_paginacao recebeu a coleção crua, não "
+            "a query já escopada por .where(supervisor_ids_com_acesso)."
+        )
+
+
+def test_exportar_avancado_escopa_query_por_supervisor_ids_com_acesso(
+    client_logado_supervisor,
+):
+    """/exportar-avancado deve escopar a query de chamados da mesma forma que /exportar."""
+    with (
+        patch("app.routes.dashboard.aplicar_filtros_dashboard_com_paginacao") as mock_filtros,
+        patch("app.routes.dashboard._filtrar_chamados_por_permissao", return_value=[]),
+        patch("app.routes.dashboard.analisador") as mock_anal,
+        patch("app.services.excel_export_service.exportador_excel") as mock_exp,
+        patch("app.routes.dashboard.db") as mock_db,
+        patch("app.routes.dashboard.verificar_e_incrementar_export", return_value=(True, None)),
+    ):
+        import io
+
+        mock_filtros.return_value = {"docs": []}
+        mock_anal.obter_metricas_gerais.return_value = {}
+        mock_anal.obter_metricas_supervisores.return_value = []
+        mock_exp.exportar_relatorio_completo.return_value = io.BytesIO(b"PK fake")
+
+        client_logado_supervisor.get("/exportar-avancado", follow_redirects=False)
+
+        colecao = mock_db.collection.return_value
+        assert colecao.where.call_count >= 1, (
+            "A query de /exportar-avancado não foi escopada por área."
+        )
+        filtro = colecao.where.call_args.kwargs.get("filter")
+        assert filtro is not None
+        assert filtro.field_path == "supervisor_ids_com_acesso"
+        assert filtro.value == "sup_1"
+
+
+def test_exportar_avancado_metricas_supervisores_filtradas_por_area(
+    client_logado_supervisor,
+):
+    """/exportar-avancado não pode incluir, na aba de Performance, métricas de
+    supervisores de áreas diferentes da do usuário que exportou."""
+    with (
+        patch("app.routes.dashboard.aplicar_filtros_dashboard_com_paginacao") as mock_filtros,
+        patch("app.routes.dashboard._filtrar_chamados_por_permissao", return_value=[]),
+        patch("app.routes.dashboard.analisador") as mock_anal,
+        patch("app.services.excel_export_service.exportador_excel") as mock_exp,
+        patch("app.routes.dashboard.db"),
+        patch("app.routes.dashboard.verificar_e_incrementar_export", return_value=(True, None)),
+    ):
+        import io
+
+        mock_filtros.return_value = {"docs": []}
+        mock_anal.obter_metricas_gerais.return_value = {}
+        mock_anal.obter_metricas_supervisores.return_value = [
+            {"supervisor_nome": "Sup Mesma Area", "area": "Manutencao"},
+            {"supervisor_nome": "Sup Outra Area", "area": "TI"},
+        ]
+        mock_exp.exportar_relatorio_completo.return_value = io.BytesIO(b"PK fake")
+
+        client_logado_supervisor.get("/exportar-avancado", follow_redirects=False)
+
+        _, kwargs = mock_exp.exportar_relatorio_completo.call_args
+        metricas_enviadas = kwargs.get("metricas_supervisores") or []
+        areas_enviadas = {m.get("area") for m in metricas_enviadas}
+        assert "TI" not in areas_enviadas, (
+            "Métricas de supervisor de outra área ('TI') vazaram pro relatório "
+            "de um supervisor da área 'Manutencao'."
+        )
+
+
 # ── Onda 3: POST /painel como supervisor ──────────────────────────────────────
 
 
@@ -780,6 +948,49 @@ def test_historico_exception_redireciona(client_logado_supervisor):
         mock_db.collection.return_value.document.return_value.get.side_effect = Exception("db err")
         r = client_logado_supervisor.get("/chamado/ch_erro/historico", follow_redirects=False)
     assert r.status_code == 302
+
+
+def test_historico_traduz_status_para_ingles(client_logado_admin):
+    """GET /chamado/<id>/historico com idioma=en não deve mostrar status cru em PT-BR.
+
+    Dois bugs no mesmo template (historico.html):
+    1. components/_status_badge.html importado sem 'with context' — badge do
+       status atual cai no fallback hardcoded em português.
+    2. O diff da timeline só traduz quando evento.campo_alterado == 'Status'
+       (maiúsculo), mas todo o backend grava campo_alterado="status"
+       (minúsculo) — a comparação nunca bate e o valor cru em PT-BR vaza
+       pro <span class="bento-diff-chip"> independente do idioma.
+    """
+    from datetime import datetime
+
+    from app.models_historico import Historico
+
+    evento = Historico(
+        id="h1",
+        chamado_id="ch1",
+        usuario_id="u1",
+        usuario_nome="Fulano",
+        acao="alteracao_status",
+        campo_alterado="status",
+        valor_anterior="Aberto",
+        valor_novo="Em Atendimento",
+        data_acao=datetime.now(),
+    )
+    with patch("app.routes.dashboard.db") as mock_db:
+        mock_doc = MagicMock()
+        mock_doc.exists = True
+        mock_doc.to_dict.return_value = _chamado_dict_fake(status="Em Atendimento")
+        mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
+        with (
+            patch("app.routes.dashboard.usuario_pode_ver_chamado", return_value=True),
+            patch("app.routes.dashboard.Historico.get_by_chamado_id", return_value=[evento]),
+        ):
+            with client_logado_admin.session_transaction() as sess:
+                sess["language"] = "en"
+            r = client_logado_admin.get("/chamado/ch1/historico")
+    body = r.data.decode("utf-8")
+    assert "In Progress" in body
+    assert "Em Atendimento" not in body
 
 
 # ── Onda 3: exportar exception handler ────────────────────────────────────────

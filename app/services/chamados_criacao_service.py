@@ -69,7 +69,7 @@ def _resolver_responsavel(
     resultado = atribuidor.atribuir(
         area=area_para_atribuicao,
         categoria=categoria,
-        prioridade=0 if categoria == "Projetos" else 1,
+        prioridade=-1 if categoria == "AOG" else (0 if categoria == "Projetos" else 1),
     )
     if resultado["sucesso"]:
         return (
@@ -231,7 +231,7 @@ def criar_chamado(
     )
 
     grupo_rl_id = None
-    if categoria == "Projetos" and rl_codigo:
+    if categoria in ("Projetos", "AOG") and rl_codigo:
         try:
             grupo = GrupoRL.get_or_create(
                 rl_codigo=rl_codigo,
@@ -250,7 +250,7 @@ def criar_chamado(
         novo_chamado = Chamado(
             numero_chamado=numero_chamado,
             categoria=categoria,
-            rl_codigo=rl_codigo if categoria == "Projetos" else None,
+            rl_codigo=rl_codigo if categoria in ("Projetos", "AOG") else None,
             tipo_solicitacao=tipo,
             gate=gate,
             impacto=impacto,

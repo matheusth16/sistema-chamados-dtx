@@ -3,7 +3,7 @@ Validação de dados de chamados e formulários.
 
 Centraliza regras de negócio para criação/edição de chamados:
 - Campos obrigatórios (descrição, tipo, categoria)
-- Regra DTX: Projetos exigem código RL (letras, números e caracteres; 1 a 100 caracteres)
+- Regra DTX: Projetos e AOG exigem código RL (letras, números e caracteres; 1 a 100 caracteres)
 - Extensões e validação de anexos (extensão + magic bytes para evitar upload malicioso)
 """
 
@@ -260,7 +260,7 @@ def validar_novo_chamado(
         - Descrição obrigatória, mínimo 3 caracteres.
         - Atribuição ao setor obrigatória.
         - Gate e impacto obrigatórios.
-        - Categoria Projetos exige rl_codigo preenchido (letras, números e caracteres; 1 a 100 caracteres).
+        - Categoria Projetos ou AOG exige rl_codigo preenchido (letras, números e caracteres; 1 a 100 caracteres).
         - Cada anexo: extensão allowlist, magic bytes, máximo 10 MB.
     """
     erros = []
@@ -297,11 +297,11 @@ def validar_novo_chamado(
         erros.append(_t("ticket_impact_required"))
 
     # 2. Validação Específica da DTX (Regra do RL)
-    # Para Projetos: código RL obrigatório — letras, números e caracteres (1 a 100)
-    if categoria == "Projetos":
+    # Para Projetos e AOG: código RL obrigatório — letras, números e caracteres (1 a 100)
+    if categoria in ("Projetos", "AOG"):
         rl_codigo = (form.get("rl_codigo") or "").strip()
         if not rl_codigo:
-            erros.append(_t("rl_code_required_projects"))
+            erros.append(_t("rl_code_required"))
         elif len(rl_codigo) > 100:
             erros.append(_t("rl_code_max_100_chars"))
         # Caracteres permitidos: letras, números, espaços e símbolos comuns (evita controle/injeção)
@@ -348,11 +348,16 @@ def validar_observadores(
     - Máximo MAX_OBSERVADORES (5) observadores por chamado.
     - Solicitante não pode ser observador do próprio chamado.
     - Cada observador deve ter usuario_id presente.
+    - Admin/admin_global não pode ser observador (CC é só para
+      solicitante/supervisor — reforça no backend o filtro já aplicado
+      em /api/usuarios/buscar, contra manipulação direta do request).
     - Duplicatas são ignoradas silenciosamente (sem erro).
 
     Returns:
         Lista de mensagens de erro; vazia se tudo OK.
     """
+    from app.models_usuario import Usuario
+
     erros: list[str] = []
     if not observadores:
         return erros
@@ -375,5 +380,11 @@ def validar_observadores(
 
     if len(vistos) > MAX_OBSERVADORES:
         erros.append(_t("max_observers_exceeded", max=MAX_OBSERVADORES))
+
+    for uid in ids_validos:
+        usuario = Usuario.get_by_id(uid)
+        if usuario is not None and getattr(usuario, "perfil", None) in ("admin", "admin_global"):
+            erros.append(_t("admin_cannot_be_observer"))
+            break
 
     return erros

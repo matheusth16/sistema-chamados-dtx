@@ -69,6 +69,7 @@ def _usuario_mock(
     u.nivel_gestao = "gestor_setor" if is_gestor else None
     u.is_gestor = is_gestor
     u.is_gestor_only = is_gestor_only
+    u.mfa_enabled = True
     return u
 
 
@@ -586,12 +587,19 @@ def check_esc_10(app) -> Resultado:
                 "aberto_sem_resposta": 0,
                 "multi_setor_travado": 0,
             },
+            "insights": {
+                "area_critica": None,
+                "tempo_medio_sem_resposta_min": 0,
+                "saude_percentual": 100,
+            },
             "chamados": [],
+            "grupos": [],
             "filtro_ativo": "todos",
         }
         with (
             patch("app.routes.auth.Usuario.get_by_email", return_value=gestor),
             patch("app.models_usuario.Usuario.get_by_id", return_value=gestor),
+            patch("app.routes.auth._dispositivo_confiavel", return_value=True),
             patch(
                 "app.routes.dashboard.obter_contexto_gestor_dashboard",
                 return_value=contexto_mock,

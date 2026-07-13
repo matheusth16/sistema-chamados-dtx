@@ -128,15 +128,18 @@
             return direction === 'asc' ? comparison : -comparison;
         };
 
-        // Separa Projetos (prioridade=0) das demais para manter Projetos sempre acima
+        // Separa AOG (prioridade=-1) e Projetos (prioridade=0) das demais, mantendo
+        // AOG > Projetos > resto sempre no topo
+        const aog = rows.filter(r => r.dataset.prioridade === '-1');
         const projetos = rows.filter(r => r.dataset.prioridade === '0');
-        const outros = rows.filter(r => r.dataset.prioridade !== '0');
+        const outros = rows.filter(r => r.dataset.prioridade !== '-1' && r.dataset.prioridade !== '0');
 
+        aog.sort(sortFn);
         projetos.sort(sortFn);
         outros.sort(sortFn);
 
-        // Reinsere: Projetos primeiro, depois os demais
-        [...projetos, ...outros].forEach(row => table.appendChild(row));
+        // Reinsere: AOG primeiro, depois Projetos, depois os demais
+        [...aog, ...projetos, ...outros].forEach(row => table.appendChild(row));
 
         // Reposiciona cabeçalhos RL antes do primeiro ticket do seu grupo
         table.querySelectorAll('tr.rl-header-row').forEach(header => {

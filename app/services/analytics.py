@@ -22,8 +22,9 @@ from app.services.business_time import percentual_prazo_resolucao
 
 logger = logging.getLogger(__name__)
 
-# Cache em memória (fallback quando Redis não está configurado)
-_RELATORIO_CACHE: dict[str, Any] = {}
+# Cache em memória (fallback quando Redis não está configurado), por período
+# (dias) — cada seleção de período no seletor da UI tem sua própria entrada.
+_RELATORIO_CACHE: dict[int, dict[str, Any]] = {}
 _RELATORIO_CACHE_TTL_SEC = 300  # 5 minutos
 # TTL para queries analíticas individuais — curto o suficiente para manter dados
 # razoavelmente frescos, longo o suficiente para não re-escanear 2000 docs por minuto.
@@ -42,6 +43,11 @@ def _sla_dias_por_categoria(categoria: str, sla_dias_custom: int | None = None) 
     if sla_dias_custom is not None and isinstance(sla_dias_custom, int) and sla_dias_custom > 0:
         return sla_dias_custom
     return SLA_DIAS_PROJETOS if (categoria or "").strip() == "Projetos" else SLA_DIAS_PADRAO
+
+
+# Firestore sempre devolve datetimes tz-aware (UTC); usar um mínimo naive aqui
+# quebraria a comparação com data_limite/agora (também tz-aware) com TypeError.
+_DATETIME_MIN_UTC = datetime.min.replace(tzinfo=UTC)
 
 
 def _to_datetime(ts: Any) -> datetime | None:
@@ -167,13 +173,13 @@ class AnalisadorChamados:
             except Exception as e:
                 logger.debug("Cache indisponível (analytics): %s", e)
         try:
-            data_limite = datetime.now() - timedelta(days=dias)
+            data_limite = datetime.now(UTC) - timedelta(days=dias)
 
             if chamados_pre_carregados is not None:
                 todos_chamados = [
                     c
                     for c in chamados_pre_carregados
-                    if (_to_datetime(c.get("data_abertura")) or datetime.min) >= data_limite
+                    if (_to_datetime(c.get("data_abertura")) or _DATETIME_MIN_UTC) >= data_limite
                 ]
             else:
                 chamados_ref = (
@@ -226,7 +232,11 @@ class AnalisadorChamados:
             um_dia = timedelta(days=1)
 
             for chamado in todos_chamados:
-                prio = chamado.get("prioridade", "Indefinido")
+                # Chave sempre str: chamados sem "prioridade" (legado) caem no
+                # fallback "Indefinido" (str), misturado com prioridades numericas
+                # (-1/0/1/2...) quebra json.dumps(sort_keys=True) — "'<' not
+                # supported between instances of 'str' and 'int'".
+                prio = str(chamado.get("prioridade", "Indefinido"))
                 prioridades[prio] = prioridades.get(prio, 0) + 1
                 cat = chamado.get("categoria") or "Indefinido"
                 categorias[cat] = categorias.get(cat, 0) + 1
@@ -698,14 +708,16 @@ class AnalisadorChamados:
     # ========== MÉTRICAS DE COMPARAÇÃO (DELTA) ==========
 
     def obter_metricas_periodo_anterior(
-        self, chamados_pre_carregados: list | None = None
+        self, chamados_pre_carregados: list | None = None, dias: int = 30
     ) -> dict[str, Any]:
-        """Métricas do período 30-60 dias atrás para calcular deltas comparativos.
+        """Métricas do período anterior (mesma duração de `dias`, imediatamente
+        antes do período atual) para calcular deltas comparativos. Ex.: dias=30
+        compara com os 30-60 dias atrás; dias=7 compara com os 7-14 dias atrás.
 
         Se chamados_pre_carregados for fornecido, filtra por data em Python —
         nenhuma query ao Firestore é feita.
         """
-        cache_key = "analytics_periodo_anterior"
+        cache_key = f"analytics_periodo_anterior_{dias}"
         if chamados_pre_carregados is None:
             try:
                 from app.cache import cache_get
@@ -716,17 +728,17 @@ class AnalisadorChamados:
             except Exception as e:
                 logger.debug("Cache indisponível (analytics): %s", e)
         try:
-            agora = datetime.now()
-            data_inicio = agora - timedelta(days=60)
-            data_fim = agora - timedelta(days=30)
+            agora = datetime.now(UTC)
+            data_inicio = agora - timedelta(days=dias * 2)
+            data_fim = agora - timedelta(days=dias)
 
             if chamados_pre_carregados is not None:
                 todos_chamados = [
                     c
                     for c in chamados_pre_carregados
                     if (
-                        (_to_datetime(c.get("data_abertura")) or datetime.min) >= data_inicio
-                        and (_to_datetime(c.get("data_abertura")) or datetime.min) < data_fim
+                        (_to_datetime(c.get("data_abertura")) or _DATETIME_MIN_UTC) >= data_inicio
+                        and (_to_datetime(c.get("data_abertura")) or _DATETIME_MIN_UTC) < data_fim
                     )
                 ]
             else:
@@ -774,6 +786,7 @@ class AnalisadorChamados:
 
             resultado = {
                 "total_chamados": total,
+                "concluidos": concluidos,
                 "taxa_resolucao_percentual": round(taxa_resolucao, 2),
                 "percentual_dentro_sla": percentual_dentro_sla,
                 "tempo_medio_resolucao_horas": round(tempo_medio, 2),
@@ -793,8 +806,15 @@ class AnalisadorChamados:
     @staticmethod
     def _calcular_deltas(atual: dict[str, Any], anterior: dict[str, Any]) -> dict[str, Any]:
         """Retorna delta (atual - anterior) para as métricas comparáveis. None quando não calculável."""
+        # "abertos"/"em_andamento" não entram aqui de propósito: seriam a
+        # contagem de chamados AINDA nesse status hoje, comparando coortes de
+        # idades diferentes (abertos há 0-30 dias vs 30-60 dias) — tickets
+        # mais antigos tiveram mais tempo pra ser resolvidos, então a
+        # comparação tende sempre a cair, independente de desempenho real.
+        # "concluidos" já é uma comparação justa (throughput no período).
         campos = [
             "total_chamados",
+            "concluidos",
             "taxa_resolucao_percentual",
             "percentual_dentro_sla",
             "tempo_medio_resolucao_horas",
@@ -838,18 +858,23 @@ class AnalisadorChamados:
 
     # ========== RELATÓRIOS DETALHADOS ==========
 
-    def obter_relatorio_completo(self, usar_cache: bool = True) -> dict[str, Any]:
+    def obter_relatorio_completo(self, usar_cache: bool = True, dias: int = 30) -> dict[str, Any]:
         """Retorna um relatório completo consolidado.
+
+        `dias` controla o período da Visão Geral (métricas gerais, gráficos e
+        resumo de SLA) — as tabelas de supervisores/áreas continuam all-time,
+        sem filtro de período.
 
         Com usar_cache=True (padrão), reutiliza resultado por 5 minutos (Redis ou memória),
         evitando várias queries pesadas ao Firestore.
         """
+        cache_key = f"relatorio_completo_{dias}"
         try:
             if usar_cache:
                 try:
                     from app.cache import cache_get, cache_set
 
-                    cached = cache_get("relatorio_completo")
+                    cached = cache_get(cache_key)
                     if cached is not None:
                         logger.debug("Relatório servido do cache (Redis/memória)")
                         return cached
@@ -857,19 +882,20 @@ class AnalisadorChamados:
                     logger.debug("Cache get ignorado: %s", e)
                 # Fallback: cache em memória local
                 now = time.time()
-                if _RELATORIO_CACHE and (now < _RELATORIO_CACHE.get("expires", 0)):
+                cache_mem = _RELATORIO_CACHE.get(dias)
+                if cache_mem and (now < cache_mem.get("expires", 0)):
                     logger.debug("Relatório servido do cache em memória")
-                    return _RELATORIO_CACHE["data"]
+                    return cache_mem["data"]
 
             # Carrega todos os chamados UMA vez (com cache Redis/memória) e distribui
             # para todas as funções de métricas — elimina múltiplas queries a 'chamados'.
             chamados_cache = self._carregar_chamados_analytics()
 
             metricas_gerais = self.obter_metricas_gerais(
-                dias=30, chamados_pre_carregados=chamados_cache
+                dias=dias, chamados_pre_carregados=chamados_cache
             )
             metricas_periodo_anterior = self.obter_metricas_periodo_anterior(
-                chamados_pre_carregados=chamados_cache
+                chamados_pre_carregados=chamados_cache, dias=dias
             )
             metricas_delta = self._calcular_deltas(metricas_gerais, metricas_periodo_anterior)
 
@@ -894,11 +920,13 @@ class AnalisadorChamados:
                 try:
                     from app.cache import cache_set
 
-                    cache_set("relatorio_completo", relatorio, _RELATORIO_CACHE_TTL_SEC)
+                    cache_set(cache_key, relatorio, _RELATORIO_CACHE_TTL_SEC)
                 except Exception as e:
                     logger.debug("Cache set ignorado: %s", e)
-                _RELATORIO_CACHE["data"] = relatorio
-                _RELATORIO_CACHE["expires"] = time.time() + _RELATORIO_CACHE_TTL_SEC
+                _RELATORIO_CACHE[dias] = {
+                    "data": relatorio,
+                    "expires": time.time() + _RELATORIO_CACHE_TTL_SEC,
+                }
             return relatorio
         except Exception as e:
             logger.exception("Erro ao gerar relatório completo: %s", e)

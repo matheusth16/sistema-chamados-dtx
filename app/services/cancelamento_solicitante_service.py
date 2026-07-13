@@ -91,6 +91,11 @@ def _notificar_cancelamento(chamado_id: str, dados: dict, motivo: str, usuario) 
     from flask import current_app
 
     app = current_app._get_current_object()  # noqa: SLF001
+    # Captura o nome ANTES de entrar na thread: usuario é o current_user do
+    # Flask-Login, um proxy ligado ao request context. A thread abaixo só
+    # empurra app_context (sem request context), então usuario.nome resolve
+    # para None ali dentro e explode silenciosamente (notificação nunca sai).
+    solicitante_nome = usuario.nome
 
     def _run():
         with app.app_context():
@@ -104,7 +109,7 @@ def _notificar_cancelamento(chamado_id: str, dados: dict, motivo: str, usuario) 
                     numero_chamado=dados.get("numero_chamado") or "N/A",
                     categoria=dados.get("categoria") or "Chamado",
                     motivo=motivo,
-                    solicitante_nome=usuario.nome,
+                    solicitante_nome=solicitante_nome,
                     dados_chamado=dados,
                 )
             except Exception as exc:

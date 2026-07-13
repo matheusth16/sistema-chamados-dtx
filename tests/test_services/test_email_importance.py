@@ -70,6 +70,18 @@ def test_resolver_importance_prioridade_zero_retorna_high():
     assert result == "high"
 
 
+def test_resolver_importance_aog_retorna_high():
+    """categoria=AOG (prioridade=-1) → 'high' para responsavel, igual Projetos."""
+    from app.services.notifications import resolver_importance
+
+    result = resolver_importance(
+        "novo_chamado_aprovador",
+        chamado_data={"categoria": "AOG", "prioridade": -1},
+        destinatario_perfil="responsavel",
+    )
+    assert result == "high"
+
+
 def test_resolver_importance_prazo_24h_high():
     """tipo=prazo_24h → 'high'."""
     from app.services.notifications import resolver_importance

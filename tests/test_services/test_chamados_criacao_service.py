@@ -1151,6 +1151,62 @@ def test_criar_chamado_aog_grava_nivel_4_e_notifica_todos_gestores(app):
     assert kwargs["chamado_data"]["numero_chamado"] == "2026-300"
 
 
+def test_criar_chamado_aog_grava_rl_codigo_e_cria_grupo_rl(app):
+    """AOG, assim como Projetos, grava rl_codigo no chamado e cria/reusa GrupoRL."""
+    form = {
+        "categoria": "AOG",
+        "tipo": "Manutencao",
+        "descricao": "Aeronave PR-ABC em solo, trem de pouso travado.",
+        "rl_codigo": "AOG-777",
+        "impacto": "",
+        "gate": "",
+    }
+    files = MagicMock()
+    files.get.return_value = None
+    files.getlist.return_value = []
+
+    with (
+        patch("app.services.chamados_criacao_service.salvar_anexo", return_value=None),
+        patch(
+            "app.services.chamados_criacao_service.gerar_numero_chamado", return_value="2026-302"
+        ),
+        patch("app.services.chamados_criacao_service.GrupoRL.get_or_create") as mock_grupo,
+        patch("app.services.chamados_criacao_service.atribuidor") as mock_atr,
+        patch("app.services.chamados_criacao_service.execute_with_retry") as mock_retry,
+        patch("app.services.chamados_criacao_service.Historico"),
+        patch("app.services.chamados_criacao_service.Usuario.get_by_id", return_value=None),
+        patch("app.services.chamados_criacao_service.notificar_aprovador_novo_chamado"),
+        patch("app.services.chamados_criacao_service.notificar_abertura_aog_todos_gestores"),
+        patch("app.services.chamados_criacao_service.threading.Thread", side_effect=_FakeThread),
+    ):
+        mock_grupo.return_value = MagicMock(id="grupo_aog_1")
+        mock_atr.atribuir.return_value = {
+            "sucesso": True,
+            "supervisor": {"id": "sup1", "nome": "Supervisor Teste"},
+            "motivo": "",
+        }
+        mock_ref = MagicMock()
+        mock_ref.id = "chamado_id_302"
+        mock_retry.return_value = (None, mock_ref)
+
+        with app.app_context():
+            chamado_id, numero, erro, _ = criar_chamado(
+                form=form,
+                files=files,
+                solicitante_id="sol1",
+                solicitante_nome="Solicitante Teste",
+                area_solicitante="Manutencao",
+                solicitante_email="sol@test.com",
+            )
+
+    assert erro is None
+    assert chamado_id == "chamado_id_302"
+    mock_grupo.assert_called_once()
+    chamado_dict_salvo = mock_retry.call_args[0][1]
+    assert chamado_dict_salvo["rl_codigo"] == "AOG-777"
+    assert chamado_dict_salvo["grupo_rl_id"] == "grupo_aog_1"
+
+
 def test_criar_chamado_normal_nao_grava_nivel_4_nem_notifica_aog(app):
     """categoria normal (não-AOG) mantém escalacao_resposta_nivel=0 e não dispara broadcast AOG."""
     form = {

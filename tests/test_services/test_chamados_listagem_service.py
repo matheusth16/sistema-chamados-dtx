@@ -400,6 +400,26 @@ def test_fallback_chamado_prioridade_zero_define_grupo_key_projeto():
     assert result["chamados"][0].grupo_key == "0|RL-PROJ"
 
 
+def test_fallback_chamado_prioridade_menos_um_define_grupo_key_aog():
+    """Chamado AOG (prioridade=-1) define _grupo_prio[rl]=-1, acima de Projetos."""
+    from app.services.chamados_listagem_service import listar_meus_chamados_fallback
+
+    doc = _make_doc("c1", {"status": "Aberto", "prioridade": -1})
+
+    with patch("app.services.chamados_listagem_service.db") as mock_db:
+        mock_db.collection.return_value.where.return_value.limit.return_value.stream.return_value = [
+            doc
+        ]
+        with patch("app.services.chamados_listagem_service.Chamado") as mock_chamado_cls:
+            c = MagicMock()
+            c.rl_codigo = "RL-AOG"
+            c.prioridade = -1
+            mock_chamado_cls.from_dict.return_value = c
+            result = listar_meus_chamados_fallback("u1", "", 10, 1)
+
+    assert result["chamados"][0].grupo_key == "-1|RL-AOG"
+
+
 def test_listar_meus_chamados_sem_cursor_cursor_prev_e_none():
     """F-26: sem cursor (primeira página), cursor_prev deve ser None."""
     from app.services.chamados_listagem_service import listar_meus_chamados
@@ -791,3 +811,32 @@ def test_listar_meus_chamados_prioridade_zero_define_grupo_projeto():
         result = listar_meus_chamados("u1")
 
     assert result["chamados"][0].grupo_key == "0|RL-PROJ"
+
+
+def test_listar_meus_chamados_prioridade_menos_um_define_grupo_aog():
+    """Chamado AOG (prioridade=-1) marca _grupo_prio[rl]=-1, acima de Projetos (linha 294)."""
+    from app.services.chamados_listagem_service import listar_meus_chamados
+
+    doc = _make_doc("c1", {"status": "Aberto", "prioridade": -1})
+
+    with (
+        patch("app.services.chamados_listagem_service.db") as mock_db,
+        patch("app.services.chamados_listagem_service.obter_total_por_contagem", return_value=1),
+        patch("app.services.chamados_listagem_service.Chamado") as mock_chamado_cls,
+        patch("app.cache.cache_get", return_value=None),
+        patch("app.cache.cache_set"),
+    ):
+        mock_q = MagicMock()
+        mock_db.collection.return_value.where.return_value = mock_q
+        mock_q.where.return_value = mock_q
+        mock_q.order_by.return_value = mock_q
+        mock_q.limit.return_value = mock_q
+        mock_q.stream.return_value = [doc]
+        c = MagicMock()
+        c.rl_codigo = "RL-AOG"
+        c.prioridade = -1
+        mock_chamado_cls.from_dict.return_value = c
+
+        result = listar_meus_chamados("u1")
+
+    assert result["chamados"][0].grupo_key == "-1|RL-AOG"

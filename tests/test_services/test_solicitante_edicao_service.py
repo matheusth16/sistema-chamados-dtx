@@ -27,6 +27,30 @@ def _usuario_mock(uid="sol_1", perfil="solicitante"):
     return u
 
 
+class _UsuarioContextoLimitado:
+    """Simula o current_user do Flask-Login (LocalProxy ligado ao request context).
+
+    Fora do request context original (ex.: dentro da thread de notificação em
+    background, que só empurra app_context) o proxy real deixa de resolver e
+    vira None — acessar .nome nesse momento explode com AttributeError. Este
+    fake reproduz esse comportamento via a flag `contexto_ativo`.
+    """
+
+    def __init__(self, uid="sol_1", nome="Solicitante Teste", perfil="solicitante"):
+        self.id = uid
+        self.perfil = perfil
+        self.email = "sol@test.com"
+        self.is_admin_or_above = perfil in ("admin", "admin_global")
+        self._nome = nome
+        self.contexto_ativo = True
+
+    @property
+    def nome(self):
+        if not self.contexto_ativo:
+            raise AttributeError("'NoneType' object has no attribute 'nome'")
+        return self._nome
+
+
 def _data_chamado(
     solicitante_id="sol_1",
     status="Aberto",
@@ -587,6 +611,46 @@ class TestNotificacaoEdicaoDescricaoClosure:
         ):
             closures[0]()  # Should not raise
 
+    def test_nome_do_solicitante_capturado_antes_da_thread(self, app):
+        """Regressão: usuario.nome deve ser lido ANTES de _run() ser agendado.
+
+        _run() só reabre app_context (não request context) dentro da thread,
+        então o current_user real fica None nesse ponto e usuario.nome
+        explodiria — a notificação teria que sair mesmo assim, com o nome
+        capturado enquanto o request context ainda existia.
+        """
+        from app.services.solicitante_edicao_service import _notificar_edicao_descricao
+
+        user = _UsuarioContextoLimitado(nome="Fulano de Tal")
+        dados = {"numero_chamado": "CH-001", "categoria": "TI", "observadores": []}
+        closures = []
+
+        def fake_thread(target, daemon=True):
+            closures.append(target)
+            m = MagicMock()
+            m.start = lambda: None
+            return m
+
+        with patch("threading.Thread", side_effect=fake_thread), app.app_context():
+            _notificar_edicao_descricao("ch_1", dados, user, "antes", "depois")
+
+        # Simula a thread rodando fora do request context original
+        user.contexto_ativo = False
+
+        with (
+            patch(
+                "app.services.chamado_notificacao_service.destinatarios_do_chamado",
+                return_value=[],
+            ),
+            patch(
+                "app.services.chamado_notificacao_service.notificar_edicao_descricao_solicitante"
+            ) as mock_notificar,
+        ):
+            closures[0]()
+
+        mock_notificar.assert_called_once()
+        assert mock_notificar.call_args.kwargs["solicitante_nome"] == "Fulano de Tal"
+
 
 class TestNotificacaoAnexoTardio:
     def test_anexo_sucedido_dispara_notificacao(self):
@@ -774,3 +838,36 @@ class TestNotificacaoAnexoTardioClosure:
             side_effect=RuntimeError("fail"),
         ):
             closures[0]()  # Should not raise
+
+    def test_nome_do_solicitante_capturado_antes_da_thread(self, app):
+        """Regressão: mesmo caso da edição de descrição, mas para anexo tardio."""
+        from app.services.solicitante_edicao_service import _notificar_anexo_tardio
+
+        user = _UsuarioContextoLimitado(nome="Fulano de Tal")
+        dados = {"numero_chamado": "CH-001", "categoria": "TI", "observadores": []}
+        closures = []
+
+        def fake_thread(target, daemon=True):
+            closures.append(target)
+            m = MagicMock()
+            m.start = lambda: None
+            return m
+
+        with patch("threading.Thread", side_effect=fake_thread), app.app_context():
+            _notificar_anexo_tardio("ch_1", dados, user, "docs/file.pdf", "motivo")
+
+        user.contexto_ativo = False
+
+        with (
+            patch(
+                "app.services.chamado_notificacao_service.destinatarios_do_chamado",
+                return_value=[],
+            ),
+            patch(
+                "app.services.chamado_notificacao_service.notificar_anexo_tardio_chamado"
+            ) as mock_notificar,
+        ):
+            closures[0]()
+
+        mock_notificar.assert_called_once()
+        assert mock_notificar.call_args.kwargs["solicitante_nome"] == "Fulano de Tal"

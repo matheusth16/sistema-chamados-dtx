@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from 'components/_status_badge.html' import status_badge %}
+{% from 'components/_status_badge.html' import status_badge with context %}
 
 {% block content %}
 <div class="space-y-4">
@@ -114,13 +114,13 @@
                                             <span style="font-size:13px; color:var(--color-text-muted); font-weight:600;">{{ evento.campo_alterado|translate_field_label }}:</span>
                                             <div class="flex items-center gap-2">
                                                 <span class="bento-diff-chip before">
-                                                    {% if evento.campo_alterado == 'Status' %}{{ translate_status(evento.valor_anterior) }}{% elif evento.campo_alterado == 'Setor/Gate' %}{% if evento.valor_anterior and (evento.valor_anterior.startswith('Gate') or evento.valor_anterior == 'N/A') %}{{ translate_gate(evento.valor_anterior) }}{% else %}{{ translate_sector(evento.valor_anterior) }}{% endif %}{% elif evento.campo_alterado == 'Categoria' %}{{ translate_category(evento.valor_anterior) }}{% else %}{{ evento.valor_anterior }}{% endif %}
+                                                    {% if evento.campo_alterado == 'status' %}{{ translate_status(evento.valor_anterior) }}{% else %}{{ evento.valor_anterior }}{% endif %}
                                                 </span>
                                                 <svg width="16" height="16" style="color:var(--color-surface-muted);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
                                                 </svg>
                                                 <span class="bento-diff-chip after">
-                                                    {% if evento.campo_alterado == 'Status' %}{{ translate_status(evento.valor_novo) }}{% elif evento.campo_alterado == 'Setor/Gate' %}{% if evento.valor_novo and (evento.valor_novo.startswith('Gate') or evento.valor_novo == 'N/A') %}{{ translate_gate(evento.valor_novo) }}{% else %}{{ translate_sector(evento.valor_novo) }}{% endif %}{% elif evento.campo_alterado == 'Categoria' %}{{ translate_category(evento.valor_novo) }}{% else %}{{ evento.valor_novo }}{% endif %}
+                                                    {% if evento.campo_alterado == 'status' %}{{ translate_status(evento.valor_novo) }}{% else %}{{ evento.valor_novo }}{% endif %}
                                                 </span>
                                             </div>
                                         </div>

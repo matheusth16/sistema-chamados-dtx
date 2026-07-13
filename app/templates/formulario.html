@@ -29,29 +29,7 @@
         {% endif %}
         {% endwith %}
 
-        <!-- Card de Identificação do Solicitante -->
-        {% if current_user.is_authenticated %}
-        <div class="bento-id-card gsap-stagger">
-            <div class="who">
-                <div class="bento-avatar">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                    </svg>
-                </div>
-                <div>
-                    <div class="bento-eyebrow">{{ t('identified_requester') }}</div>
-                    <div class="bento-id-name">{{ current_user.nome }}</div>
-                    {% if current_user.area %}
-                    <p class="text-xs font-medium mt-0.5 flex items-center gap-1" style="color:var(--color-text-muted)">
-                        <svg class="w-3 h-3" style="color:var(--color-dtx-500)" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
-                        {{ translate_sector(current_user.area) }}
-                    </p>
-                    {% endif %}
-                </div>
-            </div>
-            <a href="{{ url_for('main.logout') }}" class="bento-logout-link">{{ t('logout') }}</a>
-        </div>
-        {% else %}
+        {% if not current_user.is_authenticated %}
         <!-- Mensagem se não autenticado (não deve acontecer, mas por segurança) -->
         <div class="gsap-stagger bg-rose-50 border border-rose-200 p-5 rounded-dtx-lg mb-3">
             <p class="text-sm text-rose-800 flex items-center gap-2">
@@ -61,24 +39,25 @@
         </div>
         {% endif %}
 
-        <!-- Mini Resumo dos Chamados do Solicitante -->
+        <!-- Mini Resumo dos Chamados do Solicitante — o nome/setor já aparece na navbar, não repete aqui -->
         {% if current_user.is_authenticated and status_counts is defined %}
-        <div class="bento-stats gsap-stagger">
-            <div class="bento-stat open"><b>{{ status_counts.get('Aberto', 0) }}</b><span>{{ t('open_tickets') }}</span></div>
-            <div class="bento-stat progress"><b>{{ status_counts.get('Em Atendimento', 0) }}</b><span>{{ t('in_progress_tickets') }}</span></div>
-            <div class="bento-stat done"><b>{{ status_counts.get('Concluído', 0) }}</b><span>{{ t('completed_tickets') }}</span></div>
-        </div>
-        <p class="gsap-stagger" style="margin:-16px 0 24px; text-align:right;">
+        <div class="bento-mini-stats-bar gsap-stagger">
+            <span class="title">{{ t('your_tickets_summary_title') }}</span>
+            <div class="items">
+                <span class="item open"><b>{{ status_counts.get('Aberto', 0) }}</b>{{ t('open_tickets') }}</span>
+                <span class="item progress"><b>{{ status_counts.get('Em Atendimento', 0) }}</b>{{ t('in_progress_tickets') }}</span>
+                <span class="item done"><b>{{ status_counts.get('Concluído', 0) }}</b>{{ t('completed_tickets') }}</span>
+            </div>
             <a href="{{ url_for('main.meus_chamados') }}" class="text-xs font-bold transition-colors" style="color:var(--color-dtx-500)">
                 {{ t('my_tickets') }} <span class="ml-1 text-[10px]">→</span>
             </a>
-        </p>
+        </div>
         {% endif %}
 
         <form id="form-chamado" data-testid="chamado-form" action="/?lang={{ current_language }}" method="POST" enctype="multipart/form-data" class="bento-form gsap-stagger">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
 
-            <div class="bento-section-head"><span class="dot"></span><span>{{ t('form_section_classification') }}</span></div>
+            <div class="bento-section-head"><span class="num">1</span><span>{{ t('form_section_classification') }}</span></div>
 
             <div>
                 <label class="bento-field-label">{{ t('request_category') }}</label>
@@ -87,15 +66,16 @@
                         <input type="radio" id="cat_nao_aplicavel" name="categoria" value="Nao Aplicavel" checked onclick="toggleRL(false)" class="sr-only">
                         {{ t('not_applicable_routine') }}
                     </label>
-                    <label for="cat_projetos" class="bento-pill danger">
+                    <label for="cat_projetos" class="bento-pill warning">
                         <input type="radio" id="cat_projetos" name="categoria" value="Projetos" onclick="toggleRL(true)" class="sr-only">
-                        {{ t('projects_max_priority') }}
+                        {{ t('projects_high_priority') }}
                     </label>
                     <label for="cat_aog" class="bento-pill danger">
-                        <input type="radio" id="cat_aog" name="categoria" value="AOG" onclick="toggleRL(false)" class="sr-only">
+                        <input type="radio" id="cat_aog" name="categoria" value="AOG" onclick="toggleRL(true)" class="sr-only">
                         {{ t('aog_max_priority') }}
                     </label>
                 </div>
+                <p class="bento-field-hint">{{ t('category_priority_hint') }}</p>
             </div>
 
             <div id="div_rl" class="bento-rl-field hidden">
@@ -105,34 +85,6 @@
                     <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                     {{ t('rl_required') }}
                 </p>
-            </div>
-
-            <div class="bento-grid-2">
-                <div>
-                    <label for="tipo" class="bento-field-label plain">{{ t('type_sector') }}</label>
-                    <select name="tipo" id="tipo" data-testid="tipo-select" required onchange="filtrarResponsaveis()">
-                        <option value="" disabled selected>{{ t('select') }}</option>
-                        {% for setor in setores %}
-                        {% if current_language == 'en' %}{% set nome_display = setor.nome_en|default(setor.nome_pt) %}{% elif current_language == 'es' %}{% set nome_display = setor.nome_es|default(setor.nome_pt) %}{% else %}{% set nome_display = setor.nome_pt %}{% endif %}
-                        <option value="{{ setor.nome_pt }}">{{ nome_display }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-
-                <div>
-                    <label for="gate" class="bento-field-label plain">{{ t('gate') }}</label>
-                    <select name="gate" id="gate" required>
-                        <option value="" disabled selected>{{ t('select') }}</option>
-                        <option value="N/A">{{ t('not_applicable_short') }}</option>
-                        {% for gate_key, etapas in gate_subetapas.items() %}
-                        <optgroup label="{{ gate_key }}">
-                            {% for etapa in etapas %}
-                            <option value="{{ etapa }}">{{ translate_gate(etapa) | replace(gate_key ~ ' - ', '') }}</option>
-                            {% endfor %}
-                        </optgroup>
-                        {% endfor %}
-                    </select>
-                </div>
             </div>
 
             <div>
@@ -148,7 +100,56 @@
                 </div>
             </div>
 
-            <div class="bento-section-head"><span class="dot"></span><span>{{ t('form_section_details') }}</span></div>
+            <div class="bento-section-head"><span class="num">2</span><span>{{ t('form_section_destination') }}</span></div>
+
+            <div class="bento-form-section">
+                <div class="bento-grid-2">
+                    <div>
+                        <label for="tipo" class="bento-field-label plain">{{ t('type_sector') }}</label>
+                        <select name="tipo" id="tipo" data-testid="tipo-select" required onchange="filtrarResponsaveis()">
+                            <option value="" disabled selected>{{ t('select') }}</option>
+                            {% for setor in setores %}
+                            {% if current_language == 'en' %}{% set nome_display = setor.nome_en|default(setor.nome_pt) %}{% elif current_language == 'es' %}{% set nome_display = setor.nome_es|default(setor.nome_pt) %}{% else %}{% set nome_display = setor.nome_pt %}{% endif %}
+                            <option value="{{ setor.nome_pt }}">{{ nome_display }}</option>
+                            {% endfor %}
+                        </select>
+                        <p class="bento-field-hint">{{ t('sector_hint') }}</p>
+                    </div>
+
+                    <div>
+                        <label for="gate" class="bento-field-label plain">{{ t('gate') }}</label>
+                        <select name="gate" id="gate" required>
+                            <option value="" disabled selected>{{ t('select') }}</option>
+                            <option value="N/A">{{ t('not_applicable_short') }}</option>
+                            {% for gate_key, etapas in gate_subetapas.items() %}
+                            <optgroup label="{{ gate_key }}">
+                                {% for etapa in etapas %}
+                                <option value="{{ etapa }}">{{ translate_gate(etapa) | replace(gate_key ~ ' - ', '') }}</option>
+                                {% endfor %}
+                            </optgroup>
+                            {% endfor %}
+                        </select>
+                        <p class="bento-field-hint">{{ t('gate_hint') }}</p>
+                    </div>
+                </div>
+
+                <div id="container_responsavel" class="bento-resp-box">
+                    <label for="responsavel_visual" class="bento-field-label plain">{{ t('suggested_responsible') }}</label>
+                    <div id="responsavel_visual_wrapper" class="relative">
+                        <svg class="bento-resp-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+                        <input type="text" id="responsavel_visual" value="{{ t('select_sector_above') }}" disabled class="bento-resp-badge">
+                        <select id="responsavel_select" class="hidden mt-1"><!-- Preenchido via JS quando há mais de um supervisor --></select>
+                    </div>
+                    <input type="hidden" name="responsavel_id" id="responsavel_id" value="">
+                    <input type="hidden" name="responsavel_nome" id="responsavel_nome" value="">
+                    <p class="bento-resp-hint">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        {{ t('defined_automatically') }}
+                    </p>
+                </div>
+            </div>
+
+            <div class="bento-section-head"><span class="num">3</span><span>{{ t('form_section_details') }}</span></div>
 
             <div>
                 <label for="descricao" class="bento-field-label plain">{{ t('detailed_description') }}</label>
@@ -199,22 +200,7 @@
                 <div id="container_links_externos"></div>
             </div>
 
-            <div class="bento-section-head"><span class="dot"></span><span>{{ t('form_section_notification') }}</span></div>
-
-            <div id="container_responsavel" class="bento-resp-box">
-                <label for="responsavel_visual" class="bento-field-label plain">{{ t('suggested_responsible') }}</label>
-                <div id="responsavel_visual_wrapper" class="relative">
-                    <svg class="bento-resp-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
-                    <input type="text" id="responsavel_visual" value="{{ t('select_sector_above') }}" disabled class="bento-resp-badge">
-                    <select id="responsavel_select" class="hidden mt-1"><!-- Preenchido via JS quando há mais de um supervisor --></select>
-                </div>
-                <input type="hidden" name="responsavel_id" id="responsavel_id" value="">
-                <input type="hidden" name="responsavel_nome" id="responsavel_nome" value="">
-                <p class="bento-resp-hint">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                    {{ t('defined_automatically') }}
-                </p>
-            </div>
+            <div class="bento-section-head"><span class="num">4</span><span>{{ t('form_section_notification') }}</span></div>
 
             <!-- Observadores (em cópia) -->
             <div>

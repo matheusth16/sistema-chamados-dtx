@@ -95,14 +95,15 @@ def listar_meus_chamados_fallback(
     )
     cursor_prev = docs_pagina[0].id if inicio > 0 else None
 
-    # Calcula grupo_key para ordenar grupos Projetos antes dos demais no Jinja groupby
+    # Calcula grupo_key para ordenar grupos AOG/Projetos antes dos demais no Jinja groupby
     from collections import defaultdict
 
     _grupo_prio: dict = defaultdict(lambda: 1)
     for c in chamados:
         rl = c.rl_codigo or ""
-        if getattr(c, "prioridade", 1) == 0:
-            _grupo_prio[rl] = 0
+        prio = getattr(c, "prioridade", 1)
+        if prio < _grupo_prio[rl]:
+            _grupo_prio[rl] = prio
     for c in chamados:
         rl = c.rl_codigo or ""
         c.grupo_key = f"{_grupo_prio[rl]}|{rl}"
@@ -284,14 +285,15 @@ def listar_meus_chamados(
         except Exception as doc_err:
             logger.warning("Chamado %s ignorado (dados inválidos): %s", doc.id, doc_err)
 
-    # Calcula grupo_key para ordenar grupos Projetos antes dos demais no Jinja groupby
+    # Calcula grupo_key para ordenar grupos AOG/Projetos antes dos demais no Jinja groupby
     from collections import defaultdict
 
     _grupo_prio: dict = defaultdict(lambda: 1)
     for c in chamados:
         rl = c.rl_codigo or ""
-        if getattr(c, "prioridade", 1) == 0:
-            _grupo_prio[rl] = 0
+        prio = getattr(c, "prioridade", 1)
+        if prio < _grupo_prio[rl]:
+            _grupo_prio[rl] = prio
     for c in chamados:
         rl = c.rl_codigo or ""
         c.grupo_key = f"{_grupo_prio[rl]}|{rl}"

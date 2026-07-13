@@ -130,6 +130,11 @@ def _notificar_edicao_descricao(
     from flask import current_app
 
     app = current_app._get_current_object()  # noqa: SLF001
+    # Captura o nome ANTES de entrar na thread: usuario é o current_user do
+    # Flask-Login, um proxy ligado ao request context. A thread abaixo só
+    # empurra app_context (sem request context), então usuario.nome resolve
+    # para None ali dentro e explode silenciosamente (notificação nunca sai).
+    solicitante_nome = usuario.nome
 
     def _run():
         with app.app_context():
@@ -142,7 +147,7 @@ def _notificar_edicao_descricao(
                     chamado_id=chamado_id,
                     numero_chamado=dados.get("numero_chamado") or "N/A",
                     categoria=dados.get("categoria") or "Chamado",
-                    solicitante_nome=usuario.nome,
+                    solicitante_nome=solicitante_nome,
                     valor_anterior=valor_anterior,
                     valor_novo=valor_novo,
                     dados_chamado=dados,
@@ -231,6 +236,11 @@ def _notificar_anexo_tardio(
     from flask import current_app
 
     app = current_app._get_current_object()  # noqa: SLF001
+    # Captura o nome ANTES de entrar na thread: usuario é o current_user do
+    # Flask-Login, um proxy ligado ao request context. A thread abaixo só
+    # empurra app_context (sem request context), então usuario.nome resolve
+    # para None ali dentro e explode silenciosamente (notificação nunca sai).
+    solicitante_nome = usuario.nome
 
     def _run():
         with app.app_context():
@@ -243,7 +253,7 @@ def _notificar_anexo_tardio(
                     chamado_id=chamado_id,
                     numero_chamado=dados.get("numero_chamado") or "N/A",
                     categoria=dados.get("categoria") or "Chamado",
-                    solicitante_nome=usuario.nome,
+                    solicitante_nome=solicitante_nome,
                     nome_arquivo=os.path.basename(caminho_anexo),
                     motivo=motivo,
                     dados_chamado=dados,

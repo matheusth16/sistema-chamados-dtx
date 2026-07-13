@@ -937,7 +937,11 @@ def api_buscar_usuarios():
         return jsonify({"sucesso": True, "dados": []}), 200
     try:
         todos = Usuario.buscar_ativos(q)
-        dados = [{"id": u.id, "nome": u.nome} for u in todos if u.id != current_user.id][:10]
+        dados = [
+            {"id": u.id, "nome": u.nome}
+            for u in todos
+            if u.id != current_user.id and u.perfil not in ("admin", "admin_global")
+        ][:10]
         return jsonify({"sucesso": True, "dados": dados}), 200
     except Exception as exc:
         logger.exception("Erro em buscar_usuarios: %s", exc)

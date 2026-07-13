@@ -84,6 +84,34 @@ class TestBuscarUsuarios:
             ids = [u.get("id") for u in data.get("dados", [])]
             assert "sol_1" not in ids
 
+    def test_busca_exclui_admin_e_admin_global(self, client_logado_solicitante, app):
+        """Usuários com perfil admin/admin_global não podem ser observadores (CC)."""
+        user_admin = _usuario_mock("u_admin", "admin@test.com", "Admin Um", "admin")
+        user_admin_global = _usuario_mock(
+            "u_admin_global", "adminglobal@test.com", "Admin Global", "admin_global"
+        )
+        user_supervisor = _usuario_mock("u_sup", "sup@test.com", "Supervisor Um", "supervisor")
+        with (
+            patch(
+                "app.models_usuario.Usuario.get_by_id",
+                return_value=_usuario_mock("sol_1", "sol@test.com", "Sol", "solicitante"),
+            ),
+            patch("app.routes.api.Usuario") as mock_usuario_cls,
+        ):
+            mock_usuario_cls.buscar_ativos.return_value = [
+                user_admin,
+                user_admin_global,
+                user_supervisor,
+            ]
+            resp = client_logado_solicitante.get("/api/usuarios/buscar?q=admin")
+        assert resp.status_code == 200
+        data = json.loads(resp.data)
+        assert data["sucesso"] is True
+        ids = [u.get("id") for u in data["dados"]]
+        assert "u_admin" not in ids
+        assert "u_admin_global" not in ids
+        assert "u_sup" in ids
+
     def test_busca_limita_a_10_resultados(self, client_logado_solicitante, app):
         """Máximo 10 resultados por busca."""
         usuarios = [
@@ -114,19 +142,41 @@ class TestValidacaoObservadores:
         from app.services.validators import validar_observadores
 
         obs = [{"usuario_id": f"u{i}", "nome": f"U{i}", "email": f"u{i}@t.com"} for i in range(6)]
-        erros = validar_observadores(obs, solicitante_id="sol_1")
+        with patch("app.models_usuario.Usuario.get_by_id", return_value=None):
+            erros = validar_observadores(obs, solicitante_id="sol_1")
         assert any("5" in e or "máximo" in e.lower() for e in erros)
 
     def test_validar_observadores_solicitante_removido(self):
         from app.services.validators import validar_observadores
 
         obs = [{"usuario_id": "sol_1", "nome": "Sol", "email": "sol@t.com"}]
-        erros = validar_observadores(obs, solicitante_id="sol_1")
+        with patch("app.models_usuario.Usuario.get_by_id", return_value=None):
+            erros = validar_observadores(obs, solicitante_id="sol_1")
         assert len(erros) > 0
 
     def test_validar_5_observadores_ok(self):
         from app.services.validators import validar_observadores
 
         obs = [{"usuario_id": f"u{i}", "nome": f"U{i}", "email": f"u{i}@t.com"} for i in range(5)]
-        erros = validar_observadores(obs, solicitante_id="sol_1")
+        with patch("app.models_usuario.Usuario.get_by_id", return_value=None):
+            erros = validar_observadores(obs, solicitante_id="sol_1")
         assert erros == []
+
+    def test_validar_observadores_rejeita_admin(self):
+        """Admin/admin_global não pode ser incluído como observador (CC)."""
+        from app.services.validators import validar_observadores
+
+        admin = _usuario_mock("u_admin", "admin@t.com", "Admin", "admin")
+        obs = [{"usuario_id": "u_admin", "nome": "Admin", "email": "admin@t.com"}]
+        with patch("app.models_usuario.Usuario.get_by_id", return_value=admin):
+            erros = validar_observadores(obs, solicitante_id="sol_1")
+        assert len(erros) > 0
+
+    def test_validar_observadores_rejeita_admin_global(self):
+        from app.services.validators import validar_observadores
+
+        admin_global = _usuario_mock("u_ag", "ag@t.com", "Admin Global", "admin_global")
+        obs = [{"usuario_id": "u_ag", "nome": "Admin Global", "email": "ag@t.com"}]
+        with patch("app.models_usuario.Usuario.get_by_id", return_value=admin_global):
+            erros = validar_observadores(obs, solicitante_id="sol_1")
+        assert len(erros) > 0

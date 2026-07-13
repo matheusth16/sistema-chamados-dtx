@@ -6,7 +6,7 @@
     <div class="bento-notice" style="background:#fff1f2; color:#be123c;" role="alert">
         <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
         <p style="flex:1; font-weight:600;">{{ t('error_generating_reports') }}</p>
-        <a href="{{ url_for('main.relatorios', atualizar=1) }}" class="bento-btn-ghost">{{ t('refresh_data') }}</a>
+        <a href="{{ url_for('main.relatorios', dias=dias, atualizar=1) }}" class="bento-btn-primary">{{ t('retry') }}</a>
     </div>
     {% endif %}
 
@@ -20,7 +20,7 @@
 
     <!-- Cabeçalho -->
     <div class="bento-card">
-        <div class="bento-page-head gsap-animate" style="margin-bottom:0;">
+        <div class="bento-page-head gsap-animate" style="margin-bottom:0; flex-wrap:wrap; row-gap:14px;">
             <div style="display:flex; align-items:center; gap:14px;">
                 <span class="bento-chip-icon">
                     <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
@@ -33,12 +33,38 @@
                     </p>
                 </div>
             </div>
-            <a href="{{ url_for('main.relatorios', atualizar=1) }}" class="bento-btn-primary" aria-label="{{ t('refresh_data') }}">
-                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-                </svg>
-                {{ t('refresh_data') }}
-            </a>
+            <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                <form method="get" action="{{ url_for('main.relatorios') }}" id="form-periodo">
+                    <input type="hidden" name="pagina_sup" value="1">
+                    <input type="hidden" name="pagina_area" value="1">
+                    <input type="hidden" name="busca_sup" value="{{ busca_sup }}">
+                    <input type="hidden" name="busca_area" value="{{ busca_area }}">
+                    <input type="hidden" name="ordenar_sup" value="{{ ordenar_sup }}">
+                    <input type="hidden" name="ordem_sup" value="{{ ordem_sup }}">
+                    <input type="hidden" name="ordenar_area" value="{{ ordenar_area }}">
+                    <input type="hidden" name="ordem_area" value="{{ ordem_area }}">
+                    <div class="bento-pill-group" role="radiogroup" aria-label="{{ t('period') }}">
+                        {% for opcao_dias in (7, 30, 90) %}
+                        <label for="dias_{{ opcao_dias }}" class="bento-pill">
+                            <input type="radio" id="dias_{{ opcao_dias }}" name="dias" value="{{ opcao_dias }}"
+                                   {% if dias == opcao_dias %}checked{% endif %}
+                                   onchange="this.form.submit()" class="sr-only">
+                            {{ opcao_dias }} {{ t('days') }}
+                        </label>
+                        {% endfor %}
+                    </div>
+                </form>
+                <a href="{{ url_for('main.relatorios', dias=dias, atualizar=1) }}" class="bento-btn-primary" aria-label="{{ t('refresh_data') }}">
+                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                    </svg>
+                    {{ t('refresh_data') }}
+                </a>
+                <a href="{{ url_for('main.exportar_avancado', dias=dias) }}" class="bento-btn-outline emerald" title="{{ t('export_advanced_report_title') }}">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                    {{ t('export') }}
+                </a>
+            </div>
         </div>
     </div>
 
@@ -161,7 +187,10 @@
                     <p class="lbl">{{ t('completed_tickets') }}</p>
                     <span class="icon"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"></path></svg></span>
                 </div>
-                <p class="val font-display">{{ metricas_gerais.concluidos }}</p>
+                <div class="val-row">
+                    <p class="val font-display">{{ metricas_gerais.concluidos }}</p>
+                    {{ delta_badge(metricas_delta.get('concluidos_delta')) }}
+                </div>
             </div>
 
             <div class="bento-metric-card accent gsap-scroll-reveal-item">
@@ -194,7 +223,7 @@
                 {% endif %}
             </div>
 
-            <div class="bento-metric-card violet gsap-scroll-reveal-item">
+            <div class="bento-metric-card violet gsap-scroll-reveal-item col-span-2 lg:col-span-3">
                 <span class="bar"></span>
                 <div class="top">
                     <p class="lbl">{{ t('avg_resolution_time') }}</p>
@@ -312,6 +341,7 @@
         </h2>
 
         <form method="get" action="{{ url_for('main.relatorios') }}" class="mb-4 flex flex-wrap items-center gap-2" role="search" aria-label="{{ t('search_supervisors_placeholder') }}">
+            <input type="hidden" name="dias" value="{{ dias }}">
             <input type="hidden" name="pagina_sup" value="1">
             <input type="hidden" name="ordenar_sup" value="{{ ordenar_sup }}">
             <input type="hidden" name="ordem_sup" value="{{ ordem_sup }}">
@@ -333,26 +363,26 @@
                         <thead style="position:sticky; top:0; z-index:var(--z-sticky,20);">
                             <tr>
                                 <th style="width:18%;" class="sortable-th">
-                                    <a href="{{ url_for('main.relatorios', busca_sup=busca_sup, ordenar_sup='nome', ordem_sup='desc' if ordenar_sup == 'nome' and ordem_sup == 'asc' else 'asc', pagina_sup=1, pagina_area=pagina_area, busca_area=busca_area, ordenar_area=ordenar_area, ordem_area=ordem_area) }}">{{ t('supervisor') }}</a>
+                                    <a href="{{ url_for('main.relatorios', dias=dias, busca_sup=busca_sup, ordenar_sup='nome', ordem_sup='desc' if ordenar_sup == 'nome' and ordem_sup == 'asc' else 'asc', pagina_sup=1, pagina_area=pagina_area, busca_area=busca_area, ordenar_area=ordenar_area, ordem_area=ordem_area) }}">{{ t('supervisor') }}</a>
                                 </th>
                                 <th style="width:14%;" class="sortable-th">
-                                    <a href="{{ url_for('main.relatorios', busca_sup=busca_sup, ordenar_sup='area', ordem_sup='desc' if ordenar_sup == 'area' and ordem_sup == 'asc' else 'asc', pagina_sup=1, pagina_area=pagina_area, busca_area=busca_area, ordenar_area=ordenar_area, ordem_area=ordem_area) }}">{{ t('area_th') }}</a>
+                                    <a href="{{ url_for('main.relatorios', dias=dias, busca_sup=busca_sup, ordenar_sup='area', ordem_sup='desc' if ordenar_sup == 'area' and ordem_sup == 'asc' else 'asc', pagina_sup=1, pagina_area=pagina_area, busca_area=busca_area, ordenar_area=ordenar_area, ordem_area=ordem_area) }}">{{ t('area_th') }}</a>
                                 </th>
                                 <th style="width:8%; text-align:center;" class="sortable-th">
-                                    <a href="{{ url_for('main.relatorios', busca_sup=busca_sup, ordenar_sup='total', ordem_sup='asc' if ordenar_sup == 'total' and ordem_sup == 'desc' else 'desc', pagina_sup=1, pagina_area=pagina_area, busca_area=busca_area, ordenar_area=ordenar_area, ordem_area=ordem_area) }}">{{ t('total') }}</a>
+                                    <a href="{{ url_for('main.relatorios', dias=dias, busca_sup=busca_sup, ordenar_sup='total', ordem_sup='asc' if ordenar_sup == 'total' and ordem_sup == 'desc' else 'desc', pagina_sup=1, pagina_area=pagina_area, busca_area=busca_area, ordenar_area=ordenar_area, ordem_area=ordem_area) }}">{{ t('total') }}</a>
                                 </th>
                                 <th style="width:8%; text-align:center;" class="sortable-th">
-                                    <a href="{{ url_for('main.relatorios', busca_sup=busca_sup, ordenar_sup='carga', ordem_sup='asc' if ordenar_sup == 'carga' and ordem_sup == 'desc' else 'desc', pagina_sup=1, pagina_area=pagina_area, busca_area=busca_area, ordenar_area=ordenar_area, ordem_area=ordem_area) }}">{{ t('workload') }}</a>
+                                    <a href="{{ url_for('main.relatorios', dias=dias, busca_sup=busca_sup, ordenar_sup='carga', ordem_sup='asc' if ordenar_sup == 'carga' and ordem_sup == 'desc' else 'desc', pagina_sup=1, pagina_area=pagina_area, busca_area=busca_area, ordenar_area=ordenar_area, ordem_area=ordem_area) }}">{{ t('workload') }}</a>
                                 </th>
                                 <th style="width:8%; text-align:center;">{{ t('completed_short') }}</th>
                                 <th style="width:14%;" class="sortable-th">
-                                    <a href="{{ url_for('main.relatorios', busca_sup=busca_sup, ordenar_sup='taxa', ordem_sup='asc' if ordenar_sup == 'taxa' and ordem_sup == 'desc' else 'desc', pagina_sup=1, pagina_area=pagina_area, busca_area=busca_area, ordenar_area=ordenar_area, ordem_area=ordem_area) }}">{{ t('rate') }}</a>
+                                    <a href="{{ url_for('main.relatorios', dias=dias, busca_sup=busca_sup, ordenar_sup='taxa', ordem_sup='asc' if ordenar_sup == 'taxa' and ordem_sup == 'desc' else 'desc', pagina_sup=1, pagina_area=pagina_area, busca_area=busca_area, ordenar_area=ordenar_area, ordem_area=ordem_area) }}">{{ t('rate') }}</a>
                                 </th>
                                 <th style="width:12%; text-align:right;" class="sortable-th">
-                                    <a href="{{ url_for('main.relatorios', busca_sup=busca_sup, ordenar_sup='tempo', ordem_sup='asc' if ordenar_sup == 'tempo' and ordem_sup == 'desc' else 'desc', pagina_sup=1, pagina_area=pagina_area, busca_area=busca_area, ordenar_area=ordenar_area, ordem_area=ordem_area) }}">{{ t('time') }}</a>
+                                    <a href="{{ url_for('main.relatorios', dias=dias, busca_sup=busca_sup, ordenar_sup='tempo', ordem_sup='asc' if ordenar_sup == 'tempo' and ordem_sup == 'desc' else 'desc', pagina_sup=1, pagina_area=pagina_area, busca_area=busca_area, ordenar_area=ordenar_area, ordem_area=ordem_area) }}">{{ t('time') }}</a>
                                 </th>
                                 <th style="width:10%; text-align:right;" class="sortable-th">
-                                    <a href="{{ url_for('main.relatorios', busca_sup=busca_sup, ordenar_sup='sla', ordem_sup='asc' if ordenar_sup == 'sla' and ordem_sup == 'desc' else 'desc', pagina_sup=1, pagina_area=pagina_area, busca_area=busca_area, ordenar_area=ordenar_area, ordem_area=ordem_area) }}">{{ t('sla_percent') }}</a>
+                                    <a href="{{ url_for('main.relatorios', dias=dias, busca_sup=busca_sup, ordenar_sup='sla', ordem_sup='asc' if ordenar_sup == 'sla' and ordem_sup == 'desc' else 'desc', pagina_sup=1, pagina_area=pagina_area, busca_area=busca_area, ordenar_area=ordenar_area, ordem_area=ordem_area) }}">{{ t('sla_percent') }}</a>
                                 </th>
                             </tr>
                         </thead>
@@ -400,13 +430,13 @@
                     <div class="info">{{ t('showing') }} <b>{{ (pagina_sup - 1) * itens_por_pagina_sup + 1 }}</b> {{ t('to') }} <b>{{ [pagina_sup * itens_por_pagina_sup, total_supervisores]|min }}</b> {{ t('of') }} <b>{{ total_supervisores }}</b></div>
                     <div class="bento-pager">
                         {% if pagina_sup > 1 %}
-                        <a href="{{ url_for('main.relatorios', pagina_sup=1, busca_sup=busca_sup, ordenar_sup=ordenar_sup, ordem_sup=ordem_sup, pagina_area=pagina_area, busca_area=busca_area, ordenar_area=ordenar_area, ordem_area=ordem_area) }}" title="{{ t('first') }}" aria-label="{{ t('first') }}">&laquo;</a>
-                        <a href="{{ url_for('main.relatorios', pagina_sup=pagina_sup-1, busca_sup=busca_sup, ordenar_sup=ordenar_sup, ordem_sup=ordem_sup, pagina_area=pagina_area, busca_area=busca_area, ordenar_area=ordenar_area, ordem_area=ordem_area) }}" title="{{ t('previous') }}" aria-label="{{ t('previous') }}">&lsaquo;</a>
+                        <a href="{{ url_for('main.relatorios', dias=dias, pagina_sup=1, busca_sup=busca_sup, ordenar_sup=ordenar_sup, ordem_sup=ordem_sup, pagina_area=pagina_area, busca_area=busca_area, ordenar_area=ordenar_area, ordem_area=ordem_area) }}" title="{{ t('first') }}" aria-label="{{ t('first') }}">&laquo;</a>
+                        <a href="{{ url_for('main.relatorios', dias=dias, pagina_sup=pagina_sup-1, busca_sup=busca_sup, ordenar_sup=ordenar_sup, ordem_sup=ordem_sup, pagina_area=pagina_area, busca_area=busca_area, ordenar_area=ordenar_area, ordem_area=ordem_area) }}" title="{{ t('previous') }}" aria-label="{{ t('previous') }}">&lsaquo;</a>
                         {% endif %}
                         <span class="current">{{ pagina_sup }}/{{ total_paginas_sup }}</span>
                         {% if pagina_sup < total_paginas_sup %}
-                        <a href="{{ url_for('main.relatorios', pagina_sup=pagina_sup+1, busca_sup=busca_sup, ordenar_sup=ordenar_sup, ordem_sup=ordem_sup, pagina_area=pagina_area, busca_area=busca_area, ordenar_area=ordenar_area, ordem_area=ordem_area) }}" title="{{ t('next') }}" aria-label="{{ t('next') }}">&rsaquo;</a>
-                        <a href="{{ url_for('main.relatorios', pagina_sup=total_paginas_sup, busca_sup=busca_sup, ordenar_sup=ordenar_sup, ordem_sup=ordem_sup, pagina_area=pagina_area, busca_area=busca_area, ordenar_area=ordenar_area, ordem_area=ordem_area) }}" title="{{ t('last') }}" aria-label="{{ t('last') }}">&raquo;</a>
+                        <a href="{{ url_for('main.relatorios', dias=dias, pagina_sup=pagina_sup+1, busca_sup=busca_sup, ordenar_sup=ordenar_sup, ordem_sup=ordem_sup, pagina_area=pagina_area, busca_area=busca_area, ordenar_area=ordenar_area, ordem_area=ordem_area) }}" title="{{ t('next') }}" aria-label="{{ t('next') }}">&rsaquo;</a>
+                        <a href="{{ url_for('main.relatorios', dias=dias, pagina_sup=total_paginas_sup, busca_sup=busca_sup, ordenar_sup=ordenar_sup, ordem_sup=ordem_sup, pagina_area=pagina_area, busca_area=busca_area, ordenar_area=ordenar_area, ordem_area=ordem_area) }}" title="{{ t('last') }}" aria-label="{{ t('last') }}">&raquo;</a>
                         {% endif %}
                     </div>
                 </div>
@@ -448,6 +478,7 @@
         </h2>
 
         <form method="get" action="{{ url_for('main.relatorios') }}" class="mb-4 flex flex-wrap items-center gap-2" role="search" aria-label="{{ t('search_areas_placeholder') }}">
+            <input type="hidden" name="dias" value="{{ dias }}">
             <input type="hidden" name="pagina_area" value="1">
             <input type="hidden" name="ordenar_area" value="{{ ordenar_area }}">
             <input type="hidden" name="ordem_area" value="{{ ordem_area }}">
@@ -468,20 +499,20 @@
                         <thead style="position:sticky; top:0; z-index:var(--z-sticky,20);">
                             <tr>
                                 <th style="width:18%;" class="sortable-th">
-                                    <a href="{{ url_for('main.relatorios', busca_area=busca_area, ordenar_area='area', ordem_area='desc' if ordenar_area == 'area' and ordem_area == 'asc' else 'asc', pagina_area=1, pagina_sup=pagina_sup, busca_sup=busca_sup, ordenar_sup=ordenar_sup, ordem_sup=ordem_sup) }}">{{ t('area_th') }}</a>
+                                    <a href="{{ url_for('main.relatorios', dias=dias, busca_area=busca_area, ordenar_area='area', ordem_area='desc' if ordenar_area == 'area' and ordem_area == 'asc' else 'asc', pagina_area=1, pagina_sup=pagina_sup, busca_sup=busca_sup, ordenar_sup=ordenar_sup, ordem_sup=ordem_sup) }}">{{ t('area_th') }}</a>
                                 </th>
                                 <th style="width:8%; text-align:center;" class="sortable-th">
-                                    <a href="{{ url_for('main.relatorios', busca_area=busca_area, ordenar_area='total', ordem_area='asc' if ordenar_area == 'total' and ordem_area == 'desc' else 'desc', pagina_area=1, pagina_sup=pagina_sup, busca_sup=busca_sup, ordenar_sup=ordenar_sup, ordem_sup=ordem_sup) }}">{{ t('total') }}</a>
+                                    <a href="{{ url_for('main.relatorios', dias=dias, busca_area=busca_area, ordenar_area='total', ordem_area='asc' if ordenar_area == 'total' and ordem_area == 'desc' else 'desc', pagina_area=1, pagina_sup=pagina_sup, busca_sup=busca_sup, ordenar_sup=ordenar_sup, ordem_sup=ordem_sup) }}">{{ t('total') }}</a>
                                 </th>
                                 <th style="width:8%; text-align:center;" class="sortable-th">
-                                    <a href="{{ url_for('main.relatorios', busca_area=busca_area, ordenar_area='abertos', ordem_area='asc' if ordenar_area == 'abertos' and ordem_area == 'desc' else 'desc', pagina_area=1, pagina_sup=pagina_sup, busca_sup=busca_sup, ordenar_sup=ordenar_sup, ordem_sup=ordem_sup) }}">{{ t('open') }}</a>
+                                    <a href="{{ url_for('main.relatorios', dias=dias, busca_area=busca_area, ordenar_area='abertos', ordem_area='asc' if ordenar_area == 'abertos' and ordem_area == 'desc' else 'desc', pagina_area=1, pagina_sup=pagina_sup, busca_sup=busca_sup, ordenar_sup=ordenar_sup, ordem_sup=ordem_sup) }}">{{ t('open') }}</a>
                                 </th>
                                 <th style="width:8%; text-align:center;">{{ t('completed_short') }}</th>
                                 <th style="width:14%;" class="sortable-th">
-                                    <a href="{{ url_for('main.relatorios', busca_area=busca_area, ordenar_area='taxa', ordem_area='asc' if ordenar_area == 'taxa' and ordem_area == 'desc' else 'desc', pagina_area=1, pagina_sup=pagina_sup, busca_sup=busca_sup, ordenar_sup=ordenar_sup, ordem_sup=ordem_sup) }}">{{ t('rate') }}</a>
+                                    <a href="{{ url_for('main.relatorios', dias=dias, busca_area=busca_area, ordenar_area='taxa', ordem_area='asc' if ordenar_area == 'taxa' and ordem_area == 'desc' else 'desc', pagina_area=1, pagina_sup=pagina_sup, busca_sup=busca_sup, ordenar_sup=ordenar_sup, ordem_sup=ordem_sup) }}">{{ t('rate') }}</a>
                                 </th>
                                 <th style="width:10%; text-align:right;" class="sortable-th">
-                                    <a href="{{ url_for('main.relatorios', busca_area=busca_area, ordenar_area='tempo', ordem_area='asc' if ordenar_area == 'tempo' and ordem_area == 'desc' else 'desc', pagina_area=1, pagina_sup=pagina_sup, busca_sup=busca_sup, ordenar_sup=ordenar_sup, ordem_sup=ordem_sup) }}">{{ t('time') }}</a>
+                                    <a href="{{ url_for('main.relatorios', dias=dias, busca_area=busca_area, ordenar_area='tempo', ordem_area='asc' if ordenar_area == 'tempo' and ordem_area == 'desc' else 'desc', pagina_area=1, pagina_sup=pagina_sup, busca_sup=busca_sup, ordenar_sup=ordenar_sup, ordem_sup=ordem_sup) }}">{{ t('time') }}</a>
                                 </th>
                                 <th style="width:10%; text-align:center;">{{ t('sups_short') }}</th>
                                 <th style="width:14%; text-align:right;">{{ t('balanced') }}</th>
@@ -518,13 +549,13 @@
                     <div class="info">{{ t('showing') }} <b>{{ (pagina_area - 1) * itens_por_pagina_area + 1 }}</b> {{ t('to') }} <b>{{ [pagina_area * itens_por_pagina_area, total_areas]|min }}</b> {{ t('of') }} <b>{{ total_areas }}</b></div>
                     <div class="bento-pager">
                         {% if pagina_area > 1 %}
-                        <a href="{{ url_for('main.relatorios', pagina_area=1, busca_area=busca_area, ordenar_area=ordenar_area, ordem_area=ordem_area, pagina_sup=pagina_sup, busca_sup=busca_sup, ordenar_sup=ordenar_sup, ordem_sup=ordem_sup) }}" title="{{ t('first') }}" aria-label="{{ t('first') }}">&laquo;</a>
-                        <a href="{{ url_for('main.relatorios', pagina_area=pagina_area-1, busca_area=busca_area, ordenar_area=ordenar_area, ordem_area=ordem_area, pagina_sup=pagina_sup, busca_sup=busca_sup, ordenar_sup=ordenar_sup, ordem_sup=ordem_sup) }}" title="{{ t('previous') }}" aria-label="{{ t('previous') }}">&lsaquo;</a>
+                        <a href="{{ url_for('main.relatorios', dias=dias, pagina_area=1, busca_area=busca_area, ordenar_area=ordenar_area, ordem_area=ordem_area, pagina_sup=pagina_sup, busca_sup=busca_sup, ordenar_sup=ordenar_sup, ordem_sup=ordem_sup) }}" title="{{ t('first') }}" aria-label="{{ t('first') }}">&laquo;</a>
+                        <a href="{{ url_for('main.relatorios', dias=dias, pagina_area=pagina_area-1, busca_area=busca_area, ordenar_area=ordenar_area, ordem_area=ordem_area, pagina_sup=pagina_sup, busca_sup=busca_sup, ordenar_sup=ordenar_sup, ordem_sup=ordem_sup) }}" title="{{ t('previous') }}" aria-label="{{ t('previous') }}">&lsaquo;</a>
                         {% endif %}
                         <span class="current">{{ pagina_area }}/{{ total_paginas_area }}</span>
                         {% if pagina_area < total_paginas_area %}
-                        <a href="{{ url_for('main.relatorios', pagina_area=pagina_area+1, busca_area=busca_area, ordenar_area=ordenar_area, ordem_area=ordem_area, pagina_sup=pagina_sup, busca_sup=busca_sup, ordenar_sup=ordenar_sup, ordem_sup=ordem_sup) }}" title="{{ t('next') }}" aria-label="{{ t('next') }}">&rsaquo;</a>
-                        <a href="{{ url_for('main.relatorios', pagina_area=total_paginas_area, busca_area=busca_area, ordenar_area=ordenar_area, ordem_area=ordem_area, pagina_sup=pagina_sup, busca_sup=busca_sup, ordenar_sup=ordenar_sup, ordem_sup=ordem_sup) }}" title="{{ t('last') }}" aria-label="{{ t('last') }}">&raquo;</a>
+                        <a href="{{ url_for('main.relatorios', dias=dias, pagina_area=pagina_area+1, busca_area=busca_area, ordenar_area=ordenar_area, ordem_area=ordem_area, pagina_sup=pagina_sup, busca_sup=busca_sup, ordenar_sup=ordenar_sup, ordem_sup=ordem_sup) }}" title="{{ t('next') }}" aria-label="{{ t('next') }}">&rsaquo;</a>
+                        <a href="{{ url_for('main.relatorios', dias=dias, pagina_area=total_paginas_area, busca_area=busca_area, ordenar_area=ordenar_area, ordem_area=ordem_area, pagina_sup=pagina_sup, busca_sup=busca_sup, ordenar_sup=ordenar_sup, ordem_sup=ordem_sup) }}" title="{{ t('last') }}" aria-label="{{ t('last') }}">&raquo;</a>
                         {% endif %}
                     </div>
                 </div>
@@ -623,17 +654,41 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Gráfico: Prioridade (Projetos = 0, demais = Não Aplicável)
+    // Gráfico: Prioridade (AOG = -1, Projetos = 0, demais = Não Aplicável)
     if (document.getElementById('chartPrioridade') && dadosGerais.distribuicao_prioridade) {
         const ctxPrio = document.getElementById('chartPrioridade').getContext('2d');
         const dp = dadosGerais.distribuicao_prioridade;
+        const countAog = (dp[-1] ?? dp['-1'] ?? 0);
         const countProjetos = (dp[0] ?? dp['0'] ?? 0);
         let countNaoAplicavel = 0;
         Object.keys(dp).forEach(function(k) {
-            if (k !== '0' && k !== 0) countNaoAplicavel += (Number(dp[k]) || 0);
+            if (k !== '0' && k !== 0 && k !== '-1' && k !== -1) countNaoAplicavel += (Number(dp[k]) || 0);
         });
-        const labels = ['{{ t("projects") }}', '{{ t("not_applicable") }}'];
-        const data = [countProjetos, countNaoAplicavel];
+        const labels = ['{{ t("aog_short") }}', '{{ t("projects") }}', '{{ t("not_applicable") }}'];
+        const data = [countAog, countProjetos, countNaoAplicavel];
+
+        // Rótulo com o valor em cima de cada barra (sem plugin externo) —
+        // sem isso o usuário precisa passar o mouse pra ver o número.
+        const valueLabelPlugin = {
+            id: 'valueLabel',
+            afterDatasetsDraw(chart) {
+                const ctx = chart.ctx;
+                chart.data.datasets.forEach(function(dataset, i) {
+                    const meta = chart.getDatasetMeta(i);
+                    meta.data.forEach(function(bar, index) {
+                        const value = dataset.data[index];
+                        if (!value) return;
+                        ctx.save();
+                        ctx.fillStyle = '#1F2937';
+                        ctx.font = 'bold 12px sans-serif';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'bottom';
+                        ctx.fillText(value, bar.x, bar.y - 4);
+                        ctx.restore();
+                    });
+                });
+            }
+        };
 
         new Chart(ctxPrio, {
             type: 'bar',
@@ -651,13 +706,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 responsive: true,
                 maintainAspectRatio: false,
                 animation: false,
+                layout: {
+                    padding: { top: 20 }
+                },
                 scales: {
                     y: { beginAtZero: true }
                 },
                 plugins: {
                     legend: { display: false }
                 }
-            }
+            },
+            plugins: [valueLabelPlugin]
         });
     }
 

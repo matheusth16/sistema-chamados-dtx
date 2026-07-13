@@ -96,7 +96,7 @@ def resolver_importance(
     - tipos SLA/escalada/transferência/reabertura → 'high'
     - aviso_resolucao_supervisor: marco=80 → 'high', marco=50 → 'normal'
     - lembrete_confirmacao: lembrete>=2 → 'high', lembrete=1 → 'normal'
-    - novo_chamado_aprovador: Projetos ou prioridade=0 → 'high', demais → 'normal'
+    - novo_chamado_aprovador: Projetos/AOG ou prioridade<=0 → 'high', demais → 'normal'
     """
     if destinatario_perfil == "solicitante":
         return "normal"
@@ -115,7 +115,10 @@ def resolver_importance(
 
     if tipo_notificacao == "novo_chamado_aprovador":
         data = chamado_data or {}
-        if data.get("categoria") == "Projetos" or data.get("prioridade") == 0:
+        prioridade = data.get("prioridade")
+        if data.get("categoria") in ("Projetos", "AOG") or (
+            prioridade is not None and prioridade <= 0
+        ):
             return "high"
 
     return "normal"

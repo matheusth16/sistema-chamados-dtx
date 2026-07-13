@@ -18,6 +18,7 @@ from flask import (
 )
 from flask_login import current_user, login_required
 from google.api_core.exceptions import FailedPrecondition
+from google.cloud.firestore_v1.base_query import FieldFilter
 
 from app.cache import get_static_cached
 from app.database import db
@@ -81,6 +82,21 @@ def _dashboard_endpoint() -> str:
 
 def _redirect_dashboard(**kwargs) -> Response:
     return redirect(url_for(_dashboard_endpoint(), **kwargs))
+
+
+def _query_chamados_escopada_por_area(user):
+    """Query base de chamados, escopada por área quando o usuário é supervisor.
+
+    Mesmo filtro que obter_contexto_admin já aplica pro /painel — sem isso,
+    rotas que consultam db.collection("chamados") direto (ex.: exportações)
+    trazem chamados/métricas de áreas que não são do supervisor.
+    """
+    chamados_ref = db.collection("chamados")
+    if user.perfil == "supervisor" and getattr(user, "areas", None):
+        chamados_ref = chamados_ref.where(
+            filter=FieldFilter("supervisor_ids_com_acesso", "array_contains", user.id)
+        )
+    return chamados_ref
 
 
 def _render_dashboard() -> Response:
@@ -375,7 +391,7 @@ def exportar() -> Response:
             flash_t("error_exporting_data", "danger")
             return _redirect_dashboard()
     try:
-        chamados_ref = db.collection("chamados")
+        chamados_ref = _query_chamados_escopada_por_area(current_user)
         resultado = aplicar_filtros_dashboard_com_paginacao(
             chamados_ref, request.args, limite=MAX_EXPORT_CHAMADOS, cursor=None
         )
@@ -443,16 +459,32 @@ def exportar_avancado() -> Response:
         from app.services.excel_export_service import exportador_excel
 
         # Busca chamados com filtros e permissão (limitado para não estourar cota Firestore)
-        chamados_ref = db.collection("chamados")
+        chamados_ref = _query_chamados_escopada_por_area(current_user)
         resultado = aplicar_filtros_dashboard_com_paginacao(
             chamados_ref, request.args, limite=MAX_EXPORT_CHAMADOS, cursor=None
         )
         docs = resultado["docs"]
         chamados = _filtrar_chamados_por_permissao(docs, current_user)
 
-        # Obtém métricas
-        metricas_gerais = analisador.obter_metricas_gerais(dias=30)
-        metricas_supervisores = analisador.obter_metricas_supervisores()
+        # Métricas gerais/agregadas: analisador consulta a coleção inteira sem
+        # escopo de área — supervisor não-admin só pode ver métricas/nomes de
+        # supervisores da(s) própria(s) área(s), senão vaza dado de outras áreas.
+        if current_user.is_admin_or_above:
+            metricas_gerais = analisador.obter_metricas_gerais(dias=30)
+            metricas_supervisores = analisador.obter_metricas_supervisores()
+        else:
+            chamados_pre_carregados = [c.to_dict() for c in chamados]
+            metricas_gerais = analisador.obter_metricas_gerais(
+                dias=30, chamados_pre_carregados=chamados_pre_carregados
+            )
+            areas_usuario = set(getattr(current_user, "areas", None) or [])
+            metricas_supervisores = [
+                m
+                for m in analisador.obter_metricas_supervisores(
+                    chamados_pre_carregados=chamados_pre_carregados
+                )
+                if m.get("area") in areas_usuario
+            ]
 
         # Filtros aplicados (para documentar no Excel)
         filtros_aplicados = {}
@@ -486,13 +518,20 @@ def exportar_avancado() -> Response:
         return _redirect_dashboard()
 
 
+DIAS_PERIODO_PERMITIDOS = (7, 30, 90)
+
+
 @main.route("/admin/relatorios")
 @requer_supervisor_area
 def relatorios() -> Response:
     """Dashboard de relatórios e análises. Use ?atualizar=1 para forçar dados frescos.
-    Query params: pagina_sup, pagina_area, ordenar_sup, ordenar_area, ordem_sup, ordem_area (asc|desc), busca_sup, busca_area."""
+    Query params: dias (7|30|90, padrão 30), pagina_sup, pagina_area, ordenar_sup,
+    ordenar_area, ordem_sup, ordem_area (asc|desc), busca_sup, busca_area."""
     erro_relatorio = False
     try:
+        dias = request.args.get("dias", 30, type=int)
+        if dias not in DIAS_PERIODO_PERMITIDOS:
+            dias = 30
         atualizar = request.args.get("atualizar") == "1"
         if atualizar:
             limite = getattr(Config, "RELATORIO_MAX_POR_USUARIO_POR_DIA", 0) or 0
@@ -502,9 +541,11 @@ def relatorios() -> Response:
                     flash_t("generic_error", "danger")
                     if msg:
                         flash(msg, "warning")
-                    return redirect(url_for("main.relatorios"))
+                    return redirect(url_for("main.relatorios", dias=dias))
         try:
-            relatorio = analisador.obter_relatorio_completo(usar_cache=not atualizar) or {}
+            relatorio = (
+                analisador.obter_relatorio_completo(usar_cache=not atualizar, dias=dias) or {}
+            )
         except Exception as e_analytics:
             logger.exception("Erro ao obter relatório completo (analytics): %s", e_analytics)
             relatorio = {
@@ -619,6 +660,7 @@ def relatorios() -> Response:
             busca_area=request.args.get("busca_area", ""),
             erro_relatorio=erro_relatorio,
             setores=setores,
+            dias=dias,
         )
     except Exception as e:
         logger.exception("Erro ao gerar relatórios: %s", e)
@@ -652,6 +694,9 @@ def relatorios() -> Response:
                 busca_area=request.args.get("busca_area", ""),
                 erro_relatorio=True,
                 setores=setores,
+                dias=request.args.get("dias", 30, type=int)
+                if request.args.get("dias", 30, type=int) in DIAS_PERIODO_PERMITIDOS
+                else 30,
             )
         except Exception as e2:
             logger.exception("Erro ao renderizar página de relatórios (fallback): %s", e2)

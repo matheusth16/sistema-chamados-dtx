@@ -23,6 +23,29 @@ def _usuario_mock(uid="sol_1", perfil="solicitante"):
     return u
 
 
+class _UsuarioContextoLimitado:
+    """Simula o current_user do Flask-Login (LocalProxy ligado ao request context).
+
+    Fora do request context original (dentro da thread de notificação em
+    background, que só empurra app_context) o proxy real deixa de resolver e
+    vira None — acessar .nome nesse momento explode com AttributeError.
+    """
+
+    def __init__(self, uid="sol_1", nome="Solicitante Teste", perfil="solicitante"):
+        self.id = uid
+        self.perfil = perfil
+        self.email = "sol@test.com"
+        self.is_admin_or_above = perfil in ("admin", "admin_global")
+        self._nome = nome
+        self.contexto_ativo = True
+
+    @property
+    def nome(self):
+        if not self.contexto_ativo:
+            raise AttributeError("'NoneType' object has no attribute 'nome'")
+        return self._nome
+
+
 def _mock_doc(
     solicitante_id="sol_1",
     status="Aberto",
@@ -318,3 +341,45 @@ class TestCancelarCoverage:
 
         mock_thread_cls.assert_called_once()
         mock_thread.start.assert_called_once()
+
+    def test_nome_do_solicitante_capturado_antes_da_thread(self, app):
+        """Regressão: usuario.nome deve ser lido ANTES de _run() ser agendado.
+
+        _run() só reabre app_context (não request context) dentro da thread,
+        então o current_user real fica None nesse ponto e usuario.nome
+        explodiria — a notificação de cancelamento teria que sair mesmo
+        assim, com o nome capturado enquanto o request context ainda existia.
+        """
+        from app.services.cancelamento_solicitante_service import _notificar_cancelamento
+
+        user = _UsuarioContextoLimitado(nome="Fulano de Tal")
+        dados = {"numero_chamado": "CH-001", "categoria": "TI", "observadores": []}
+        closures = []
+
+        def fake_thread(target, daemon=True):
+            closures.append(target)
+            m = MagicMock()
+            m.start = lambda: None
+            return m
+
+        with patch("threading.Thread", side_effect=fake_thread), app.app_context():
+            _notificar_cancelamento(
+                chamado_id="ch_1", dados=dados, motivo="motivo válido", usuario=user
+            )
+
+        # Simula a thread rodando fora do request context original
+        user.contexto_ativo = False
+
+        with (
+            patch(
+                "app.services.chamado_notificacao_service.destinatarios_do_chamado",
+                return_value=[],
+            ),
+            patch(
+                "app.services.chamado_notificacao_service.notificar_cancelamento_chamado"
+            ) as mock_notificar,
+        ):
+            closures[0]()
+
+        mock_notificar.assert_called_once()
+        assert mock_notificar.call_args.kwargs["solicitante_nome"] == "Fulano de Tal"

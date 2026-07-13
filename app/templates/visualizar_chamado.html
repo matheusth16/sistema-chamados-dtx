@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from 'components/_status_badge.html' import status_badge %}
+{% from 'components/_status_badge.html' import status_badge with context %}
 
 {% block content %}
 {% set participantes_pendentes = (chamado.participantes | rejectattr('status', 'equalto', 'concluido') | list) if chamado.participantes else [] %}
@@ -557,7 +557,7 @@
             {{ t('escalation_actions_title') if t else 'Ações de Escalonamento' }}
         </h4>
         <div class="flex flex-wrap gap-3">
-            <button onclick="document.getElementById('modal-transferir-area').classList.remove('hidden')" class="bento-escalation-btn amber">
+            <button onclick="abrirModalEscalonamento('modal-transferir-area')" class="bento-escalation-btn amber">
                 <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
                 {{ t('escalation_transfer_area_btn') if t else 'Transferir Área' }}
             </button>
@@ -565,12 +565,12 @@
                 <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>
                 {{ t('escalation_escalate_colleague_btn') if t else 'Escalonar para Colega' }}
             </button>
-            <button onclick="document.getElementById('modal-incluir-participantes').classList.remove('hidden')" class="bento-escalation-btn teal">
+            <button onclick="abrirModalEscalonamento('modal-incluir-participantes')" class="bento-escalation-btn teal">
                 <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
                 {{ t('escalation_include_supervisors_btn') if t else 'Incluir supervisores' }}
             </button>
             {% if current_user.perfil in ('supervisor', 'admin', 'admin_global') %}
-            <button onclick="document.getElementById('modal-previsao-atendimento').classList.remove('hidden')" class="bento-escalation-btn amber">
+            <button onclick="abrirModalEscalonamento('modal-previsao-atendimento')" class="bento-escalation-btn amber">
                 <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                 {{ t('attendance_forecast_btn') if t else 'Definir previsão de atendimento' }}
             </button>
@@ -580,18 +580,18 @@
 </div>
 
 <!-- Modal: Transferir Área -->
-<div id="modal-transferir-area" class="hidden bento-modal-overlay flex items-center justify-center p-4">
+<div id="modal-transferir-area" class="hidden bento-modal-overlay flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="modal-transferir-area-titulo">
     <div class="bento-modal-backdrop"></div>
     <div class="bento-modal-panel" style="position:relative; z-index:1;">
         <div class="head">
-            <h3 style="font-weight:800; font-size:15px;">{{ t('escalation_transfer_modal_title') if t else 'Transferir Área' }}</h3>
-            <button onclick="document.getElementById('modal-transferir-area').classList.add('hidden')" class="bento-modal-close">
+            <h3 id="modal-transferir-area-titulo" style="font-weight:800; font-size:15px;">{{ t('escalation_transfer_modal_title') if t else 'Transferir Área' }}</h3>
+            <button onclick="fecharModalEscalonamento('modal-transferir-area')" class="bento-modal-close">
                 <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
             </button>
         </div>
         <div class="space-y-4" style="padding:24px;">
             <div>
-                <label class="bento-field-label" style="margin-bottom:6px;">{{ t('escalation_dest_area_label') if t else 'Área Destino' }} <span style="color:#e11d48;">*</span></label>
+                <label for="transferir-area-select" class="bento-field-label" style="margin-bottom:6px;">{{ t('escalation_dest_area_label') if t else 'Área Destino' }} <span style="color:#e11d48;">*</span></label>
                 <select id="transferir-area-select" onchange="carregarSupervisoresDestino(this.value)"
                     style="width:100%; background:var(--color-surface-canvas); border:1.5px solid transparent; border-radius:14px; padding:11px 14px; font-family:inherit; font-size:14px;">
                     <option value="">{{ t('escalation_select_area') if t else 'Selecione uma área...' }}</option>
@@ -603,14 +603,14 @@
                 </select>
             </div>
             <div>
-                <label class="bento-field-label" style="margin-bottom:6px;">{{ t('escalation_dest_responsible_label') if t else 'Responsável Destino' }} <span style="color:#e11d48;">*</span></label>
+                <label for="transferir-supervisor-select" class="bento-field-label" style="margin-bottom:6px;">{{ t('escalation_dest_responsible_label') if t else 'Responsável Destino' }} <span style="color:#e11d48;">*</span></label>
                 <select id="transferir-supervisor-select" disabled
                     style="width:100%; background:var(--color-surface-canvas); border:1.5px solid transparent; border-radius:14px; padding:11px 14px; font-family:inherit; font-size:14px;">
                     <option value="">{{ t('escalation_select_area_first') if t else 'Selecione a área primeiro...' }}</option>
                 </select>
             </div>
             <div>
-                <label class="bento-field-label" style="margin-bottom:6px;">{{ t('escalation_reason_label') if t else 'Motivo' }} <span style="color:#e11d48;">*</span></label>
+                <label for="transferir-motivo" class="bento-field-label" style="margin-bottom:6px;">{{ t('escalation_reason_label') if t else 'Motivo' }} <span style="color:#e11d48;">*</span></label>
                 <textarea id="transferir-motivo" rows="3" maxlength="500"
                     placeholder="{{ t('escalation_transfer_reason_placeholder') if t else 'Descreva o motivo da transferência...' }}"
                     style="width:100%; background:var(--color-surface-canvas); border:1.5px solid transparent; border-radius:14px; padding:11px 14px; font-family:inherit; font-size:14px; resize:none;"></textarea>
@@ -618,7 +618,7 @@
             <div id="transferir-erro" class="hidden bento-inline-notice error"></div>
         </div>
         <div class="flex gap-3" style="padding:0 24px 24px;">
-            <button onclick="document.getElementById('modal-transferir-area').classList.add('hidden')" class="bento-btn-outline" style="flex:1; justify-content:center;">
+            <button onclick="fecharModalEscalonamento('modal-transferir-area')" class="bento-btn-outline" style="flex:1; justify-content:center;">
                 {{ t('cancel') if t else 'Cancelar' }}
             </button>
             <button onclick="executarTransferirArea()" class="bento-btn-block solid-amber" style="flex:1;">
@@ -629,25 +629,25 @@
 </div>
 
 <!-- Modal: Escalonar para Colega -->
-<div id="modal-escalonar-colega" class="hidden bento-modal-overlay flex items-center justify-center p-4">
+<div id="modal-escalonar-colega" class="hidden bento-modal-overlay flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="modal-escalonar-colega-titulo">
     <div class="bento-modal-backdrop"></div>
     <div class="bento-modal-panel" style="position:relative; z-index:1;">
         <div class="head">
-            <h3 style="font-weight:800; font-size:15px;">{{ t('escalation_escalate_modal_title') if t else 'Escalonar para Colega' }}</h3>
-            <button onclick="document.getElementById('modal-escalonar-colega').classList.add('hidden')" class="bento-modal-close">
+            <h3 id="modal-escalonar-colega-titulo" style="font-weight:800; font-size:15px;">{{ t('escalation_escalate_modal_title') if t else 'Escalonar para Colega' }}</h3>
+            <button onclick="fecharModalEscalonamento('modal-escalonar-colega')" class="bento-modal-close">
                 <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
             </button>
         </div>
         <div class="space-y-4" style="padding:24px;">
             <div>
-                <label class="bento-field-label" style="margin-bottom:6px;">{{ t('escalation_colleague_label') if t else 'Colega' }} ({{ chamado.area }}) <span style="color:#e11d48;">*</span></label>
+                <label for="escalonar-supervisor-select" class="bento-field-label" style="margin-bottom:6px;">{{ t('escalation_colleague_label') if t else 'Colega' }} ({{ chamado.area }}) <span style="color:#e11d48;">*</span></label>
                 <select id="escalonar-supervisor-select" disabled
                     style="width:100%; background:var(--color-surface-canvas); border:1.5px solid transparent; border-radius:14px; padding:11px 14px; font-family:inherit; font-size:14px;">
                     <option value="">{{ t('loading_generic') if t else 'Carregando...' }}</option>
                 </select>
             </div>
             <div>
-                <label class="bento-field-label" style="margin-bottom:6px;">{{ t('escalation_reason_label') if t else 'Motivo' }} <span style="color:#e11d48;">*</span></label>
+                <label for="escalonar-motivo" class="bento-field-label" style="margin-bottom:6px;">{{ t('escalation_reason_label') if t else 'Motivo' }} <span style="color:#e11d48;">*</span></label>
                 <textarea id="escalonar-motivo" rows="3" maxlength="500"
                     placeholder="{{ t('escalation_escalate_reason_placeholder') if t else 'Descreva o motivo do escalonamento...' }}"
                     style="width:100%; background:var(--color-surface-canvas); border:1.5px solid transparent; border-radius:14px; padding:11px 14px; font-family:inherit; font-size:14px; resize:none;"></textarea>
@@ -655,7 +655,7 @@
             <div id="escalonar-erro" class="hidden bento-inline-notice error"></div>
         </div>
         <div class="flex gap-3" style="padding:0 24px 24px;">
-            <button onclick="document.getElementById('modal-escalonar-colega').classList.add('hidden')" class="bento-btn-outline" style="flex:1; justify-content:center;">
+            <button onclick="fecharModalEscalonamento('modal-escalonar-colega')" class="bento-btn-outline" style="flex:1; justify-content:center;">
                 {{ t('cancel') if t else 'Cancelar' }}
             </button>
             <button onclick="executarEscalonarColega()" class="bento-btn-block" style="flex:1; background:#7c3aed; color:#fff;">
@@ -666,18 +666,18 @@
 </div>
 
 <!-- Modal: Incluir Supervisores (Fase 4) -->
-<div id="modal-incluir-participantes" class="hidden bento-modal-overlay flex items-center justify-center p-4">
+<div id="modal-incluir-participantes" class="hidden bento-modal-overlay flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="modal-incluir-participantes-titulo">
     <div class="bento-modal-backdrop"></div>
     <div class="bento-modal-panel" style="position:relative; z-index:1;">
         <div class="head">
-            <h3 style="font-weight:800; font-size:15px;">{{ t('escalation_include_modal_title') if t else 'Incluir supervisores' }}</h3>
-            <button onclick="document.getElementById('modal-incluir-participantes').classList.add('hidden')" class="bento-modal-close">
+            <h3 id="modal-incluir-participantes-titulo" style="font-weight:800; font-size:15px;">{{ t('escalation_include_modal_title') if t else 'Incluir supervisores' }}</h3>
+            <button onclick="fecharModalEscalonamento('modal-incluir-participantes')" class="bento-modal-close">
                 <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
             </button>
         </div>
         <div class="space-y-4" style="padding:24px;">
             <div>
-                <label class="bento-field-label" style="margin-bottom:6px;">{{ t('escalation_area_label') if t else 'Área' }} <span style="color:#e11d48;">*</span></label>
+                <label for="incluir-area-select" class="bento-field-label" style="margin-bottom:6px;">{{ t('escalation_area_label') if t else 'Área' }} <span style="color:#e11d48;">*</span></label>
                 <select id="incluir-area-select" onchange="carregarSupervisoresParaIncluir(this.value)"
                     style="width:100%; background:var(--color-surface-canvas); border:1.5px solid transparent; border-radius:14px; padding:11px 14px; font-family:inherit; font-size:14px;">
                     <option value="">{{ t('escalation_select_area') if t else 'Selecione uma área...' }}</option>
@@ -687,7 +687,7 @@
                 </select>
             </div>
             <div>
-                <label class="bento-field-label" style="margin-bottom:6px;">{{ t('escalation_supervisor_label') if t else 'Supervisor' }} <span style="color:#e11d48;">*</span></label>
+                <label for="incluir-supervisor-select" class="bento-field-label" style="margin-bottom:6px;">{{ t('escalation_supervisor_label') if t else 'Supervisor' }} <span style="color:#e11d48;">*</span></label>
                 <div class="flex gap-2">
                     <select id="incluir-supervisor-select" disabled
                         style="flex:1; background:var(--color-surface-canvas); border:1.5px solid transparent; border-radius:14px; padding:11px 14px; font-family:inherit; font-size:14px;">
@@ -702,7 +702,7 @@
             <div id="incluir-erro" class="hidden bento-inline-notice error"></div>
         </div>
         <div class="flex gap-3" style="padding:0 24px 24px;">
-            <button onclick="document.getElementById('modal-incluir-participantes').classList.add('hidden'); limparModalIncluir()" class="bento-btn-outline" style="flex:1; justify-content:center;">
+            <button onclick="fecharModalEscalonamento('modal-incluir-participantes'); limparModalIncluir()" class="bento-btn-outline" style="flex:1; justify-content:center;">
                 {{ t('cancel') if t else 'Cancelar' }}
             </button>
             <button onclick="executarIncluirParticipantes()" class="bento-btn-block solid-teal" style="flex:1;">
@@ -713,23 +713,23 @@
 </div>
 
 <!-- Modal: Previsão de Atendimento -->
-<div id="modal-previsao-atendimento" class="hidden bento-modal-overlay flex items-center justify-center p-4">
+<div id="modal-previsao-atendimento" class="hidden bento-modal-overlay flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="modal-previsao-atendimento-titulo">
     <div class="bento-modal-backdrop"></div>
     <div class="bento-modal-panel" style="position:relative; z-index:1;">
         <div class="head">
-            <h3 style="font-weight:800; font-size:15px;">{{ t('attendance_forecast_btn') if t else 'Definir previsão de atendimento' }}</h3>
-            <button onclick="document.getElementById('modal-previsao-atendimento').classList.add('hidden')" class="bento-modal-close">
+            <h3 id="modal-previsao-atendimento-titulo" style="font-weight:800; font-size:15px;">{{ t('attendance_forecast_btn') if t else 'Definir previsão de atendimento' }}</h3>
+            <button onclick="fecharModalEscalonamento('modal-previsao-atendimento')" class="bento-modal-close">
                 <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
             </button>
         </div>
         <div class="space-y-4" style="padding:24px;">
             <div>
-                <label class="bento-field-label" style="margin-bottom:6px;">{{ t('attendance_forecast_label') if t else 'Previsão de atendimento' }} <span style="color:#e11d48;">*</span></label>
+                <label for="previsao-atendimento-data" class="bento-field-label" style="margin-bottom:6px;">{{ t('attendance_forecast_label') if t else 'Previsão de atendimento' }} <span style="color:#e11d48;">*</span></label>
                 <input type="datetime-local" id="previsao-atendimento-data"
                     style="width:100%; background:var(--color-surface-canvas); border:1.5px solid transparent; border-radius:14px; padding:11px 14px; font-family:inherit; font-size:14px;">
             </div>
             <div>
-                <label class="bento-field-label" style="margin-bottom:6px;">{{ t('escalation_reason_label') if t else 'Motivo' }} <span style="color:#e11d48;">*</span></label>
+                <label for="previsao-atendimento-motivo" class="bento-field-label" style="margin-bottom:6px;">{{ t('escalation_reason_label') if t else 'Motivo' }} <span style="color:#e11d48;">*</span></label>
                 <textarea id="previsao-atendimento-motivo" rows="3" maxlength="500"
                     placeholder="{{ t('attendance_forecast_reason_placeholder') if t else 'Ex: combinei com o gestor, preciso de mais tempo antes de atender' }}"
                     style="width:100%; background:var(--color-surface-canvas); border:1.5px solid transparent; border-radius:14px; padding:11px 14px; font-family:inherit; font-size:14px; resize:none;"></textarea>
@@ -737,7 +737,7 @@
             <div id="previsao-atendimento-erro" class="hidden bento-inline-notice error"></div>
         </div>
         <div class="flex gap-3" style="padding:0 24px 24px;">
-            <button onclick="document.getElementById('modal-previsao-atendimento').classList.add('hidden')" class="bento-btn-outline" style="flex:1; justify-content:center;">
+            <button onclick="fecharModalEscalonamento('modal-previsao-atendimento')" class="bento-btn-outline" style="flex:1; justify-content:center;">
                 {{ t('cancel') if t else 'Cancelar' }}
             </button>
             <button onclick="executarDefinirPrevisaoAtendimento()" class="bento-btn-block solid-amber" style="flex:1;">
@@ -792,6 +792,58 @@ Object.assign(window.DTX_MSGS, {
         if (el) { el.classList.add('hidden'); }
     }
 
+    // ── Acessibilidade dos modais de escalonamento: foco + Escape ───────────
+    // Os modais são <div class="hidden"> (não <dialog> nativo), então não há
+    // focus trap nem Escape-to-close por padrão do navegador — implementado
+    // aqui manualmente.
+    var _ultimoElementoFocado = null;
+
+    function _focaveisDoModal(modal) {
+        return Array.prototype.slice
+            .call(modal.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'))
+            .filter(function(el) { return !el.disabled && el.offsetParent !== null; });
+    }
+
+    function _trapFocusHandler(e) {
+        var modal = e.currentTarget;
+        if (e.key === 'Escape') {
+            fecharModalEscalonamento(modal.id);
+            return;
+        }
+        if (e.key !== 'Tab') { return; }
+        var focaveis = _focaveisDoModal(modal);
+        if (focaveis.length === 0) { return; }
+        var primeiro = focaveis[0];
+        var ultimo = focaveis[focaveis.length - 1];
+        if (e.shiftKey && document.activeElement === primeiro) {
+            ultimo.focus();
+            e.preventDefault();
+        } else if (!e.shiftKey && document.activeElement === ultimo) {
+            primeiro.focus();
+            e.preventDefault();
+        }
+    }
+
+    window.abrirModalEscalonamento = function(modalId) {
+        var modal = document.getElementById(modalId);
+        if (!modal) { return; }
+        _ultimoElementoFocado = document.activeElement;
+        modal.classList.remove('hidden');
+        modal.addEventListener('keydown', _trapFocusHandler);
+        var focaveis = _focaveisDoModal(modal);
+        if (focaveis.length > 0) { focaveis[0].focus(); }
+    };
+
+    window.fecharModalEscalonamento = function(modalId) {
+        var modal = document.getElementById(modalId);
+        if (!modal) { return; }
+        modal.classList.add('hidden');
+        modal.removeEventListener('keydown', _trapFocusHandler);
+        if (_ultimoElementoFocado && typeof _ultimoElementoFocado.focus === 'function') {
+            _ultimoElementoFocado.focus();
+        }
+    };
+
     window.carregarSupervisoresDestino = function(area) {
         var selSup = document.getElementById('transferir-supervisor-select');
         selSup.disabled = true;
@@ -836,11 +888,11 @@ Object.assign(window.DTX_MSGS, {
             if (colegas.length === 0) {
                 selSup.innerHTML = '<option value="">' + DTX_MSGS.no_colleague_available + '</option>';
             }
-            document.getElementById('modal-escalonar-colega').classList.remove('hidden');
+            abrirModalEscalonamento('modal-escalonar-colega');
         })
         .catch(function() {
             selSup.innerHTML = '<option value="">' + DTX_MSGS.error_loading + '</option>';
-            document.getElementById('modal-escalonar-colega').classList.remove('hidden');
+            abrirModalEscalonamento('modal-escalonar-colega');
         });
     };
 

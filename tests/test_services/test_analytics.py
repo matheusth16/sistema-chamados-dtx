@@ -79,6 +79,20 @@ def test_calcular_deltas_retorna_valores_corretos():
     assert deltas["tempo_medio_resolucao_horas_delta"] == -3.0
 
 
+def test_calcular_deltas_inclui_concluidos_mas_nao_abertos_em_andamento():
+    """concluidos_delta é calculado (comparação justa de throughput), mas
+    abertos/em_andamento não geram delta — comparariam coortes de idades
+    diferentes e sempre cairiam, mascarando o desempenho real."""
+    from app.services.analytics import AnalisadorChamados
+
+    atual = {"concluidos": 20, "abertos": 5, "em_andamento": 3}
+    anterior = {"concluidos": 15, "abertos": 12, "em_andamento": 8}
+    deltas = AnalisadorChamados._calcular_deltas(atual, anterior)
+    assert deltas["concluidos_delta"] == 5
+    assert "abertos_delta" not in deltas
+    assert "em_andamento_delta" not in deltas
+
+
 # ── Testes N+1 elimination ────────────────────────────────────────────────────
 
 
@@ -186,12 +200,12 @@ def test_obter_metricas_areas_usa_dados_pre_carregados_sem_query_chamados():
 
 def test_obter_metricas_gerais_usa_chamados_pre_carregados_sem_query():
     """Com chamados_pre_carregados, obter_metricas_gerais não deve chamar get_db."""
-    from datetime import datetime, timedelta
+    from datetime import UTC, datetime, timedelta
     from unittest.mock import MagicMock, patch
 
     from app.services.analytics import AnalisadorChamados
 
-    agora = datetime.now()
+    agora = datetime.now(UTC)
     chamados = [
         {
             "status": "Aberto",
@@ -220,14 +234,108 @@ def test_obter_metricas_gerais_usa_chamados_pre_carregados_sem_query():
     assert r["concluidos"] == 1
 
 
-def test_obter_metricas_periodo_anterior_usa_chamados_pre_carregados_sem_query():
-    """Com chamados_pre_carregados, obter_metricas_periodo_anterior não deve chamar get_db."""
-    from datetime import datetime, timedelta
+def test_obter_metricas_gerais_com_data_abertura_tz_aware_nao_retorna_vazio():
+    """Firestore sempre devolve data_abertura tz-aware (UTC); comparar com
+    datetime.now() naive (sem tz) causa TypeError, engolido pelo except geral,
+    que faz obter_metricas_gerais retornar {} e os gráficos ficarem vazios.
+    """
+    from datetime import UTC, datetime, timedelta
     from unittest.mock import MagicMock, patch
 
     from app.services.analytics import AnalisadorChamados
 
-    agora = datetime.now()
+    agora_aware = datetime.now(UTC)
+    chamados = [
+        {
+            "status": "Aberto",
+            "data_abertura": agora_aware - timedelta(days=5),
+            "data_conclusao": None,
+            "categoria": "TI",
+            "prioridade": 1,
+        },
+    ]
+    mock_db = MagicMock()
+    with patch.object(AnalisadorChamados, "get_db", return_value=mock_db):
+        a = AnalisadorChamados()
+        r = a.obter_metricas_gerais(dias=30, chamados_pre_carregados=chamados)
+
+    assert r != {}
+    assert r["total_chamados"] == 1
+
+
+def test_obter_metricas_periodo_anterior_com_data_abertura_tz_aware_nao_retorna_vazio():
+    """Mesmo bug de datetime naive vs aware, agora em obter_metricas_periodo_anterior
+    (usado para calcular os deltas/badges de tendência dos relatórios)."""
+    from datetime import UTC, datetime, timedelta
+    from unittest.mock import MagicMock, patch
+
+    from app.services.analytics import AnalisadorChamados
+
+    agora_aware = datetime.now(UTC)
+    chamados = [
+        {
+            "status": "Concluído",
+            "data_abertura": agora_aware - timedelta(days=45),
+            "data_conclusao": agora_aware - timedelta(days=40),
+            "categoria": "TI",
+            "sla_dias": None,
+        },
+    ]
+    mock_db = MagicMock()
+    with patch.object(AnalisadorChamados, "get_db", return_value=mock_db):
+        a = AnalisadorChamados()
+        r = a.obter_metricas_periodo_anterior(chamados_pre_carregados=chamados)
+
+    assert r != {}
+    assert r["total_chamados"] == 1
+
+
+def test_obter_metricas_gerais_distribuicao_prioridade_chaves_sempre_str():
+    """Chamados sem campo 'prioridade' (legado) caem no fallback str 'Indefinido',
+    misturado com prioridades numericas (-1/0/1) quebra json.dumps(sort_keys=True)
+    no template ('<' not supported between instances of 'str' and 'int') — as
+    chaves do dict devem ser sempre do mesmo tipo (str) para serializar com
+    segurança."""
+    from datetime import UTC, datetime, timedelta
+    from unittest.mock import MagicMock, patch
+
+    from app.services.analytics import AnalisadorChamados
+
+    agora = datetime.now(UTC)
+    chamados = [
+        {
+            "status": "Aberto",
+            "data_abertura": agora - timedelta(days=1),
+            "categoria": "AOG",
+            "prioridade": -1,
+        },
+        {
+            "status": "Aberto",
+            "data_abertura": agora - timedelta(days=1),
+            "categoria": "TI",
+            # sem "prioridade" — chamado legado, cai no fallback "Indefinido"
+        },
+    ]
+    mock_db = MagicMock()
+    with patch.object(AnalisadorChamados, "get_db", return_value=mock_db):
+        a = AnalisadorChamados()
+        r = a.obter_metricas_gerais(dias=30, chamados_pre_carregados=chamados)
+
+    dp = r["distribuicao_prioridade"]
+    assert all(isinstance(k, str) for k in dp)
+    import json
+
+    json.dumps(dp, sort_keys=True)  # não deve levantar TypeError
+
+
+def test_obter_metricas_periodo_anterior_usa_chamados_pre_carregados_sem_query():
+    """Com chamados_pre_carregados, obter_metricas_periodo_anterior não deve chamar get_db."""
+    from datetime import UTC, datetime, timedelta
+    from unittest.mock import MagicMock, patch
+
+    from app.services.analytics import AnalisadorChamados
+
+    agora = datetime.now(UTC)
     chamados = [
         {
             "status": "Concluído",
@@ -252,6 +360,68 @@ def test_obter_metricas_periodo_anterior_usa_chamados_pre_carregados_sem_query()
     mock_db.collection.assert_not_called()
     assert r["total_chamados"] == 1
     assert r["taxa_resolucao_percentual"] == 100.0
+
+
+def test_obter_metricas_periodo_anterior_usa_janela_proporcional_ao_dias():
+    """Com dias=7, período anterior deve ser 7-14 dias atrás (não fixo em 30-60).
+
+    Chamado aberto há 10 dias cai dentro da janela 7-14 quando dias=7, mas
+    ficaria fora da janela 30-60 usada quando dias=30 (o antigo hardcode).
+    """
+    from datetime import UTC, datetime, timedelta
+    from unittest.mock import MagicMock, patch
+
+    from app.services.analytics import AnalisadorChamados
+
+    agora = datetime.now(UTC)
+    chamados = [
+        {
+            "status": "Aberto",
+            "data_abertura": agora - timedelta(days=10),
+            "data_conclusao": None,
+            "categoria": "TI",
+        },
+    ]
+    mock_db = MagicMock()
+    with patch.object(AnalisadorChamados, "get_db", return_value=mock_db):
+        a = AnalisadorChamados()
+        r_7 = a.obter_metricas_periodo_anterior(chamados_pre_carregados=chamados, dias=7)
+        r_30 = a.obter_metricas_periodo_anterior(chamados_pre_carregados=chamados, dias=30)
+
+    assert r_7["total_chamados"] == 1
+    assert r_30["total_chamados"] == 0
+
+
+def test_obter_metricas_periodo_anterior_inclui_concluidos():
+    """obter_metricas_periodo_anterior retorna 'concluidos' pro delta do card
+    de concluídos (antes só tinha total_chamados/taxa/sla/tempo)."""
+    from datetime import UTC, datetime, timedelta
+    from unittest.mock import MagicMock, patch
+
+    from app.services.analytics import AnalisadorChamados
+
+    agora = datetime.now(UTC)
+    chamados = [
+        {
+            "status": "Concluído",
+            "data_abertura": agora - timedelta(days=40),
+            "data_conclusao": agora - timedelta(days=35),
+            "categoria": "TI",
+            "sla_dias": None,
+        },
+        {
+            "status": "Aberto",
+            "data_abertura": agora - timedelta(days=45),
+            "data_conclusao": None,
+            "categoria": "TI",
+        },
+    ]
+    mock_db = MagicMock()
+    with patch.object(AnalisadorChamados, "get_db", return_value=mock_db):
+        a = AnalisadorChamados()
+        r = a.obter_metricas_periodo_anterior(chamados_pre_carregados=chamados, dias=30)
+
+    assert r["concluidos"] == 1
 
 
 def test_obter_metricas_areas_filtra_usuarios_por_perfil_supervisor():
@@ -776,12 +946,12 @@ def test_obter_metricas_gerais_exception_retorna_dict_vazio(app):
 
 def test_obter_metricas_gerais_calcula_sla_e_em_risco():
     """obter_metricas_gerais calcula concluidos_dentro_sla e em_risco corretamente."""
-    from datetime import datetime, timedelta
+    from datetime import UTC, datetime, timedelta
     from unittest.mock import MagicMock, patch
 
     from app.services.analytics import AnalisadorChamados
 
-    agora = datetime.now()
+    agora = datetime.now(UTC)
     chamados = [
         {  # Concluído dentro do SLA (1 dia, SLA=3)
             "status": "Concluído",
@@ -1407,6 +1577,40 @@ def test_obter_relatorio_completo_salva_cache_e_memoria(app):
     mock_set.assert_called()
 
 
+def test_obter_relatorio_completo_propaga_dias_para_metricas_gerais_e_delta(app):
+    """obter_relatorio_completo(dias=7) deve usar 7 dias tanto na Visão Geral
+    quanto no cálculo de delta (período anterior), e não misturar cache com
+    outros períodos (ex.: 30 dias)."""
+    from unittest.mock import MagicMock, patch
+
+    from app.services.analytics import AnalisadorChamados
+
+    mock_db = MagicMock()
+    mock_col = MagicMock()
+    mock_col.limit.return_value = mock_col
+    mock_col.stream.return_value = iter([])
+    mock_db.collection.return_value = mock_col
+
+    with (
+        app.app_context(),
+        patch.object(AnalisadorChamados, "get_db", return_value=mock_db),
+        patch.object(AnalisadorChamados, "obter_metricas_gerais", return_value={}) as mock_mg,
+        patch.object(
+            AnalisadorChamados, "obter_metricas_periodo_anterior", return_value={}
+        ) as mock_mpa,
+        patch.object(AnalisadorChamados, "obter_metricas_supervisores", return_value=[]),
+        patch.object(AnalisadorChamados, "obter_metricas_areas", return_value=[]),
+        patch.object(AnalisadorChamados, "obter_insights", return_value=[]),
+        patch("app.cache.cache_get", return_value=None),
+        patch("app.cache.cache_set"),
+    ):
+        a = AnalisadorChamados()
+        a.obter_relatorio_completo(usar_cache=True, dias=7)
+
+    assert mock_mg.call_args.kwargs["dias"] == 7
+    assert mock_mpa.call_args.kwargs["dias"] == 7
+
+
 def test_obter_relatorio_completo_exception_retorna_estrutura_vazia(app):
     """obter_relatorio_completo retorna estrutura vazia quando ocorre exceção."""
     from unittest.mock import patch
@@ -1575,12 +1779,12 @@ def test_em_atendimento_em_risco_quando_percentual_79():
 
 def test_obter_metricas_gerais_em_atendimento_em_risco_por_percentual_resolucao():
     """Chamado Em Atendimento com data_em_atendimento → em_risco via percentual_prazo_resolucao."""
-    from datetime import datetime, timedelta
+    from datetime import UTC, datetime, timedelta
     from unittest.mock import MagicMock, patch
 
     from app.services.analytics import AnalisadorChamados
 
-    agora = datetime.now()
+    agora = datetime.now(UTC)
     chamados = [
         {
             "status": "Em Atendimento",

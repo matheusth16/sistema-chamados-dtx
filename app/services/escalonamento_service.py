@@ -504,7 +504,13 @@ def definir_previsao_atendimento(
         )
         return {"sucesso": False, "erro": _t("no_permission_set_attendance_forecast")}
 
-    if previsao <= datetime.now():
+    # previsao chega naive do <input type="datetime-local">, representando um
+    # horário no fuso de negócio (Config.SLA_TIMEZONE) — mesma convenção usada
+    # na leitura em sla_escalacao_service.py. Comparar contra datetime.now()
+    # puro (relógio do SO) quebra quando o servidor não está nesse fuso (ex.:
+    # container em UTC): um horário futuro em Brasília pareceria "passado".
+    agora_fuso_negocio = datetime.now(ZoneInfo(Config.SLA_TIMEZONE)).replace(tzinfo=None)
+    if previsao <= agora_fuso_negocio:
         return {"sucesso": False, "erro": _t("attendance_forecast_must_be_future")}
 
     # ── update atômico ───────────────────────────────────────────────────────

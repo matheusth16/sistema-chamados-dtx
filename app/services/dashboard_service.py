@@ -167,27 +167,34 @@ def obter_contexto_admin(
     docs = resultado["docs"]
     chamados = _filtrar_chamados_por_permissao(docs, user)
 
+    def _tier(c):
+        # AOG > Projetos > demais. Verifica categoria diretamente (não depende do campo
+        # prioridade, que pode não existir em chamados antigos), com prioridade como fallback.
+        if c.categoria == "AOG" or getattr(c, "prioridade", 1) == -1:
+            return -1
+        if c.categoria == "Projetos" or getattr(c, "prioridade", 1) == 0:
+            return 0
+        return 1
+
     def _chave(c):
         concluido = c.status in ("Concluído", "Cancelado")
         num_id = extrair_numero_chamado(c.numero_chamado)
         if concluido:
             return (True, 0, num_id)
-        # Projetos Aberto/Em Atendimento sempre no topo
-        # Verifica categoria diretamente (não depende do campo prioridade, que pode não existir em chamados antigos)
-        eh_projetos = c.categoria == "Projetos" or getattr(c, "prioridade", 1) == 0
-        prioridade_cat = 0 if eh_projetos else 1
-        return (False, prioridade_cat, num_id)
+        # AOG e Projetos (Aberto/Em Atendimento) sempre no topo, AOG primeiro
+        return (False, _tier(c), num_id)
 
     chamados_ordenados = sorted(chamados, key=_chave)
 
-    # Calcula grupo_key para ordenar grupos Projetos antes dos demais no Jinja groupby
+    # Calcula grupo_key para ordenar grupos AOG/Projetos antes dos demais no Jinja groupby
     from collections import defaultdict
 
     _grupo_prio: dict = defaultdict(lambda: 1)
     for c in chamados_ordenados:
         rl = c.rl_codigo or ""
-        if c.categoria == "Projetos" or getattr(c, "prioridade", 1) == 0:
-            _grupo_prio[rl] = 0
+        tier = _tier(c)
+        if tier < _grupo_prio[rl]:
+            _grupo_prio[rl] = tier
     for c in chamados_ordenados:
         rl = c.rl_codigo or ""
         c.grupo_key = f"{_grupo_prio[rl]}|{rl}"

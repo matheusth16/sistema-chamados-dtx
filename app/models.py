@@ -68,9 +68,13 @@ class Chamado:
         self.confirmacao_solicitante = (
             confirmacao_solicitante  # None | "pendente" | "confirmado" | "reaberto"
         )
-        # Prioridade centralizada: Projetos = 0, demais = informado ou 1
+        # Prioridade centralizada: AOG = -1 (acima de tudo), Projetos = 0, demais = informado ou 1
         self.prioridade = (
-            0 if categoria == "Projetos" else (prioridade if prioridade is not None else 1)
+            -1
+            if categoria == "AOG"
+            else 0
+            if categoria == "Projetos"
+            else (prioridade if prioridade is not None else 1)
         )
         self.tipo_solicitacao = tipo_solicitacao
         self.gate = gate

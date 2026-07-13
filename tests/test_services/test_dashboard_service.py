@@ -298,6 +298,63 @@ def test_obter_contexto_admin_projetos_no_topo_e_grupo_key_definido():
     assert projetos_c.grupo_key.startswith("0|")
 
 
+def test_obter_contexto_admin_aog_acima_de_projetos():
+    """AOG fica acima de Projetos, que fica acima do resto; grupo_key de AOG começa com '-1|'."""
+    from app.services.dashboard_service import obter_contexto_admin
+
+    user = MagicMock()
+    user.perfil = "admin"
+    user.areas = ["Geral"]
+    user.id = "admin1"
+    user.is_admin_or_above = True
+
+    def _doc(num, cat, rl=""):
+        d = MagicMock()
+        d.id = f"doc_{num}"
+        d.to_dict.return_value = {
+            "categoria": cat,
+            "tipo_solicitacao": "Corretiva",
+            "descricao": f"D{num}",
+            "responsavel": "",
+            "numero_chamado": str(num).zfill(5),
+            "area": "Manutencao",
+            "rl_codigo": rl,
+            "status": "Aberto",
+        }
+        return d
+
+    docs = [
+        _doc(3, "Manutencao"),
+        _doc(1, "Projetos", rl="RL-001"),
+        _doc(2, "AOG", rl="AOG-001"),
+    ]
+
+    with (
+        patch("app.services.dashboard_service.get_static_cached", return_value=[]),
+        patch("app.services.dashboard_service.filtrar_supervisores_por_area", return_value=[]),
+        patch("app.services.dashboard_service.db") as mock_db,
+        patch(
+            "app.services.dashboard_service.aplicar_filtros_dashboard_com_paginacao"
+        ) as mock_filtros,
+        patch("app.services.dashboard_service.obter_sla_para_exibicao", return_value=None),
+    ):
+        mock_db.collection.return_value = MagicMock()
+        mock_filtros.return_value = {
+            "docs": docs,
+            "proximo_cursor": None,
+            "tem_proxima": False,
+            "cursor_anterior": None,
+            "tem_anterior": False,
+        }
+        ctx = obter_contexto_admin(user, {}, itens_por_pagina=25)
+
+    chamados = ctx["chamados"]
+    assert chamados[0].categoria == "AOG", "AOG deve aparecer primeiro, acima de Projetos"
+    assert chamados[1].categoria == "Projetos", "Projetos deve aparecer logo após AOG"
+    aog_c = next(c for c in chamados if c.categoria == "AOG")
+    assert aog_c.grupo_key.startswith("-1|")
+
+
 def test_obter_contexto_admin_supervisor_aplica_filtro_por_areas():
     """obter_contexto_admin com perfil supervisor adiciona .where() na ref de chamados."""
     from app.services.dashboard_service import obter_contexto_admin

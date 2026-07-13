@@ -1055,6 +1055,54 @@ class TestDefinirPrevisaoAtendimento:
 
         assert resultado["sucesso"] is False
 
+    def test_definir_previsao_futura_no_fuso_de_negocio_nao_e_rejeitada(self):
+        """Regressão: previsão claramente futura no fuso de negócio (Brasília) não
+        pode ser rejeitada só porque o servidor roda em outro fuso (ex.: UTC em
+        container Docker/Azure Container Apps).
+
+        O campo chega do <input type="datetime-local"> como string sem timezone
+        (ex.: "2026-07-13T11:00"), representando um horário no fuso de negócio
+        (Config.SLA_TIMEZONE = America/Sao_Paulo). Comparar isso contra
+        datetime.now() puro (relógio do SO, sem fuso) quebra assim que o
+        servidor não estiver na mesma timezone que o negócio: um horário 2h no
+        futuro em Brasília pode parecer "no passado" pro servidor em UTC
+        (Brasília = UTC-3), e a previsão é rejeitada por engano.
+        """
+        from datetime import datetime
+
+        from app.services.escalonamento_service import definir_previsao_atendimento
+
+        mock_db, updated = _make_db_mock(
+            _chamado_dict(area="Engenharia", responsavel_id="id_julia")
+        )
+
+        # Momento real: 09:00 em Brasília (UTC-3) == 12:00 UTC.
+        # Supervisor define previsão pra 11:00 em Brasília — 2h no futuro, de verdade.
+        previsao_11h_brasilia = datetime(2026, 7, 13, 11, 0)
+
+        def _now_mock(tz=None):
+            # Sem tz: relogio "naive" do SO do servidor, que roda em UTC -> 12:00.
+            if tz is None:
+                return datetime(2026, 7, 13, 12, 0)
+            # Com tz (America/Sao_Paulo): mesmo instante real, em Brasilia -> 09:00.
+            return datetime(2026, 7, 13, 9, 0, tzinfo=tz)
+
+        mock_datetime = MagicMock(wraps=datetime)
+        mock_datetime.now.side_effect = _now_mock
+
+        with (
+            patch("app.services.escalonamento_service.db", mock_db),
+            patch("app.services.escalonamento_service.datetime", mock_datetime),
+        ):
+            resultado = definir_previsao_atendimento(
+                "id_chamado", previsao_11h_brasilia, "motivo valido", JULIA
+            )
+
+        assert resultado["sucesso"] is True, (
+            "Previsão 2h no futuro (fuso de negócio) foi rejeitada como 'passado' "
+            "por causa da comparação ingênua com datetime.now() do servidor."
+        )
+
     def test_definir_previsao_nao_owner_retorna_erro(self):
         from datetime import datetime, timedelta
 
