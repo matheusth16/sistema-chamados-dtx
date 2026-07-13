@@ -91,6 +91,9 @@ class TestCriacaoComObservadores:
             stack.enter_context(
                 patch("app.services.chamados_criacao_service._notificar_observadores_inclusao")
             )
+            stack.enter_context(
+                patch("app.services.chamados_criacao_service.Usuario.get_by_id", return_value=None)
+            )
 
             mock_atr.atribuir.return_value = _fake_atribuidor_result()
             with app.app_context():
@@ -148,6 +151,9 @@ class TestCriacaoComObservadores:
             )
             stack.enter_context(
                 patch("app.services.chamados_criacao_service._notificar_observadores_inclusao")
+            )
+            stack.enter_context(
+                patch("app.services.chamados_criacao_service.Usuario.get_by_id", return_value=None)
             )
 
             mock_atr.atribuir.return_value = _fake_atribuidor_result()

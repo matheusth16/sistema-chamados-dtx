@@ -1120,6 +1120,8 @@ def test_criar_chamado_aog_grava_nivel_4_e_notifica_todos_gestores(app):
         patch(
             "app.services.chamados_criacao_service.notificar_abertura_aog_todos_gestores"
         ) as mock_notif_aog,
+        patch("app.services.chamados_criacao_service.criar_notificacao"),
+        patch("app.services.chamados_criacao_service.enviar_webpush_usuario"),
         patch("app.services.chamados_criacao_service.threading.Thread", side_effect=_FakeThread),
     ):
         mock_atr.atribuir.return_value = {
@@ -1177,6 +1179,8 @@ def test_criar_chamado_aog_grava_rl_codigo_e_cria_grupo_rl(app):
         patch("app.services.chamados_criacao_service.Usuario.get_by_id", return_value=None),
         patch("app.services.chamados_criacao_service.notificar_aprovador_novo_chamado"),
         patch("app.services.chamados_criacao_service.notificar_abertura_aog_todos_gestores"),
+        patch("app.services.chamados_criacao_service.criar_notificacao"),
+        patch("app.services.chamados_criacao_service.enviar_webpush_usuario"),
         patch("app.services.chamados_criacao_service.threading.Thread", side_effect=_FakeThread),
     ):
         mock_grupo.return_value = MagicMock(id="grupo_aog_1")
@@ -1234,6 +1238,8 @@ def test_criar_chamado_normal_nao_grava_nivel_4_nem_notifica_aog(app):
         patch(
             "app.services.chamados_criacao_service.notificar_abertura_aog_todos_gestores"
         ) as mock_notif_aog,
+        patch("app.services.chamados_criacao_service.criar_notificacao"),
+        patch("app.services.chamados_criacao_service.enviar_webpush_usuario"),
         patch("app.services.chamados_criacao_service.threading.Thread", side_effect=_FakeThread),
     ):
         mock_atr.atribuir.return_value = {
