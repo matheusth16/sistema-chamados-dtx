@@ -480,12 +480,15 @@ def _configurar_seguranca(app: Flask) -> None:
             response.headers["Strict-Transport-Security"] = (
                 "max-age=31536000; includeSubDomains; preload"
             )
-            # CSP em produção: nonce para scripts/estilos inline (sem 'unsafe-inline')
+            # CSP em produção: nonce para scripts inline (sem 'unsafe-inline').
+            # style-src usa 'unsafe-inline' em vez de nonce: o app define estilos via
+            # element.style.x no JS (barras, cores dinâmicas) e nonce não cobre esse
+            # caso (só <style>/<link>) — CSS injection é baixo risco comparado a script.
             nonce = g.get("csp_nonce", "")
             csp = (
                 "default-src 'self'; "
                 "script-src 'self' https://cdn.tailwindcss.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net 'nonce-{nonce}'; "
-                "style-src 'self' https://fonts.googleapis.com https://cdn.jsdelivr.net 'nonce-{nonce}'; "
+                "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; "
                 "img-src 'self' data: https: blob:; "
                 "font-src 'self' https://cdn.jsdelivr.net https://fonts.gstatic.com; "
                 "connect-src 'self'; "
