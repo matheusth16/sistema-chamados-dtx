@@ -62,6 +62,7 @@
                 <tbody>
                 {% for grupo in chamados|groupby('grupo_key') %}
                 {% set rl = grupo.grouper.split('|')[1] %}
+                {% set categoria_grupo = grupo.list[0].categoria %}
                 {% set colspan = 8 %}
                 {% include 'components/_rl_header.html' with context %}
                 {% for chamado in grupo.list %}

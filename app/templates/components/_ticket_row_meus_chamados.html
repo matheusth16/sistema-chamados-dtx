@@ -2,7 +2,7 @@
 {% from 'components/_status_badge.html' import status_badge with context %}
 <tr data-testid="ticket-row" data-prioridade="{{ chamado.prioridade }}" data-rl-codigo="{{ chamado.rl_codigo or '' }}"
     data-detail-url="{{ url_for('main.visualizar_detalhe_chamado', chamado_id=chamado.id) }}"
-    class="hoverable{% if chamado.categoria == 'Projetos' %} bento-tr-projeto{% endif %}">
+    class="hoverable{% if chamado.categoria == 'Projetos' %} bento-tr-projeto{% elif chamado.categoria == 'AOG' %} bento-tr-aog{% endif %}">
     <td class="id-cell">
         <div class="num">{{ chamado.numero_chamado }}</div>
         {% if chamado.rl_codigo %}
@@ -13,7 +13,7 @@
         {% endif %}
     </td>
     <td>
-        <span class="bento-cat-pill{% if chamado.categoria == 'Projetos' %} projeto{% endif %}">
+        <span class="bento-cat-pill{% if chamado.categoria == 'Projetos' %} projeto{% elif chamado.categoria == 'AOG' %} aog{% endif %}">
             {{ translate_category(chamado.categoria) }}
         </span>
     </td>

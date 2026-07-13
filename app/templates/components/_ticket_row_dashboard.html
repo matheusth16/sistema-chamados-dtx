@@ -2,7 +2,7 @@
 {% from 'components/_status_badge.html' import status_badge, sla_badge with context %}
 <tr data-chamado-id="{{ chamado.id }}" data-testid="chamado-row" data-prioridade="{{ chamado.prioridade }}" data-rl-codigo="{{ chamado.rl_codigo or '' }}"
     data-detail-url="{{ url_for('main.visualizar_detalhe_chamado', chamado_id=chamado.id) }}"
-    class="hoverable{% if chamado.categoria == 'Projetos' %} bento-tr-projeto{% endif %}">
+    class="hoverable{% if chamado.categoria == 'Projetos' %} bento-tr-projeto{% elif chamado.categoria == 'AOG' %} bento-tr-aog{% endif %}">
     <td style="overflow:visible;">
         <label style="display:inline-flex; align-items:center; justify-content:center; min-width:32px; min-height:32px; cursor:pointer;">
             <input type="checkbox" class="bulk-cb bento-checkbox"
@@ -16,7 +16,7 @@
         {% endif %}
     </td>
     <td data-cell="categoria">
-        <span class="bento-cat-pill{% if chamado.categoria == 'Projetos' %} projeto{% endif %}">
+        <span class="bento-cat-pill{% if chamado.categoria == 'Projetos' %} projeto{% elif chamado.categoria == 'AOG' %} aog{% endif %}">
             {{ translate_category(chamado.categoria) }}
         </span>
     </td>

@@ -1,9 +1,12 @@
-{# Cabeçalho de grupo por RL — âncora visual de agrupamento (Web Designer) #}
+{# Cabeçalho de grupo por RL — âncora visual de agrupamento (Web Designer).
+   Cor acompanha a categoria do grupo: AOG mantém o vermelho/rosa (emergência),
+   Projetos usa âmbar — mesma distinção das linhas/pills da tabela. #}
 {% if rl %}
-<tr class="rl-header-row bg-rose-50/60" data-rl="{{ rl }}">
-    <td colspan="{{ colspan|default(9) }}" class="px-5 py-3 text-xs font-black text-rose-800 uppercase tracking-widest">
+{% set _eh_projeto = categoria_grupo is defined and categoria_grupo == 'Projetos' %}
+<tr class="rl-header-row {{ 'projeto' if _eh_projeto else '' }}" data-rl="{{ rl }}">
+    <td colspan="{{ colspan|default(9) }}" class="px-5 py-3 text-xs font-black uppercase tracking-widest">
         <span class="inline-flex items-center gap-2">
-            <span class="rl-tag inline-flex w-6 h-6 rounded-md bg-rose-200/80 items-center justify-center text-rose-700 shrink-0" aria-hidden="true">RL</span>
+            <span class="rl-tag inline-flex w-6 h-6 rounded-md items-center justify-center shrink-0" aria-hidden="true">RL</span>
             {{ rl }}
         </span>
     </td>
