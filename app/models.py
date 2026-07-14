@@ -157,6 +157,13 @@ class Chamado:
             return dt.strftime("%d/%m/%Y %H:%M")
         return "-"
 
+    def previsao_atendimento_formatada(self):
+        """Retorna previsao_atendimento formatada como string"""
+        dt = self._converter_timestamp(self.previsao_atendimento)
+        if dt and isinstance(dt, datetime):
+            return dt.strftime("%d/%m/%Y %H:%M")
+        return "-"
+
     def to_dict(self):
         """Converte para dicionário para salvar no Firestore"""
         return {

@@ -306,6 +306,20 @@ def test_data_cancelamento_formatada_retorna_traco_quando_none():
     assert c.data_cancelamento_formatada() == "-"
 
 
+def test_previsao_atendimento_formatada_retorna_traco_quando_none():
+    c = _chamado()
+    c.previsao_atendimento = None
+    assert c.previsao_atendimento_formatada() == "-"
+
+
+def test_previsao_atendimento_formatada_retorna_string_data():
+    c = _chamado()
+    c.previsao_atendimento = datetime(2024, 6, 15, 10, 30, tzinfo=pytz.utc)
+    resultado = c.previsao_atendimento_formatada()
+    assert "/" in resultado
+    assert ":" in resultado
+
+
 # ── __repr__ ─────────────────────────────────────────────────────────────────
 
 

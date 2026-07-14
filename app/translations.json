@@ -1114,6 +1114,41 @@
     "en": "Default",
     "es": "Predeterminado"
   },
+  "deadline_and_alerts_title": {
+    "pt_BR": "Prazo e avisos",
+    "en": "Deadline and alerts",
+    "es": "Plazo y avisos"
+  },
+  "ticket_deadline_label": {
+    "pt_BR": "Prazo do chamado (dias)",
+    "en": "Ticket deadline (days)",
+    "es": "Plazo del ticket (días)"
+  },
+  "ticket_deadline_help": {
+    "pt_BR": "Quantos dias esse chamado tem até ficar atrasado. Deixe em branco para manter. Digite 0 para voltar ao padrão.",
+    "en": "How many days this ticket has before it's considered late. Leave blank to keep the current value. Enter 0 to reset to default.",
+    "es": "Cuántos días tiene este ticket antes de considerarse atrasado. Deje en blanco para mantener el valor actual. Ingrese 0 para restablecer al predeterminado."
+  },
+  "postpone_escalation_label": {
+    "pt_BR": "Adiar avisos de escalonamento",
+    "en": "Postpone escalation alerts",
+    "es": "Posponer avisos de escalonamiento"
+  },
+  "no_forecast_set": {
+    "pt_BR": "Nenhum aviso adiado no momento.",
+    "en": "No alerts postponed right now.",
+    "es": "Ningún aviso pospuesto por ahora."
+  },
+  "escalation_transfer_area_help": {
+    "pt_BR": "Muda a área dona e o responsável pelo chamado — o chamado deixa de ser seu e passa para o novo responsável escolhido.",
+    "en": "Changes the owning area and the person responsible for the ticket — the ticket stops being yours and moves to the newly chosen responsible.",
+    "es": "Cambia el área dueña y el responsable del ticket — el ticket deja de ser suyo y pasa al nuevo responsable elegido."
+  },
+  "escalation_include_supervisors_help": {
+    "pt_BR": "Colaborar com acesso — os supervisores incluídos acompanham o chamado individualmente, sem tirar a sua responsabilidade por ele.",
+    "en": "Collaborate with access — the supervisors you add can track the ticket individually, without taking your responsibility for it away.",
+    "es": "Colaborar con acceso — los supervisores incluidos siguen el ticket individualmente, sin quitarle su responsabilidad sobre él."
+  },
   "edit_description_placeholder": {
     "pt_BR": "Edite ou adicione texto à descrição existente...",
     "en": "Edit or add text to the existing description...",
