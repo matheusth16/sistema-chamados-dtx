@@ -1785,9 +1785,9 @@
     "es": "Correo electrónico *"
   },
   "ex_email": {
-    "pt_BR": "usuario@dtx.com",
-    "en": "user@dtx.com",
-    "es": "usuario@dtx.com"
+    "pt_BR": "usuario@dtx.aero",
+    "en": "user@dtx.aero",
+    "es": "usuario@dtx.aero"
   },
   "full_name_required": {
     "pt_BR": "Nome Completo *",
