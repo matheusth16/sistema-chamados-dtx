@@ -24,6 +24,7 @@ from zoneinfo import ZoneInfo
 
 from google.cloud.firestore_v1.base_query import FieldFilter
 
+from app.cache import get_static_cached
 from app.database import db
 from app.services.business_time import (
     adicionar_dias_uteis,
@@ -65,7 +66,8 @@ def _construir_mapa_gestor_setor() -> dict[str, str]:
 
     try:
         mapa: dict[str, str] = {}
-        for usuario in Usuario.get_all():
+        usuarios = get_static_cached("sla_gestores_usuarios", Usuario.get_all, ttl_seconds=300)
+        for usuario in usuarios:
             if getattr(usuario, "nivel_gestao", None) != "gestor_setor":
                 continue
             if not getattr(usuario, "ativo", True) or not getattr(usuario, "email", None):

@@ -46,6 +46,22 @@ def test_formulario_com_login_retorna_200(client_logado_solicitante):
     )
 
 
+def test_formulario_usa_cache_para_setores(client_logado_solicitante):
+    """GET / deve buscar setores via get_static_cached('categorias_setor', ...),
+    não CategoriaSetor.get_all() direto — evita reler a coleção a cada carregamento
+    do formulário (F-XX economia de leituras Firestore no free tier)."""
+    with (
+        patch("app.routes.chamados.get_static_cached") as mock_cache,
+        patch("app.routes.chamados.obter_total_por_contagem", return_value=0),
+    ):
+        mock_cache.return_value = []
+        client_logado_solicitante.get("/", follow_redirects=False)
+    chaves_chamadas = [c.args[0] for c in mock_cache.call_args_list if c.args]
+    assert "categorias_setor" in chaves_chamadas, (
+        "GET / não busca setores via get_static_cached('categorias_setor', ...)"
+    )
+
+
 def test_post_criar_chamado_invalido_retorna_pagina_com_erros(client_logado_solicitante):
     """POST / com dados inválidos (ex.: descrição vazia) retorna 200 com erros no formulário."""
     with patch("app.routes.chamados.get_static_cached") as mock_cache:

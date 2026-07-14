@@ -20,9 +20,19 @@ def _mapa_gestor_setor_vazio():
     (Usuario.get_all), não a função em si, para que _construir_mapa_gestor_setor
     continue rodando de verdade em todos os testes desta suíte. Testes que
     precisam de usuários específicos usam `with patch(...)` internamente no
-    mesmo alvo (tem precedência sobre este autouse)."""
+    mesmo alvo (tem precedência sobre este autouse).
+
+    _construir_mapa_gestor_setor cacheia Usuario.get_all via get_static_cached
+    (F-XX economia de leituras no job de 10 em 10 min) — limpa a chave antes e
+    depois de cada teste para que o `with patch(...)` interno de cada teste não
+    seja mascarado por um resultado cacheado de um teste anterior.
+    """
+    from app.cache import static_cache_delete
+
+    static_cache_delete("sla_gestores_usuarios")
     with patch("app.models_usuario.Usuario.get_all", return_value=[]):
         yield
+    static_cache_delete("sla_gestores_usuarios")
 
 
 # ---------------------------------------------------------------------------
@@ -98,6 +108,24 @@ def _make_usuario_gestor(email, areas, nivel_gestao="gestor_setor", ativo=True):
     u.nivel_gestao = nivel_gestao
     u.ativo = ativo
     return u
+
+
+def test_mapa_gestor_setor_cacheia_usuario_get_all():
+    """Duas chamadas seguidas a _construir_mapa_gestor_setor() (Escada A + Escada B
+    no mesmo ciclo do job) devem ler Usuario.get_all apenas 1 vez, não 2 — o job
+    roda a cada 10 min e a lista de gestores quase nunca muda (F-XX leituras)."""
+    from app.services.sla_escalacao_service import _construir_mapa_gestor_setor
+
+    usuarios = [_make_usuario_gestor("qualidade@dtx.aero", ["Qualidade"])]
+
+    with patch("app.models_usuario.Usuario.get_all", return_value=usuarios) as mock_get_all:
+        _construir_mapa_gestor_setor()
+        _construir_mapa_gestor_setor()
+
+    assert mock_get_all.call_count == 1, (
+        "_construir_mapa_gestor_setor não está cacheando Usuario.get_all — "
+        f"chamado {mock_get_all.call_count}x em 2 chamadas seguidas"
+    )
 
 
 def test_mapa_gestor_setor_mapeia_areas_do_gestor():

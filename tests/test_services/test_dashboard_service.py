@@ -3,6 +3,14 @@
 from unittest.mock import MagicMock, patch
 
 
+def test_itens_por_pagina_dashboard_reduzido_para_economizar_leituras():
+    """ITENS_POR_PAGINA_DASHBOARD deve ser <= 25 — reduz leituras Firestore por
+    visita ao dashboard (cada item de página = 1 leitura), relevante no free tier."""
+    from config import Config
+
+    assert Config.ITENS_POR_PAGINA_DASHBOARD <= 25
+
+
 def test_usuario_get_by_ids_retorna_dict_vazio_para_lista_vazia():
     """get_by_ids com lista vazia retorna {} sem acessar o Firestore."""
     from app.models_usuario import Usuario

@@ -201,7 +201,7 @@ def obter_contexto_admin(
 
     for c in chamados_ordenados:
         c.sla_info = obter_sla_para_exibicao(c)
-    gates = get_static_cached("categorias_gate", CategoriaGate.get_all, ttl_seconds=300)
+    gates = get_static_cached("categorias_gate", CategoriaGate.get_all, ttl_seconds=1800)
     lista_gates = sorted([g.nome_pt for g in gates])
     total_chamados = len(chamados_ordenados)
     total_paginas = (

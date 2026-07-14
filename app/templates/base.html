@@ -409,7 +409,7 @@
           });
         }
 
-        carregarNotificacoes();
+        atualizarSóBadge();
         var _POLL_MS = 300000; // 5 minutos (reduz reads Firestore em ~60%)
         var _DEBOUNCE_MS = 60000; // ignora visibilitychange se polou há < 60s
         setInterval(function () {

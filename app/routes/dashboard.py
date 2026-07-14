@@ -153,7 +153,11 @@ def _render_dashboard() -> Response:
         contexto = obter_contexto_admin(
             current_user, request.args, itens_por_pagina=itens_por_pagina
         )
-        setores = [s for s in CategoriaSetor.get_all() if getattr(s, "ativo", True)]
+        setores = [
+            s
+            for s in get_static_cached("categorias_setor", CategoriaSetor.get_all, ttl_seconds=1800)
+            if getattr(s, "ativo", True)
+        ]
         return render_template("dashboard.html", **contexto, setores=setores)
     except FailedPrecondition as e:
         msg = str(e).lower()
@@ -249,7 +253,11 @@ def visualizar_detalhe_chamado(chamado_id: str) -> Response:
             if pode_editar_base
             else []
         )
-        setores = [s for s in CategoriaSetor.get_all() if getattr(s, "ativo", True)]
+        setores = [
+            s
+            for s in get_static_cached("categorias_setor", CategoriaSetor.get_all, ttl_seconds=1800)
+            if getattr(s, "ativo", True)
+        ]
 
         _status_cancelaveis_sol = {"Aberto", "Em Atendimento", "Aguardando Informação"}
         eh_dono_do_chamado = chamado.solicitante_id == current_user.id and not getattr(
@@ -634,7 +642,11 @@ def relatorios() -> Response:
         )[:3]
 
         # Áreas: lista completa (para traduções no front-end)
-        setores = [s for s in CategoriaSetor.get_all() if getattr(s, "ativo", True)]
+        setores = [
+            s
+            for s in get_static_cached("categorias_setor", CategoriaSetor.get_all, ttl_seconds=1800)
+            if getattr(s, "ativo", True)
+        ]
 
         return render_template(
             "relatorios.html",
@@ -670,7 +682,13 @@ def relatorios() -> Response:
         logger.exception("Erro ao gerar relatórios: %s", e)
         try:
             # Tenta exibir a página de relatórios com dados vazios e mensagem de erro
-            setores = [s for s in CategoriaSetor.get_all() if getattr(s, "ativo", True)]
+            setores = [
+                s
+                for s in get_static_cached(
+                    "categorias_setor", CategoriaSetor.get_all, ttl_seconds=1800
+                )
+                if getattr(s, "ativo", True)
+            ]
             return render_template(
                 "relatorios.html",
                 relatorio={},

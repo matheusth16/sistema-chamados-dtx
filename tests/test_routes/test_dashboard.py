@@ -849,6 +849,22 @@ def test_painel_post_falha_sem_chave_erro(client_logado_admin):
 # ── Onda 3: _render_dashboard FailedPrecondition ──────────────────────────────
 
 
+def test_render_dashboard_usa_cache_para_setores(client_logado_admin):
+    """_render_dashboard (GET /admin) deve buscar setores via get_static_cached
+    ('categorias_setor', ...), não CategoriaSetor.get_all() direto — evita reler a
+    coleção a cada carregamento do dashboard (F-XX economia de leituras Firestore)."""
+    with (
+        patch("app.routes.dashboard.obter_contexto_admin", return_value={}),
+        patch("app.routes.dashboard.get_static_cached") as mock_cache,
+    ):
+        mock_cache.return_value = []
+        client_logado_admin.get("/admin", follow_redirects=False)
+    chaves_chamadas = [c.args[0] for c in mock_cache.call_args_list if c.args]
+    assert "categorias_setor" in chaves_chamadas, (
+        "GET /admin não busca setores via get_static_cached('categorias_setor', ...)"
+    )
+
+
 def test_admin_get_failed_precondition_retorna_503(client_logado_admin):
     """GET /admin quando Firestore retorna FailedPrecondition ('currently building') retorna 503."""
     from google.api_core.exceptions import FailedPrecondition

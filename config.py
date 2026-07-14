@@ -165,8 +165,9 @@ class Config:
 
     # 4. Paginação
     ITENS_POR_PAGINA = 10
-    # Dashboard: docs por página com cursor-based pagination (Firestore lê limit+1 docs)
-    ITENS_POR_PAGINA_DASHBOARD = 50
+    # Dashboard: docs por página com cursor-based pagination (Firestore lê limit+1 docs).
+    # Reduzido de 50 para 25 para economizar leituras Firestore no free tier (Spark).
+    ITENS_POR_PAGINA_DASHBOARD = 25
 
     # 5. Rate Limiting (limite de requisições por janela de tempo)
     # Em desenvolvimento: desativado para melhor UX

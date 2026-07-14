@@ -26,7 +26,8 @@ logger = logging.getLogger(__name__)
 
 
 def _setores_ativos():
-    return [s for s in CategoriaSetor.get_all() if getattr(s, "ativo", True)]
+    setores = get_static_cached("categorias_setor", CategoriaSetor.get_all, ttl_seconds=1800)
+    return [s for s in setores if getattr(s, "ativo", True)]
 
 
 def _build_gate_subetapas():
@@ -44,7 +45,7 @@ def index() -> Response:
 
         setores = _setores_ativos()
         impactos = get_static_cached(
-            "categorias_impacto", CategoriaImpacto.get_all, ttl_seconds=300
+            "categorias_impacto", CategoriaImpacto.get_all, ttl_seconds=1800
         )
         ab_variante = get_variante(current_user.id, "AB-001")
 
@@ -82,7 +83,7 @@ def index() -> Response:
             flash(erro, "danger")
         setores = _setores_ativos()
         impactos = get_static_cached(
-            "categorias_impacto", CategoriaImpacto.get_all, ttl_seconds=300
+            "categorias_impacto", CategoriaImpacto.get_all, ttl_seconds=1800
         )
         return render_template(
             "formulario.html",
@@ -104,7 +105,7 @@ def index() -> Response:
         flash(erro, "danger")
         setores = _setores_ativos()
         impactos = get_static_cached(
-            "categorias_impacto", CategoriaImpacto.get_all, ttl_seconds=300
+            "categorias_impacto", CategoriaImpacto.get_all, ttl_seconds=1800
         )
         return render_template(
             "formulario.html",
