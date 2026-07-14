@@ -177,7 +177,7 @@
 .bento-chip-badge.rl{ background:#fff; color:#9f1239; border:1px solid #fecdd3; }
 .bento-chip-badge.obs{ background:#f3e8ff; color:#7e22ce; }
 
-.bento-cat-pill{ display:inline-block; font-size:11px; font-weight:700; padding:4px 10px; border-radius:99px; background:var(--color-dtx-100); color:var(--color-dtx-500); white-space:nowrap; }
+.bento-cat-pill{ display:inline-block; max-width:100%; font-size:11px; font-weight:700; padding:4px 10px; border-radius:99px; background:var(--color-dtx-100); color:var(--color-dtx-500); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; vertical-align:middle; box-sizing:border-box; }
 .bento-cat-pill.projeto{ background:#fff; color:#d97706; border:1.5px solid #d97706; }
 .bento-cat-pill.aog{ background:#fff; color:#e11d48; border:1.5px solid #e11d48; }
 
@@ -267,14 +267,14 @@ dialog.bento-modal textarea:focus{ outline:none; border-color:var(--color-dtx-50
 
 /* Dashboard: tabela de 9 colunas (checkbox + 8) — larguras próprias, mais específicas que .bento-table-scope genérico */
 .bento-table-scope.dash-table th:nth-child(1), .bento-table-scope.dash-table td:nth-child(1){ width:4%; }
-.bento-table-scope.dash-table th:nth-child(2), .bento-table-scope.dash-table td:nth-child(2){ width:9%; }
-.bento-table-scope.dash-table th:nth-child(3), .bento-table-scope.dash-table td:nth-child(3){ width:9%; }
-.bento-table-scope.dash-table th:nth-child(4), .bento-table-scope.dash-table td:nth-child(4){ width:13%; }
-.bento-table-scope.dash-table th:nth-child(5), .bento-table-scope.dash-table td:nth-child(5){ width:12%; }
-.bento-table-scope.dash-table th:nth-child(6), .bento-table-scope.dash-table td:nth-child(6){ width:19%; }
+.bento-table-scope.dash-table th:nth-child(2), .bento-table-scope.dash-table td:nth-child(2){ width:8%; }
+.bento-table-scope.dash-table th:nth-child(3), .bento-table-scope.dash-table td:nth-child(3){ width:12%; overflow:visible; text-overflow:clip; }
+.bento-table-scope.dash-table th:nth-child(4), .bento-table-scope.dash-table td:nth-child(4){ width:15%; }
+.bento-table-scope.dash-table th:nth-child(5), .bento-table-scope.dash-table td:nth-child(5){ width:11%; }
+.bento-table-scope.dash-table th:nth-child(6), .bento-table-scope.dash-table td:nth-child(6){ width:15%; }
 .bento-table-scope.dash-table th:nth-child(7), .bento-table-scope.dash-table td:nth-child(7){ width:12%; }
 .bento-table-scope.dash-table th:nth-child(8), .bento-table-scope.dash-table td:nth-child(8){ width:11%; text-align:center; }
-.bento-table-scope.dash-table th:nth-child(9), .bento-table-scope.dash-table td:nth-child(9){ width:11%; }
+.bento-table-scope.dash-table th:nth-child(9), .bento-table-scope.dash-table td:nth-child(9){ width:12%; }
 
 /* ── components/navbar.html — mesma aparência já aprovada, portada de utilitário Tailwind pra CSS próprio.
    Os estados de abrir/fechar do hambúrguer e do sino continuam via classe utilitária Tailwind
