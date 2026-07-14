@@ -156,8 +156,10 @@
 <script nonce="{{ csp_nonce }}">
     function toggleArea() {
         const perfil = document.getElementById('perfilSelect').value;
+        const nivelGestaoSelect = document.getElementById('nivel_gestao');
+        const nivelGestao = nivelGestaoSelect ? nivelGestaoSelect.value : '';
         const areaDiv = document.getElementById('areaDiv');
-        if (perfil === 'supervisor') {
+        if (perfil === 'supervisor' || nivelGestao === 'gestor_setor') {
             areaDiv.classList.remove('hidden');
         } else {
             areaDiv.classList.add('hidden');
@@ -167,6 +169,8 @@
     document.addEventListener('DOMContentLoaded', function() {
         const perfilSelect = document.getElementById('perfilSelect');
         if (perfilSelect) perfilSelect.addEventListener('change', toggleArea);
+        const nivelGestaoSelect = document.getElementById('nivel_gestao');
+        if (nivelGestaoSelect) nivelGestaoSelect.addEventListener('change', toggleArea);
 
         document.querySelectorAll('form[data-confirm]').forEach(function(form) {
             form.addEventListener('submit', function(e) {
