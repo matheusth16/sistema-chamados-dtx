@@ -70,8 +70,8 @@ def admin_global_dashboard() -> Response:
 
         total_chamados = 0
         try:
-            docs = db.collection("chamados").get()
-            total_chamados = len(docs)
+            resultado_agregacao = db.collection("chamados").count().get()
+            total_chamados = resultado_agregacao[0][0].value
         except Exception as e:
             logger.warning("Erro ao contar total de chamados (admin_global): %s", e)
 

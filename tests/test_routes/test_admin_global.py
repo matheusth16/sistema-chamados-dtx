@@ -200,6 +200,26 @@ def test_admin_global_sem_login_redireciona(client):
     assert "login" in r.location
 
 
+def test_admin_global_conta_chamados_via_agregacao_sem_ler_colecao_inteira(
+    client_logado_admin_global,
+):
+    """GET /admin-global usa count().get() (agregação) para o total de chamados,
+    em vez de baixar todos os documentos da coleção só para contar (F-XX perf)."""
+    mock_agg_result = MagicMock()
+    mock_agg_result.value = 42
+    with (
+        patch("app.routes.admin_global.db") as mock_db,
+        patch("app.routes.admin_global.Usuario") as mock_usuario,
+    ):
+        mock_usuario.get_all.return_value = []
+        mock_db.collection.return_value.count.return_value.get.return_value = [[mock_agg_result]]
+        r = client_logado_admin_global.get("/admin-global", follow_redirects=False)
+
+    assert r.status_code == 200
+    assert b"42" in r.data
+    mock_db.collection.return_value.get.assert_not_called()
+
+
 # ---------------------------------------------------------------------------
 # T1D — Proteção de criação de admin (T8)
 # ---------------------------------------------------------------------------

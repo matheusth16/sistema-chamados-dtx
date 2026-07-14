@@ -52,6 +52,15 @@
       ]
     },
     {
+      "collectionGroup": "chamados",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "status", "order": "ASCENDING"},
+        {"fieldPath": "responsavel", "order": "ASCENDING"},
+        {"fieldPath": "data_abertura", "order": "DESCENDING"}
+      ]
+    },
+    {
       "collectionGroup": "notificacoes",
       "queryScope": "COLLECTION",
       "fields": [
@@ -237,6 +246,16 @@
       "queryScope": "COLLECTION",
       "fields": [
         {"fieldPath": "supervisor_ids_com_acesso", "arrayConfig": "CONTAINS"},
+        {"fieldPath": "responsavel", "order": "ASCENDING"},
+        {"fieldPath": "data_abertura", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "chamados",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "supervisor_ids_com_acesso", "arrayConfig": "CONTAINS"},
+        {"fieldPath": "status", "order": "ASCENDING"},
         {"fieldPath": "responsavel", "order": "ASCENDING"},
         {"fieldPath": "data_abertura", "order": "DESCENDING"}
       ]

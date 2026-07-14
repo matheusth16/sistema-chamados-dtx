@@ -160,7 +160,11 @@ def _render_dashboard() -> Response:
         if "currently building" in msg or "cannot be used yet" in msg:
             logger.warning("Índice Firestore em construção: %s", e)
             return render_template("dashboard_indice_construindo.html"), 503
-        raise
+        # Combinação de filtros sem índice composto criado — degrada em vez de
+        # derrubar a página com 500. Redireciona sem os filtros da query string.
+        logger.warning("Combinação de filtros sem índice Firestore disponível: %s", e)
+        flash_t("dashboard_filtros_sem_indice", "warning")
+        return redirect(url_for(request.endpoint))
 
 
 @main.route("/gestor/dashboard", methods=["GET"])

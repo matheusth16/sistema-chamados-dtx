@@ -2069,6 +2069,11 @@
     "en": "Error updating: {error}",
     "es": "Error al actualizar: {error}"
   },
+  "dashboard_filtros_sem_indice": {
+    "pt_BR": "Essa combinação de filtros não é suportada no momento. Tente remover um dos filtros.",
+    "en": "This filter combination isn't supported right now. Try removing one of the filters.",
+    "es": "Esta combinación de filtros no es compatible por ahora. Intente quitar uno de los filtros."
+  },
   "only_view_history_your_area": {
     "pt_BR": "Você só pode visualizar histórico de chamados da sua área",
     "en": "You can only view history for tickets in your area",

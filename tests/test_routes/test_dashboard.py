@@ -859,6 +859,22 @@ def test_admin_get_failed_precondition_retorna_503(client_logado_admin):
     assert r.status_code == 503
 
 
+def test_admin_get_failed_precondition_indice_ausente_degrada_sem_crash(client_logado_admin):
+    """GET /admin com combinação de filtros sem índice composto (não 'building') não deve
+    derrubar a página com 500 — deve redirecionar de volta ao dashboard sem os filtros."""
+    from google.api_core.exceptions import FailedPrecondition
+
+    with patch("app.routes.dashboard.obter_contexto_admin") as mock_ctx:
+        mock_ctx.side_effect = FailedPrecondition(
+            "The query requires an index. You can create it here: https://console.firebase.google.com/..."
+        )
+        r = client_logado_admin.get(
+            "/admin?status=Aberto&responsavel=Fulano", follow_redirects=False
+        )
+    assert r.status_code == 302
+    assert "admin" in r.location
+
+
 # ── Onda 3: /painel redireciona admin ─────────────────────────────────────────
 
 
