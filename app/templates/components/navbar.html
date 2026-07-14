@@ -84,6 +84,19 @@
                         </div>
 
                         {% if current_user.perfil in ('admin', 'admin_global') %}
+                        <a href="{{ url_for('main.index') }}" class="bento-nav-menu-item{% if request.endpoint == 'main.index' %} active{% endif %}" role="menuitem" {% if request.endpoint == 'main.index' %}aria-current="page"{% endif %}>
+                            <span class="icon-chip">
+                                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+                            </span>
+                            {{ t('nav_new_ticket') }}
+                        </a>
+                        <a href="{{ url_for('main.meus_chamados') }}" class="bento-nav-menu-item{% if request.endpoint == 'main.meus_chamados' %} active{% endif %}" role="menuitem" {% if request.endpoint == 'main.meus_chamados' %}aria-current="page"{% endif %}>
+                            <span class="icon-chip">
+                                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>
+                            </span>
+                            {{ t('nav_my_tickets') }}
+                        </a>
+                        <div class="bento-nav-divider"></div>
                         <div class="bento-nav-section-label">{{ t('administration_section') }}</div>
                         {% if current_user.perfil == 'admin_global' %}
                         <a href="{{ url_for('main.admin_global_dashboard') }}" class="bento-nav-menu-item purple{% if request.endpoint == 'main.admin_global_dashboard' %} active{% endif %}" role="menuitem">

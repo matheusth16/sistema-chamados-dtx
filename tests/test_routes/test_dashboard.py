@@ -60,6 +60,28 @@ def test_admin_com_admin_retorna_200(client_logado_admin):
     assert r.status_code == 200
 
 
+def test_admin_navbar_tem_link_novo_chamado_e_meus_chamados(client_logado_admin):
+    """Navbar (menu hambúrguer) do Admin deve ter link para abrir chamado e ver
+    seus próprios chamados — o backend já permite (@requer_solicitante inclui
+    admin/admin_global), só faltava o link na UI para chegar lá."""
+    with patch("app.routes.dashboard.obter_contexto_admin") as mock_ctx:
+        mock_ctx.return_value = {
+            "chamados": [],
+            "gates": [],
+            "responsaveis": [],
+            "sla_map": {},
+            "tem_proxima": False,
+            "tem_anterior": False,
+            "proximo_cursor": None,
+            "cursor_anterior": None,
+        }
+        r = client_logado_admin.get("/admin", follow_redirects=False)
+    assert r.status_code == 200
+    html = r.data.decode("utf-8")
+    assert "New Ticket" in html, "Link 'New Ticket' ausente na navbar do Admin"
+    assert "My Tickets" in html, "Link 'My Tickets' ausente na navbar do Admin"
+
+
 def test_exportar_sem_login_redireciona(client):
     """GET /exportar sem login redireciona para login."""
     r = client.get("/exportar", follow_redirects=False)
