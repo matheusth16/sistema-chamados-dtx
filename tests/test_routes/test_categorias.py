@@ -32,6 +32,45 @@ def test_admin_categorias_com_admin_retorna_200(client_logado_admin):
     )
 
 
+def test_admin_categorias_atributos_data_tojson_html_escapados(client_logado_admin):
+    """Botões Edit com data-*="{{ valor|tojson }}" devem ter as aspas do JSON
+    escapadas como entidade HTML (&#34;), não cruas — tojson marca a saída como
+    'segura' (Markup), então o autoescape do Jinja NÃO escapa as aspas internas
+    ao embutir em atributo HTML, quebrando o atributo e deixando data-nome-pt=""
+    vazio (JSON.parse('') -> "Unexpected end of JSON input", botão Edit
+    parece não fazer nada). Precisa de |tojson|forceescape."""
+    from unittest.mock import MagicMock
+
+    mock_setor = MagicMock()
+    mock_setor.id = "setor1"
+    mock_setor.nome_pt = "Engenharia"
+    mock_setor.nome_en = "Engineering"
+    mock_setor.nome_es = "Ingeniería"
+    mock_setor.descricao_pt = ""
+    mock_setor.ativo = True
+
+    with (
+        patch(
+            "app.routes.categorias.CategoriaSetor.get_all_incluindo_inativos",
+            return_value=[mock_setor],
+        ),
+        patch("app.routes.categorias.CategoriaGate.get_all", return_value=[]),
+        patch("app.routes.categorias.CategoriaImpacto.get_all_incluindo_inativos", return_value=[]),
+    ):
+        r = client_logado_admin.get("/admin/categorias", follow_redirects=False)
+
+    assert r.status_code == 200
+    html = r.data.decode("utf-8")
+    assert 'data-nome-pt=""Engenharia""' not in html, (
+        "data-nome-pt com aspas cruas do tojson quebrando o atributo HTML — "
+        "botão Edit fica com dataset vazio (JSON.parse falha, modal não abre)"
+    )
+    assert "&#34;Engenharia&#34;" in html or "&quot;Engenharia&quot;" in html, (
+        "data-nome-pt não está com as aspas do JSON escapadas como entidade HTML "
+        "(esperado |tojson|forceescape)"
+    )
+
+
 def test_admin_categorias_passa_gate_pai_opcoes(client_logado_admin):
     """GET /admin/categorias passa gate_pai_opcoes ao template."""
     with (

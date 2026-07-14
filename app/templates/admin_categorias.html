@@ -100,10 +100,10 @@
               <div class="mt-3 flex gap-2">
                 <button type="button"
                         data-action="edit-setor"
-                        data-id="{{ setor.id | tojson }}"
-                        data-nome-pt="{{ setor.nome_pt | tojson }}"
-                        data-descricao-pt="{{ (setor.descricao_pt or "") | tojson }}"
-                        data-ativo="{{ setor.ativo | tojson }}"
+                        data-id="{{ setor.id | tojson | forceescape }}"
+                        data-nome-pt="{{ setor.nome_pt | tojson | forceescape }}"
+                        data-descricao-pt="{{ (setor.descricao_pt or "") | tojson | forceescape }}"
+                        data-ativo="{{ setor.ativo | tojson | forceescape }}"
                         aria-label="{{ t('edit') }} {{ setor.nome_pt }}" class="bento-row-btn edit">
                   {{ t('edit') }}
                 </button>
@@ -204,11 +204,11 @@
               <div class="mt-3 flex gap-2">
                 <button type="button"
                         data-action="edit-gate"
-                        data-id="{{ gate.id | tojson }}"
-                        data-gate-pai="{{ (gate.gate_pai or "") | tojson }}"
-                        data-etapa="{{ (gate.etapa or gate.nome_pt or "") | tojson }}"
-                        data-descricao-pt="{{ (gate.descricao_pt or "") | tojson }}"
-                        data-ativo="{{ gate.ativo | tojson }}"
+                        data-id="{{ gate.id | tojson | forceescape }}"
+                        data-gate-pai="{{ (gate.gate_pai or "") | tojson | forceescape }}"
+                        data-etapa="{{ (gate.etapa or gate.nome_pt or "") | tojson | forceescape }}"
+                        data-descricao-pt="{{ (gate.descricao_pt or "") | tojson | forceescape }}"
+                        data-ativo="{{ gate.ativo | tojson | forceescape }}"
                         aria-label="{{ t('edit') }} {{ gate.nome_pt }}" class="bento-row-btn edit">
                   {{ t('edit') }}
                 </button>
@@ -284,10 +284,10 @@
               <div class="mt-3 flex gap-2">
                 <button type="button"
                         data-action="edit-impacto"
-                        data-id="{{ impacto.id | tojson }}"
-                        data-nome-pt="{{ impacto.nome_pt | tojson }}"
-                        data-descricao-pt="{{ (impacto.descricao_pt or "") | tojson }}"
-                        data-ativo="{{ impacto.ativo | tojson }}"
+                        data-id="{{ impacto.id | tojson | forceescape }}"
+                        data-nome-pt="{{ impacto.nome_pt | tojson | forceescape }}"
+                        data-descricao-pt="{{ (impacto.descricao_pt or "") | tojson | forceescape }}"
+                        data-ativo="{{ impacto.ativo | tojson | forceescape }}"
                         aria-label="{{ t('edit') }} {{ impacto.nome_pt }}" class="bento-row-btn edit">
                   {{ t('edit') }}
                 </button>
