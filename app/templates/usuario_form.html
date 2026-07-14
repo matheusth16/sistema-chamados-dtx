@@ -50,7 +50,7 @@
       <!-- Perfil -->
       <div>
         <label for="perfilSelect" class="bento-field-label plain">{{ t('profile_required') }}</label>
-        <select name="perfil" id="perfilSelect" required onchange="toggleArea()">
+        <select name="perfil" id="perfilSelect" required>
           <option value="solicitante" {% if usuario and usuario.perfil=='solicitante' %}selected{% endif %}>{{ t('requester_creates_tickets') }}</option>
           <option value="supervisor" {% if usuario and usuario.perfil=='supervisor' %}selected{% endif %}>{{ t('supervisor_manages_area') }}</option>
           <option value="admin" {% if usuario and usuario.perfil=='admin' %}selected{% endif %}>{{ t('admin_full_access') }}</option>
@@ -143,7 +143,7 @@
        o form de edição por engano, em vez de acionar anonimizar_usuario. #}
     {% if usuario and not usuario.ativo and not usuario.email.endswith('@anonimizado.invalid') %}
     <form method="POST" action="{{ url_for('main.anonimizar_usuario', usuario_id=usuario.id) }}"
-          onsubmit="return confirm(`{{ t('anonymize_user_confirm') }}`)" style="padding:0 24px 24px;">
+          data-confirm="{{ t('anonymize_user_confirm') }}" style="padding:0 24px 24px;">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
       <button type="submit" class="bento-btn-outline danger">
         {{ t('anonymize_user') }}
@@ -163,6 +163,18 @@
             areaDiv.classList.add('hidden');
         }
     }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const perfilSelect = document.getElementById('perfilSelect');
+        if (perfilSelect) perfilSelect.addEventListener('change', toggleArea);
+
+        document.querySelectorAll('form[data-confirm]').forEach(function(form) {
+            form.addEventListener('submit', function(e) {
+                if (!confirm(form.dataset.confirm)) e.preventDefault();
+            });
+        });
+    });
+
     toggleArea();
 </script>
 

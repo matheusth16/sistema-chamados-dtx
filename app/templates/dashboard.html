@@ -110,13 +110,13 @@
                         <th>
                             <input type="checkbox" id="bulk-select-all" class="bento-checkbox" title="{{ t('select_all') }}">
                         </th>
-                        <th class="sortable" data-column="1" onclick="sortTable(1, 'number')">{{ t('id_ref') }}<span class="sort-icon ml-1" style="opacity:.4">↕</span></th>
-                        <th class="filterable" data-column="2" onclick="showFilterDropdown(2, this)">{{ t('category') }}</th>
-                        <th class="filterable" data-column="3" onclick="showFilterDropdown(3, this)">{{ t('sector_gate') }}</th>
-                        <th class="filterable" data-column="4" onclick="showFilterDropdown(4, this)">{{ t('assigned_to') }}</th>
+                        <th class="sortable" data-column="1" data-sort-type="number">{{ t('id_ref') }}<span class="sort-icon ml-1" style="opacity:.4">↕</span></th>
+                        <th class="filterable" data-column="2">{{ t('category') }}</th>
+                        <th class="filterable" data-column="3">{{ t('sector_gate') }}</th>
+                        <th class="filterable" data-column="4">{{ t('assigned_to') }}</th>
                         <th>{{ t('description') }}</th>
-                        <th class="filterable" data-column="6" onclick="showFilterDropdown(6, this)">{{ t('status') }}</th>
-                        <th class="sortable" data-column="7" onclick="sortTable(7, 'text')" style="text-align:center">SLA<span class="sort-icon ml-1" style="opacity:.4">↕</span></th>
+                        <th class="filterable" data-column="6">{{ t('status') }}</th>
+                        <th class="sortable" data-column="7" data-sort-type="text" style="text-align:center">SLA<span class="sort-icon ml-1" style="opacity:.4">↕</span></th>
                         <th style="text-align:center">{{ t('actions') }}</th>
                     </tr>
                 </thead>

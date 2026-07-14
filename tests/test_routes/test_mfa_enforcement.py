@@ -68,6 +68,30 @@ def test_rotas_isentas_permanecem_acessiveis_sem_mfa_configurado(client):
         assert "login" in r_logout.location
 
 
+def test_sw_js_isento_do_redirecionamento_troca_senha_obrigatoria(client):
+    """/sw.js não deve ser redirecionado para /alterar-senha-obrigatoria, mesmo com must_change_password=True.
+
+    Mesma classe de bug do redirecionamento de MFA: o registro do Service Worker
+    não pode ser interceptado por nenhum gate de tela obrigatória.
+    """
+    usuario = _usuario_mock(
+        "u_sw_senha",
+        "sw_senha@test.com",
+        "solicitante",
+        mfa_enabled=True,
+        must_change_password=True,
+    )
+    with (
+        patch("app.routes.auth.Usuario.get_by_email", return_value=usuario),
+        patch("app.models_usuario.Usuario.get_by_id", return_value=usuario),
+        patch("app.routes.auth._dispositivo_confiavel", return_value=True),
+    ):
+        client.post("/login", data={"email": usuario.email, "senha": "ok"}, follow_redirects=False)
+        r = client.get("/sw.js")
+
+    assert r.status_code == 200
+
+
 def test_troca_de_senha_obrigatoria_tem_prioridade_sobre_mfa(client):
     """Com must_change_password=True e mfa_enabled=False, o usuário vai primeiro para a troca de senha."""
     usuario = _usuario_mock(
@@ -83,6 +107,24 @@ def test_troca_de_senha_obrigatoria_tem_prioridade_sobre_mfa(client):
         )
     assert r.status_code == 302
     assert "alterar-senha-obrigatoria" in r.location
+
+
+def test_sw_js_isento_do_redirecionamento_mfa_obrigatorio(client):
+    """/sw.js não deve ser redirecionado para /mfa/configurar, mesmo com mfa_enabled=False.
+
+    O browser registra o Service Worker via <script>-like fetch de /sw.js; se essa
+    rota for redirecionada, o registro falha com "script resource is behind a
+    redirect", quebrando push notifications até o usuário configurar o MFA.
+    """
+    usuario = _usuario_mock("u_sw", "sw@test.com", "solicitante", mfa_enabled=False)
+    with (
+        patch("app.routes.auth.Usuario.get_by_email", return_value=usuario),
+        patch("app.models_usuario.Usuario.get_by_id", return_value=usuario),
+    ):
+        client.post("/login", data={"email": usuario.email, "senha": "ok"}, follow_redirects=False)
+        r = client.get("/sw.js")
+
+    assert r.status_code == 200
 
 
 def test_apos_configurar_mfa_navegacao_deixa_de_ser_bloqueada(client):

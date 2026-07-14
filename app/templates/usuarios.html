@@ -54,7 +54,7 @@
             <td style="text-align:right;">
               <div class="flex gap-2 justify-end flex-wrap">
                 {% if current_user.perfil == 'admin' %}
-                <form method="POST" action="{{ url_for('main.resetar_exp_usuario', usuario_id=usuario.id) }}" onsubmit="return confirm(`{{ t('confirm_reset_exp', nome=usuario.nome) }}`)">
+                <form method="POST" action="{{ url_for('main.resetar_exp_usuario', usuario_id=usuario.id) }}" data-confirm="{{ t('confirm_reset_exp', nome=usuario.nome) }}">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                   <button type="submit" class="bento-row-btn" style="background:var(--color-status-open-bg); color:#b45309;" title="{{ t('reset_exp_btn_title') }}">
                     {{ t('reset_exp_btn') }}
@@ -67,7 +67,7 @@
                 </a>
 
                 {% if usuario.id != current_user.id %}
-                <form method="POST" action="{{ url_for('main.resetar_senha_usuario', usuario_id=usuario.id) }}" onsubmit="return confirm(`{{ t('confirm_reset_password', nome=usuario.nome) }}`)">
+                <form method="POST" action="{{ url_for('main.resetar_senha_usuario', usuario_id=usuario.id) }}" data-confirm="{{ t('confirm_reset_password', nome=usuario.nome) }}">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                   <button type="submit" class="bento-row-btn" style="background:#fff7ed; color:#c2410c;" title="{{ t('reset_password_btn_title') }}">
                     {{ t('reset_password_btn') }}
@@ -76,7 +76,7 @@
                 {% endif %}
 
                 {% if usuario.mfa_enabled %}
-                <form method="POST" action="{{ url_for('main.desativar_mfa_usuario', usuario_id=usuario.id) }}" onsubmit="return confirm(`{{ t('confirm_disable_mfa', nome=usuario.nome) }}`)">
+                <form method="POST" action="{{ url_for('main.desativar_mfa_usuario', usuario_id=usuario.id) }}" data-confirm="{{ t('confirm_disable_mfa', nome=usuario.nome) }}">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                   <button type="submit" class="bento-row-btn" style="background:#eff6ff; color:#1d4ed8;" title="{{ t('disable_mfa_btn_title') }}">
                     {{ t('disable_mfa_btn') }}
@@ -85,7 +85,7 @@
                 {% endif %}
 
                 {% if usuario.id != current_user.id %}
-                <form method="POST" action="{{ url_for('main.deletar_usuario', usuario_id=usuario.id) }}" onsubmit="return confirm(`{{ t('confirm_delete_user', nome=usuario.nome) }}`)">
+                <form method="POST" action="{{ url_for('main.deletar_usuario', usuario_id=usuario.id) }}" data-confirm="{{ t('confirm_delete_user', nome=usuario.nome) }}">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                   <button type="submit" class="bento-row-btn delete">
                     {{ t('delete') }}
@@ -115,4 +115,14 @@
     </div>
   </div>
 </div>
+
+<script nonce="{{ csp_nonce }}">
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('form[data-confirm]').forEach(function(form) {
+        form.addEventListener('submit', function(e) {
+            if (!confirm(form.dataset.confirm)) e.preventDefault();
+        });
+    });
+});
+</script>
 {% endblock %}

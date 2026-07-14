@@ -63,15 +63,15 @@
                 <label class="bento-field-label">{{ t('request_category') }}</label>
                 <div class="bento-pill-group">
                     <label for="cat_nao_aplicavel" class="bento-pill">
-                        <input type="radio" id="cat_nao_aplicavel" name="categoria" value="Nao Aplicavel" checked onclick="toggleRL(false)" class="sr-only">
+                        <input type="radio" id="cat_nao_aplicavel" name="categoria" value="Nao Aplicavel" checked data-toggle-rl="false" class="sr-only">
                         {{ t('not_applicable_routine') }}
                     </label>
                     <label for="cat_projetos" class="bento-pill warning">
-                        <input type="radio" id="cat_projetos" name="categoria" value="Projetos" onclick="toggleRL(true)" class="sr-only">
+                        <input type="radio" id="cat_projetos" name="categoria" value="Projetos" data-toggle-rl="true" class="sr-only">
                         {{ t('projects_high_priority') }}
                     </label>
                     <label for="cat_aog" class="bento-pill danger">
-                        <input type="radio" id="cat_aog" name="categoria" value="AOG" onclick="toggleRL(true)" class="sr-only">
+                        <input type="radio" id="cat_aog" name="categoria" value="AOG" data-toggle-rl="true" class="sr-only">
                         {{ t('aog_max_priority') }}
                     </label>
                 </div>
@@ -106,7 +106,7 @@
                 <div class="bento-grid-2">
                     <div>
                         <label for="tipo" class="bento-field-label plain">{{ t('type_sector') }}</label>
-                        <select name="tipo" id="tipo" data-testid="tipo-select" required onchange="filtrarResponsaveis()">
+                        <select name="tipo" id="tipo" data-testid="tipo-select" required>
                             <option value="" disabled selected>{{ t('select') }}</option>
                             {% for setor in setores %}
                             {% if current_language == 'en' %}{% set nome_display = setor.nome_en|default(setor.nome_pt) %}{% elif current_language == 'es' %}{% set nome_display = setor.nome_es|default(setor.nome_pt) %}{% else %}{% set nome_display = setor.nome_pt %}{% endif %}
@@ -377,6 +377,16 @@
                 campoResponsavel.value = "{{ t('error_loading') }}";
             });
     }
+
+    // Alterna a exibição do campo RL conforme a categoria selecionada (CSP: sem onclick inline)
+    document.querySelectorAll('[data-toggle-rl]').forEach(function(radio) {
+        radio.addEventListener('click', function() {
+            toggleRL(radio.dataset.toggleRl === 'true');
+        });
+    });
+
+    // Filtra responsáveis ao trocar o setor (CSP: sem onchange inline)
+    document.getElementById('tipo').addEventListener('change', filtrarResponsaveis);
 
     // Atualiza os campos ocultos quando o usuário escolhe outro responsável no select
     document.getElementById('responsavel_select').addEventListener('change', function() {

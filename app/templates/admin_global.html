@@ -50,10 +50,9 @@
           <td style="font-weight:700;">{{ u.nome }}</td>
           <td style="color:var(--color-text-muted); font-size:13px;">{{ u.email }}</td>
           <td>
-            <form method="POST" action="{{ url_for('main.admin_global_rebaixar_admin', usuario_id=u.id) }}" class="inline">
+            <form method="POST" action="{{ url_for('main.admin_global_rebaixar_admin', usuario_id=u.id) }}" class="inline" data-confirm="{{ t('confirm_demote_to_supervisor', nome=u.nome) }}">
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-              <button type="submit" class="bento-row-btn delete"
-                onclick="return confirm('{{ t('confirm_demote_to_supervisor', nome=u.nome) }}')">
+              <button type="submit" class="bento-row-btn delete">
                 {{ t('demote_to_supervisor_btn') }}
               </button>
             </form>
@@ -89,10 +88,9 @@
           <td style="color:var(--color-text-muted); font-size:13px;">{{ u.email }}</td>
           <td style="color:var(--color-text-muted); font-size:13px;">{{ translate_sector_list(u.area) if u.area else '—' }}</td>
           <td>
-            <form method="POST" action="{{ url_for('main.admin_global_promover_supervisor', usuario_id=u.id) }}" class="inline">
+            <form method="POST" action="{{ url_for('main.admin_global_promover_supervisor', usuario_id=u.id) }}" class="inline" data-confirm="{{ t('confirm_promote_to_admin', nome=u.nome) }}">
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-              <button type="submit" class="bento-row-btn" style="background:#faf5ff; color:#7e22ce;"
-                onclick="return confirm('{{ t('confirm_promote_to_admin', nome=u.nome) }}')">
+              <button type="submit" class="bento-row-btn" style="background:#faf5ff; color:#7e22ce;">
                 {{ t('promote_to_admin_btn') }}
               </button>
             </form>
@@ -107,4 +105,14 @@
   </div>
 
 </div>
+
+<script nonce="{{ csp_nonce }}">
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('form[data-confirm]').forEach(function(form) {
+        form.addEventListener('submit', function(e) {
+            if (!confirm(form.dataset.confirm)) e.preventDefault();
+        });
+    });
+});
+</script>
 {% endblock %}

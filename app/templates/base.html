@@ -93,7 +93,7 @@
           <button
             type="button"
             class="bento-toast-close"
-            onclick="this.closest('.flash-toast').style.display = 'none'"
+            data-action="close-toast"
             aria-label="{{ t('close_notification') }}"
           >
             <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -123,6 +123,12 @@
             }, 500);
           }
         }, 5000);
+        document.querySelectorAll('[data-action="close-toast"]').forEach(function (btn) {
+          btn.addEventListener("click", function () {
+            var toast = btn.closest(".flash-toast");
+            if (toast) toast.style.display = "none";
+          });
+        });
       </script>
       {% endif %} {% endwith %} {% endif %} {% block content %}{% endblock %}
     </main>
@@ -261,7 +267,15 @@
                   lista.innerHTML =
                     '<div class="p-3 text-sm text-yellow-600 text-center">' +
                     window.DTX_i18n.notifications_load_error +
-                    ' <button class="underline ml-1" onclick="carregarNotificacoes()">&#8635;</button></div>';
+                    ' <button type="button" class="underline ml-1" id="btn-recarregar-notificacoes">&#8635;</button></div>';
+                  var btnRecarregar = document.getElementById(
+                    "btn-recarregar-notificacoes",
+                  );
+                  if (btnRecarregar)
+                    btnRecarregar.addEventListener(
+                      "click",
+                      carregarNotificacoes,
+                    );
                 } else {
                   lista.innerHTML =
                     '<div class="p-3 text-sm text-gray-500 text-center">' + window.DTX_i18n.notifications_empty + '</div>';

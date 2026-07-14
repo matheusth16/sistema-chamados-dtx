@@ -18,7 +18,7 @@ from app.routes import (  # noqa: E402
     usuarios,  # noqa: E402, F401
 )
 
-# Exporta a view para CSRF exempt no create_app
-from app.routes.api import atualizar_status_ajax  # noqa: E402, F401
+# Exporta as views para CSRF exempt no create_app
+from app.routes.api import atualizar_status_ajax, csp_report  # noqa: E402, F401
 
-__all__ = ["main", "atualizar_status_ajax"]
+__all__ = ["main", "atualizar_status_ajax", "csp_report"]

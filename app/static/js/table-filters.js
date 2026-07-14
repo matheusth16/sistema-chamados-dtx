@@ -36,6 +36,29 @@
     function init() {
         loadState();
         applyStoredState();
+        bindHeaderEvents();
+    }
+
+    /**
+     * Liga os cliques dos cabeçalhos de ordenação/filtro via delegação de dados
+     * (data-column / data-sort-type), em vez de atributos onclick inline —
+     * necessário porque a CSP de produção não autoriza handlers inline.
+     */
+    function bindHeaderEvents() {
+        document.querySelectorAll('th.sortable[data-column]').forEach(th => {
+            th.addEventListener('click', () => {
+                const columnIndex = parseInt(th.dataset.column, 10);
+                const type = th.dataset.sortType || 'text';
+                window.sortTable(columnIndex, type);
+            });
+        });
+
+        document.querySelectorAll('th.filterable[data-column]').forEach(th => {
+            th.addEventListener('click', () => {
+                const columnIndex = parseInt(th.dataset.column, 10);
+                window.showFilterDropdown(columnIndex, th);
+            });
+        });
     }
 
     /**

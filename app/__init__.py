@@ -60,7 +60,7 @@ def create_app():
         app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 0
 
     # Inicializa CSRF Protection
-    CSRFProtect(app)
+    csrf = CSRFProtect(app)
 
     # Rate Limiting (limiter definido em app.limiter, usado pelos blueprints)
     from app.limiter import limiter
@@ -92,9 +92,13 @@ def create_app():
     _configurar_i18n(app)
 
     # Importa e registra as rotas
-    from app.routes import main
+    from app.routes import csp_report, main
 
     app.register_blueprint(main)
+
+    # /api/csp-report recebe POST nativo do browser (mecanismo report-uri da CSP),
+    # sem token CSRF anexado — precisa ficar isento ou toda violação vira 400.
+    csrf.exempt(csp_report)
 
     # Segurança: headers e validação Origin/Referer em POST sensíveis
     _configurar_seguranca(app)
@@ -819,7 +823,12 @@ def _configurar_timeout_sessao(app: Flask) -> None:
             return None
 
         # Lista de rotas isentas da verificação
-        rotas_isentas = ["main.alterar_senha_obrigatoria", "main.logout", "main.login"]
+        rotas_isentas = [
+            "main.alterar_senha_obrigatoria",
+            "main.logout",
+            "main.login",
+            "main.service_worker_js",
+        ]
 
         # Verifica se usuário está autenticado e precisa trocar senha — nenhum
         # perfil é isento (admin e admin_global incluídos)
@@ -845,6 +854,7 @@ def _configurar_timeout_sessao(app: Flask) -> None:
             "main.logout",
             "main.login",
             "main.verificar_mfa",
+            "main.service_worker_js",
         ]
 
         if (

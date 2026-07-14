@@ -39,7 +39,7 @@
             </div>
         </div>
 
-        <button type="button" onclick="window.print()" data-testid="mfa-backup-codes-print-btn"
+        <button type="button" data-action="print" data-testid="mfa-backup-codes-print-btn"
            class="w-full h-11 inline-flex items-center justify-center gap-2 text-sm font-bold rounded-dtx-lg border transition-colors duration-200 mb-3"
            style="border-color: var(--color-surface-border); color: var(--color-dtx-700)">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -54,4 +54,12 @@
         </a>
     </div>
 </div>
+
+<script nonce="{{ csp_nonce }}">
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('[data-action="print"]').forEach(function(btn) {
+        btn.addEventListener('click', function() { window.print(); });
+    });
+});
+</script>
 {% endblock %}

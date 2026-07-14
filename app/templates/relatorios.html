@@ -48,7 +48,7 @@
                         <label for="dias_{{ opcao_dias }}" class="bento-pill">
                             <input type="radio" id="dias_{{ opcao_dias }}" name="dias" value="{{ opcao_dias }}"
                                    {% if dias == opcao_dias %}checked{% endif %}
-                                   onchange="this.form.submit()" class="sr-only">
+                                   data-auto-submit class="sr-only">
                             {{ opcao_dias }} {{ t('days') }}
                         </label>
                         {% endfor %}
@@ -840,6 +840,11 @@ document.addEventListener('DOMContentLoaded', function() {
     // Aplicar larguras das barras de progresso
     document.querySelectorAll('[data-width]').forEach(function(el) {
         el.style.width = el.getAttribute('data-width') + '%';
+    });
+
+    // Auto-submit do formulário de período ao trocar a opção selecionada
+    document.querySelectorAll('[data-auto-submit]').forEach(function(el) {
+        el.addEventListener('change', function() { el.form.submit(); });
     });
 
     // Esconder loading após renderizar

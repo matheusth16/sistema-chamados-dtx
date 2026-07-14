@@ -386,6 +386,34 @@ def test_csp_report_corpo_vazio_retorna_204(client):
     assert r.status_code == 204
 
 
+def test_csp_report_isento_de_csrf():
+    """POST /api/csp-report deve retornar 204 mesmo com CSRF protection ativa.
+
+    O browser envia esse POST nativamente (mecanismo report-uri da CSP), sem
+    token CSRF anexado — a rota precisa estar isenta ou toda violação reportada
+    vira 400 e nunca chega a ser logada (ver F-XX regressão de produção).
+    """
+    from app import create_app
+
+    app = create_app()
+    app.config["TESTING"] = True
+    app.config["WTF_CSRF_ENABLED"] = True
+    app.config["SECRET_KEY"] = "test-secret"
+    app.config["APP_BASE_URL"] = ""
+    app.config["SSO_REDIRECT_URI"] = ""
+    client_csrf = app.test_client()
+
+    payload = {
+        "csp-report": {
+            "blocked-uri": "inline",
+            "violated-directive": "script-src-elem",
+            "document-uri": "https://app.example.com/",
+        }
+    }
+    r = client_csrf.post("/api/csp-report", json=payload, content_type="application/json")
+    assert r.status_code == 204
+
+
 # ── i18n notificações ─────────────────────────────────────────────────────────
 
 
