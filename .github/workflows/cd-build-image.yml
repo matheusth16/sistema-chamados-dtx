@@ -1,4 +1,4 @@
-name: CD - Build & Push Image
+name: CD - Build, Push & Deploy
 
 on:
   push:
@@ -45,3 +45,19 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Login no Azure
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Atualiza o Container App para a imagem nova
+        run: |
+          az containerapp update \
+            -n sistema-chamados \
+            -g rg-sistema-chamados \
+            --image ghcr.io/${{ github.repository }}:latest
+
+      - name: Logout do Azure
+        if: always()
+        run: az logout
