@@ -37,6 +37,7 @@ jobs:
             type=sha,format=short
 
       - name: Build e push
+        id: build
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -53,10 +54,14 @@ jobs:
 
       - name: Atualiza o Container App para a imagem nova
         run: |
+          # Usa o digest exato (não a tag mutável :latest) e um revision-suffix
+          # único por execução — "az containerapp update" com a mesma string de
+          # tag não cria revisão nova mesmo que a imagem remota tenha mudado.
           az containerapp update \
             -n sistema-chamados \
             -g rg-sistema-chamados \
-            --image ghcr.io/${{ github.repository }}:latest
+            --image ghcr.io/${{ github.repository }}@${{ steps.build.outputs.digest }} \
+            --revision-suffix gh${{ github.run_number }}
 
       - name: Logout do Azure
         if: always()
