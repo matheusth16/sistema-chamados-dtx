@@ -17,7 +17,7 @@ gunicorn==25.1.0
 openpyxl==3.1.5
 
 # --- LGPD: PII encryption at rest (ENCRYPT_PII_AT_REST=true) ---
-cryptography==46.0.7
+cryptography==48.0.1
 
 # --- MFA (TOTP + QR code) ---
 pyotp==2.9.0
