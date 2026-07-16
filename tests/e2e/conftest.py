@@ -63,6 +63,14 @@ def _stub_server() -> Generator[str | None, None, None]:
     pois o Flask trata /login e o redirect de rotas protegidas sem acessar Firestore.
     Chamadas a Firestore que ocorrerem no stub são capturadas silenciosamente (try/except
     nos services retornam None) — o comportamento de "credenciais inválidas" é preservado.
+
+    A credencial usada em CI (GOOGLE_CREDENTIALS_JSON fake) é sintaticamente válida mas
+    não corresponde a nenhum projeto GCP real: qualquer chamada ao Firestore falha, só que
+    não instantaneamente — o SDK do Google tenta novamente por até ~60s antes de levantar a
+    exceção, estourando o timeout de 30s do pytest (pytest.ini) e derrubando o teste. Como o
+    stub roda no mesmo processo (thread, não subprocess), mockar os métodos do objeto `db`
+    aqui afeta todos os módulos que já importaram essa mesma instância — sem precisar tocar
+    em cada rota/serviço individualmente.
     """
     ci_mode = (
         os.environ.get("CI") == "true" or os.environ.get("FLASK_E2E_STUB") == "1"
@@ -72,29 +80,44 @@ def _stub_server() -> Generator[str | None, None, None]:
         yield None
         return
 
+    from unittest.mock import MagicMock, patch
+
     from werkzeug.serving import make_server
 
+    import app.database
     from app import create_app
 
-    stub = create_app()
-    stub.config["TESTING"] = True
-    stub.config["WTF_CSRF_ENABLED"] = False
-    stub.config["SECRET_KEY"] = "test-stub-e2e-secret"
-    stub.config["APP_BASE_URL"] = ""
-    # Desativa rate limiting no stub para que SMOKE-02 (login inválido) não bloqueie
-    stub.config["RATELIMIT_ENABLED"] = False
+    # `db` é um singleton do Firestore importado por referência em vários módulos
+    # (models_usuario.py, models.py, etc.) — mockar os métodos do objeto existente,
+    # em vez de reatribuir app.database.db, garante que todos esses módulos também
+    # vejam o mock, sem precisar descobrir e patchar cada um individualmente.
+    mock_collection = MagicMock()
+    mock_collection.where.return_value.stream.return_value = iter([])
+    mock_collection.where.return_value.limit.return_value.stream.return_value = iter([])
+    mock_collection.document.return_value.get.return_value = MagicMock(exists=False)
+    mock_collection.limit.return_value.stream.return_value = iter([])
+    mock_collection.stream.return_value = iter([])
 
-    # Porta 0 = OS escolhe uma porta livre (sem race condition)
-    server = make_server("127.0.0.1", 0, stub)
-    port = server.socket.getsockname()[1]
-    url = f"http://127.0.0.1:{port}"
+    with patch.object(app.database.db, "collection", return_value=mock_collection):
+        stub = create_app()
+        stub.config["TESTING"] = True
+        stub.config["WTF_CSRF_ENABLED"] = False
+        stub.config["SECRET_KEY"] = "test-stub-e2e-secret"
+        stub.config["APP_BASE_URL"] = ""
+        # Desativa rate limiting no stub para que SMOKE-02 (login inválido) não bloqueie
+        stub.config["RATELIMIT_ENABLED"] = False
 
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
-    thread.start()
+        # Porta 0 = OS escolhe uma porta livre (sem race condition)
+        server = make_server("127.0.0.1", 0, stub)
+        port = server.socket.getsockname()[1]
+        url = f"http://127.0.0.1:{port}"
 
-    yield url
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
 
-    server.shutdown()
+        yield url
+
+        server.shutdown()
 
 
 # ---------------------------------------------------------------------------
