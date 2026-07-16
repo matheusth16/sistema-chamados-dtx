@@ -1,7 +1,7 @@
 # Production dependencies - sistema_chamados Flask + Firestore
 
 # --- Web Framework ---
-Flask==3.0.3
+Flask==3.1.3
 Flask-Login==0.6.3
 Flask-WTF==1.2.2
 Flask-Limiter==4.1.1
@@ -17,7 +17,7 @@ gunicorn==25.1.0
 openpyxl==3.1.5
 
 # --- LGPD: PII encryption at rest (ENCRYPT_PII_AT_REST=true) ---
-cryptography==45.0.3
+cryptography==46.0.7
 
 # --- MFA (TOTP + QR code) ---
 pyotp==2.9.0
@@ -36,8 +36,8 @@ boto3==1.38.24
 APScheduler==3.10.4
 
 # --- Utilities ---
-bleach==6.2.0
-python-dotenv==1.0.1
+bleach==6.4.0
+python-dotenv==1.2.2
 python-json-logger==3.2.1
 pytz==2025.2
 redis==7.2.0
