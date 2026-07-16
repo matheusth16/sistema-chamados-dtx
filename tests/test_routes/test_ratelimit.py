@@ -97,6 +97,9 @@ def test_atualizar_status_retorna_429_apos_exceder_limite(app_rl):
     usuario.is_anonymous = False
     usuario.check_password = MagicMock(return_value=True)
 
+    mock_doc = MagicMock()
+    mock_doc.exists = False
+
     with (
         patch("app.routes.auth.Usuario.get_by_email", return_value=usuario),
         patch("app.models_usuario.Usuario.get_by_id", return_value=usuario),
@@ -104,7 +107,9 @@ def test_atualizar_status_retorna_429_apos_exceder_limite(app_rl):
         patch("app.routes.auth.LoginAttemptTracker.reset_attempts"),
         patch("app.routes.auth.LoginAttemptTracker.log_success_attempt"),
         patch("app.routes.auth._dispositivo_confiavel", return_value=True),
+        patch("app.routes.api.db") as mock_db,
     ):
+        mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
         client = app_rl.test_client()
         client.post("/login", data={"email": "rl@test.com", "senha": "ok"})
 

@@ -27,7 +27,10 @@ def test_admin_com_supervisor_redireciona_para_painel(client_logado_supervisor):
 
 def test_painel_com_supervisor_retorna_200(client_logado_supervisor):
     """GET /painel com supervisor retorna 200 e página do dashboard (mock contexto)."""
-    with patch("app.routes.dashboard.obter_contexto_admin") as mock_ctx:
+    with (
+        patch("app.routes.dashboard.obter_contexto_admin") as mock_ctx,
+        patch("app.routes.dashboard.get_static_cached", return_value=[]),
+    ):
         mock_ctx.return_value = {
             "chamados": [],
             "gates": [],
@@ -45,7 +48,10 @@ def test_painel_com_supervisor_retorna_200(client_logado_supervisor):
 
 def test_admin_com_admin_retorna_200(client_logado_admin):
     """GET /admin com admin retorna 200."""
-    with patch("app.routes.dashboard.obter_contexto_admin") as mock_ctx:
+    with (
+        patch("app.routes.dashboard.obter_contexto_admin") as mock_ctx,
+        patch("app.routes.dashboard.get_static_cached", return_value=[]),
+    ):
         mock_ctx.return_value = {
             "chamados": [],
             "gates": [],
@@ -64,7 +70,10 @@ def test_admin_navbar_tem_link_novo_chamado_e_meus_chamados(client_logado_admin)
     """Navbar (menu hambúrguer) do Admin deve ter link para abrir chamado e ver
     seus próprios chamados — o backend já permite (@requer_solicitante inclui
     admin/admin_global), só faltava o link na UI para chegar lá."""
-    with patch("app.routes.dashboard.obter_contexto_admin") as mock_ctx:
+    with (
+        patch("app.routes.dashboard.obter_contexto_admin") as mock_ctx,
+        patch("app.routes.dashboard.get_static_cached", return_value=[]),
+    ):
         mock_ctx.return_value = {
             "chamados": [],
             "gates": [],
@@ -117,7 +126,10 @@ def test_exportar_sem_login_redireciona(client):
 
 def test_exportar_com_supervisor_retorna_200_ou_redirect(client_logado_supervisor):
     """GET /exportar com supervisor retorna 200 (arquivo) ou redirect em caso de erro (mock)."""
-    with patch("app.routes.dashboard.aplicar_filtros_dashboard_com_paginacao") as mock_filtros:
+    with (
+        patch("app.routes.dashboard.aplicar_filtros_dashboard_com_paginacao") as mock_filtros,
+        patch("app.routes.dashboard.verificar_e_incrementar_export", return_value=(True, None)),
+    ):
         mock_doc = MagicMock()
         mock_doc.to_dict.return_value = {}
         mock_doc.id = "doc1"
@@ -148,7 +160,10 @@ def test_relatorios_com_admin_retorna_200(client_logado_admin):
             "metricas_areas": [],
             "insights": [],
         }
-        with patch("app.routes.dashboard.Usuario.get_all", return_value=[]):
+        with (
+            patch("app.routes.dashboard.Usuario.get_all", return_value=[]),
+            patch("app.routes.dashboard.CategoriaSetor.get_all", return_value=[]),
+        ):
             r = client_logado_admin.get("/admin/relatorios", follow_redirects=False)
     assert r.status_code == 200
     assert b"relat" in r.data.lower() or b"report" in r.data.lower() or b"anal" in r.data.lower()
@@ -164,7 +179,10 @@ def test_relatorios_propaga_dias_valido_para_analisador(client_logado_admin):
             "metricas_areas": [],
             "insights": [],
         }
-        with patch("app.routes.dashboard.Usuario.get_all", return_value=[]):
+        with (
+            patch("app.routes.dashboard.Usuario.get_all", return_value=[]),
+            patch("app.routes.dashboard.CategoriaSetor.get_all", return_value=[]),
+        ):
             r = client_logado_admin.get("/admin/relatorios?dias=7", follow_redirects=False)
     assert r.status_code == 200
     assert mock_anal.obter_relatorio_completo.call_args.kwargs["dias"] == 7
@@ -180,7 +198,10 @@ def test_relatorios_dias_invalido_normaliza_para_30(client_logado_admin):
             "metricas_areas": [],
             "insights": [],
         }
-        with patch("app.routes.dashboard.Usuario.get_all", return_value=[]):
+        with (
+            patch("app.routes.dashboard.Usuario.get_all", return_value=[]),
+            patch("app.routes.dashboard.CategoriaSetor.get_all", return_value=[]),
+        ):
             r = client_logado_admin.get("/admin/relatorios?dias=999", follow_redirects=False)
     assert r.status_code == 200
     assert mock_anal.obter_relatorio_completo.call_args.kwargs["dias"] == 30
@@ -196,7 +217,10 @@ def test_supervisor_pode_ver_relatorios(client_logado_supervisor):
             "metricas_areas": [],
             "insights": [],
         }
-        with patch("app.routes.dashboard.Usuario.get_all", return_value=[]):
+        with (
+            patch("app.routes.dashboard.Usuario.get_all", return_value=[]),
+            patch("app.routes.dashboard.CategoriaSetor.get_all", return_value=[]),
+        ):
             r = client_logado_supervisor.get("/admin/relatorios", follow_redirects=False)
     assert r.status_code == 200
 
@@ -300,7 +324,25 @@ def test_admin_post_status_change_admin_sucesso(client_logado_admin):
 
 def test_admin_post_status_change_falha_exibe_erro(client_logado_admin):
     """POST /admin quando atualizar_status_chamado retorna sucesso=False redireciona."""
-    with patch("app.routes.dashboard.atualizar_status_chamado") as mock_atualizar:
+    mock_doc = MagicMock()
+    mock_doc.exists = True
+    mock_doc.to_dict.return_value = {
+        "status": "Em Atendimento",
+        "confirmacao_solicitante": None,
+        "area": "Geral",
+        "solicitante_id": "s1",
+        "participantes": [],
+    }
+    with (
+        patch("app.routes.dashboard.db") as mock_db,
+        patch("app.routes.dashboard.Chamado") as mock_chamado_cls,
+        patch("app.routes.dashboard.atualizar_status_chamado") as mock_atualizar,
+    ):
+        mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
+        mock_chamado = MagicMock()
+        mock_chamado.status = "Em Atendimento"
+        mock_chamado.confirmacao_solicitante = None
+        mock_chamado_cls.from_dict.return_value = mock_chamado
         mock_atualizar.return_value = {"sucesso": False, "erro": "Status inválido"}
         r = client_logado_admin.post(
             "/admin",
@@ -346,7 +388,25 @@ def test_admin_post_status_change_supervisor_sem_permissao_redireciona(client_lo
 
 def test_admin_post_exception_redireciona(client_logado_admin):
     """POST /admin quando atualizar_status_chamado lança exceção redireciona."""
-    with patch("app.routes.dashboard.atualizar_status_chamado", side_effect=Exception("timeout")):
+    mock_doc = MagicMock()
+    mock_doc.exists = True
+    mock_doc.to_dict.return_value = {
+        "status": "Em Atendimento",
+        "confirmacao_solicitante": None,
+        "area": "Geral",
+        "solicitante_id": "s1",
+        "participantes": [],
+    }
+    with (
+        patch("app.routes.dashboard.db") as mock_db,
+        patch("app.routes.dashboard.Chamado") as mock_chamado_cls,
+        patch("app.routes.dashboard.atualizar_status_chamado", side_effect=Exception("timeout")),
+    ):
+        mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
+        mock_chamado = MagicMock()
+        mock_chamado.status = "Em Atendimento"
+        mock_chamado.confirmacao_solicitante = None
+        mock_chamado_cls.from_dict.return_value = mock_chamado
         r = client_logado_admin.post(
             "/admin",
             data={"chamado_id": "ch1", "novo_status": "Concluído"},
@@ -884,7 +944,25 @@ def test_painel_post_chamado_inexistente(client_logado_supervisor):
 
 def test_painel_post_falha_sem_chave_erro(client_logado_admin):
     """POST /admin quando sucesso=False sem 'erro' no resultado exibe flash genérico."""
-    with patch("app.routes.dashboard.atualizar_status_chamado") as mock_atualizar:
+    mock_doc = MagicMock()
+    mock_doc.exists = True
+    mock_doc.to_dict.return_value = {
+        "status": "Em Atendimento",
+        "confirmacao_solicitante": None,
+        "area": "Geral",
+        "solicitante_id": "s1",
+        "participantes": [],
+    }
+    with (
+        patch("app.routes.dashboard.db") as mock_db,
+        patch("app.routes.dashboard.Chamado") as mock_chamado_cls,
+        patch("app.routes.dashboard.atualizar_status_chamado") as mock_atualizar,
+    ):
+        mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
+        mock_chamado = MagicMock()
+        mock_chamado.status = "Em Atendimento"
+        mock_chamado.confirmacao_solicitante = None
+        mock_chamado_cls.from_dict.return_value = mock_chamado
         mock_atualizar.return_value = {"sucesso": False}  # sem chave 'erro'
         r = client_logado_admin.post(
             "/admin",
@@ -1078,9 +1156,12 @@ def test_historico_traduz_status_para_ingles(client_logado_admin):
 
 def test_exportar_exception_redireciona(client_logado_supervisor):
     """GET /exportar quando ocorre exceção redireciona para painel."""
-    with patch(
-        "app.routes.dashboard.aplicar_filtros_dashboard_com_paginacao",
-        side_effect=Exception("timeout"),
+    with (
+        patch(
+            "app.routes.dashboard.aplicar_filtros_dashboard_com_paginacao",
+            side_effect=Exception("timeout"),
+        ),
+        patch("app.routes.dashboard.verificar_e_incrementar_export", return_value=(True, None)),
     ):
         r = client_logado_supervisor.get("/exportar", follow_redirects=False)
     assert r.status_code == 302
@@ -1175,6 +1256,7 @@ def test_exportar_avancado_exception_redireciona(client_logado_supervisor):
         patch("app.routes.dashboard._filtrar_chamados_por_permissao", return_value=[]),
         patch("app.routes.dashboard.analisador") as mock_anal,
         patch("app.routes.dashboard.db"),
+        patch("app.routes.dashboard.verificar_e_incrementar_export", return_value=(True, None)),
     ):
         mock_filtros.return_value = {"docs": []}
         mock_anal.obter_metricas_gerais.return_value = {}
@@ -1195,6 +1277,7 @@ def test_exportar_avancado_com_filtros_no_url(client_logado_supervisor):
         patch("app.routes.dashboard.analisador") as mock_anal,
         patch("app.services.excel_export_service.exportador_excel") as mock_exp,
         patch("app.routes.dashboard.db"),
+        patch("app.routes.dashboard.verificar_e_incrementar_export", return_value=(True, None)),
     ):
         import io
 

@@ -45,17 +45,26 @@ _DASHBOARD_CTX = {
 
 
 def _meus_chamados(client, lang: str):
-    with patch("app.routes.chamados.listar_meus_chamados", return_value=_MEUS_CHAMADOS_CTX):
+    with (
+        patch("app.routes.chamados.listar_meus_chamados", return_value=_MEUS_CHAMADOS_CTX),
+        patch("app.routes.chamados.listar_chamados_como_observador", return_value=[]),
+    ):
         return client.get(f"/meus-chamados?lang={lang}", follow_redirects=False)
 
 
 def _admin(client, lang: str):
-    with patch("app.routes.dashboard.obter_contexto_admin", return_value=_DASHBOARD_CTX):
+    with (
+        patch("app.routes.dashboard.obter_contexto_admin", return_value=_DASHBOARD_CTX),
+        patch("app.routes.dashboard.get_static_cached", return_value=[]),
+    ):
         return client.get(f"/admin?lang={lang}", follow_redirects=False)
 
 
 def _painel(client, lang: str):
-    with patch("app.routes.dashboard.obter_contexto_admin", return_value=_DASHBOARD_CTX):
+    with (
+        patch("app.routes.dashboard.obter_contexto_admin", return_value=_DASHBOARD_CTX),
+        patch("app.routes.dashboard.get_static_cached", return_value=[]),
+    ):
         return client.get(f"/painel?lang={lang}", follow_redirects=False)
 
 

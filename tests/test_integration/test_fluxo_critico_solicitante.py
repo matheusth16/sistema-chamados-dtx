@@ -37,6 +37,7 @@ def test_acesso_formulario_apos_login_retorna_200(client_logado_solicitante):
     with (
         patch("app.routes.chamados.get_static_cached", return_value=[]),
         patch("app.routes.chamados.obter_total_por_contagem", return_value=0),
+        patch("app.routes.chamados._build_gate_subetapas", return_value={}),
     ):
         r = client_logado_solicitante.get("/")
     assert r.status_code == 200
@@ -49,7 +50,13 @@ def test_acesso_formulario_apos_login_retorna_200(client_logado_solicitante):
 
 def test_criar_chamado_descricao_vazia_nao_cria(client_logado_solicitante):
     """POST / com descrição vazia não cria chamado — permanece na página com feedback de erro."""
-    with patch("app.routes.chamados.criar_chamado") as mock_criar:
+    with (
+        patch("app.routes.chamados.criar_chamado") as mock_criar,
+        patch("app.services.gates_service.CategoriaGate") as mock_gate_cls,
+        patch("app.routes.chamados.get_static_cached", return_value=[]),
+        patch("app.routes.chamados._build_gate_subetapas", return_value={}),
+    ):
+        mock_gate_cls.get_all_ativos.return_value = []
         r = client_logado_solicitante.post(
             "/",
             data={

@@ -46,13 +46,19 @@ _MEUS_CHAMADOS_CTX = {
 
 @contextmanager
 def _mock_dashboard():
-    with patch("app.routes.dashboard.obter_contexto_admin", return_value=_DASHBOARD_CTX):
+    with (
+        patch("app.routes.dashboard.obter_contexto_admin", return_value=_DASHBOARD_CTX),
+        patch("app.routes.dashboard.get_static_cached", return_value=[]),
+    ):
         yield
 
 
 @contextmanager
 def _mock_meus_chamados():
-    with patch("app.routes.chamados.listar_meus_chamados", return_value=_MEUS_CHAMADOS_CTX):
+    with (
+        patch("app.routes.chamados.listar_meus_chamados", return_value=_MEUS_CHAMADOS_CTX),
+        patch("app.routes.chamados.listar_chamados_como_observador", return_value=[]),
+    ):
         yield
 
 
@@ -61,6 +67,7 @@ def _mock_formulario():
     with (
         patch("app.routes.chamados.get_static_cached", return_value=[]),
         patch("app.routes.chamados.obter_total_por_contagem", return_value=0),
+        patch("app.routes.chamados._build_gate_subetapas", return_value={}),
     ):
         yield
 

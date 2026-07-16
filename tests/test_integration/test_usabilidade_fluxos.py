@@ -95,7 +95,9 @@ def test_usabilidade_formulario_invalido_retorna_erros_na_pagina(client_logado_s
     with (
         patch("app.routes.chamados.CategoriaSetor.get_all", return_value=[]),
         patch("app.routes.chamados.CategoriaImpacto.get_all", return_value=[]),
+        patch("app.services.gates_service.CategoriaGate") as mock_gate_cls,
     ):
+        mock_gate_cls.get_all_ativos.return_value = []
         r = client_logado_solicitante.post(
             "/",
             data={

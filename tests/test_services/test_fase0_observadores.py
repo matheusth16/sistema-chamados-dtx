@@ -212,14 +212,16 @@ class TestValidarObservadores:
         from app.services.validators import validar_observadores
 
         obs = [{"usuario_id": f"u{i}"} for i in range(6)]
-        erros = validar_observadores(obs, solicitante_id="sol_1")
+        with patch("app.models_usuario.Usuario.get_by_id", return_value=None):
+            erros = validar_observadores(obs, solicitante_id="sol_1")
         assert any("5" in e or "máximo" in e.lower() for e in erros)
 
     def test_solicitante_nao_pode_ser_observador(self):
         from app.services.validators import validar_observadores
 
         obs = [{"usuario_id": "sol_1", "nome": "Sol", "email": "s@t.com"}]
-        erros = validar_observadores(obs, solicitante_id="sol_1")
+        with patch("app.models_usuario.Usuario.get_by_id", return_value=None):
+            erros = validar_observadores(obs, solicitante_id="sol_1")
         assert any("requester" in e.lower() or "own ticket" in e.lower() for e in erros)
 
     def test_deduplica_observadores(self):
@@ -230,7 +232,8 @@ class TestValidarObservadores:
             {"usuario_id": "u1", "nome": "A", "email": "a@t.com"},
             {"usuario_id": "u1", "nome": "A", "email": "a@t.com"},
         ]
-        erros = validar_observadores(obs, solicitante_id="sol_1")
+        with patch("app.models_usuario.Usuario.get_by_id", return_value=None):
+            erros = validar_observadores(obs, solicitante_id="sol_1")
         assert erros == []
 
     def test_ids_invalidos_retornam_erro(self):

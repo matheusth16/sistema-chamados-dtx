@@ -19,7 +19,10 @@ def test_meus_chamados_sem_login_redireciona(client):
 
 def test_meus_chamados_com_solicitante_retorna_200(client_logado_solicitante):
     """GET /meus-chamados com solicitante logado retorna 200 (mock listagem)."""
-    with patch("app.routes.chamados.listar_meus_chamados") as mock_listar:
+    with (
+        patch("app.routes.chamados.listar_meus_chamados") as mock_listar,
+        patch("app.routes.chamados.listar_chamados_como_observador", return_value=[]),
+    ):
         mock_listar.return_value = {
             "chamados": [],
             "pagina_atual": 1,
@@ -38,7 +41,10 @@ def test_formulario_com_login_retorna_200(client_logado_solicitante):
     """GET / (formulário) com solicitante logado retorna 200 e página do formulário."""
     with patch("app.routes.chamados.get_static_cached") as mock_cache:
         mock_cache.return_value = []
-        with patch("app.routes.chamados.obter_total_por_contagem", return_value=0):
+        with (
+            patch("app.routes.chamados.obter_total_por_contagem", return_value=0),
+            patch("app.routes.chamados._build_gate_subetapas", return_value={}),
+        ):
             r = client_logado_solicitante.get("/", follow_redirects=False)
     assert r.status_code == 200
     assert (
@@ -53,6 +59,7 @@ def test_formulario_usa_cache_para_setores(client_logado_solicitante):
     with (
         patch("app.routes.chamados.get_static_cached") as mock_cache,
         patch("app.routes.chamados.obter_total_por_contagem", return_value=0),
+        patch("app.routes.chamados._build_gate_subetapas", return_value={}),
     ):
         mock_cache.return_value = []
         client_logado_solicitante.get("/", follow_redirects=False)
@@ -64,8 +71,13 @@ def test_formulario_usa_cache_para_setores(client_logado_solicitante):
 
 def test_post_criar_chamado_invalido_retorna_pagina_com_erros(client_logado_solicitante):
     """POST / com dados inválidos (ex.: descrição vazia) retorna 200 com erros no formulário."""
-    with patch("app.routes.chamados.get_static_cached") as mock_cache:
+    with (
+        patch("app.routes.chamados.get_static_cached") as mock_cache,
+        patch("app.services.gates_service.CategoriaGate") as mock_gate_cls,
+        patch("app.routes.chamados._build_gate_subetapas", return_value={}),
+    ):
         mock_cache.return_value = []
+        mock_gate_cls.get_all_ativos.return_value = []
         r = client_logado_solicitante.post(
             "/",
             data={
@@ -103,6 +115,7 @@ def test_post_criar_chamado_com_erro_exibe_formulario(client_logado_solicitante)
     with (
         patch("app.routes.chamados.get_static_cached", return_value=[]),
         patch("app.routes.chamados.validar_novo_chamado", return_value=[]),
+        patch("app.routes.chamados._build_gate_subetapas", return_value={}),
         patch(
             "app.routes.chamados.criar_chamado",
             return_value=(None, None, "Erro interno ao criar chamado", None),
@@ -142,6 +155,7 @@ def test_meus_chamados_fallback_quando_indice_ausente(client_logado_solicitante)
             side_effect=Exception("index building failed_precondition"),
         ),
         patch("app.routes.chamados.listar_meus_chamados_fallback") as mock_fallback,
+        patch("app.routes.chamados.listar_chamados_como_observador", return_value=[]),
     ):
         mock_fallback.return_value = {
             "chamados": [],
@@ -172,6 +186,7 @@ def test_formulario_variante_b_renderiza_contador(client_logado_solicitante):
     with (
         patch("app.routes.chamados.get_static_cached", return_value=[]),
         patch("app.routes.chamados.obter_total_por_contagem", return_value=0),
+        patch("app.routes.chamados._build_gate_subetapas", return_value={}),
         patch("app.services.ab_service.get_variante", return_value="B"),
     ):
         r = client_logado_solicitante.get("/", follow_redirects=False)
@@ -184,6 +199,7 @@ def test_formulario_variante_a_sem_contador(client_logado_solicitante):
     with (
         patch("app.routes.chamados.get_static_cached", return_value=[]),
         patch("app.routes.chamados.obter_total_por_contagem", return_value=0),
+        patch("app.routes.chamados._build_gate_subetapas", return_value={}),
         patch("app.services.ab_service.get_variante", return_value="A"),
     ):
         r = client_logado_solicitante.get("/", follow_redirects=False)
@@ -193,7 +209,10 @@ def test_formulario_variante_a_sem_contador(client_logado_solicitante):
 
 def test_gamificacao_oculta_na_navbar(client_logado_solicitante):
     """UI de gamificação está oculta (bloco XP removido da navbar até conquistas serem implementadas)."""
-    with patch("app.routes.chamados.listar_meus_chamados") as mock_listar:
+    with (
+        patch("app.routes.chamados.listar_meus_chamados") as mock_listar,
+        patch("app.routes.chamados.listar_chamados_como_observador", return_value=[]),
+    ):
         mock_listar.return_value = {
             "chamados": [],
             "pagina_atual": 1,

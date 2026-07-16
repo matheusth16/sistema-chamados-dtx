@@ -240,10 +240,10 @@ def test_alterar_senha_senha_padrao_bloqueada(client, app):
 
 def test_alterar_senha_sucesso_redireciona_para_index(client, app):
     """POST /alterar-senha-obrigatoria com senha válida redireciona para index."""
-    usuario = _create_client_must_change_password(client, app)
+    usuario_original = _create_client_must_change_password(client, app)
     with (
-        patch("app.routes.auth.Usuario.get_by_email", return_value=usuario),
-        patch("app.models_usuario.Usuario.get_by_id", return_value=usuario),
+        patch("app.routes.auth.Usuario.get_by_email", return_value=usuario_original),
+        patch("app.models_usuario.Usuario.get_by_id", return_value=usuario_original),
     ):
         client.post(
             "/login", data={"email": "change@test.com", "senha": "ok"}, follow_redirects=False
@@ -257,7 +257,10 @@ def test_alterar_senha_sucesso_redireciona_para_index(client, app):
 
     usuario = MagicMock()
     usuario.check_password = MagicMock(return_value=False)
-    with patch("app.routes.auth.Usuario.get_by_email", return_value=usuario):
+    with (
+        patch("app.routes.auth.Usuario.get_by_email", return_value=usuario),
+        patch("app.models_usuario.Usuario.get_by_id", return_value=usuario_original),
+    ):
         r2 = client.post(
             "/login", data={"email": "existente@test.com", "senha": "errada"}, follow_redirects=True
         )

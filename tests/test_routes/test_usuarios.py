@@ -67,7 +67,8 @@ def test_admin_usuarios_novo_sem_login_redireciona(client):
 
 def test_admin_usuarios_novo_com_admin_retorna_200(client_logado_admin):
     """GET /admin/usuarios/novo com admin retorna formulário."""
-    r = client_logado_admin.get("/admin/usuarios/novo", follow_redirects=False)
+    with patch("app.routes.usuarios.CategoriaSetor.get_all", return_value=[]):
+        r = client_logado_admin.get("/admin/usuarios/novo", follow_redirects=False)
     assert r.status_code == 200
 
 
@@ -177,16 +178,17 @@ def test_criar_usuario_email_invalido_redireciona_com_erro(client_logado_admin):
 
 def test_criar_usuario_email_dominio_invalido_redireciona_com_erro(client_logado_admin):
     """POST criar com email fora do domínio @dtx.aero redireciona com erro."""
-    r = client_logado_admin.post(
-        "/admin/usuarios",
-        data={
-            "acao": "criar",
-            "email": "fulano@gmail.com",
-            "nome": "Fulano Tal",
-            "perfil": "solicitante",
-        },
-        follow_redirects=True,
-    )
+    with patch("app.routes.usuarios.Usuario.get_all", return_value=[]):
+        r = client_logado_admin.post(
+            "/admin/usuarios",
+            data={
+                "acao": "criar",
+                "email": "fulano@gmail.com",
+                "nome": "Fulano Tal",
+                "perfil": "solicitante",
+            },
+            follow_redirects=True,
+        )
     assert r.status_code == 200
     assert b"dtx.aero" in r.data
 

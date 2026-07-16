@@ -122,7 +122,13 @@ def test_staging_auth_rotas_excluidas_sem_basic(client_staging):
 def test_staging_auth_deep_health_ainda_usa_health_secret(client_staging):
     """/health?deep=1: excluído do Basic Auth; sem health token → não 401 Basic; com token correto → 200/503."""
     _test_secret = "segredo-teste-health-valido-32ch"
-    with patch.dict(os.environ, {"HEALTH_SECRET": _test_secret}, clear=False):
+    with (
+        patch.dict(os.environ, {"HEALTH_SECRET": _test_secret}, clear=False),
+        patch("app.routes.api.db") as mock_db,
+    ):
+        mock_db.collection.return_value.limit.return_value.get.side_effect = Exception(
+            "Firestore indisponível no teste"
+        )
         # Sem health token → não bloqueado por Basic Auth (pode ser 401 pelo guard de HEALTH_SECRET)
         resp_no_token = client_staging.get("/health?deep=1")
         www_auth = resp_no_token.headers.get("WWW-Authenticate", "")

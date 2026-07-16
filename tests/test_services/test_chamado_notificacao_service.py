@@ -112,6 +112,7 @@ class TestNotificarCancelamentoChamado:
                 return_value=[sup],
             ),
             patch("app.services.chamado_notificacao_service.enviar_email") as mock_email,
+            patch("app.services.chamado_notificacao_service.criar_notificacao"),
         ):
             mock_email.return_value = (True, None)
             notificar_cancelamento_chamado(
@@ -140,6 +141,7 @@ class TestNotificarCancelamentoChamado:
                 return_value=[sup, obs],
             ),
             patch("app.services.chamado_notificacao_service.enviar_email") as mock_email,
+            patch("app.services.chamado_notificacao_service.criar_notificacao"),
         ):
             mock_email.return_value = (True, None)
             notificar_cancelamento_chamado(
@@ -196,6 +198,7 @@ class TestNotificarEdicaoDescricaoSolicitante:
                 return_value=[sup, obs],
             ),
             patch("app.services.chamado_notificacao_service.enviar_email") as mock_email,
+            patch("app.services.chamado_notificacao_service.criar_notificacao"),
         ):
             mock_email.return_value = (True, None)
             notificar_edicao_descricao_solicitante(
@@ -225,6 +228,7 @@ class TestNotificarEdicaoDescricaoSolicitante:
                 return_value=[sup],
             ),
             patch("app.services.chamado_notificacao_service.enviar_email") as mock_email,
+            patch("app.services.chamado_notificacao_service.criar_notificacao"),
         ):
             mock_email.return_value = (True, None)
             notificar_edicao_descricao_solicitante(
@@ -365,6 +369,7 @@ class TestNotificarObservadoresCriacao:
                 return_value=[usuario_sem_email],
             ),
             patch("app.services.chamado_notificacao_service.enviar_email") as mock_email,
+            patch("app.services.chamado_notificacao_service.criar_notificacao"),
         ):
             notificar_cancelamento_chamado(
                 chamado_id="ch_1",
@@ -434,6 +439,7 @@ class TestNotificarAnexoTardioChamado:
                 return_value=[sup, obs],
             ),
             patch("app.services.chamado_notificacao_service.enviar_email") as mock_email,
+            patch("app.services.chamado_notificacao_service.criar_notificacao"),
         ):
             mock_email.return_value = (True, None)
             notificar_anexo_tardio_chamado(
@@ -463,6 +469,7 @@ class TestNotificarAnexoTardioChamado:
                 return_value=[sup],
             ),
             patch("app.services.chamado_notificacao_service.enviar_email") as mock_email,
+            patch("app.services.chamado_notificacao_service.criar_notificacao"),
         ):
             mock_email.return_value = (True, None)
             notificar_anexo_tardio_chamado(
@@ -520,6 +527,7 @@ class TestNotificarRespostaSolicitanteChamado:
                 return_value=[sup, obs],
             ),
             patch("app.services.chamado_notificacao_service.enviar_email") as mock_email,
+            patch("app.services.chamado_notificacao_service.criar_notificacao"),
         ):
             mock_email.return_value = (True, None)
             notificar_resposta_solicitante_chamado(
@@ -550,6 +558,7 @@ class TestNotificarRespostaSolicitanteChamado:
                 return_value=[sup],
             ),
             patch("app.services.chamado_notificacao_service.enviar_email") as mock_email,
+            patch("app.services.chamado_notificacao_service.criar_notificacao"),
         ):
             mock_email.return_value = (True, None)
             notificar_resposta_solicitante_chamado(

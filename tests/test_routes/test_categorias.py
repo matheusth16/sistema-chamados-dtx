@@ -1,6 +1,6 @@
 """Testes das rotas de administração de categorias (/admin/categorias). Requer perfil admin."""
 
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 
 def test_admin_categorias_sem_login_redireciona(client):
@@ -331,6 +331,7 @@ def test_criar_gate_gate_pai_invalido_redireciona(client_logado_admin):
 def test_criar_gate_nome_duplicado_redireciona_sem_criar(client_logado_admin):
     """POST criar_gate com gate_pai+etapa que já existe é rejeitado, sem chamar save()."""
     with (
+        patch("app.routes.categorias.CategoriaGate.get_all", return_value=[MagicMock()]),
         patch("app.routes.categorias.CategoriaGate.nome_existe", return_value=True) as mock_existe,
         patch("app.routes.categorias.CategoriaGate.save") as mock_save,
     ):

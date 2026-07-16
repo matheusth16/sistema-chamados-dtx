@@ -342,6 +342,7 @@ def test_notificar_solicitante_com_sid_envia_notificacao_e_webpush(app):
         patch("app.services.status_service.Usuario.get_by_id", return_value=MagicMock()),
         patch("app.services.status_service.notificar_solicitante_status") as mock_notif,
         patch("app.services.webpush_service.enviar_webpush_usuario") as mock_webpush,
+        patch("app.services.notifications_inapp.criar_notificacao_solicitante"),
     ):
         app.config["APP_BASE_URL"] = "https://example.test"
         _notificar_solicitante(

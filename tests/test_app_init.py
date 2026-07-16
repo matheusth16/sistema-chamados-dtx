@@ -341,7 +341,8 @@ def test_headers_hsts_csp_em_producao_https(app, client):
 def test_validar_origin_rota_nao_critica_passa(app, client):
     """POST em rota não-crítica com APP_BASE_URL → não valida origin (retorna None)."""
     app.config["APP_BASE_URL"] = "https://app.example.com"
-    r = client.post("/login", data={"email": "x@x.com", "senha": "y"})
+    with patch("app.routes.auth.Usuario.get_by_email", return_value=None):
+        r = client.post("/login", data={"email": "x@x.com", "senha": "y"})
     assert r.status_code != 403  # Não bloqueado por origin check
 
 

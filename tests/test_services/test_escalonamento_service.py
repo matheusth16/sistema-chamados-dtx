@@ -1093,6 +1093,7 @@ class TestDefinirPrevisaoAtendimento:
         with (
             patch("app.services.escalonamento_service.db", mock_db),
             patch("app.services.escalonamento_service.datetime", mock_datetime),
+            patch("app.services.escalonamento_service.Historico"),
         ):
             resultado = definir_previsao_atendimento(
                 "id_chamado", previsao_11h_brasilia, "motivo valido", JULIA

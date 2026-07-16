@@ -51,6 +51,7 @@ def test_envia_lembrete_1_apos_24h(app):
         patch(
             "app.services.lembrete_confirmacao_service.notificar_solicitante_lembrete_confirmacao"
         ) as mock_notif,
+        patch("app.services.lembrete_confirmacao_service._criar_inapp_lembrete"),
     ):
         mock_db.collection.return_value.where.return_value.where.return_value.limit.return_value.stream.return_value = iter(
             [doc]
@@ -117,6 +118,7 @@ def test_envia_lembrete_2_apos_48h(app):
         patch(
             "app.services.lembrete_confirmacao_service.notificar_solicitante_lembrete_confirmacao"
         ) as mock_notif,
+        patch("app.services.lembrete_confirmacao_service._criar_inapp_lembrete"),
     ):
         mock_db.collection.return_value.where.return_value.where.return_value.limit.return_value.stream.return_value = iter(
             [doc]
@@ -150,6 +152,7 @@ def test_nao_envia_lembrete_2_se_flag_1_nao_enviada(app):
         patch(
             "app.services.lembrete_confirmacao_service.notificar_solicitante_lembrete_confirmacao"
         ),
+        patch("app.services.lembrete_confirmacao_service._criar_inapp_lembrete"),
     ):
         mock_db.collection.return_value.where.return_value.where.return_value.limit.return_value.stream.return_value = iter(
             [doc]

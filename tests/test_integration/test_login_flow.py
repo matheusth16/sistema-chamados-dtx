@@ -12,9 +12,10 @@ def test_login_get_exibe_formulario(client):
 
 def test_login_post_credenciais_invalidas_volta_para_login(client):
     """POST /login com email/senha inválidos redireciona para login com flash."""
-    r = client.post(
-        "/login", data={"email": "invalido@test.com", "senha": "wrong"}, follow_redirects=True
-    )
+    with patch("app.routes.auth.Usuario.get_by_email", return_value=None):
+        r = client.post(
+            "/login", data={"email": "invalido@test.com", "senha": "wrong"}, follow_redirects=True
+        )
     assert r.status_code == 200
     assert (
         b"login" in r.data.lower() or b"incorretos" in r.data.lower() or b"email" in r.data.lower()
@@ -49,6 +50,7 @@ def test_login_post_sucesso_redireciona_conforme_perfil(client):
     usuario.get_id = lambda: "sup_1"
     with (
         patch("app.routes.auth.Usuario.get_by_email", return_value=usuario),
+        patch("app.models_usuario.Usuario.get_by_id", return_value=usuario),
         patch("app.routes.auth._dispositivo_confiavel", return_value=True),
     ):
         r2 = client.post(
