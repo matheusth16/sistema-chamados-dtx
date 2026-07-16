@@ -33,13 +33,22 @@ jobs:
       # suíte inteira (inclusive SMOKE-01/02/03, que não tocam Firestore de verdade)
       # cai antes mesmo do primeiro teste rodar.
       GOOGLE_CREDENTIALS_JSON: '{"type": "service_account", "project_id": "ci-fake-project", "private_key_id": "ci-fake-key-id", "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC2H2Rns0S4xt6P\nTOsU0mDNCi363m5JytLONflzA6PbProR1UPPTM8mlikovXNvMRD2fUVfOiGKv5ho\ns+a6fxjqLiGBQfqYM04GT8uY+zuw2WR/FX4B4jaRZXopfbqEy4IrrpPKIklGO8Uy\n0wmbCawLvrwhk0fiawYG+DOitUj/jXE0Sn8/8O9ZzGLlF58jl1Yp74DzmlrpBmru\nOlMVoifB056NmW1V1ViYk/1+QObxCoMID7d8cdklvC1DMVaRgsTfKcWuuzHO6MHO\nRbI+9G7MdVy1mTU+yw+E9n/y0NSVB275o18/GTqIRPuDSh8QdcAVnN+M0alLLfx1\nKs37+cmbAgMBAAECggEAHOPF7Z1GXXlOfLTa5aaprFzdBlqabCI8ZnGxbEk7iN/e\nbE3EP/ITOi+/v7KtyQmjgzZD9uMlxvi1mIZRJ2xZ62v97J8mvVYGHoIx7caMpXUW\nuAIUxv+3YEEUq9hB6ibOM1eyIfJmZTm+Al3vvCRAomxTM5BFaulHP3vH1RukxMTK\nK00NT8rW3RuCH629C9lPnm9PyLCVU5B5bX7pXoeLJr7Sh9iFExljJ3+fnH66Z9tM\nxwnqJEvwT/oYCvWIVNQFs4twJ0byHbsYZXGAmLnxAXg06XxT9mf0gzPOFTBTsKRI\nVB3untdMwWfeTBKKTGAholVxJCPTo2m/hAWtUxvsgQKBgQDxvSv0jnb+tMYHIYva\nloLfi0vyZWbcIMMH5HiR0R8y7SCCy4dUSNU/0wvtctUHQ4jaVRiOcZc+6ESZDetu\nA8BhsLUYAF78MAnkE0pzNfgmbyEYlkKQ6sRqPOj0vd5aK45Ur10qIzN4c3SSNize\nZxUeGCLJwCcpigRIJbfwhKUiiwKBgQDA3d+V5sLDobdIR+696ZyBER8edo1gJTPM\nrfJxDbkwK23U+ETNaaCxnvMnSZ2LZaiM9pF610mYqouS5tQot5zlNhxU9vn4of4i\n9lRvvMht6EgwxlzpA3SY/WHtFz1Q634zZcxlDyTOxTYR7wbVt8wL0PpYJi2bc5wW\nquzfarEnMQKBgQDVEj19CFlgNaxaOrpPh9yA9wGQ/MnF+uaMvVd8h0utko7WWljE\n9JFp+TaJK28TQPaOIvVLEFoUa5uTIE7EIHBgauWj6yfNtvXw3wP/OrGoBsmwJzkz\nDIrlbRyUJAqphbylbhB7BJ3obDNycGfp/AgEB5gaJdEe7vTJNt3DFNeM8wKBgDor\n8b8t3frRsQ1tHNZNOvY26tLuYQ/pyKjoomJ1CDE+OB9vTplCTcSlM6Pa8VjVLbRu\nvkx12O3iKr0BQGaTkxATdRIveBAFFDkJYUhegXmdAQEtI2LotudaLYosY0Mf9G2e\nO7sTiT+QfhGEreQSTsoVmxyxTzo+8YpovY9Zh9tRAoGAYHSM+yX0kNgaB2pGuVph\n9DH4iAZMRDx8vhUjwUGSzBJj1wc4VaLm+de8MX2NoQaGTeHwpQt3OMOcfkf1vWy4\nz/TpWM+2SYuinF+TNrXPGF8m+dBoptI4TvKmxYTMpz7e4UQTmIE6AF9td9aM32pQ\noneMH9fpSPE/BwUcxHfuoQI=\n-----END PRIVATE KEY-----\n", "client_email": "ci-fake@ci-fake-project.iam.gserviceaccount.com", "client_id": "000000000000000000000", "auth_uri": "https://accounts.google.com/o/oauth2/auth", "token_uri": "https://oauth2.googleapis.com/token", "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs", "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/ci-fake%40ci-fake-project.iam.gserviceaccount.com", "universe_domain": "googleapis.com"}'
+      # FLASK_TEST_URL vazio → usa o stub em thread local (ver conftest.py). Se um dia
+      # existir staging de verdade, defina o secret FLASK_TEST_URL e as contas abaixo
+      # deixam de ser necessárias (creds reais viriam de secrets, não daqui).
       FLASK_TEST_URL: ${{ secrets.FLASK_TEST_URL || '' }}
-      TEST_SOLICITANTE_EMAIL: ${{ secrets.TEST_SOLICITANTE_EMAIL || '' }}
-      TEST_SOLICITANTE_PASSWORD: ${{ secrets.TEST_SOLICITANTE_PASSWORD || '' }}
-      TEST_SUPERVISOR_EMAIL: ${{ secrets.TEST_SUPERVISOR_EMAIL || '' }}
-      TEST_SUPERVISOR_PASSWORD: ${{ secrets.TEST_SUPERVISOR_PASSWORD || '' }}
-      TEST_ADMIN_EMAIL: ${{ secrets.TEST_ADMIN_EMAIL || '' }}
-      TEST_ADMIN_PASSWORD: ${{ secrets.TEST_ADMIN_PASSWORD || '' }}
+      # Contas de teste 100% fake, existem só dentro do stub em memória (ver
+      # _fake_usuarios_por_id em tests/e2e/conftest.py) — não são credenciais reais,
+      # não têm acesso a nada, por isso ficam em texto puro aqui em vez de em secrets.
+      TEST_SOLICITANTE_EMAIL: "e2e.solicitante@dtx.aero"
+      TEST_SOLICITANTE_PASSWORD: "E2eTeste2026!"
+      TEST_SOLICITANTE_TOTP_SECRET: "5KHQN27VBTA57XJBK5YR5NY4WGXBLVZ5"
+      TEST_SUPERVISOR_EMAIL: "e2e.supervisor@dtx.aero"
+      TEST_SUPERVISOR_PASSWORD: "E2eTeste2026!"
+      TEST_SUPERVISOR_TOTP_SECRET: "I3AK4NH2DG4XQIZTZAGPNNUYGZMNYKFM"
+      TEST_ADMIN_EMAIL: "e2e.admin@dtx.aero"
+      TEST_ADMIN_PASSWORD: "E2eTeste2026!"
+      TEST_ADMIN_TOTP_SECRET: "BTYKKDGWJZGP5Z3TLLPEHMQLQE7W6FMZ"
 
     steps:
       - name: Checkout
