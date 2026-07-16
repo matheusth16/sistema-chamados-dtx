@@ -507,6 +507,84 @@ def test_grupos_limita_chamados_por_raia():
     assert len(grupo_atrasados["chamados"]) == 6
 
 
+# ---------------------------------------------------------------------------
+# Nível 3 — escopo por área para gestor_setor (usuario opcional)
+# ---------------------------------------------------------------------------
+
+
+def _make_chamado_em_area(area: str):
+    c = MagicMock()
+    c.status = "Aberto"
+    c.is_atrasado = False
+    c.sla_dias = None
+    c.area = area
+    c.data_abertura = datetime(2024, 6, 3, 9, 0)
+    c.participantes = []
+    return c
+
+
+def test_gestor_setor_ve_apenas_chamados_da_propria_area():
+    usuario = MagicMock()
+    usuario.nivel_gestao = "gestor_setor"
+    usuario.areas = ["Manutencao"]
+
+    dentro = _make_chamado_em_area("Manutencao")
+    fora = _make_chamado_em_area("TI")
+
+    with patch(
+        "app.services.gestor_dashboard_service._carregar_todos_chamados",
+        return_value=[dentro, fora],
+    ):
+        ctx = obter_contexto_gestor_dashboard(agora=_AGORA_FIXED, usuario=usuario)
+
+    assert ctx["contadores"]["total"] == 1
+    assert ctx["chamados"] == [dentro]
+
+
+def test_gestor_setor_com_multiplas_areas_ve_todas_as_suas():
+    usuario = MagicMock()
+    usuario.nivel_gestao = "gestor_setor"
+    usuario.areas = ["Manutencao", "TI"]
+
+    manutencao = _make_chamado_em_area("Manutencao")
+    ti = _make_chamado_em_area("TI")
+    outra = _make_chamado_em_area("Financeiro")
+
+    with patch(
+        "app.services.gestor_dashboard_service._carregar_todos_chamados",
+        return_value=[manutencao, ti, outra],
+    ):
+        ctx = obter_contexto_gestor_dashboard(agora=_AGORA_FIXED, usuario=usuario)
+
+    assert ctx["contadores"]["total"] == 2
+
+
+def test_gerente_producao_nao_filtra_por_area():
+    """Níveis acima de gestor_setor continuam vendo todas as áreas."""
+    usuario = MagicMock()
+    usuario.nivel_gestao = "gerente_producao"
+    usuario.areas = ["Manutencao"]
+
+    with patch(
+        "app.services.gestor_dashboard_service._carregar_todos_chamados",
+        return_value=[_make_chamado_em_area("Manutencao"), _make_chamado_em_area("TI")],
+    ):
+        ctx = obter_contexto_gestor_dashboard(agora=_AGORA_FIXED, usuario=usuario)
+
+    assert ctx["contadores"]["total"] == 2
+
+
+def test_usuario_none_nao_filtra_por_area():
+    """Sem usuario informado (retrocompatibilidade), nenhum filtro de área é aplicado."""
+    with patch(
+        "app.services.gestor_dashboard_service._carregar_todos_chamados",
+        return_value=[_make_chamado_em_area("Manutencao"), _make_chamado_em_area("TI")],
+    ):
+        ctx = obter_contexto_gestor_dashboard(agora=_AGORA_FIXED)
+
+    assert ctx["contadores"]["total"] == 2
+
+
 def test_carregar_todos_chamados_retorna_vazio_em_excecao():
     """_carregar_todos_chamados retorna [] em exceção do Firestore (linhas 89-91)."""
     from app.services.gestor_dashboard_service import _carregar_todos_chamados

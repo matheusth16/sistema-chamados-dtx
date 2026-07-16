@@ -11,16 +11,22 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 
-def supervisor_pode_alterar_chamado(usuario: Any, chamado_area: str) -> bool:
+def supervisor_pode_alterar_chamado(usuario: Any, chamado_area: str, chamado: Any = None) -> bool:
     """Verifica se o usuário tem permissão de ESCRITA no chamado.
 
     Admin pode sempre. Supervisor somente se a área do chamado
     estiver nas suas áreas (regra mais restritiva que a de leitura).
     Gestor read-only (is_gestor_only=True) nunca pode escrever.
 
+    Quando `chamado` é informado e o usuário é gestor_setor (Nível 3), aplica
+    também a restrição de posse: a leitura ampliada de gestor_setor sobre chamado
+    de colega da própria área não vira permissão de escrita — só dono/fila/
+    participante/quem abriu (ver usuario_pode_operar_chamado).
+
     Args:
         usuario: current_user (com .perfil e .areas)
         chamado_area: campo area do chamado
+        chamado: objeto Chamado completo (opcional — habilita a checagem de posse)
 
     Returns:
         True se pode alterar, False caso contrário.
@@ -32,7 +38,13 @@ def supervisor_pode_alterar_chamado(usuario: Any, chamado_area: str) -> bool:
         return False
     if usuario.perfil != "supervisor":
         return False
-    return chamado_area in getattr(usuario, "areas", [])
+    if chamado_area not in getattr(usuario, "areas", []):
+        return False
+    if chamado is not None and getattr(usuario, "nivel_gestao", None) == "gestor_setor":
+        from app.services.permissions import usuario_pode_operar_chamado
+
+        return usuario_pode_operar_chamado(usuario, chamado)
+    return True
 
 
 def verificar_permissao_mudanca_status(
@@ -53,7 +65,7 @@ def verificar_permissao_mudanca_status(
     Returns:
         (permitido, mensagem_erro) — mensagem_erro é None quando permitido.
     """
-    from app.services.permissions import usuario_pode_ver_chamado
+    from app.services.permissions import usuario_pode_operar_chamado
 
     # Gestor read-only: bloqueio antes de qualquer outra verificação
     if getattr(usuario, "is_gestor_only", None) is True:
@@ -65,7 +77,10 @@ def verificar_permissao_mudanca_status(
         if novo_status != "Cancelado":
             return False, "access_denied_requester_cancel_only"
     elif usuario.perfil == "supervisor":
-        if not usuario_pode_ver_chamado(usuario, chamado):
+        # usuario_pode_operar_chamado (não usuario_pode_ver_chamado): a leitura
+        # ampliada de gestor_setor sobre chamado de colega não pode virar escrita
+        # (Nível 3 — enxergar não é igual a poder editar).
+        if not usuario_pode_operar_chamado(usuario, chamado):
             return False, "access_denied_out_of_area"
     return True, None
 

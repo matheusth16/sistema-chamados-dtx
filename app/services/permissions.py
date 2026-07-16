@@ -78,10 +78,27 @@ def usuario_pode_ver_chamado(user: Usuario, chamado: Any) -> bool:
     if user.is_admin_or_above:
         return True
 
-    # Gestor read-only: visão ampliada (vê todos os chamados)
-    if getattr(user, "is_gestor", None) is True and not user.is_admin_or_above:
-        return True
+    if getattr(user, "is_gestor", None) is True:
+        if getattr(user, "nivel_gestao", None) == "gestor_setor":
+            # Gestor de setor: leitura ampliada, mas restrita à(s) própria(s) área(s) —
+            # fora delas cai nas regras normais de perfil abaixo (dono/fila/participante).
+            if chamado.area in getattr(user, "areas", []):
+                return True
+        else:
+            # gerente_producao / assistente_gm / gm: visão ampliada (todas as áreas)
+            return True
 
+    return _usuario_pode_operar_chamado_base(user, chamado)
+
+
+def _usuario_pode_operar_chamado_base(user: Usuario, chamado: Any) -> bool:
+    """Regras de dono/fila/participante/observador — sem a leitura ampliada de gestor.
+
+    Usada tanto pela cauda de usuario_pode_ver_chamado (perfis solicitante/supervisor)
+    quanto por usuario_pode_operar_chamado (gate de escrita, que não deve herdar a
+    visão ampliada que gestor_setor ganha sobre chamado de colega — enxergar não é
+    igual a poder editar).
+    """
     if user.perfil == "solicitante":
         if getattr(chamado, "solicitante_id", None) == user.id:
             return True
@@ -116,6 +133,21 @@ def usuario_pode_ver_chamado(user: Usuario, chamado: Any) -> bool:
         return bool(_eh_observador(user.id, chamado))
 
     return False
+
+
+def usuario_pode_operar_chamado(user: Usuario, chamado: Any) -> bool:
+    """Gate de ESCRITA: admin sempre pode; demais perfis seguem as regras normais de
+    dono/fila/participante/quem abriu.
+
+    Diferente de usuario_pode_ver_chamado, NÃO herda a leitura ampliada que
+    gestor_setor ganha sobre chamado de colega da própria área — enxergar não vira
+    edição automática (Nível 3, ver [[project_nivel3_gerente_setor]]).
+    """
+    if user.is_admin_or_above:
+        return True
+    if getattr(user, "is_gestor_only", None) is True:
+        return False
+    return _usuario_pode_operar_chamado_base(user, chamado)
 
 
 def _eh_observador(user_id: str, chamado) -> bool:

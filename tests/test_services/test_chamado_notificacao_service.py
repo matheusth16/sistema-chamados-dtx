@@ -504,6 +504,92 @@ class TestNotificarAnexoTardioChamado:
         mock_email.assert_not_called()
 
 
+class TestNotificarRespostaSolicitanteChamado:
+    def test_email_enviado_ao_responsavel_e_observadores(self):
+        """notificar_resposta_solicitante_chamado envia email a responsável + observadores."""
+        from app.services.chamado_notificacao_service import (
+            notificar_resposta_solicitante_chamado,
+        )
+
+        sup = _usuario_mock("sup_1", "Supervisor", "sup@test.com")
+        obs = _usuario_mock("obs_1", "Obs A", "obs@test.com")
+
+        with (
+            patch(
+                "app.services.chamado_notificacao_service.destinatarios_do_chamado",
+                return_value=[sup, obs],
+            ),
+            patch("app.services.chamado_notificacao_service.enviar_email") as mock_email,
+        ):
+            mock_email.return_value = (True, None)
+            notificar_resposta_solicitante_chamado(
+                chamado_id="ch_1",
+                numero_chamado="CH-001",
+                categoria="TI",
+                solicitante_nome="João",
+                mensagem="Modelo XYZ-123",
+                dados_chamado={"responsavel_id": "sup_1", "observadores": []},
+            )
+
+        assert mock_email.call_count == 2
+        emails_enviados = [c[0][0] for c in mock_email.call_args_list]
+        assert "sup@test.com" in emails_enviados
+        assert "obs@test.com" in emails_enviados
+
+    def test_corpo_contem_mensagem(self):
+        """Corpo do email deve incluir a mensagem enviada pelo solicitante."""
+        from app.services.chamado_notificacao_service import (
+            notificar_resposta_solicitante_chamado,
+        )
+
+        sup = _usuario_mock("sup_1", "Supervisor", "sup@test.com")
+
+        with (
+            patch(
+                "app.services.chamado_notificacao_service.destinatarios_do_chamado",
+                return_value=[sup],
+            ),
+            patch("app.services.chamado_notificacao_service.enviar_email") as mock_email,
+        ):
+            mock_email.return_value = (True, None)
+            notificar_resposta_solicitante_chamado(
+                chamado_id="ch_2",
+                numero_chamado="CH-002",
+                categoria="Infra",
+                solicitante_nome="Maria",
+                mensagem="O equipamento é o modelo ABC-9",
+                dados_chamado={"responsavel_id": "sup_1", "observadores": []},
+            )
+
+        corpo_html = mock_email.call_args[0][2]
+        assert "CH-002" in corpo_html
+        assert "ABC-9" in corpo_html
+
+    def test_sem_destinatarios_nao_envia_email(self):
+        """Sem responsável nem observadores → nenhum email enviado."""
+        from app.services.chamado_notificacao_service import (
+            notificar_resposta_solicitante_chamado,
+        )
+
+        with (
+            patch(
+                "app.services.chamado_notificacao_service.destinatarios_do_chamado",
+                return_value=[],
+            ),
+            patch("app.services.chamado_notificacao_service.enviar_email") as mock_email,
+        ):
+            notificar_resposta_solicitante_chamado(
+                chamado_id="ch_3",
+                numero_chamado="CH-003",
+                categoria="TI",
+                solicitante_nome="Carlos",
+                mensagem="Resposta qualquer",
+                dados_chamado={},
+            )
+
+        mock_email.assert_not_called()
+
+
 class TestInAppEWebPushNotificacoes:
     """Lacunas A+B: in-app e web push para edição/anexo/cancelamento."""
 

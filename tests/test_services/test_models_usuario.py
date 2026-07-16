@@ -963,8 +963,9 @@ def test_is_gestor_only_false_para_admin_com_nivel_gestao():
     assert u.is_gestor_only is False
 
 
-def test_is_gestor_only_true_para_supervisor_com_nivel_gestao():
-    """is_gestor_only é True para supervisor com nivel_gestao (read-only operacional)."""
+def test_is_gestor_only_false_para_supervisor_com_nivel_gestao():
+    """is_gestor_only é False para supervisor com nivel_gestao (Nível 3: dual role —
+    quem acumula perfil operacional + gestão mantém escrita no próprio setor)."""
     from app.models_usuario import Usuario
 
     with patch("app.models_usuario.db"):
@@ -976,6 +977,24 @@ def test_is_gestor_only_true_para_supervisor_com_nivel_gestao():
             nivel_gestao="assistente_gm",
         )
 
+    assert u.is_gestor is True
+    assert u.is_gestor_only is False
+
+
+def test_is_gestor_only_true_para_solicitante_com_nivel_gestao():
+    """is_gestor_only é True para gestor "puro" (perfil sem responsabilidade operacional)."""
+    from app.models_usuario import Usuario
+
+    with patch("app.models_usuario.db"):
+        u = Usuario(
+            id="g_006",
+            email="gpuro@dtx.aero",
+            nome="Gestor Puro",
+            perfil="solicitante",
+            nivel_gestao="gm",
+        )
+
+    assert u.is_gestor is True
     assert u.is_gestor_only is True
 
 

@@ -8,6 +8,7 @@ from app.services.permission_validation import (
     usuario_pode_mutar_chamado,
     verificar_permissao_mudanca_status,
 )
+from app.services.permissions import usuario_pode_ver_chamado
 
 # ---------------------------------------------------------------------------
 # supervisor_pode_alterar_chamado (já existia, garante não-regressão)
@@ -105,9 +106,12 @@ def test_permissao_mudanca_supervisor_area_correta_permitido():
     chamado = MagicMock()
     chamado.area = "Manutencao"
 
-    # A função faz `from app.services.permissions import usuario_pode_ver_chamado`
-    # internamente, então o patch deve ser no módulo de origem.
-    with patch("app.services.permissions.usuario_pode_ver_chamado", return_value=True) as mock_perm:
+    # A função faz `from app.services.permissions import usuario_pode_operar_chamado`
+    # internamente (gate de escrita, não o de leitura), então o patch deve ser no
+    # módulo de origem.
+    with patch(
+        "app.services.permissions.usuario_pode_operar_chamado", return_value=True
+    ) as mock_perm:
         permitido, erro = verificar_permissao_mudanca_status(sup, chamado, "Concluído")
         mock_perm.assert_called_once_with(sup, chamado)
 
@@ -121,11 +125,13 @@ def test_permissao_mudanca_supervisor_area_errada_negado():
 
     sup = MagicMock()
     sup.perfil = "supervisor"
+    sup.is_admin_or_above = False
+    sup.is_gestor_only = False
     sup.areas = ["TI"]
     chamado = MagicMock()
     chamado.area = "Manutencao"
 
-    with patch("app.services.permissions.usuario_pode_ver_chamado", return_value=False):
+    with patch("app.services.permissions.usuario_pode_operar_chamado", return_value=False):
         permitido, erro = verificar_permissao_mudanca_status(sup, chamado, "Concluído")
 
     assert permitido is False
@@ -165,8 +171,10 @@ def test_filtrar_supervisores_supervisor_filtra_por_area():
 # ---------------------------------------------------------------------------
 
 
-def test_gestor_only_nao_pode_mudar_status():
-    """verificar_permissao_mudanca_status retorna False para gestor read-only."""
+def test_supervisor_gestor_setor_pode_mudar_status_do_proprio_chamado():
+    """Nível 3: dual role (supervisor + gestor_setor) mantém escrita no que é dele —
+    is_gestor_only é False, então verificar_permissao_mudanca_status segue a regra
+    normal de supervisor (dono/fila/participante)."""
     from unittest.mock import patch
 
     from app.models_usuario import Usuario
@@ -177,23 +185,82 @@ def test_gestor_only_nao_pode_mudar_status():
             email="g@dtx.aero",
             nome="G",
             perfil="supervisor",
+            areas=["Manutencao"],
             nivel_gestao="gestor_setor",
         )
     chamado = MagicMock()
+    chamado.area = "Manutencao"
     chamado.solicitante_id = "outro"
+    chamado.responsavel_id = "g_t01"
+    chamado.participantes = []
 
-    with patch("app.services.permissions.usuario_pode_ver_chamado", return_value=True):
-        # is_gestor_only is True (supervisor + nivel_gestao)
-        assert gestor.is_gestor_only is True
-        permitido, erro = verificar_permissao_mudanca_status(gestor, chamado, "Em Atendimento")
+    assert gestor.is_gestor_only is False
+    permitido, erro = verificar_permissao_mudanca_status(gestor, chamado, "Em Atendimento")
+
+    assert permitido is True
+    assert erro is None
+
+
+def test_supervisor_gestor_setor_nao_pode_mudar_status_de_chamado_do_colega():
+    """QA (Nível 3): a leitura ampliada de gestor_setor sobre chamado do colega na
+    própria área NÃO pode virar permissão de escrita — precisa do fluxo normal de
+    reatribuição de responsável antes de poder mexer no chamado."""
+    from unittest.mock import patch
+
+    from app.models_usuario import Usuario
+
+    with patch("app.models_usuario.db"):
+        gestor = Usuario(
+            id="g_t01",
+            email="g@dtx.aero",
+            nome="G",
+            perfil="supervisor",
+            areas=["Manutencao"],
+            nivel_gestao="gestor_setor",
+        )
+    chamado = MagicMock()
+    chamado.area = "Manutencao"
+    chamado.solicitante_id = "outro"
+    chamado.responsavel_id = "colega_supervisor"
+    chamado.participantes = []
+
+    # Enxerga o chamado (leitura ampliada de gestor_setor)...
+    assert usuario_pode_ver_chamado(gestor, chamado) is True
+    # ...mas não pode mudar o status dele.
+    permitido, erro = verificar_permissao_mudanca_status(gestor, chamado, "Em Atendimento")
+
+    assert permitido is False
+    assert erro is not None
+
+
+def test_gestor_puro_nao_pode_mudar_status():
+    """Gestor "puro" (perfil não-operacional, ex.: solicitante + nivel_gestao) continua
+    bloqueado — read-only real, diferente do dual role supervisor + gestor_setor."""
+    from unittest.mock import patch
+
+    from app.models_usuario import Usuario
+
+    with patch("app.models_usuario.db"):
+        gestor_puro = Usuario(
+            id="g_puro",
+            email="gp@dtx.aero",
+            nome="GP",
+            perfil="solicitante",
+            nivel_gestao="gm",
+        )
+    chamado = MagicMock()
+
+    assert gestor_puro.is_gestor_only is True
+    permitido, erro = verificar_permissao_mudanca_status(gestor_puro, chamado, "Em Atendimento")
 
     assert permitido is False
     assert erro is not None
     assert "read-only" in erro.lower() or "gestor" in erro.lower()
 
 
-def test_gestor_only_supervisor_pode_alterar_chamado_retorna_false():
-    """supervisor_pode_alterar_chamado retorna False para gestor read-only."""
+def test_supervisor_gestor_setor_pode_alterar_chamado_na_propria_area():
+    """supervisor_pode_alterar_chamado (sem o chamado completo, só a área — modo
+    legado) retorna True para dual role dentro da própria área."""
     from unittest.mock import patch
 
     from app.models_usuario import Usuario
@@ -207,8 +274,75 @@ def test_gestor_only_supervisor_pode_alterar_chamado_retorna_false():
             areas=["Manutencao"],
             nivel_gestao="gestor_setor",
         )
-    assert gestor.is_gestor_only is True
-    assert supervisor_pode_alterar_chamado(gestor, "Manutencao") is False
+    assert gestor.is_gestor_only is False
+    assert supervisor_pode_alterar_chamado(gestor, "Manutencao") is True
+
+
+def test_supervisor_gestor_setor_com_chamado_do_colega_nao_pode_alterar():
+    """QA (Nível 3): quando o chamado completo é passado, supervisor_pode_alterar_chamado
+    aplica a restrição de posse pra dual role — vendo o chamado do colega não editando."""
+    from unittest.mock import patch
+
+    from app.models_usuario import Usuario
+
+    with patch("app.models_usuario.db"):
+        gestor = Usuario(
+            id="g_t02b",
+            email="g2b@dtx.aero",
+            nome="G2b",
+            perfil="supervisor",
+            areas=["Manutencao"],
+            nivel_gestao="gestor_setor",
+        )
+    chamado = MagicMock()
+    chamado.area = "Manutencao"
+    chamado.solicitante_id = "outro"
+    chamado.responsavel_id = "colega_supervisor"
+    chamado.participantes = []
+
+    assert supervisor_pode_alterar_chamado(gestor, "Manutencao", chamado) is False
+
+
+def test_supervisor_gestor_setor_com_chamado_proprio_pode_alterar():
+    """Quando o chamado completo é passado e é do próprio gestor_setor, continua podendo."""
+    from unittest.mock import patch
+
+    from app.models_usuario import Usuario
+
+    with patch("app.models_usuario.db"):
+        gestor = Usuario(
+            id="g_t02c",
+            email="g2c@dtx.aero",
+            nome="G2c",
+            perfil="supervisor",
+            areas=["Manutencao"],
+            nivel_gestao="gestor_setor",
+        )
+    chamado = MagicMock()
+    chamado.area = "Manutencao"
+    chamado.solicitante_id = "outro"
+    chamado.responsavel_id = "g_t02c"
+    chamado.participantes = []
+
+    assert supervisor_pode_alterar_chamado(gestor, "Manutencao", chamado) is True
+
+
+def test_supervisor_gestor_setor_nao_altera_chamado_fora_da_area():
+    """Fora da própria área, dual role continua bloqueado (regra normal de área do supervisor)."""
+    from unittest.mock import patch
+
+    from app.models_usuario import Usuario
+
+    with patch("app.models_usuario.db"):
+        gestor = Usuario(
+            id="g_t03",
+            email="g3@dtx.aero",
+            nome="G3",
+            perfil="supervisor",
+            areas=["Manutencao"],
+            nivel_gestao="gestor_setor",
+        )
+    assert supervisor_pode_alterar_chamado(gestor, "TI") is False
 
 
 def test_admin_com_nivel_gestao_ainda_edita():

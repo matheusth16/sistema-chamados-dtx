@@ -725,3 +725,214 @@ def test_criar_notificacao_solicitante_retorna_none_sem_ids():
         tipo="status_em_atendimento",
     )
     assert result is None
+
+
+# ── localizar_notificacao — tipos observador ─────────────────────────────────
+
+
+def _doc_observador(tipo: str) -> dict:
+    return {
+        "tipo": tipo,
+        "numero_chamado": "CHM-0100",
+        "categoria": "TI",
+        "titulo": "título original",
+        "mensagem": "mensagem original",
+    }
+
+
+def test_localizar_observador_edicao_descricao_traduz():
+    from app.services.notifications_inapp import localizar_notificacao
+
+    out = localizar_notificacao(_doc_observador("observador_edicao_descricao"), "en")
+    assert "CHM-0100" in out["titulo"]
+    assert out["titulo"] != "título original"
+    assert out["mensagem"] != "mensagem original"
+
+
+def test_localizar_observador_anexo_tardio_traduz():
+    from app.services.notifications_inapp import localizar_notificacao
+
+    out = localizar_notificacao(_doc_observador("observador_anexo_tardio"), "en")
+    assert "CHM-0100" in out["titulo"]
+    assert out["mensagem"] != "mensagem original"
+
+
+def test_localizar_observador_cancelamento_traduz():
+    from app.services.notifications_inapp import localizar_notificacao
+
+    out = localizar_notificacao(_doc_observador("observador_cancelamento"), "en")
+    assert "CHM-0100" in out["titulo"]
+    assert out["mensagem"] != "mensagem original"
+
+
+def test_localizar_observador_status_em_atendimento_traduz():
+    from app.services.notifications_inapp import localizar_notificacao
+
+    out = localizar_notificacao(_doc_observador("observador_status_em_atendimento"), "en")
+    assert "CHM-0100" in out["titulo"]
+    assert out["mensagem"] != "mensagem original"
+
+
+def test_localizar_observador_status_concluido_traduz():
+    from app.services.notifications_inapp import localizar_notificacao
+
+    out = localizar_notificacao(_doc_observador("observador_status_concluido"), "en")
+    assert "CHM-0100" in out["titulo"]
+    assert out["mensagem"] != "mensagem original"
+
+
+def test_localizar_observador_incluido_traduz():
+    from app.services.notifications_inapp import localizar_notificacao
+
+    out = localizar_notificacao(_doc_observador("observador_incluido"), "en")
+    assert "CHM-0100" in out["titulo"]
+    assert out["mensagem"] != "mensagem original"
+
+
+# ── localizar_notificacao — tipos participante ───────────────────────────────
+
+
+def test_localizar_participante_incluido_traduz():
+    from app.services.notifications_inapp import localizar_notificacao
+
+    doc = {
+        "tipo": "participante_incluido",
+        "numero_chamado": "CHM-0200",
+        "categoria": "Qualidade",
+        "titulo": "título original",
+        "mensagem": "mensagem original",
+    }
+    out = localizar_notificacao(doc, "en")
+    assert "CHM-0200" in out["titulo"]
+    assert out["mensagem"] != "mensagem original"
+
+
+def test_localizar_todos_participantes_concluidos_traduz():
+    from app.services.notifications_inapp import localizar_notificacao
+
+    doc = {
+        "tipo": "todos_participantes_concluidos",
+        "numero_chamado": "CHM-0201",
+        "categoria": "Qualidade",
+        "titulo": "título original",
+        "mensagem": "mensagem original",
+    }
+    out = localizar_notificacao(doc, "en")
+    assert "CHM-0201" in out["titulo"]
+    assert out["mensagem"] != "mensagem original"
+
+
+# ── criar_notificacao — payload opcional solicitante_nome ───────────────────
+
+
+def test_criar_notificacao_inclui_solicitante_nome_no_payload():
+    """Quando solicitante_nome é informado, deve entrar no payload salvo no Firestore."""
+    from app.services.notifications_inapp import criar_notificacao
+
+    with patch("app.services.notifications_inapp.db") as mock_db:
+        mock_ref = MagicMock()
+        mock_ref.id = "notif1"
+        mock_db.collection.return_value.add.return_value = (None, mock_ref)
+
+        criar_notificacao(
+            usuario_id="u1",
+            chamado_id="ch1",
+            numero_chamado="CHM-0300",
+            titulo="Título",
+            mensagem="Mensagem",
+            solicitante_nome="Fulano",
+        )
+
+    payload = mock_db.collection.return_value.add.call_args[0][0]
+    assert payload["solicitante_nome"] == "Fulano"
+
+
+def test_criar_notificacao_inclui_categoria_no_payload():
+    """Quando categoria é informada, deve entrar no payload salvo no Firestore."""
+    from app.services.notifications_inapp import criar_notificacao
+
+    with patch("app.services.notifications_inapp.db") as mock_db:
+        mock_ref = MagicMock()
+        mock_ref.id = "notif2"
+        mock_db.collection.return_value.add.return_value = (None, mock_ref)
+
+        criar_notificacao(
+            usuario_id="u1",
+            chamado_id="ch1",
+            numero_chamado="CHM-0301",
+            titulo="Título",
+            mensagem="Mensagem",
+            categoria="TI",
+        )
+
+    payload = mock_db.collection.return_value.add.call_args[0][0]
+    assert payload["categoria"] == "TI"
+
+
+# ── texto_notificacao_novo_chamado ───────────────────────────────────────────
+
+
+def test_texto_notificacao_novo_chamado_en():
+    from app.services.notifications_inapp import texto_notificacao_novo_chamado
+
+    titulo, mensagem = texto_notificacao_novo_chamado(
+        numero="CHM-0500", categoria_raw="Nao Aplicavel", solicitante_nome="Fulano", language="en"
+    )
+    assert "CHM-0500" in titulo
+    assert "Fulano" in mensagem
+
+
+# ── listar_para_usuario com language aplica localizar_notificacao ───────────
+
+
+def test_listar_para_usuario_com_language_localiza_resultado():
+    from app.services.notifications_inapp import listar_para_usuario
+
+    doc = MagicMock()
+    doc.id = "n1"
+    doc.to_dict.return_value = {
+        "tipo": "status_em_atendimento",
+        "numero_chamado": "CHM-0400",
+        "categoria": "TI",
+        "usuario_id": "u1",
+        "titulo": "título original",
+        "mensagem": "mensagem original",
+        "data_criacao": None,
+    }
+
+    with patch("app.services.notifications_inapp.db") as mock_db:
+        query = mock_db.collection.return_value.where.return_value
+        query.order_by.return_value.limit.return_value.stream.return_value = [doc]
+        result = listar_para_usuario("u1", language="en")
+
+    assert len(result) == 1
+    assert result[0]["titulo"] != "título original"
+
+
+# ── _ts_sort_key — exceção no timestamp cai no fallback 0.0 ──────────────────
+
+
+def test_ts_sort_key_excecao_retorna_zero():
+    from app.services.notifications_inapp import _ts_sort_key
+
+    doc = MagicMock()
+    ts = MagicMock()
+    ts.timestamp.side_effect = Exception("boom")
+    doc.to_dict.return_value = {"data_criacao": ts}
+
+    assert _ts_sort_key(doc) == 0.0
+
+
+# ── Guardas de usuario_id vazio ──────────────────────────────────────────────
+
+
+def test_listar_para_usuario_sem_usuario_id_retorna_vazio():
+    from app.services.notifications_inapp import listar_para_usuario
+
+    assert listar_para_usuario("") == []
+
+
+def test_contar_nao_lidas_sem_usuario_id_retorna_zero():
+    from app.services.notifications_inapp import contar_nao_lidas
+
+    assert contar_nao_lidas("") == 0

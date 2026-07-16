@@ -52,7 +52,7 @@ from app.services.permission_validation import (
     nivel_congelamento_chamado,
     supervisor_pode_alterar_chamado,
 )
-from app.services.permissions import usuario_pode_ver_chamado
+from app.services.permissions import usuario_pode_operar_chamado, usuario_pode_ver_chamado
 from app.services.solicitante_edicao_service import segundos_restantes_janela_edicao
 from app.services.status_service import atualizar_status_chamado
 from app.utils import formatar_data_para_excel
@@ -117,7 +117,7 @@ def _render_dashboard() -> Response:
             data_anterior = doc_anterior.to_dict()
             chamado_obj = Chamado.from_dict(data_anterior, chamado_id)
 
-            if current_user.perfil == "supervisor" and not usuario_pode_ver_chamado(
+            if current_user.perfil == "supervisor" and not usuario_pode_operar_chamado(
                 current_user, chamado_obj
             ):
                 flash_t("only_update_tickets_your_area", "danger")
@@ -177,7 +177,7 @@ def _render_dashboard() -> Response:
 def gestor_dashboard() -> Response:
     """Dashboard gerencial read-only (Fase 5). Acessível por gestores e admins."""
     filtro = request.args.get("filtro")
-    contexto = obter_contexto_gestor_dashboard(filtro=filtro)
+    contexto = obter_contexto_gestor_dashboard(filtro=filtro, usuario=current_user)
     return render_template("gestor_dashboard.html", **contexto)
 
 
@@ -237,9 +237,12 @@ def visualizar_detalhe_chamado(chamado_id: str) -> Response:
         # mas só quem tem a área do chamado (ou admin) pode de fato editar — um
         # supervisor que só enxerga o chamado como observador (cc) fica read-only.
         # (supervisor_pode_alterar_chamado já bloqueia gestor_only internamente.)
-        pode_editar_base = supervisor_pode_alterar_chamado(current_user, chamado.area)
+        pode_editar_base = supervisor_pode_alterar_chamado(current_user, chamado.area, chamado)
         # Chamado Concluído (qualquer nível) bloqueia edição operacional no formulário
         pode_editar = pode_editar_base and nivel is None
+        # Descrição é texto do solicitante — só admin pode sobrescrever (ver
+        # edicao_chamado_service.py); supervisor nunca edita o que foi escrito.
+        pode_editar_descricao = pode_editar and current_user.is_admin_or_above
 
         usuarios_gestao = get_static_cached("usuarios_all", Usuario.get_all, ttl_seconds=300)
         supervisores_list = [u for u in usuarios_gestao if u.perfil == "supervisor" and u.nome]
@@ -281,6 +284,7 @@ def visualizar_detalhe_chamado(chamado_id: str) -> Response:
             chamado=chamado,
             voltar_url=voltar_url,
             pode_editar=pode_editar,
+            pode_editar_descricao=pode_editar_descricao,
             nivel_congelamento=nivel,
             supervisores_detalhados=supervisores_detalhados,
             setores=setores,

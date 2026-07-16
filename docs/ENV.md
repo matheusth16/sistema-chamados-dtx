@@ -236,30 +236,21 @@ Logs são gravados em `logs/sistema_chamados.log` (formato JSON com rotação). 
 
 ---
 
-## Perfil Gestor — E-mails gerenciais (Fase 5)
+## Perfil Gestor — E-mails gerenciais
 
-| Variável | Descrição | Padrão | Exemplo |
-|----------|-----------|--------|---------|
-| `GESTOR_EMAILS` | Mapa JSON de `nivel_gestao → endereço de e-mail` para os destinatários da **Escada A** (Fase 6) e **Escada B** (Fase 7) — e-mail por nível de escalação gerencial. Usado pelo job `sla_escalacao` em ambas as escadas. Chaves válidas: `gestor_setor`, `gerente_producao`, `assistente_gm`, `gm`. JSON inválido ou ausente → `{}` (níveis incrementam sem envio de e-mail; log `WARNING`). | `{}` | `{"gm":"gm@dtx.aero","assistente_gm":"asst@dtx.aero"}` |
+Não há variável de ambiente para os e-mails de escalonamento gerencial. O
+destinatário de cada nível (`gestor_setor`, `gerente_producao`, `assistente_gm`,
+`gm`) é resolvido em tempo real a partir do cadastro real de usuários — campo
+Nível de Gestão em `/admin/usuarios` — via `app/services/gestor_escalonamento_service.py`.
+Cadastrar ou desativar um usuário nesse painel já reflete no próximo job, sem
+precisar reiniciar a aplicação ou alterar configuração.
 
-**Formato JSON:**
-```json
-{
-  "gestor_setor": "",
-  "gerente_producao": "",
-  "assistente_gm": "asst@dtx.aero",
-  "gm": "gm@dtx.aero"
-}
-```
-
-> **Fases 6–7 (implementado):** este campo alimenta o job `sla_escalacao` que roda a cada 10 min e chama três funções em sequência:
+> **Escadas de escalonamento:** o job `sla_escalacao` roda a cada 10 min e chama três funções em sequência:
 > - **Escada A** (`processar_escada_a`) — notifica por atraso de *resposta* (+1h/+2h/+3h/+4h úteis após abertura sem atendimento).
 > - **Escada B** (`processar_escada_b`) — notifica por estouro do prazo de *resolução* (+0h/+4h/+8h/+12h úteis após deadline de 2 ou 3 dias úteis).
 > - **Avisos preventivos** (`processar_avisos_resolucao`) — alerta o responsável ao atingir 50%/80% do prazo de resolução.
 >
-> Chaves com valor `""` são silenciosamente ignoradas. Não há validação de formato de e-mail no boot — JSON inválido é normalizado para `{}` com `WARNING` no log.
-
-**Helper:** `config.get_gestor_email(nivel)` → retorna `str | None` para o nível informado.
+> `gestor_setor` é resolvido por área (`construir_mapa_gestor_setor`); os demais níveis são company-wide (`construir_mapa_niveis_superiores`). Nível sem usuário ativo cadastrado → incrementa sem enviar e-mail, com `WARNING` no log. O broadcast imediato de abertura de AOG (`notificar_abertura_aog_todos_gestores`) usa a mesma fonte.
 
 ---
 

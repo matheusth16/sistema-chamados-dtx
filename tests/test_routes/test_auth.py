@@ -69,6 +69,40 @@ def test_login_must_change_password_redireciona_para_alterar_senha(client):
     assert "alterar-senha" in (r.location or "")
 
 
+def test_login_supervisor_dual_role_gestor_setor_redireciona_para_painel(client, app):
+    """Nível 3: supervisor com nivel_gestao=gestor_setor cai em /painel (mantém escrita no
+    próprio setor) — não mais direto em /gestor/dashboard, que fica só para gestor "puro"."""
+    usuario = MagicMock()
+    usuario.id = "dual1"
+    usuario.email = "dual@test.com"
+    usuario.nome = "Dual Role"
+    usuario.perfil = "supervisor"
+    usuario.must_change_password = False
+    usuario.mfa_enabled = True
+    usuario.nivel_gestao = "gestor_setor"
+    usuario.is_gestor = True
+    usuario.is_admin_or_above = False
+    usuario.is_gestor_only = False
+    usuario.get_id = lambda: "dual1"
+    usuario.is_authenticated = True
+    usuario.is_active = True
+    usuario.is_anonymous = False
+    usuario.check_password = MagicMock(return_value=True)
+
+    with (
+        patch("app.routes.auth.Usuario.get_by_email", return_value=usuario),
+        patch("app.models_usuario.Usuario.get_by_id", return_value=usuario),
+        patch("app.routes.auth._dispositivo_confiavel", return_value=True),
+    ):
+        r = client.post(
+            "/login", data={"email": "dual@test.com", "senha": "ok"}, follow_redirects=False
+        )
+
+    assert r.status_code == 302
+    assert "painel" in (r.location or "")
+    assert "gestor" not in (r.location or "")
+
+
 def test_login_solicitante_autenticado_redireciona_para_index(client_logado_solicitante):
     """GET /login com solicitante já autenticado redireciona para index (/)."""
     r = client_logado_solicitante.get("/login", follow_redirects=False)

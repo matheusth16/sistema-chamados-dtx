@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 
 from app.services.permissions import (
     calcular_supervisor_ids_com_acesso,
+    usuario_pode_operar_chamado,
     usuario_pode_ver_chamado,
     usuario_pode_ver_chamado_otimizado,
 )
@@ -28,13 +29,15 @@ def _chamado_mock(
     return c
 
 
-def _usuario_mock(perfil, areas=None, uid=_TEST_USER_ID):
+def _usuario_mock(perfil, areas=None, uid=_TEST_USER_ID, nivel_gestao=None, is_gestor=None):
     u = MagicMock()
     u.id = uid
     u.perfil = perfil
     u.areas = areas or []
     u.is_admin_or_above = perfil in ("admin", "admin_global")
     u.is_supervisor_or_above = perfil in ("supervisor", "admin", "admin_global")
+    u.nivel_gestao = nivel_gestao
+    u.is_gestor = is_gestor if is_gestor is not None else nivel_gestao is not None
     return u
 
 
@@ -164,6 +167,104 @@ class TestUsuarioPodeVerChamado:
         chamado.solicitante_id = "sol_x"
         del chamado.participantes  # simula campo ausente
         assert usuario_pode_ver_chamado(sup, chamado) is True
+
+
+class TestUsuarioPodeVerChamadoGestorSetor:
+    """Nível 3: gestor_setor enxerga chamados da própria área mesmo sem ser
+    dono/fila/participante — mas não amplia para outras áreas (só gerente_producao/
+    assistente_gm/gm têm visão de todas as áreas)."""
+
+    def test_gestor_setor_ve_chamado_da_propria_area_mesmo_sem_ser_owner(self):
+        gestor = _usuario_mock(
+            "supervisor", areas=["Manutencao"], uid="gestor_1", nivel_gestao="gestor_setor"
+        )
+        chamado = _chamado_mock(area="Manutencao", responsavel_id="outro_supervisor")
+        assert usuario_pode_ver_chamado(gestor, chamado) is True
+
+    def test_gestor_setor_nao_amplia_visao_para_outra_area(self):
+        """Fora da própria área, gestor_setor cai nas regras normais de supervisor (nega)."""
+        gestor = _usuario_mock(
+            "supervisor", areas=["Manutencao"], uid="gestor_1", nivel_gestao="gestor_setor"
+        )
+        chamado = _chamado_mock(area="TI", responsavel_id="outro_supervisor")
+        assert usuario_pode_ver_chamado(gestor, chamado) is False
+
+    def test_gestor_setor_fora_da_area_mas_participante_ainda_ve(self):
+        """Fora da própria área como gestor, mas participante ativo do chamado: ainda vê
+        via ramo normal de participante (o ramo de gestor não bloqueia os demais)."""
+        gestor = _usuario_mock(
+            "supervisor", areas=["Manutencao"], uid="gestor_1", nivel_gestao="gestor_setor"
+        )
+        chamado = _chamado_mock(
+            area="TI",
+            responsavel_id="outro",
+            participantes=[{"supervisor_id": "gestor_1", "status": "em_atendimento"}],
+        )
+        assert usuario_pode_ver_chamado(gestor, chamado) is True
+
+    def test_gerente_producao_ve_chamado_de_qualquer_area(self):
+        """Níveis de gestão acima de gestor_setor mantêm visão ampliada (todas as áreas)."""
+        gerente = _usuario_mock(
+            "supervisor", areas=["Manutencao"], uid="gerente_1", nivel_gestao="gerente_producao"
+        )
+        chamado = _chamado_mock(area="TI", responsavel_id="outro_supervisor")
+        assert usuario_pode_ver_chamado(gerente, chamado) is True
+
+
+class TestUsuarioPodeOperarChamado:
+    """Nível 3 — QA encontrou a lacuna: gestor_setor enxergava o chamado do colega
+    (via usuario_pode_ver_chamado) e isso vazava para o gate de ESCRITA, deixando o
+    dual role editar/mudar status de chamado que não é dele. usuario_pode_operar_chamado
+    é o gate de escrita que não herda a leitura ampliada de gestor_setor — só dono/
+    fila/participante/quem abriu pode escrever, igual a um supervisor comum."""
+
+    def test_gestor_setor_nao_pode_operar_chamado_do_colega_na_propria_area(self):
+        """Enxergar (usuario_pode_ver_chamado) != poder editar (usuario_pode_operar_chamado)."""
+        gestor = _usuario_mock(
+            "supervisor", areas=["Manutencao"], uid="gestor_1", nivel_gestao="gestor_setor"
+        )
+        chamado = _chamado_mock(area="Manutencao", responsavel_id="colega_supervisor")
+        assert usuario_pode_ver_chamado(gestor, chamado) is True
+        assert usuario_pode_operar_chamado(gestor, chamado) is False
+
+    def test_gestor_setor_pode_operar_chamado_proprio(self):
+        gestor = _usuario_mock(
+            "supervisor", areas=["Manutencao"], uid="gestor_1", nivel_gestao="gestor_setor"
+        )
+        chamado = _chamado_mock(area="Manutencao", responsavel_id="gestor_1")
+        assert usuario_pode_operar_chamado(gestor, chamado) is True
+
+    def test_gestor_setor_pode_operar_chamado_na_fila_sem_owner(self):
+        gestor = _usuario_mock(
+            "supervisor", areas=["Manutencao"], uid="gestor_1", nivel_gestao="gestor_setor"
+        )
+        chamado = _chamado_mock(area="Manutencao", responsavel_id=None)
+        assert usuario_pode_operar_chamado(gestor, chamado) is True
+
+    def test_supervisor_comum_operar_igual_a_ver(self):
+        """Para supervisor sem nivel_gestao, operar e ver devem concordar sempre
+        (a restrição extra só existe pra quem tem a leitura ampliada de gestor_setor)."""
+        sup = _usuario_mock("supervisor", areas=["Manutencao"], uid="sup_1")
+        chamado_fila = _chamado_mock(area="Manutencao", responsavel_id=None)
+        chamado_colega = _chamado_mock(area="Manutencao", responsavel_id="outro")
+        assert usuario_pode_operar_chamado(sup, chamado_fila) == usuario_pode_ver_chamado(
+            sup, chamado_fila
+        )
+        assert usuario_pode_operar_chamado(sup, chamado_colega) == usuario_pode_ver_chamado(
+            sup, chamado_colega
+        )
+
+    def test_admin_sempre_pode_operar(self):
+        admin = _usuario_mock("admin", areas=[])
+        chamado = _chamado_mock(area="Qualquer")
+        assert usuario_pode_operar_chamado(admin, chamado) is True
+
+    def test_gestor_puro_nao_pode_operar_nem_o_proprio_chamado(self):
+        """is_gestor_only bloqueia escrita mesmo quando a pessoa é a solicitante do chamado."""
+        gestor_puro = _usuario_mock("solicitante", uid="gp_1", nivel_gestao="gm", is_gestor=True)
+        gestor_puro.is_gestor_only = True
+        chamado = _chamado_mock(area="Manutencao", solicitante_id="gp_1")
+        assert usuario_pode_operar_chamado(gestor_puro, chamado) is False
 
 
 class TestUsuarioPodeVerChamadoOtimizado:

@@ -36,7 +36,6 @@ from app.services.email_templates import (
     build_email_shell,
     build_two_ctas,
 )
-from config import Config
 
 _EMAIL_LANG = "en"
 _VALID_IMPORTANCE: frozenset[str] = frozenset({"high", "normal", "low"})
@@ -1461,8 +1460,18 @@ def notificar_abertura_aog_todos_gestores(chamado_data: dict, chamado_id: str) -
     Diferente da Escada A normal (escalada gradual, 1 nível por vez conforme o tempo
     passa), AOG (Aircraft On Ground) é emergência imediata — avisa todo mundo de uma
     vez na abertura, sem esperar o job de escalonamento nem a janela de expediente.
-    Gestor sem e-mail configurado é pulado (log warning), não impede os demais.
+    gestor_setor é resolvido pela área/categoria do próprio chamado, igual à
+    Escada A/B. Nível sem ninguém cadastrado cascateia pro nível de gestão
+    acima (nunca fica sem notificar por lacuna de cadastro — é emergência);
+    se a cascata leva dois níveis pro mesmo destinatário, notifica só uma vez.
+    Só fica sem notificar se NENHUM nível tiver alguém cadastrado (log warning).
     """
+    from app.services.gestor_escalonamento_service import (
+        construir_mapa_gestor_setor,
+        construir_mapa_niveis_superiores,
+        resolver_email_gestor_com_cascata,
+    )
+
     numero_chamado = chamado_data.get("numero_chamado") or "N/A"
     categoria = chamado_data.get("categoria") or ""
     area = chamado_data.get("area") or ""
@@ -1512,16 +1521,33 @@ def notificar_abertura_aog_todos_gestores(chamado_data: dict, chamado_id: str) -
         f"Category: {cat_d}\nArea: {area_d}" + (f"\n\nView ticket: {link}" if link else "")
     )
 
+    mapa_gestor_setor = construir_mapa_gestor_setor()
+    mapa_niveis_superiores = construir_mapa_niveis_superiores()
+
     importance = resolver_importance("abertura_aog")
+    emails_ja_notificados: set[str] = set()
     for chave_gestor in _NIVEIS_GESTOR_AOG:
-        email_dest = Config.get_gestor_email(chave_gestor)
+        email_dest = resolver_email_gestor_com_cascata(
+            chave_gestor, categoria, mapa_gestor_setor, mapa_niveis_superiores
+        )
         if not email_dest:
             logger.warning(
-                "AOG abertura: gestor '%s' sem e-mail configurado (chamado %s).",
+                "AOG abertura: nenhum usuário ativo com nivel_gestao='%s' (ou acima) "
+                "cadastrado (chamado %s).",
                 chave_gestor,
                 numero_chamado,
             )
             continue
+        if email_dest in emails_ja_notificados:
+            logger.info(
+                "AOG abertura: nível '%s' cascateou pro mesmo destinatário já notificado "
+                "(%s, chamado %s) — não duplicado.",
+                chave_gestor,
+                email_dest,
+                numero_chamado,
+            )
+            continue
+        emails_ja_notificados.add(email_dest)
         try:
             ok, err = enviar_email(
                 email_dest, assunto, corpo_html, corpo_texto, importance=importance

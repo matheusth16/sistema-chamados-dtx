@@ -4,11 +4,12 @@ A Escada A notifica gestores quando chamados Abertos excedem thresholds cumulati
 de minutos úteis sem entrar em atendimento. O job APScheduler chama
 processar_escada_a() a cada 10 minutos.
 
-Decisão de design (sem e-mail configurado):
-  Se a chave do nível não estiver em GESTOR_EMAILS, o nível é incrementado mesmo
-  assim, sem envio de e-mail. Isso evita que chamados fiquem presos tentando
-  re-notificar um destinatário não configurado a cada execução do job. O
-  comportamento é registrado em log warning para diagnóstico operacional.
+Decisão de design (sem gestor cadastrado):
+  Se não houver usuário ativo com o nivel_gestao daquele nível (ver
+  gestor_escalonamento_service), o nível é incrementado mesmo assim, sem envio
+  de e-mail. Isso evita que chamados fiquem presos tentando re-notificar um
+  destinatário inexistente a cada execução do job. O comportamento é
+  registrado em log warning para diagnóstico operacional.
 
 Índice Firestore necessário (composite):
   Collection: chamados
@@ -24,7 +25,6 @@ from zoneinfo import ZoneInfo
 
 from google.cloud.firestore_v1.base_query import FieldFilter
 
-from app.cache import get_static_cached
 from app.database import db
 from app.services.business_time import (
     adicionar_dias_uteis,
@@ -32,6 +32,18 @@ from app.services.business_time import (
     minutos_uteis_entre,
     percentual_prazo_resolucao,
     pode_enviar_notificacao_agora,
+)
+from app.services.gestor_escalonamento_service import (
+    NIVEL_PARA_CHAVE_GESTOR,
+)
+from app.services.gestor_escalonamento_service import (
+    construir_mapa_gestor_setor as _construir_mapa_gestor_setor,
+)
+from app.services.gestor_escalonamento_service import (
+    construir_mapa_niveis_superiores as _construir_mapa_niveis_superiores,
+)
+from app.services.gestor_escalonamento_service import (
+    resolver_email_gestor as _resolver_email_gestor,
 )
 from app.services.notifications import (
     notificar_aviso_resolucao_supervisor,
@@ -41,53 +53,6 @@ from app.services.notifications import (
 from config import Config
 
 logger = logging.getLogger(__name__)
-
-NIVEL_PARA_CHAVE_GESTOR: dict[int, str] = {
-    1: "gestor_setor",
-    2: "gerente_producao",
-    3: "assistente_gm",
-    4: "gm",
-}
-
-
-def _construir_mapa_gestor_setor() -> dict[str, str]:
-    """Monta {nome_setor: email} uma vez por execução do job (evita N leituras).
-
-    O gestor de cada setor é sempre um usuário real do sistema: marcado com
-    nivel_gestao == 'gestor_setor' e com as áreas que gerencia em .areas
-    (mesmos campos já usados pelo cadastro de usuário / Gestor Dashboard).
-    Usuários inativos ou sem nivel_gestao='gestor_setor' são ignorados. Se
-    duas pessoas cobrirem a mesma área (config inconsistente), mantém a
-    primeira encontrada e loga warning — não é motivo para travar o job.
-    Setores sem gestor mapeado caem no fallback flat em
-    _processar_chamado_escada_a/_b.
-    """
-    from app.models_usuario import Usuario
-
-    try:
-        mapa: dict[str, str] = {}
-        usuarios = get_static_cached("sla_gestores_usuarios", Usuario.get_all, ttl_seconds=300)
-        for usuario in usuarios:
-            if getattr(usuario, "nivel_gestao", None) != "gestor_setor":
-                continue
-            if not getattr(usuario, "ativo", True) or not getattr(usuario, "email", None):
-                continue
-            for area in usuario.areas or []:
-                if area in mapa:
-                    logger.warning(
-                        "Escada: mais de um gestor_setor para a área '%s' — mantendo %s, "
-                        "ignorando %s.",
-                        area,
-                        mapa[area],
-                        usuario.email,
-                    )
-                    continue
-                mapa[area] = usuario.email
-        return mapa
-    except Exception as exc:
-        logger.warning("Falha ao montar mapa gestor_setor: %s. Usando fallback flat.", exc)
-        return {}
-
 
 # Thresholds em minutos úteis derivados de SLA_ESCALADA_A_HORAS_UTEIS = [1, 2, 3, 4]
 _MINUTOS_THRESHOLDS: list[int] = [h * 60 for h in Config.SLA_ESCALADA_A_HORAS_UTEIS]
@@ -140,6 +105,7 @@ def processar_escada_a(agora: datetime | None = None) -> dict:
     }
 
     mapa_gestor_setor = _construir_mapa_gestor_setor()
+    mapa_niveis_superiores = _construir_mapa_niveis_superiores()
 
     try:
         docs = (
@@ -157,7 +123,9 @@ def processar_escada_a(agora: datetime | None = None) -> dict:
     for doc in docs:
         stats["processados"] += 1
         try:
-            _processar_chamado_escada_a(doc, agora, stats, mapa_gestor_setor)
+            _processar_chamado_escada_a(
+                doc, agora, stats, mapa_gestor_setor, mapa_niveis_superiores
+            )
         except Exception as exc:
             logger.exception("Escada A: erro ao processar chamado %s: %s", doc.id, exc)
             stats["erros"] += 1
@@ -166,7 +134,11 @@ def processar_escada_a(agora: datetime | None = None) -> dict:
 
 
 def _processar_chamado_escada_a(
-    doc, agora: datetime, stats: dict, mapa_gestor_setor: dict[str, str]
+    doc,
+    agora: datetime,
+    stats: dict,
+    mapa_gestor_setor: dict[str, str],
+    mapa_niveis_superiores: dict[str, str],
 ) -> None:
     """Avalia e (se aplicável) escala um único chamado na Escada A."""
     data = doc.to_dict()
@@ -203,13 +175,10 @@ def _processar_chamado_escada_a(
 
     novo_nivel = nivel_atual + 1
     chave_gestor = NIVEL_PARA_CHAVE_GESTOR.get(novo_nivel)
-    if chave_gestor == "gestor_setor":
-        categoria = data.get("categoria") or ""
-        email_dest = mapa_gestor_setor.get(categoria) or Config.get_gestor_email("gestor_setor")
-    elif chave_gestor:
-        email_dest = Config.get_gestor_email(chave_gestor)
-    else:
-        email_dest = None
+    categoria = data.get("categoria") or ""
+    email_dest = _resolver_email_gestor(
+        chave_gestor, categoria, mapa_gestor_setor, mapa_niveis_superiores
+    )
 
     if email_dest:
         try:
@@ -229,10 +198,12 @@ def _processar_chamado_escada_a(
                 exc,
             )
     else:
-        # E-mail não configurado: incrementa nível mesmo assim para evitar loop
+        # Nenhum usuário ativo cadastrado com esse nivel_gestao: incrementa nível
+        # mesmo assim para evitar loop (ver _construir_mapa_gestor_setor /
+        # _construir_mapa_niveis_superiores).
         logger.warning(
-            "Escada A: chamado %s → nível %d: chave '%s' não configurada em GESTOR_EMAILS. "
-            "Incrementando nível sem e-mail.",
+            "Escada A: chamado %s → nível %d: nenhum usuário ativo com nivel_gestao='%s' "
+            "cadastrado. Incrementando nível sem e-mail.",
             doc.id,
             novo_nivel,
             chave_gestor,
@@ -468,6 +439,7 @@ def processar_escada_b(agora: datetime | None = None) -> dict:
     }
 
     mapa_gestor_setor = _construir_mapa_gestor_setor()
+    mapa_niveis_superiores = _construir_mapa_niveis_superiores()
 
     try:
         docs = (
@@ -485,7 +457,9 @@ def processar_escada_b(agora: datetime | None = None) -> dict:
     for doc in docs:
         stats["processados"] += 1
         try:
-            _processar_chamado_escada_b(doc, agora, stats, mapa_gestor_setor)
+            _processar_chamado_escada_b(
+                doc, agora, stats, mapa_gestor_setor, mapa_niveis_superiores
+            )
         except Exception as exc:
             logger.exception("Escada B: erro ao processar chamado %s: %s", doc.id, exc)
             stats["erros"] += 1
@@ -494,7 +468,11 @@ def processar_escada_b(agora: datetime | None = None) -> dict:
 
 
 def _processar_chamado_escada_b(
-    doc, agora: datetime, stats: dict, mapa_gestor_setor: dict[str, str]
+    doc,
+    agora: datetime,
+    stats: dict,
+    mapa_gestor_setor: dict[str, str],
+    mapa_niveis_superiores: dict[str, str],
 ) -> None:
     """Avalia e (se aplicável) escala um único chamado na Escada B."""
     data = doc.to_dict()
@@ -543,13 +521,9 @@ def _processar_chamado_escada_b(
 
     novo_nivel = nivel_atual + 1
     chave_gestor = NIVEL_PARA_CHAVE_GESTOR.get(novo_nivel)
-    if chave_gestor == "gestor_setor":
-        categoria = data.get("categoria") or ""
-        email_dest = mapa_gestor_setor.get(categoria) or Config.get_gestor_email("gestor_setor")
-    elif chave_gestor:
-        email_dest = Config.get_gestor_email(chave_gestor)
-    else:
-        email_dest = None
+    email_dest = _resolver_email_gestor(
+        chave_gestor, categoria, mapa_gestor_setor, mapa_niveis_superiores
+    )
 
     if email_dest:
         try:
@@ -570,8 +544,8 @@ def _processar_chamado_escada_b(
             )
     else:
         logger.warning(
-            "Escada B: chamado %s → nível %d: chave '%s' não configurada em GESTOR_EMAILS. "
-            "Incrementando nível sem e-mail.",
+            "Escada B: chamado %s → nível %d: nenhum usuário ativo com nivel_gestao='%s' "
+            "cadastrado. Incrementando nível sem e-mail.",
             doc.id,
             novo_nivel,
             chave_gestor,

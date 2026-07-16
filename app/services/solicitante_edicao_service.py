@@ -2,6 +2,7 @@
 Edições que o solicitante pode fazer após a criação do chamado:
   - editar_descricao_solicitante: janela de 30 min, só status Aberto
   - adicionar_anexo_tardio: qualquer status não-terminal, requer motivo
+  - responder_chamado_solicitante: resposta em texto livre, sem exigir anexo
 """
 
 import logging
@@ -19,7 +20,9 @@ JANELA_EDICAO_TEXTO_MIN = 30
 _BRASILIA = pytz.timezone("America/Sao_Paulo")
 _STATUS_PERMITIDOS_ANEXO = {"Aberto", "Em Atendimento", "Aguardando Informação"}
 _STATUS_PERMITIDOS_EDICAO = {"Aberto"}
+_STATUS_PERMITIDOS_RESPOSTA = {"Aberto", "Em Atendimento", "Aguardando Informação"}
 _MOTIVO_MIN_CHARS = 10
+_MENSAGEM_MIN_CHARS = 2
 
 
 def _t(key, **kwargs):
@@ -260,5 +263,103 @@ def _notificar_anexo_tardio(
                 )
             except Exception as exc:
                 logger.warning("Notificação de anexo tardio não enviada: %s", exc)
+
+    threading.Thread(target=_run, daemon=True).start()
+
+
+def responder_chamado_solicitante(
+    chamado_id: str,
+    mensagem: str,
+    usuario,
+) -> dict:
+    """
+    Resposta em texto livre do solicitante dono, sem exigir anexo.
+    Usada para responder pedidos de informação do responsável (status
+    Aguardando Informação) sem precisar anexar um arquivo só para poder
+    escrever algo no campo de motivo do anexo tardio.
+    """
+    doc = _get_chamado_doc(chamado_id)
+    if not doc.exists:
+        return {"sucesso": False, "erro": _t("ticket_not_found_dot"), "codigo": 404}
+
+    data = doc.to_dict()
+    solicitante_id = data.get("solicitante_id")
+    status = data.get("status", "")
+
+    if solicitante_id != usuario.id:
+        return {"sucesso": False, "erro": _t("no_permission_reply_ticket"), "codigo": 403}
+
+    mensagem = (mensagem or "").strip()
+    if len(mensagem) < _MENSAGEM_MIN_CHARS:
+        return {
+            "sucesso": False,
+            "erro": _t("reply_message_required", min_chars=_MENSAGEM_MIN_CHARS),
+            "codigo": 400,
+        }
+
+    if status not in _STATUS_PERMITIDOS_RESPOSTA:
+        return {
+            "sucesso": False,
+            "erro": _t("cannot_reply_status", status=status),
+            "codigo": 403,
+        }
+
+    try:
+        Historico(
+            chamado_id=chamado_id,
+            usuario_id=usuario.id,
+            usuario_nome=usuario.nome,
+            acao="resposta_solicitante",
+            campo_alterado="mensagem",
+            valor_anterior=None,
+            valor_novo=mensagem,
+        ).save()
+
+        _notificar_resposta_solicitante(
+            chamado_id=chamado_id,
+            dados=data,
+            usuario=usuario,
+            mensagem=mensagem,
+        )
+
+        return {"sucesso": True}
+
+    except Exception as exc:
+        logger.exception(
+            "Erro ao registrar resposta do solicitante no chamado %s: %s", chamado_id, exc
+        )
+        return {"sucesso": False, "erro": _t("internal_error_saving_reply"), "codigo": 500}
+
+
+def _notificar_resposta_solicitante(chamado_id: str, dados: dict, usuario, mensagem: str) -> None:
+    """Dispara notificação de resposta do solicitante em thread background."""
+    import threading
+
+    from flask import current_app
+
+    app = current_app._get_current_object()  # noqa: SLF001
+    # Captura o nome ANTES de entrar na thread: usuario é o current_user do
+    # Flask-Login, um proxy ligado ao request context. A thread abaixo só
+    # empurra app_context (sem request context), então usuario.nome resolve
+    # para None ali dentro e explode silenciosamente (notificação nunca sai).
+    solicitante_nome = usuario.nome
+
+    def _run():
+        with app.app_context():
+            try:
+                from app.services.chamado_notificacao_service import (
+                    notificar_resposta_solicitante_chamado,
+                )
+
+                notificar_resposta_solicitante_chamado(
+                    chamado_id=chamado_id,
+                    numero_chamado=dados.get("numero_chamado") or "N/A",
+                    categoria=dados.get("categoria") or "Chamado",
+                    solicitante_nome=solicitante_nome,
+                    mensagem=mensagem,
+                    dados_chamado=dados,
+                )
+            except Exception as exc:
+                logger.warning("Notificação de resposta do solicitante não enviada: %s", exc)
 
     threading.Thread(target=_run, daemon=True).start()

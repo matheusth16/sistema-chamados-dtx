@@ -64,7 +64,7 @@ def processar_edicao_chamado(
     # como observador (cc) não deve poder editá-lo, só acompanhar.
     from app.services.permission_validation import supervisor_pode_alterar_chamado
 
-    if not supervisor_pode_alterar_chamado(usuario_atual, chamado_obj.area):
+    if not supervisor_pode_alterar_chamado(usuario_atual, chamado_obj.area, chamado_obj):
         return {
             "sucesso": False,
             "erro": _t("ticket_out_of_area_no_permission"),
@@ -148,8 +148,16 @@ def processar_edicao_chamado(
                     area_final, update_data.get("responsavel_id"), participantes
                 )
 
-        # 3. Descrição
+        # 3. Descrição — texto original do solicitante. Só admin/admin_global pode
+        # sobrescrever (válvula de escape administrativa); supervisor nunca altera
+        # o que o solicitante escreveu, só acompanha e escala.
         if nova_descricao and nova_descricao.strip() != data_chamado.get("descricao", "").strip():
+            if not getattr(usuario_atual, "is_admin_or_above", False):
+                return {
+                    "sucesso": False,
+                    "erro": _t("cannot_edit_solicitante_description"),
+                    "codigo": 403,
+                }
             nova_descricao = bleach.clean(nova_descricao.strip(), tags=[], strip=True)[:3000]
             descricao_anterior = (data_chamado.get("descricao") or "").strip()
             update_data["descricao"] = nova_descricao

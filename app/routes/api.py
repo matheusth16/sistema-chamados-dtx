@@ -33,10 +33,11 @@ from app.services.permission_validation import (
     usuario_pode_mutar_chamado,
     verificar_permissao_mudanca_status,
 )
-from app.services.permissions import usuario_pode_ver_chamado
+from app.services.permissions import usuario_pode_operar_chamado, usuario_pode_ver_chamado
 from app.services.solicitante_edicao_service import (
     adicionar_anexo_tardio,
     editar_descricao_solicitante,
+    responder_chamado_solicitante,
 )
 from app.services.status_service import atualizar_status_chamado
 from app.services.upload import salvar_anexo
@@ -451,7 +452,7 @@ def bulk_atualizar_status():
                     continue
                 doc_data = doc.to_dict()
                 chamado_obj = Chamado.from_dict(doc_data, chamado_id)
-                if not usuario_pode_ver_chamado(current_user, chamado_obj):
+                if not usuario_pode_operar_chamado(current_user, chamado_obj):
                     erros.append({"id": chamado_id, "erro": _t("no_permission_for_ticket")})
                     continue
                 from app.services.permission_validation import chamado_aceita_transicao_status
@@ -843,6 +844,15 @@ def api_confirmar_resolucao(chamado_id: str):
                     current_user.nome,
                 )
         else:
+            reaberturas_atual = data.get("reaberturas_solicitante_count", 0)
+            if reaberturas_atual >= LIMITE_REABERTURAS_SOLICITANTE:
+                return jsonify(
+                    {
+                        "sucesso": False,
+                        "erro": _t("reopen_limit_reached", limite=LIMITE_REABERTURAS_SOLICITANTE),
+                    }
+                ), 403
+
             db.collection("chamados").document(chamado_id).update(
                 {
                     "status": "Aberto",
@@ -856,6 +866,8 @@ def api_confirmar_resolucao(chamado_id: str):
                     # Lembretes resetados para que o próximo ciclo de conclusão funcione
                     "lembrete_confirmacao_1_enviado": False,
                     "lembrete_confirmacao_2_enviado": False,
+                    # Limite de auto-reabertura (Nível 1): supervisor/admin reabrem sem esse teto
+                    "reaberturas_solicitante_count": reaberturas_atual + 1,
                 }
             )
             Historico(
@@ -953,6 +965,7 @@ def api_buscar_usuarios():
 # ---------------------------------------------------------------------------
 
 DESCRICAO_MIN_CHARS = 3
+LIMITE_REABERTURAS_SOLICITANTE = 3
 
 
 @main.route("/api/chamado/<chamado_id>/editar-solicitante", methods=["POST"])
@@ -1039,6 +1052,32 @@ def api_anexo_solicitante(chamado_id: str):
         chamado_id=chamado_id,
         caminho_anexo=caminho,
         motivo=motivo,
+        usuario=current_user,
+    )
+
+    codigo = resultado.pop("codigo", 200) if not resultado["sucesso"] else 200
+    return jsonify(resultado), codigo
+
+
+@main.route("/api/chamado/<chamado_id>/responder-solicitante", methods=["POST"])
+@login_required
+def api_responder_solicitante(chamado_id: str):
+    """
+    Resposta em texto livre do dono do chamado, sem exigir anexo.
+    Fecha a lacuna de pedidos de informação (status Aguardando Informação)
+    que exigiam anexar um arquivo só para poder responder por texto.
+    """
+    if getattr(current_user, "is_gestor_only", False):
+        return jsonify({"sucesso": False, "erro": _t("unauthorized_access")}), 403
+
+    payload = request.get_json(silent=True) or {}
+    mensagem = (payload.get("mensagem") or "").strip()
+    if not mensagem:
+        return jsonify({"sucesso": False, "erro": _t("reply_message_required", min_chars=2)}), 400
+
+    resultado = responder_chamado_solicitante(
+        chamado_id=chamado_id,
+        mensagem=mensagem,
         usuario=current_user,
     )
 

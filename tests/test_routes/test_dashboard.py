@@ -1419,3 +1419,42 @@ def test_visualizar_chamado_com_referrer_same_origin(client_logado_admin):
                 follow_redirects=False,
             )
     assert r.status_code == 200
+
+
+# ── Supervisor não edita descrição do solicitante ──────────────────────────────
+
+
+def test_visualizar_chamado_supervisor_nao_mostra_descricao_editavel(client_logado_supervisor):
+    """Supervisor da área vê a descrição só como texto, sem textarea editável."""
+    with patch("app.routes.dashboard.db") as mock_db:
+        mock_doc = MagicMock()
+        mock_doc.exists = True
+        mock_doc.to_dict.return_value = _chamado_dict_fake(area="Manutencao")
+        mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
+        with (
+            patch("app.routes.dashboard.usuario_pode_ver_chamado", return_value=True),
+            patch("app.routes.dashboard.get_static_cached", return_value=[]),
+            patch("app.routes.dashboard.CategoriaSetor.get_all", return_value=[]),
+            patch("app.routes.dashboard.filtrar_supervisores_por_area", return_value=[]),
+        ):
+            r = client_logado_supervisor.get("/chamado/ch1", follow_redirects=False)
+    assert r.status_code == 200
+    assert b'id="modal-descricao"' not in r.data
+
+
+def test_visualizar_chamado_admin_mostra_descricao_editavel(client_logado_admin):
+    """Admin continua vendo a descrição como textarea editável (válvula de escape)."""
+    with patch("app.routes.dashboard.db") as mock_db:
+        mock_doc = MagicMock()
+        mock_doc.exists = True
+        mock_doc.to_dict.return_value = _chamado_dict_fake()
+        mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
+        with (
+            patch("app.routes.dashboard.usuario_pode_ver_chamado", return_value=True),
+            patch("app.routes.dashboard.get_static_cached", return_value=[]),
+            patch("app.routes.dashboard.CategoriaSetor.get_all", return_value=[]),
+            patch("app.routes.dashboard.filtrar_supervisores_por_area", return_value=[]),
+        ):
+            r = client_logado_admin.get("/chamado/ch1", follow_redirects=False)
+    assert r.status_code == 200
+    assert b'id="modal-descricao"' in r.data

@@ -1,6 +1,6 @@
 """Testes da rota GET /gestor/dashboard e decoradores @requer_gestor / @requer_gestor_ou_admin."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import ANY, MagicMock, patch
 
 import pytest
 
@@ -37,6 +37,23 @@ def _mock_gestor(uid="gest_1", perfil="supervisor", nivel_gestao="gestor_setor")
 def client_logado_gestor(client, app):
     """Cliente com usuário supervisor gestor_setor já logado."""
     user = _mock_gestor()
+    with (
+        patch("app.routes.auth.Usuario.get_by_email", return_value=user),
+        patch("app.models_usuario.Usuario.get_by_id", return_value=user),
+        patch("app.routes.auth._dispositivo_confiavel", return_value=True),
+    ):
+        client.post("/login", data={"email": user.email, "senha": "ok"}, follow_redirects=False)
+        yield client
+
+
+@pytest.fixture
+def client_logado_gestor_setor_dual_role(client, app):
+    """Cliente com supervisor + gestor_setor real (Nível 3: is_gestor_only=False,
+    diferente de client_logado_gestor que fixa is_gestor_only=True pra testar o
+    caso legado de gestor 100% read-only)."""
+    user = _mock_gestor(uid="dual_1")
+    user.is_gestor_only = False
+    user.areas = ["Geral"]
     with (
         patch("app.routes.auth.Usuario.get_by_email", return_value=user),
         patch("app.models_usuario.Usuario.get_by_id", return_value=user),
@@ -190,7 +207,7 @@ def test_gestor_dashboard_filtro_atrasados(client_logado_gestor):
     ) as mock_svc:
         resp = client_logado_gestor.get("/gestor/dashboard?filtro=atrasados")
     assert resp.status_code == 200
-    mock_svc.assert_called_once_with(filtro="atrasados")
+    mock_svc.assert_called_once_with(filtro="atrasados", usuario=ANY)
 
 
 def test_gestor_nao_pode_mudar_status_via_api(client_logado_gestor):
@@ -206,6 +223,38 @@ def test_gestor_nao_pode_mudar_status_via_api(client_logado_gestor):
             "/api/atualizar-status",
             json={"chamado_id": "ch_001", "novo_status": "Em Atendimento"},
         )
+    assert resp.status_code == 403
+
+
+def test_gestor_setor_dual_role_nao_muda_status_de_chamado_do_colega(
+    client_logado_gestor_setor_dual_role,
+):
+    """QA (Nível 3): supervisor + gestor_setor enxerga chamado do colega na própria
+    área (leitura ampliada), mas POST /api/atualizar-status continua bloqueado —
+    enxergar não é igual a poder editar."""
+    chamado_data = {
+        "area": "Geral",
+        "status": "Em Atendimento",
+        "solicitante_id": "outro_solicitante",
+        "responsavel_id": "colega_supervisor",
+        "participantes": [],
+        "numero_chamado": "CHM-9999",
+        "categoria": "Geral",
+        "tipo_solicitacao": "Outros",
+        "descricao": "chamado do colega",
+        "responsavel": "Colega",
+    }
+    mock_doc = MagicMock()
+    mock_doc.exists = True
+    mock_doc.to_dict.return_value = chamado_data
+
+    with patch("app.routes.api.db") as mock_db:
+        mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
+        resp = client_logado_gestor_setor_dual_role.post(
+            "/api/atualizar-status",
+            json={"chamado_id": "ch_colega", "novo_status": "Concluído"},
+        )
+
     assert resp.status_code == 403
 
 

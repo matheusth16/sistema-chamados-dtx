@@ -157,13 +157,16 @@ def _carregar_todos_chamados() -> list[Chamado]:
 
 
 def obter_contexto_gestor_dashboard(
-    filtro: str | None = None, agora: datetime | None = None
+    filtro: str | None = None, agora: datetime | None = None, usuario=None
 ) -> dict:
     """Constrói o contexto para o template gestor_dashboard.html.
 
     Args:
         filtro: "atrasados" | "aberto_sem_resposta" | "multi_setor" | "todos" | None
         agora: Instante de referência para cálculo de minutos úteis. None = now().
+        usuario: current_user. Quando nivel_gestao == "gestor_setor", restringe os
+            chamados à(s) área(s) do usuário (Nível 3). Outros níveis de gestão e
+            usuario=None mantêm a visão ampliada (todas as áreas).
 
     Returns:
         dict com contadores, insights de triagem, lista de chamados (filtrada pelo
@@ -171,6 +174,10 @@ def obter_contexto_gestor_dashboard(
     """
     _agora = agora or datetime.now(ZoneInfo(Config.SLA_TIMEZONE))
     todos = _carregar_todos_chamados()
+
+    if usuario is not None and getattr(usuario, "nivel_gestao", None) == "gestor_setor":
+        areas_gestor = set(getattr(usuario, "areas", None) or [])
+        todos = [c for c in todos if getattr(c, "area", None) in areas_gestor]
 
     atrasados = [c for c in todos if _is_atrasado(c)]
     abertos_sem_resp = [c for c in todos if _is_aberto_sem_resposta(c, _agora)]

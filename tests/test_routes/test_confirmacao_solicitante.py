@@ -3,7 +3,9 @@
 from unittest.mock import MagicMock, patch
 
 
-def _doc_chamado(solicitante_id="sol_1", status="Concluído", confirmacao="pendente"):
+def _doc_chamado(
+    solicitante_id="sol_1", status="Concluído", confirmacao="pendente", reaberturas_count=0
+):
     doc = MagicMock()
     doc.exists = True
     doc.to_dict.return_value = {
@@ -16,6 +18,7 @@ def _doc_chamado(solicitante_id="sol_1", status="Concluído", confirmacao="pende
         "responsavel_id": "sup_1",
         "responsavel": "Supervisor",
         "solicitante_nome": "Solicitante",
+        "reaberturas_solicitante_count": reaberturas_count,
     }
     return doc
 
@@ -83,6 +86,77 @@ def test_reabrir_sem_motivo_retorna_400(client_logado_solicitante):
         )
     assert r.status_code == 400
     assert r.get_json()["sucesso"] is False
+
+
+# ── Limite de reaberturas pelo solicitante (3x) ─────────────────────────────────
+
+
+def test_reabrir_incrementa_contador(client_logado_solicitante):
+    """Reabertura bem-sucedida incrementa reaberturas_solicitante_count."""
+    doc = _doc_chamado(reaberturas_count=1)
+    with (
+        patch("app.routes.api.db") as mock_db,
+        patch("app.routes.api.Historico"),
+    ):
+        mock_db.collection.return_value.document.return_value.get.return_value = doc
+        r = client_logado_solicitante.post(
+            "/api/chamado/ch_123/confirmar-resolucao",
+            json={"acao": "reabrir", "motivo": "Ainda com problema"},
+            content_type="application/json",
+        )
+    assert r.status_code == 200
+    payload = mock_db.collection.return_value.document.return_value.update.call_args[0][0]
+    assert payload.get("reaberturas_solicitante_count") == 2
+
+
+def test_reabrir_no_limite_ainda_permite_terceira_vez(client_logado_solicitante):
+    """Com 2 reaberturas anteriores, a 3ª ainda é permitida (limite = 3)."""
+    doc = _doc_chamado(reaberturas_count=2)
+    with (
+        patch("app.routes.api.db") as mock_db,
+        patch("app.routes.api.Historico"),
+    ):
+        mock_db.collection.return_value.document.return_value.get.return_value = doc
+        r = client_logado_solicitante.post(
+            "/api/chamado/ch_123/confirmar-resolucao",
+            json={"acao": "reabrir", "motivo": "Ainda com problema"},
+            content_type="application/json",
+        )
+    assert r.status_code == 200
+    payload = mock_db.collection.return_value.document.return_value.update.call_args[0][0]
+    assert payload.get("reaberturas_solicitante_count") == 3
+
+
+def test_reabrir_apos_limite_atingido_bloqueado(client_logado_solicitante):
+    """Após 3 reaberturas, a 4ª tentativa é bloqueada com 403."""
+    doc = _doc_chamado(reaberturas_count=3)
+    with patch("app.routes.api.db") as mock_db:
+        mock_db.collection.return_value.document.return_value.get.return_value = doc
+        r = client_logado_solicitante.post(
+            "/api/chamado/ch_123/confirmar-resolucao",
+            json={"acao": "reabrir", "motivo": "Ainda com problema"},
+            content_type="application/json",
+        )
+    assert r.status_code == 403
+    assert r.get_json()["sucesso"] is False
+    mock_db.collection.return_value.document.return_value.update.assert_not_called()
+
+
+def test_reabrir_apos_limite_nao_dispara_notificacao(client_logado_solicitante):
+    """Bloqueio por limite não deve disparar notificação de reabertura."""
+    doc = _doc_chamado(reaberturas_count=3)
+    with (
+        patch("app.routes.api.db") as mock_db,
+        patch("app.routes.api._enviar_notificacao_reabrir") as mock_notif,
+    ):
+        mock_db.collection.return_value.document.return_value.get.return_value = doc
+        r = client_logado_solicitante.post(
+            "/api/chamado/ch_123/confirmar-resolucao",
+            json={"acao": "reabrir", "motivo": "Ainda com problema"},
+            content_type="application/json",
+        )
+    assert r.status_code == 403
+    mock_notif.assert_not_called()
 
 
 # ── Controle de acesso ─────────────────────────────────────────────────────────

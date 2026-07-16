@@ -871,3 +871,274 @@ class TestNotificacaoAnexoTardioClosure:
 
         mock_notificar.assert_called_once()
         assert mock_notificar.call_args.kwargs["solicitante_nome"] == "Fulano de Tal"
+
+
+# ---------------------------------------------------------------------------
+# responder_chamado_solicitante — resposta em texto livre (sem exigir anexo)
+# ---------------------------------------------------------------------------
+
+
+class TestResponderChamadoSolicitante:
+    def test_resposta_em_aguardando_informacao_sucede(self):
+        """Status Aguardando Informação + mensagem válida → sucesso + histórico."""
+        from app.services.solicitante_edicao_service import responder_chamado_solicitante
+
+        user = _usuario_mock()
+        chamado_data = _data_chamado(status="Aguardando Informação")
+
+        mock_doc = MagicMock()
+        mock_doc.exists = True
+        mock_doc.to_dict.return_value = chamado_data
+
+        with (
+            patch("app.services.solicitante_edicao_service.db") as mock_db,
+            patch("app.services.solicitante_edicao_service.Historico") as mock_hist,
+            patch("app.services.solicitante_edicao_service._notificar_resposta_solicitante"),
+        ):
+            mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
+            mock_hist.return_value.save.return_value = True
+
+            resultado = responder_chamado_solicitante(
+                chamado_id="ch_1",
+                mensagem="Modelo XYZ-123",
+                usuario=user,
+            )
+
+        assert resultado["sucesso"] is True
+        mock_hist.return_value.save.assert_called_once()
+
+    def test_resposta_sem_mensagem_retorna_400(self):
+        """Mensagem vazia → 400 sem tocar no Firestore."""
+        from app.services.solicitante_edicao_service import responder_chamado_solicitante
+
+        user = _usuario_mock()
+        chamado_data = _data_chamado(status="Aguardando Informação")
+
+        mock_doc = MagicMock()
+        mock_doc.exists = True
+        mock_doc.to_dict.return_value = chamado_data
+
+        with patch("app.services.solicitante_edicao_service.db") as mock_db:
+            mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
+            resultado = responder_chamado_solicitante(
+                chamado_id="ch_1",
+                mensagem="  ",
+                usuario=user,
+            )
+
+        assert resultado["sucesso"] is False
+        assert resultado.get("codigo") == 400
+
+    def test_resposta_em_concluido_bloqueada(self):
+        """Status Concluído → não pode responder (usar confirmar/reabrir)."""
+        from app.services.solicitante_edicao_service import responder_chamado_solicitante
+
+        user = _usuario_mock()
+        chamado_data = _data_chamado(status="Concluído")
+
+        mock_doc = MagicMock()
+        mock_doc.exists = True
+        mock_doc.to_dict.return_value = chamado_data
+
+        with patch("app.services.solicitante_edicao_service.db") as mock_db:
+            mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
+            resultado = responder_chamado_solicitante(
+                chamado_id="ch_1",
+                mensagem="Resposta qualquer",
+                usuario=user,
+            )
+
+        assert resultado["sucesso"] is False
+        assert resultado.get("codigo") == 403
+
+    def test_nao_owner_bloqueado(self):
+        """Só o dono (solicitante_id) pode responder."""
+        from app.services.solicitante_edicao_service import responder_chamado_solicitante
+
+        user = _usuario_mock(uid="nao_owner")
+        chamado_data = _data_chamado(solicitante_id="dono_real", status="Aguardando Informação")
+
+        mock_doc = MagicMock()
+        mock_doc.exists = True
+        mock_doc.to_dict.return_value = chamado_data
+
+        with patch("app.services.solicitante_edicao_service.db") as mock_db:
+            mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
+            resultado = responder_chamado_solicitante(
+                chamado_id="ch_1",
+                mensagem="Resposta qualquer",
+                usuario=user,
+            )
+
+        assert resultado["sucesso"] is False
+        assert resultado.get("codigo") == 403
+
+    def test_chamado_nao_encontrado_retorna_404(self):
+        from app.services.solicitante_edicao_service import responder_chamado_solicitante
+
+        user = _usuario_mock()
+        mock_doc = MagicMock()
+        mock_doc.exists = False
+
+        with patch("app.services.solicitante_edicao_service.db") as mock_db:
+            mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
+            resultado = responder_chamado_solicitante("ch_x", "Resposta válida", user)
+
+        assert resultado["sucesso"] is False
+        assert resultado.get("codigo") == 404
+
+    def test_excecao_retorna_500(self):
+        from app.services.solicitante_edicao_service import responder_chamado_solicitante
+
+        user = _usuario_mock()
+        chamado_data = _data_chamado(status="Aguardando Informação")
+        mock_doc = MagicMock()
+        mock_doc.exists = True
+        mock_doc.to_dict.return_value = chamado_data
+
+        with (
+            patch("app.services.solicitante_edicao_service.db") as mock_db,
+            patch(
+                "app.services.solicitante_edicao_service.Historico",
+                side_effect=RuntimeError("boom"),
+            ),
+        ):
+            mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
+            resultado = responder_chamado_solicitante("ch_1", "Resposta válida", user)
+
+        assert resultado["sucesso"] is False
+        assert resultado.get("codigo") == 500
+
+    def test_resposta_sucedida_dispara_notificacao(self):
+        """Após sucesso, _notificar_resposta_solicitante deve ser chamado."""
+        from app.services.solicitante_edicao_service import responder_chamado_solicitante
+
+        user = _usuario_mock()
+        chamado_data = _data_chamado(status="Aguardando Informação")
+        mock_doc = MagicMock()
+        mock_doc.exists = True
+        mock_doc.to_dict.return_value = chamado_data
+
+        with (
+            patch("app.services.solicitante_edicao_service.db") as mock_db,
+            patch("app.services.solicitante_edicao_service.Historico") as mock_hist,
+            patch(
+                "app.services.solicitante_edicao_service._notificar_resposta_solicitante"
+            ) as mock_notif,
+        ):
+            mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
+            mock_hist.return_value.save.return_value = True
+
+            resultado = responder_chamado_solicitante("ch_1", "Resposta válida", user)
+
+        assert resultado["sucesso"] is True
+        mock_notif.assert_called_once()
+
+    def test_resposta_falha_nao_dispara_notificacao(self):
+        user = _usuario_mock()
+        chamado_data = _data_chamado(status="Aguardando Informação")
+        mock_doc = MagicMock()
+        mock_doc.exists = True
+        mock_doc.to_dict.return_value = chamado_data
+
+        from app.services.solicitante_edicao_service import responder_chamado_solicitante
+
+        with (
+            patch("app.services.solicitante_edicao_service.db") as mock_db,
+            patch(
+                "app.services.solicitante_edicao_service.Historico",
+                side_effect=RuntimeError("db fail"),
+            ),
+            patch(
+                "app.services.solicitante_edicao_service._notificar_resposta_solicitante"
+            ) as mock_notif,
+        ):
+            mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
+            resultado = responder_chamado_solicitante("ch_1", "Resposta válida", user)
+
+        assert resultado["sucesso"] is False
+        mock_notif.assert_not_called()
+
+
+class TestNotificacaoRespostaSolicitanteClosure:
+    def test_closure_run_chama_notificar_resposta(self, app):
+        from app.services.solicitante_edicao_service import _notificar_resposta_solicitante
+
+        user = _usuario_mock()
+        dados = {"numero_chamado": "CH-001", "categoria": "TI", "observadores": []}
+        closures = []
+
+        def fake_thread(target, daemon=True):
+            closures.append(target)
+            m = MagicMock()
+            m.start = lambda: None
+            return m
+
+        with (
+            patch("threading.Thread", side_effect=fake_thread),
+            app.app_context(),
+        ):
+            _notificar_resposta_solicitante("ch_1", dados, user, "Resposta do solicitante")
+
+        assert len(closures) == 1
+        with patch(
+            "app.services.chamado_notificacao_service.destinatarios_do_chamado", return_value=[]
+        ):
+            closures[0]()
+
+    def test_closure_run_captura_excecao(self, app):
+        from app.services.solicitante_edicao_service import _notificar_resposta_solicitante
+
+        user = _usuario_mock()
+        dados = {}
+        closures = []
+
+        def fake_thread(target, daemon=True):
+            closures.append(target)
+            m = MagicMock()
+            m.start = lambda: None
+            return m
+
+        with (
+            patch("threading.Thread", side_effect=fake_thread),
+            app.app_context(),
+        ):
+            _notificar_resposta_solicitante("ch_1", dados, user, "Resposta")
+
+        with patch(
+            "app.services.chamado_notificacao_service.destinatarios_do_chamado",
+            side_effect=RuntimeError("fail"),
+        ):
+            closures[0]()  # Should not raise
+
+    def test_nome_do_solicitante_capturado_antes_da_thread(self, app):
+        from app.services.solicitante_edicao_service import _notificar_resposta_solicitante
+
+        user = _UsuarioContextoLimitado(nome="Fulano de Tal")
+        dados = {"numero_chamado": "CH-001", "categoria": "TI", "observadores": []}
+        closures = []
+
+        def fake_thread(target, daemon=True):
+            closures.append(target)
+            m = MagicMock()
+            m.start = lambda: None
+            return m
+
+        with patch("threading.Thread", side_effect=fake_thread), app.app_context():
+            _notificar_resposta_solicitante("ch_1", dados, user, "Resposta do solicitante")
+
+        user.contexto_ativo = False
+
+        with (
+            patch(
+                "app.services.chamado_notificacao_service.destinatarios_do_chamado",
+                return_value=[],
+            ),
+            patch(
+                "app.services.chamado_notificacao_service.notificar_resposta_solicitante_chamado"
+            ) as mock_notificar,
+        ):
+            closures[0]()
+
+        mock_notificar.assert_called_once()
+        assert mock_notificar.call_args.kwargs["solicitante_nome"] == "Fulano de Tal"

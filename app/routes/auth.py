@@ -92,11 +92,6 @@ def _finalizar_login(usuario: Usuario, remember: bool, client_ip: str) -> Respon
     if usuario.perfil == "solicitante":
         return redirect(url_for("main.index"))
     if usuario.perfil == "supervisor":
-        # Gestor read-only vai direto para o painel gerencial
-        if getattr(usuario, "is_gestor", False) and not getattr(
-            usuario, "is_admin_or_above", False
-        ):
-            return redirect(url_for("main.gestor_dashboard"))
         return redirect(url_for("main.painel"))
     return redirect(url_for("main.admin"))
 

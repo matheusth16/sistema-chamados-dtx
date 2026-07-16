@@ -52,7 +52,7 @@ Não há scripts manuais para acioná-los; esta tabela documenta configuração 
 
 | Job ID | Trigger | Serviço | Dependências em produção |
 |--------|---------|---------|--------------------------|
-| **`sla_escalacao`** (Fases 6–7) | Interval — a cada 10 min | `processar_escada_a()` + `processar_avisos_resolucao()` + `processar_escada_b()` | `GESTOR_EMAILS` configurado; índices Firestore `status ASC + escalacao_resposta_nivel ASC` e `status ASC + escalacao_resolucao_nivel ASC` (ver `docs/INDICES_FIRESTORE.md`) |
+| **`sla_escalacao`** (Fases 6–7) | Interval — a cada 10 min | `processar_escada_a()` + `processar_avisos_resolucao()` + `processar_escada_b()` | Usuários com Nível de Gestão cadastrados em `/admin/usuarios` (destinatários resolvidos via `gestor_escalonamento_service.py`, sem env var); índices Firestore `status ASC + escalacao_resposta_nivel ASC` e `status ASC + escalacao_resolucao_nivel ASC` (ver `docs/INDICES_FIRESTORE.md`) |
 | **`relatorio_semanal`** | Cron — sex 10h00 BRT | `report_service.enviar_relatorio_semanal()` | `GRAPH_*` configurado para envio de e-mail |
 | **`reset_ranking_semanal`** | Cron — dom 23h59 BRT | `GamificationService.resetar_ranking_semanal()` | — |
 | **`limpar_contadores_uso`** | Cron — dom 02h00 BRT | `contadores_uso.limpar_contadores_antigos()` | — |

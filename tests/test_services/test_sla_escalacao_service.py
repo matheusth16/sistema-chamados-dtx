@@ -14,13 +14,14 @@ from app.services.sla_escalacao_service import (
 @pytest.fixture(autouse=True)
 def _mapa_gestor_setor_vazio():
     """Autouse: evita que os testes desta suíte toquem o Firestore real via
-    Usuario.get_all (usado por _construir_mapa_gestor_setor). Lista vazia por
-    padrão, fazendo o nível 1 cair no fallback flat Config.get_gestor_email —
-    igual ao comportamento anterior à resolução por setor. Mocka a dependência
-    (Usuario.get_all), não a função em si, para que _construir_mapa_gestor_setor
-    continue rodando de verdade em todos os testes desta suíte. Testes que
-    precisam de usuários específicos usam `with patch(...)` internamente no
-    mesmo alvo (tem precedência sobre este autouse).
+    Usuario.get_all (usado por _construir_mapa_gestor_setor e
+    _construir_mapa_niveis_superiores). Lista vazia por padrão, fazendo qualquer
+    nível cair em "sem gestor cadastrado" (sem e-mail, sem fallback flat — fonte
+    única de verdade é o cadastro real de usuários). Mocka a dependência
+    (Usuario.get_all), não as funções em si, para que elas continuem rodando de
+    verdade em todos os testes desta suíte. Testes que precisam de usuários
+    específicos usam `with patch(...)` internamente no mesmo alvo (tem
+    precedência sobre este autouse).
 
     _construir_mapa_gestor_setor cacheia Usuario.get_all via get_static_cached
     (F-XX economia de leituras no job de 10 em 10 min) — limpa a chave antes e
@@ -200,7 +201,7 @@ def test_mapa_gestor_setor_conflito_mantem_primeiro_e_loga_warning():
 
     with (
         patch("app.models_usuario.Usuario.get_all", return_value=usuarios),
-        patch("app.services.sla_escalacao_service.logger") as mock_logger,
+        patch("app.services.gestor_escalonamento_service.logger") as mock_logger,
     ):
         mapa = _construir_mapa_gestor_setor()
 
@@ -236,8 +237,8 @@ def test_escada_a_dispara_nivel_1_apos_1h_util():
             "app.services.sla_escalacao_service.notificar_escalada_resposta_gerencial"
         ) as mock_notif,
         patch(
-            "app.services.sla_escalacao_service.Config.get_gestor_email",
-            return_value="gestor@dtx.aero",
+            "app.services.sla_escalacao_service._construir_mapa_gestor_setor",
+            return_value={"Manutenção": "gestor@dtx.aero"},
         ),
     ):
         _setup_query(mock_db, [doc])
@@ -270,7 +271,6 @@ def test_escada_a_nivel_1_usa_email_do_setor_do_chamado():
             "app.services.sla_escalacao_service._construir_mapa_gestor_setor",
             return_value={"Qualidade": "qualidade@dtx.aero"},
         ),
-        patch("app.services.sla_escalacao_service.Config.get_gestor_email") as mock_flat,
     ):
         _setup_query(mock_db, [doc])
         resultado = processar_escada_a(agora=agora)
@@ -282,11 +282,11 @@ def test_escada_a_nivel_1_usa_email_do_setor_do_chamado():
         nivel=1,
         email_dest="qualidade@dtx.aero",
     )
-    mock_flat.assert_not_called()  # e-mail do setor resolveu; fallback flat nem foi consultado
 
 
-def test_escada_a_nivel_1_fallback_quando_setor_sem_email():
-    """Nível 1: setor do chamado não está no mapa → cai no fallback flat Config.get_gestor_email."""
+def test_escada_a_nivel_1_sem_fallback_quando_setor_sem_gestor_cadastrado():
+    """Nível 1: setor do chamado não tem gestor_setor cadastrado → sem e-mail (sem
+    fallback flat — fonte única de verdade é o cadastro real de usuários)."""
     abertura = _dt(2024, 6, 3, 9, 0)
     agora = _dt(2024, 6, 3, 10, 1)
 
@@ -301,25 +301,18 @@ def test_escada_a_nivel_1_fallback_quando_setor_sem_email():
             "app.services.sla_escalacao_service._construir_mapa_gestor_setor",
             return_value={"Qualidade": "qualidade@dtx.aero"},  # não tem "Manutenção"
         ),
-        patch(
-            "app.services.sla_escalacao_service.Config.get_gestor_email",
-            return_value="fallback@dtx.aero",
-        ),
     ):
         _setup_query(mock_db, [doc])
         resultado = processar_escada_a(agora=agora)
 
-    assert resultado["emails"] == 1
-    mock_notif.assert_called_once_with(
-        chamado_data=doc.to_dict.return_value,
-        chamado_id=doc.id,
-        nivel=1,
-        email_dest="fallback@dtx.aero",
-    )
+    assert resultado["emails"] == 0
+    assert resultado["escalados"] == 1  # nível incrementa mesmo sem e-mail
+    mock_notif.assert_not_called()
 
 
 def test_escada_a_nivel_2_ignora_mapa_de_setor():
-    """Nível 2+: usa só Config.get_gestor_email — mapa de setor não é nem consultado."""
+    """Nível 2+: usa o mapa de níveis superiores (company-wide) — mapa de setor
+    (nível 1) é construído (uma vez por execução), mas seu valor não é usado."""
     abertura = _dt(2024, 6, 3, 9, 0)
     agora = _dt(2024, 6, 3, 11, 1)  # 121 min úteis, nivel_atual=1 → sobe pra 2
 
@@ -333,15 +326,15 @@ def test_escada_a_nivel_2_ignora_mapa_de_setor():
             return_value={"Qualidade": "qualidade@dtx.aero"},
         ) as mock_mapa,
         patch(
-            "app.services.sla_escalacao_service.Config.get_gestor_email",
-            return_value="producao@dtx.aero",
-        ) as mock_flat,
+            "app.services.sla_escalacao_service._construir_mapa_niveis_superiores",
+            return_value={"gerente_producao": "producao@dtx.aero"},
+        ) as mock_superiores,
     ):
         _setup_query(mock_db, [doc])
         resultado = processar_escada_a(agora=agora)
 
     assert resultado["emails"] == 1
-    mock_flat.assert_called_once_with("gerente_producao")
+    mock_superiores.assert_called_once()
     mock_mapa.assert_called_once()  # construído (uma vez por execução), mas o valor não é usado p/ nível 2
 
 
@@ -363,14 +356,16 @@ def test_processar_escada_a_monta_mapa_gestor_setor_uma_vez_por_execucao():
             return_value={},
         ) as mock_mapa,
         patch(
-            "app.services.sla_escalacao_service.Config.get_gestor_email", return_value="x@dtx.aero"
-        ),
+            "app.services.sla_escalacao_service._construir_mapa_niveis_superiores",
+            return_value={},
+        ) as mock_superiores,
     ):
         _setup_query(mock_db, docs)
         resultado = processar_escada_a(agora=agora)
 
     assert resultado["processados"] == 2
     mock_mapa.assert_called_once()
+    mock_superiores.assert_called_once()
 
 
 def test_escada_a_nao_dispara_durante_almoco():
@@ -474,10 +469,6 @@ def test_escada_a_um_nivel_por_execucao():
     with (
         patch("app.services.sla_escalacao_service.db") as mock_db,
         patch("app.services.sla_escalacao_service.notificar_escalada_resposta_gerencial"),
-        patch(
-            "app.services.sla_escalacao_service.Config.get_gestor_email",
-            return_value="gestor@dtx.aero",
-        ),
     ):
         _setup_query(mock_db, [doc])
         resultado = processar_escada_a(agora=agora)
@@ -501,8 +492,8 @@ def test_escada_a_nivel_2_apos_2h_util():
             "app.services.sla_escalacao_service.notificar_escalada_resposta_gerencial"
         ) as mock_notif,
         patch(
-            "app.services.sla_escalacao_service.Config.get_gestor_email",
-            return_value="prod@dtx.aero",
+            "app.services.sla_escalacao_service._construir_mapa_niveis_superiores",
+            return_value={"gerente_producao": "prod@dtx.aero"},
         ),
     ):
         _setup_query(mock_db, [doc])
@@ -516,8 +507,8 @@ def test_escada_a_nivel_2_apos_2h_util():
 
 
 def test_escada_a_sem_email_config_incrementa_sem_enviar():
-    """GESTOR_EMAILS vazio → nível incrementado mas sem e-mail (evitar loop infinito)."""
-    # Config.get_gestor_email retorna None por padrão em ambiente de teste (GESTOR_EMAILS={})
+    """Nenhum usuário cadastrado com nivel_gestao (autouse desta suíte já garante
+    Usuario.get_all=[]) → nível incrementado mas sem e-mail (evitar loop infinito)."""
     abertura = _dt(2024, 6, 3, 9, 0)
     agora = _dt(2024, 6, 3, 10, 5)  # 65 min úteis → nivel_esperado=1
 
@@ -528,8 +519,6 @@ def test_escada_a_sem_email_config_incrementa_sem_enviar():
         patch(
             "app.services.sla_escalacao_service.notificar_escalada_resposta_gerencial"
         ) as mock_notif,
-        # Garante explicitamente que nenhum e-mail está configurado
-        patch("config.Config.get_gestor_email", return_value=None),
     ):
         _setup_query(mock_db, [doc])
         resultado = processar_escada_a(agora=agora)
@@ -603,10 +592,6 @@ def test_escada_a_excecao_por_chamado_nao_para_processamento():
     with (
         patch("app.services.sla_escalacao_service.db") as mock_db,
         patch("app.services.sla_escalacao_service.notificar_escalada_resposta_gerencial"),
-        patch(
-            "app.services.sla_escalacao_service.Config.get_gestor_email",
-            return_value="gestor@dtx.aero",
-        ),
     ):
         _setup_query(mock_db, [doc_ruim, doc_bom])
         resultado = processar_escada_a(agora=agora)
@@ -1010,8 +995,8 @@ def test_escada_b_projetos_deadline_2_dias_uteis():
             "app.services.sla_escalacao_service.notificar_escalada_resolucao_gerencial"
         ) as mock_notif,
         patch(
-            "app.services.sla_escalacao_service.Config.get_gestor_email",
-            return_value="gestor@dtx.aero",
+            "app.services.sla_escalacao_service._construir_mapa_gestor_setor",
+            return_value={"Projetos": "gestor@dtx.aero"},
         ),
     ):
         _setup_query(mock_db, [doc])
@@ -1089,8 +1074,8 @@ def test_escada_b_aog_escala_fora_da_janela_de_expediente():
             "app.services.sla_escalacao_service.notificar_escalada_resolucao_gerencial"
         ) as mock_notif,
         patch(
-            "app.services.sla_escalacao_service.Config.get_gestor_email",
-            return_value="gestor@dtx.aero",
+            "app.services.sla_escalacao_service._construir_mapa_gestor_setor",
+            return_value={"AOG": "gestor@dtx.aero"},
         ),
     ):
         _setup_query(mock_db, [doc])
@@ -1152,7 +1137,6 @@ def test_escada_b_nivel_1_usa_email_do_setor_do_chamado():
             "app.services.sla_escalacao_service._construir_mapa_gestor_setor",
             return_value={"Projetos": "projetos@dtx.aero"},
         ),
-        patch("app.services.sla_escalacao_service.Config.get_gestor_email") as mock_flat,
     ):
         _setup_query(mock_db, [doc])
         resultado = processar_escada_b(agora=agora)
@@ -1164,11 +1148,11 @@ def test_escada_b_nivel_1_usa_email_do_setor_do_chamado():
         nivel=1,
         email_dest="projetos@dtx.aero",
     )
-    mock_flat.assert_not_called()
 
 
-def test_escada_b_nivel_1_fallback_quando_setor_sem_email():
-    """Escada B nível 1: setor fora do mapa → cai no fallback flat Config.get_gestor_email."""
+def test_escada_b_nivel_1_sem_fallback_quando_setor_sem_gestor_cadastrado():
+    """Escada B nível 1: setor do chamado sem gestor_setor cadastrado → sem e-mail
+    (sem fallback flat — fonte única de verdade é o cadastro real de usuários)."""
     from app.services.sla_escalacao_service import processar_escada_b
 
     agora = _dt(2024, 6, 5, 10, 0)
@@ -1187,25 +1171,18 @@ def test_escada_b_nivel_1_fallback_quando_setor_sem_email():
             "app.services.sla_escalacao_service._construir_mapa_gestor_setor",
             return_value={"Qualidade": "qualidade@dtx.aero"},  # não tem "Projetos"
         ),
-        patch(
-            "app.services.sla_escalacao_service.Config.get_gestor_email",
-            return_value="fallback@dtx.aero",
-        ),
     ):
         _setup_query(mock_db, [doc])
         resultado = processar_escada_b(agora=agora)
 
-    assert resultado["emails"] == 1
-    mock_notif.assert_called_once_with(
-        chamado_data=doc.to_dict.return_value,
-        chamado_id=doc.id,
-        nivel=1,
-        email_dest="fallback@dtx.aero",
-    )
+    assert resultado["emails"] == 0
+    assert resultado["escalados"] == 1  # nível incrementa mesmo sem e-mail
+    mock_notif.assert_not_called()
 
 
 def test_escada_b_sem_email_config_incrementa_sem_notificar():
-    """Config.get_gestor_email retorna None → nível incrementado, sem e-mail."""
+    """Nenhum usuário cadastrado com nivel_gestao (autouse desta suíte já garante
+    Usuario.get_all=[]) → nível incrementado, sem e-mail."""
     from app.services.sla_escalacao_service import processar_escada_b
 
     agora = _dt(2024, 6, 5, 10, 0)
@@ -1220,7 +1197,6 @@ def test_escada_b_sem_email_config_incrementa_sem_notificar():
         patch(
             "app.services.sla_escalacao_service.notificar_escalada_resolucao_gerencial"
         ) as mock_notif,
-        patch("config.Config.get_gestor_email", return_value=None),
     ):
         _setup_query(mock_db, [doc])
         resultado = processar_escada_b(agora=agora)
@@ -1357,10 +1333,6 @@ def test_escada_a_com_previsao_atendimento_ja_vencida_escala_normal():
     with (
         patch("app.services.sla_escalacao_service.db") as mock_db,
         patch("app.services.sla_escalacao_service.notificar_escalada_resposta_gerencial"),
-        patch(
-            "app.services.sla_escalacao_service.Config.get_gestor_email",
-            return_value="gestor@dtx.aero",
-        ),
     ):
         _setup_query(mock_db, [doc])
         resultado = processar_escada_a(agora=agora)
@@ -1421,8 +1393,8 @@ def test_escada_b_com_previsao_atendimento_ja_vencida_escala_normal():
             "app.services.sla_escalacao_service.notificar_escalada_resolucao_gerencial"
         ) as mock_notif,
         patch(
-            "app.services.sla_escalacao_service.Config.get_gestor_email",
-            return_value="gestor@dtx.aero",
+            "app.services.sla_escalacao_service._construir_mapa_gestor_setor",
+            return_value={"Projetos": "gestor@dtx.aero"},
         ),
     ):
         _setup_query(mock_db, [doc])

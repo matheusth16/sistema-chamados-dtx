@@ -110,8 +110,13 @@ class Usuario(UserMixin):
 
     @property
     def is_gestor_only(self) -> bool:
-        """Gestor sem privilégio admin — visão read-only do painel operacional."""
-        return self.is_gestor and not self.is_admin_or_above
+        """Gestor "puro" (sem perfil operacional) — visão read-only do painel operacional.
+
+        Quem acumula perfil=supervisor + nivel_gestao (ex.: gestor_setor) mantém a
+        capacidade de operar chamados do próprio setor — só vira 100% read-only quem
+        não tem perfil operacional nenhum.
+        """
+        return self.is_gestor and not self.is_admin_or_above and self.perfil != "supervisor"
 
     @property
     def area(self):

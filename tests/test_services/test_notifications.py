@@ -1182,8 +1182,16 @@ def test_notificar_abertura_aog_todos_gestores_envia_para_os_4_niveis(app):
         app.app_context(),
         patch("app.services.notifications.enviar_email", return_value=(True, None)) as mock_send,
         patch(
-            "app.services.notifications.Config.get_gestor_email",
-            side_effect=lambda chave: emails_por_nivel.get(chave),
+            "app.services.gestor_escalonamento_service.construir_mapa_gestor_setor",
+            return_value={"AOG": "setor@dtx.aero"},
+        ),
+        patch(
+            "app.services.gestor_escalonamento_service.construir_mapa_niveis_superiores",
+            return_value={
+                "gerente_producao": "producao@dtx.aero",
+                "assistente_gm": "assistente@dtx.aero",
+                "gm": "gm@dtx.aero",
+            },
         ),
     ):
         notificar_abertura_aog_todos_gestores(chamado_data=chamado_data, chamado_id="ch_aog_1")
@@ -1198,30 +1206,61 @@ def test_notificar_abertura_aog_todos_gestores_envia_para_os_4_niveis(app):
         assert call.kwargs.get("importance") == "high"
 
 
-def test_notificar_abertura_aog_pula_gestor_sem_email_configurado(app):
-    """Gestor sem e-mail configurado é pulado (log warning), não impede os outros 3."""
+def test_notificar_abertura_aog_cascateia_para_nivel_acima_quando_ausente(app):
+    """gestor_setor sem ninguém cadastrado pra área → cascateia pro gerente_producao
+    (emergência: nunca fica sem notificar por lacuna de cadastro)."""
     from app.services.notifications import notificar_abertura_aog_todos_gestores
 
     chamado_data = {"numero_chamado": "CHM-AOG-02", "categoria": "AOG"}
-
-    emails_parciais = {
-        "gestor_setor": None,
-        "gerente_producao": "producao@dtx.aero",
-        "assistente_gm": "assistente@dtx.aero",
-        "gm": "gm@dtx.aero",
-    }
 
     with (
         app.app_context(),
         patch("app.services.notifications.enviar_email", return_value=(True, None)) as mock_send,
         patch(
-            "app.services.notifications.Config.get_gestor_email",
-            side_effect=lambda chave: emails_parciais.get(chave),
+            "app.services.gestor_escalonamento_service.construir_mapa_gestor_setor",
+            return_value={},  # nenhum gestor_setor cadastrado pra área "AOG"
+        ),
+        patch(
+            "app.services.gestor_escalonamento_service.construir_mapa_niveis_superiores",
+            return_value={
+                "gerente_producao": "producao@dtx.aero",
+                "assistente_gm": "assistente@dtx.aero",
+                "gm": "gm@dtx.aero",
+            },
         ),
     ):
         notificar_abertura_aog_todos_gestores(chamado_data=chamado_data, chamado_id="ch_aog_2")
 
-    assert mock_send.call_count == 3  # gestor_setor pulado, sem exception
+    # gestor_setor cascateia pra producao@dtx.aero (mesmo destinatário do nível
+    # gerente_producao) — deduplicado, não duplica o e-mail: 3 envios no total
+    # (producao, assistente, gm), não 4.
+    assert mock_send.call_count == 3
+    destinatarios = [call.args[0] for call in mock_send.call_args_list]
+    assert destinatarios == ["producao@dtx.aero", "assistente@dtx.aero", "gm@dtx.aero"]
+
+
+def test_notificar_abertura_aog_sem_ninguem_cadastrado_em_nenhum_nivel_nao_envia(app):
+    """Nenhum nível (nem acima, via cascata) tem alguém cadastrado → nenhum e-mail
+    enviado, sem exception (só log warning)."""
+    from app.services.notifications import notificar_abertura_aog_todos_gestores
+
+    chamado_data = {"numero_chamado": "CHM-AOG-02B", "categoria": "AOG"}
+
+    with (
+        app.app_context(),
+        patch("app.services.notifications.enviar_email", return_value=(True, None)) as mock_send,
+        patch(
+            "app.services.gestor_escalonamento_service.construir_mapa_gestor_setor",
+            return_value={},
+        ),
+        patch(
+            "app.services.gestor_escalonamento_service.construir_mapa_niveis_superiores",
+            return_value={},
+        ),
+    ):
+        notificar_abertura_aog_todos_gestores(chamado_data=chamado_data, chamado_id="ch_aog_2b")
+
+    mock_send.assert_not_called()
 
 
 def test_notificar_abertura_aog_falha_de_envio_nao_levanta(app):
@@ -1236,8 +1275,16 @@ def test_notificar_abertura_aog_falha_de_envio_nao_levanta(app):
             "app.services.notifications.enviar_email", return_value=(False, "timeout")
         ) as mock_send,
         patch(
-            "app.services.notifications.Config.get_gestor_email",
-            return_value="gestor@dtx.aero",
+            "app.services.gestor_escalonamento_service.construir_mapa_gestor_setor",
+            return_value={"AOG": "setor@dtx.aero"},
+        ),
+        patch(
+            "app.services.gestor_escalonamento_service.construir_mapa_niveis_superiores",
+            return_value={
+                "gerente_producao": "producao@dtx.aero",
+                "assistente_gm": "assistente@dtx.aero",
+                "gm": "gm@dtx.aero",
+            },
         ),
     ):
         notificar_abertura_aog_todos_gestores(

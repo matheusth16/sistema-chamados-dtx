@@ -5288,5 +5288,40 @@
     "pt_BR": "Enviar documento",
     "en": "Send document",
     "es": "Enviar documento"
+  },
+  "no_permission_reply_ticket": {
+    "pt_BR": "Sem permissão para responder este chamado.",
+    "en": "No permission to reply to this ticket.",
+    "es": "Sin permiso para responder este ticket."
+  },
+  "reply_message_required": {
+    "pt_BR": "Mensagem obrigatória (mínimo {min_chars} caracteres).",
+    "en": "Message required (minimum {min_chars} characters).",
+    "es": "Mensaje obligatorio (mínimo {min_chars} caracteres)."
+  },
+  "cannot_reply_status": {
+    "pt_BR": "Não é possível responder com status '{status}'.",
+    "en": "Cannot reply with status '{status}'.",
+    "es": "No se puede responder con estado '{status}'."
+  },
+  "internal_error_saving_reply": {
+    "pt_BR": "Erro interno ao salvar resposta. Tente novamente.",
+    "en": "Internal error saving reply. Please try again.",
+    "es": "Error interno al guardar la respuesta. Intente de nuevo."
+  },
+  "push_subject_reply": {
+    "pt_BR": "[Resposta] Chamado {numero} — solicitante respondeu",
+    "en": "[Reply] Ticket {numero} — requester replied",
+    "es": "[Respuesta] Ticket {numero} — el solicitante respondió"
+  },
+  "reopen_limit_reached": {
+    "pt_BR": "Limite de {limite} reaberturas atingido. Fale com o responsável ou supervisor para reabrir manualmente.",
+    "en": "Limit of {limite} reopenings reached. Contact the assignee or supervisor to reopen manually.",
+    "es": "Límite de {limite} reaperturas alcanzado. Contacte al responsable o supervisor para reabrir manualmente."
+  },
+  "cannot_edit_solicitante_description": {
+    "pt_BR": "Supervisor não pode alterar a descrição original escrita pelo solicitante.",
+    "en": "Supervisors cannot edit the original description written by the requester.",
+    "es": "El supervisor no puede editar la descripción original escrita por el solicitante."
   }
 }

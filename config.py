@@ -296,21 +296,6 @@ class Config:
     LOG_MAX_BYTES = int(os.getenv("LOG_MAX_BYTES", 2 * 1024 * 1024))  # 2 MB
     LOG_BACKUP_COUNT = int(os.getenv("LOG_BACKUP_COUNT", 5))
 
-    # Escalada gerencial (Fase 6 — prep): emails por nivel_gestao
-    # Formato JSON: '{"gestor_setor":"x@dtx.aero","gerente_producao":"...","assistente_gm":"...","gm":"..."}'
-    _gestor_emails_raw = os.getenv("GESTOR_EMAILS", "{}")
-    try:
-        import json as _json
-
-        GESTOR_EMAILS: dict[str, str] = _json.loads(_gestor_emails_raw)
-    except Exception:
-        GESTOR_EMAILS: dict[str, str] = {}
-
-    @classmethod
-    def get_gestor_email(cls, nivel: str) -> str | None:
-        """Retorna o e-mail do gestor para o nivel_gestao informado, ou None se não configurado."""
-        return cls.GESTOR_EMAILS.get(nivel)
-
     # SLA / Tempo útil DTX
     SLA_HORARIO_INICIO = os.getenv("SLA_HORARIO_INICIO", "07:00")
     SLA_HORARIO_FIM = os.getenv("SLA_HORARIO_FIM", "16:30")

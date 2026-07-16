@@ -113,7 +113,7 @@ def test_setor_get_all_retorna_vazio_quando_excecao():
     from app.models_categorias import CategoriaSetor
 
     with patch("app.models_categorias.db") as mock_db:
-        mock_db.collection.return_value.stream.side_effect = Exception("err")
+        mock_db.collection.return_value.where.return_value.stream.side_effect = Exception("err")
         result = CategoriaSetor.get_all()
 
     assert result == []
@@ -671,3 +671,255 @@ def test_impacto_save_tem_firebase_retry():
             imp.save()
 
     assert mock_db.collection.return_value.document.return_value.update.call_count == 3
+
+
+# ── save() propaga exceção (re-raise) ────────────────────────────────────────
+
+
+def test_setor_save_propaga_excecao():
+    """CategoriaSetor.save relança a exceção do Firestore (não a engole)."""
+    from app.models_categorias import CategoriaSetor
+
+    with (
+        patch("app.models_categorias.traduzir_categoria", return_value={"en": "E", "es": "E"}),
+        patch("app.models_categorias.db") as mock_db,
+    ):
+        mock_db.collection.return_value.add.side_effect = Exception("db down")
+        s = CategoriaSetor(nome_pt="Falha", nome_en="Fail", nome_es="Falla")
+        try:
+            s.save()
+            raised = False
+        except Exception:
+            raised = True
+
+    assert raised is True
+
+
+def test_gate_save_existente_chama_update():
+    """CategoriaGate.save com id existente chama db.collection().document().update()."""
+    from app.models_categorias import CategoriaGate
+
+    with (
+        patch("app.models_categorias.traduzir_categoria", return_value={"en": "E", "es": "E"}),
+        patch("app.models_categorias.db") as mock_db,
+    ):
+        g = CategoriaGate(nome_pt="Gate Existente", id="g1")
+        g.save()
+
+    mock_db.collection.return_value.document.return_value.update.assert_called_once()
+
+
+def test_gate_save_propaga_excecao():
+    """CategoriaGate.save relança a exceção do Firestore (não a engole)."""
+    from app.models_categorias import CategoriaGate
+
+    with (
+        patch("app.models_categorias.traduzir_categoria", return_value={"en": "E", "es": "E"}),
+        patch("app.models_categorias.db") as mock_db,
+    ):
+        mock_db.collection.return_value.add.side_effect = Exception("db down")
+        g = CategoriaGate(nome_pt="Falha", nome_en="Fail", nome_es="Falla")
+        try:
+            g.save()
+            raised = False
+        except Exception:
+            raised = True
+
+    assert raised is True
+
+
+# ── get_by_id: não encontrado (CategoriaGate / CategoriaImpacto) ─────────────
+
+
+def test_gate_get_by_id_nao_encontrado_retorna_none():
+    """CategoriaGate.get_by_id retorna None quando doc não existe."""
+    from app.models_categorias import CategoriaGate
+
+    doc = MagicMock()
+    doc.exists = False
+
+    with patch("app.models_categorias.db") as mock_db:
+        mock_db.collection.return_value.document.return_value.get.return_value = doc
+        result = CategoriaGate.get_by_id("naoexiste")
+
+    assert result is None
+
+
+def test_impacto_get_by_id_nao_encontrado_retorna_none():
+    """CategoriaImpacto.get_by_id retorna None quando doc não existe."""
+    from app.models_categorias import CategoriaImpacto
+
+    doc = MagicMock()
+    doc.exists = False
+
+    with patch("app.models_categorias.db") as mock_db:
+        mock_db.collection.return_value.document.return_value.get.return_value = doc
+        result = CategoriaImpacto.get_by_id("naoexiste")
+
+    assert result is None
+
+
+# ── nome_existe (CategoriaSetor / CategoriaGate / CategoriaImpacto) ──────────
+
+
+def _docs_nome_existe(nomes_por_id: dict) -> list:
+    docs = []
+    for doc_id, nome in nomes_por_id.items():
+        d = MagicMock()
+        d.id = doc_id
+        d.to_dict.return_value = {"nome_pt": nome}
+        docs.append(d)
+    return docs
+
+
+def test_setor_nome_existe_vazio_retorna_false():
+    """nome_existe com string vazia/whitespace nem consulta o Firestore."""
+    from app.models_categorias import CategoriaSetor
+
+    with patch("app.models_categorias.db") as mock_db:
+        result = CategoriaSetor.nome_existe("   ")
+
+    assert result is False
+    mock_db.collection.assert_not_called()
+
+
+def test_setor_nome_existe_encontrado_case_insensitive():
+    """nome_existe compara case-insensitive e ignora espaços nas pontas."""
+    from app.models_categorias import CategoriaSetor
+
+    with patch("app.models_categorias.db") as mock_db:
+        mock_db.collection.return_value.stream.return_value = _docs_nome_existe(
+            {"s1": "Manutenção"}
+        )
+        result = CategoriaSetor.nome_existe("  manutenção  ")
+
+    assert result is True
+
+
+def test_setor_nome_existe_ignora_id_atual():
+    """nome_existe não considera duplicidade contra o próprio registro sendo editado."""
+    from app.models_categorias import CategoriaSetor
+
+    with patch("app.models_categorias.db") as mock_db:
+        mock_db.collection.return_value.stream.return_value = _docs_nome_existe(
+            {"s1": "Manutenção"}
+        )
+        result = CategoriaSetor.nome_existe("Manutenção", id_atual="s1")
+
+    assert result is False
+
+
+def test_setor_nome_existe_nao_encontrado_retorna_false():
+    from app.models_categorias import CategoriaSetor
+
+    with patch("app.models_categorias.db") as mock_db:
+        mock_db.collection.return_value.stream.return_value = _docs_nome_existe({"s1": "TI"})
+        result = CategoriaSetor.nome_existe("Qualidade")
+
+    assert result is False
+
+
+def test_setor_nome_existe_excecao_retorna_false():
+    from app.models_categorias import CategoriaSetor
+
+    with patch("app.models_categorias.db") as mock_db:
+        mock_db.collection.return_value.stream.side_effect = Exception("err")
+        result = CategoriaSetor.nome_existe("Qualquer")
+
+    assert result is False
+
+
+def test_gate_nome_existe_encontrado():
+    from app.models_categorias import CategoriaGate
+
+    with patch("app.models_categorias.db") as mock_db:
+        mock_db.collection.return_value.stream.return_value = _docs_nome_existe(
+            {"g1": "Gate 1 - Desmontagem"}
+        )
+        result = CategoriaGate.nome_existe("Gate 1 - Desmontagem")
+
+    assert result is True
+
+
+def test_gate_nome_existe_ignora_id_atual():
+    from app.models_categorias import CategoriaGate
+
+    with patch("app.models_categorias.db") as mock_db:
+        mock_db.collection.return_value.stream.return_value = _docs_nome_existe(
+            {"g1": "Gate 1 - Desmontagem"}
+        )
+        result = CategoriaGate.nome_existe("Gate 1 - Desmontagem", id_atual="g1")
+
+    assert result is False
+
+
+def test_gate_nome_existe_vazio_retorna_false():
+    from app.models_categorias import CategoriaGate
+
+    with patch("app.models_categorias.db") as mock_db:
+        result = CategoriaGate.nome_existe("")
+
+    assert result is False
+    mock_db.collection.assert_not_called()
+
+
+def test_gate_nome_existe_nao_encontrado_retorna_false():
+    from app.models_categorias import CategoriaGate
+
+    with patch("app.models_categorias.db") as mock_db:
+        mock_db.collection.return_value.stream.return_value = _docs_nome_existe(
+            {"g1": "Gate 1 - Desmontagem"}
+        )
+        result = CategoriaGate.nome_existe("Gate 2 - Montagem")
+
+    assert result is False
+
+
+def test_gate_nome_existe_excecao_retorna_false():
+    from app.models_categorias import CategoriaGate
+
+    with patch("app.models_categorias.db") as mock_db:
+        mock_db.collection.return_value.stream.side_effect = Exception("err")
+        result = CategoriaGate.nome_existe("Qualquer")
+
+    assert result is False
+
+
+def test_impacto_nome_existe_encontrado():
+    from app.models_categorias import CategoriaImpacto
+
+    with patch("app.models_categorias.db") as mock_db:
+        mock_db.collection.return_value.stream.return_value = _docs_nome_existe({"i1": "Crítico"})
+        result = CategoriaImpacto.nome_existe("crítico")
+
+    assert result is True
+
+
+def test_impacto_nome_existe_vazio_retorna_false():
+    from app.models_categorias import CategoriaImpacto
+
+    with patch("app.models_categorias.db") as mock_db:
+        result = CategoriaImpacto.nome_existe(None)
+
+    assert result is False
+    mock_db.collection.assert_not_called()
+
+
+def test_impacto_nome_existe_ignora_id_atual():
+    from app.models_categorias import CategoriaImpacto
+
+    with patch("app.models_categorias.db") as mock_db:
+        mock_db.collection.return_value.stream.return_value = _docs_nome_existe({"i1": "Crítico"})
+        result = CategoriaImpacto.nome_existe("Crítico", id_atual="i1")
+
+    assert result is False
+
+
+def test_impacto_nome_existe_excecao_retorna_false():
+    from app.models_categorias import CategoriaImpacto
+
+    with patch("app.models_categorias.db") as mock_db:
+        mock_db.collection.return_value.stream.side_effect = Exception("err")
+        result = CategoriaImpacto.nome_existe("Qualquer")
+
+    assert result is False

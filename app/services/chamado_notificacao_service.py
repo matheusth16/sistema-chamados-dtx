@@ -443,6 +443,77 @@ def notificar_anexo_tardio_chamado(
             )
 
 
+def notificar_resposta_solicitante_chamado(
+    *,
+    chamado_id: str,
+    numero_chamado: str,
+    categoria: str,
+    solicitante_nome: str,
+    mensagem: str,
+    dados_chamado: dict,
+) -> None:
+    """Notifica responsável + observadores quando o solicitante responde em texto livre."""
+    destinatarios = destinatarios_do_chamado(dados_chamado)
+    if not destinatarios:
+        logger.info("Reply CH %s: no recipients, no e-mail sent.", numero_chamado)
+        return
+
+    assunto = get_translation("push_subject_reply", "en", numero=numero_chamado)
+    link = _link_chamado(chamado_id)
+
+    for usuario in destinatarios:
+        email = getattr(usuario, "email", None)
+        uid = getattr(usuario, "id", None)
+
+        if email:
+            corpo_html = build_email_shell(
+                f"Ticket {numero_chamado} — New Reply",
+                "#0891b2",
+                f"<p>The requester <em>{escape(solicitante_nome)}</em> replied to ticket "
+                f"<strong>{escape(numero_chamado)}</strong> ({escape(categoria)}).</p>"
+                + build_detail_table(
+                    [
+                        ("Ticket", numero_chamado),
+                        ("Category", categoria),
+                        ("Message", mensagem),
+                        ("Replied by", solicitante_nome),
+                    ]
+                )
+                + (build_cta_button("View ticket", link, "#2563eb") if link else ""),
+            )
+            corpo_texto = (
+                f"Ticket {numero_chamado} — new reply from {solicitante_nome}.\n"
+                f"Message: {mensagem}" + (f"\n\nView ticket: {link}" if link else "")
+            )
+            ok, err = enviar_email(email, assunto, corpo_html, corpo_texto, importance="normal")
+            if ok:
+                logger.info("Reply e-mail sent to %s (ticket %s)", email, numero_chamado)
+            else:
+                logger.warning(
+                    "Failed to send reply e-mail to %s (ticket %s): %s",
+                    email,
+                    numero_chamado,
+                    err,
+                )
+
+        if uid:
+            criar_notificacao(
+                usuario_id=uid,
+                chamado_id=chamado_id,
+                numero_chamado=numero_chamado,
+                titulo=f"Nova resposta — Chamado {numero_chamado}",
+                mensagem=categoria,
+                tipo="observador_resposta_solicitante",
+                categoria=categoria,
+            )
+            webpush_service.enviar_webpush_usuario(
+                uid,
+                titulo=assunto,
+                corpo=categoria,
+                url=link or "",
+            )
+
+
 def _link_chamado(chamado_id: str) -> str:
     try:
         from flask import current_app, url_for

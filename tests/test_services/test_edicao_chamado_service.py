@@ -848,6 +848,122 @@ def test_processar_edicao_descricao_acima_de_3000_chars_e_truncada(app):
     assert len(update_data["descricao"]) <= 3000
 
 
+def test_supervisor_nao_pode_editar_descricao_do_solicitante(app):
+    """Supervisor tentando alterar a descrição original do solicitante → 403.
+
+    Anexos já eram protegidos (só permitiam adicionar, nunca remover/substituir);
+    a descrição era o único campo escrito pelo solicitante que o supervisor ainda
+    conseguia sobrescrever livremente.
+    """
+    from app.services.edicao_chamado_service import processar_edicao_chamado
+
+    sup = _make_usuario(perfil="supervisor", uid="sup1", areas=["Manutencao"])
+    doc = _make_doc()
+
+    with (
+        app.app_context(),
+        patch("app.services.edicao_chamado_service.db") as mock_db,
+        patch("app.services.edicao_chamado_service.Chamado") as mock_chamado_cls,
+        patch("app.services.edicao_chamado_service.execute_with_retry") as mock_retry,
+    ):
+        mock_db.collection.return_value.document.return_value.get.return_value = doc
+        mock_db.batch.return_value = MagicMock()
+        mock_chamado = MagicMock()
+        mock_chamado.status = "Aberto"
+        mock_chamado.confirmacao_solicitante = None
+        mock_chamado.area = "Manutencao"
+        mock_chamado_cls.from_dict.return_value = mock_chamado
+
+        result = processar_edicao_chamado(
+            usuario_atual=sup,
+            chamado_id="ch1",
+            novo_status="",
+            motivo_cancelamento="",
+            nova_descricao="Descrição alterada pelo supervisor",
+            novo_responsavel_id="",
+            novo_sla_str="",
+            arquivos_novos=[],
+            setores_adicionais_lista=[],
+        )
+
+    assert result["sucesso"] is False
+    assert result.get("codigo") == 403
+    mock_retry.assert_not_called()
+
+
+def test_admin_ainda_pode_editar_descricao_do_solicitante(app):
+    """Admin continua podendo editar a descrição (válvula de escape administrativa)."""
+    from app.services.edicao_chamado_service import processar_edicao_chamado
+
+    admin = _make_usuario(perfil="admin")
+    doc = _make_doc()
+
+    with (
+        app.app_context(),
+        patch("app.services.edicao_chamado_service.db") as mock_db,
+        patch("app.services.edicao_chamado_service.Chamado") as mock_chamado_cls,
+        patch("app.services.edicao_chamado_service.execute_with_retry") as mock_retry,
+    ):
+        mock_db.collection.return_value.document.return_value.get.return_value = doc
+        mock_db.batch.return_value = MagicMock()
+        mock_chamado_cls.from_dict.return_value = MagicMock()
+
+        result = processar_edicao_chamado(
+            usuario_atual=admin,
+            chamado_id="ch1",
+            novo_status="",
+            motivo_cancelamento="",
+            nova_descricao="Descrição corrigida pelo admin",
+            novo_responsavel_id="",
+            novo_sla_str="",
+            arquivos_novos=[],
+            setores_adicionais_lista=[],
+        )
+
+    assert result["sucesso"] is True
+    update_data = mock_retry.call_args[0][1]
+    assert update_data.get("descricao") == "Descrição corrigida pelo admin"
+
+
+def test_supervisor_pode_editar_outros_campos_sem_tocar_descricao(app):
+    """Supervisor continua podendo mudar status/responsável/SLA sem mexer na descrição."""
+    from app.services.edicao_chamado_service import processar_edicao_chamado
+
+    sup = _make_usuario(perfil="supervisor", uid="sup1", areas=["Manutencao"])
+    doc = _make_doc()
+
+    with (
+        app.app_context(),
+        patch("app.services.edicao_chamado_service.db") as mock_db,
+        patch("app.services.edicao_chamado_service.Chamado") as mock_chamado_cls,
+        patch("app.services.edicao_chamado_service.atualizar_status_chamado") as mock_status,
+        patch("app.services.edicao_chamado_service.execute_with_retry"),
+    ):
+        mock_db.collection.return_value.document.return_value.get.return_value = doc
+        mock_db.batch.return_value = MagicMock()
+        mock_chamado = MagicMock()
+        mock_chamado.status = "Aberto"
+        mock_chamado.confirmacao_solicitante = None
+        mock_chamado.area = "Manutencao"
+        mock_chamado_cls.from_dict.return_value = mock_chamado
+        mock_status.return_value = {"sucesso": True, "mensagem": "Status atualizado"}
+
+        result = processar_edicao_chamado(
+            usuario_atual=sup,
+            chamado_id="ch1",
+            novo_status="Em Atendimento",
+            motivo_cancelamento="",
+            nova_descricao="",
+            novo_responsavel_id="",
+            novo_sla_str="",
+            arquivos_novos=[],
+            setores_adicionais_lista=[],
+        )
+
+    assert result["sucesso"] is True
+    mock_status.assert_called_once()
+
+
 def test_processar_edicao_descricao_menor_que_3000_nao_e_alterada(app):
     """F-25: nova_descricao com <= 3000 chars deve ser salva sem truncamento."""
     from app.services.edicao_chamado_service import processar_edicao_chamado

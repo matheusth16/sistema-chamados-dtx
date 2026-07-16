@@ -951,7 +951,7 @@ A cada **10 minutos**, o job chama as três funções na ordem:
 
 **Degraus da Escada A** (tempo útil acumulado desde a abertura):
 
-| Degrau | Threshold | Destinatário | Chave `GESTOR_EMAILS` |
+| Degrau | Threshold | Destinatário | `nivel_gestao` |
 |--------|-----------|-------------|------------------------|
 | 1 | +60 min úteis | Gestor do Setor | `gestor_setor` |
 | 2 | +120 min úteis | Gerente de Produção | `gerente_producao` |
@@ -961,7 +961,7 @@ A cada **10 minutos**, o job chama as três funções na ordem:
 **Janela de envio:** seg–sex 07:00–11:30 e 13:00–16:30 BRT.
 Chamados elegíveis fora dessa janela são contabilizados em `pulados_fora_janela` e reprocessados na próxima execução.
 
-**Comportamento sem e-mail configurado:** se a chave do nível não estiver em `GESTOR_EMAILS`, o nível é incrementado normalmente (sem envio). Evita que um chamado fique preso esperando configuração ausente. Log de `WARNING` emitido.
+**Resolução do destinatário:** sempre via `app/services/gestor_escalonamento_service.py`, a partir do cadastro real de usuários (campo Nível de Gestão) — sem configuração paralela em variável de ambiente. `gestor_setor` é por área; os demais níveis são company-wide. **Sem usuário cadastrado com esse nível:** o nível é incrementado normalmente (sem envio). Evita que um chamado fique preso esperando alguém ser cadastrado. Log de `WARNING` emitido.
 
 **Reabertura:** `POST /api/chamado/<id>/confirmar-resolucao` com `acao="reabrir"` reseta `escalacao_resposta_nivel = 0`, reiniciando a Escada A do zero (ADR-004).
 
@@ -1023,7 +1023,7 @@ Threshold atingido fora da janela → `pulados_fora_janela++`, reprocessado na p
 
 **Degraus pós-deadline** (minutos úteis APÓS o deadline):
 
-| Degrau | Threshold após deadline | Destinatário | Chave `GESTOR_EMAILS` |
+| Degrau | Threshold após deadline | Destinatário | `nivel_gestao` |
 |--------|------------------------|-------------|------------------------|
 | 1 | +0 min úteis | Gestor do Setor | `gestor_setor` |
 | 2 | +240 min úteis (4h) | Gerente de Produção | `gerente_producao` |

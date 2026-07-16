@@ -215,7 +215,7 @@
                             {{ t('problem_description') if t else 'Descrição do Problema' }}
                         </label>
 
-                        {% if pode_editar %}
+                        {% if pode_editar_descricao %}
                         <textarea id="modal-descricao" form="form-status" name="nova_descricao" rows="4"
                             style="width:100%; box-sizing:border-box; flex:1; min-height:160px; background:var(--color-surface-canvas); border:1.5px solid transparent; border-radius:14px; padding:14px 16px; font-family:inherit; font-size:14px; line-height:1.6; color:inherit; resize:none; overflow:auto;"
                             placeholder="{{ t('edit_description_placeholder') if t else 'Descreva o chamado' }}">{{ chamado.descricao }}</textarea>

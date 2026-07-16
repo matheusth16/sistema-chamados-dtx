@@ -2,6 +2,8 @@
 
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 
 def test_bulk_status_sem_login_retorna_401_ou_redirect(client):
     """POST /api/bulk-status sem autenticação deve falhar.
@@ -120,3 +122,80 @@ def test_bulk_status_lote_falha_total_ainda_retorna_sucesso_true_no_topo(
     assert data.get("atualizados") == 0
     assert data.get("total_solicitados") == 2
     assert len(data.get("erros", [])) == 2
+
+
+@pytest.fixture
+def client_logado_gestor_setor_dual_role(client, app):
+    """Supervisor + gestor_setor real (Nível 3, dual role): is_gestor_only=False,
+    mantém escrita — mas só no que é dono/fila/participante, não em qualquer
+    chamado da área só porque a leitura ampliada de gestor_setor deixa ele ver."""
+    from unittest.mock import MagicMock
+
+    user = MagicMock()
+    user.id = "gestor_setor_1"
+    user.email = "gestor.setor@test.com"
+    user.nome = "Gestor Setor Teste"
+    user.perfil = "supervisor"
+    user.area = "Manutencao"
+    user.areas = ["Manutencao"]
+    user.nivel_gestao = "gestor_setor"
+    user.is_authenticated = True
+    user.check_password = MagicMock(return_value=True)
+    user.get_id = lambda: "gestor_setor_1"
+    user.must_change_password = False
+    user.mfa_enabled = True
+    user.is_admin_or_above = False
+    user.is_supervisor_or_above = True
+    user.onboarding_perfis_vistos = ["supervisor"]
+    user.onboarding_passo = 0
+    user.ativo = True
+    user.is_gestor = True
+    user.is_gestor_only = False
+    with (
+        patch("app.routes.auth.Usuario.get_by_email", return_value=user),
+        patch("app.models_usuario.Usuario.get_by_id", return_value=user),
+        patch("app.routes.auth._dispositivo_confiavel", return_value=True),
+    ):
+        client.post(
+            "/login",
+            data={"email": "gestor.setor@test.com", "senha": "ok"},
+            follow_redirects=False,
+        )
+        yield client
+
+
+def test_bulk_status_gestor_setor_nao_altera_chamado_do_colega_na_mesma_area(
+    client_logado_gestor_setor_dual_role,
+):
+    """QA (Nível 3): a leitura ampliada de gestor_setor sobre chamado do colega na
+    própria área não pode virar permissão de escrita em lote — só enxergar, não
+    poder editar (mesma regra já aplicada em /api/atualizar-status)."""
+    doc_colega = MagicMock()
+    doc_colega.exists = True
+    doc_colega.to_dict.return_value = {
+        "area": "Manutencao",
+        "status": "Aberto",
+        "responsavel_id": "colega_supervisor",
+        "solicitante_id": "sol_x",
+        "participantes": [],
+    }
+    with (
+        patch("app.routes.api.db") as mock_db,
+        patch("app.routes.api.atualizar_status_chamado") as mock_atualizar,
+    ):
+        mock_db.collection.return_value.document.return_value.get.return_value = doc_colega
+        mock_atualizar.return_value = {"sucesso": True, "novo_status": "Concluído"}
+
+        r = client_logado_gestor_setor_dual_role.post(
+            "/api/bulk-status",
+            json={"chamado_ids": ["ch_colega"], "novo_status": "Concluído"},
+            content_type="application/json",
+            headers={"Origin": "http://localhost:5000"},
+        )
+
+    assert r.status_code == 200
+    data = r.get_json()
+    assert data.get("atualizados") == 0
+    assert len(data.get("erros", [])) == 1
+    # Prova que foi a checagem de permissão que bloqueou, não uma falha do service.
+    mock_atualizar.assert_not_called()
