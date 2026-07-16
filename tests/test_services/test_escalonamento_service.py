@@ -1042,11 +1042,17 @@ class TestDefinirPrevisaoAtendimento:
 
     def test_definir_previsao_no_passado_retorna_erro(self):
         from datetime import datetime, timedelta
+        from zoneinfo import ZoneInfo
 
         from app.services.escalonamento_service import definir_previsao_atendimento
+        from config import Config
 
         mock_db, _ = _make_db_mock(_chamado_dict(area="Engenharia", responsavel_id="id_julia"))
-        previsao_passada = datetime.now() - timedelta(hours=1)
+        # "Passado" tem que ser em relação ao fuso de negócio (SLA_TIMEZONE), não
+        # ao relógio naive do runner — em CI (UTC), "agora - 1h" ainda pode estar
+        # no futuro em Brasília (UTC-3), fazendo o teste passar por acidente.
+        agora_fuso_negocio = datetime.now(ZoneInfo(Config.SLA_TIMEZONE)).replace(tzinfo=None)
+        previsao_passada = agora_fuso_negocio - timedelta(hours=1)
 
         with patch("app.services.escalonamento_service.db", mock_db):
             resultado = definir_previsao_atendimento(
