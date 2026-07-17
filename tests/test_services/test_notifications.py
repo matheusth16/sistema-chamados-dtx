@@ -589,7 +589,7 @@ def test_enviar_email_usa_graph_quando_configurado(app):
         app.app_context(),
         patch.dict("os.environ", env),
         patch(
-            "app.services.notifications._enviar_via_graph", return_value=(True, None)
+            "app.services.notifications_core._enviar_via_graph", return_value=(True, None)
         ) as mock_graph,
     ):
         app.config["NOTIFY_EMAIL_ENABLED"] = True
@@ -910,6 +910,85 @@ def test_notificar_solicitante_status_email_falha_nao_levanta(app):
     ):
         app.config["APP_BASE_URL"] = "https://example.test"
         notificar_solicitante_status("ch1", "CH-001", "Concluído", "TI", solicitante)
+
+
+# ── notificar_solicitante_confirmacao_pendente ────────────────────────────────
+
+
+def test_notificar_solicitante_confirmacao_pendente_envia_email(app):
+    """notificar_solicitante_confirmacao_pendente envia e-mail pedindo confirmação."""
+    from app.services.notifications import notificar_solicitante_confirmacao_pendente
+
+    solicitante = MagicMock()
+    solicitante.email = "sol@dtx.aero"
+    solicitante.nome = "Sol"
+    with (
+        app.app_context(),
+        patch("app.services.notifications.enviar_email", return_value=(True, None)) as mock_send,
+    ):
+        app.config["APP_BASE_URL"] = "https://example.test"
+        notificar_solicitante_confirmacao_pendente("ch1", "CH-001", "TI", solicitante)
+
+    mock_send.assert_called_once()
+
+
+def test_notificar_solicitante_confirmacao_pendente_sem_usuario_nao_envia(app):
+    """Com solicitante_usuario=None, nenhum e-mail é enviado."""
+    from app.services.notifications import notificar_solicitante_confirmacao_pendente
+
+    with (
+        app.app_context(),
+        patch("app.services.notifications.enviar_email") as mock_send,
+    ):
+        notificar_solicitante_confirmacao_pendente("ch1", "CH-001", "TI", None)
+
+    mock_send.assert_not_called()
+
+
+def test_notificar_solicitante_confirmacao_pendente_sem_email_nao_envia(app):
+    """Com email vazio no usuário, nenhum e-mail é enviado."""
+    from app.services.notifications import notificar_solicitante_confirmacao_pendente
+
+    solicitante = MagicMock()
+    solicitante.email = ""
+    with (
+        app.app_context(),
+        patch("app.services.notifications.enviar_email") as mock_send,
+    ):
+        notificar_solicitante_confirmacao_pendente("ch1", "CH-001", "TI", solicitante)
+
+    mock_send.assert_not_called()
+
+
+def test_notificar_solicitante_confirmacao_pendente_falha_nao_levanta(app):
+    """Envio falho não levanta exceção."""
+    from app.services.notifications import notificar_solicitante_confirmacao_pendente
+
+    solicitante = MagicMock()
+    solicitante.email = "sol@dtx.aero"
+    solicitante.nome = "Sol"
+    with (
+        app.app_context(),
+        patch("app.services.notifications.enviar_email", return_value=(False, "err")),
+    ):
+        notificar_solicitante_confirmacao_pendente("ch1", "CH-001", "TI", solicitante)
+
+
+def test_notificar_solicitante_confirmacao_pendente_sem_base_url(app):
+    """Sem APP_BASE_URL configurada, ainda envia (sem link no corpo)."""
+    from app.services.notifications import notificar_solicitante_confirmacao_pendente
+
+    solicitante = MagicMock()
+    solicitante.email = "sol@dtx.aero"
+    solicitante.nome = "Sol"
+    with (
+        app.app_context(),
+        patch("app.services.notifications.enviar_email", return_value=(True, None)) as mock_send,
+    ):
+        app.config["APP_BASE_URL"] = ""
+        notificar_solicitante_confirmacao_pendente("ch1", "CH-001", "TI", solicitante)
+
+    mock_send.assert_called_once()
 
 
 # ── notificar_setores_adicionais_chamado ──────────────────────────────────────

@@ -327,7 +327,7 @@ def test_enviar_email_passa_importance_high_para_graph(app):
     with (
         app.app_context(),
         patch(
-            "app.services.notifications._enviar_via_graph", return_value=(True, None)
+            "app.services.notifications_core._enviar_via_graph", return_value=(True, None)
         ) as mock_graph,
     ):
         app.config["NOTIFY_EMAIL_ENABLED"] = True
@@ -345,7 +345,7 @@ def test_enviar_email_default_importance_normal(app):
     with (
         app.app_context(),
         patch(
-            "app.services.notifications._enviar_via_graph", return_value=(True, None)
+            "app.services.notifications_core._enviar_via_graph", return_value=(True, None)
         ) as mock_graph,
     ):
         app.config["NOTIFY_EMAIL_ENABLED"] = True
@@ -363,7 +363,7 @@ def test_enviar_email_importance_invalida_usa_normal(app):
     with (
         app.app_context(),
         patch(
-            "app.services.notifications._enviar_via_graph", return_value=(True, None)
+            "app.services.notifications_core._enviar_via_graph", return_value=(True, None)
         ) as mock_graph,
     ):
         app.config["NOTIFY_EMAIL_ENABLED"] = True
