@@ -461,7 +461,9 @@ def test_carregar_mais_supervisor_sem_areas_retorna_vazio(client_logado_supervis
 
 
 def test_api_buscar_usuarios_excecao_retorna_500(client_logado_supervisor):
-    with patch("app.routes.api.Usuario.buscar_ativos", side_effect=Exception("db down")):
+    with patch(
+        "app.routes.api_solicitante.Usuario.buscar_ativos", side_effect=Exception("db down")
+    ):
         resp = client_logado_supervisor.get("/api/usuarios/buscar?q=ab")
     assert resp.status_code == 500
     assert resp.get_json()["sucesso"] is False
@@ -507,7 +509,7 @@ def test_api_anexo_solicitante_gestor_only_retorna_403(client_logado_gestor):
 def test_api_anexo_solicitante_tipo_nao_permitido_retorna_400(client_logado_solicitante):
     import io
 
-    with patch("app.routes.api.salvar_anexo", return_value=None):
+    with patch("app.routes.api_solicitante.salvar_anexo", return_value=None):
         resp = client_logado_solicitante.post(
             "/api/chamado/ch1/anexo-solicitante",
             data={

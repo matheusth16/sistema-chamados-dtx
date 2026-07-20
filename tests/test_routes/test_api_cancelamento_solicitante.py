@@ -34,7 +34,7 @@ class TestCancelarSolicitanteRota:
         with (
             patch("app.models_usuario.Usuario.get_by_id", return_value=sol),
             patch(
-                "app.routes.api.cancelar_chamado_solicitante",
+                "app.routes.api_solicitante.cancelar_chamado_solicitante",
                 return_value={"sucesso": True},
             ),
         ):
@@ -55,7 +55,7 @@ class TestCancelarSolicitanteRota:
         with (
             patch("app.models_usuario.Usuario.get_by_id", return_value=sup),
             patch(
-                "app.routes.api.cancelar_chamado_solicitante",
+                "app.routes.api_solicitante.cancelar_chamado_solicitante",
                 return_value={"sucesso": False, "erro": "Sem permissão.", "codigo": 403},
             ),
         ):
@@ -74,7 +74,7 @@ class TestCancelarSolicitanteRota:
         with (
             patch("app.models_usuario.Usuario.get_by_id", return_value=sup),
             patch(
-                "app.routes.api.cancelar_chamado_solicitante",
+                "app.routes.api_solicitante.cancelar_chamado_solicitante",
                 return_value={"sucesso": True},
             ),
         ):
@@ -106,7 +106,7 @@ class TestCancelarSolicitanteRota:
         with (
             patch("app.models_usuario.Usuario.get_by_id", return_value=sol),
             patch(
-                "app.routes.api.cancelar_chamado_solicitante",
+                "app.routes.api_solicitante.cancelar_chamado_solicitante",
                 return_value={
                     "sucesso": False,
                     "erro": "Não pode cancelar chamado concluído.",

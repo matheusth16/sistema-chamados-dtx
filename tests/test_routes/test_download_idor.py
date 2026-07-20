@@ -68,7 +68,7 @@ def test_download_anexo_rejeita_chave_fora_dos_anexos(client_logado_solicitante)
     """GET com chave que não está nos anexos do chamado retorna 403 (IDOR)."""
     doc = _make_chamado_doc(chaves=["r2:original.pdf"], solicitante_id="sol_1")
 
-    with patch("app.routes.api.db") as mock_db:
+    with patch("app.routes.api_solicitante.db") as mock_db:
         mock_db.collection.return_value.document.return_value.get.return_value = doc
         r = client_logado_solicitante.get(
             "/api/download-anexo?chamado_id=ch1&chave=r2:outro_arquivo.pdf"
@@ -91,7 +91,7 @@ def test_download_anexo_rejeita_usuario_sem_permissao(client_logado_solicitante)
     """
     doc = _make_chamado_doc(chaves=["r2:arq.pdf"], solicitante_id="outro_usuario")
 
-    with patch("app.routes.api.db") as mock_db:
+    with patch("app.routes.api_solicitante.db") as mock_db:
         mock_db.collection.return_value.document.return_value.get.return_value = doc
         r = client_logado_solicitante.get("/api/download-anexo?chamado_id=ch1&chave=r2:arq.pdf")
 
@@ -116,7 +116,7 @@ def test_download_anexo_redireciona_usuario_autorizado(client_logado_solicitante
     doc = _make_chamado_doc(chaves=["r2:arq.pdf"], solicitante_id="sol_1")
 
     with (
-        patch("app.routes.api.db") as mock_db,
+        patch("app.routes.api_solicitante.db") as mock_db,
         patch(
             "app.services.upload.gerar_url_presignada",
             return_value="https://r2.example.com/arq.pdf",
@@ -136,7 +136,7 @@ def test_download_anexo_sucesso_loga_acesso(client_logado_solicitante, caplog):
     doc = _make_chamado_doc(chaves=["r2:arq.pdf"], solicitante_id="sol_1")
 
     with (
-        patch("app.routes.api.db") as mock_db,
+        patch("app.routes.api_solicitante.db") as mock_db,
         patch(
             "app.services.upload.gerar_url_presignada",
             return_value="https://r2.example.com/arq.pdf",

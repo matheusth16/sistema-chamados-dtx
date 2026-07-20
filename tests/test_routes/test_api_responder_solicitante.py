@@ -41,7 +41,7 @@ class TestResponderSolicitanteRota:
         with (
             patch("app.models_usuario.Usuario.get_by_id", return_value=sol),
             patch(
-                "app.routes.api.responder_chamado_solicitante",
+                "app.routes.api_solicitante.responder_chamado_solicitante",
                 return_value={"sucesso": True},
             ),
         ):
@@ -61,7 +61,7 @@ class TestResponderSolicitanteRota:
         with (
             patch("app.models_usuario.Usuario.get_by_id", return_value=sup),
             patch(
-                "app.routes.api.responder_chamado_solicitante",
+                "app.routes.api_solicitante.responder_chamado_solicitante",
                 return_value={"sucesso": False, "erro": "Sem permissão.", "codigo": 403},
             ),
         ):
@@ -79,7 +79,7 @@ class TestResponderSolicitanteRota:
         with (
             patch("app.models_usuario.Usuario.get_by_id", return_value=sup),
             patch(
-                "app.routes.api.responder_chamado_solicitante",
+                "app.routes.api_solicitante.responder_chamado_solicitante",
                 return_value={"sucesso": True},
             ),
         ):
@@ -96,7 +96,7 @@ class TestResponderSolicitanteRota:
 
         with (
             patch("app.models_usuario.Usuario.get_by_id", return_value=sol),
-            patch("app.routes.api.responder_chamado_solicitante") as mock_svc,
+            patch("app.routes.api_solicitante.responder_chamado_solicitante") as mock_svc,
         ):
             resp = client_logado_solicitante.post(
                 "/api/chamado/ch1/responder-solicitante",
@@ -112,7 +112,7 @@ class TestResponderSolicitanteRota:
 
         with (
             patch("app.models_usuario.Usuario.get_by_id", return_value=gestor_only),
-            patch("app.routes.api.responder_chamado_solicitante") as mock_svc,
+            patch("app.routes.api_solicitante.responder_chamado_solicitante") as mock_svc,
         ):
             resp = client_logado_solicitante.post(
                 "/api/chamado/ch1/responder-solicitante",
@@ -142,7 +142,7 @@ class TestResponderSolicitanteRota:
         with (
             patch("app.models_usuario.Usuario.get_by_id", return_value=sol),
             patch(
-                "app.routes.api.responder_chamado_solicitante",
+                "app.routes.api_solicitante.responder_chamado_solicitante",
                 return_value=resultado_service,
             ),
         ):

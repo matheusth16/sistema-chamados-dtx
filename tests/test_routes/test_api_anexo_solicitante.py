@@ -49,9 +49,9 @@ class TestAnexoSolicitanteRota:
 
         with (
             patch("app.models_usuario.Usuario.get_by_id", return_value=sol),
-            patch("app.routes.api.salvar_anexo", return_value="path/relatorio.pdf"),
+            patch("app.routes.api_solicitante.salvar_anexo", return_value="path/relatorio.pdf"),
             patch(
-                "app.routes.api.adicionar_anexo_tardio",
+                "app.routes.api_solicitante.adicionar_anexo_tardio",
                 return_value={"sucesso": True},
             ),
         ):
@@ -71,9 +71,9 @@ class TestAnexoSolicitanteRota:
 
         with (
             patch("app.models_usuario.Usuario.get_by_id", return_value=sup),
-            patch("app.routes.api.salvar_anexo", return_value="path/f.pdf"),
+            patch("app.routes.api_solicitante.salvar_anexo", return_value="path/f.pdf"),
             patch(
-                "app.routes.api.adicionar_anexo_tardio",
+                "app.routes.api_solicitante.adicionar_anexo_tardio",
                 return_value={"sucesso": False, "erro": "Sem permissão.", "codigo": 403},
             ),
         ):
@@ -91,9 +91,9 @@ class TestAnexoSolicitanteRota:
 
         with (
             patch("app.models_usuario.Usuario.get_by_id", return_value=sup),
-            patch("app.routes.api.salvar_anexo", return_value="path/relatorio.pdf"),
+            patch("app.routes.api_solicitante.salvar_anexo", return_value="path/relatorio.pdf"),
             patch(
-                "app.routes.api.adicionar_anexo_tardio",
+                "app.routes.api_solicitante.adicionar_anexo_tardio",
                 return_value={"sucesso": True},
             ),
         ):
@@ -111,9 +111,9 @@ class TestAnexoSolicitanteRota:
 
         with (
             patch("app.models_usuario.Usuario.get_by_id", return_value=adm),
-            patch("app.routes.api.salvar_anexo", return_value="path/f.pdf"),
+            patch("app.routes.api_solicitante.salvar_anexo", return_value="path/f.pdf"),
             patch(
-                "app.routes.api.adicionar_anexo_tardio",
+                "app.routes.api_solicitante.adicionar_anexo_tardio",
                 return_value={"sucesso": False, "erro": "Sem permissão.", "codigo": 403},
             ),
         ):
@@ -131,7 +131,7 @@ class TestAnexoSolicitanteRota:
 
         with (
             patch("app.models_usuario.Usuario.get_by_id", return_value=sol),
-            patch("app.routes.api.adicionar_anexo_tardio") as mock_svc,
+            patch("app.routes.api_solicitante.adicionar_anexo_tardio") as mock_svc,
         ):
             resp = client_logado_solicitante.post(
                 "/api/chamado/ch1/anexo-solicitante",
@@ -161,9 +161,9 @@ class TestAnexoSolicitanteRota:
 
         with (
             patch("app.models_usuario.Usuario.get_by_id", return_value=sol),
-            patch("app.routes.api.salvar_anexo", return_value="path/f.pdf"),
+            patch("app.routes.api_solicitante.salvar_anexo", return_value="path/f.pdf"),
             patch(
-                "app.routes.api.adicionar_anexo_tardio",
+                "app.routes.api_solicitante.adicionar_anexo_tardio",
                 return_value={"sucesso": False, "erro": "Sem permissão.", "codigo": 403},
             ),
         ):

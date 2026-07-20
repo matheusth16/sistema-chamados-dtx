@@ -11,6 +11,7 @@ from app.routes import (  # noqa: E402
     admin_global,  # noqa: E402, F401
     api,  # noqa: E402, F401
     api_notificacoes,  # noqa: E402, F401
+    api_solicitante,  # noqa: E402, F401
     auth,  # noqa: E402, F401
     categorias,  # noqa: E402, F401
     chamados,  # noqa: E402, F401

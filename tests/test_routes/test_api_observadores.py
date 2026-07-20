@@ -42,7 +42,7 @@ class TestBuscarUsuarios:
         user_alice = _usuario_mock("u_alice", "alice@test.com", "Alice Silva", "supervisor")
         with (
             patch("app.models_usuario.Usuario.get_by_id", return_value=user_alice),
-            patch("app.routes.api.Usuario") as mock_usuario_cls,
+            patch("app.routes.api_solicitante.Usuario") as mock_usuario_cls,
         ):
             mock_usuario_cls.buscar_ativos.return_value = [user_alice]
             resp = client_logado_solicitante.get(
@@ -74,7 +74,7 @@ class TestBuscarUsuarios:
         user_outro = _usuario_mock("u_outro", "outro@test.com", "Outro Usuário", "supervisor")
         with (
             patch("app.models_usuario.Usuario.get_by_id", return_value=user_sol),
-            patch("app.routes.api.Usuario") as mock_usuario_cls,
+            patch("app.routes.api_solicitante.Usuario") as mock_usuario_cls,
         ):
             mock_usuario_cls.buscar_ativos.return_value = [user_sol, user_outro]
             resp = client_logado_solicitante.get("/api/usuarios/buscar?q=te")
@@ -96,7 +96,7 @@ class TestBuscarUsuarios:
                 "app.models_usuario.Usuario.get_by_id",
                 return_value=_usuario_mock("sol_1", "sol@test.com", "Sol", "solicitante"),
             ),
-            patch("app.routes.api.Usuario") as mock_usuario_cls,
+            patch("app.routes.api_solicitante.Usuario") as mock_usuario_cls,
         ):
             mock_usuario_cls.buscar_ativos.return_value = [
                 user_admin,
@@ -122,7 +122,7 @@ class TestBuscarUsuarios:
                 "app.models_usuario.Usuario.get_by_id",
                 return_value=_usuario_mock("sol_1", "sol@test.com", "Sol", "solicitante"),
             ),
-            patch("app.routes.api.Usuario") as mock_usuario_cls,
+            patch("app.routes.api_solicitante.Usuario") as mock_usuario_cls,
         ):
             mock_usuario_cls.buscar_ativos.return_value = usuarios
             resp = client_logado_solicitante.get("/api/usuarios/buscar?q=user")

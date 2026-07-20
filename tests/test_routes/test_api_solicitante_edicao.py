@@ -40,7 +40,7 @@ class TestEditarSolicitanteRota:
         with (
             patch("app.models_usuario.Usuario.get_by_id", return_value=sol),
             patch(
-                "app.routes.api.editar_descricao_solicitante",
+                "app.routes.api_solicitante.editar_descricao_solicitante",
                 return_value=resultado_service,
             ),
         ):
@@ -61,7 +61,7 @@ class TestEditarSolicitanteRota:
         with (
             patch("app.models_usuario.Usuario.get_by_id", return_value=sup),
             patch(
-                "app.routes.api.editar_descricao_solicitante",
+                "app.routes.api_solicitante.editar_descricao_solicitante",
                 return_value={"sucesso": False, "erro": "Sem permissão.", "codigo": 403},
             ),
         ):
@@ -80,7 +80,7 @@ class TestEditarSolicitanteRota:
         with (
             patch("app.models_usuario.Usuario.get_by_id", return_value=sup),
             patch(
-                "app.routes.api.editar_descricao_solicitante",
+                "app.routes.api_solicitante.editar_descricao_solicitante",
                 return_value={"sucesso": True},
             ),
         ):
@@ -99,7 +99,7 @@ class TestEditarSolicitanteRota:
         with (
             patch("app.models_usuario.Usuario.get_by_id", return_value=adm),
             patch(
-                "app.routes.api.editar_descricao_solicitante",
+                "app.routes.api_solicitante.editar_descricao_solicitante",
                 return_value={"sucesso": False, "erro": "Sem permissão.", "codigo": 403},
             ),
         ):
@@ -136,7 +136,7 @@ class TestEditarSolicitanteRota:
         with (
             patch("app.models_usuario.Usuario.get_by_id", return_value=sol),
             patch(
-                "app.routes.api.editar_descricao_solicitante",
+                "app.routes.api_solicitante.editar_descricao_solicitante",
                 return_value=resultado_service,
             ),
         ):
@@ -166,7 +166,7 @@ class TestEditarSolicitanteRota:
         with (
             patch("app.models_usuario.Usuario.get_by_id", return_value=sol),
             patch(
-                "app.routes.api.editar_descricao_solicitante",
+                "app.routes.api_solicitante.editar_descricao_solicitante",
                 return_value={"sucesso": True},
             ),
         ):

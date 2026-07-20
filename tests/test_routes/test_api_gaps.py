@@ -11,7 +11,7 @@ def test_download_anexo_chamado_nao_encontrado_retorna_404(client_logado_solicit
     """GET /api/download-anexo com chamado inexistente retorna 404."""
     doc = MagicMock()
     doc.exists = False
-    with patch("app.routes.api.db") as mock_db:
+    with patch("app.routes.api_solicitante.db") as mock_db:
         mock_db.collection.return_value.document.return_value.get.return_value = doc
         r = client_logado_solicitante.get("/api/download-anexo?chamado_id=ch999&chave=r2:arq.pdf")
     assert r.status_code == 404
@@ -23,9 +23,9 @@ def test_download_anexo_presign_falha_retorna_503(client_logado_solicitante):
     doc.exists = True
     doc.to_dict.return_value = {"anexos": ["r2:arq.pdf"], "anexo": None, "solicitante_id": "sol_1"}
     with (
-        patch("app.routes.api.db") as mock_db,
-        patch("app.routes.api.Chamado.from_dict", return_value=MagicMock()),
-        patch("app.routes.api.usuario_pode_ver_chamado", return_value=True),
+        patch("app.routes.api_solicitante.db") as mock_db,
+        patch("app.routes.api_solicitante.Chamado.from_dict", return_value=MagicMock()),
+        patch("app.routes.api_solicitante.usuario_pode_ver_chamado", return_value=True),
         patch("app.services.upload.gerar_url_presignada", return_value=None),
     ):
         mock_db.collection.return_value.document.return_value.get.return_value = doc
@@ -43,9 +43,9 @@ def test_download_anexo_com_campo_legado_anexo_simples(client_logado_solicitante
         "solicitante_id": "sol_1",
     }
     with (
-        patch("app.routes.api.db") as mock_db,
-        patch("app.routes.api.Chamado.from_dict", return_value=MagicMock()),
-        patch("app.routes.api.usuario_pode_ver_chamado", return_value=True),
+        patch("app.routes.api_solicitante.db") as mock_db,
+        patch("app.routes.api_solicitante.Chamado.from_dict", return_value=MagicMock()),
+        patch("app.routes.api_solicitante.usuario_pode_ver_chamado", return_value=True),
         patch(
             "app.services.upload.gerar_url_presignada", return_value="https://r2.example.com/l.pdf"
         ),
