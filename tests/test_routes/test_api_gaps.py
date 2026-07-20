@@ -366,7 +366,7 @@ def test_bulk_status_em_atendimento_fila_delega_atualizar_status_chamado(client_
 
 def test_api_notificacoes_contar_sucesso(client_logado_solicitante):
     """GET /api/notificacoes/contar retorna total_nao_lidas."""
-    with patch("app.routes.api.contar_nao_lidas", return_value=3):
+    with patch("app.routes.api_notificacoes.contar_nao_lidas", return_value=3):
         r = client_logado_solicitante.get("/api/notificacoes/contar")
     assert r.status_code == 200
     data = r.get_json()
@@ -376,7 +376,7 @@ def test_api_notificacoes_contar_sucesso(client_logado_solicitante):
 
 def test_api_notificacoes_contar_excecao_retorna_zero(client_logado_solicitante):
     """GET /api/notificacoes/contar com exceção retorna total_nao_lidas=0."""
-    with patch("app.routes.api.contar_nao_lidas", side_effect=Exception("redis down")):
+    with patch("app.routes.api_notificacoes.contar_nao_lidas", side_effect=Exception("redis down")):
         r = client_logado_solicitante.get("/api/notificacoes/contar")
     assert r.status_code == 200
     data = r.get_json()
@@ -386,7 +386,7 @@ def test_api_notificacoes_contar_excecao_retorna_zero(client_logado_solicitante)
 
 def test_api_notificacoes_ler_todas_sucesso(client_logado_solicitante):
     """POST /api/notificacoes/ler-todas marca todas como lidas e retorna count."""
-    with patch("app.routes.api.marcar_todas_como_lidas", return_value=5):
+    with patch("app.routes.api_notificacoes.marcar_todas_como_lidas", return_value=5):
         r = client_logado_solicitante.post("/api/notificacoes/ler-todas")
     assert r.status_code == 200
     data = r.get_json()
@@ -397,7 +397,7 @@ def test_api_notificacoes_ler_todas_sucesso(client_logado_solicitante):
 
 def test_api_notificacoes_ler_todas_excecao_retorna_500(client_logado_solicitante):
     """POST /api/notificacoes/ler-todas com exceção retorna 500."""
-    with patch("app.routes.api.marcar_todas_como_lidas", side_effect=Exception("err")):
+    with patch("app.routes.api_notificacoes.marcar_todas_como_lidas", side_effect=Exception("err")):
         r = client_logado_solicitante.post("/api/notificacoes/ler-todas")
     assert r.status_code == 500
     data = r.get_json()
@@ -406,7 +406,9 @@ def test_api_notificacoes_ler_todas_excecao_retorna_500(client_logado_solicitant
 
 def test_api_notificacoes_listar_excecao_retorna_500(client_logado_solicitante):
     """GET /api/notificacoes com exceção retorna 500 com estrutura segura."""
-    with patch("app.routes.api.listar_para_usuario", side_effect=Exception("redis fail")):
+    with patch(
+        "app.routes.api_notificacoes.listar_para_usuario", side_effect=Exception("redis fail")
+    ):
         r = client_logado_solicitante.get("/api/notificacoes")
     assert r.status_code == 500
     data = r.get_json()
@@ -418,7 +420,7 @@ def test_api_notificacoes_listar_excecao_retorna_500(client_logado_solicitante):
 
 def test_api_notificacoes_marcar_lida_excecao_retorna_500(client_logado_solicitante):
     """POST /api/notificacoes/<id>/ler com exceção retorna 500."""
-    with patch("app.routes.api.marcar_como_lida", side_effect=Exception("err")):
+    with patch("app.routes.api_notificacoes.marcar_como_lida", side_effect=Exception("err")):
         r = client_logado_solicitante.post("/api/notificacoes/notif_1/ler")
     assert r.status_code == 500
     data = r.get_json()
@@ -432,7 +434,7 @@ def test_api_notificacoes_marcar_lida_excecao_retorna_500(client_logado_solicita
 
 def test_api_push_subscribe_excecao_retorna_500(client_logado_solicitante):
     """POST /api/push-subscribe com exceção em salvar_inscricao retorna 500."""
-    with patch("app.routes.api.salvar_inscricao", side_effect=Exception("push err")):
+    with patch("app.routes.api_notificacoes.salvar_inscricao", side_effect=Exception("push err")):
         r = client_logado_solicitante.post(
             "/api/push-subscribe",
             json={"subscription": {"endpoint": "https://example.com/push"}},

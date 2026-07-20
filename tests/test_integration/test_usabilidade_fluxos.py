@@ -255,8 +255,8 @@ def test_usabilidade_editar_sem_permissao_retorna_403_mensagem_clara(client_loga
 def test_usabilidade_notificacoes_estrutura_fixa(client_logado_solicitante):
     """U-NOT-01: Listagem de notificações retorna notificacoes e total_nao_lidas."""
     with (
-        patch("app.routes.api.listar_para_usuario", return_value=[]),
-        patch("app.routes.api.contar_nao_lidas", return_value=0),
+        patch("app.routes.api_notificacoes.listar_para_usuario", return_value=[]),
+        patch("app.routes.api_notificacoes.contar_nao_lidas", return_value=0),
     ):
         r = client_logado_solicitante.get("/api/notificacoes")
     assert r.status_code == 200

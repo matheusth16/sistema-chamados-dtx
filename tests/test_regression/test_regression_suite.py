@@ -229,8 +229,8 @@ def test_regression_notificacoes_sem_login_401(client):
 def test_regression_notificacoes_com_login_200_estrutura(client_logado_solicitante):
     """Regressão: GET /api/notificacoes com login retorna 200 e notificacoes, total_nao_lidas."""
     with (
-        patch("app.routes.api.listar_para_usuario", return_value=[]),
-        patch("app.routes.api.contar_nao_lidas", return_value=0),
+        patch("app.routes.api_notificacoes.listar_para_usuario", return_value=[]),
+        patch("app.routes.api_notificacoes.contar_nao_lidas", return_value=0),
     ):
         r = client_logado_solicitante.get("/api/notificacoes")
     assert r.status_code == 200

@@ -416,7 +416,7 @@ def test_bulk_atualizar_status_servico_retorna_erro_e_registra(client_logado_sup
 
 
 def test_api_push_subscribe_sucesso_retorna_200(client_logado_supervisor):
-    with patch("app.routes.api.salvar_inscricao", return_value=True):
+    with patch("app.routes.api_notificacoes.salvar_inscricao", return_value=True):
         resp = client_logado_supervisor.post(
             "/api/push-subscribe",
             json={"subscription": {"endpoint": "https://push.example/x"}},

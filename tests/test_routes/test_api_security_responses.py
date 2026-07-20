@@ -231,7 +231,9 @@ def test_bulk_status_erro_por_item_usa_mensagem_generica(client_logado_superviso
 
 def test_notificacoes_marcar_lida_500_usa_erro_interno(client_logado_supervisor):
     """Falha em marcar notificação como lida retorna 500 com ERRO_INTERNO_MSG."""
-    with patch("app.routes.api.marcar_como_lida", side_effect=RuntimeError("db error")):
+    with patch(
+        "app.routes.api_notificacoes.marcar_como_lida", side_effect=RuntimeError("db error")
+    ):
         r = client_logado_supervisor.post("/api/notificacoes/notif_123/ler")
 
     assert r.status_code == 500
@@ -243,7 +245,9 @@ def test_notificacoes_marcar_lida_500_usa_erro_interno(client_logado_supervisor)
 
 def test_notificacoes_ler_todas_500_usa_erro_interno(client_logado_supervisor):
     """Falha em marcar todas as notificações retorna 500 com ERRO_INTERNO_MSG."""
-    with patch("app.routes.api.marcar_todas_como_lidas", side_effect=RuntimeError("timeout")):
+    with patch(
+        "app.routes.api_notificacoes.marcar_todas_como_lidas", side_effect=RuntimeError("timeout")
+    ):
         r = client_logado_supervisor.post("/api/notificacoes/ler-todas")
 
     assert r.status_code == 500
@@ -255,7 +259,9 @@ def test_notificacoes_ler_todas_500_usa_erro_interno(client_logado_supervisor):
 
 def test_push_subscribe_500_usa_erro_interno(client_logado_supervisor):
     """Falha ao salvar inscrição push retorna 500 com ERRO_INTERNO_MSG."""
-    with patch("app.routes.api.salvar_inscricao", side_effect=RuntimeError("redis down")):
+    with patch(
+        "app.routes.api_notificacoes.salvar_inscricao", side_effect=RuntimeError("redis down")
+    ):
         r = client_logado_supervisor.post(
             "/api/push-subscribe",
             json={"subscription": {"endpoint": "https://example.com/push", "keys": {}}},

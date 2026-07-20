@@ -313,8 +313,8 @@ def test_api_notificacoes_sem_login_401(client):
 def test_api_notificacoes_sucesso_200_estrutura(client_logado_solicitante):
     """GET /api/notificacoes retorna 200 com notificacoes e total_nao_lidas."""
     with (
-        patch("app.routes.api.listar_para_usuario", return_value=[]),
-        patch("app.routes.api.contar_nao_lidas", return_value=0),
+        patch("app.routes.api_notificacoes.listar_para_usuario", return_value=[]),
+        patch("app.routes.api_notificacoes.contar_nao_lidas", return_value=0),
     ):
         r = client_logado_solicitante.get("/api/notificacoes")
     assert r.status_code == 200
@@ -335,7 +335,7 @@ def test_api_notificacoes_ler_sem_login_401(client):
 @pytest.mark.api
 def test_api_notificacoes_ler_sucesso_200_estrutura(client_logado_solicitante):
     """POST /api/notificacoes/<id>/ler retorna 200 com sucesso."""
-    with patch("app.routes.api.marcar_como_lida", return_value=True):
+    with patch("app.routes.api_notificacoes.marcar_como_lida", return_value=True):
         r = client_logado_solicitante.post(
             "/api/notificacoes/not_123/ler",
             content_type="application/json",
