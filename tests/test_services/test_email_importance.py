@@ -385,7 +385,9 @@ def test_notificar_prazo_24h_importance_high(app):
 
     with (
         app.app_context(),
-        patch("app.services.notifications.enviar_email", return_value=(True, None)) as mock_send,
+        patch(
+            "app.services.notifications_chamados.enviar_email", return_value=(True, None)
+        ) as mock_send,
     ):
         app.config["APP_BASE_URL"] = "https://example.test"
         notificar_responsavel_prazo_24h(
@@ -406,7 +408,9 @@ def test_notificar_aprovador_projetos_importance_high(app):
 
     with (
         app.app_context(),
-        patch("app.services.notifications.enviar_email", return_value=(True, None)) as mock_send,
+        patch(
+            "app.services.notifications_chamados.enviar_email", return_value=(True, None)
+        ) as mock_send,
     ):
         app.config["APP_BASE_URL"] = "https://example.test"
         notificar_aprovador_novo_chamado(
@@ -433,7 +437,9 @@ def test_notificar_aprovador_prioridade_zero_importance_high(app):
 
     with (
         app.app_context(),
-        patch("app.services.notifications.enviar_email", return_value=(True, None)) as mock_send,
+        patch(
+            "app.services.notifications_chamados.enviar_email", return_value=(True, None)
+        ) as mock_send,
     ):
         app.config["APP_BASE_URL"] = "https://example.test"
         notificar_aprovador_novo_chamado(
@@ -460,7 +466,9 @@ def test_notificar_aprovador_padrao_importance_normal(app):
 
     with (
         app.app_context(),
-        patch("app.services.notifications.enviar_email", return_value=(True, None)) as mock_send,
+        patch(
+            "app.services.notifications_chamados.enviar_email", return_value=(True, None)
+        ) as mock_send,
     ):
         app.config["APP_BASE_URL"] = "https://example.test"
         notificar_aprovador_novo_chamado(
@@ -489,7 +497,9 @@ def test_notificar_solicitante_status_importance_normal(app):
 
     with (
         app.app_context(),
-        patch("app.services.notifications.enviar_email", return_value=(True, None)) as mock_send,
+        patch(
+            "app.services.notifications_chamados.enviar_email", return_value=(True, None)
+        ) as mock_send,
     ):
         app.config["APP_BASE_URL"] = "https://example.test"
         notificar_solicitante_status("ch1", "CH-001", "Concluído", "Projetos", solicitante)
@@ -574,7 +584,9 @@ def test_notificar_lembrete_confirmacao_1_importance_normal(app):
 
     with (
         app.app_context(),
-        patch("app.services.notifications.enviar_email", return_value=(True, None)) as mock_send,
+        patch(
+            "app.services.notifications_chamados.enviar_email", return_value=(True, None)
+        ) as mock_send,
     ):
         app.config["APP_BASE_URL"] = "https://example.test"
         notificar_solicitante_lembrete_confirmacao(
@@ -595,7 +607,9 @@ def test_notificar_lembrete_confirmacao_2_importance_high(app):
 
     with (
         app.app_context(),
-        patch("app.services.notifications.enviar_email", return_value=(True, None)) as mock_send,
+        patch(
+            "app.services.notifications_chamados.enviar_email", return_value=(True, None)
+        ) as mock_send,
     ):
         app.config["APP_BASE_URL"] = "https://example.test"
         notificar_solicitante_lembrete_confirmacao(
@@ -658,7 +672,9 @@ def test_notificar_chamado_reaberto_importance_high(app):
 
     with (
         app.app_context(),
-        patch("app.services.notifications.enviar_email", return_value=(True, None)) as mock_send,
+        patch(
+            "app.services.notifications_chamados.enviar_email", return_value=(True, None)
+        ) as mock_send,
     ):
         app.config["APP_BASE_URL"] = "https://example.test"
         notificar_supervisor_chamado_reaberto(
@@ -683,7 +699,9 @@ def test_notificar_transferencia_area_importance_high(app):
 
     with (
         app.app_context(),
-        patch("app.services.notifications.enviar_email", return_value=(True, None)) as mock_send,
+        patch(
+            "app.services.notifications_chamados.enviar_email", return_value=(True, None)
+        ) as mock_send,
     ):
         app.config["APP_BASE_URL"] = "https://example.test"
         notificar_supervisor_transferencia_area(
@@ -708,7 +726,9 @@ def test_notificar_escalonamento_colega_importance_high(app):
 
     with (
         app.app_context(),
-        patch("app.services.notifications.enviar_email", return_value=(True, None)) as mock_send,
+        patch(
+            "app.services.notifications_chamados.enviar_email", return_value=(True, None)
+        ) as mock_send,
     ):
         app.config["APP_BASE_URL"] = "https://example.test"
         notificar_supervisor_escalonamento_colega(
@@ -737,7 +757,9 @@ def test_notificar_aprovador_projetos_assunto_tem_prefixo(app):
 
     with (
         app.app_context(),
-        patch("app.services.notifications.enviar_email", return_value=(True, None)) as mock_send,
+        patch(
+            "app.services.notifications_chamados.enviar_email", return_value=(True, None)
+        ) as mock_send,
     ):
         app.config["APP_BASE_URL"] = "https://example.test"
         notificar_aprovador_novo_chamado(
@@ -764,7 +786,9 @@ def test_notificar_aprovador_padrao_assunto_sem_prefixo(app):
 
     with (
         app.app_context(),
-        patch("app.services.notifications.enviar_email", return_value=(True, None)) as mock_send,
+        patch(
+            "app.services.notifications_chamados.enviar_email", return_value=(True, None)
+        ) as mock_send,
     ):
         app.config["APP_BASE_URL"] = "https://example.test"
         notificar_aprovador_novo_chamado(

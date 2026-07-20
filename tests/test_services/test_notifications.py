@@ -185,7 +185,7 @@ def test_notificar_responsavel_prazo_24h_envia_direto(app):
 
     with (
         app.app_context(),
-        patch("app.services.notifications.enviar_email") as mock_enviar,
+        patch("app.services.notifications_chamados.enviar_email") as mock_enviar,
     ):
         app.config["APP_BASE_URL"] = "https://example.test"
         mock_enviar.return_value = (True, None)
@@ -214,7 +214,7 @@ def test_notificar_responsavel_setor_adicional_envia_direto(app):
 
     with (
         app.app_context(),
-        patch("app.services.notifications.enviar_email") as mock_enviar,
+        patch("app.services.notifications_chamados.enviar_email") as mock_enviar,
     ):
         app.config["APP_BASE_URL"] = "https://example.test"
         mock_enviar.return_value = (True, None)
@@ -248,7 +248,7 @@ def test_notificar_responsavel_chamado_confirmado_envia_email(app):
 
     with (
         app.app_context(),
-        patch("app.services.notifications.enviar_email") as mock_enviar,
+        patch("app.services.notifications_chamados.enviar_email") as mock_enviar,
     ):
         app.config["APP_BASE_URL"] = "https://example.test"
         mock_enviar.return_value = (True, None)
@@ -275,7 +275,7 @@ def test_notificar_responsavel_chamado_confirmado_skip_sem_responsavel(app):
 
     with (
         app.app_context(),
-        patch("app.services.notifications.enviar_email") as mock_enviar,
+        patch("app.services.notifications_chamados.enviar_email") as mock_enviar,
     ):
         notificar_responsavel_chamado_confirmado(
             chamado_id="ch_abc",
@@ -297,7 +297,7 @@ def test_notificar_responsavel_chamado_confirmado_skip_sem_email(app):
 
     with (
         app.app_context(),
-        patch("app.services.notifications.enviar_email") as mock_enviar,
+        patch("app.services.notifications_chamados.enviar_email") as mock_enviar,
     ):
         notificar_responsavel_chamado_confirmado(
             chamado_id="ch_abc",
@@ -318,7 +318,7 @@ def test_notificar_aprovador_envia_direto_ao_responsavel(app):
 
     with (
         app.app_context(),
-        patch("app.services.notifications.enviar_email") as mock_enviar,
+        patch("app.services.notifications_chamados.enviar_email") as mock_enviar,
     ):
         app.config["APP_BASE_URL"] = "https://example.test"
         mock_enviar.return_value = (True, None)
@@ -353,7 +353,9 @@ def test_notificar_solicitante_status_sempre_envia_sem_gate(app):
     solicitante.nome = "Usuário Teste"
     with (
         app.app_context(),
-        patch("app.services.notifications.enviar_email", return_value=(True, None)) as mock_send,
+        patch(
+            "app.services.notifications_chamados.enviar_email", return_value=(True, None)
+        ) as mock_send,
     ):
         app.config["APP_BASE_URL"] = "https://example.test"
         notificar_solicitante_status("ch1", "CH-001", "Concluído", "TI", solicitante)
@@ -366,7 +368,7 @@ def test_notificar_solicitante_status_sem_usuario_nao_envia(app):
 
     with (
         app.app_context(),
-        patch("app.services.notifications.enviar_email") as mock_send,
+        patch("app.services.notifications_chamados.enviar_email") as mock_send,
     ):
         app.config["NOTIFY_SOLICITANTE_EMAIL"] = True
         notificar_solicitante_status("ch1", "CH-001", "Concluído", "TI", None)
@@ -383,7 +385,7 @@ def test_notificar_solicitante_status_sem_email_nao_envia(app):
     solicitante.email = ""
     with (
         app.app_context(),
-        patch("app.services.notifications.enviar_email") as mock_send,
+        patch("app.services.notifications_chamados.enviar_email") as mock_send,
     ):
         app.config["NOTIFY_SOLICITANTE_EMAIL"] = True
         notificar_solicitante_status("ch1", "CH-001", "Concluído", "TI", solicitante)
@@ -401,7 +403,9 @@ def test_notificar_solicitante_status_concluido_envia_email(app):
     solicitante.nome = "Solicitante Teste"
     with (
         app.app_context(),
-        patch("app.services.notifications.enviar_email", return_value=(True, None)) as mock_send,
+        patch(
+            "app.services.notifications_chamados.enviar_email", return_value=(True, None)
+        ) as mock_send,
     ):
         app.config["NOTIFY_SOLICITANTE_EMAIL"] = True
         app.config["APP_BASE_URL"] = "https://example.test"
@@ -426,7 +430,9 @@ def test_notificar_solicitante_status_em_atendimento_envia_email(app):
     solicitante.nome = "Outro Solicitante"
     with (
         app.app_context(),
-        patch("app.services.notifications.enviar_email", return_value=(True, None)) as mock_send,
+        patch(
+            "app.services.notifications_chamados.enviar_email", return_value=(True, None)
+        ) as mock_send,
     ):
         app.config["NOTIFY_SOLICITANTE_EMAIL"] = True
         app.config["APP_BASE_URL"] = "https://example.test"
@@ -611,7 +617,7 @@ def test_notificar_aprovador_novo_chamado_html_com_ctas(app):
 
     with (
         app.app_context(),
-        patch("app.services.notifications.enviar_email") as mock_enviar,
+        patch("app.services.notifications_chamados.enviar_email") as mock_enviar,
     ):
         app.config["APP_BASE_URL"] = "https://example.test"
         mock_enviar.return_value = (True, None)
@@ -780,7 +786,9 @@ def test_notificar_aprovador_email_falha_loga_warning(app):
     responsavel = type("Resp", (), {"email": "resp@dtx.aero"})()
     with (
         app.app_context(),
-        patch("app.services.notifications.enviar_email", return_value=(False, "SMTP error")),
+        patch(
+            "app.services.notifications_chamados.enviar_email", return_value=(False, "SMTP error")
+        ),
     ):
         app.config["APP_BASE_URL"] = "https://example.test"
         notificar_aprovador_novo_chamado(
@@ -801,7 +809,7 @@ def test_notificar_prazo_24h_email_vazio_nao_envia(app):
 
     with (
         app.app_context(),
-        patch("app.services.notifications.enviar_email") as mock_send,
+        patch("app.services.notifications_chamados.enviar_email") as mock_send,
     ):
         notificar_responsavel_prazo_24h(
             chamado_id="ch1",
@@ -817,7 +825,7 @@ def test_notificar_prazo_24h_email_falha_nao_levanta(app):
 
     with (
         app.app_context(),
-        patch("app.services.notifications.enviar_email", return_value=(False, "err")),
+        patch("app.services.notifications_chamados.enviar_email", return_value=(False, "err")),
     ):
         app.config["APP_BASE_URL"] = "https://example.test"
         notificar_responsavel_prazo_24h(
@@ -868,7 +876,7 @@ def test_notificar_setor_adicional_email_vazio_nao_envia(app):
 
     with (
         app.app_context(),
-        patch("app.services.notifications.enviar_email") as mock_send,
+        patch("app.services.notifications_chamados.enviar_email") as mock_send,
     ):
         notificar_responsavel_setor_adicional(
             chamado_id="ch1",
@@ -885,7 +893,7 @@ def test_notificar_setor_adicional_email_falha_nao_levanta(app):
 
     with (
         app.app_context(),
-        patch("app.services.notifications.enviar_email", return_value=(False, "err")),
+        patch("app.services.notifications_chamados.enviar_email", return_value=(False, "err")),
     ):
         app.config["APP_BASE_URL"] = "https://example.test"
         notificar_responsavel_setor_adicional(
@@ -906,7 +914,7 @@ def test_notificar_solicitante_status_email_falha_nao_levanta(app):
     solicitante.nome = "Sol"
     with (
         app.app_context(),
-        patch("app.services.notifications.enviar_email", return_value=(False, "err")),
+        patch("app.services.notifications_chamados.enviar_email", return_value=(False, "err")),
     ):
         app.config["APP_BASE_URL"] = "https://example.test"
         notificar_solicitante_status("ch1", "CH-001", "Concluído", "TI", solicitante)
@@ -924,7 +932,9 @@ def test_notificar_solicitante_confirmacao_pendente_envia_email(app):
     solicitante.nome = "Sol"
     with (
         app.app_context(),
-        patch("app.services.notifications.enviar_email", return_value=(True, None)) as mock_send,
+        patch(
+            "app.services.notifications_chamados.enviar_email", return_value=(True, None)
+        ) as mock_send,
     ):
         app.config["APP_BASE_URL"] = "https://example.test"
         notificar_solicitante_confirmacao_pendente("ch1", "CH-001", "TI", solicitante)
@@ -938,7 +948,7 @@ def test_notificar_solicitante_confirmacao_pendente_sem_usuario_nao_envia(app):
 
     with (
         app.app_context(),
-        patch("app.services.notifications.enviar_email") as mock_send,
+        patch("app.services.notifications_chamados.enviar_email") as mock_send,
     ):
         notificar_solicitante_confirmacao_pendente("ch1", "CH-001", "TI", None)
 
@@ -953,7 +963,7 @@ def test_notificar_solicitante_confirmacao_pendente_sem_email_nao_envia(app):
     solicitante.email = ""
     with (
         app.app_context(),
-        patch("app.services.notifications.enviar_email") as mock_send,
+        patch("app.services.notifications_chamados.enviar_email") as mock_send,
     ):
         notificar_solicitante_confirmacao_pendente("ch1", "CH-001", "TI", solicitante)
 
@@ -969,7 +979,7 @@ def test_notificar_solicitante_confirmacao_pendente_falha_nao_levanta(app):
     solicitante.nome = "Sol"
     with (
         app.app_context(),
-        patch("app.services.notifications.enviar_email", return_value=(False, "err")),
+        patch("app.services.notifications_chamados.enviar_email", return_value=(False, "err")),
     ):
         notificar_solicitante_confirmacao_pendente("ch1", "CH-001", "TI", solicitante)
 
@@ -983,7 +993,9 @@ def test_notificar_solicitante_confirmacao_pendente_sem_base_url(app):
     solicitante.nome = "Sol"
     with (
         app.app_context(),
-        patch("app.services.notifications.enviar_email", return_value=(True, None)) as mock_send,
+        patch(
+            "app.services.notifications_chamados.enviar_email", return_value=(True, None)
+        ) as mock_send,
     ):
         app.config["APP_BASE_URL"] = ""
         notificar_solicitante_confirmacao_pendente("ch1", "CH-001", "TI", solicitante)
@@ -1000,7 +1012,7 @@ def test_notificar_setores_adicionais_lista_vazia_retorna_imediatamente(app):
 
     with (
         app.app_context(),
-        patch("app.services.notifications.enviar_email") as mock_send,
+        patch("app.services.notifications_chamados.enviar_email") as mock_send,
     ):
         notificar_setores_adicionais_chamado(
             chamado_id="ch1",
@@ -1027,7 +1039,9 @@ def test_notificar_setores_adicionais_com_supervisor_envia_email(app):
         app.app_context(),
         patch("app.models_usuario.Usuario.get_supervisores_por_area", return_value=[sup]),
         patch("app.utils_areas.setor_para_area", return_value="Manutencao"),
-        patch("app.services.notifications.enviar_email", return_value=(True, None)) as mock_send,
+        patch(
+            "app.services.notifications_chamados.enviar_email", return_value=(True, None)
+        ) as mock_send,
     ):
         app.config["APP_BASE_URL"] = "https://example.test"
         notificar_setores_adicionais_chamado(
@@ -1057,7 +1071,7 @@ def test_notificar_setores_adicionais_supervisor_sem_email_ignorado(app):
         app.app_context(),
         patch("app.models_usuario.Usuario.get_supervisores_por_area", return_value=[sup]),
         patch("app.utils_areas.setor_para_area", return_value=None),
-        patch("app.services.notifications.enviar_email") as mock_send,
+        patch("app.services.notifications_chamados.enviar_email") as mock_send,
     ):
         notificar_setores_adicionais_chamado(
             chamado_id="ch2",
@@ -1085,7 +1099,9 @@ def test_notificar_transferencia_area_chama_enviar_email_com_area_correta(app):
 
     with (
         app.app_context(),
-        patch("app.services.notifications.enviar_email", return_value=(True, None)) as mock_send,
+        patch(
+            "app.services.notifications_chamados.enviar_email", return_value=(True, None)
+        ) as mock_send,
     ):
         app.config["APP_BASE_URL"] = "https://example.test"
         notificar_supervisor_transferencia_area(
@@ -1115,7 +1131,9 @@ def test_notificar_escalonamento_colega_chama_enviar_email(app):
 
     with (
         app.app_context(),
-        patch("app.services.notifications.enviar_email", return_value=(True, None)) as mock_send,
+        patch(
+            "app.services.notifications_chamados.enviar_email", return_value=(True, None)
+        ) as mock_send,
     ):
         app.config["APP_BASE_URL"] = "https://example.test"
         notificar_supervisor_escalonamento_colega(
@@ -1144,7 +1162,7 @@ def test_notificar_transferencia_sem_email_destino_nao_dispara(app):
 
     with (
         app.app_context(),
-        patch("app.services.notifications.enviar_email") as mock_send,
+        patch("app.services.notifications_chamados.enviar_email") as mock_send,
     ):
         notificar_supervisor_transferencia_area(
             chamado_id="ch_fase3c",
@@ -1170,7 +1188,7 @@ def test_notificar_setores_adicionais_envio_falho_nao_levanta(app):
         app.app_context(),
         patch("app.models_usuario.Usuario.get_supervisores_por_area", return_value=[sup]),
         patch("app.utils_areas.setor_para_area", return_value=None),
-        patch("app.services.notifications.enviar_email", return_value=(False, "err")),
+        patch("app.services.notifications_chamados.enviar_email", return_value=(False, "err")),
     ):
         app.config["APP_BASE_URL"] = "https://example.test"
         notificar_setores_adicionais_chamado(
@@ -1197,7 +1215,9 @@ def test_notificar_participante_incluido_envia_email(app):
 
     with (
         app.app_context(),
-        patch("app.services.notifications.enviar_email", return_value=(True, None)) as mock_send,
+        patch(
+            "app.services.notifications_chamados.enviar_email", return_value=(True, None)
+        ) as mock_send,
     ):
         app.config["APP_BASE_URL"] = "https://example.test"
         notificar_participante_incluido(
@@ -1222,7 +1242,7 @@ def test_notificar_participante_incluido_sem_usuario_nao_envia(app):
 
     with (
         app.app_context(),
-        patch("app.services.notifications.enviar_email") as mock_send,
+        patch("app.services.notifications_chamados.enviar_email") as mock_send,
     ):
         notificar_participante_incluido(
             chamado_id="ch_p2",
@@ -1244,7 +1264,7 @@ def test_notificar_participante_incluido_email_falha_nao_levanta(app):
 
     with (
         app.app_context(),
-        patch("app.services.notifications.enviar_email", return_value=(False, "err")),
+        patch("app.services.notifications_chamados.enviar_email", return_value=(False, "err")),
     ):
         app.config["APP_BASE_URL"] = "https://example.test"
         notificar_participante_incluido(
@@ -1266,7 +1286,9 @@ def test_notificar_owner_todos_participantes_concluiram_envia_email(app):
 
     with (
         app.app_context(),
-        patch("app.services.notifications.enviar_email", return_value=(True, None)) as mock_send,
+        patch(
+            "app.services.notifications_chamados.enviar_email", return_value=(True, None)
+        ) as mock_send,
     ):
         app.config["APP_BASE_URL"] = "https://example.test"
         notificar_owner_todos_participantes_concluiram(
@@ -1289,7 +1311,7 @@ def test_notificar_owner_todos_participantes_concluiram_sem_usuario_nao_envia(ap
 
     with (
         app.app_context(),
-        patch("app.services.notifications.enviar_email") as mock_send,
+        patch("app.services.notifications_chamados.enviar_email") as mock_send,
     ):
         notificar_owner_todos_participantes_concluiram(
             chamado_id="ch_o2",
@@ -1311,7 +1333,7 @@ def test_notificar_owner_todos_participantes_concluiram_email_falha_nao_levanta(
 
     with (
         app.app_context(),
-        patch("app.services.notifications.enviar_email", return_value=(False, "err")),
+        patch("app.services.notifications_chamados.enviar_email", return_value=(False, "err")),
     ):
         app.config["APP_BASE_URL"] = "https://example.test"
         notificar_owner_todos_participantes_concluiram(
