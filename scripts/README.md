@@ -310,7 +310,7 @@ python scripts/migrar_supervisor_ids_com_acesso.py --apply
 3. Executar `--apply` para backfill dos chamados legados
 4. Confirmar no console Firestore que chamados legados têm o campo preenchido
 
-> **Referência:** `app/services/permissions.py` — `calcular_supervisor_ids_com_acesso()`; `app/routes/api.py` — `_aplicar_filtro_perfil()` query `array_contains`; `docs/adr/004-escalonamento-sla-gerencial.md` — ADR-004 Fase 2.
+> **Referência:** `app/services/permissions.py` — `calcular_supervisor_ids_com_acesso()`; `app/routes/api_chamados.py` — `_aplicar_filtro_perfil()` query `array_contains`; `docs/adr/004-escalonamento-sla-gerencial.md` — ADR-004 Fase 2.
 
 ### migrar_participantes.py
 

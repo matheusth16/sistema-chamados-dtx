@@ -21,7 +21,7 @@
 
 ## Requisitos
 
-- Python 3.12+
+- Python 3.14+
 - Firebase Account com Firestore e Firebase Storage
 - pip (gerenciador de pacotes Python)
 
@@ -119,12 +119,17 @@ Endpoints principais:
 sistema-chamados-dtx/
 ├── app/
 │   ├── routes/                   # Rotas Flask
-│   │   ├── api.py                # Endpoints JSON/API
+│   │   ├── api_chamados.py       # Endpoints JSON/API — status, edição, bulk, onboarding
+│   │   ├── api_colaboracao.py    # Endpoints JSON/API — escalonamento, participantes
+│   │   ├── api_notificacoes.py   # Endpoints JSON/API — notificações in-app, web push
+│   │   ├── api_solicitante.py    # Endpoints JSON/API — self-service do solicitante
 │   │   ├── auth.py               # Login, logout, senha
 │   │   ├── chamados.py           # Criação e listagem (solicitante)
 │   │   ├── dashboard.py          # Dashboard (supervisor/admin)
 │   │   ├── usuarios.py           # Gestão de usuários (admin)
-│   │   └── categorias.py         # Gestão de categorias (admin)
+│   │   ├── categorias.py         # Gestão de categorias (admin)
+│   │   ├── admin_global.py       # Governança de admins/supervisores
+│   │   └── mfa.py                # Configuração de MFA
 │   ├── services/                 # Lógica de negócio
 │   │   ├── chamados_criacao_service.py
 │   │   ├── chamados_listagem_service.py

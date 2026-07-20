@@ -154,8 +154,8 @@ docker compose up -d --build
 
 O `Dockerfile` é multi-stage:
 1. **css-builder** (Node 20) — gera o Tailwind purgado (`tailwind.min.css`)
-2. **builder** (Python 3.12) — instala dependências
-3. **runtime** (Python 3.12-slim) — imagem final, usuário não-root, gunicorn
+2. **builder** (Python 3.14) — instala dependências
+3. **runtime** (Python 3.14-slim) — imagem final, usuário não-root, gunicorn
 
 O `start.sh` sobe o gunicorn: **1 worker / 8 threads** (`gthread`), bind `0.0.0.0:8080`,
 timeout 120s. O compose mapeia `5000:8080` por padrão.

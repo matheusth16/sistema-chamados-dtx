@@ -111,7 +111,7 @@ Quando o operador escalar para múltiplos workers/containers, basta definir `GUN
 
 ### Autenticação do endpoint deep health (Ressalva R1 — pós ADR)
 
-O finding MEDIUM identificado pós-implementação (HEALTH_SECRET em query string `?token=` visível em access logs) foi resolvido em `app/routes/api.py`:
+O finding MEDIUM identificado pós-implementação (HEALTH_SECRET em query string `?token=` visível em access logs) foi resolvido em `app/routes/api_chamados.py`:
 
 - Canal primário: header `X-Health-Token` (não aparece em access logs do Gunicorn/nginx)
 - Canal deprecado: `?token=` mantido para compatibilidade UptimeRobot/BetterUptime legado

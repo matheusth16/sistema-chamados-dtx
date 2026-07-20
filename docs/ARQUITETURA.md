@@ -34,7 +34,7 @@
 
 ## 1. Visão geral arquitetural
 
-O Sistema de Chamados DTX Aerospace é uma aplicação web monolítica construída com Flask 3.0, organizada em camadas bem definidas: rotas (HTTP handler), serviços (lógica de negócio) e modelos (representação de dados). A persistência é feita integralmente no Google Firestore (banco NoSQL em nuvem), arquivos são armazenados no Cloudflare R2 com fallback em cascata para Firebase Storage e disco local. O sistema roda em container Docker (servidor local/on-premise, via `docker-compose.yml` + `Dockerfile`), servido por Gunicorn (1 worker, 8 threads), e usa Redis para rate limiting e cache em produção. E-mails transacionais são enviados exclusivamente via Microsoft Graph API (client credentials). A internacionalização (PT-BR, EN, ES) combina `translations.json` (UI) com tradução automática de categorias via `translation_service.py` (mapa estático + MyMemory API). Gates de produção (pai + sub-etapas) são gerenciados em `categorias_gates` no Firestore, com catálogo canônico em `app/gates_config.py`. A interface é renderizada server-side com Jinja2, complementada por Tailwind CSS (compilado no Docker via Node.js 20) e animações GSAP. Jobs agendados (relatórios, alertas, reset de ranking semanal, limpeza de contadores_uso) são gerenciados pelo APScheduler embutido na aplicação, com **distributed lock Redis** (`scheduler_lock.py`) para evitar execução duplicada em multi-worker. A coleção `contadores_uso` tem política de retenção de **90 dias**: documentos mais antigos são removidos pelo job `limpar_contadores_uso` toda domingo às 02h00 BRT; o CLI `scripts/limpar_contadores_uso.py` permite execuções manuais em dry-run ou apply. O sistema inclui gamificação (EXP, níveis, conquistas), notificações push via Web Push API (VAPID + Service Worker) e o perfil `admin_global` para governança de administradores.
+O Sistema de Chamados DTX Aerospace é uma aplicação web monolítica construída com Flask 3.1, organizada em camadas bem definidas: rotas (HTTP handler), serviços (lógica de negócio) e modelos (representação de dados). A persistência é feita integralmente no Google Firestore (banco NoSQL em nuvem), arquivos são armazenados no Cloudflare R2 com fallback em cascata para Firebase Storage e disco local. O sistema roda em container Docker no **Azure Container Apps** (imagem publicada no GHCR via CI/CD, ver seção 15), servido por Gunicorn (1 worker, 8 threads), e usa Redis para rate limiting e cache em produção. E-mails transacionais são enviados exclusivamente via Microsoft Graph API (client credentials). A internacionalização (PT-BR, EN, ES) combina `translations.json` (UI) com tradução automática de categorias via `translation_service.py` (mapa estático + MyMemory API). Gates de produção (pai + sub-etapas) são gerenciados em `categorias_gates` no Firestore, com catálogo canônico em `app/gates_config.py`. A interface é renderizada server-side com Jinja2, complementada por Tailwind CSS (compilado no Docker via Node.js 20) e animações GSAP. Jobs agendados (relatórios, alertas, reset de ranking semanal, limpeza de contadores_uso) são gerenciados pelo APScheduler embutido na aplicação, com **distributed lock Redis** (`scheduler_lock.py`) para evitar execução duplicada em multi-worker. A coleção `contadores_uso` tem política de retenção de **90 dias**: documentos mais antigos são removidos pelo job `limpar_contadores_uso` toda domingo às 02h00 BRT; o CLI `scripts/limpar_contadores_uso.py` permite execuções manuais em dry-run ou apply. O sistema inclui gamificação (EXP, níveis, conquistas), notificações push via Web Push API (VAPID + Service Worker) e o perfil `admin_global` para governança de administradores.
 
 ---
 
@@ -80,8 +80,8 @@ C4Container
     Person(usuario, "Usuário (qualquer perfil)", "Acessa via navegador web")
 
     Container(proxy, "Proxy Reverso", "Nginx", "Termina TLS, repassa para Gunicorn")
-    Container(gunicorn, "Gunicorn", "Python WSGI Server", "1 worker / 8 threads (gthread) em container Docker (servidor local/on-premise)")
-    Container(flask_app, "Aplicação Flask", "Python 3.12+ / Flask 3.0", "Lógica de negócio, rotas, templates, scheduler, gamificação, web push")
+    Container(gunicorn, "Gunicorn", "Python WSGI Server", "1 worker / 8 threads (gthread) em container Docker no Azure Container Apps")
+    Container(flask_app, "Aplicação Flask", "Python 3.14 / Flask 3.1", "Lógica de negócio, rotas, templates, scheduler, gamificação, web push")
     Container(redis_cache, "Redis", "Redis 7+", "Rate limiting, cache de sessão e dados estáticos")
     Container(service_worker, "Service Worker (sw.js)", "JavaScript no navegador", "Recebe e exibe notificações push")
 
@@ -117,7 +117,10 @@ C4Component
         Component(auth_routes, "Routes: Auth", "app/routes/auth.py", "Login, logout, troca de senha")
         Component(chamados_routes, "Routes: Chamados", "app/routes/chamados.py", "Criação e listagem de chamados")
         Component(dashboard_routes, "Routes: Dashboard", "app/routes/dashboard.py", "Painel supervisor/admin, export")
-        Component(api_routes, "Routes: API", "app/routes/api.py", "Endpoints JSON (status, notif, push)")
+        Component(api_chamados_routes, "Routes: API Chamados", "app/routes/api_chamados.py", "Endpoints JSON: status, edição, bulk, paginação, onboarding")
+        Component(api_colaboracao_routes, "Routes: API Colaboração", "app/routes/api_colaboracao.py", "Endpoints JSON: escalonamento, participantes")
+        Component(api_notificacoes_routes, "Routes: API Notificações", "app/routes/api_notificacoes.py", "Endpoints JSON: notificações in-app, web push")
+        Component(api_solicitante_routes, "Routes: API Solicitante", "app/routes/api_solicitante.py", "Endpoints JSON: self-service do solicitante")
         Component(usuarios_routes, "Routes: Usuários", "app/routes/usuarios.py", "CRUD usuários (admin)")
         Component(categorias_routes, "Routes: Categorias", "app/routes/categorias.py", "CRUD setores, gates, impactos + tradução automática")
         Component(admin_global_routes, "Routes: Admin Global", "app/routes/admin_global.py", "Governança de admins/supervisores (perfil admin_global)")
@@ -125,7 +128,7 @@ C4Component
         Component(criacao_svc, "Service: Criação", "app/services/chamados_criacao_service.py", "Cria chamado: upload, numeração, histórico, notif")
         Component(status_svc, "Service: Status", "app/services/status_service.py", "Atualiza status, histórico, gamificação")
         Component(upload_svc, "Service: Upload", "app/services/upload.py", "R2 → Firebase Storage → disco")
-        Component(notif_svc, "Service: Notificações", "app/services/notifications.py", "E-mail via Microsoft Graph API")
+        Component(notif_svc, "Service: Notificações", "app/services/notifications_core.py (+ notifications_chamados/_escalonamento/_usuarios.py; notifications.py é só barrel de reexport)", "E-mail via Microsoft Graph API")
         Component(webpush_svc, "Service: Web Push", "app/services/webpush_service.py + notifications_inapp.py", "Inscrições VAPID + envio push")
         Component(report_svc, "Service: Relatório", "app/services/report_service.py", "Relatório semanal HTML para e-mail")
         Component(analytics_svc, "Service: Analytics", "app/services/analytics.py", "Métricas, SLA, relatórios")
@@ -148,7 +151,7 @@ C4Component
     Rel(criacao_svc, notif_svc, "Notifica aprovador")
     Rel(criacao_svc, webpush_svc, "Push in-app")
     Rel(dashboard_routes, analytics_svc, "Métricas e relatórios")
-    Rel(api_routes, status_svc, "Atualiza status")
+    Rel(api_chamados_routes, status_svc, "Atualiza status")
     Rel(status_svc, gamif_svc, "Adiciona EXP")
     Rel(chamados_routes, gates_svc, "Sub-etapas do formulário")
     Rel(gates_svc, gates_cfg, "Fallback estático")
@@ -324,7 +327,10 @@ sequenceDiagram
 | `app/routes/auth.py` | Login, logout, troca de senha obrigatória | LoginAttemptTracker, models_usuario | Todos |
 | `app/routes/chamados.py` | Criação e listagem de chamados (solicitante) | chamados_criacao_service, validators | Todos |
 | `app/routes/dashboard.py` | Dashboard, visualização, histórico, export | dashboard_service, status_service | supervisor, admin |
-| `app/routes/api.py` | Endpoints JSON (status, notificações, push) | permissions, status_service | Todos |
+| `app/routes/api_chamados.py` | Endpoints JSON: status, edição, bulk, paginação, onboarding, health | permissions, status_service | Todos |
+| `app/routes/api_colaboracao.py` | Endpoints JSON: escalonamento, participantes | permission_validation | supervisor, admin |
+| `app/routes/api_notificacoes.py` | Endpoints JSON: notificações in-app, web push | notifications_inapp, webpush_service | Todos |
+| `app/routes/api_solicitante.py` | Endpoints JSON: self-service do solicitante (download-anexo, editar, cancelar) | permissions | solicitante |
 | `app/routes/usuarios.py` | CRUD de usuários | models_usuario, notifications | admin |
 | `app/routes/categorias.py` | CRUD de setores, gates (pai + sub-etapa), impactos; tradução automática via `translation_service` | models_categorias, translation_service, gates_service | admin |
 | `app/routes/admin_global.py` | Dashboard `/admin-global`; promover supervisor→admin e rebaixar admin→supervisor | models_usuario, decoradores | admin_global |
@@ -349,7 +355,7 @@ sequenceDiagram
 | `app/services/permissions.py` | RBAC: verifica quem pode ver/editar cada chamado | models_usuario | — |
 | `app/services/analytics.py` | Métricas de SLA, relatório completo (max 2000 docs), KPIs | Firestore, cache | Cobertura 60% |
 | `app/services/report_service.py` | Relatório semanal HTML para e-mail; `_tabela_html` com `html.escape()` (F-15 resolvido); N+1 em admins resolvido (F-24 — Onda B: batch `Usuario.get_by_ids`) | Firestore, Usuario, notif | — |
-| `app/services/notifications.py` | E-mail transacional via Microsoft Graph API (client credentials) | email_templates, Graph API | Cobertura 98% (S3-02) |
+| `app/services/notifications_core.py` (+ `notifications_chamados/_escalonamento/_usuarios.py`; `notifications.py` é barrel de reexport) | E-mail transacional via Microsoft Graph API (client credentials) | email_templates, Graph API | Cobertura 98% (S3-02) |
 | `app/services/notifications_inapp.py` | Notificações in-app via Web Push (VAPID) | pywebpush, webpush_service | — |
 | `app/services/webpush_service.py` | Gerencia inscrições push: `MAX_INSCRICOES=20` com `.limit()` (F-17 resolvido 2026-06-18) | Firestore | — |
 | `app/services/login_attempts.py` | Lockout de IP e e-mail, contador de tentativas | cache | — |
@@ -369,7 +375,7 @@ sequenceDiagram
 | `app/services/onboarding_service.py` | Tour de boas-vindas: avancar_passo, concluir_onboarding | — |
 | `app/services/email_templates.py` | Builders HTML reutilizáveis para e-mails (`build_email_shell`, `build_detail_table`) | Usado por `notifications.py` |
 | `app/services/notify_retry.py` | `executar_com_retry()` com backoff exponencial para envio de e-mail | Usado em `usuarios.py` |
-| `app/services/permission_validation.py` | `supervisor_pode_alterar_chamado()`, `verificar_permissao_mudanca_status()` | Usado em `api.py` |
+| `app/services/permission_validation.py` | `supervisor_pode_alterar_chamado()`, `verificar_permissao_mudanca_status()` | Usado em `api_chamados.py`, `api_colaboracao.py` |
 | `app/services/ab_service.py` | A/B test determinístico por UID (`get_variante`) — experimento AB-001 no formulário de chamados | Usado em `chamados.py`, `formulario.html` |
 
 ### Sistema de Gates (produção)
@@ -430,7 +436,7 @@ Validação (validators.py)
 | `app/static/js/onboarding.js` | Tour de onboarding; hover via `mouseenter`/`mouseleave` em `bindCardEvents()` (F-48 resolvido 2026-06-18) | — |
 | `app/static/js/table-filters.js` | Filtros de tabela client-side; strings i18n via `DTX_MSGS` do servidor (F-37, F-38, F-44 resolvidos) | — |
 | `app/static/js/dashboard_otimizacoes.js` | Status, cancelamento via modal `<dialog>`; `DTX_MSGS`/`DTX_URLS`/`DTX_STATUS_VALIDOS` via servidor (F-33, F-34, F-36, F-46 resolvidos); guard `getElementById('dtx-dashboard-fade-keyframes')` evita dedup de `<style>` (F-41 resolvido 2026-06-19) | — |
-| `app/static/js/sw.js` | Service Worker Web Push; erros logados com `console.error` (F-43 resolvido) | — |
+| `/sw.js` (servido dinamicamente por `app/routes/api_notificacoes.py`, não é arquivo estático) | Service Worker Web Push; erros logados com `console.error` (F-43 resolvido) | — |
 
 ### Scripts
 
@@ -508,10 +514,10 @@ O sistema suporta notificações push via Web Push API com chaves VAPID. O usuá
 
 | Componente | Arquivo | Responsabilidade |
 |---|---|---|
-| Service Worker | `app/static/js/sw.js` | Roda em segundo plano no browser; recebe e exibe push |
+| Service Worker | `/sw.js` — servido dinamicamente por `app/routes/api_notificacoes.py` (`service_worker_js()`), não é um arquivo estático | Roda em segundo plano no browser; recebe e exibe push |
 | Serviço de inscrições | `app/services/webpush_service.py` | CRUD de inscrições push no Firestore |
 | Envio de push | `app/services/notifications_inapp.py` | Usa pywebpush para enviar notificações |
-| Rota de inscrição | `app/routes/api.py` `/api/webpush/*` | Endpoints para subscribe/unsubscribe |
+| Rota de inscrição | `app/routes/api_notificacoes.py` — `/api/push-vapid-public` (GET), `/api/push-subscribe` (POST) | Endpoints de inscrição push; **não há rota de unsubscribe implementada hoje** |
 
 ### Fluxo completo
 
@@ -660,14 +666,14 @@ sequenceDiagram
 | **Brute-force lockout** | LoginAttemptTracker: IP + email, contador incremental | `app/services/login_attempts.py` |
 | **Validação de uploads** | Extensão em allowlist + verificação magic bytes | `app/services/validators.py`, `upload.py` |
 | **IDOR prevention** | Verificação `chamado_pertence_ao_usuario` antes de qualquer acesso a documento | `app/services/permissions.py` |
-| **Download seguro** | URLs pré-assinadas R2 com validade 1h + verificação de permissão | `app/routes/api.py` |
+| **Download seguro** | URLs pré-assinadas R2 com validade 1h + verificação de permissão | `app/routes/api_solicitante.py` |
 | **RBAC** | Decoradores @requer_perfil verificam perfil + área + status ativo | `app/decoradores.py` |
 | **Criptografia PII** | Criptografia opcional de campos sensíveis (ENCRYPT_PII_AT_REST) | `app/models_usuario.py`, config |
 | **Headers de segurança** | Content-Security-Policy, X-Frame-Options, X-Content-Type-Options | `app/__init__.py` (after_request) |
 | **Inatividade** | Logout automático após 15 minutos de inatividade | `app/routes/auth.py`, JS |
 | **Secrets em variáveis** | Nenhuma credencial no código-fonte; todas via `.env` / variáveis de ambiente | `.gitignore`, `config.py` |
 | **Paginação** | Todas as consultas ao Firestore usam `.limit()` e `.start_after()` | `app/services/chamados_listagem_service.py` |
-| **Bulk action limit** | Máximo 50 IDs por operação em lote (bulk-status) | `app/routes/api.py` |
+| **Bulk action limit** | Máximo 50 IDs por operação em lote (bulk-status) | `app/routes/api_chamados.py` |
 | **VAPID Web Push** | Chaves VAPID em variáveis de ambiente; inscrições em Firestore | `app/services/webpush_service.py`, `sw.js` |
 
 ---
@@ -706,16 +712,17 @@ sequenceDiagram
 
 ```mermaid
 flowchart LR
-    DEV([Dev: git push]) --> GH[GitHub — branch main]
-    GH --> BUILD[docker compose build\nStage 0: Node 20 — npm ci + build tailwind.min.css\nStage 1: Python 3.12 — pip install + copia app]
-    BUILD --> RUN[docker compose up -d\nservidor local / on-premise]
-    RUN --> GUNIC[Gunicorn via start.sh\n1 worker / 8 threads — gthread]
+    DEV([Dev: git push]) --> GH[GitHub Actions\ncd-build-image.yml]
+    GH --> BUILD[docker buildx build\nStage 0: Node 20 — npm ci + build tailwind.min.css\nStage 1: Python 3.14 — pip install\nStage 2: runtime]
+    BUILD --> PUSH[Push da imagem\nghcr.io/matheusth16/sistema-chamados-dtx]
+    PUSH --> AZURE[az containerapp update\nAzure Container Apps]
+    AZURE --> GUNIC[Gunicorn via start.sh\n1 worker / 8 threads — gthread]
     GUNIC --> WARM[App warmup\nFirestore ping + cache init]
     WARM --> SCHED[APScheduler\nstart() — jobs agendados]
     SCHED --> READY([Pronto para tráfego])
 ```
 
-> **Nota:** `railway.toml`, `cloudbuild.yaml` e `.gcloudignore` foram removidos (2026-06). O deploy atual usa Docker em servidor local/on-premise: `docker-compose.yml` + `Dockerfile`.
+> **Nota:** `railway.toml`, `cloudbuild.yaml` e `.gcloudignore` foram removidos (2026-06). O deploy de produção hoje é **Azure Container Apps** (free tier, plano Consumption): o workflow `.github/workflows/cd-build-image.yml` builda a imagem Docker, publica no GHCR (repositório público) e roda `az containerapp update` a cada push em `main`. `docker-compose.yml` + `Dockerfile` continuam existindo, mas servem apenas para desenvolvimento local — não são o mecanismo de produção. Ver `docs/DEPLOYMENT_PLAN.md` para o passo a passo completo.
 
 ### Variáveis de ambiente obrigatórias em produção
 
@@ -777,7 +784,7 @@ As rotas usam imports inline (`from app.services.X import func`). O mock deve se
 with patch("app.services.edicao_chamado_service.db") as mock_db: ...
 
 # Errado (mock inerte — teste passa mesmo com bug)
-with patch("app.routes.api.db") as mock_db: ...  # NAO FAZER
+with patch("app.routes.api_chamados.db") as mock_db: ...  # NAO FAZER
 ```
 
 ### Fixtures do conftest.py

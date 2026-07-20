@@ -150,7 +150,7 @@
 
 ### Comportamento de visibilidade pós-implementação (Fase 2)
 
-Após a Fase 2, a função `usuario_pode_ver_chamado` em `app/services/permissions.py` e o filtro `_aplicar_filtro_perfil` em `app/routes/api.py` passarão a usar a lógica composta:
+Após a Fase 2, a função `usuario_pode_ver_chamado` em `app/services/permissions.py` e o filtro `_aplicar_filtro_perfil` em `app/routes/api_chamados.py` passarão a usar a lógica composta:
 
 | Condição | Supervisor vê? | Admin vê? | Gestor vê? |
 |----------|---------------|-----------|------------|

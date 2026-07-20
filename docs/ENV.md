@@ -270,8 +270,9 @@ Recomenda-se integrar `pip audit` no pipeline de CI e corrigir vulnerabilidades 
 
 O Firebase é inicializado em `app/database.py`:
 
-- **Desenvolvimento e produção (Docker/servidor local):** arquivo `credentials.json` na raiz do projeto (conta de serviço do Firebase), montado no container via volume.
-- **Application Default Credentials (ADC):** suportado como fallback se `credentials.json` não estiver presente e o ambiente fornecer credenciais padrão.
+- **Produção (Azure Container Apps):** variável de ambiente `GOOGLE_CREDENTIALS_JSON` (conteúdo do JSON da conta de serviço), lida primeiro por `app/database.py`.
+- **Desenvolvimento local (docker-compose):** arquivo `credentials.json` na raiz do projeto, montado no container via volume — usado como segunda opção se `GOOGLE_CREDENTIALS_JSON` não estiver definida.
+- **Application Default Credentials (ADC):** suportado como último fallback se nem a env var nem `credentials.json` estiverem presentes e o ambiente fornecer credenciais padrão.
 
 | Variável | Descrição | Obrigatório em produção |
 |----------|-----------|-------------------------|

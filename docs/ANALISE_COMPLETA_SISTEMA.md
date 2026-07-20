@@ -112,7 +112,7 @@ Firebase/Firestore (Database)
 | **Auth** | Flask-Login (sessão) |
 | **Storage** | Cloudflare R2 (anexos) com fallback Firebase Storage |
 | **E-mail** | Microsoft Graph API |
-| **Deploy** | Container Docker em servidor local/on-premise |
+| **Deploy** | Container Docker no Azure Container Apps (imagem publicada no GHCR via CI/CD) |
 | **Server** | Gunicorn (1 worker / 8 threads, gthread) |
 | **Cache (Opcional)** | Redis |
 
@@ -293,17 +293,15 @@ PERMANENT_SESSION_LIFETIME = 86400
 - **Sugestão:** Ajustar para 500-1000 req/hora
 - **Tempo:** 10min
 
-#### #3: Docstring contraditória (CSRF em API)
-- **Arquivo:** `app/routes/api.py` (atualizar_status_ajax)
-- **Problema:** Docstring diz "isento" mas requer CSRF token
-- **Risco:** Confunde manutenção futura
+#### #3: Docstring contraditória (CSRF em API) — ✅ Resolvido
+- **Arquivo:** `app/routes/api_chamados.py` (atualizar_status_ajax)
+- **Status:** docstring hoje já diz corretamente "Requer CSRF; o frontend deve enviar o token no header X-CSRFToken" — contradição não existe mais
 - **Solução:** Atualizar docstring
 - **Tempo:** 5min
 
-#### #4: Import fora de ordem (PEP 8)
-- **Arquivo:** `app/routes/api.py:~88`
-- **Problema:** `from app.services.upload import salvar_anexo` entre funções
-- **Solução:** Mover para imports do topo
+#### #4: Import fora de ordem (PEP 8) — ✅ Resolvido
+- **Arquivo:** `app/routes/api_solicitante.py:20`
+- **Status:** `from app.services.upload import salvar_anexo` já está no topo do arquivo, junto com os demais imports — não está mais entre funções
 - **Tempo:** 5min
 
 #### #5: console.log em produção
@@ -493,8 +491,8 @@ Overall Coverage ................ 60% ⚠️
 - ✅ `docs/MELHORIAS_QUALIDADE.md` - Análise técnica detalhada
 - ✅ `docs/PLANO_SUGESTOES.md` - Plano de execução
 - ✅ `docs/API.md` - Documentação de endpoints
-- ✅ `docs/DEPLOYMENT_PLAN.md` - Deploy via Docker (servidor local)
-- ✅ `docs/IMPLEMENTATION_PLAN.md` - Histórico de implementação
+- ✅ `docs/DEPLOYMENT_PLAN.md` - Deploy via Docker (Azure Container Apps)
+- ✅ `docs/plans/2026-02-20-implementation-plan-inicial.md` - Histórico de implementação (movido de `docs/IMPLEMENTATION_PLAN.md`)
 
 ---
 

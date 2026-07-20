@@ -5,7 +5,7 @@
 | **Status** | Accepted |
 | **Data** | 2026-06-24 |
 | **Autores** | Matheus Costa — DTX Aerospace Engineering |
-| **Relacionado** | ADR-003 (fail-fast / APScheduler); ADR-001 (criptografia PII); `.cursor/plans/escalonamento_e_sla_dtx_d3e9e5bb.plan.md`; `docs/plans/2026-06-23-escalonamento-sla.md` |
+| **Relacionado** | ADR-003 (fail-fast / APScheduler); ADR-001 (criptografia PII); `docs/plans/2026-06-23-escalonamento-sla.md` |
 
 ---
 

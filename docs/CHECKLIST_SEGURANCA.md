@@ -67,12 +67,12 @@ Este documento deve ser consultado em **duas situações**:
 - [x] **Nenhuma rota expõe dados de outro usuário sem verificação de permissão**
   - Arquivo de referência: `app/services/permissions.py`
   - Como verificar: Toda consulta por `chamado_id` deve passar por `usuario_pode_ver_chamado(usuario, chamado)`
-  - **Verificado 2026-07-06** — `usuario_pode_ver_chamado` usado em `dashboard.py` e `api.py` antes de liberar dados
+  - **Verificado 2026-07-06** — `usuario_pode_ver_chamado` usado em `dashboard.py` e `api_chamados.py` antes de liberar dados
 
 - [x] **Rotas de API (`/api/*`) também têm proteção de perfil**
-  - Arquivo de referência: `app/routes/api.py`
-  - Como verificar: `grep -n "route" app/routes/api.py` — verificar decorador em cada rota
-  - **Verificado 2026-07-06** — todas as ~26 rotas de `api.py` têm `@login_required` e/ou `@requer_*`
+  - Arquivo de referência: `app/routes/api_chamados.py`, `api_colaboracao.py`, `api_notificacoes.py`, `api_solicitante.py` (split de `api.py`)
+  - Como verificar: `grep -n "route" app/routes/api_*.py` — verificar decorador em cada rota
+  - **Verificado 2026-07-06** — todas as ~26 rotas (hoje distribuídas nos 4 arquivos `api_*.py`) têm `@login_required` e/ou `@requer_*`
 
 ### 1.2 Verificação de IDOR (Insecure Direct Object Reference)
 
@@ -83,7 +83,7 @@ Este documento deve ser consultado em **duas situações**:
   - **Verificado 2026-07-06** — `usuario_pode_ver_chamado`/`_otimizado` chamado antes de exibir; `tests/test_routes/test_download_idor.py`
 
 - [x] **Download de anexo verifica propriedade do chamado antes de gerar URL pré-assinada**
-  - Arquivo de referência: `app/routes/api.py` — endpoint `/api/download-anexo` (linhas ~245–259)
+  - Arquivo de referência: `app/routes/api_solicitante.py` — endpoint `/api/download-anexo`
   - Como verificar: Tentar baixar anexo de chamado de outro usuário com token de outro — deve retornar 403
   - **Verificado 2026-07-06** — checa `chave in anexos` + `usuario_pode_ver_chamado` antes de gerar URL. Acesso bem-sucedido agora também é logado (`logger.info` com usuário/chamado/chave) — **Resolvido 2026-07-06**, antes só logava em falha (ver §8.1)
 
@@ -183,7 +183,7 @@ Este documento deve ser consultado em **duas situações**:
   - **Verificado 2026-07-06** — `CSRFProtect(app)` global em `app/__init__.py`; 26+ ocorrências de `csrf_token` em templates
 
 - [x] **Endpoints de API JSON verificam CSRF (ou usam autenticação stateless adequada)**
-  - Arquivo de referência: `app/routes/api.py`
+  - Arquivo de referência: `app/routes/api_chamados.py`, `api_colaboracao.py`, `api_notificacoes.py`, `api_solicitante.py`
   - Como verificar: Tentar chamar endpoint POST `/api/status` sem token CSRF — deve retornar 400
   - **Verificado 2026-07-06** — protegido globalmente por `CSRFProtect`; frontend envia header `X-CSRFToken`
 
@@ -221,8 +221,8 @@ Este documento deve ser consultado em **duas situações**:
   - **Verificado 2026-07-06**
 
 - [x] **Endpoints de API têm rate limit proporcional ao uso esperado**
-  - Arquivo de referência: `app/routes/api.py` (limites de 5–30/min conforme endpoint)
-  - Como verificar: `grep -n "@limiter\|rate_limit" app/routes/api.py`
+  - Arquivo de referência: `app/routes/api_chamados.py`, `api_notificacoes.py` (limites de 5–30/min conforme endpoint)
+  - Como verificar: `grep -n "@limiter\|rate_limit" app/routes/api_*.py`
   - **Verificado 2026-07-06**
 
 - [x] **Redis está configurado como backend de rate limit em produção**
@@ -393,7 +393,7 @@ Este documento deve ser consultado em **duas situações**:
 
 - [x] **HEALTH_SECRET autenticado via header `X-Health-Token` (token fora da URL)**
   - Finding anterior: `MEDIUM` — token `?token=<HEALTH_SECRET>` aparecia em access logs do Gunicorn/nginx
-  - Solução: `app/routes/api.py:_obter_health_token_request()` — lê header `X-Health-Token` (primário), cai para `?token=` apenas como fallback deprecado (compat UptimeRobot legado)
+  - Solução: `app/routes/api_chamados.py:_obter_health_token_request()` — lê header `X-Health-Token` (primário), cai para `?token=` apenas como fallback deprecado (compat UptimeRobot legado)
   - Comparação: `hmac.compare_digest(provided, secret)` — timing-safe (previne timing attacks)
   - Testes: CT-HEALTH-10 a 13 (`tests/test_routes/test_health_sw.py`)
   - Monitoramento: `curl -H "X-Health-Token: $HEALTH_SECRET" "https://host/health?deep=1"`
@@ -420,7 +420,7 @@ Este documento deve ser consultado em **duas situações**:
   - **Verificado 2026-07-06**
 
 - [x] **Acessos a dados sensíveis são logados (download de anexos, visualização de chamados)**
-  - Arquivo de referência: `app/routes/api.py` — endpoint `/api/download-anexo`
+  - Arquivo de referência: `app/routes/api_solicitante.py` — endpoint `/api/download-anexo`
   - **Resolvido 2026-07-06** — antes só logava em falha (`logger.error`); agora também loga em sucesso (`logger.info` com usuário/chamado/chave). Teste: `tests/test_routes/test_download_idor.py::test_download_anexo_sucesso_loga_acesso`
 
 - [x] **Erros internos são logados com traceback mas a resposta ao cliente é genérica**
@@ -459,13 +459,13 @@ Este documento deve ser consultado em **duas situações**:
 
 ### 8.4 Respostas de erro genéricas — CWI 3.2
 
-- [x] **Handlers 500 em `api.py` usam `ERRO_INTERNO_MSG` — não expõem `str(exception)`, Firestore, traceback ou nome de tecnologia**
-  - Arquivo de referência: `app/routes/api.py:38` — `ERRO_INTERNO_MSG = "Erro interno. Tente novamente."`
-  - Handlers corrigidos (Onda 3b): `api_notificacoes_marcar_lida:L393`, `api_notificacoes_ler_todas:L405`, `api_push_subscribe:L438`
-  - Fix específico: `bulk_atualizar_status:L331` — `str(e)` substituído por `"Erro ao processar chamado"` (evita vazar nome de exceção Firestore)
+- [x] **Handlers 500 nos módulos `api_*.py` usam mensagem genérica traduzida — não expõem `str(exception)`, Firestore, traceback ou nome de tecnologia**
+  - Arquivo de referência: hoje é `_t("internal_error_retry")` (chave em `app/translations.json`, PT/EN/ES), não mais a constante `ERRO_INTERNO_MSG` — foi migrada pro sistema de i18n do projeto em algum momento após o split de `api.py`
+  - Handlers corrigidos (Onda 3b): `api_notificacoes_marcar_lida`, `api_notificacoes_ler_todas`, `api_push_subscribe` (hoje em `app/routes/api_notificacoes.py`)
+  - Fix específico: `bulk_atualizar_status` (hoje em `app/routes/api_chamados.py`) — `str(e)` substituído por mensagem genérica (evita vazar nome de exceção Firestore)
   - Padrão: erros 400/403 de negócio podem ter mensagens específicas ("Chamado não encontrado" — ok); erros 500 SEMPRE genéricos
   - Fora de escopo: rotas HTML com `flash_t(..., error=str(e))` em `usuarios.py`, `categorias.py`, `dashboard.py` — backlog Onda futura (ver §8.5)
-  - Como verificar: `grep -n 'str(e)' app/routes/api.py` → sem ocorrências em handlers de erro
+  - Como verificar: `grep -n 'str(e)' app/routes/api_*.py` → sem ocorrências em handlers de erro
   - Testes automatizados: `tests/test_routes/test_api_security_responses.py` (11 testes CWI 3.2)
   - **Resolvido 2026-06-23 — Onda 3b (CWI 3.2)**
 
@@ -1247,7 +1247,7 @@ Os itens deste checklist mapeiam para o OWASP Top 10 (2021):
 |---|---|---|---|---|
 | **1.1** | Usuário anônimo → 302/401 (login obrigatório) | Sim | `tests/test_routes/test_auth.py`, `test_app_init.py`, `@login_required` em todas as rotas sensíveis | `[x]` 2026-06-23 — `executar_qa_manual_cwi.py` (302 em `/meus-chamados`, `/api/notificacoes`) |
 | **1.2** | Permissão por perfil (solicitante, supervisor, admin) | Sim | `tests/test_services/test_permissions.py`, `@requer_solicitante` / `@requer_supervisor_area` / `@requer_admin` em `app/routes/` | `[x]` 2026-06-23 — solicitante em `/admin/categorias` → 302 |
-| **1.3** | IDOR — só recursos próprios (URL, body, anexo) | Sim | `tests/test_routes/test_permissions.py`, `tests/test_routes/test_download_idor.py`, `test_api.py` | `[x]` 2026-06-23 — `GET /api/chamado/<id_alheio>` → 403 (+ pytest IDOR) |
+| **1.3** | IDOR — só recursos próprios (URL, body, anexo) | Sim | `tests/test_services/test_permissions.py`, `tests/test_routes/test_download_idor.py`, `test_api.py` | `[x]` 2026-06-23 — `GET /api/chamado/<id_alheio>` → 403 (+ pytest IDOR) |
 | **2.1** | HTTPS em produção (redirect HTTP→HTTPS) | Sim | `tests/test_config_production.py::test_cwi21_https_redirect_em_producao`, `tests/test_app_init.py` | `[x]` 2026-06-23 — prod simulada → 301 `https://` |
 | **2.2** | Senhas com hash forte (Werkzeug scrypt/pbkdf2) | Doc + teste | `tests/test_services/test_models_usuario.py::test_senha_hash_usa_formato_werkzeug_nao_plaintext`; `CHECKLIST_SEGURANCA.md §1.4` | `[x]` 2026-06-23 — Firestore `usuarios.senha_hash` prefixo `scrypt:32768:8:1$…` (não plaintext) |
 | **2.3** | PII minimizado/oculto nas respostas e criptografado em repouso | Sim | `tests/test_routes/test_api_security_responses.py` (respostas HTTP); `tests/test_services/test_pii_encryption.py` + `test_models_usuario.py` (Onda 4 Fernet) | `[x]` 2026-06-23 — resposta API sem `senha_hash`; mecanismo Fernet `fernet:v1:` pronto para `nome`/`email` — **`ENCRYPT_PII_AT_REST=false` é o default real** (`.env.example`), deliberado por segurança de boot; ativar em produção exige `ENCRYPTION_KEY` + migração prévia (ver §9.2) |

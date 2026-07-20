@@ -248,13 +248,17 @@ sistema_chamados/
 │   │
 │   ├── routes/                   # Blueprints de rotas (todos registram no blueprint 'main')
 │   │   ├── __init__.py           # Registro de todos os blueprints
-│   │   ├── api.py                # Endpoints JSON/API (/api/*)
+│   │   ├── api_chamados.py       # Endpoints JSON/API — status, edição, bulk, onboarding (/api/*)
+│   │   ├── api_colaboracao.py    # Endpoints JSON/API — escalonamento, participantes (/api/*)
+│   │   ├── api_notificacoes.py   # Endpoints JSON/API — notificações in-app, web push (/api/*)
+│   │   ├── api_solicitante.py    # Endpoints JSON/API — self-service do solicitante (/api/*)
 │   │   ├── auth.py               # Login, logout, troca de senha obrigatória
 │   │   ├── chamados.py           # Criação e listagem de chamados (solicitante)
 │   │   ├── dashboard.py          # Dashboard, visualização, histórico, export (supervisor/admin)
 │   │   ├── usuarios.py           # CRUD de usuários (admin)
 │   │   ├── categorias.py         # CRUD de setores, gates, impactos + tradução automática (admin)
-│   │   └── admin_global.py       # Governança de admins/supervisores (apenas admin_global)
+│   │   ├── admin_global.py       # Governança de admins/supervisores (apenas admin_global)
+│   │   └── mfa.py                # Configuração de MFA (TOTP + QR code)
 │   │
 │   ├── services/                 # Lógica de negócio (NUNCA misture com rotas)
 │   │   ├── chamados_criacao_service.py   # Criação de chamado completo
@@ -347,7 +351,10 @@ sistema_chamados/
 | `app/routes/auth.py` | Login, logout, troca de senha obrigatória | LoginAttemptTracker, models_usuario | Todos |
 | `app/routes/chamados.py` | Criação e listagem de chamados | chamados_criacao_service, validators | Todos |
 | `app/routes/dashboard.py` | Dashboard, visualização, histórico, export | dashboard_service, status_service | supervisor, admin |
-| `app/routes/api.py` | Endpoints JSON (status, notificações, push) | permissions, status_service | Todos |
+| `app/routes/api_chamados.py` | Endpoints JSON: status, edição, bulk, paginação, onboarding | permissions, status_service | Todos |
+| `app/routes/api_colaboracao.py` | Endpoints JSON: escalonamento, participantes | permission_validation | supervisor, admin |
+| `app/routes/api_notificacoes.py` | Endpoints JSON: notificações in-app, web push | notifications_inapp, webpush_service | Todos |
+| `app/routes/api_solicitante.py` | Endpoints JSON: self-service do solicitante | permissions | solicitante |
 | `app/routes/usuarios.py` | CRUD de usuários | models_usuario, notifications | admin |
 | `app/routes/categorias.py` | CRUD de setores, gates, impactos + tradução automática | models_categorias, translation_service | admin |
 | `app/routes/admin_global.py` | Governança de admins/supervisores (promover, revogar, listar) | models_usuario | admin_global |
@@ -639,7 +646,7 @@ with patch("app.services.edicao_chamado_service.db") as mock_db:
 **Errado — patch na rota (mock inerte, teste passa mesmo com bug):**
 
 ```python
-with patch("app.routes.api.db") as mock_db:  # NAO FAZER
+with patch("app.routes.api_chamados.db") as mock_db:  # NAO FAZER
     ...
 ```
 
@@ -898,7 +905,10 @@ def test_nova_rota_retorna_200(client_logado_admin):
 ```
 Chamados/solicitante       → app/routes/chamados.py
 Dashboard/supervisor       → app/routes/dashboard.py
-API JSON                   → app/routes/api.py
+API JSON (status/bulk)     → app/routes/api_chamados.py
+API JSON (colaboração)     → app/routes/api_colaboracao.py
+API JSON (notificações)    → app/routes/api_notificacoes.py
+API JSON (solicitante)     → app/routes/api_solicitante.py
 Usuários (admin)           → app/routes/usuarios.py
 Categorias (admin)         → app/routes/categorias.py
 Governança (admin_global)  → app/routes/admin_global.py
@@ -1193,9 +1203,9 @@ python scripts/limpar_contadores_uso.py --apply      # deleta de verdade
 
 **Armadilha em testes:** `db.batch()` só é chamado se houver ao menos 1 doc no stream — o mock de `mock_db.batch.assert_not_called()` funciona quando o stream retorna `iter([])`. Se mockar com uma lista não vazia, `batch.delete` e `batch.commit` serão chamados.
 
-### Armadilha 14 — Arquivo de teste legado ativo (F-53) ✅ Resolvido 2026-06-17
+### Armadilha 14 — Arquivo de teste legado ativo (F-53) ✅ Resolvido 2026-06-17, removido de vez 2026-07-06
 
-`tests/e2e/test_solicitante.py` está marcado com `@pytest.mark.skip` (legado). Usar **`tests/e2e/test_fluxo_solicitante.py`** para fluxos E2E de solicitante.
+`tests/e2e/test_solicitante.py` foi **deletado** (antes só estava marcado `@pytest.mark.skip`, mas continuava existindo no repo — ver `CHECKLIST_SEGURANCA.md`). Usar **`tests/e2e/test_fluxo_solicitante.py`** para fluxos E2E de solicitante.
 
 ### Armadilha 15 — `confirmacao-solicitante.md` fora de lugar (F-78) ✅ Resolvido 2026-06-17
 

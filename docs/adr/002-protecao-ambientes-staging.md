@@ -15,7 +15,7 @@ O sistema de chamados DTX possui ambiente de produção e ambientes não-produti
 - Receber dados reais (por erro do operador) sem as mesmas salvaguardas de produção
 - Confundir usuários finais que acessam o URL errado
 
-O DTX opera com deploy Docker em servidor local/on-premise. A proteção de ambientes não-prod deve ser simples, confiável e não interferir no fluxo de desenvolvimento (pytest) nem no ambiente de produção.
+O DTX opera com deploy Docker no Azure Container Apps (à época desta decisão, o deploy era em servidor local/on-premise; migrado desde então — ver `docs/DEPLOYMENT_PLAN.md`). A proteção de ambientes não-prod deve ser simples, confiável e não interferir no fluxo de desenvolvimento (pytest) nem no ambiente de produção.
 
 ---
 

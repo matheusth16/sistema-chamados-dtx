@@ -248,14 +248,14 @@ def test_listar_chamados_chama_firestore(client_logado_admin):
 - Campo renomeado/removido na response quebra múltiplos testes
 
 ### Causa raiz mais comum
-- Estrutura de response alterada em `api.py` sem atualizar testes
+- Estrutura de response alterada em algum dos `app/routes/api_*.py` sem atualizar testes
 - Handler de exceção retorna HTML (Flask default 500) em vez de JSON
 
 ### Checklist de triagem
 
 ```bash
 # Verificar o contrato atual da rota
-grep -A 20 "def api_" app/routes/api.py | grep "return jsonify"
+grep -A 20 "def api_" app/routes/api_*.py | grep "return jsonify"
 
 # Rodar com -s e ver o body real
 pytest tests/test_routes/test_api_contract.py -s --tb=short

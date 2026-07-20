@@ -55,7 +55,7 @@ Cada passo é identificado por um índice inteiro (`passo`) no JavaScript; esse 
 
 ### API de controle de onboarding
 
-Três rotas em `app/routes/api.py`, todas delegando para `app/services/onboarding_service.py`:
+Três rotas em `app/routes/api_chamados.py`, todas delegando para `app/services/onboarding_service.py`:
 
 - **POST** `/api/onboarding/avancar`
   - Salva o passo atual via `avancar_passo(user_id, passo)` → `db.collection("usuarios").document(user_id).update({"onboarding_passo": passo})`.

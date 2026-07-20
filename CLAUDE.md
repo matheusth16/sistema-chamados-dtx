@@ -1,8 +1,8 @@
 # CLAUDE.md — Convenções do Projeto sistema_chamados
 
 ## Stack
-- **Backend:** Flask 3.0 + Firestore (firebase-admin), Flask-Login, Flask-WTF (CSRF)
-- **Frontend:** Tailwind CSS (CDN), GSAP 3 (ScrollTrigger, ScrollToPlugin)
+- **Backend:** Flask 3.1 + Firestore (firebase-admin), Flask-Login, Flask-WTF (CSRF)
+- **Frontend:** Tailwind CSS (compilado via CLI, `npm run build:css` — não é CDN), GSAP 3 (ScrollTrigger, ScrollToPlugin)
 - **Python:** 3.14, pytest + unittest.mock
 - **Blueprint:** único `main` — todos os módulos de rota registram nele
 - **Serviços externos:** Firebase/Firestore (banco), Cloudflare R2 (anexos — bucket privado, URLs pré-assinadas), Microsoft Graph API (e-mail)
@@ -18,7 +18,7 @@
 ### Python / Flask
 - Imports inline nas rotas (`from app.services.X import func`) — padrão do projeto
 - Responses JSON: sempre `{"sucesso": bool, "erro"?: str, "dados"?: obj}`
-- Decoradores de acesso: `@requer_solicitante`, `@requer_supervisor_area`, `@requer_admin`
+- Decoradores de acesso: `@requer_solicitante`, `@requer_supervisor_area`, `@requer_perfil("admin")` (não existe um `@requer_admin` dedicado)
 - Serviços em `app/services/` — lógica de negócio separada das rotas
 - Exceções customizadas em `app/exceptions.py`
 
@@ -96,12 +96,17 @@ app/
 ├── decoradores.py           # @requer_* decoradores
 ├── i18n.py                  # Internacionalização (PT-BR, EN, ES)
 ├── routes/
-│   ├── api.py               # Rotas JSON/API
+│   ├── api_chamados.py      # Rotas JSON/API — status, edição, bulk, paginação, onboarding
+│   ├── api_colaboracao.py   # Rotas JSON/API — escalonamento, participantes
+│   ├── api_notificacoes.py  # Rotas JSON/API — notificações in-app, web push
+│   ├── api_solicitante.py   # Rotas JSON/API — self-service do solicitante (anexos, editar, cancelar)
 │   ├── auth.py              # Login, logout, senha
 │   ├── chamados.py          # Criação e listagem (solicitante)
 │   ├── dashboard.py         # Dashboard (supervisor/admin)
 │   ├── usuarios.py          # Gestão de usuários (admin)
-│   └── categorias.py        # Gestão de categorias (admin)
+│   ├── categorias.py        # Gestão de categorias (admin)
+│   ├── admin_global.py      # Governança de admins/supervisores (perfil admin_global)
+│   └── mfa.py               # Configuração de MFA (TOTP + QR code)
 └── services/
     ├── chamados_criacao_service.py
     ├── chamados_listagem_service.py
