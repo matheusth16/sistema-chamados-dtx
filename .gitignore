@@ -87,6 +87,12 @@ _backup_nao_utilizados/
 # --- Ferramentas de IA / Editor ---
 .claude/
 .cursor/
+# design.json e live/config.json ficam versionados (config compartilhada);
+# só o cache de sessão (caminhos locais da máquina) não deve ser commitado.
+.impeccable/hook.cache.json
+
+# --- Artefatos de testes E2E (screenshots/vídeos/traces de falhas do Playwright) ---
+test-results-qa/
 
 # --- Arquivos locais de trabalho (não versionados) ---
 *.docx
