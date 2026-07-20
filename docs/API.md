@@ -648,7 +648,7 @@ await fetch('/api/push-subscribe', {
 ## Onboarding
 
 As três rotas abaixo controlam o tour de boas-vindas exibido a novos usuários.
-O estado é persistido por usuário no Firestore (`onboarding_passo`, `onboarding_completo`).
+O estado é persistido por usuário no Firestore (`onboarding_passo`, `onboarding_perfis_vistos`).
 
 ### `POST /api/onboarding/avancar`
 

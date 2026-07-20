@@ -51,7 +51,7 @@ def _usuario_dict_fake(**overrides):
     base = {
         "uid": "u1", "nome": "Fulano", "email": "f@dtx.com",
         "perfil": "solicitante", "setor": "TI", "ativo": True,
-        "onboarding_completo": False, "onboarding_passo": 0,
+        "onboarding_perfis_vistos": [], "onboarding_passo": 0,
     }
     return {**base, **overrides}
 ```

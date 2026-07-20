@@ -1,7 +1,7 @@
 # Plano de Implementação de Melhorias - Sistema de Chamados
 
 **Data de Início**: 20 de fevereiro de 2026
-**Status**: Em Progresso
+**Status**: **ARQUIVADO** — 3 melhorias concluídas há meses (2026-07-20). Ver `docs/ARQUITETURA.md` pro estado atual.
 
 ---
 
