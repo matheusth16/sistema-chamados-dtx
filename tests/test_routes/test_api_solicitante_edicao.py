@@ -190,3 +190,16 @@ class TestEditarSolicitanteRota:
             )
 
         assert resp.status_code == 400
+
+    def test_descricao_excede_maximo_retorna_400(self, client_logado_solicitante, app):
+        """Descrição acima de MAX_DESCRICAO_CHARS deve falhar (400)."""
+        sol = _usuario_mock("sol_1", "solicitante")
+
+        with patch("app.models_usuario.Usuario.get_by_id", return_value=sol):
+            resp = client_logado_solicitante.post(
+                "/api/chamado/ch1/editar-solicitante",
+                data=json.dumps({"descricao": "a" * 5001}),
+                content_type="application/json",
+            )
+
+        assert resp.status_code == 400

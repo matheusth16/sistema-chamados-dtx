@@ -52,6 +52,32 @@ def test_validar_novo_chamado_descricao_minimo_caracteres():
     assert any("at least 3" in e for e in erros)
 
 
+def test_validar_novo_chamado_descricao_excede_maximo():
+    """Descrição acima de MAX_DESCRICAO_CHARS retorna erro."""
+    form = {
+        "descricao": "a" * 5001,
+        "tipo": "Manutencao",
+        "categoria": "Chamado",
+        "gate": "N/A",
+        "impacto": "Impacto Baixo",
+    }
+    erros = validar_novo_chamado(form)
+    assert any("5000" in e for e in erros)
+
+
+def test_validar_novo_chamado_descricao_no_limite_maximo_ok():
+    """Descrição com exatamente MAX_DESCRICAO_CHARS não gera erro de tamanho."""
+    form = {
+        "descricao": "a" * 5000,
+        "tipo": "Manutencao",
+        "categoria": "Chamado",
+        "gate": "N/A",
+        "impacto": "Impacto Baixo",
+    }
+    erros = validar_novo_chamado(form)
+    assert not any("5000" in e for e in erros)
+
+
 def test_validar_novo_chamado_tipo_obrigatorio():
     """Sem setor atribuído retorna erro."""
     form = {

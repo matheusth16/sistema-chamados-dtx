@@ -272,12 +272,16 @@ def validar_novo_chamado(
     gate = (form.get("gate") or "").strip()
     impacto = (form.get("impacto") or "").strip()
 
+    from config import Config
+
     if not descricao:
         _log_ab_descricao_insuficiente(form)
         erros.append(_t("ticket_description_required"))
-    elif len(descricao) < 3:
+    elif len(descricao) < Config.MIN_DESCRICAO_CHARS:
         _log_ab_descricao_insuficiente(form)
         erros.append(_t("ticket_description_min_3"))
+    elif len(descricao) > Config.MAX_DESCRICAO_CHARS:
+        erros.append(_t("description_max_chars", max_chars=Config.MAX_DESCRICAO_CHARS))
 
     if not tipo:
         erros.append(_t("sector_assignment_required"))

@@ -21,8 +21,6 @@ from app.services.upload import salvar_anexo
 
 logger = logging.getLogger(__name__)
 
-DESCRICAO_MIN_CHARS = 3
-
 
 def _t(key, **kwargs):
     """Traduz uma chave i18n para o idioma da sessão atual."""
@@ -105,14 +103,26 @@ def api_editar_solicitante(chamado_id: str):
     if getattr(current_user, "is_gestor_only", False):
         return jsonify({"sucesso": False, "erro": _t("unauthorized_access")}), 403
 
+    from config import Config
+
     payload = request.get_json(silent=True) or {}
     descricao = (payload.get("descricao") or "").strip()
-    if len(descricao) < DESCRICAO_MIN_CHARS:
+    if len(descricao) < Config.MIN_DESCRICAO_CHARS:
         return (
             jsonify(
                 {
                     "sucesso": False,
-                    "erro": _t("description_min_chars", min_chars=DESCRICAO_MIN_CHARS),
+                    "erro": _t("description_min_chars", min_chars=Config.MIN_DESCRICAO_CHARS),
+                }
+            ),
+            400,
+        )
+    if len(descricao) > Config.MAX_DESCRICAO_CHARS:
+        return (
+            jsonify(
+                {
+                    "sucesso": False,
+                    "erro": _t("description_max_chars", max_chars=Config.MAX_DESCRICAO_CHARS),
                 }
             ),
             400,

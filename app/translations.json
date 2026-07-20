@@ -4079,6 +4079,11 @@
     "en": "Minimum description of {min_chars} characters.",
     "es": "Descripción mínima de {min_chars} caracteres."
   },
+  "description_max_chars": {
+    "pt_BR": "Descrição excede o máximo de {max_chars} caracteres.",
+    "en": "Description exceeds the maximum of {max_chars} characters.",
+    "es": "La descripción excede el máximo de {max_chars} caracteres."
+  },
   "reason_required_min_10_parens": {
     "pt_BR": "Motivo obrigatório (mínimo 10 caracteres).",
     "en": "Reason required (minimum 10 characters).",
