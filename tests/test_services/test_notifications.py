@@ -59,7 +59,7 @@ def test_notificar_novo_usuario_cadastrado_envia_direto(app):
 
     with (
         app.app_context(),
-        patch("app.services.notifications.enviar_email") as mock_enviar,
+        patch("app.services.notifications_usuarios.enviar_email") as mock_enviar,
     ):
         app.config["APP_BASE_URL"] = "https://example.test"
         mock_enviar.return_value = (True, None)
@@ -87,7 +87,7 @@ def test_notificar_novo_usuario_sso_envia_email_sem_senha(app):
 
     with (
         app.app_context(),
-        patch("app.services.notifications.enviar_email") as mock_enviar,
+        patch("app.services.notifications_usuarios.enviar_email") as mock_enviar,
     ):
         app.config["APP_BASE_URL"] = "https://example.test"
         mock_enviar.return_value = (True, None)
@@ -113,7 +113,7 @@ def test_notificar_admins_novo_usuario_sso_envia_para_cada_admin(app):
     admins = ["admin1@dtx.aero", "admin2@dtx.aero"]
     with (
         app.app_context(),
-        patch("app.services.notifications.enviar_email") as mock_enviar,
+        patch("app.services.notifications_usuarios.enviar_email") as mock_enviar,
     ):
         app.config["APP_BASE_URL"] = "https://example.test"
         mock_enviar.return_value = (True, None)
@@ -134,7 +134,7 @@ def test_notificar_admins_novo_usuario_sso_lista_vazia_nao_envia(app):
 
     with (
         app.app_context(),
-        patch("app.services.notifications.enviar_email") as mock_enviar,
+        patch("app.services.notifications_usuarios.enviar_email") as mock_enviar,
     ):
         notificar_admins_novo_usuario_sso(
             admin_emails=[], usuario_email="novo.sso@dtx.aero", usuario_nome="Novo SSO"
@@ -149,7 +149,7 @@ def test_notificar_mudanca_perfil_envia_email_com_novo_perfil(app):
 
     with (
         app.app_context(),
-        patch("app.services.notifications.enviar_email") as mock_enviar,
+        patch("app.services.notifications_usuarios.enviar_email") as mock_enviar,
     ):
         app.config["APP_BASE_URL"] = "https://example.test"
         mock_enviar.return_value = (True, None)
@@ -172,7 +172,7 @@ def test_notificar_mudanca_perfil_sem_email_nao_envia(app):
 
     with (
         app.app_context(),
-        patch("app.services.notifications.enviar_email") as mock_enviar,
+        patch("app.services.notifications_usuarios.enviar_email") as mock_enviar,
     ):
         notificar_mudanca_perfil(usuario_email="", usuario_nome="X", novo_perfil="admin")
 
@@ -834,7 +834,7 @@ def test_notificar_novo_usuario_email_vazio_nao_envia(app):
 
     with (
         app.app_context(),
-        patch("app.services.notifications.enviar_email") as mock_send,
+        patch("app.services.notifications_usuarios.enviar_email") as mock_send,
     ):
         notificar_novo_usuario_cadastrado(
             usuario_id="u1",
@@ -850,7 +850,7 @@ def test_notificar_novo_usuario_email_falha_nao_levanta(app):
 
     with (
         app.app_context(),
-        patch("app.services.notifications.enviar_email", return_value=(False, "err")),
+        patch("app.services.notifications_usuarios.enviar_email", return_value=(False, "err")),
     ):
         app.config["APP_BASE_URL"] = "https://example.test"
         notificar_novo_usuario_cadastrado(
