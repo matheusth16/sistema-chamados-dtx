@@ -206,7 +206,7 @@ A tabela de chamados é o componente mais denso do sistema — funciona como tel
 ### Do:
 - **Do** usar o token semântico em `:root` pra qualquer cor nova — nunca um hex hardcoded solto no template.
 - **Do** reservar gradiente para uma única ação primária por tela (Regra do Destaque Único).
-- **Do** usar `.dtx-card-raised` (borda superior de 3–4px na cor do destaque, cantos superiores retos via `rounded-t-none`/`rounded-b-*`) quando um card ou callout precisa de ênfase — esse é o padrão sancionado de "card importante", aplicado em `_stat_card.html`, `_filter_panel.html`, `historico.html`, `visualizar_chamado.html` e no flash toast.
+- **Do** usar `.dtx-card-raised` (borda superior de 3–4px na cor do destaque, cantos superiores retos via `rounded-t-none`/`rounded-b-*`) quando um card ou callout precisa de ênfase — esse é o padrão sancionado de "card importante", aplicado em `historico.html`, `visualizar_chamado.html` e no flash toast.
 - **Do** usar fundo tintado (sem borda) para sinalizar uma linha de tabela (`<tr>`) — é o padrão em `_ticket_row_dashboard.html`, `_ticket_row_meus_chamados.html` e `_rl_header.html` para a categoria "Projetos"/agrupamento RL.
 - **Do** usar a escala semântica de z-index do `tailwind.config.js` (`z-sticky: 10`, `z-nav: 20`, `z-dropdown: 30`, `z-modal: 40`, `z-toast: 50`) para qualquer elemento novo com posicionamento fixo/sticky/absoluto — nunca um valor `z-[N]` arbitrário. O link de skip-to-content é a única exceção deliberada, em `z-[9999]`, pois deve renderizar acima de absolutamente tudo, inclusive toasts.
 - **Do** manter alvos de toque ≥44×44px em qualquer elemento interativo da navbar e células de tabela com ação.
