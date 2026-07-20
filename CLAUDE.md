@@ -52,8 +52,8 @@ pytest --tb=short -q
 # 4. Gate de cobertura por módulo (>= 85%)
 python scripts/check_coverage_per_module.py --json-only
 
-# 5. Push (usa o script da skill)
-bash skills/Essencial/git-pushing/scripts/smart_commit.sh "tipo: descrição"
+# 5. Push (usa o script da skill global)
+bash ~/.claude/skills/git-pushing/scripts/smart_commit.sh "tipo: descrição"
 ```
 
 ## Conventional commits
