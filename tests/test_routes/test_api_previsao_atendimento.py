@@ -44,9 +44,9 @@ class TestPrevisaoAtendimentoRota:
         chamado_mock = _mock_chamado_obj(area="Manutencao", responsavel_id="sup_1")
 
         with (
-            patch("app.routes.api.db") as mock_db,
-            patch("app.routes.api.Chamado") as mock_chamado_cls,
-            patch("app.routes.api.usuario_pode_ver_chamado", return_value=True),
+            patch("app.routes.api_colaboracao.db") as mock_db,
+            patch("app.routes.api_colaboracao.Chamado") as mock_chamado_cls,
+            patch("app.routes.api_colaboracao.usuario_pode_ver_chamado", return_value=True),
             patch(
                 "app.services.escalonamento_service.definir_previsao_atendimento",
                 return_value={
@@ -73,9 +73,9 @@ class TestPrevisaoAtendimentoRota:
         chamado_mock = _mock_chamado_obj(area="Manutencao", responsavel_id="sup_1")
 
         with (
-            patch("app.routes.api.db") as mock_db,
-            patch("app.routes.api.Chamado") as mock_chamado_cls,
-            patch("app.routes.api.usuario_pode_ver_chamado", return_value=True),
+            patch("app.routes.api_colaboracao.db") as mock_db,
+            patch("app.routes.api_colaboracao.Chamado") as mock_chamado_cls,
+            patch("app.routes.api_colaboracao.usuario_pode_ver_chamado", return_value=True),
         ):
             mock_db.collection.return_value.document.return_value.get.return_value = doc
             mock_chamado_cls.from_dict.return_value = chamado_mock
@@ -120,9 +120,9 @@ class TestPrevisaoAtendimentoRota:
         chamado_mock = _mock_chamado_obj(area="Manutencao", responsavel_id="outro_sup")
 
         with (
-            patch("app.routes.api.db") as mock_db,
-            patch("app.routes.api.Chamado") as mock_chamado_cls,
-            patch("app.routes.api.usuario_pode_ver_chamado", return_value=True),
+            patch("app.routes.api_colaboracao.db") as mock_db,
+            patch("app.routes.api_colaboracao.Chamado") as mock_chamado_cls,
+            patch("app.routes.api_colaboracao.usuario_pode_ver_chamado", return_value=True),
         ):
             mock_db.collection.return_value.document.return_value.get.return_value = doc
             mock_chamado_cls.from_dict.return_value = chamado_mock
@@ -141,9 +141,9 @@ class TestPrevisaoAtendimentoRota:
         chamado_mock = _mock_chamado_obj(area="TI", responsavel_id="outro_sup")
 
         with (
-            patch("app.routes.api.db") as mock_db,
-            patch("app.routes.api.Chamado") as mock_chamado_cls,
-            patch("app.routes.api.usuario_pode_ver_chamado", return_value=False),
+            patch("app.routes.api_colaboracao.db") as mock_db,
+            patch("app.routes.api_colaboracao.Chamado") as mock_chamado_cls,
+            patch("app.routes.api_colaboracao.usuario_pode_ver_chamado", return_value=False),
         ):
             mock_db.collection.return_value.document.return_value.get.return_value = doc
             mock_chamado_cls.from_dict.return_value = chamado_mock
@@ -160,7 +160,7 @@ class TestPrevisaoAtendimentoRota:
         doc_inexistente = MagicMock()
         doc_inexistente.exists = False
 
-        with patch("app.routes.api.db") as mock_db:
+        with patch("app.routes.api_colaboracao.db") as mock_db:
             mock_db.collection.return_value.document.return_value.get.return_value = doc_inexistente
             resp = client_logado_supervisor.post(
                 "/api/chamado/id_inexistente/previsao-atendimento",
@@ -176,9 +176,9 @@ class TestPrevisaoAtendimentoRota:
         chamado_mock = _mock_chamado_obj(area="Manutencao", responsavel_id="sup_1")
 
         with (
-            patch("app.routes.api.db") as mock_db,
-            patch("app.routes.api.Chamado") as mock_chamado_cls,
-            patch("app.routes.api.usuario_pode_ver_chamado", return_value=True),
+            patch("app.routes.api_colaboracao.db") as mock_db,
+            patch("app.routes.api_colaboracao.Chamado") as mock_chamado_cls,
+            patch("app.routes.api_colaboracao.usuario_pode_ver_chamado", return_value=True),
             patch(
                 "app.services.escalonamento_service.definir_previsao_atendimento",
                 return_value={

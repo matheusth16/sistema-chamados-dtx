@@ -55,9 +55,9 @@ class TestIncluirParticipantesRota:
         chamado_mock = _mock_chamado_obj(area="Manutencao", responsavel_id="sup_1")
 
         with (
-            patch("app.routes.api.db") as mock_db,
-            patch("app.routes.api.Chamado") as mock_chamado_cls,
-            patch("app.routes.api.usuario_pode_ver_chamado", return_value=True),
+            patch("app.routes.api_colaboracao.db") as mock_db,
+            patch("app.routes.api_colaboracao.Chamado") as mock_chamado_cls,
+            patch("app.routes.api_colaboracao.usuario_pode_ver_chamado", return_value=True),
             patch(
                 "app.services.escalonamento_service.incluir_participantes",
                 return_value={
@@ -77,7 +77,7 @@ class TestIncluirParticipantesRota:
                     },
                 },
             ),
-            patch("app.routes.api.threading"),
+            patch("app.routes.api_colaboracao.threading"),
         ):
             mock_db.collection.return_value.document.return_value.get.return_value = doc
             mock_chamado_cls.from_dict.return_value = chamado_mock
@@ -99,9 +99,9 @@ class TestIncluirParticipantesRota:
         chamado_mock = _mock_chamado_obj(area="Manutencao", responsavel_id="sup_1")
 
         with (
-            patch("app.routes.api.db") as mock_db,
-            patch("app.routes.api.Chamado") as mock_chamado_cls,
-            patch("app.routes.api.usuario_pode_ver_chamado", return_value=True),
+            patch("app.routes.api_colaboracao.db") as mock_db,
+            patch("app.routes.api_colaboracao.Chamado") as mock_chamado_cls,
+            patch("app.routes.api_colaboracao.usuario_pode_ver_chamado", return_value=True),
         ):
             mock_db.collection.return_value.document.return_value.get.return_value = doc
             mock_chamado_cls.from_dict.return_value = chamado_mock
@@ -129,9 +129,9 @@ class TestIncluirParticipantesRota:
         chamado_mock = _mock_chamado_obj(area="Manutencao", responsavel_id="outro_sup")
 
         with (
-            patch("app.routes.api.db") as mock_db,
-            patch("app.routes.api.Chamado") as mock_chamado_cls,
-            patch("app.routes.api.usuario_pode_ver_chamado", return_value=True),
+            patch("app.routes.api_colaboracao.db") as mock_db,
+            patch("app.routes.api_colaboracao.Chamado") as mock_chamado_cls,
+            patch("app.routes.api_colaboracao.usuario_pode_ver_chamado", return_value=True),
         ):
             mock_db.collection.return_value.document.return_value.get.return_value = doc
             mock_chamado_cls.from_dict.return_value = chamado_mock
@@ -159,9 +159,9 @@ class TestIncluirParticipantesRota:
         chamado_mock = _mock_chamado_obj(area="Manutencao", responsavel_id="outro_sup")
 
         with (
-            patch("app.routes.api.db") as mock_db,
-            patch("app.routes.api.Chamado") as mock_chamado_cls,
-            patch("app.routes.api.usuario_pode_ver_chamado", return_value=False),
+            patch("app.routes.api_colaboracao.db") as mock_db,
+            patch("app.routes.api_colaboracao.Chamado") as mock_chamado_cls,
+            patch("app.routes.api_colaboracao.usuario_pode_ver_chamado", return_value=False),
         ):
             mock_db.collection.return_value.document.return_value.get.return_value = doc
             mock_chamado_cls.from_dict.return_value = chamado_mock
@@ -180,9 +180,9 @@ class TestIncluirParticipantesRota:
         chamado_mock = _mock_chamado_obj(area="Manutencao", responsavel_id="outro_sup")
 
         with (
-            patch("app.routes.api.db") as mock_db,
-            patch("app.routes.api.Chamado") as mock_chamado_cls,
-            patch("app.routes.api.usuario_pode_ver_chamado", return_value=True),
+            patch("app.routes.api_colaboracao.db") as mock_db,
+            patch("app.routes.api_colaboracao.Chamado") as mock_chamado_cls,
+            patch("app.routes.api_colaboracao.usuario_pode_ver_chamado", return_value=True),
             patch(
                 "app.services.escalonamento_service.incluir_participantes",
                 return_value={
@@ -190,7 +190,7 @@ class TestIncluirParticipantesRota:
                     "dados": {"participantes": [], "adicionados": []},
                 },
             ),
-            patch("app.routes.api.threading"),
+            patch("app.routes.api_colaboracao.threading"),
         ):
             mock_db.collection.return_value.document.return_value.get.return_value = doc
             mock_chamado_cls.from_dict.return_value = chamado_mock
@@ -237,9 +237,9 @@ class TestConcluirMinhaParteRota:
         )
 
         with (
-            patch("app.routes.api.db") as mock_db,
-            patch("app.routes.api.Chamado") as mock_chamado_cls,
-            patch("app.routes.api.usuario_pode_ver_chamado", return_value=True),
+            patch("app.routes.api_colaboracao.db") as mock_db,
+            patch("app.routes.api_colaboracao.Chamado") as mock_chamado_cls,
+            patch("app.routes.api_colaboracao.usuario_pode_ver_chamado", return_value=True),
             patch(
                 "app.services.escalonamento_service.concluir_minha_parte",
                 return_value={"sucesso": True, "dados": {"pode_concluir_global": False}},
@@ -272,9 +272,9 @@ class TestConcluirMinhaParteRota:
         )
 
         with (
-            patch("app.routes.api.db") as mock_db,
-            patch("app.routes.api.Chamado") as mock_chamado_cls,
-            patch("app.routes.api.usuario_pode_ver_chamado", return_value=True),
+            patch("app.routes.api_colaboracao.db") as mock_db,
+            patch("app.routes.api_colaboracao.Chamado") as mock_chamado_cls,
+            patch("app.routes.api_colaboracao.usuario_pode_ver_chamado", return_value=True),
         ):
             mock_db.collection.return_value.document.return_value.get.return_value = doc
             mock_chamado_cls.from_dict.return_value = chamado_mock
@@ -315,14 +315,14 @@ class TestConcluirMinhaParteRota:
         )
 
         with (
-            patch("app.routes.api.db") as mock_db,
-            patch("app.routes.api.Chamado") as mock_chamado_cls,
-            patch("app.routes.api.usuario_pode_ver_chamado", return_value=True),
+            patch("app.routes.api_colaboracao.db") as mock_db,
+            patch("app.routes.api_colaboracao.Chamado") as mock_chamado_cls,
+            patch("app.routes.api_colaboracao.usuario_pode_ver_chamado", return_value=True),
             patch(
                 "app.services.escalonamento_service.concluir_minha_parte",
                 return_value={"sucesso": True, "dados": {"pode_concluir_global": True}},
             ),
-            patch("app.routes.api.threading") as mock_threading,
+            patch("app.routes.api_colaboracao.threading") as mock_threading,
         ):
             mock_db.collection.return_value.document.return_value.get.return_value = doc
             mock_chamado_cls.from_dict.return_value = chamado_mock
@@ -347,9 +347,9 @@ class TestNotificacaoTriplaInclusao:
         chamado_mock = _mock_chamado_obj(area="Manutencao", responsavel_id="sup_1")
 
         with (
-            patch("app.routes.api.db") as mock_db,
-            patch("app.routes.api.Chamado") as mock_chamado_cls,
-            patch("app.routes.api.usuario_pode_ver_chamado", return_value=True),
+            patch("app.routes.api_colaboracao.db") as mock_db,
+            patch("app.routes.api_colaboracao.Chamado") as mock_chamado_cls,
+            patch("app.routes.api_colaboracao.usuario_pode_ver_chamado", return_value=True),
             patch(
                 "app.services.escalonamento_service.incluir_participantes",
                 return_value={
@@ -369,7 +369,7 @@ class TestNotificacaoTriplaInclusao:
                     },
                 },
             ),
-            patch("app.routes.api.threading") as mock_threading,
+            patch("app.routes.api_colaboracao.threading") as mock_threading,
         ):
             mock_db.collection.return_value.document.return_value.get.return_value = doc
             mock_chamado_cls.from_dict.return_value = chamado_mock
@@ -392,9 +392,9 @@ class TestNotificacaoTriplaInclusao:
         chamado_mock = _mock_chamado_obj(area="Manutencao", responsavel_id="sup_1")
 
         with (
-            patch("app.routes.api.db") as mock_db,
-            patch("app.routes.api.Chamado") as mock_chamado_cls,
-            patch("app.routes.api.usuario_pode_ver_chamado", return_value=True),
+            patch("app.routes.api_colaboracao.db") as mock_db,
+            patch("app.routes.api_colaboracao.Chamado") as mock_chamado_cls,
+            patch("app.routes.api_colaboracao.usuario_pode_ver_chamado", return_value=True),
             patch(
                 "app.services.escalonamento_service.incluir_participantes",
                 return_value={
@@ -402,7 +402,7 @@ class TestNotificacaoTriplaInclusao:
                     "erro": "Nenhum participante novo para incluir — todos já são participantes do chamado",
                 },
             ),
-            patch("app.routes.api.threading") as mock_threading,
+            patch("app.routes.api_colaboracao.threading") as mock_threading,
         ):
             mock_db.collection.return_value.document.return_value.get.return_value = doc
             mock_chamado_cls.from_dict.return_value = chamado_mock

@@ -827,9 +827,9 @@ def test_gestor_transferir_area_403(client_logado_gestor):
     chamado_obj.responsavel_id = "gest_1"
 
     with (
-        patch("app.routes.api.db") as mock_db,
-        patch("app.routes.api.usuario_pode_ver_chamado", return_value=True),
-        patch("app.routes.api.Chamado.from_dict", return_value=chamado_obj),
+        patch("app.routes.api_colaboracao.db") as mock_db,
+        patch("app.routes.api_colaboracao.usuario_pode_ver_chamado", return_value=True),
+        patch("app.routes.api_colaboracao.Chamado.from_dict", return_value=chamado_obj),
     ):
         mock_db.collection.return_value.document.return_value.get.return_value = doc
         resp = client_logado_gestor.post(
@@ -849,9 +849,9 @@ def test_gestor_escalonar_colega_403(client_logado_gestor):
     chamado_obj.responsavel_id = "gest_1"
 
     with (
-        patch("app.routes.api.db") as mock_db,
-        patch("app.routes.api.usuario_pode_ver_chamado", return_value=True),
-        patch("app.routes.api.Chamado.from_dict", return_value=chamado_obj),
+        patch("app.routes.api_colaboracao.db") as mock_db,
+        patch("app.routes.api_colaboracao.usuario_pode_ver_chamado", return_value=True),
+        patch("app.routes.api_colaboracao.Chamado.from_dict", return_value=chamado_obj),
     ):
         mock_db.collection.return_value.document.return_value.get.return_value = doc
         resp = client_logado_gestor.post(
@@ -871,9 +871,9 @@ def test_gestor_incluir_participantes_403(client_logado_gestor):
     chamado_obj.responsavel_id = "gest_1"
 
     with (
-        patch("app.routes.api.db") as mock_db,
-        patch("app.routes.api.usuario_pode_ver_chamado", return_value=True),
-        patch("app.routes.api.Chamado.from_dict", return_value=chamado_obj),
+        patch("app.routes.api_colaboracao.db") as mock_db,
+        patch("app.routes.api_colaboracao.usuario_pode_ver_chamado", return_value=True),
+        patch("app.routes.api_colaboracao.Chamado.from_dict", return_value=chamado_obj),
     ):
         mock_db.collection.return_value.document.return_value.get.return_value = doc
         resp = client_logado_gestor.post(
@@ -897,8 +897,8 @@ def test_gestor_concluir_minha_parte_403_mesmo_sendo_participante(client_logado_
     ]
 
     with (
-        patch("app.routes.api.db") as mock_db,
-        patch("app.routes.api.Chamado.from_dict", return_value=chamado_obj),
+        patch("app.routes.api_colaboracao.db") as mock_db,
+        patch("app.routes.api_colaboracao.Chamado.from_dict", return_value=chamado_obj),
     ):
         mock_db.collection.return_value.document.return_value.get.return_value = doc
         resp = client_logado_gestor.post("/api/chamado/ch_001/concluir-minha-parte")
