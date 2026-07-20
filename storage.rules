@@ -1,0 +1,17 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Acesso ao Firebase Storage é feito APENAS pelo backend (Flask) via
+    // Firebase Admin SDK com credentials.json / Application Default
+    // Credentials. Não há acesso direto do cliente (browser/mobile) ao
+    // Storage — anexos usam Cloudflare R2 como armazenamento preferencial,
+    // com Firebase Storage só como fallback. Regras abaixo negam todo
+    // acesso direto para evitar uso indevido caso alguém tente acessar o
+    // bucket fora do app.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

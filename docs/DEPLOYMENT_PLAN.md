@@ -293,6 +293,20 @@ firebase deploy --only firestore:indexes
 
 (Requer Firebase CLI autenticado no projeto Firebase usado como banco.)
 
+### Regras de segurança (Firestore + Storage)
+
+`firestore.rules` e `storage.rules` só valem no projeto Firebase real depois de
+deployadas — editar o arquivo local não muda nada em produção até rodar:
+
+```bash
+firebase deploy --only firestore:rules,storage
+```
+
+Ambas as regras são deny-all por padrão (`allow read, write: if false`) — o
+acesso real é sempre via Firebase Admin SDK no backend, que ignora essas
+regras. Elas existem só como defesa em profundidade contra acesso direto
+indevido (cliente/browser) caso algo seja mal configurado no futuro.
+
 ---
 
 ## Criptografia PII (Onda 4 — LGPD / CWI 2.3)
