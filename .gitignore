@@ -87,8 +87,12 @@ _backup_nao_utilizados/
 # --- Ferramentas de IA / Editor ---
 .claude/
 .cursor/
-# design.json e live/config.json ficam versionados (config compartilhada);
-# só o cache de sessão (caminhos locais da máquina) não deve ser commitado.
+# live/config.json fica versionado (config compartilhada da revisão visual ao
+# vivo). design.json era um snapshot gerado (2026-07-01) que duplicava e ficou
+# desatualizado em relação a docs/DESIGN.md (fonte de verdade real, mantida à
+# mão) — removido do repositório, mas gitignored em vez de deletado do disco,
+# caso a ferramenta ainda leia esse arquivo localmente.
+.impeccable/design.json
 .impeccable/hook.cache.json
 
 # --- Artefatos de testes E2E (screenshots/vídeos/traces de falhas do Playwright) ---
