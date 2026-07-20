@@ -1,7 +1,9 @@
-# Ruff — linter e formatter para o projeto sistema_chamados (Flask + Python 3.12+)
+# Ruff — linter e formatter para o projeto sistema_chamados (Flask + Python 3.14)
 # Referência: https://docs.astral.sh/ruff/configuration/
+# Nota: ruff 0.9.10 (requirements-dev.txt) ainda não tem "py314" como opção de
+# target-version — "py313" é o valor suportado mais próximo da versão real do projeto.
 
-target-version = "py312"
+target-version = "py313"
 line-length = 100
 
 # Pastas a ignorar

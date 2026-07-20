@@ -12,7 +12,7 @@ COPY app/static/css/input.css ./app/static/css/input.css
 RUN npm run build:css
 
 # ── Stage 1: builder ──────────────────────────────────────────────────────────
-FROM python:3.12-slim AS builder
+FROM python:3.14-slim AS builder
 
 WORKDIR /build
 
@@ -25,7 +25,7 @@ COPY requirements.txt .
 RUN pip install --prefix=/install --no-warn-script-location -r requirements.txt
 
 # ── Stage 2: runtime ─────────────────────────────────────────────────────────
-FROM python:3.12-slim AS runtime
+FROM python:3.14-slim AS runtime
 
 # Usuário não-root com UID/GID fixos (reproduzível entre builds)
 RUN groupadd --gid 1001 appgroup \

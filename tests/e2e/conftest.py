@@ -140,7 +140,7 @@ def _build_usuarios_collection_mock(usuarios_por_id: dict[str, dict]):
 
 
 @pytest.fixture(scope="session")
-def _stub_server() -> Generator[str | None, None, None]:
+def _stub_server() -> Generator[str | None]:
     """Inicia Flask em background para CI quando nenhum servidor externo está disponível.
 
     Ativado quando FLASK_E2E_STUB=1 ou CI=true e FLASK_TEST_URL não está definido.
