@@ -1,7 +1,7 @@
 """Testes da rota POST /api/chamado/<id>/previsao-atendimento.
 
 Segue padrão do projeto (mesmo de test_api_escalonamento.py):
-- patch('app.routes.api.db') para simular Firestore na rota
+- patch('app.routes.api_colaboracao.db') para simular Firestore na rota
 - patch do serviço importado inline pela rota
 - Usa fixtures client_logado_supervisor, client_logado_admin, client_logado_solicitante
 """

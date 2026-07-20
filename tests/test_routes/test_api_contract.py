@@ -78,9 +78,9 @@ def test_api_atualizar_status_sucesso_200_estrutura(client_logado_supervisor):
     chamado_mock.solicitante_id = "s1"
     chamado_mock.participantes = []
     with (
-        patch("app.routes.api.db") as mock_db,
-        patch("app.routes.api.Chamado") as mock_chamado_cls,
-        patch("app.routes.api.atualizar_status_chamado") as m,
+        patch("app.routes.api_chamados.db") as mock_db,
+        patch("app.routes.api_chamados.Chamado") as mock_chamado_cls,
+        patch("app.routes.api_chamados.atualizar_status_chamado") as m,
     ):
         mock_db.collection.return_value.document.return_value.get.return_value = doc
         mock_chamado_cls.from_dict.return_value = chamado_mock
@@ -139,12 +139,12 @@ def test_api_bulk_status_chamado_ids_nao_lista_400(client_logado_supervisor):
 @pytest.mark.api
 def test_api_bulk_status_sucesso_200_estrutura(client_logado_supervisor):
     """POST /api/bulk-status sucesso retorna 200 com sucesso, atualizados, total_solicitados, erros."""
-    with patch("app.routes.api.db") as mock_db:
+    with patch("app.routes.api_chamados.db") as mock_db:
         doc = MagicMock()
         doc.exists = True
         doc.to_dict.return_value = {"area": "Manutencao", "status": "Aberto"}
         mock_db.collection.return_value.document.return_value.get.return_value = doc
-        with patch("app.routes.api.atualizar_status_chamado") as mock_atualizar:
+        with patch("app.routes.api_chamados.atualizar_status_chamado") as mock_atualizar:
             mock_atualizar.return_value = {
                 "sucesso": True,
                 "mensagem": "ok",
@@ -220,7 +220,7 @@ def test_api_chamados_paginar_sem_login_401(client):
 @pytest.mark.api
 def test_api_chamados_paginar_sucesso_200_estrutura(client_logado_supervisor):
     """GET /api/chamados/paginar retorna 200 com chamados e paginacao."""
-    with patch("app.routes.api.aplicar_filtros_dashboard_com_paginacao") as m:
+    with patch("app.routes.api_chamados.aplicar_filtros_dashboard_com_paginacao") as m:
         m.return_value = {"docs": [], "proximo_cursor": None, "tem_proxima": False}
         r = client_logado_supervisor.get("/api/chamados/paginar")
     assert r.status_code == 200
@@ -243,7 +243,7 @@ def test_api_carregar_mais_sem_login_401(client):
 @pytest.mark.api
 def test_api_carregar_mais_sucesso_200_estrutura(client_logado_supervisor):
     """POST /api/carregar-mais retorna 200 com chamados, cursor_proximo, tem_proxima."""
-    with patch("app.routes.api.aplicar_filtros_dashboard_com_paginacao") as m:
+    with patch("app.routes.api_chamados.aplicar_filtros_dashboard_com_paginacao") as m:
         m.return_value = {"docs": [], "proximo_cursor": None, "tem_proxima": False}
         r = client_logado_supervisor.post(
             "/api/carregar-mais",
@@ -287,9 +287,9 @@ def test_api_chamado_por_id_sucesso_200_estrutura(client_logado_supervisor):
         "tipo_solicitacao": "Manutencao",
     }
     with (
-        patch("app.routes.api.db") as mock_db,
-        patch("app.routes.api.usuario_pode_ver_chamado", return_value=True),
-        patch("app.routes.api.obter_sla_para_exibicao", return_value=None),
+        patch("app.routes.api_chamados.db") as mock_db,
+        patch("app.routes.api_chamados.usuario_pode_ver_chamado", return_value=True),
+        patch("app.routes.api_chamados.obter_sla_para_exibicao", return_value=None),
     ):
         mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
         r = client_logado_supervisor.get("/api/chamado/ch1")

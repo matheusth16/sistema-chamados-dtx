@@ -58,8 +58,8 @@ def test_bulk_status_lote_100_por_cento_sucesso(client_logado_supervisor):
         "participantes": [],
     }
     with (
-        patch("app.routes.api.db") as mock_db,
-        patch("app.routes.api.atualizar_status_chamado") as mock_atualizar,
+        patch("app.routes.api_chamados.db") as mock_db,
+        patch("app.routes.api_chamados.atualizar_status_chamado") as mock_atualizar,
     ):
         col = mock_db.collection.return_value
 
@@ -107,7 +107,7 @@ def test_bulk_status_lote_falha_total_ainda_retorna_sucesso_true_no_topo(
         "solicitante_id": "sol_x",
         "participantes": [],
     }
-    with patch("app.routes.api.db") as mock_db:
+    with patch("app.routes.api_chamados.db") as mock_db:
         mock_db.collection.return_value.document.return_value.get.return_value = doc_outra_area
 
         r = client_logado_supervisor.post(
@@ -180,8 +180,8 @@ def test_bulk_status_gestor_setor_nao_altera_chamado_do_colega_na_mesma_area(
         "participantes": [],
     }
     with (
-        patch("app.routes.api.db") as mock_db,
-        patch("app.routes.api.atualizar_status_chamado") as mock_atualizar,
+        patch("app.routes.api_chamados.db") as mock_db,
+        patch("app.routes.api_chamados.atualizar_status_chamado") as mock_atualizar,
     ):
         mock_db.collection.return_value.document.return_value.get.return_value = doc_colega
         mock_atualizar.return_value = {"sucesso": True, "novo_status": "Concluído"}

@@ -63,7 +63,7 @@ def test_api_editar_chamado_supervisor_outra_area_retorna_403(client_logado_supe
             return supervisor_user
         return None
 
-    # O serviço usa app.services.edicao_chamado_service.db, não app.routes.api.db
+    # O serviço usa app.services.edicao_chamado_service.db, não app.routes.api_chamados.db
     with patch("app.services.edicao_chamado_service.db") as mock_db:
         mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
         with patch(
@@ -93,7 +93,7 @@ def test_carregar_mais_sem_login_redireciona(client):
 
 def test_carregar_mais_retorna_estrutura_esperada(client_logado_supervisor):
     """POST /api/carregar-mais retorna sucesso, chamados, cursor_proximo, tem_proxima (ou 403 por Origin)."""
-    with patch("app.routes.api.aplicar_filtros_dashboard_com_paginacao") as mock_filtros:
+    with patch("app.routes.api_chamados.aplicar_filtros_dashboard_com_paginacao") as mock_filtros:
         mock_filtros.return_value = {
             "docs": [],
             "proximo_cursor": None,
@@ -229,8 +229,8 @@ def test_bulk_status_supervisor_outra_area_retorna_erro_por_chamado(client_logad
         "participantes": [],
     }
     with (
-        patch("app.routes.api.db") as mock_db,
-        patch("app.routes.api.atualizar_status_chamado") as mock_atualizar,
+        patch("app.routes.api_chamados.db") as mock_db,
+        patch("app.routes.api_chamados.atualizar_status_chamado") as mock_atualizar,
     ):
         col = mock_db.collection.return_value
 
@@ -287,7 +287,7 @@ def test_api_chamado_por_id_solicitante_chamado_de_outro_retorna_403(client_loga
         "responsavel": "Alguém",
         "tipo_solicitacao": "Manutencao",
     }
-    with patch("app.routes.api.db") as mock_db:
+    with patch("app.routes.api_chamados.db") as mock_db:
         mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
         r = client_logado_solicitante.get("/api/chamado/ch_123")
     assert r.status_code == 403
@@ -312,9 +312,9 @@ def test_api_chamado_por_id_supervisor_sua_area_retorna_200(client_logado_superv
         "responsavel": "Supervisor Teste",
         "tipo_solicitacao": "Manutencao",
     }
-    with patch("app.routes.api.db") as mock_db:
+    with patch("app.routes.api_chamados.db") as mock_db:
         mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
-        with patch("app.routes.api.obter_sla_para_exibicao", return_value=None):
+        with patch("app.routes.api_chamados.obter_sla_para_exibicao", return_value=None):
             r = client_logado_supervisor.get("/api/chamado/ch_manutencao_1")
     assert r.status_code == 200
     data = r.get_json()
@@ -346,7 +346,7 @@ def test_post_editar_chamado_chamado_id_alheio_retorna_403(client_logado_solicit
         "tipo_solicitacao": "Suporte",
         "prioridade": 2,
     }
-    with patch("app.routes.api.db") as mock_db:
+    with patch("app.routes.api_chamados.db") as mock_db:
         mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
         r = client_logado_solicitante.post(
             "/api/atualizar-status",
@@ -471,7 +471,7 @@ def test_filtro_perfil_supervisor_sem_areas_retorna_none():
     """
     from unittest.mock import MagicMock
 
-    from app.routes.api import _aplicar_filtro_perfil
+    from app.routes.api_chamados import _aplicar_filtro_perfil
 
     ref = MagicMock()
     user = MagicMock()
@@ -510,7 +510,7 @@ def test_paginar_supervisor_sem_areas_nao_expoe_todos_chamados(
         "prioridade": 1,
     }
 
-    with patch("app.routes.api.aplicar_filtros_dashboard_com_paginacao") as mock_filtros:
+    with patch("app.routes.api_chamados.aplicar_filtros_dashboard_com_paginacao") as mock_filtros:
         mock_filtros.return_value = {
             "docs": [doc_alheio],  # Simula que existem docs no banco
             "proximo_cursor": None,

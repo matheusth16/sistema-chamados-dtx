@@ -205,7 +205,7 @@ def test_regression_carregar_mais_sem_login_401(client):
 
 def test_regression_carregar_mais_com_login_200_estrutura(client_logado_supervisor):
     """Regressão: POST /api/carregar-mais com login retorna 200 e estrutura."""
-    with patch("app.routes.api.aplicar_filtros_dashboard_com_paginacao") as mock_f:
+    with patch("app.routes.api_chamados.aplicar_filtros_dashboard_com_paginacao") as mock_f:
         mock_f.return_value = {"docs": [], "proximo_cursor": None, "tem_proxima": False}
         r = client_logado_supervisor.post(
             "/api/carregar-mais",

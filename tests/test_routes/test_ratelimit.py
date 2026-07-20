@@ -107,7 +107,7 @@ def test_atualizar_status_retorna_429_apos_exceder_limite(app_rl):
         patch("app.routes.auth.LoginAttemptTracker.reset_attempts"),
         patch("app.routes.auth.LoginAttemptTracker.log_success_attempt"),
         patch("app.routes.auth._dispositivo_confiavel", return_value=True),
-        patch("app.routes.api.db") as mock_db,
+        patch("app.routes.api_chamados.db") as mock_db,
     ):
         mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
         client = app_rl.test_client()

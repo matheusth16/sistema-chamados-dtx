@@ -1,7 +1,7 @@
 """Testes das rotas POST /api/chamado/<id>/transferir-area e /escalonar-colega.
 
 Segue padrão do projeto:
-- patch('app.routes.api.db') para simular Firestore na rota
+- patch('app.routes.api_colaboracao.db') para simular Firestore na rota
 - patch do serviço importado inline pela rota
 - Usa fixtures client_logado_supervisor, client_logado_admin, client_logado_solicitante
 """

@@ -117,7 +117,7 @@ def test_criar_chamado_valido_redireciona_e_chama_service(client_logado_solicita
 def test_api_chamados_paginar_retorna_estrutura_para_solicitante(client_logado_solicitante):
     """GET /api/chamados/paginar como solicitante retorna 200 com chamados e paginacao."""
     with patch(
-        "app.routes.api.aplicar_filtros_dashboard_com_paginacao",
+        "app.routes.api_chamados.aplicar_filtros_dashboard_com_paginacao",
         return_value={"docs": [], "proximo_cursor": None, "tem_proxima": False},
     ):
         r = client_logado_solicitante.get("/api/chamados/paginar")

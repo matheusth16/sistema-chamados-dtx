@@ -78,9 +78,9 @@ def test_api_chamado_por_id_resposta_sem_campos_internos(client_logado_superviso
     }
 
     with (
-        patch("app.routes.api.db") as mock_db,
-        patch("app.routes.api.usuario_pode_ver_chamado", return_value=True),
-        patch("app.routes.api.obter_sla_para_exibicao", return_value={}),
+        patch("app.routes.api_chamados.db") as mock_db,
+        patch("app.routes.api_chamados.usuario_pode_ver_chamado", return_value=True),
+        patch("app.routes.api_chamados.obter_sla_para_exibicao", return_value={}),
     ):
         mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
         r = client_logado_supervisor.get("/api/chamado/ch_001")
@@ -119,9 +119,9 @@ def test_api_chamado_por_id_campos_esperados_presentes(client_logado_supervisor)
     }
 
     with (
-        patch("app.routes.api.db") as mock_db,
-        patch("app.routes.api.usuario_pode_ver_chamado", return_value=True),
-        patch("app.routes.api.obter_sla_para_exibicao", return_value={"status": "ok"}),
+        patch("app.routes.api_chamados.db") as mock_db,
+        patch("app.routes.api_chamados.usuario_pode_ver_chamado", return_value=True),
+        patch("app.routes.api_chamados.obter_sla_para_exibicao", return_value={"status": "ok"}),
     ):
         mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
         r = client_logado_supervisor.get("/api/chamado/ch_042")
@@ -137,7 +137,7 @@ def test_api_chamado_por_id_campos_esperados_presentes(client_logado_supervisor)
 
 def test_api_chamado_por_id_500_usa_mensagem_generica(client_logado_supervisor):
     """Quando db lança exceção em /api/chamado/<id>, resposta 500 usa ERRO_INTERNO_MSG."""
-    with patch("app.routes.api.db") as mock_db:
+    with patch("app.routes.api_chamados.db") as mock_db:
         mock_db.collection.return_value.document.return_value.get.side_effect = RuntimeError(
             "Firestore connection timeout — credenciais inválidas"
         )
@@ -160,9 +160,9 @@ def test_api_chamados_paginar_500_usa_mensagem_generica(client_logado_supervisor
     mock_ref.where.return_value = mock_ref
 
     with (
-        patch("app.routes.api.db") as mock_db,
+        patch("app.routes.api_chamados.db") as mock_db,
         patch(
-            "app.routes.api.aplicar_filtros_dashboard_com_paginacao",
+            "app.routes.api_chamados.aplicar_filtros_dashboard_com_paginacao",
             side_effect=RuntimeError("Google Cloud quota exceeded"),
         ),
     ):
@@ -200,8 +200,8 @@ def test_bulk_status_erro_por_item_usa_mensagem_generica(client_logado_superviso
     mock_col.document.return_value.get.side_effect = get_side_effect
 
     with (
-        patch("app.routes.api.db") as mock_db,
-        patch("app.routes.api.atualizar_status_chamado") as mock_atualizar,
+        patch("app.routes.api_chamados.db") as mock_db,
+        patch("app.routes.api_chamados.atualizar_status_chamado") as mock_atualizar,
     ):
         mock_db.collection.return_value = mock_col
         mock_atualizar.return_value = {
@@ -292,10 +292,12 @@ def test_atualizar_status_exception_em_service_nao_vaza_internals(client_logado_
     }
 
     with (
-        patch("app.routes.api.db") as mock_db,
-        patch("app.routes.api.verificar_permissao_mudanca_status", return_value=(True, None)),
+        patch("app.routes.api_chamados.db") as mock_db,
         patch(
-            "app.routes.api.atualizar_status_chamado",
+            "app.routes.api_chamados.verificar_permissao_mudanca_status", return_value=(True, None)
+        ),
+        patch(
+            "app.routes.api_chamados.atualizar_status_chamado",
             return_value={
                 "sucesso": False,
                 "erro": "Erro interno. Tente novamente.",
@@ -336,7 +338,9 @@ def test_api_supervisores_lista_nao_expoe_senha_hash(client_logado_solicitante):
     sup_com_hash.email = "ext@dtx.aero"
     sup_com_hash.senha_hash = "scrypt:32768:8:1:HASH_SECRETO"
 
-    with patch("app.routes.api.Usuario.get_supervisores_por_area", return_value=[sup_com_hash]):
+    with patch(
+        "app.routes.api_chamados.Usuario.get_supervisores_por_area", return_value=[sup_com_hash]
+    ):
         r = client_logado_solicitante.get("/api/supervisores/lista?area=Manutencao")
 
     assert r.status_code == 200

@@ -124,7 +124,7 @@ def test_staging_auth_deep_health_ainda_usa_health_secret(client_staging):
     _test_secret = "segredo-teste-health-valido-32ch"
     with (
         patch.dict(os.environ, {"HEALTH_SECRET": _test_secret}, clear=False),
-        patch("app.routes.api.db") as mock_db,
+        patch("app.routes.api_chamados.db") as mock_db,
     ):
         mock_db.collection.return_value.limit.return_value.get.side_effect = Exception(
             "Firestore indisponível no teste"

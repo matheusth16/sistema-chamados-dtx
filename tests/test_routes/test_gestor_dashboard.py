@@ -213,9 +213,9 @@ def test_gestor_dashboard_filtro_atrasados(client_logado_gestor):
 def test_gestor_nao_pode_mudar_status_via_api(client_logado_gestor):
     """POST /api/atualizar-status retorna 403 para gestor read-only."""
     with (
-        patch("app.routes.api.db"),
+        patch("app.routes.api_chamados.db"),
         patch(
-            "app.routes.api.verificar_permissao_mudanca_status",
+            "app.routes.api_chamados.verificar_permissao_mudanca_status",
             return_value=(False, "Acesso negado: gestores têm visão read-only"),
         ),
     ):
@@ -248,7 +248,7 @@ def test_gestor_setor_dual_role_nao_muda_status_de_chamado_do_colega(
     mock_doc.exists = True
     mock_doc.to_dict.return_value = chamado_data
 
-    with patch("app.routes.api.db") as mock_db:
+    with patch("app.routes.api_chamados.db") as mock_db:
         mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
         resp = client_logado_gestor_setor_dual_role.post(
             "/api/atualizar-status",

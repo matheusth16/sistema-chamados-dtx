@@ -13,7 +13,7 @@ import pytest
 def _patch_setor_para_area_routes():
     """Evita chamadas ao Firestore via setor_para_area nas rotas."""
     with patch(
-        "app.routes.api.setor_para_area",
+        "app.routes.api_chamados.setor_para_area",
         side_effect=lambda setor_nome: setor_nome or "",
     ):
         yield

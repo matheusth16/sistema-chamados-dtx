@@ -51,9 +51,9 @@ def _mock_db_com_ref():
 def test_search_payload_nao_causa_500(client_logado_supervisor, payload):
     """search=<injection_payload> retorna 200, 400 ou 403 — nunca 500."""
     with (
-        patch("app.routes.api.db", _mock_db_com_ref()),
+        patch("app.routes.api_chamados.db", _mock_db_com_ref()),
         patch(
-            "app.routes.api.aplicar_filtros_dashboard_com_paginacao",
+            "app.routes.api_chamados.aplicar_filtros_dashboard_com_paginacao",
             return_value=_mock_paginacao_vazia(),
         ),
     ):
@@ -65,9 +65,9 @@ def test_search_payload_nao_causa_500(client_logado_supervisor, payload):
 def test_search_payload_nao_vaza_internals(client_logado_supervisor, payload):
     """search=<injection_payload> não vaza nomes internos de tecnologia/campo."""
     with (
-        patch("app.routes.api.db", _mock_db_com_ref()),
+        patch("app.routes.api_chamados.db", _mock_db_com_ref()),
         patch(
-            "app.routes.api.aplicar_filtros_dashboard_com_paginacao",
+            "app.routes.api_chamados.aplicar_filtros_dashboard_com_paginacao",
             return_value=_mock_paginacao_vazia(),
         ),
     ):
@@ -84,9 +84,9 @@ def test_search_payload_nao_vaza_internals(client_logado_supervisor, payload):
 def test_search_payload_nao_retorna_dados_extras(client_logado_supervisor, payload):
     """search=<injection_payload> retorna lista vazia (mock controlado), não dados de outros."""
     with (
-        patch("app.routes.api.db", _mock_db_com_ref()),
+        patch("app.routes.api_chamados.db", _mock_db_com_ref()),
         patch(
-            "app.routes.api.aplicar_filtros_dashboard_com_paginacao",
+            "app.routes.api_chamados.aplicar_filtros_dashboard_com_paginacao",
             return_value=_mock_paginacao_vazia(),
         ),
     ):
@@ -111,9 +111,10 @@ def test_payload_tratado_como_string_literal(client_logado_supervisor, payload):
         return _mock_paginacao_vazia()
 
     with (
-        patch("app.routes.api.db", _mock_db_com_ref()),
+        patch("app.routes.api_chamados.db", _mock_db_com_ref()),
         patch(
-            "app.routes.api.aplicar_filtros_dashboard_com_paginacao", side_effect=capturar_filtros
+            "app.routes.api_chamados.aplicar_filtros_dashboard_com_paginacao",
+            side_effect=capturar_filtros,
         ),
     ):
         client_logado_supervisor.get(f"/api/chamados/paginar?search={payload}")

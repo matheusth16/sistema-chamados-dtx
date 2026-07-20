@@ -23,7 +23,8 @@ def test_supervisores_lista_exclui_usuario_logado(client_logado_supervisor):
     sup_outro = _sup_mock("sup_2", "Outro Supervisor", "outro@test.com")
 
     with patch(
-        "app.routes.api.Usuario.get_supervisores_por_area", return_value=[sup_logado, sup_outro]
+        "app.routes.api_chamados.Usuario.get_supervisores_por_area",
+        return_value=[sup_logado, sup_outro],
     ):
         r = client_logado_supervisor.get("/api/supervisores/lista?area=Manutencao")
 
@@ -40,7 +41,7 @@ def test_supervisores_lista_exclui_usuario_logado(client_logado_supervisor):
 
 def test_supervisores_lista_area_sem_supervisores_retorna_lista_vazia(client_logado_supervisor):
     """Área sem supervisores → lista vazia, sem erro."""
-    with patch("app.routes.api.Usuario.get_supervisores_por_area", return_value=[]):
+    with patch("app.routes.api_chamados.Usuario.get_supervisores_por_area", return_value=[]):
         r = client_logado_supervisor.get("/api/supervisores/lista?area=Inexistente")
 
     assert r.status_code == 200
@@ -58,7 +59,9 @@ def test_supervisores_lista_quando_unico_supervisor_e_o_proprio_logado_retorna_v
     """
     sup_logado = _sup_mock("sup_1", "Supervisor Teste", "sup@test.com")
 
-    with patch("app.routes.api.Usuario.get_supervisores_por_area", return_value=[sup_logado]):
+    with patch(
+        "app.routes.api_chamados.Usuario.get_supervisores_por_area", return_value=[sup_logado]
+    ):
         r = client_logado_supervisor.get("/api/supervisores/lista?area=Manutencao")
 
     assert r.status_code == 200

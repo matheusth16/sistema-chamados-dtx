@@ -1,4 +1,4 @@
-"""Testes direcionados a linhas descobertas em app/routes/api.py (gate de cobertura >= 85%).
+"""Testes direcionados a linhas descobertas em app/routes/api_chamados.py e api_colaboracao.py (gate de cobertura >= 85%).
 
 Cobre: helpers de notificação em background (_dados_chamado_*_valido, _enviar_notificacao_*,
 _notificar_escalonamento, _notificar_participante_incluido, _notificar_owner_todos_concluiram),
@@ -7,7 +7,7 @@ api_push_subscribe, api_chamados_paginar, carregar_mais, api_buscar_usuarios,
 api_editar_solicitante/cancelar_solicitante/anexo_solicitante (gestor read-only),
 api_transferir_area, api_escalonar_colega, api_incluir_participantes, api_concluir_minha_parte.
 
-Segue padrão do projeto: patch('app.routes.api.db'), patch do serviço no módulo de origem,
+Segue padrão do projeto: patch('app.routes.api_chamados.db'), patch do serviço no módulo de origem,
 fixtures client_logado_{solicitante,supervisor,admin,gestor}.
 """
 
@@ -65,33 +65,33 @@ def _mock_chamado_obj(
 
 
 def test_dados_chamado_reaberto_valido_retorna_none_quando_nao_existe():
-    from app.routes.api import _dados_chamado_reaberto_valido
+    from app.routes.api_chamados import _dados_chamado_reaberto_valido
 
     doc = MagicMock()
     doc.exists = False
-    with patch("app.routes.api.db") as mock_db:
+    with patch("app.routes.api_chamados.db") as mock_db:
         mock_db.collection.return_value.document.return_value.get.return_value = doc
         assert _dados_chamado_reaberto_valido("ch1") is None
 
 
 def test_dados_chamado_reaberto_valido_retorna_none_quando_status_diferente():
-    from app.routes.api import _dados_chamado_reaberto_valido
+    from app.routes.api_chamados import _dados_chamado_reaberto_valido
 
     doc = MagicMock()
     doc.exists = True
     doc.to_dict.return_value = {"status": "Concluído", "confirmacao_solicitante": "reaberto"}
-    with patch("app.routes.api.db") as mock_db:
+    with patch("app.routes.api_chamados.db") as mock_db:
         mock_db.collection.return_value.document.return_value.get.return_value = doc
         assert _dados_chamado_reaberto_valido("ch1") is None
 
 
 def test_dados_chamado_reaberto_valido_retorna_dados_quando_valido():
-    from app.routes.api import _dados_chamado_reaberto_valido
+    from app.routes.api_chamados import _dados_chamado_reaberto_valido
 
     doc = MagicMock()
     doc.exists = True
     doc.to_dict.return_value = {"status": "Aberto", "confirmacao_solicitante": "reaberto"}
-    with patch("app.routes.api.db") as mock_db:
+    with patch("app.routes.api_chamados.db") as mock_db:
         mock_db.collection.return_value.document.return_value.get.return_value = doc
         result = _dados_chamado_reaberto_valido("ch1")
     assert result is not None
@@ -99,23 +99,23 @@ def test_dados_chamado_reaberto_valido_retorna_dados_quando_valido():
 
 
 def test_dados_chamado_confirmado_valido_retorna_none_quando_nao_confirmado():
-    from app.routes.api import _dados_chamado_confirmado_valido
+    from app.routes.api_chamados import _dados_chamado_confirmado_valido
 
     doc = MagicMock()
     doc.exists = True
     doc.to_dict.return_value = {"confirmacao_solicitante": "pendente"}
-    with patch("app.routes.api.db") as mock_db:
+    with patch("app.routes.api_chamados.db") as mock_db:
         mock_db.collection.return_value.document.return_value.get.return_value = doc
         assert _dados_chamado_confirmado_valido("ch1") is None
 
 
 def test_dados_chamado_confirmado_valido_retorna_dados_quando_confirmado():
-    from app.routes.api import _dados_chamado_confirmado_valido
+    from app.routes.api_chamados import _dados_chamado_confirmado_valido
 
     doc = MagicMock()
     doc.exists = True
     doc.to_dict.return_value = {"confirmacao_solicitante": "confirmado"}
-    with patch("app.routes.api.db") as mock_db:
+    with patch("app.routes.api_chamados.db") as mock_db:
         mock_db.collection.return_value.document.return_value.get.return_value = doc
         result = _dados_chamado_confirmado_valido("ch1")
     assert result is not None
@@ -136,7 +136,7 @@ class _SyncThread:
 
 
 def test_enviar_notificacao_reabrir_executa_e_notifica(app):
-    from app.routes.api import _enviar_notificacao_reabrir
+    from app.routes.api_chamados import _enviar_notificacao_reabrir
 
     doc = MagicMock()
     doc.exists = True
@@ -149,9 +149,9 @@ def test_enviar_notificacao_reabrir_executa_e_notifica(app):
     }
 
     with (
-        patch("app.routes.api.db") as mock_db,
-        patch("app.routes.api.threading.Thread", _SyncThread),
-        patch("app.routes.api.Usuario.get_by_id", return_value=MagicMock(nome="Sup")),
+        patch("app.routes.api_chamados.db") as mock_db,
+        patch("app.routes.api_chamados.threading.Thread", _SyncThread),
+        patch("app.routes.api_chamados.Usuario.get_by_id", return_value=MagicMock(nome="Sup")),
         patch("app.services.notifications.notificar_supervisor_chamado_reaberto") as mock_notif,
     ):
         mock_db.collection.return_value.document.return_value.get.return_value = doc
@@ -161,7 +161,7 @@ def test_enviar_notificacao_reabrir_executa_e_notifica(app):
 
 
 def test_enviar_notificacao_reabrir_excecao_e_logada_sem_propagar(app):
-    from app.routes.api import _enviar_notificacao_reabrir
+    from app.routes.api_chamados import _enviar_notificacao_reabrir
 
     doc = MagicMock()
     doc.exists = True
@@ -172,9 +172,11 @@ def test_enviar_notificacao_reabrir_excecao_e_logada_sem_propagar(app):
     }
 
     with (
-        patch("app.routes.api.db") as mock_db,
-        patch("app.routes.api.threading.Thread", _SyncThread),
-        patch("app.routes.api.Usuario.get_by_id", side_effect=RuntimeError("falha usuario")),
+        patch("app.routes.api_chamados.db") as mock_db,
+        patch("app.routes.api_chamados.threading.Thread", _SyncThread),
+        patch(
+            "app.routes.api_chamados.Usuario.get_by_id", side_effect=RuntimeError("falha usuario")
+        ),
     ):
         mock_db.collection.return_value.document.return_value.get.return_value = doc
         # Não deve levantar exceção — apenas logar e seguir
@@ -182,14 +184,14 @@ def test_enviar_notificacao_reabrir_excecao_e_logada_sem_propagar(app):
 
 
 def test_enviar_notificacao_reabrir_chamado_invalido_nao_notifica(app):
-    from app.routes.api import _enviar_notificacao_reabrir
+    from app.routes.api_chamados import _enviar_notificacao_reabrir
 
     doc = MagicMock()
     doc.exists = False
 
     with (
-        patch("app.routes.api.db") as mock_db,
-        patch("app.routes.api.threading.Thread", _SyncThread),
+        patch("app.routes.api_chamados.db") as mock_db,
+        patch("app.routes.api_chamados.threading.Thread", _SyncThread),
         patch("app.services.notifications.notificar_supervisor_chamado_reaberto") as mock_notif,
     ):
         mock_db.collection.return_value.document.return_value.get.return_value = doc
@@ -199,7 +201,7 @@ def test_enviar_notificacao_reabrir_chamado_invalido_nao_notifica(app):
 
 
 def test_enviar_notificacao_confirmar_executa_e_notifica(app):
-    from app.routes.api import _enviar_notificacao_confirmar
+    from app.routes.api_chamados import _enviar_notificacao_confirmar
 
     doc = MagicMock()
     doc.exists = True
@@ -211,9 +213,9 @@ def test_enviar_notificacao_confirmar_executa_e_notifica(app):
     }
 
     with (
-        patch("app.routes.api.db") as mock_db,
-        patch("app.routes.api.threading.Thread", _SyncThread),
-        patch("app.routes.api.Usuario.get_by_id", return_value=MagicMock(nome="Sup")),
+        patch("app.routes.api_chamados.db") as mock_db,
+        patch("app.routes.api_chamados.threading.Thread", _SyncThread),
+        patch("app.routes.api_chamados.Usuario.get_by_id", return_value=MagicMock(nome="Sup")),
         patch("app.services.notifications.notificar_responsavel_chamado_confirmado") as mock_notif,
     ):
         mock_db.collection.return_value.document.return_value.get.return_value = doc
@@ -223,7 +225,7 @@ def test_enviar_notificacao_confirmar_executa_e_notifica(app):
 
 
 def test_enviar_notificacao_confirmar_sem_responsavel_nao_notifica(app):
-    from app.routes.api import _enviar_notificacao_confirmar
+    from app.routes.api_chamados import _enviar_notificacao_confirmar
 
     doc = MagicMock()
     doc.exists = True
@@ -235,8 +237,8 @@ def test_enviar_notificacao_confirmar_sem_responsavel_nao_notifica(app):
     }
 
     with (
-        patch("app.routes.api.db") as mock_db,
-        patch("app.routes.api.threading.Thread", _SyncThread),
+        patch("app.routes.api_chamados.db") as mock_db,
+        patch("app.routes.api_chamados.threading.Thread", _SyncThread),
         patch("app.services.notifications.notificar_responsavel_chamado_confirmado") as mock_notif,
     ):
         mock_db.collection.return_value.document.return_value.get.return_value = doc
@@ -246,7 +248,7 @@ def test_enviar_notificacao_confirmar_sem_responsavel_nao_notifica(app):
 
 
 def test_enviar_notificacao_confirmar_excecao_e_logada_sem_propagar(app):
-    from app.routes.api import _enviar_notificacao_confirmar
+    from app.routes.api_chamados import _enviar_notificacao_confirmar
 
     doc = MagicMock()
     doc.exists = True
@@ -256,24 +258,26 @@ def test_enviar_notificacao_confirmar_excecao_e_logada_sem_propagar(app):
     }
 
     with (
-        patch("app.routes.api.db") as mock_db,
-        patch("app.routes.api.threading.Thread", _SyncThread),
-        patch("app.routes.api.Usuario.get_by_id", side_effect=RuntimeError("falha usuario")),
+        patch("app.routes.api_chamados.db") as mock_db,
+        patch("app.routes.api_chamados.threading.Thread", _SyncThread),
+        patch(
+            "app.routes.api_chamados.Usuario.get_by_id", side_effect=RuntimeError("falha usuario")
+        ),
     ):
         mock_db.collection.return_value.document.return_value.get.return_value = doc
         _enviar_notificacao_confirmar(app, "ch1", {}, "Fulano")
 
 
 def test_enviar_notificacao_confirmar_chamado_invalido_nao_notifica(app):
-    from app.routes.api import _enviar_notificacao_confirmar
+    from app.routes.api_chamados import _enviar_notificacao_confirmar
 
     doc = MagicMock()
     doc.exists = True
     doc.to_dict.return_value = {"confirmacao_solicitante": "pendente"}
 
     with (
-        patch("app.routes.api.db") as mock_db,
-        patch("app.routes.api.threading.Thread", _SyncThread),
+        patch("app.routes.api_chamados.db") as mock_db,
+        patch("app.routes.api_chamados.threading.Thread", _SyncThread),
         patch("app.services.notifications.notificar_responsavel_chamado_confirmado") as mock_notif,
     ):
         mock_db.collection.return_value.document.return_value.get.return_value = doc
@@ -290,9 +294,11 @@ def test_atualizar_status_ajax_transicao_bloqueada_retorna_403(client_logado_sup
     chamado_mock = _mock_chamado_obj(status="Concluído")
 
     with (
-        patch("app.routes.api.db") as mock_db,
-        patch("app.routes.api.Chamado") as mock_chamado_cls,
-        patch("app.routes.api.verificar_permissao_mudanca_status", return_value=(True, None)),
+        patch("app.routes.api_chamados.db") as mock_db,
+        patch("app.routes.api_chamados.Chamado") as mock_chamado_cls,
+        patch(
+            "app.routes.api_chamados.verificar_permissao_mudanca_status", return_value=(True, None)
+        ),
         patch(
             "app.services.permission_validation.chamado_aceita_transicao_status",
             return_value=(False, "bloqueado"),
@@ -358,9 +364,9 @@ def test_bulk_atualizar_status_transicao_bloqueada_adiciona_erro(client_logado_s
     doc = _chamado_doc_mock(status="Concluído", confirmacao_solicitante="confirmado")
 
     with (
-        patch("app.routes.api.db") as mock_db,
-        patch("app.routes.api.Chamado") as mock_chamado_cls,
-        patch("app.routes.api.usuario_pode_ver_chamado", return_value=True),
+        patch("app.routes.api_chamados.db") as mock_db,
+        patch("app.routes.api_chamados.Chamado") as mock_chamado_cls,
+        patch("app.routes.api_chamados.usuario_pode_ver_chamado", return_value=True),
         patch(
             "app.services.permission_validation.chamado_aceita_transicao_status",
             return_value=(False, "bloqueado"),
@@ -385,15 +391,15 @@ def test_bulk_atualizar_status_servico_retorna_erro_e_registra(client_logado_sup
     doc = _chamado_doc_mock(status="Em Atendimento")
 
     with (
-        patch("app.routes.api.db") as mock_db,
-        patch("app.routes.api.Chamado") as mock_chamado_cls,
-        patch("app.routes.api.usuario_pode_ver_chamado", return_value=True),
+        patch("app.routes.api_chamados.db") as mock_db,
+        patch("app.routes.api_chamados.Chamado") as mock_chamado_cls,
+        patch("app.routes.api_chamados.usuario_pode_ver_chamado", return_value=True),
         patch(
             "app.services.permission_validation.chamado_aceita_transicao_status",
             return_value=(True, None),
         ),
         patch(
-            "app.routes.api.atualizar_status_chamado",
+            "app.routes.api_chamados.atualizar_status_chamado",
             return_value={"sucesso": False, "erro": "Falha ao salvar"},
         ),
     ):
@@ -431,9 +437,9 @@ def test_api_push_subscribe_sucesso_retorna_200(client_logado_supervisor):
 
 def test_api_chamados_paginar_limite_invalido_usa_padrao(client_logado_admin):
     with (
-        patch("app.routes.api.db"),
+        patch("app.routes.api_chamados.db"),
         patch(
-            "app.routes.api.aplicar_filtros_dashboard_com_paginacao",
+            "app.routes.api_chamados.aplicar_filtros_dashboard_com_paginacao",
             return_value={"docs": [], "proximo_cursor": None, "tem_proxima": False},
         ),
     ):

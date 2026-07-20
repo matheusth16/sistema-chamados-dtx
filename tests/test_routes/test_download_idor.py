@@ -141,7 +141,7 @@ def test_download_anexo_sucesso_loga_acesso(client_logado_solicitante, caplog):
             "app.services.upload.gerar_url_presignada",
             return_value="https://r2.example.com/arq.pdf",
         ),
-        caplog.at_level(logging.INFO, logger="app.routes.api"),
+        caplog.at_level(logging.INFO, logger="app.routes.api_solicitante"),
     ):
         mock_db.collection.return_value.document.return_value.get.return_value = doc
         client_logado_solicitante.get("/api/download-anexo?chamado_id=ch1&chave=r2:arq.pdf")

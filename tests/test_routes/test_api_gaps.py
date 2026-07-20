@@ -94,9 +94,11 @@ def test_atualizar_status_cancelado_sem_motivo_retorna_400(client_logado_supervi
     chamado_mock = MagicMock()
     chamado_mock.area = "Manutencao"
     with (
-        patch("app.routes.api.db") as mock_db,
-        patch("app.routes.api.Chamado") as mock_chamado,
-        patch("app.routes.api.verificar_permissao_mudanca_status", return_value=(True, None)),
+        patch("app.routes.api_chamados.db") as mock_db,
+        patch("app.routes.api_chamados.Chamado") as mock_chamado,
+        patch(
+            "app.routes.api_chamados.verificar_permissao_mudanca_status", return_value=(True, None)
+        ),
     ):
         mock_db.collection.return_value.document.return_value.get.return_value = doc
         mock_chamado.from_dict.return_value = chamado_mock
@@ -113,7 +115,7 @@ def test_atualizar_status_cancelado_sem_motivo_retorna_400(client_logado_supervi
 
 def test_atualizar_status_excecao_retorna_500(client_logado_supervisor):
     """POST /api/atualizar-status com exceção interna retorna 500 genérico."""
-    with patch("app.routes.api.db") as mock_db:
+    with patch("app.routes.api_chamados.db") as mock_db:
         mock_db.collection.side_effect = Exception("db explodiu")
         r = client_logado_supervisor.post(
             "/api/atualizar-status",
@@ -186,7 +188,7 @@ def test_bulk_status_chamado_nao_encontrado_vai_para_erros(client_logado_supervi
     doc_nao_existe = MagicMock()
     doc_nao_existe.exists = False
 
-    with patch("app.routes.api.db") as mock_db:
+    with patch("app.routes.api_chamados.db") as mock_db:
         mock_db.collection.return_value.document.return_value.get.return_value = doc_nao_existe
         r = client_logado_supervisor.post(
             "/api/bulk-status",
@@ -214,8 +216,8 @@ def test_bulk_status_concluido_seta_data_conclusao(client_logado_supervisor):
     }
 
     with (
-        patch("app.routes.api.db") as mock_db,
-        patch("app.routes.api.atualizar_status_chamado") as mock_atualizar,
+        patch("app.routes.api_chamados.db") as mock_db,
+        patch("app.routes.api_chamados.atualizar_status_chamado") as mock_atualizar,
     ):
         mock_db.collection.return_value.document.return_value.get.return_value = doc
         mock_atualizar.return_value = {
@@ -252,8 +254,8 @@ def test_bulk_status_inner_exception_vai_para_erros(client_logado_supervisor):
     }
 
     with (
-        patch("app.routes.api.db") as mock_db,
-        patch("app.routes.api.atualizar_status_chamado", side_effect=Exception("timeout")),
+        patch("app.routes.api_chamados.db") as mock_db,
+        patch("app.routes.api_chamados.atualizar_status_chamado", side_effect=Exception("timeout")),
     ):
         mock_db.collection.return_value.document.return_value.get.return_value = doc
         r = client_logado_supervisor.post(
@@ -272,8 +274,8 @@ def test_bulk_status_inner_exception_vai_para_erros(client_logado_supervisor):
 def test_bulk_status_outer_exception_retorna_500(client_logado_supervisor):
     """POST /api/bulk-status: exceção em cascata (logger.warning raises) retorna 500."""
     with (
-        patch("app.routes.api.db") as mock_db,
-        patch("app.routes.api.logger") as mock_logger,
+        patch("app.routes.api_chamados.db") as mock_db,
+        patch("app.routes.api_chamados.logger") as mock_logger,
     ):
         doc = MagicMock()
         doc.exists = True
@@ -305,8 +307,8 @@ def test_bulk_status_supervisor_nao_altera_ticket_de_colega_mesma_area(client_lo
         "participantes": [],
     }
     with (
-        patch("app.routes.api.db") as mock_db,
-        patch("app.routes.api.atualizar_status_chamado") as mock_atualizar,
+        patch("app.routes.api_chamados.db") as mock_db,
+        patch("app.routes.api_chamados.atualizar_status_chamado") as mock_atualizar,
     ):
         mock_db.collection.return_value.document.return_value.get.return_value = doc
         r = client_logado_supervisor.post(
@@ -335,8 +337,8 @@ def test_bulk_status_em_atendimento_fila_delega_atualizar_status_chamado(client_
         "participantes": [],
     }
     with (
-        patch("app.routes.api.db") as mock_db,
-        patch("app.routes.api.atualizar_status_chamado") as mock_atualizar,
+        patch("app.routes.api_chamados.db") as mock_db,
+        patch("app.routes.api_chamados.atualizar_status_chamado") as mock_atualizar,
     ):
         mock_db.collection.return_value.document.return_value.get.return_value = doc
         mock_atualizar.return_value = {
@@ -454,7 +456,7 @@ def test_api_chamado_por_id_nao_encontrado_retorna_404(client_logado_supervisor)
     """GET /api/chamado/<id> com chamado inexistente retorna 404."""
     doc = MagicMock()
     doc.exists = False
-    with patch("app.routes.api.db") as mock_db:
+    with patch("app.routes.api_chamados.db") as mock_db:
         mock_db.collection.return_value.document.return_value.get.return_value = doc
         r = client_logado_supervisor.get("/api/chamado/nao_existe")
     assert r.status_code == 404
@@ -470,9 +472,9 @@ def test_api_chamado_por_id_supervisor_sem_permissao_retorna_403(client_logado_s
     chamado_mock = MagicMock()
     chamado_mock.area = "TI"
     with (
-        patch("app.routes.api.db") as mock_db,
-        patch("app.routes.api.Chamado.from_dict", return_value=chamado_mock),
-        patch("app.routes.api.usuario_pode_ver_chamado", return_value=False),
+        patch("app.routes.api_chamados.db") as mock_db,
+        patch("app.routes.api_chamados.Chamado.from_dict", return_value=chamado_mock),
+        patch("app.routes.api_chamados.usuario_pode_ver_chamado", return_value=False),
     ):
         mock_db.collection.return_value.document.return_value.get.return_value = doc
         r = client_logado_supervisor.get("/api/chamado/ch_ti_1")
@@ -483,7 +485,7 @@ def test_api_chamado_por_id_supervisor_sem_permissao_retorna_403(client_logado_s
 
 def test_api_chamado_por_id_excecao_retorna_500(client_logado_supervisor):
     """GET /api/chamado/<id> com exceção inesperada retorna 500 genérico."""
-    with patch("app.routes.api.db") as mock_db:
+    with patch("app.routes.api_chamados.db") as mock_db:
         mock_db.collection.side_effect = Exception("timeout")
         r = client_logado_supervisor.get("/api/chamado/ch_err")
     assert r.status_code == 500
@@ -498,7 +500,7 @@ def test_api_chamado_por_id_excecao_retorna_500(client_logado_supervisor):
 
 def test_aplicar_filtro_perfil_admin_retorna_ref_sem_where(app):
     """_aplicar_filtro_perfil para admin retorna a ref original sem filtro."""
-    from app.routes.api import _aplicar_filtro_perfil
+    from app.routes.api_chamados import _aplicar_filtro_perfil
 
     ref = MagicMock()
     user = MagicMock()
@@ -512,7 +514,7 @@ def test_aplicar_filtro_perfil_admin_retorna_ref_sem_where(app):
 
 def test_aplicar_filtro_perfil_solicitante_filtra_por_id(app):
     """_aplicar_filtro_perfil para solicitante adiciona filtro por solicitante_id."""
-    from app.routes.api import _aplicar_filtro_perfil
+    from app.routes.api_chamados import _aplicar_filtro_perfil
 
     ref = MagicMock()
     user = MagicMock()
@@ -556,8 +558,8 @@ def test_api_chamados_paginar_retorna_estrutura_esperada(client_logado_admin):
     chamado_mock.data_conclusao_formatada.return_value = "-"
 
     with (
-        patch("app.routes.api.aplicar_filtros_dashboard_com_paginacao") as mock_filtros,
-        patch("app.routes.api.Chamado.from_dict", return_value=chamado_mock),
+        patch("app.routes.api_chamados.aplicar_filtros_dashboard_com_paginacao") as mock_filtros,
+        patch("app.routes.api_chamados.Chamado.from_dict", return_value=chamado_mock),
     ):
         mock_filtros.return_value = {
             "docs": [doc],
@@ -577,7 +579,8 @@ def test_api_chamados_paginar_retorna_estrutura_esperada(client_logado_admin):
 def test_api_chamados_paginar_excecao_retorna_500(client_logado_admin):
     """GET /api/chamados/paginar com exceção retorna 500 genérico."""
     with patch(
-        "app.routes.api.aplicar_filtros_dashboard_com_paginacao", side_effect=Exception("err")
+        "app.routes.api_chamados.aplicar_filtros_dashboard_com_paginacao",
+        side_effect=Exception("err"),
     ):
         r = client_logado_admin.get("/api/chamados/paginar")
     assert r.status_code == 500
@@ -603,8 +606,8 @@ def test_carregar_mais_com_docs_retorna_chamados(client_logado_supervisor):
     chamado_mock.data_abertura_formatada.return_value = "02/01/2025"
 
     with (
-        patch("app.routes.api.aplicar_filtros_dashboard_com_paginacao") as mock_filtros,
-        patch("app.routes.api.Chamado.from_dict", return_value=chamado_mock),
+        patch("app.routes.api_chamados.aplicar_filtros_dashboard_com_paginacao") as mock_filtros,
+        patch("app.routes.api_chamados.Chamado.from_dict", return_value=chamado_mock),
     ):
         mock_filtros.return_value = {
             "docs": [doc],
@@ -627,7 +630,8 @@ def test_carregar_mais_com_docs_retorna_chamados(client_logado_supervisor):
 def test_carregar_mais_excecao_retorna_500(client_logado_supervisor):
     """POST /api/carregar-mais com exceção retorna 500 genérico."""
     with patch(
-        "app.routes.api.aplicar_filtros_dashboard_com_paginacao", side_effect=Exception("err")
+        "app.routes.api_chamados.aplicar_filtros_dashboard_com_paginacao",
+        side_effect=Exception("err"),
     ):
         r = client_logado_supervisor.post(
             "/api/carregar-mais",
@@ -684,7 +688,7 @@ def test_confirmar_resolucao_chamado_nao_encontrado_retorna_404(client_logado_so
     """POST confirmar-resolucao com chamado inexistente retorna 404."""
     doc = MagicMock()
     doc.exists = False
-    with patch("app.routes.api.db") as mock_db:
+    with patch("app.routes.api_chamados.db") as mock_db:
         mock_db.collection.return_value.document.return_value.get.return_value = doc
         r = client_logado_solicitante.post(
             "/api/chamado/ch_nao_existe/confirmar-resolucao",
@@ -706,7 +710,7 @@ def test_confirmar_resolucao_excecao_retorna_500(client_logado_solicitante):
         "solicitante_id": "sol_1",
     }
     with (
-        patch("app.routes.api.db") as mock_db,
+        patch("app.routes.api_chamados.db") as mock_db,
     ):
         mock_db.collection.return_value.document.return_value.get.return_value = doc
         mock_db.collection.return_value.document.return_value.update.side_effect = Exception("db")
@@ -727,7 +731,9 @@ def test_confirmar_resolucao_excecao_retorna_500(client_logado_solicitante):
 
 def test_api_lista_supervisores_excecao_retorna_200_vazio(client_logado_solicitante):
     """GET /api/supervisores/lista com exceção retorna 200 com lista vazia (degradado)."""
-    with patch("app.routes.api.Usuario.get_supervisores_por_area", side_effect=Exception("db")):
+    with patch(
+        "app.routes.api_chamados.Usuario.get_supervisores_por_area", side_effect=Exception("db")
+    ):
         r = client_logado_solicitante.get("/api/supervisores/lista?area=TI")
     assert r.status_code == 200
     data = r.get_json()
@@ -744,7 +750,7 @@ def test_api_lista_supervisores_excecao_retorna_200_vazio(client_logado_solicita
 def test_aplicar_filtro_perfil_supervisor_usa_array_contains(app):
     """Supervisor → filtro por supervisor_ids_com_acesso array_contains (não area in)."""
 
-    from app.routes.api import _aplicar_filtro_perfil
+    from app.routes.api_chamados import _aplicar_filtro_perfil
 
     ref = MagicMock()
     user = MagicMock()
@@ -765,7 +771,7 @@ def test_aplicar_filtro_perfil_supervisor_usa_array_contains(app):
 
 def test_aplicar_filtro_perfil_supervisor_sem_areas_retorna_none(app):
     """Supervisor sem áreas → retorna None (sem acesso)."""
-    from app.routes.api import _aplicar_filtro_perfil
+    from app.routes.api_chamados import _aplicar_filtro_perfil
 
     ref = MagicMock()
     user = MagicMock()
@@ -805,8 +811,8 @@ def test_supervisor_bulk_status_nao_regrediu(client_logado_supervisor):
         "participantes": [],
     }
     with (
-        patch("app.routes.api.db") as mock_db,
-        patch("app.routes.api.atualizar_status_chamado") as mock_atualizar,
+        patch("app.routes.api_chamados.db") as mock_db,
+        patch("app.routes.api_chamados.atualizar_status_chamado") as mock_atualizar,
     ):
         mock_db.collection.return_value.document.return_value.get.return_value = doc
         mock_atualizar.return_value = {"sucesso": True, "mensagem": "ok"}

@@ -30,7 +30,7 @@ def test_health_deep_firestore_ok(client):
     mock_query = MagicMock()
     mock_query.limit.return_value.get.return_value = []
 
-    with patch("app.routes.api.db") as mock_db:
+    with patch("app.routes.api_chamados.db") as mock_db:
         mock_db.collection.return_value = mock_query
         r = client.get("/health?deep=1")
 
@@ -45,7 +45,7 @@ def test_health_deep_firestore_ok(client):
 
 def test_health_deep_firestore_falha(client):
     """CT-HEALTH-03: ?deep=1 com Firestore falhando retorna status 'degraded'."""
-    with patch("app.routes.api.db") as mock_db:
+    with patch("app.routes.api_chamados.db") as mock_db:
         mock_db.collection.side_effect = Exception("Firestore unreachable")
         r = client.get("/health?deep=1")
 
@@ -62,7 +62,7 @@ def test_health_deep_nao_expoe_versao(client):
     mock_query = MagicMock()
     mock_query.limit.return_value.get.return_value = []
 
-    with patch("app.routes.api.db") as mock_db:
+    with patch("app.routes.api_chamados.db") as mock_db:
         mock_db.collection.return_value = mock_query
         r = client.get("/health?deep=1")
 
@@ -75,7 +75,7 @@ def test_health_deep_nao_expoe_versao(client):
 
 def test_health_shallow_nao_chama_firestore(client):
     """CT-HEALTH-05: GET /health (sem ?deep) não faz chamada ao Firestore."""
-    with patch("app.routes.api.db") as mock_db:
+    with patch("app.routes.api_chamados.db") as mock_db:
         r = client.get("/health")
 
     assert r.status_code == 200
@@ -107,7 +107,7 @@ def test_health_deep_com_token_correto_retorna_200(client):
     mock_query.limit.return_value.get.return_value = []
     with (
         patch.dict(os.environ, {"HEALTH_SECRET": "supersecret"}),
-        patch("app.routes.api.db") as mock_db,
+        patch("app.routes.api_chamados.db") as mock_db,
     ):
         mock_db.collection.return_value = mock_query
         r = client.get("/health?deep=1&token=supersecret")
@@ -158,8 +158,8 @@ def test_health_deep_cache_branch_ok_com_cache_set(client):
     mock_query.limit.return_value.get.return_value = []
 
     with (
-        patch("app.routes.api.db") as mock_db,
-        patch("app.routes.api.cache_set") as mock_cache_set,
+        patch("app.routes.api_chamados.db") as mock_db,
+        patch("app.routes.api_chamados.cache_set") as mock_cache_set,
     ):
         mock_db.collection.return_value = mock_query
         r = client.get("/health?deep=1")
@@ -180,8 +180,8 @@ def test_health_deep_cache_branch_degraded_quando_excecao(client):
     mock_query.limit.return_value.get.return_value = []
 
     with (
-        patch("app.routes.api.db") as mock_db,
-        patch("app.routes.api.cache_set", side_effect=RuntimeError("redis down")),
+        patch("app.routes.api_chamados.db") as mock_db,
+        patch("app.routes.api_chamados.cache_set", side_effect=RuntimeError("redis down")),
     ):
         mock_db.collection.return_value = mock_query
         r = client.get("/health?deep=1")
@@ -205,7 +205,7 @@ def test_health_deep_com_header_x_health_token_correto_retorna_200(client):
     mock_query.limit.return_value.get.return_value = []
     with (
         patch.dict(os.environ, {"HEALTH_SECRET": "supersecret"}),
-        patch("app.routes.api.db") as mock_db,
+        patch("app.routes.api_chamados.db") as mock_db,
     ):
         mock_db.collection.return_value = mock_query
         r = client.get("/health?deep=1", headers={"X-Health-Token": "supersecret"})
@@ -225,7 +225,7 @@ def test_health_deep_header_sem_query_token_retorna_200(client):
     mock_query.limit.return_value.get.return_value = []
     with (
         patch.dict(os.environ, {"HEALTH_SECRET": "minhachavefort32x"}),
-        patch("app.routes.api.db") as mock_db,
+        patch("app.routes.api_chamados.db") as mock_db,
     ):
         mock_db.collection.return_value = mock_query
         # sem ?token= na URL — token apenas no header
@@ -242,7 +242,7 @@ def test_health_deep_query_token_deprecado_ainda_funciona(client):
     mock_query.limit.return_value.get.return_value = []
     with (
         patch.dict(os.environ, {"HEALTH_SECRET": "supersecret"}),
-        patch("app.routes.api.db") as mock_db,
+        patch("app.routes.api_chamados.db") as mock_db,
     ):
         mock_db.collection.return_value = mock_query
         r = client.get("/health?deep=1&token=supersecret")

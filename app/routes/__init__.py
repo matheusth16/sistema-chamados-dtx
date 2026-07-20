@@ -9,7 +9,7 @@ main = Blueprint("main", __name__)
 # Importa os módulos para registrar as rotas no blueprint
 from app.routes import (  # noqa: E402
     admin_global,  # noqa: E402, F401
-    api,  # noqa: E402, F401
+    api_chamados,  # noqa: E402, F401
     api_colaboracao,  # noqa: E402, F401
     api_notificacoes,  # noqa: E402, F401
     api_solicitante,  # noqa: E402, F401
@@ -22,6 +22,6 @@ from app.routes import (  # noqa: E402
 )
 
 # Exporta as views para CSRF exempt no create_app
-from app.routes.api import atualizar_status_ajax, csp_report  # noqa: E402, F401
+from app.routes.api_chamados import atualizar_status_ajax, csp_report  # noqa: E402, F401
 
 __all__ = ["main", "atualizar_status_ajax", "csp_report"]

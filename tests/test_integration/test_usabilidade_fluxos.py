@@ -158,7 +158,7 @@ def test_usabilidade_api_sem_login_retorna_401_json_nao_500(client):
 
 def test_usabilidade_carregar_mais_estrutura_consistente(client_logado_supervisor):
     """U-DASH-01: API de listagem retorna estrutura consistente (ou 403 por Origin)."""
-    with patch("app.routes.api.aplicar_filtros_dashboard_com_paginacao") as mock_f:
+    with patch("app.routes.api_chamados.aplicar_filtros_dashboard_com_paginacao") as mock_f:
         mock_f.return_value = {"docs": [], "proximo_cursor": None, "tem_proxima": False}
         r = client_logado_supervisor.post(
             "/api/carregar-mais",
@@ -190,9 +190,9 @@ def test_usabilidade_atualizar_status_resposta_sucesso_ou_erro_explicito(client_
     chamado_mock.solicitante_id = "s1"
     chamado_mock.participantes = []
     with (
-        patch("app.routes.api.db") as mock_db,
-        patch("app.routes.api.Chamado") as mock_chamado_cls,
-        patch("app.routes.api.atualizar_status_chamado") as mock_st,
+        patch("app.routes.api_chamados.db") as mock_db,
+        patch("app.routes.api_chamados.Chamado") as mock_chamado_cls,
+        patch("app.routes.api_chamados.atualizar_status_chamado") as mock_st,
     ):
         mock_db.collection.return_value.document.return_value.get.return_value = doc
         mock_chamado_cls.from_dict.return_value = chamado_mock
@@ -210,12 +210,12 @@ def test_usabilidade_atualizar_status_resposta_sucesso_ou_erro_explicito(client_
 
 def test_usabilidade_bulk_status_retorna_resumo_atualizados_e_erros(client_logado_supervisor):
     """U-STAT-02: Bulk status retorna resumo (ou 403 por Origin)."""
-    with patch("app.routes.api.db") as mock_db:
+    with patch("app.routes.api_chamados.db") as mock_db:
         doc = MagicMock()
         doc.exists = True
         doc.to_dict.return_value = {"area": "Manutencao", "status": "Aberto"}
         mock_db.collection.return_value.document.return_value.get.return_value = doc
-        with patch("app.routes.api.atualizar_status_chamado") as mock_atualizar:
+        with patch("app.routes.api_chamados.atualizar_status_chamado") as mock_atualizar:
             mock_atualizar.return_value = {
                 "sucesso": True,
                 "mensagem": "ok",

@@ -63,9 +63,9 @@ def test_atualizar_status_com_sucesso_retorna_200(client_logado_supervisor):
     chamado_mock.solicitante_id = "s1"
     chamado_mock.participantes = []
     with (
-        patch("app.routes.api.db") as mock_db,
-        patch("app.routes.api.Chamado") as mock_chamado_cls,
-        patch("app.routes.api.atualizar_status_chamado") as mock_atualizar,
+        patch("app.routes.api_chamados.db") as mock_db,
+        patch("app.routes.api_chamados.Chamado") as mock_chamado_cls,
+        patch("app.routes.api_chamados.atualizar_status_chamado") as mock_atualizar,
     ):
         mock_db.collection.return_value.document.return_value.get.return_value = doc
         mock_chamado_cls.from_dict.return_value = chamado_mock
@@ -89,7 +89,7 @@ def test_atualizar_status_chamado_inexistente_retorna_404(client_logado_supervis
     """CT-STAT-04: Chamado não encontrado retorna 404."""
     mock_doc = MagicMock()
     mock_doc.exists = False
-    with patch("app.routes.api.db") as mock_db:
+    with patch("app.routes.api_chamados.db") as mock_db:
         mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
         r = client_logado_supervisor.post(
             "/api/atualizar-status",
@@ -165,8 +165,8 @@ def test_atualizar_status_supervisor_outra_area_retorna_403(client_logado_superv
     chamado_mock.solicitante_id = "outro_usuario"
 
     with (
-        patch("app.routes.api.db") as mock_db,
-        patch("app.routes.api.Chamado") as mock_chamado_cls,
+        patch("app.routes.api_chamados.db") as mock_db,
+        patch("app.routes.api_chamados.Chamado") as mock_chamado_cls,
     ):
         mock_db.collection.return_value.document.return_value.get.return_value = doc
         mock_chamado_cls.from_dict.return_value = chamado_mock
@@ -203,9 +203,9 @@ def test_atualizar_status_transicao_invalida_retorna_400(client_logado_superviso
     chamado_mock.solicitante_id = "s1"
     chamado_mock.participantes = []
     with (
-        patch("app.routes.api.db") as mock_db,
-        patch("app.routes.api.Chamado") as mock_chamado_cls,
-        patch("app.routes.api.atualizar_status_chamado") as mock_atualizar,
+        patch("app.routes.api_chamados.db") as mock_db,
+        patch("app.routes.api_chamados.Chamado") as mock_chamado_cls,
+        patch("app.routes.api_chamados.atualizar_status_chamado") as mock_atualizar,
     ):
         mock_db.collection.return_value.document.return_value.get.return_value = doc
         mock_chamado_cls.from_dict.return_value = chamado_mock
@@ -245,8 +245,8 @@ def test_atualizar_status_reabrir_concluido_sem_motivo_retorna_400(client_logado
     chamado_mock.participantes = []
     chamado_mock.confirmacao_solicitante = "pendente"
     with (
-        patch("app.routes.api.db") as mock_db,
-        patch("app.routes.api.Chamado") as mock_chamado_cls,
+        patch("app.routes.api_chamados.db") as mock_db,
+        patch("app.routes.api_chamados.Chamado") as mock_chamado_cls,
     ):
         mock_db.collection.return_value.document.return_value.get.return_value = doc
         mock_chamado_cls.from_dict.return_value = chamado_mock
@@ -279,8 +279,8 @@ def test_atualizar_status_reabrir_concluido_motivo_curto_retorna_400(client_loga
     chamado_mock.participantes = []
     chamado_mock.confirmacao_solicitante = "confirmado"
     with (
-        patch("app.routes.api.db") as mock_db,
-        patch("app.routes.api.Chamado") as mock_chamado_cls,
+        patch("app.routes.api_chamados.db") as mock_db,
+        patch("app.routes.api_chamados.Chamado") as mock_chamado_cls,
     ):
         mock_db.collection.return_value.document.return_value.get.return_value = doc
         mock_chamado_cls.from_dict.return_value = chamado_mock
@@ -310,9 +310,9 @@ def test_atualizar_status_reabrir_concluido_com_motivo_valido_passa(client_logad
     chamado_mock.participantes = []
     chamado_mock.confirmacao_solicitante = "confirmado"
     with (
-        patch("app.routes.api.db") as mock_db,
-        patch("app.routes.api.Chamado") as mock_chamado_cls,
-        patch("app.routes.api.atualizar_status_chamado") as mock_atualizar,
+        patch("app.routes.api_chamados.db") as mock_db,
+        patch("app.routes.api_chamados.Chamado") as mock_chamado_cls,
+        patch("app.routes.api_chamados.atualizar_status_chamado") as mock_atualizar,
     ):
         mock_db.collection.return_value.document.return_value.get.return_value = doc
         mock_chamado_cls.from_dict.return_value = chamado_mock

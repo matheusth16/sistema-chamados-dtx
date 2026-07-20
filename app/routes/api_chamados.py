@@ -1,4 +1,4 @@
-"""Rotas de API (JSON) e service worker: status, notificações, push, paginação, disponibilidade."""
+"""Rotas núcleo de chamados: status, edição, bulk, paginação, confirmação, onboarding, health check, CSP report."""
 
 import contextlib
 import hmac
