@@ -109,25 +109,10 @@
     "en": "Gate 4 - Final Inspection",
     "es": "Gate 4 - Inspección Final"
   },
-  "gate_step_required": {
-    "pt_BR": "Selecione a sub-etapa do gate",
-    "en": "Select the gate sub-step",
-    "es": "Seleccione la sub-etapa del gate"
-  },
-  "select_gate_step": {
-    "pt_BR": "Selecione a etapa...",
-    "en": "Select step...",
-    "es": "Seleccione la etapa..."
-  },
   "attached_file": {
     "pt_BR": "Arquivo Anexado",
     "en": "Attached File",
     "es": "Archivo Adjunto"
-  },
-  "manager_action": {
-    "pt_BR": "Ação do Gestor",
-    "en": "Manager Action",
-    "es": "Acción del Gestor"
   },
   "select": {
     "pt_BR": "Selecione...",
@@ -199,11 +184,6 @@
     "en": "Error loading - Will be assigned manually",
     "es": "Error al cargar - Se asignará manualmente"
   },
-  "click_eye_full": {
-    "pt_BR": "Clique no olho para ver completo",
-    "en": "Click the eye icon to see the full text",
-    "es": "Haz clic en el ícono de ojo para ver el texto completo"
-  },
   "view_history": {
     "pt_BR": "Visualizar Histórico",
     "en": "View History",
@@ -218,11 +198,6 @@
     "pt_BR": "Senha",
     "en": "Password",
     "es": "Contraseña"
-  },
-  "option_attend": {
-    "pt_BR": "Atender",
-    "en": "Attend",
-    "es": "Atender"
   },
   "fill_details": {
     "pt_BR": "Preencha os detalhes abaixo. Projetos têm prioridade automática.",
@@ -248,11 +223,6 @@
     "pt_BR": "Destino do Chamado",
     "en": "Ticket Destination",
     "es": "Destino del Ticket"
-  },
-  "auto_tag": {
-    "pt_BR": "Auto",
-    "en": "Auto",
-    "es": "Auto"
   },
   "rl_code_example": {
     "pt_BR": "Ex: 045, ABC-01, 123/2026",
@@ -324,16 +294,6 @@
     "en": "Additional sectors",
     "es": "Sectores adicionales"
   },
-  "additional_sectors_help": {
-    "pt_BR": "Marque os setores a incluir no chamado. Os supervisores desses setores receberão e-mail informando a inclusão.",
-    "en": "Check the sectors to include in this ticket. Supervisors of those sectors will receive an email notifying them.",
-    "es": "Marque los sectores a incluir en el ticket. Los supervisores de esos sectores recibirán un correo informando."
-  },
-  "complete_details": {
-    "pt_BR": "Detalhes completos da solicitação",
-    "en": "Complete details of the request",
-    "es": "Detalles completos de la solicitud"
-  },
   "projects_high_priority": {
     "pt_BR": "Projetos (Prioridade Alta)",
     "en": "Projects (High Priority)",
@@ -374,11 +334,6 @@
     "en": "Try again",
     "es": "Intentar de nuevo"
   },
-  "download_attachment": {
-    "pt_BR": "Baixar Anexo",
-    "en": "Download Attachment",
-    "es": "Descargar Adjunto"
-  },
   "completion_date": {
     "pt_BR": "Data de Conclusão",
     "en": "Completion Date",
@@ -389,11 +344,6 @@
     "en": "Search (ID, RL, Description)",
     "es": "Buscar (ID, RL, Descripción)"
   },
-  "search_reports": {
-    "pt_BR": "Buscar",
-    "en": "Search",
-    "es": "Buscar"
-  },
   "file_types": {
     "pt_BR": "Formatos permitidos:",
     "en": "Allowed formats:",
@@ -403,16 +353,6 @@
     "pt_BR": "Imagens, PDF, Excel e Word. Máx. 10 MB por arquivo",
     "en": "Images, PDF, Excel and Word. Max 10 MB per file",
     "es": "Imágenes, PDF, Excel y Word. Máx. 10 MB por archivo"
-  },
-  "file_max_size": {
-    "pt_BR": "Máx. 10MB",
-    "en": "Max 10MB",
-    "es": "Máx. 10MB"
-  },
-  "attachments_selected": {
-    "pt_BR": "{count} arquivo(s) selecionado(s)",
-    "en": "{count} file(s) selected",
-    "es": "{count} archivo(s) seleccionado(s)"
   },
   "remove_attachment": {
     "pt_BR": "Remover",
@@ -443,11 +383,6 @@
     "pt_BR": "chamados encontrados",
     "en": "tickets found",
     "es": "tickets encontrados"
-  },
-  "file_ready": {
-    "pt_BR": "Arquivo pronto para envio:",
-    "en": "File ready for submission:",
-    "es": "Archivo listo para envío:"
   },
   "no_tickets_hint_default": {
     "pt_BR": "Comece criando seu primeiro chamado para acompanhar o andamento.",
@@ -518,16 +453,6 @@
     "pt_BR": "Solicitante",
     "en": "Requester",
     "es": "Solicitante"
-  },
-  "timeline_client": {
-    "pt_BR": "Prazo / Cliente",
-    "en": "Timeline / Client",
-    "es": "Plazo / Cliente"
-  },
-  "option_finish": {
-    "pt_BR": "Concluir",
-    "en": "Complete",
-    "es": "Completar"
   },
   "logout": {
     "pt_BR": "Sair",
@@ -609,11 +534,6 @@
     "en": "Change Status to:",
     "es": "Cambiar Estado a:"
   },
-  "identified_requester": {
-    "pt_BR": "Solicitante Identificado",
-    "en": "Identified Requester",
-    "es": "Solicitante Identificado"
-  },
   "pagination": {
     "pt_BR": "Paginação",
     "en": "Pagination",
@@ -674,11 +594,6 @@
     "en": "You must be logged in to create a ticket.",
     "es": "Debe estar conectado para crear un ticket."
   },
-  "login_subtitle": {
-    "pt_BR": "DTX Aerospace",
-    "en": "DTX Aerospace",
-    "es": "DTX Aerospace"
-  },
   "gate_2": {
     "pt_BR": "Gate 2",
     "en": "Gate 2",
@@ -688,11 +603,6 @@
     "pt_BR": "Selecionar todos",
     "en": "Select all",
     "es": "Seleccionar todo"
-  },
-  "opening_info": {
-    "pt_BR": "Informações de Abertura",
-    "en": "Opening Information",
-    "es": "Información de Apertura"
   },
   "submit_request": {
     "pt_BR": "Enviar Solicitação",
@@ -708,11 +618,6 @@
     "pt_BR": "Definido automaticamente pelo sistema.",
     "en": "Defined automatically by the system.",
     "es": "Definido automáticamente por el sistema."
-  },
-  "login_title": {
-    "pt_BR": "Andon",
-    "en": "Andon",
-    "es": "Andon"
   },
   "remember_me": {
     "pt_BR": "Manter-me conectado por 30 dias",
@@ -813,11 +718,6 @@
     "pt_BR": "Português (Brasil)",
     "en": "Português (Brasil)",
     "es": "Português (Brasil)"
-  },
-  "viewing_chamado": {
-    "pt_BR": "Visualizando Chamado",
-    "en": "Viewing Ticket",
-    "es": "Viendo Ticket"
   },
   "email": {
     "pt_BR": "Email",
@@ -1024,16 +924,6 @@
     "en": "Categories",
     "es": "Categorías"
   },
-  "nav_logout": {
-    "pt_BR": "Sair",
-    "en": "Logout",
-    "es": "Cerrar sesión"
-  },
-  "footer_text": {
-    "pt_BR": "DTX Aerospace. Todos os direitos reservados.",
-    "en": "DTX Aerospace. All rights reserved.",
-    "es": "DTX Aerospace. Todos los derechos reservados."
-  },
   "footer_system_name": {
     "pt_BR": "Andon",
     "en": "Andon",
@@ -1043,31 +933,6 @@
     "pt_BR": "Nível",
     "en": "Level",
     "es": "Nivel"
-  },
-  "xp_weekly": {
-    "pt_BR": "XP Semanal",
-    "en": "Weekly XP",
-    "es": "XP Semanal"
-  },
-  "progress_global": {
-    "pt_BR": "Progresso global",
-    "en": "Global progress",
-    "es": "Progreso global"
-  },
-  "xp_total_label": {
-    "pt_BR": "XP Total",
-    "en": "Total XP",
-    "es": "XP Total"
-  },
-  "opening_date": {
-    "pt_BR": "Data de Abertura",
-    "en": "Opening Date",
-    "es": "Fecha de Apertura"
-  },
-  "rate_service": {
-    "pt_BR": "Avalie o Atendimento",
-    "en": "Rate the Service",
-    "es": "Califique el Servicio"
   },
   "rating": {
     "pt_BR": "Nota",
@@ -1079,30 +944,15 @@
     "en": "Comment",
     "es": "Comentario"
   },
-  "submit_rating": {
-    "pt_BR": "Avaliar",
-    "en": "Submit Rating",
-    "es": "Enviar Calificación"
-  },
   "sla_tooltip": {
     "pt_BR": "Projetos: 2 dias. Demais: 3 dias.",
     "en": "Projects: 2 days. Others: 3 days.",
     "es": "Proyectos: 2 días. Otros: 3 días."
   },
-  "sla_custom_label": {
-    "pt_BR": "SLA Personalizado (dias)",
-    "en": "Custom SLA (days)",
-    "es": "SLA Personalizado (días)"
-  },
   "sla_custom_badge": {
     "pt_BR": "Personalizado",
     "en": "Custom",
     "es": "Personalizado"
-  },
-  "sla_custom_help": {
-    "pt_BR": "Deixe em branco para manter o atual. Digite 0 para voltar ao padrão (Projetos: 2d, demais: 3d).",
-    "en": "Leave blank to keep the current value. Enter 0 to reset to default (Projects: 2d, others: 3d).",
-    "es": "Deje en blanco para mantener el valor actual. Ingrese 0 para restablecer al predeterminado (Proyectos: 2d, otros: 3d)."
   },
   "sla_custom_tooltip": {
     "pt_BR": "SLA personalizado",
@@ -1154,11 +1004,6 @@
     "en": "Edit or add text to the existing description...",
     "es": "Edite o agregue texto a la descripción existente..."
   },
-  "current_attachments": {
-    "pt_BR": "Anexos Atuais",
-    "en": "Current Attachments",
-    "es": "Archivos Adjuntos Actuales"
-  },
   "no_attachments_current": {
     "pt_BR": "Sem anexos atuais.",
     "en": "No current attachments.",
@@ -1188,11 +1033,6 @@
     "pt_BR": "Erro de rede ao salvar!",
     "en": "Network error while saving!",
     "es": "¡Error de red al guardar!"
-  },
-  "viewing_ticket_num": {
-    "pt_BR": "Visualizando Chamado ",
-    "en": "Viewing Ticket ",
-    "es": "Viendo Ticket "
   },
   "ticket_num": {
     "pt_BR": "Chamado #",
@@ -1343,11 +1183,6 @@
     "pt_BR": "SLA %",
     "en": "SLA %",
     "es": "SLA %"
-  },
-  "workload_distributed": {
-    "pt_BR": "Carga de Trabalho Distribuída",
-    "en": "Distributed Workload",
-    "es": "Carga de Trabajo Distribuida"
   },
   "area_performance": {
     "pt_BR": "Performance por Área",
@@ -1539,20 +1374,10 @@
     "en": "New Gate",
     "es": "Nuevo Gate"
   },
-  "ex_gate_5": {
-    "pt_BR": "ex: Gate 5",
-    "en": "e.g.: Gate 5",
-    "es": "ej.: Gate 5"
-  },
   "ex_validation_req": {
     "pt_BR": "ex: Validação de requisitos",
     "en": "e.g.: Requirements validation",
     "es": "ej.: Validación de requisitos"
-  },
-  "order_auto_assigned_note": {
-    "pt_BR": "A ordem será atribuída automaticamente (próximo número sequencial)",
-    "en": "Order will be automatically assigned (next sequential number)",
-    "es": "El orden será asignado automáticamente (siguiente número secuencial)"
   },
   "add_gate": {
     "pt_BR": "Adicionar Gate",
@@ -1644,41 +1469,6 @@
     "en": "Choose an action:",
     "es": "Elige una acción:"
   },
-  "translation_management": {
-    "pt_BR": "Gerenciamento de Traduções",
-    "en": "Translation Management",
-    "es": "Gestión de Traducciones"
-  },
-  "edit_system_terms": {
-    "pt_BR": "Edite os termos do sistema em múltiplos idiomas",
-    "en": "Edit system terms in multiple languages",
-    "es": "Edite los términos del sistema en múltiples idiomas"
-  },
-  "search_key_or_text": {
-    "pt_BR": "Buscar por chave ou texto...",
-    "en": "Search by key or text...",
-    "es": "Buscar por clave o texto..."
-  },
-  "system_key": {
-    "pt_BR": "Chave do Sistema",
-    "en": "System Key",
-    "es": "Clave del Sistema"
-  },
-  "portuguese_pt_br": {
-    "pt_BR": "Português (pt_BR)",
-    "en": "Portuguese (pt_BR)",
-    "es": "Portugués (pt_BR)"
-  },
-  "english_en": {
-    "pt_BR": "Inglês (en)",
-    "en": "English (en)",
-    "es": "Inglés (en)"
-  },
-  "spanish_es": {
-    "pt_BR": "Espanhol (es)",
-    "en": "Spanish (es)",
-    "es": "Español (es)"
-  },
   "save": {
     "pt_BR": "Salvar",
     "en": "Save",
@@ -1703,11 +1493,6 @@
     "pt_BR": "Erro",
     "en": "Error",
     "es": "Error"
-  },
-  "error_in_request_console": {
-    "pt_BR": "Erro na requisição. Verifique o console.",
-    "en": "Request error. Check the console.",
-    "es": "Error en la solicitud. Verifique la consola."
   },
   "users_registered_in_system": {
     "pt_BR": "usuários cadastrados no sistema.",
@@ -1824,55 +1609,10 @@
     "en": "Areas/Sectors (Select one or more) *",
     "es": "Áreas/Sectores (Seleccione uno o más) *"
   },
-  "area_maintenance": {
-    "pt_BR": "Manutenção",
-    "en": "Maintenance",
-    "es": "Mantenimiento"
-  },
-  "area_engineering": {
-    "pt_BR": "Engenharia",
-    "en": "Engineering",
-    "es": "Ingeniería"
-  },
-  "area_quality": {
-    "pt_BR": "Qualidade",
-    "en": "Quality",
-    "es": "Calidad"
-  },
-  "area_commercial": {
-    "pt_BR": "Comercial",
-    "en": "Commercial",
-    "es": "Comercial"
-  },
-  "area_planning": {
-    "pt_BR": "Planejamento",
-    "en": "Planning",
-    "es": "Planificación"
-  },
-  "area_material": {
-    "pt_BR": "Material",
-    "en": "Material",
-    "es": "Material"
-  },
-  "new_password_leave_blank": {
-    "pt_BR": "Nova Senha (deixe em branco para manter)",
-    "en": "New Password (leave blank to keep)",
-    "es": "Nueva Contraseña (dejar en blanco para mantener)"
-  },
-  "leave_blank_to_keep_current": {
-    "pt_BR": "Deixe vazio para manter a senha atual",
-    "en": "Leave empty to keep the current password",
-    "es": "Dejar vacío para mantener la contraseña actual"
-  },
   "password_required": {
     "pt_BR": "Senha *",
     "en": "Password *",
     "es": "Contraseña *"
-  },
-  "minimum_6_chars": {
-    "pt_BR": "Mínimo 6 caracteres",
-    "en": "Minimum 6 characters",
-    "es": "Mínimo 6 caracteres"
   },
   "cancel": {
     "pt_BR": "Cancelar",
@@ -2099,11 +1839,6 @@
     "en": "Error generating reports. Please try again.",
     "es": "Error al generar informes. Por favor inténtalo de nuevo."
   },
-  "error_attachment_upload_production": {
-    "pt_BR": "O anexo não pôde ser salvo (Firebase Storage indisponível em produção). Configure FIREBASE_STORAGE_BUCKET no ambiente. O chamado foi criado/atualizado sem o anexo.",
-    "en": "Attachment could not be saved (Firebase Storage unavailable in production). Set FIREBASE_STORAGE_BUCKET in the environment. The ticket was created/updated without the attachment.",
-    "es": "El adjunto no pudo guardarse (Firebase Storage no disponible en producción). Configure FIREBASE_STORAGE_BUCKET. El ticket se creó/actualizó sin el adjunto."
-  },
   "error_loading_index_info": {
     "pt_BR": "Erro ao carregar informações de índices",
     "en": "Error loading index information",
@@ -2134,11 +1869,6 @@
     "en": "Unable to save the ticket. Please try again.",
     "es": "No se pudo guardar el ticket. Por favor inténtalo de nuevo."
   },
-  "error_loading_your_tickets": {
-    "pt_BR": "Erro ao carregar seus chamados.",
-    "en": "Error loading your tickets.",
-    "es": "Error al cargar tus tickets."
-  },
   "invalid_email": {
     "pt_BR": "Email inválido",
     "en": "Invalid email",
@@ -2168,11 +1898,6 @@
     "pt_BR": "Pelo menos uma Área é obrigatória para supervisores e admins",
     "en": "At least one Area is required for supervisors and admins",
     "es": "Se requiere al menos un Área para supervisores y admins"
-  },
-  "password_min_chars": {
-    "pt_BR": "Senha deve ter pelo menos 6 caracteres",
-    "en": "Password must have at least 6 characters",
-    "es": "La contraseña debe tener al menos 6 caracteres"
   },
   "user_created_success": {
     "pt_BR": "Usuário {nome} criado com sucesso!",
@@ -2284,11 +2009,6 @@
     "en": "To request access, contact the administrator",
     "es": "Para solicitar acceso, contacte al administrador"
   },
-  "resolution_rate_by_area": {
-    "pt_BR": "Taxa de Resolução por Área (%)",
-    "en": "Resolution Rate by Area (%)",
-    "es": "Tasa de Resolución por Área (%)"
-  },
   "insight_sla_ok_title": {
     "pt_BR": "SLA em dia",
     "en": "SLA On Track",
@@ -2344,11 +2064,6 @@
     "en": "Area {area} has a resolution rate of {taxa}%. Investigation recommended.",
     "es": "El área {area} tiene una tasa de resolución de {taxa}%. Se recomienda investigación."
   },
-  "avg_time_by_area": {
-    "pt_BR": "Tempo Médio por Área (h)",
-    "en": "Avg. Time by Area (h)",
-    "es": "Tiempo Medio por Área (h)"
-  },
   "last_update": {
     "pt_BR": "Última atualização",
     "en": "Last update",
@@ -2388,16 +2103,6 @@
     "pt_BR": "Nenhuma área com dados no período.",
     "en": "No areas with data in the period.",
     "es": "Ningún área con datos en el período."
-  },
-  "sort_asc": {
-    "pt_BR": "Ordenar crescente",
-    "en": "Sort ascending",
-    "es": "Ordenar ascendente"
-  },
-  "sort_desc": {
-    "pt_BR": "Ordenar decrescente",
-    "en": "Sort descending",
-    "es": "Ordenar descendente"
   },
   "table_supervisors_caption": {
     "pt_BR": "Performance da equipe por supervisor",
@@ -2769,11 +2474,6 @@
     "en": "Please provide a reason for cancellation",
     "es": "Proporcione un motivo para la cancelación"
   },
-  "sectors_added_notify_failed": {
-    "pt_BR": "Setores adicionados, mas houve falha ao notificar.",
-    "en": "Sectors added, but notification failed.",
-    "es": "Sectores añadidos, pero la notificación falló."
-  },
   "file_save_error_production": {
     "pt_BR": "Houve um problema ao salvar o arquivo em produção.",
     "en": "There was a problem saving the file in production.",
@@ -2854,11 +2554,6 @@
     "en": "Enable",
     "es": "Activar"
   },
-  "quick_navigation": {
-    "pt_BR": "Navegação Rápida",
-    "en": "Quick Navigation",
-    "es": "Navegación Rápida"
-  },
   "administration_section": {
     "pt_BR": "Administração",
     "en": "Administration",
@@ -2903,11 +2598,6 @@
     "pt_BR": "vs. período anterior",
     "en": "vs. previous period",
     "es": "vs. período anterior"
-  },
-  "hours_abbv": {
-    "pt_BR": "h",
-    "en": "h",
-    "es": "h"
   },
   "hr": {
     "pt_BR": "RH",
@@ -2969,11 +2659,6 @@
     "en": "Procurement",
     "es": "Aprovisionamiento"
   },
-  "confirm_resolution_title": {
-    "pt_BR": "Este chamado foi resolvido?",
-    "en": "Was this ticket resolved?",
-    "es": "¿Este ticket fue resuelto?"
-  },
   "confirm_resolution_message": {
     "pt_BR": "O atendimento foi concluído. Confirme se o problema foi resolvido.",
     "en": "The service has been completed. Please confirm if the issue was resolved.",
@@ -2998,16 +2683,6 @@
     "pt_BR": "Descreva o que ficou pendente...",
     "en": "Describe what is still pending...",
     "es": "Describa lo que aún está pendiente..."
-  },
-  "resolution_confirmed": {
-    "pt_BR": "Chamado encerrado. Obrigado pela confirmação!",
-    "en": "Ticket closed. Thank you for confirming!",
-    "es": "Ticket cerrado. ¡Gracias por confirmar!"
-  },
-  "ticket_reopened": {
-    "pt_BR": "Chamado reaberto. A equipe será notificada.",
-    "en": "Ticket reopened. The team will be notified.",
-    "es": "Ticket reabierto. Se notificará al equipo."
   },
   "awaiting_confirmation": {
     "pt_BR": "Aguardando sua confirmação",
@@ -3204,11 +2879,6 @@
     "en": "Active",
     "es": "Activo"
   },
-  "inactive_status_label": {
-    "pt_BR": "Inativo",
-    "en": "Inactive",
-    "es": "Inactivo"
-  },
   "deactivate_account_help": {
     "pt_BR": "Desativar bloqueia o login. A conta pode ser reativada. Para remoção definitiva, use Excluir.",
     "en": "Deactivating blocks login. The account can be reactivated. For permanent removal, use Delete.",
@@ -3378,16 +3048,6 @@
     "pt_BR": "Pendente",
     "en": "Pending",
     "es": "Pendiente"
-  },
-  "participants_use_include_hint": {
-    "pt_BR": "Para colaboração com acompanhamento individual de status, use",
-    "en": "For collaboration with individual status tracking, use",
-    "es": "Para colaboración con seguimiento individual de estado, use"
-  },
-  "participants_hint_suffix": {
-    "pt_BR": "(participantes) abaixo.",
-    "en": "(participants) below.",
-    "es": "(participantes) abajo."
   },
   "participant_you_are_participant": {
     "pt_BR": "Você é participante deste chamado",
@@ -3634,11 +3294,6 @@
     "en": "General",
     "es": "General"
   },
-  "preview_modal_title": {
-    "pt_BR": "Revise seu chamado antes de enviar",
-    "en": "Review your ticket before submitting",
-    "es": "Revise su ticket antes de enviar"
-  },
   "preview_confirm_btn": {
     "pt_BR": "Confirmar envio",
     "en": "Confirm & send",
@@ -3719,20 +3374,10 @@
     "en": "Available for 30 minutes after opening the ticket.",
     "es": "Disponible por 30 minutos después de abrir el ticket."
   },
-  "edit_description_countdown": {
-    "pt_BR": "Tempo restante",
-    "en": "Time remaining",
-    "es": "Tiempo restante"
-  },
   "edit_description_save_btn": {
     "pt_BR": "Salvar descrição",
     "en": "Save description",
     "es": "Guardar descripción"
-  },
-  "edit_description_success": {
-    "pt_BR": "Descrição atualizada com sucesso.",
-    "en": "Description updated successfully.",
-    "es": "Descripción actualizada correctamente."
   },
   "cancel_ticket_sol_title": {
     "pt_BR": "Cancelar chamado",
@@ -3748,11 +3393,6 @@
     "pt_BR": "Confirmar cancelamento",
     "en": "Confirm cancellation",
     "es": "Confirmar cancelación"
-  },
-  "cancel_ticket_success": {
-    "pt_BR": "Chamado cancelado com sucesso.",
-    "en": "Ticket cancelled successfully.",
-    "es": "Ticket cancelado correctamente."
   },
   "sol_actions_title": {
     "pt_BR": "Suas ações",
@@ -4498,11 +4138,6 @@
     "pt_BR": "Ex: combinei com o gestor, preciso de mais tempo antes de atender",
     "en": "E.g: agreed with the manager, I need more time before attending",
     "es": "Ej: acordado con el gestor, necesito más tiempo antes de atender"
-  },
-  "attendance_forecast_set_success": {
-    "pt_BR": "Previsão de atendimento definida com sucesso",
-    "en": "Attendance forecast set successfully",
-    "es": "Previsión de atención definida con éxito"
   },
   "invalid_request_data": {
     "pt_BR": "Dados da requisição inválidos.",
