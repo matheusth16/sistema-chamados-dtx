@@ -32,8 +32,11 @@ credentials.json
 # Testes (não vão para produção)
 tests/
 coverage.xml
+coverage.json
 htmlcov/
 .coverage
+test-results-qa/
+tmp/
 
 # Ferramentas de desenvolvimento
 requirements-dev.txt
@@ -67,3 +70,7 @@ firestore-debug.log
 # IDE
 .vscode/
 .idea/
+.cursor/
+
+# Ferramentas de IA/design (cache local pode conter caminhos da máquina)
+.impeccable/
