@@ -86,11 +86,6 @@ Configure as variáveis abaixo (ver `app/services/notifications.py`).
 Se as variáveis `GRAPH_*` não estiverem completas, o envio por e-mail fica desabilitado
 (o sistema continua funcionando com notificações in-app e Web Push).
 
-| Variável | Descrição | Padrão | Exemplo |
-|----------|-----------|--------|---------|
-| `NOTIFY_SOLICITANTE_EMAIL` | Ativa e-mail ao solicitante em mudança de status para *Em Atendimento* ou *Concluído*. Requer `GRAPH_*` configurado. | `false` | `true` |
-| `NOTIFY_RELAY_EMAIL` | Caixa relay monitorada (ex.: por automações externas) para gatilhos de notificação. | (vazio) | `dtxls.support@dtx.aero` |
-
 **Azure AD:** conceda e dê *admin consent* à permissão `Mail.Send` do tipo *Application*.
 O `GRAPH_CLIENT_SECRET` expira — renove-o no Azure (Certificates & secrets) quando
 ocorrerem erros `401 Unauthorized`. Retentativas com backoff em `app/services/notify_retry.py`.

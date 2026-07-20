@@ -253,9 +253,6 @@ class Config:
     SSO_TENANT_ID = os.getenv("SSO_TENANT_ID", "").strip() or GRAPH_TENANT_ID
     SSO_REDIRECT_URI = os.getenv("SSO_REDIRECT_URI", "").strip()
 
-    # Relay monitorado pelo Power Automate (caixa de entrada que dispara os flows)
-    NOTIFY_RELAY_EMAIL = os.getenv("NOTIFY_RELAY_EMAIL", "dtxls.support@dtx.aero").strip()
-
     # Cloudflare R2 (armazenamento de arquivos/anexos)
     R2_ACCOUNT_ID = os.getenv("R2_ACCOUNT_ID", "").strip()
     R2_ACCESS_KEY_ID = os.getenv("R2_ACCESS_KEY_ID", "").strip()
@@ -266,9 +263,6 @@ class Config:
     # Web Push (notificações no navegador). Gere chaves com: python gerar_vapid_keys.py
     VAPID_PUBLIC_KEY = os.getenv("VAPID_PUBLIC_KEY", "")
     VAPID_PRIVATE_KEY = os.getenv("VAPID_PRIVATE_KEY", "")
-
-    # Notificação e-mail ao solicitante em mudança de status (opt-in)
-    NOTIFY_SOLICITANTE_EMAIL = _to_bool(os.getenv("NOTIFY_SOLICITANTE_EMAIL"), default=False)
 
     # Envio global de e-mails transacionais (Graph API).
     # Desligado por padrão fora de produção — evita disparos acidentais em dev/testes locais.

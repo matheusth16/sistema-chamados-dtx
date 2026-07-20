@@ -370,7 +370,6 @@ def test_notificar_solicitante_status_sem_usuario_nao_envia(app):
         app.app_context(),
         patch("app.services.notifications_chamados.enviar_email") as mock_send,
     ):
-        app.config["NOTIFY_SOLICITANTE_EMAIL"] = True
         notificar_solicitante_status("ch1", "CH-001", "Concluído", "TI", None)
     mock_send.assert_not_called()
 
@@ -387,7 +386,6 @@ def test_notificar_solicitante_status_sem_email_nao_envia(app):
         app.app_context(),
         patch("app.services.notifications_chamados.enviar_email") as mock_send,
     ):
-        app.config["NOTIFY_SOLICITANTE_EMAIL"] = True
         notificar_solicitante_status("ch1", "CH-001", "Concluído", "TI", solicitante)
     mock_send.assert_not_called()
 
@@ -407,7 +405,6 @@ def test_notificar_solicitante_status_concluido_envia_email(app):
             "app.services.notifications_chamados.enviar_email", return_value=(True, None)
         ) as mock_send,
     ):
-        app.config["NOTIFY_SOLICITANTE_EMAIL"] = True
         app.config["APP_BASE_URL"] = "https://example.test"
         notificar_solicitante_status("ch1", "CH-001", "Concluído", "Manutenção", solicitante)
     mock_send.assert_called_once()
@@ -434,7 +431,6 @@ def test_notificar_solicitante_status_em_atendimento_envia_email(app):
             "app.services.notifications_chamados.enviar_email", return_value=(True, None)
         ) as mock_send,
     ):
-        app.config["NOTIFY_SOLICITANTE_EMAIL"] = True
         app.config["APP_BASE_URL"] = "https://example.test"
         notificar_solicitante_status("ch2", "CH-002", "Em Atendimento", "Projetos", solicitante)
     mock_send.assert_called_once()
