@@ -512,7 +512,9 @@ def test_notificar_aviso_resolucao_marco_80_importance_high(app):
 
     with (
         app.app_context(),
-        patch("app.services.notifications.enviar_email", return_value=(True, None)) as mock_email,
+        patch(
+            "app.services.notifications_escalonamento.enviar_email", return_value=(True, None)
+        ) as mock_email,
         patch("app.services.notifications_inapp.criar_notificacao"),
         patch("app.services.webpush_service.enviar_webpush_usuario"),
     ):
@@ -543,7 +545,9 @@ def test_notificar_aviso_resolucao_marco_50_importance_normal(app):
 
     with (
         app.app_context(),
-        patch("app.services.notifications.enviar_email", return_value=(True, None)) as mock_email,
+        patch(
+            "app.services.notifications_escalonamento.enviar_email", return_value=(True, None)
+        ) as mock_email,
         patch("app.services.notifications_inapp.criar_notificacao"),
         patch("app.services.webpush_service.enviar_webpush_usuario"),
     ):
@@ -608,7 +612,9 @@ def test_notificar_escalada_resposta_importance_high(app):
 
     with (
         app.app_context(),
-        patch("app.services.notifications.enviar_email", return_value=(True, None)) as mock_send,
+        patch(
+            "app.services.notifications_escalonamento.enviar_email", return_value=(True, None)
+        ) as mock_send,
     ):
         notificar_escalada_resposta_gerencial(
             chamado_data={"numero_chamado": "CHM-001"},
@@ -627,7 +633,9 @@ def test_notificar_escalada_resolucao_importance_high(app):
 
     with (
         app.app_context(),
-        patch("app.services.notifications.enviar_email", return_value=(True, None)) as mock_send,
+        patch(
+            "app.services.notifications_escalonamento.enviar_email", return_value=(True, None)
+        ) as mock_send,
     ):
         notificar_escalada_resolucao_gerencial(
             chamado_data={"numero_chamado": "CHM-001"},

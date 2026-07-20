@@ -1185,6 +1185,143 @@ def test_notificar_setores_adicionais_envio_falho_nao_levanta(app):
         )
 
 
+# ── Participantes — notificar_participante_incluido / notificar_owner_todos_participantes_concluiram ──
+
+
+def test_notificar_participante_incluido_envia_email(app):
+    """notificar_participante_incluido envia e-mail ao supervisor incluído como participante."""
+    from app.services.notifications import notificar_participante_incluido
+
+    responsavel = MagicMock()
+    responsavel.email = "responsavel@dtx.aero"
+
+    with (
+        app.app_context(),
+        patch("app.services.notifications.enviar_email", return_value=(True, None)) as mock_send,
+    ):
+        app.config["APP_BASE_URL"] = "https://example.test"
+        notificar_participante_incluido(
+            chamado_id="ch_p1",
+            numero_chamado="CHM-0300",
+            categoria="TI",
+            area="Engenharia",
+            responsavel_usuario=responsavel,
+        )
+
+    mock_send.assert_called_once()
+    destinatario, assunto, corpo_html, _corpo_texto = mock_send.call_args[0]
+    assert destinatario == "responsavel@dtx.aero"
+    assert "CHM-0300" in assunto
+    assert "participant" in assunto.lower()
+    assert "CHM-0300" in corpo_html
+
+
+def test_notificar_participante_incluido_sem_usuario_nao_envia(app):
+    """notificar_participante_incluido sem responsavel_usuario não chama enviar_email."""
+    from app.services.notifications import notificar_participante_incluido
+
+    with (
+        app.app_context(),
+        patch("app.services.notifications.enviar_email") as mock_send,
+    ):
+        notificar_participante_incluido(
+            chamado_id="ch_p2",
+            numero_chamado="CHM-0301",
+            categoria="TI",
+            area="Engenharia",
+            responsavel_usuario=None,
+        )
+
+    mock_send.assert_not_called()
+
+
+def test_notificar_participante_incluido_email_falha_nao_levanta(app):
+    """notificar_participante_incluido com envio falho não levanta exceção."""
+    from app.services.notifications import notificar_participante_incluido
+
+    responsavel = MagicMock()
+    responsavel.email = "responsavel@dtx.aero"
+
+    with (
+        app.app_context(),
+        patch("app.services.notifications.enviar_email", return_value=(False, "err")),
+    ):
+        app.config["APP_BASE_URL"] = "https://example.test"
+        notificar_participante_incluido(
+            chamado_id="ch_p3",
+            numero_chamado="CHM-0302",
+            categoria="TI",
+            area="Engenharia",
+            responsavel_usuario=responsavel,
+        )  # não deve levantar
+
+
+def test_notificar_owner_todos_participantes_concluiram_envia_email(app):
+    """notificar_owner_todos_participantes_concluiram avisa owner que pode fechar o chamado."""
+    from app.services.notifications import notificar_owner_todos_participantes_concluiram
+
+    owner = MagicMock()
+    owner.email = "owner@dtx.aero"
+    owner.nome = "Owner Fulano"
+
+    with (
+        app.app_context(),
+        patch("app.services.notifications.enviar_email", return_value=(True, None)) as mock_send,
+    ):
+        app.config["APP_BASE_URL"] = "https://example.test"
+        notificar_owner_todos_participantes_concluiram(
+            chamado_id="ch_o1",
+            numero_chamado="CHM-0400",
+            categoria="TI",
+            owner_usuario=owner,
+        )
+
+    mock_send.assert_called_once()
+    destinatario, assunto, corpo_html, _corpo_texto = mock_send.call_args[0]
+    assert destinatario == "owner@dtx.aero"
+    assert "CHM-0400" in assunto
+    assert "Owner Fulano" in corpo_html
+
+
+def test_notificar_owner_todos_participantes_concluiram_sem_usuario_nao_envia(app):
+    """notificar_owner_todos_participantes_concluiram sem owner_usuario não chama enviar_email."""
+    from app.services.notifications import notificar_owner_todos_participantes_concluiram
+
+    with (
+        app.app_context(),
+        patch("app.services.notifications.enviar_email") as mock_send,
+    ):
+        notificar_owner_todos_participantes_concluiram(
+            chamado_id="ch_o2",
+            numero_chamado="CHM-0401",
+            categoria="TI",
+            owner_usuario=None,
+        )
+
+    mock_send.assert_not_called()
+
+
+def test_notificar_owner_todos_participantes_concluiram_email_falha_nao_levanta(app):
+    """notificar_owner_todos_participantes_concluiram com envio falho não levanta exceção."""
+    from app.services.notifications import notificar_owner_todos_participantes_concluiram
+
+    owner = MagicMock()
+    owner.email = "owner@dtx.aero"
+    owner.nome = "Owner Fulano"
+
+    with (
+        app.app_context(),
+        patch("app.services.notifications.enviar_email", return_value=(False, "err")),
+    ):
+        app.config["APP_BASE_URL"] = "https://example.test"
+        notificar_owner_todos_participantes_concluiram(
+            chamado_id="ch_o3",
+            numero_chamado="CHM-0402",
+            categoria="TI",
+            owner_usuario=owner,
+        )  # não deve levantar
+
+
 # ── notificar_escalada_resposta_gerencial (Fase 6 — Escada A) ──────────────
 
 
@@ -1202,7 +1339,9 @@ def test_notificar_escalada_resposta_gerencial_assunto_contem_numero(app):
 
     with (
         app.app_context(),
-        patch("app.services.notifications.enviar_email", return_value=(True, None)) as mock_send,
+        patch(
+            "app.services.notifications_escalonamento.enviar_email", return_value=(True, None)
+        ) as mock_send,
     ):
         app.config["APP_BASE_URL"] = "https://example.test"
         notificar_escalada_resposta_gerencial(
@@ -1225,7 +1364,9 @@ def test_notificar_escalada_resposta_gerencial_falha_nao_levanta(app):
 
     with (
         app.app_context(),
-        patch("app.services.notifications.enviar_email", return_value=(False, "timeout")),
+        patch(
+            "app.services.notifications_escalonamento.enviar_email", return_value=(False, "timeout")
+        ),
     ):
         notificar_escalada_resposta_gerencial(
             chamado_data={"numero_chamado": "CHM-0001"},
@@ -1259,7 +1400,9 @@ def test_notificar_abertura_aog_todos_gestores_envia_para_os_4_niveis(app):
 
     with (
         app.app_context(),
-        patch("app.services.notifications.enviar_email", return_value=(True, None)) as mock_send,
+        patch(
+            "app.services.notifications_escalonamento.enviar_email", return_value=(True, None)
+        ) as mock_send,
         patch(
             "app.services.gestor_escalonamento_service.construir_mapa_gestor_setor",
             return_value={"AOG": "setor@dtx.aero"},
@@ -1294,7 +1437,9 @@ def test_notificar_abertura_aog_cascateia_para_nivel_acima_quando_ausente(app):
 
     with (
         app.app_context(),
-        patch("app.services.notifications.enviar_email", return_value=(True, None)) as mock_send,
+        patch(
+            "app.services.notifications_escalonamento.enviar_email", return_value=(True, None)
+        ) as mock_send,
         patch(
             "app.services.gestor_escalonamento_service.construir_mapa_gestor_setor",
             return_value={},  # nenhum gestor_setor cadastrado pra área "AOG"
@@ -1327,7 +1472,9 @@ def test_notificar_abertura_aog_sem_ninguem_cadastrado_em_nenhum_nivel_nao_envia
 
     with (
         app.app_context(),
-        patch("app.services.notifications.enviar_email", return_value=(True, None)) as mock_send,
+        patch(
+            "app.services.notifications_escalonamento.enviar_email", return_value=(True, None)
+        ) as mock_send,
         patch(
             "app.services.gestor_escalonamento_service.construir_mapa_gestor_setor",
             return_value={},
@@ -1351,7 +1498,7 @@ def test_notificar_abertura_aog_falha_de_envio_nao_levanta(app):
     with (
         app.app_context(),
         patch(
-            "app.services.notifications.enviar_email", return_value=(False, "timeout")
+            "app.services.notifications_escalonamento.enviar_email", return_value=(False, "timeout")
         ) as mock_send,
         patch(
             "app.services.gestor_escalonamento_service.construir_mapa_gestor_setor",
@@ -1390,7 +1537,9 @@ def test_notificar_aviso_resolucao_supervisor_envia_email(app):
 
     with (
         app.app_context(),
-        patch("app.services.notifications.enviar_email", return_value=(True, None)) as mock_email,
+        patch(
+            "app.services.notifications_escalonamento.enviar_email", return_value=(True, None)
+        ) as mock_email,
         patch("app.services.notifications_inapp.criar_notificacao") as mock_criar,
         patch("app.services.webpush_service.enviar_webpush_usuario") as mock_webpush,
     ):
@@ -1429,7 +1578,7 @@ def test_notificar_aviso_resolucao_supervisor_sem_email_dispara_inapp_e_webpush(
 
     with (
         app.app_context(),
-        patch("app.services.notifications.enviar_email") as mock_email,
+        patch("app.services.notifications_escalonamento.enviar_email") as mock_email,
         patch("app.services.notifications_inapp.criar_notificacao") as mock_criar,
         patch("app.services.webpush_service.enviar_webpush_usuario") as mock_webpush,
     ):
@@ -1461,7 +1610,9 @@ def test_notificar_escalada_resolucao_gerencial_envia_email(app):
 
     with (
         app.app_context(),
-        patch("app.services.notifications.enviar_email", return_value=(True, None)) as mock_email,
+        patch(
+            "app.services.notifications_escalonamento.enviar_email", return_value=(True, None)
+        ) as mock_email,
     ):
         app.config["APP_BASE_URL"] = "https://example.test"
         notificar_escalada_resolucao_gerencial(
