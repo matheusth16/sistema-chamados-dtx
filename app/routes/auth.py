@@ -89,6 +89,8 @@ def _finalizar_login(usuario: Usuario, remember: bool, client_ip: str) -> Respon
         return redirect(url_for("main.mfa_configurar"))
 
     flash_t("welcome_user", "success", nome=usuario.nome)
+    if getattr(usuario, "is_gestor_only", False):
+        return redirect(url_for("main.gestor_dashboard"))
     if usuario.perfil == "solicitante":
         return redirect(url_for("main.index"))
     if usuario.perfil == "supervisor":
@@ -111,6 +113,8 @@ def login() -> Response:
             mask_email_for_log(current_user.email),
             current_user.perfil,
         )
+        if getattr(current_user, "is_gestor_only", False):
+            return redirect(url_for("main.gestor_dashboard"))
         if current_user.perfil == "solicitante":
             return redirect(url_for("main.index"))
         if current_user.perfil == "supervisor":

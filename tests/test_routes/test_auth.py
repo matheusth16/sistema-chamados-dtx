@@ -103,6 +103,73 @@ def test_login_supervisor_dual_role_gestor_setor_redireciona_para_painel(client,
     assert "gestor" not in (r.location or "")
 
 
+def test_login_gestor_puro_redireciona_para_gestor_dashboard(client, app):
+    """Nível 3: gestor "puro" (is_gestor_only=True, sem perfil operacional) cai
+    direto em /gestor/dashboard — não tem painel operacional útil pra ver."""
+    usuario = MagicMock()
+    usuario.id = "gestor1"
+    usuario.email = "gestor@test.com"
+    usuario.nome = "Gestor Puro"
+    usuario.perfil = "supervisor"
+    usuario.must_change_password = False
+    usuario.mfa_enabled = True
+    usuario.nivel_gestao = "gerente_producao"
+    usuario.is_gestor = True
+    usuario.is_admin_or_above = False
+    usuario.is_gestor_only = True
+    usuario.get_id = lambda: "gestor1"
+    usuario.is_authenticated = True
+    usuario.is_active = True
+    usuario.is_anonymous = False
+    usuario.check_password = MagicMock(return_value=True)
+
+    with (
+        patch("app.routes.auth.Usuario.get_by_email", return_value=usuario),
+        patch("app.models_usuario.Usuario.get_by_id", return_value=usuario),
+        patch("app.routes.auth._dispositivo_confiavel", return_value=True),
+    ):
+        r = client.post(
+            "/login", data={"email": "gestor@test.com", "senha": "ok"}, follow_redirects=False
+        )
+
+    assert r.status_code == 302
+    assert "gestor" in (r.location or "")
+
+
+def test_login_get_ja_autenticado_gestor_puro_redireciona_para_gestor_dashboard(client, app):
+    """Nível 3: acessar GET /login já logado como gestor "puro" também cai em
+    /gestor/dashboard — mesma regra do redirect pós-senha, não só duplicada lá."""
+    usuario = MagicMock()
+    usuario.id = "gestor2"
+    usuario.email = "gestor2@test.com"
+    usuario.nome = "Gestor Puro 2"
+    usuario.perfil = "supervisor"
+    usuario.must_change_password = False
+    usuario.mfa_enabled = True
+    usuario.nivel_gestao = "gerente_producao"
+    usuario.is_gestor = True
+    usuario.is_admin_or_above = False
+    usuario.is_gestor_only = True
+    usuario.get_id = lambda: "gestor2"
+    usuario.is_authenticated = True
+    usuario.is_active = True
+    usuario.is_anonymous = False
+    usuario.check_password = MagicMock(return_value=True)
+
+    with (
+        patch("app.routes.auth.Usuario.get_by_email", return_value=usuario),
+        patch("app.models_usuario.Usuario.get_by_id", return_value=usuario),
+        patch("app.routes.auth._dispositivo_confiavel", return_value=True),
+    ):
+        client.post(
+            "/login", data={"email": "gestor2@test.com", "senha": "ok"}, follow_redirects=False
+        )
+        r = client.get("/login", follow_redirects=False)
+
+    assert r.status_code == 302
+    assert "gestor" in (r.location or "")
+
+
 def test_login_solicitante_autenticado_redireciona_para_index(client_logado_solicitante):
     """GET /login com solicitante já autenticado redireciona para index (/)."""
     r = client_logado_solicitante.get("/login", follow_redirects=False)

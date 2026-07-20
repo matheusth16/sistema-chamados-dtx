@@ -30,6 +30,7 @@ def test_usabilidade_login_sucesso_redireciona_por_perfil(client):
     usuario_sol.check_password = MagicMock(return_value=True)
     usuario_sol.get_id = lambda: "sol_1"
     usuario_sol.must_change_password = False
+    usuario_sol.is_gestor_only = False
     with (
         patch("app.routes.auth.Usuario.get_by_email", return_value=usuario_sol),
         patch("app.models_usuario.Usuario.get_by_id", return_value=usuario_sol),
@@ -48,6 +49,7 @@ def test_usabilidade_login_sucesso_redireciona_por_perfil(client):
     usuario_sup.check_password = MagicMock(return_value=True)
     usuario_sup.get_id = lambda: "sup_1"
     usuario_sup.must_change_password = False
+    usuario_sup.is_gestor_only = False
     with (
         patch("app.routes.auth.Usuario.get_by_email", return_value=usuario_sup),
         patch("app.models_usuario.Usuario.get_by_id", return_value=usuario_sup),

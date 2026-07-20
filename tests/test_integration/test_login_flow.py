@@ -36,6 +36,7 @@ def test_login_post_sucesso_redireciona_conforme_perfil(client):
         False  # evita redirect para troca de senha; testa redirect por perfil
     )
     usuario.mfa_enabled = True  # evita redirect para /mfa/configurar; testa redirect por perfil
+    usuario.is_gestor_only = False  # sem nivel_gestao; testa redirect só por perfil
     with (
         patch("app.routes.auth.Usuario.get_by_email", return_value=usuario),
         patch("app.routes.auth._dispositivo_confiavel", return_value=True),

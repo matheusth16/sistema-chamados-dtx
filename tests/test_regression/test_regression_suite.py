@@ -78,6 +78,7 @@ def test_regression_login_supervisor_redireciona_para_painel(client):
     usuario.get_id = lambda: "sup_1"
     usuario.must_change_password = False  # senão app redireciona para /alterar-senha-obrigatoria
     usuario.mfa_enabled = True  # senão app redireciona para /mfa/configurar
+    usuario.is_gestor_only = False  # senão app redireciona para /gestor/dashboard
     with (
         patch("app.routes.auth.Usuario.get_by_email", return_value=usuario),
         patch("app.routes.auth._dispositivo_confiavel", return_value=True),
