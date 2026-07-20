@@ -1289,8 +1289,8 @@ bandit -r app/ -ll
 # Passo 3 — Testes completos
 pytest --tb=short -q
 
-# Passo 4 — Push (via script da skill)
-bash skills/Essencial/git-pushing/scripts/smart_commit.sh "tipo: descrição"
+# Passo 4 — Push (via script da skill global)
+bash ~/.claude/skills/git-pushing/scripts/smart_commit.sh "tipo: descrição"
 ```
 
 > **Atenção:** O gate de cobertura é **85%** global e **85% por módulo** (`python scripts/check_coverage_per_module.py`). Se sua mudança reduzir a cobertura abaixo desse valor, adicione testes antes de abrir PR.
