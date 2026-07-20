@@ -45,3 +45,25 @@ repos:
         args: ["--maxkb=500"]
       - id: debug-statements
         name: "sem debugger/breakpoints no código"
+      - id: detect-private-key
+        name: "sem chave privada commitada"
+      - id: check-merge-conflict
+        name: "sem marcador de merge conflict"
+
+  # --- Conventional Commits: valida formato "tipo(escopo): assunto" ---
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: v3.6.0
+    hooks:
+      - id: conventional-pre-commit
+        name: "commit-msg — conventional commits"
+        stages: [commit-msg]
+        args:
+          - feat
+          - fix
+          - security
+          - test
+          - refactor
+          - perf
+          - chore
+          - docs
+          - style

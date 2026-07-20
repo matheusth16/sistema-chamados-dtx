@@ -42,7 +42,7 @@ O **Sistema de Chamados DTX** é uma aplicação web de gerenciamento de tickets
 ### Padrão MVC/Blueprints
 ```
 Sistema de Chamados
-├── app.py / run.py (Entry point)
+├── run.py (Entry point)
 ├── config.py (Configuração centralizada)
 ├── app/
 │   ├── __init__.py (Factory pattern - create_app())
