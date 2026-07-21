@@ -11,21 +11,21 @@ Flags:
   --apply     Executa as alterações no Firestore.
 
 Uso:
-    python scripts/migrar_grupos_rl.py          # dry-run
-    python scripts/migrar_grupos_rl.py --apply  # aplica
+    python scripts/migrations/migrar_grupos_rl.py          # dry-run
+    python scripts/migrations/migrar_grupos_rl.py --apply  # aplica
 """
 
 import os
 import sys
 from pathlib import Path
 
-# Adiciona a raiz do projeto ao path (script está em scripts/)
-_raiz = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# Adiciona a raiz do projeto ao path (script está em scripts/migrations/)
+_raiz = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, _raiz)
 
 from app.database import db  # noqa: E402
 from app.models_grupo_rl import GrupoRL  # noqa: E402
-from scripts._migration_utils import (  # noqa: E402
+from scripts.migrations._migration_utils import (  # noqa: E402
     _commit_batch,
     _iter_collection_paginated,
     _write_checkpoint,

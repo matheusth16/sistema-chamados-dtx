@@ -1,5 +1,5 @@
 """
-OBSOLETO: Este script foi substituído por scripts/migrar_setores_catalogo.py
+OBSOLETO: Este script foi substituído por scripts/migrations/migrar_setores_catalogo.py
 (que possui flag --dry-run e é idempotente). Mantido apenas para referência
 histórica. Não executar em produção sem revisar o código.
 
@@ -9,8 +9,8 @@ DRY-RUN (somente leitura, nenhuma alteração é gravada). Use --apply para
 efetuar as alterações reais.
 
 Uso:
-    python scripts/atualizar_firebase.py            # dry-run (seguro)
-    python scripts/atualizar_firebase.py --apply    # grava de verdade
+    python scripts/migrations/atualizar_firebase.py            # dry-run (seguro)
+    python scripts/migrations/atualizar_firebase.py --apply    # grava de verdade
 """
 
 import argparse
@@ -21,7 +21,7 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 
 # Garante que credentials.json seja encontrado na raiz do projeto
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.chdir(ROOT)
 
 

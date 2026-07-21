@@ -111,7 +111,7 @@ az containerapp show -n sistema-chamados -g rg-sistema-chamados \
   --query "properties.template.containers[0].env[?starts_with(name, 'GRAPH_')]"
 
 # Gerar/inspecionar snapshots visuais dos e-mails (roda localmente, não envia para produção)
-python scripts/gerar_email_visual_snapshots.py
+python scripts/qa/gerar_email_visual_snapshots.py
 ```
 
 **Ações**

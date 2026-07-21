@@ -5,8 +5,8 @@ Idempotente: pode ser rodado múltiplas vezes sem efeitos colaterais.
 Dry-run por padrão; use --apply para gravar de verdade.
 
 Uso:
-    python scripts/adicionar_setor_ti.py            # inspeciona sem gravar
-    python scripts/adicionar_setor_ti.py --apply    # grava no Firestore
+    python scripts/migrations/adicionar_setor_ti.py            # inspeciona sem gravar
+    python scripts/migrations/adicionar_setor_ti.py --apply    # grava no Firestore
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ import os
 import sys
 from datetime import datetime
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.chdir(ROOT)
 sys.path.insert(0, ROOT)
 

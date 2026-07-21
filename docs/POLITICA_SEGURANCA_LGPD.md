@@ -104,7 +104,7 @@ A organização deve indicar um **Encarregado de Dados (DPO)** e divulgar canal 
 
 | Medida                    | Onde está no código / config                              |
 |---------------------------|------------------------------------------------------------|
-| Criptografia Fernet (PII) | **Implementado — Onda 4 (2026-06-23).** `nome` e `email` criptografados em repouso no Firestore quando `ENCRYPT_PII_AT_REST=true`. Ver `app/services/pii_encryption.py`, `app/models_usuario.py`, `scripts/migrar_pii_criptografia.py` e [`docs/adr/001-criptografia-pii-fernet.md`](adr/001-criptografia-pii-fernet.md). Default `false` (ativação via ops, ver `docs/ENV.md`). |
+| Criptografia Fernet (PII) | **Implementado — Onda 4 (2026-06-23).** `nome` e `email` criptografados em repouso no Firestore quando `ENCRYPT_PII_AT_REST=true`. Ver `app/services/pii_encryption.py`, `app/models_usuario.py`, `scripts/migrations/migrar_pii_criptografia.py` e [`docs/adr/001-criptografia-pii-fernet.md`](adr/001-criptografia-pii-fernet.md). Default `false` (ativação via ops, ver `docs/ENV.md`). |
 | Hash de senha             | `app/models_usuario.py` (Werkzeug)                         |
 | Cookies e HSTS            | `config.py` (session), `app/__init__.py` (headers)          |
 | CSP e Permissions-Policy  | `app/__init__.py` (headers em produção)                     |
@@ -114,4 +114,4 @@ A organização deve indicar um **Encarregado de Dados (DPO)** e divulgar canal 
 | Mascaramento de PII em logs | `app/utils.py` (mask_email_for_log), `app/routes/auth.py` |
 | Firestore (somente backend) | `firestore.rules`, `app/database.py`                     |
 
-A criptografia Fernet de PII em repouso foi **implementada na Onda 4** (2026-06-23) via `app/services/pii_encryption.py`. O default `ENCRYPT_PII_AT_REST=false` garante zero breaking change; a ativação exige migração prévia dos dados existentes com `scripts/migrar_pii_criptografia.py` e criação do índice Firestore em `email_lookup_hash`. Ver procedimento completo em `docs/ENV.md` e `docs/DEPLOYMENT_PLAN.md`.
+A criptografia Fernet de PII em repouso foi **implementada na Onda 4** (2026-06-23) via `app/services/pii_encryption.py`. O default `ENCRYPT_PII_AT_REST=false` garante zero breaking change; a ativação exige migração prévia dos dados existentes com `scripts/migrations/migrar_pii_criptografia.py` e criação do índice Firestore em `email_lookup_hash`. Ver procedimento completo em `docs/ENV.md` e `docs/DEPLOYMENT_PLAN.md`.

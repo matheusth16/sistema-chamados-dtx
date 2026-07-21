@@ -24,8 +24,8 @@ ORDEM OBRIGATÓRIA antes de --apply em produção:
 Exige ENCRYPT_PII_AT_REST=true e ENCRYPTION_KEY válida no ambiente ao rodar --apply.
 
 Uso:
-  python scripts/migrar_pii_criptografia.py            # dry-run
-  python scripts/migrar_pii_criptografia.py --apply    # executa
+  python scripts/migrations/migrar_pii_criptografia.py            # dry-run
+  python scripts/migrations/migrar_pii_criptografia.py --apply    # executa
 """
 
 from __future__ import annotations
@@ -33,12 +33,12 @@ from __future__ import annotations
 import os
 import sys
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.chdir(ROOT)
 sys.path.insert(0, ROOT)
 
 from app.services.pii_encryption import email_lookup_hash as _pii_email_hash  # noqa: E402
-from scripts._migration_utils import _commit_batch, _iter_collection_paginated  # noqa: E402
+from scripts.migrations._migration_utils import _commit_batch, _iter_collection_paginated  # noqa: E402
 
 _FERNET_PREFIX = "fernet:v1:"
 

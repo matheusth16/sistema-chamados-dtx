@@ -40,7 +40,7 @@ def _make_doc(doc_id: str, data: dict) -> MagicMock:
 
 def test_decide_doc_completo_retorna_none(fernet):
     """Doc com prefix + hash já migrado → None (skip)."""
-    from scripts.migrar_pii_criptografia import _decide_migration_update
+    from scripts.migrations.migrar_pii_criptografia import _decide_migration_update
 
     email_enc = _FERNET_PREFIX + fernet.encrypt(b"user@dtx.aero").decode()
     nome_enc = _FERNET_PREFIX + fernet.encrypt(b"User").decode()
@@ -50,7 +50,7 @@ def test_decide_doc_completo_retorna_none(fernet):
 
 def test_decide_plaintext_sem_hash_encripta_e_hash(fernet):
     """Plaintext + sem hash → dict com email/nome criptografado + hash correto."""
-    from scripts.migrar_pii_criptografia import _decide_migration_update
+    from scripts.migrations.migrar_pii_criptografia import _decide_migration_update
 
     data = {"email": "user@dtx.aero", "nome": "Fulano"}
     result = _decide_migration_update(data, fernet)
@@ -65,7 +65,7 @@ def test_decide_plaintext_sem_hash_encripta_e_hash(fernet):
 
 def test_decide_prefix_sem_hash_apenas_adiciona_hash_sem_reencriptar(fernet):
     """Prefix + sem hash: apenas adiciona email_lookup_hash — não re-criptografa email."""
-    from scripts.migrar_pii_criptografia import _decide_migration_update
+    from scripts.migrations.migrar_pii_criptografia import _decide_migration_update
 
     plain = b"partial@dtx.aero"
     email_enc = _FERNET_PREFIX + fernet.encrypt(plain).decode()
@@ -85,7 +85,7 @@ def test_decide_prefix_sem_hash_apenas_adiciona_hash_sem_reencriptar(fernet):
 
 def test_decide_email_vazio_retorna_none(fernet):
     """Email vazio → None (skip sem atualizar)."""
-    from scripts.migrar_pii_criptografia import _decide_migration_update
+    from scripts.migrations.migrar_pii_criptografia import _decide_migration_update
 
     assert _decide_migration_update({"email": "", "nome": "X"}, fernet) is None
     assert _decide_migration_update({"nome": "X"}, fernet) is None
@@ -107,13 +107,14 @@ def test_migrar_doc_completo_skip(fernet):
     )
     db = MagicMock()
 
-    from scripts.migrar_pii_criptografia import migrar
+    from scripts.migrations.migrar_pii_criptografia import migrar
 
     with (
         patch(
-            "scripts.migrar_pii_criptografia._iter_collection_paginated", return_value=iter([doc])
+            "scripts.migrations.migrar_pii_criptografia._iter_collection_paginated",
+            return_value=iter([doc]),
         ),
-        patch("scripts.migrar_pii_criptografia._commit_batch") as mock_commit,
+        patch("scripts.migrations.migrar_pii_criptografia._commit_batch") as mock_commit,
     ):
         stats = migrar(db, fernet, dry_run=False)
 
@@ -127,13 +128,14 @@ def test_migrar_plaintext_apply_encripta_e_commita(fernet):
     doc = _make_doc("uid2", {"email": "novo@dtx.aero", "nome": "Novo"})
     db = MagicMock()
 
-    from scripts.migrar_pii_criptografia import migrar
+    from scripts.migrations.migrar_pii_criptografia import migrar
 
     with (
         patch(
-            "scripts.migrar_pii_criptografia._iter_collection_paginated", return_value=iter([doc])
+            "scripts.migrations.migrar_pii_criptografia._iter_collection_paginated",
+            return_value=iter([doc]),
         ),
-        patch("scripts.migrar_pii_criptografia._commit_batch") as mock_commit,
+        patch("scripts.migrations.migrar_pii_criptografia._commit_batch") as mock_commit,
     ):
         stats = migrar(db, fernet, dry_run=False)
 
@@ -147,13 +149,14 @@ def test_migrar_dry_run_nao_chama_commit_batch(fernet):
     doc = _make_doc("uid3", {"email": "dry@dtx.aero", "nome": "Dry"})
     db = MagicMock()
 
-    from scripts.migrar_pii_criptografia import migrar
+    from scripts.migrations.migrar_pii_criptografia import migrar
 
     with (
         patch(
-            "scripts.migrar_pii_criptografia._iter_collection_paginated", return_value=iter([doc])
+            "scripts.migrations.migrar_pii_criptografia._iter_collection_paginated",
+            return_value=iter([doc]),
         ),
-        patch("scripts.migrar_pii_criptografia._commit_batch") as mock_commit,
+        patch("scripts.migrations.migrar_pii_criptografia._commit_batch") as mock_commit,
     ):
         stats = migrar(db, fernet, dry_run=True)
 

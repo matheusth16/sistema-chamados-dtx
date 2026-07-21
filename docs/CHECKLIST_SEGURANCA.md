@@ -6,8 +6,8 @@
 | **Versão** | 3.6 |
 | **Data** | 2026-07-06 |
 | **Autor** | DTX Aerospace — Engenharia de Software |
-| **Última auditoria** | 2026-06-23 (**QA manual CWI executado** — 15 PASS / 2 SKIP ops; `scripts/executar_qa_manual_cwi.py`; **Onda 5 Polish**; **Onda 4 Fernet PII**; matriz CWI §20; Ondas 1–5+4 concluídas; **82/82 achados**; gate **52/52**; CWI 2.3 **COMPLETO**) |
-| **Encerramento plano CWI v2** | 2026-06-23 — **encerrado** — ver [`docs/ENCERRAMENTO_PROJETO_CWI.md`](ENCERRAMENTO_PROJETO_CWI.md) (rollout Fernet 2/2 usuários migrados) |
+| **Última auditoria** | 2026-06-23 (**QA manual CWI executado** — 15 PASS / 2 SKIP ops; `scripts/qa/executar_qa_manual_cwi.py`; **Onda 5 Polish**; **Onda 4 Fernet PII**; matriz CWI §20; Ondas 1–5+4 concluídas; **82/82 achados**; gate **52/52**; CWI 2.3 **COMPLETO**) |
+| **Encerramento plano CWI v2** | 2026-06-23 — **encerrado** — ver [`docs/historico/ENCERRAMENTO_PROJETO_CWI.md`](historico/ENCERRAMENTO_PROJETO_CWI.md) (rollout Fernet 2/2 usuários migrados) |
 | **Auditoria de checkboxes 2026-07-06** | Verificação item a item contra o código atual (não só contra a tabela de achados): corrigidas ~30 divergências entre "Status atual: ABERTO" no corpo do documento e "Resolvido" na tabela de achados (F-05, F-34, F-36–38, F-40, F-43, F-44, F-50–53, F-62, F-64–67, F-70–78 — a tabela estava certa, o texto da seção estava desatualizado). Implementados nesta sessão: histórico de ações admin em usuários (`historico_usuario_service.py`), página `/meus-dados` (LGPD — direito de acesso), anonimização sob demanda de usuário desativado, header `Server` neutralizado (`gunicorn.conf.py`), `SECRET_KEY` com validação de comprimento mínimo (32 chars) em produção, log de acesso bem-sucedido a anexo, `rgba()` legado residual removido de `relatorios.css`/`table-filters.css`. Ver detalhe em cada seção abaixo. |
 
 ---
@@ -102,7 +102,7 @@ Este documento deve ser consultado em **duas situações**:
 - [x] **Usuários desativados não conseguem fazer login**
   - Arquivo de referência: `app/models_usuario.py` — campo `ativo`; `app/routes/auth.py:79–83` (bloqueio pré-sessão, sem incrementar lockout); `app/__init__.py:87–90` (`user_loader` invalida sessão ativa ao detectar `ativo=False`)
   - Testes: CT-AUTH-I1 a CT-AUTH-I4 (`tests/test_routes/test_auth.py`); 7 testes de modelo (`tests/test_services/test_models_usuario.py`); 5 testes admin desativar/ativar (`tests/test_routes/test_usuarios.py`)
-  - Migração: `scripts/migrar_usuarios_ativo.py` — dry-run (2026-06-22) identificou 7 docs legados sem campo `ativo`; `--apply` backfilla com `ativo=true`
+  - Migração: `scripts/migrations/migrar_usuarios_ativo.py` — dry-run (2026-06-22) identificou 7 docs legados sem campo `ativo`; `--apply` backfilla com `ativo=true`
   - **Resolvido 2026-06-22 — Onda 2 (desativação de usuários)**
 
 ### 1.4 Algoritmo de hash de senhas — CWI 2.2
@@ -498,7 +498,7 @@ Este documento deve ser consultado em **duas situações**:
 - [ ] **`ENCRYPT_PII_AT_REST` está configurado corretamente em produção**
   - Arquivo de referência: `config.py`, `app/models_usuario.py`, `app/services/pii_encryption.py`
   - Como verificar: Variável de ambiente `ENCRYPT_PII_AT_REST`; verificar se campos são criptografados antes de gravar
-  - **Mecanismo pronto e testado, default `false` deliberado.** Correção 2026-07-06: a Seção 20 (matriz CWI) deste documento afirmava "`ENCRYPT_PII_AT_REST=true` ativo no `.env` dev", o que não bate com `.env.example` (default `false`, comentado). Decisão desta sessão: **não mudar o default** — ativar em produção exige `ENCRYPTION_KEY` definida (fail-fast se ausente) e migração prévia dos usuários existentes (`scripts/migrar_pii_criptografia.py`), então "true" por padrão quebraria qualquer ambiente sem essa preparação. `.env.example` e `docs/ENV.md` agora deixam explícito que é preciso ativar manualmente em produção real seguindo os passos documentados. Esta linha específica da Seção 20 foi corrigida (ver lá).
+  - **Mecanismo pronto e testado, default `false` deliberado.** Correção 2026-07-06: a Seção 20 (matriz CWI) deste documento afirmava "`ENCRYPT_PII_AT_REST=true` ativo no `.env` dev", o que não bate com `.env.example` (default `false`, comentado). Decisão desta sessão: **não mudar o default** — ativar em produção exige `ENCRYPTION_KEY` definida (fail-fast se ausente) e migração prévia dos usuários existentes (`scripts/migrations/migrar_pii_criptografia.py`), então "true" por padrão quebraria qualquer ambiente sem essa preparação. `.env.example` e `docs/ENV.md` agora deixam explícito que é preciso ativar manualmente em produção real seguindo os passos documentados. Esta linha específica da Seção 20 foi corrigida (ver lá).
 
 - [x] **Dados de usuário deletado/desativado são tratados conforme política**
   - Arquivo de referência: `docs/POLITICA_SEGURANCA_LGPD.md`, `app/routes/usuarios.py`
@@ -570,7 +570,7 @@ Este documento deve ser consultado em **duas situações**:
   - **Verificado 2026-07-06**
 
 - [ ] **Scripts de migração já executados não serão re-executados**
-  - Arquivo de referência: `scripts/migrar_*.py`
+  - Arquivo de referência: `scripts/migrations/migrar_*.py`
   - Como verificar: Documentar data de execução em cada script (comentário ou log)
 
 ### 10.3 Verificação pós-deploy
@@ -745,7 +745,7 @@ curl -I http://hml-host/health
 ### 13.1 Proteção contra execução destrutiva acidental
 
 - [x] **Scripts destrutivos têm modo dry-run por padrão — requerem `--apply` (ou equivalente) para executar de fato**
-  - Arquivo de referência: `scripts/atualizar_firebase.py:16,119-130` (F-71), `scripts/atualizar_setores_from_print.py:23,94-105` (F-72)
+  - Arquivo de referência: `scripts/migrations/atualizar_firebase.py:16,119-130` (F-71), `scripts/migrations/atualizar_setores_from_print.py:23,94-105` (F-72)
   - Como verificar: Executar o script sem argumentos — não deve alterar dados, apenas listar o que seria feito
   - **Correção 2026-07-06:** desmarcado apesar de F-71/F-72 já dizerem "Resolvido" na tabela. Conferido: ambos scripts têm `argparse` com `--apply`, dry-run por padrão — **RESOLVIDO**.
 
@@ -914,8 +914,8 @@ curl -I http://hml-host/health
 | **F-50** | **Tautologia em `test_i18n.py:29`: `assert result != "back" or result == "back"` — o teste nunca falha** | `tests/test_i18n.py:29` | **Resolvido** 2026-06-17 — assert corrigido para valor esperado real | S0-01 |
 | **F-51** | **URL E2E `/relatorios` em `test_fluxo_supervisor.py:34,60` — rota real é `/admin/relatorios`** | `tests/e2e/test_fluxo_supervisor.py` | **Resolvido** 2026-06-17 — URLs corrigidas | S0-02 |
 | **F-52** | **URL E2E `/relatorios` em `test_fluxo_admin.py:53` — rota real é `/admin/relatorios`** | `tests/e2e/test_fluxo_admin.py` | **Resolvido** 2026-06-17 — URL corrigida | S0-02 |
-| **F-71** | **`atualizar_firebase.py` apaga coleções inteiras sem dry-run, sem confirmação e sem checar ambiente** | `scripts/atualizar_firebase.py` | **Resolvido** 2026-06-17 — flags `--dry-run` e `--apply`; marcado obsoleto em `scripts/README.md` | S1-07 |
-| **F-72** | **`atualizar_setores_from_print.py` apaga `categorias_setores` sem dry-run nem confirmação** | `scripts/atualizar_setores_from_print.py` | **Resolvido** 2026-06-17 — flags `--dry-run` e `--apply` | S1-08 |
+| **F-71** | **`atualizar_firebase.py` apaga coleções inteiras sem dry-run, sem confirmação e sem checar ambiente** | `scripts/migrations/atualizar_firebase.py` | **Resolvido** 2026-06-17 — flags `--dry-run` e `--apply`; marcado obsoleto em `scripts/README.md` | S1-07 |
+| **F-72** | **`atualizar_setores_from_print.py` apaga `categorias_setores` sem dry-run nem confirmação** | `scripts/migrations/atualizar_setores_from_print.py` | **Resolvido** 2026-06-17 — flags `--dry-run` e `--apply` | S1-08 |
 
 ### Achados de Média Severidade
 
@@ -959,7 +959,7 @@ curl -I http://hml-host/health
 |---|---|---|---|---|
 | F-08 | `docs/SLO.md` healthcheckTimeout divergia da configuração real | `docs/SLO.md` | **Fechado** S4-09 (2026-06-17) |
 | F-09 | `run.py` usa host `localhost` quando não em debug | `run.py:27` | **Fechado** S1-05 (2026-06-17) — host `0.0.0.0` em produção (Docker) com `# nosec B104` |
-| F-10 | `docs/ANALISE_COMPLETA_SISTEMA.md` referencia Firebase Authentication (não implementado) | `docs/ANALISE_COMPLETA_SISTEMA.md` | **Fechado** S5-02 (2026-06-17) — corrigido para Flask-Login |
+| F-10 | `docs/historico/ANALISE_COMPLETA_SISTEMA.md` referencia Firebase Authentication (não implementado) | `docs/historico/ANALISE_COMPLETA_SISTEMA.md` | **Fechado** S5-02 (2026-06-17) — corrigido para Flask-Login |
 | F-11 | `tailwind.min.css` commitado E re-gerado no Dockerfile | `Dockerfile`, `.gitignore` | **Resolvido** 2026-06-18 — adicionado ao `.gitignore`; DEV_SETUP.md documenta `npm run build:css` obrigatório (S4-10) | S4-10 |
 | F-12 | `Usuario.get_all()` sem cache em `visualizar_detalhe_chamado` | `app/routes/dashboard.py:159` | **Resolvido** 2026-06-18 — substituído por `get_static_cached("usuarios_all", ...)` TTL 300s em 2 locais (S4-03) | S4-03 |
 | F-25 | `max_len = 3000` definido mas `nova_descricao` salva sem truncamento no Firestore | `edicao_chamado_service.py:126-129` | **Resolvido** 2026-06-18 — `[:3000]` aplicado após `bleach.clean()` antes de persistir (Onda A) | Onda A |
@@ -986,7 +986,7 @@ curl -I http://hml-host/health
 | **F-70** | **`app/static/dist/` contém bundle SPA não documentado — possivelmente não deveria estar no repositório** | `app/static/dist/` | **Resolvido** 2026-06-17 — `app/static/dist/` adicionado ao `.gitignore` | S0-05 |
 | **F-73** | **`scripts/` sem README explicando qual script usar em cada situação** | `scripts/` | **Resolvido** 2026-06-17 — `scripts/README.md` criado | S5-11 |
 | **F-74** | **Três scripts sobrepostos para seeding de categorias** | `scripts/` | **Resolvido** 2026-06-17 — matriz de scripts documentada em `scripts/README.md` | S5-11 |
-| **F-75** | **Script de migração sem transação — falha parcial deixa dados em estado inconsistente** | `scripts/migrar_*.py` | **Resolvido** 2026-06-18 (hardening completo) — `--apply` obrigatório; default `dry_run=True`; batch writes ≤500 ops em todos os scripts (`migrar_catalogo`, `migrar_chamados`, `migrar_usuarios`, `migrar_gates`, `migrar_grupos_rl`, `migrar_setor_area`); checkpoint JSON por fase em `scripts/.checkpoints/` (no `.gitignore`); paginação `limit/start_after` em `migrar_chamados`, `migrar_usuarios`, `migrar_grupos_rl` (sem OOM); helpers compartilhados em `scripts/_migration_utils.py`; rollback manual documentado em README | Onda C w1/w3 |
+| **F-75** | **Script de migração sem transação — falha parcial deixa dados em estado inconsistente** | `scripts/migrations/migrar_*.py` | **Resolvido** 2026-06-18 (hardening completo) — `--apply` obrigatório; default `dry_run=True`; batch writes ≤500 ops em todos os scripts (`migrar_catalogo`, `migrar_chamados`, `migrar_usuarios`, `migrar_gates`, `migrar_grupos_rl`, `migrar_setor_area`); checkpoint JSON por fase em `scripts/.checkpoints/` (no `.gitignore`); paginação `limit/start_after` em `migrar_chamados`, `migrar_usuarios`, `migrar_grupos_rl` (sem OOM); helpers compartilhados em `scripts/migrations/_migration_utils.py`; rollback manual documentado em README | Onda C w1/w3 |
 | **F-76** | **`python-dotenv` não listado explicitamente como dependência dos scripts** | `requirements*.txt` | **Resolvido** 2026-06-18 — `python-dotenv==1.0.1` em `requirements.txt:33` (Fase 0) | Fase 0 |
 | **F-78** | **`confirmacao-solicitante.md` na raiz do projeto — deveria estar em `docs/plans/`** | `confirmacao-solicitante.md` | **Resolvido** 2026-06-17 — movido para `docs/plans/` | S0-04 |
 | **F-79** | **`TESTES_API.md` aponta para `test_api_contract.py` que não existe no projeto** | `docs/TESTES_API.md` | **Resolvido** 2026-06-17 — doc alinhado com `tests/test_routes/test_api_contract.py` | S5-09 |
@@ -1266,7 +1266,7 @@ Os itens deste checklist mapeiam para o OWASP Top 10 (2021):
 | **CWI 2.3 completo (Fernet/LGPD)** | ✅ **Ativo em produção** (`ENCRYPT_PII_AT_REST=true`, confirmado 2026-07-21) — 100% dos usuários migrados, índice `email_lookup_hash` deployado | — |
 | **CWI + baseline DTX** | ✅ Implementado | Onda 2 (`ativo=false`) implementada |
 
-> **Última execução QA manual:** 2026-06-23 — `python scripts/executar_qa_manual_cwi.py` → 15 PASS, 0 FAIL, 2 SKIP. Evidência: `docs/evidencias/QA_MANUAL_CWI_EVIDENCIA.md`
+> **Última execução QA manual:** 2026-06-23 — `python scripts/qa/executar_qa_manual_cwi.py` → 15 PASS, 0 FAIL, 2 SKIP. Evidência: `docs/evidencias/QA_MANUAL_CWI_EVIDENCIA.md`
 
 ---
 

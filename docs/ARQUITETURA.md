@@ -398,7 +398,7 @@ Validação (validators.py)
 | Persistência | `app/models_categorias.py` → `CategoriaGate` | CRUD admin em `categorias_gates` |
 | Serviço | `app/services/gates_service.py` | Monta dict do formulário e valida valores |
 | Admin | `app/routes/categorias.py` | CRUD de gates com tradução automática |
-| Migração | `scripts/migrar_gates_subetapas.py` | Migração idempotente de dados legados |
+| Migração | `scripts/migrations/migrar_gates_subetapas.py` | Migração idempotente de dados legados |
 
 ### Modelos
 
@@ -442,15 +442,15 @@ Validação (validators.py)
 
 | Script | Propósito |
 |---|---|
-| `scripts/init_categorias.py` | Semente inicial de categorias e setores no Firestore |
-| `scripts/atualizar_firebase.py` | **OBSOLETO/PERIGOSO** — superado por `migrar_setores_catalogo.py` |
+| `scripts/seed/init_categorias.py` | Semente inicial de categorias e setores no Firestore |
+| `scripts/migrations/atualizar_firebase.py` | **OBSOLETO/PERIGOSO** — superado por `migrar_setores_catalogo.py` |
 | `scripts/verificar_dependencias.py` | pip audit + pytest; diagnóstico de ambiente |
-| `scripts/atualizar_setores_from_print.py` | Migração — sem dry-run, usar com cuidado |
-| `scripts/gerar_email_visual_snapshots.py` | QA — gera snapshots HTML de e-mails |
+| `scripts/migrations/atualizar_setores_from_print.py` | Migração — sem dry-run, usar com cuidado |
+| `scripts/qa/gerar_email_visual_snapshots.py` | QA — gera snapshots HTML de e-mails |
 | `scripts/testar_email_smtp.py` | **Legado** — diagnóstico SMTP (substituído por Graph API) |
-| `scripts/migrar_setores_catalogo.py` | Migração completa de setores com dry-run — preferir este |
-| `scripts/migrar_gates_subetapas.py` | Migração idempotente de sub-etapas de gates |
-| `scripts/atualizar_traducoes_setores.py` | Sincroniza traduções de setores/gates no Firestore |
+| `scripts/migrations/migrar_setores_catalogo.py` | Migração completa de setores com dry-run — preferir este |
+| `scripts/migrations/migrar_gates_subetapas.py` | Migração idempotente de sub-etapas de gates |
+| `scripts/migrations/atualizar_traducoes_setores.py` | Sincroniza traduções de setores/gates no Firestore |
 | `scripts/promover_admin_global.py` | Promove usuário existente ao perfil `admin_global` |
 | `scripts/gerar_vapid_keys.py` | Gera par de chaves VAPID para Web Push |
 

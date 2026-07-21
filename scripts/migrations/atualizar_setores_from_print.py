@@ -12,8 +12,8 @@ recria. Por padrão executa em modo DRY-RUN (somente leitura). Use --apply
 para efetuar as alterações reais.
 
 Uso:
-    python scripts/atualizar_setores_from_print.py            # dry-run (seguro)
-    python scripts/atualizar_setores_from_print.py --apply    # grava de verdade
+    python scripts/migrations/atualizar_setores_from_print.py            # dry-run (seguro)
+    python scripts/migrations/atualizar_setores_from_print.py --apply    # grava de verdade
 
 Requer `credentials.json` na raiz do projeto.
 """
@@ -29,7 +29,7 @@ from datetime import datetime
 import firebase_admin
 from firebase_admin import credentials, firestore
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.chdir(ROOT)
 sys.path.insert(0, ROOT)
 

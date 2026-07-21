@@ -18,8 +18,8 @@ def main():
     print("\nPara ativar criptografia dos campos 'nome' e 'email' em usuários (LGPD):")
     print("ENCRYPT_PII_AT_REST=true")
     print("\nDepois rode a migração de dados existentes:")
-    print("  python scripts/migrar_pii_criptografia.py           # dry-run")
-    print("  python scripts/migrar_pii_criptografia.py --apply   # aplica")
+    print("  python scripts/migrations/migrar_pii_criptografia.py           # dry-run")
+    print("  python scripts/migrations/migrar_pii_criptografia.py --apply   # aplica")
 
 
 if __name__ == "__main__":

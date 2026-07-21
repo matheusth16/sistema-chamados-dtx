@@ -14,7 +14,7 @@ Coleções afetadas:
   usuarios           — migra campo `areas` (lista)
 
 NÃO altera nenhuma referência aos subsetores Produção - *
-NÃO executa scripts/atualizar_setores_from_print.py
+NÃO executa scripts/migrations/atualizar_setores_from_print.py
 """
 
 from __future__ import annotations
@@ -24,13 +24,13 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.chdir(ROOT)
 sys.path.insert(0, ROOT)
 
 import firebase_admin  # noqa: E402, I001
 from firebase_admin import credentials, firestore  # noqa: E402
-from scripts._migration_utils import (  # noqa: E402
+from scripts.migrations._migration_utils import (  # noqa: E402
     _commit_batch,
     _iter_collection_paginated,
     _write_checkpoint as _write_checkpoint_util,

@@ -336,11 +336,11 @@ indevido (cliente/browser) caso algo seja mal configurado no futuro.
   ```
 - [ ] **5. Dry-run — confirmar contagem sem alterar dados:**
   ```bash
-  ENCRYPTION_KEY=<chave> python scripts/migrar_pii_criptografia.py
+  ENCRYPTION_KEY=<chave> python scripts/migrations/migrar_pii_criptografia.py
   ```
 - [ ] **6. Aplicar migração** (app pode continuar rodando durante a migração; dual-read garante compatibilidade):
   ```bash
-  ENCRYPT_PII_AT_REST=true ENCRYPTION_KEY=<chave> python scripts/migrar_pii_criptografia.py --apply
+  ENCRYPT_PII_AT_REST=true ENCRYPTION_KEY=<chave> python scripts/migrations/migrar_pii_criptografia.py --apply
   ```
 - [ ] **7. Smoke test** — tentar login com um usuário migrado. Se falhar, verificar se `ENCRYPTION_KEY` do `--apply` é igual à configurada no servidor.
 - [ ] **8. Ativar flag e reiniciar** — somente após 100% dos docs migrados:
@@ -366,10 +366,10 @@ Firestore como fonte de verdade. Sem o documento, a app usa o fallback estático
 
 ```bash
 # Dry-run (seguro — só exibe o payload, não grava nada)
-python scripts/migrar_setor_area.py
+python scripts/migrations/migrar_setor_area.py
 
 # Gravar config/setor_para_area no Firestore (executar uma vez após o deploy)
-python scripts/migrar_setor_area.py --apply
+python scripts/migrations/migrar_setor_area.py --apply
 ```
 
 **Ordem recomendada:** pode rodar antes ou depois do `docker compose up`; o fallback estático cobre os primeiros requests se o documento ainda não existir.

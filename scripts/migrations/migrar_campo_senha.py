@@ -6,14 +6,14 @@ Adiciona os campos:
 - must_change_password: False (assumido que já trocaram a senha)
 - password_changed_at: None
 
-Uso: python scripts/migrar_campo_senha.py (a partir da raiz do projeto)
+Uso: python scripts/migrations/migrar_campo_senha.py (a partir da raiz do projeto)
 """
 
 import os
 import sys
 
-# Adiciona a raiz do projeto ao path (script está em scripts/)
-_raiz = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# Adiciona a raiz do projeto ao path (script está em scripts/migrations/)
+_raiz = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, _raiz)
 
 from app.database import db  # noqa: E402

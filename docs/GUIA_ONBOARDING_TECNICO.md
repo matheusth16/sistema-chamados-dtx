@@ -43,7 +43,7 @@
 
 O Sistema de Chamados DTX Aerospace é uma aplicação web interna que gerencia solicitações entre colaboradores da empresa. Um **solicitante** abre um chamado descrevendo uma demanda, um **supervisor** da área responsável assume e processa o chamado, e um **administrador** tem visão completa de tudo, incluindo relatórios e gestão de usuários.
 
-> **Baseline de qualidade (2026-06-22 — Onda 4 concluída):** 1435 testes passando, cobertura global 94,98% (gate: 85%), zero achados de Alta severidade abertos, 82/82 achados resolvidos. Gate por módulo: `python scripts/check_coverage_per_module.py` — 52/52 módulos OK, 0 pendentes. Ver `docs/PLANO_SPRINT.md` e `docs/RELATORIO_EXECUTIVO.md`.
+> **Baseline de qualidade (2026-06-22 — Onda 4 concluída):** 1435 testes passando, cobertura global 94,98% (gate: 85%), zero achados de Alta severidade abertos, 82/82 achados resolvidos. Gate por módulo: `python scripts/check_coverage_per_module.py` — 52/52 módulos OK, 0 pendentes. Ver `docs/PLANO_SPRINT.md` e `docs/historico/RELATORIO_EXECUTIVO.md`.
 
 ### Quem usa
 
@@ -208,7 +208,7 @@ A aplicação estará disponível em `http://localhost:5000`.
 Use o script para criar o primeiro usuário admin:
 
 ```bash
-python scripts/criar_usuario.py
+python scripts/seed/criar_usuario.py
 ```
 
 Siga as instruções interativas para definir e-mail, senha e perfil `admin`.
@@ -216,7 +216,7 @@ Siga as instruções interativas para definir e-mail, senha e perfil `admin`.
 ### 3.9 Inicializar categorias (se banco vazio)
 
 ```bash
-python scripts/init_categorias.py
+python scripts/seed/init_categorias.py
 ```
 
 Isso popula as categorias, setores, gates e impactos padrão no Firestore.
@@ -417,17 +417,17 @@ sistema_chamados/
 
 | Script | Tipo | Uso |
 |---|---|---|
-| `scripts/criar_usuario.py` | Setup | Criação interativa de usuário inicial |
-| `scripts/init_categorias.py` | Setup | Inicialização de categorias, setores, gates e impactos padrão |
-| `scripts/atualizar_traducoes_setores.py` | Migração | Atualiza traduções de setores no Firestore |
+| `scripts/seed/criar_usuario.py` | Setup | Criação interativa de usuário inicial |
+| `scripts/seed/init_categorias.py` | Setup | Inicialização de categorias, setores, gates e impactos padrão |
+| `scripts/migrations/atualizar_traducoes_setores.py` | Migração | Atualiza traduções de setores no Firestore |
 | `scripts/gerar_vapid_keys.py` | Setup | Gera par de chaves VAPID para Web Push |
-| `scripts/atualizar_firebase.py` | Migração — **OBSOLETO/PERIGOSO** | Sobreescrito por `migrar_setores_catalogo.py`; apaga sem dry-run |
+| `scripts/migrations/atualizar_firebase.py` | Migração — **OBSOLETO/PERIGOSO** | Sobreescrito por `migrar_setores_catalogo.py`; apaga sem dry-run |
 | `scripts/verificar_dependencias.py` | Dev | pip audit + pytest; seguro |
-| `scripts/atualizar_setores_from_print.py` | Migração — **PERIGOSO** | 15 setores; sem dry-run |
-| `scripts/gerar_email_visual_snapshots.py` | QA/Dev | Snapshots HTML de e-mails; não envia e-mail real |
+| `scripts/migrations/atualizar_setores_from_print.py` | Migração — **PERIGOSO** | 15 setores; sem dry-run |
+| `scripts/qa/gerar_email_visual_snapshots.py` | QA/Dev | Snapshots HTML de e-mails; não envia e-mail real |
 | `scripts/testar_email_smtp.py` | Diagnóstico | Envia e-mail SMTP real de teste |
-| `scripts/migrar_setores_catalogo.py` | Migração | 3 coleções; tem dry-run — **preferir este** |
-| `scripts/migrar_gates_subetapas.py` | Migração | Idempotente; não apaga dados |
+| `scripts/migrations/migrar_setores_catalogo.py` | Migração | 3 coleções; tem dry-run — **preferir este** |
+| `scripts/migrations/migrar_gates_subetapas.py` | Migração | Idempotente; não apaga dados |
 
 ---
 
@@ -1012,7 +1012,7 @@ const msg = window.DTX_MSGS?.minha_chave || 'Texto fallback';
 Se a tradução for de categorias ou setores armazenados no Firestore, use o script:
 
 ```bash
-python scripts/atualizar_traducoes_setores.py
+python scripts/migrations/atualizar_traducoes_setores.py
 ```
 
 ---
@@ -1177,7 +1177,7 @@ O diretório `app/static/dist/` contém um bundle SPA experimental que não é u
 
 ### Armadilha 10 — Scripts destrutivos sem proteção (F-71/72) ✅ Resolvido 2026-06-17
 
-`scripts/atualizar_firebase.py` e `scripts/atualizar_setores_from_print.py` agora exigem `--apply` para executar alterações destrutivas; o padrão é `--dry-run`. O primeiro script é **obsoleto** — preferir `scripts/migrar_setores_catalogo.py`. Consulte `scripts/README.md` para a matriz completa de scripts.
+`scripts/migrations/atualizar_firebase.py` e `scripts/migrations/atualizar_setores_from_print.py` agora exigem `--apply` para executar alterações destrutivas; o padrão é `--dry-run`. O primeiro script é **obsoleto** — preferir `scripts/migrations/migrar_setores_catalogo.py`. Consulte `scripts/README.md` para a matriz completa de scripts.
 
 ### Armadilha 11 — APScheduler em multi-worker: patch por job, não por scheduler
 
@@ -1370,7 +1370,7 @@ R: Deixe `GRAPH_TENANT_ID`, `GRAPH_CLIENT_ID`, `GRAPH_CLIENT_SECRET` e `GRAPH_SE
 R: Não para coleções grandes. Sempre use paginação com `.limit()` e `.start_after()`. Ver `app/services/chamados_listagem_service.py` como exemplo.
 
 **P: Como reseto a senha de um usuário?**
-R: Via painel de admin em `/admin/usuarios`, ou via script: `python scripts/criar_usuario.py --reset-senha`.
+R: Via painel de admin em `/admin/usuarios`, ou via script: `python scripts/seed/criar_usuario.py --reset-senha`.
 
 **P: Qual é a diferença entre `@requer_solicitante` e `login_required`?**
 R: `@requer_solicitante` inclui `login_required` mais verifica se o usuário está ativo e se não precisa trocar a senha. Sempre use os decoradores do projeto, não o do Flask-Login diretamente.
@@ -1382,7 +1382,7 @@ R: Adicione a chave de idioma em `app/translations.json`, registre o idioma em `
 R: Grupo de Revisão e Liberação — estrutura hierárquica de aprovação para determinadas categorias de chamado. Configurado via painel admin em `/admin-categorias`.
 
 **P: Como crio um superusuário para o ambiente de desenvolvimento?**
-R: Use `python scripts/criar_usuario.py` e defina o perfil como `admin`. Para testar funcionalidades exclusivas de governança, defina o perfil como `admin_global`. Em desenvolvimento, você pode criar quantos usuários precisar. Só existe um `admin_global` por instância (restrição por design).
+R: Use `python scripts/seed/criar_usuario.py` e defina o perfil como `admin`. Para testar funcionalidades exclusivas de governança, defina o perfil como `admin_global`. Em desenvolvimento, você pode criar quantos usuários precisar. Só existe um `admin_global` por instância (restrição por design).
 
 **P: O que é `ENCRYPT_PII_AT_REST`?**
 R: Flag que ativa a criptografia de campos sensíveis (nome, e-mail, telefone) no Firestore usando a chave `ENCRYPTION_KEY`. Em desenvolvimento, deixe `false`. Em produção, consulte `docs/ENV.md` para o procedimento correto de ativação.
@@ -1409,7 +1409,7 @@ R: Resolvido em 2026-06-18 (S4-02). `GamificationService.resetar_ranking_semanal
 R: Execute `firebase deploy --only firestore:indexes`. O arquivo `firestore.indexes.json` define os índices compostos. Sobre F-82 (resolvido): o filtro do dashboard por responsável usa o campo **`responsavel`** (nome), conforme `app/services/filters.py` (`FieldFilter("responsavel", "==", ...)`), portanto os índices sobre `responsavel` estão corretos. O campo `responsavel_id` (UID) também existe, mas é usado para agrupamento/atribuição e notificações, não para esse filtro.
 
 **P: Quais scripts de migração posso rodar com segurança?**
-R: `scripts/migrar_setores_catalogo.py` (tem `--dry-run`), `scripts/migrar_gates_subetapas.py` (idempotente) e `scripts/verificar_dependencias.py` (apenas leitura). Evite `scripts/atualizar_firebase.py` (obsoleto, apaga sem dry-run) e `scripts/atualizar_setores_from_print.py` (sem dry-run). Ver tabela de scripts na seção 5.
+R: `scripts/migrations/migrar_setores_catalogo.py` (tem `--dry-run`), `scripts/migrations/migrar_gates_subetapas.py` (idempotente) e `scripts/verificar_dependencias.py` (apenas leitura). Evite `scripts/migrations/atualizar_firebase.py` (obsoleto, apaga sem dry-run) e `scripts/migrations/atualizar_setores_from_print.py` (sem dry-run). Ver tabela de scripts na seção 5.
 
 ---
 

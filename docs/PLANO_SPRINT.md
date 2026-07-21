@@ -1036,7 +1036,7 @@ Também corrigir:
 
 ---
 
-### Tarefa S5-02 — Corrigir `docs/ANALISE_COMPLETA_SISTEMA.md` (P2)
+### Tarefa S5-02 — Corrigir `docs/historico/ANALISE_COMPLETA_SISTEMA.md` (P2)
 
 **Achados relacionados:** F-35, F-42
 **Esforço:** M (meio dia)
@@ -1219,7 +1219,7 @@ Adicionar ao README de scripts:
 | S4.5-03 | Substituir `rgba()` por `rgb(r g b / a)` em `relatorios.css` (F-66) | P2 | XS | `app/static/css/relatorios.css` | 4.5 | **Concluído 2026-06-17** |
 | S4.5-04 | Remover tokens locais `--dash-*`/`--reports-*` (F-65) | P2 | S | `dashboard.css`, `relatorios.css` | 4.5 | **Concluído 2026-06-17** |
 | S5-01 | Reescrever INCIDENT_RUNBOOK.md para Docker (F-39, F-40) | P1 | M | `docs/INCIDENT_RUNBOOK.md` | 5 | **Concluído 2026-06-17** |
-| S5-02 | Corrigir ANALISE_COMPLETA_SISTEMA.md (F-35, F-42) | P2 | M | `docs/ANALISE_COMPLETA_SISTEMA.md` | 5 | **Concluído 2026-06-17** |
+| S5-02 | Corrigir ANALISE_COMPLETA_SISTEMA.md (F-35, F-42) | P2 | M | `docs/historico/ANALISE_COMPLETA_SISTEMA.md` | 5 | **Concluído 2026-06-17** |
 | S5-03 | Atualizar ENV.md (F-45) | P2 | S | `docs/ENV.md` | 5 | **Concluído 2026-06-17** |
 | S5-04 | Adicionar Node.js ao DEV_SETUP.md (F-49) | P2 | XS | `docs/DEV_SETUP.md` | 5 | **Concluído 2026-06-17** |
 | S5-05 | Corrigir inconsistência API.md (F-47) | P3 | XS | `docs/API.md` | 5 | **Concluído 2026-06-17** |

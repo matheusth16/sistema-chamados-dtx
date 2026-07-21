@@ -48,7 +48,7 @@ jobs:
           k6 run \
             -e BASE_URL=$BASE_URL \
             --out json=k6-results.json \
-            scripts/k6/smoke.js
+            scripts/qa/k6/smoke.js
 
       - name: Run stress test
         if: inputs.test_type == 'stress'
@@ -56,7 +56,7 @@ jobs:
           k6 run \
             -e BASE_URL=$BASE_URL \
             --out json=k6-results.json \
-            scripts/k6/stress.js
+            scripts/qa/k6/stress.js
 
       - name: Upload k6 results
         if: always()

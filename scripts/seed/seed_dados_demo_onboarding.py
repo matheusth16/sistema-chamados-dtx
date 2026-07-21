@@ -7,15 +7,15 @@ fake com status variados, para que as telas capturadas pelo Playwright
 de usuários/chamados da DTX.
 
 Uso:
-    python scripts/seed_dados_demo_onboarding.py            # cria/atualiza os dados demo
-    python scripts/seed_dados_demo_onboarding.py --limpar   # remove os dados demo
+    python scripts/seed/seed_dados_demo_onboarding.py            # cria/atualiza os dados demo
+    python scripts/seed/seed_dados_demo_onboarding.py --limpar   # remove os dados demo
 """
 
 import argparse
 import os
 import sys
 
-_raiz = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_raiz = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, _raiz)
 
 from app.database import db  # noqa: E402

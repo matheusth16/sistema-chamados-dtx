@@ -27,7 +27,7 @@ from pathlib import Path
 
 def main() -> None:
     # Garante que a raiz do projeto esteja no sys.path (para importar `app`).
-    root = Path(__file__).resolve().parent.parent
+    root = Path(__file__).resolve().parent.parent.parent
     root_str = str(root)
     if root_str not in sys.path:
         sys.path.insert(0, root_str)

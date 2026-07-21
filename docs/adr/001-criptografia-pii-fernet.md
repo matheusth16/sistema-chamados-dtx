@@ -106,10 +106,10 @@ python scripts/gerar_chave_criptografia.py
 #    OU Firebase Console > Firestore > Indexes > Single field: email_lookup_hash (ASC)
 
 # 3. Dry-run (lista documentos a migrar, sem alterar)
-python scripts/migrar_pii_criptografia.py
+python scripts/migrations/migrar_pii_criptografia.py
 
 # 4. Aplicar migração (app pode estar rodando; dual-read garante compatibilidade)
-ENCRYPT_PII_AT_REST=true ENCRYPTION_KEY=<chave> python scripts/migrar_pii_criptografia.py --apply
+ENCRYPT_PII_AT_REST=true ENCRYPTION_KEY=<chave> python scripts/migrations/migrar_pii_criptografia.py --apply
 
 # 5. Smoke test: tentar login com usuário migrado
 

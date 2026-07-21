@@ -126,7 +126,7 @@ Implementar a **Onda 6 — Escalonamento Multi-setor e SLA Gerencial** com os se
 |---|---|
 | Índices Firestore para query owner+fila | Atualizar `firestore.indexes.json` na Fase 2; ver `docs/INDICES_FIRESTORE.md` |
 | Jobs paralelos sem Redis | `scheduler_lock.py` (ADR-003); deploy DTX com 1 worker |
-| `setores_adicionais` legado | Script `scripts/migrar_participantes.py` + `from_dict` dual-read retrocompatível |
+| `setores_adicionais` legado | Script `scripts/migrations/migrar_participantes.py` + `from_dict` dual-read retrocompatível |
 | Spam de e-mail por job repetido | Flags `*_enviado_em` por nível; `pode_enviar_notificacao_agora()` no job |
 | Chamado órfão pós-transferência | Update atômico Firestore + teste de regressão anti-órfão (Fase 3) |
 | Firestore sem OR entre campos distintos (query dashboard) | Campo desnormalizado `supervisor_ids_com_acesso` + `array_contains`; update atômico em toda mutação de owner/participante |

@@ -40,7 +40,7 @@ def _make_mock_db(*docs) -> tuple[MagicMock, MagicMock]:
 
 
 def test_migrar_chamados_dry_run_nao_grava():
-    from scripts.migrar_setores_catalogo import migrar_chamados
+    from scripts.migrations.migrar_setores_catalogo import migrar_chamados
 
     doc = _make_doc({"area": "PPCP", "setores_adicionais": None})
     db, _batch = _make_mock_db(doc)
@@ -52,7 +52,7 @@ def test_migrar_chamados_dry_run_nao_grava():
 
 
 def test_migrar_usuarios_dry_run_nao_grava():
-    from scripts.migrar_setores_catalogo import migrar_usuarios
+    from scripts.migrations.migrar_setores_catalogo import migrar_usuarios
 
     doc = _make_doc({"areas": ["PPCP", "Logistica"], "email": "a@b.com"})
     db, _batch = _make_mock_db(doc)
@@ -70,7 +70,7 @@ def test_migrar_usuarios_dry_run_nao_grava():
 
 def test_migrar_chamados_apply_usa_batch_e_nao_update_direto():
     """Apply mode: batch.update + batch.commit, NÃO doc.reference.update."""
-    from scripts.migrar_setores_catalogo import migrar_chamados
+    from scripts.migrations.migrar_setores_catalogo import migrar_chamados
 
     doc = _make_doc({"area": "PPCP", "setores_adicionais": None})
     db, batch = _make_mock_db(doc)
@@ -83,7 +83,7 @@ def test_migrar_chamados_apply_usa_batch_e_nao_update_direto():
 
 def test_migrar_usuarios_apply_usa_batch_e_nao_update_direto():
     """Apply mode: batch.update + batch.commit, NÃO doc.reference.update."""
-    from scripts.migrar_setores_catalogo import migrar_usuarios
+    from scripts.migrations.migrar_setores_catalogo import migrar_usuarios
 
     doc = _make_doc({"areas": ["PPCP", "Logistica"], "email": "a@b.com"})
     db, batch = _make_mock_db(doc)
@@ -96,7 +96,7 @@ def test_migrar_usuarios_apply_usa_batch_e_nao_update_direto():
 
 def test_migrar_chamados_apply_batch_update_chamado_correto():
     """Batch deve incluir atualização do campo area renomeado."""
-    from scripts.migrar_setores_catalogo import migrar_chamados
+    from scripts.migrations.migrar_setores_catalogo import migrar_chamados
 
     doc = _make_doc({"area": "Procurement", "setores_adicionais": None})
     db, batch = _make_mock_db(doc)
@@ -113,7 +113,7 @@ def test_migrar_chamados_apply_batch_update_chamado_correto():
 
 def test_migrar_gates_dry_run_nao_chama_save():
     """migrar(dry_run=True) não chama gate.save() em nenhum gate novo."""
-    import scripts.migrar_gates_subetapas as m
+    import scripts.migrations.migrar_gates_subetapas as m
 
     gate_inst = MagicMock()
     with patch.object(m, "CategoriaGate") as mock_gate_cls:
@@ -127,7 +127,7 @@ def test_migrar_gates_dry_run_nao_chama_save():
 
 def test_migrar_gates_apply_usa_batch():
     """migrar(dry_run=False) usa batch.commit, NÃO gate.save()."""
-    import scripts.migrar_gates_subetapas as m
+    import scripts.migrations.migrar_gates_subetapas as m
 
     gate_inst = MagicMock()
     gate_inst.to_dict.return_value = {"nome_pt": "Gate Test"}
@@ -146,7 +146,7 @@ def test_migrar_gates_apply_usa_batch():
 
 def test_migrar_gates_ja_existente_nao_duplica():
     """Gate com mesmo nome_pt existente não é criado novamente."""
-    import scripts.migrar_gates_subetapas as m
+    import scripts.migrations.migrar_gates_subetapas as m
     from app.gates_config import GATE_SUBETAPAS
 
     primeiro_pai = next(iter(GATE_SUBETAPAS))
@@ -201,7 +201,7 @@ def test_migrar_grupos_rl_dry_run_nao_grava():
     mock_grupo = MagicMock()
     mock_grupo.id = "grupo-1"
 
-    import scripts.migrar_grupos_rl as m
+    import scripts.migrations.migrar_grupos_rl as m
 
     with (
         patch.object(m, "db", mock_db),
@@ -239,7 +239,7 @@ def test_migrar_grupos_rl_apply_atualiza_chamado():
     mock_grupo = MagicMock()
     mock_grupo.id = "grupo-2"
 
-    import scripts.migrar_grupos_rl as m
+    import scripts.migrations.migrar_grupos_rl as m
 
     with (
         patch.object(m, "db", mock_db),
@@ -268,7 +268,7 @@ def test_migrar_grupos_rl_ignora_sem_rl_codigo():
     mock_db = MagicMock()
     mock_db.collection.return_value = mock_chamados_ref
 
-    import scripts.migrar_grupos_rl as m
+    import scripts.migrations.migrar_grupos_rl as m
 
     with (
         patch.object(m, "db", mock_db),
@@ -287,7 +287,7 @@ def test_migrar_grupos_rl_ignora_sem_rl_codigo():
 
 def test_migrar_gates_default_eh_dry_run():
     """migrar() sem argumento explícito NÃO deve chamar gate.save()."""
-    import scripts.migrar_gates_subetapas as m
+    import scripts.migrations.migrar_gates_subetapas as m
 
     gate_inst = MagicMock()
     with patch.object(m, "CategoriaGate") as mock_gate_cls:
@@ -322,7 +322,7 @@ def test_migrar_grupos_rl_default_eh_dry_run():
     mock_grupo = MagicMock()
     mock_grupo.id = "grupo-z"
 
-    import scripts.migrar_grupos_rl as m
+    import scripts.migrations.migrar_grupos_rl as m
 
     with (
         patch.object(m, "db", mock_db),
@@ -342,7 +342,7 @@ def test_migrar_grupos_rl_default_eh_dry_run():
 
 def test_migrar_chamados_apply_escreve_checkpoint(tmp_path):
     """Apply mode: arquivo JSON de checkpoint é criado após migrar_chamados."""
-    from scripts.migrar_setores_catalogo import migrar_chamados
+    from scripts.migrations.migrar_setores_catalogo import migrar_chamados
 
     doc = _make_doc({"area": "PPCP", "setores_adicionais": None})
     db, batch = _make_mock_db(doc)
@@ -359,7 +359,7 @@ def test_migrar_chamados_apply_escreve_checkpoint(tmp_path):
 
 def test_migrar_chamados_dry_run_com_checkpoint_dir_nao_cria_arquivo(tmp_path):
     """Dry-run: mesmo com checkpoint_dir fornecido, nenhum JSON é criado."""
-    from scripts.migrar_setores_catalogo import migrar_chamados
+    from scripts.migrations.migrar_setores_catalogo import migrar_chamados
 
     doc = _make_doc({"area": "PPCP", "setores_adicionais": None})
     db, _batch = _make_mock_db(doc)
@@ -371,7 +371,7 @@ def test_migrar_chamados_dry_run_com_checkpoint_dir_nao_cria_arquivo(tmp_path):
 
 def test_migrar_usuarios_apply_escreve_checkpoint(tmp_path):
     """Apply mode: arquivo JSON de checkpoint é criado após migrar_usuarios."""
-    from scripts.migrar_setores_catalogo import migrar_usuarios
+    from scripts.migrations.migrar_setores_catalogo import migrar_usuarios
 
     doc = _make_doc({"areas": ["Logistica"], "email": "a@b.com"})
     db, batch = _make_mock_db(doc)
@@ -387,7 +387,7 @@ def test_migrar_usuarios_apply_escreve_checkpoint(tmp_path):
 
 def test_migrar_usuarios_dry_run_com_checkpoint_dir_nao_cria_arquivo(tmp_path):
     """Dry-run: mesmo com checkpoint_dir fornecido, nenhum JSON é criado."""
-    from scripts.migrar_setores_catalogo import migrar_usuarios
+    from scripts.migrations.migrar_setores_catalogo import migrar_usuarios
 
     doc = _make_doc({"areas": ["Logistica"], "email": "a@b.com"})
     db, _batch = _make_mock_db(doc)
@@ -399,7 +399,7 @@ def test_migrar_usuarios_dry_run_com_checkpoint_dir_nao_cria_arquivo(tmp_path):
 
 def test_migrar_catalogo_apply_escreve_checkpoint(tmp_path):
     """Apply mode: arquivo JSON de checkpoint é criado após migrar_catalogo."""
-    from scripts.migrar_setores_catalogo import migrar_catalogo
+    from scripts.migrations.migrar_setores_catalogo import migrar_catalogo
 
     # Setor sem rename/desativar necessário → sem chamada a translation_service
     doc = _make_doc({"nome_pt": "TI", "ativo": True})
@@ -422,7 +422,7 @@ def test_migrar_catalogo_apply_escreve_checkpoint(tmp_path):
 
 def test_migrar_chamados_501_docs_usa_dois_batch_commits():
     """Com 501 docs a alterar, _commit_batch deve usar exatamente 2 commits."""
-    from scripts.migrar_setores_catalogo import migrar_chamados
+    from scripts.migrations.migrar_setores_catalogo import migrar_chamados
 
     docs = [_make_doc({"area": "PPCP", "setores_adicionais": None}) for _ in range(501)]
     batch1, batch2 = MagicMock(), MagicMock()
@@ -448,7 +448,7 @@ def test_migrar_chamados_501_docs_usa_dois_batch_commits():
 
 def test_migrar_catalogo_apply_usa_batch_nao_update_direto():
     """Apply: RENAME usa batch.update, nunca doc.reference.update direto."""
-    from scripts.migrar_setores_catalogo import migrar_catalogo
+    from scripts.migrations.migrar_setores_catalogo import migrar_catalogo
 
     doc1 = _make_doc({"nome_pt": "PPCP", "ativo": True})
     doc2 = _make_doc({"nome_pt": "Logistica", "ativo": True})
@@ -458,7 +458,7 @@ def test_migrar_catalogo_apply_usa_batch_nao_update_direto():
     db.batch.return_value = batch
 
     with patch(
-        "scripts.migrar_setores_catalogo._rename_nome_en_es",
+        "scripts.migrations.migrar_setores_catalogo._rename_nome_en_es",
         return_value={"nome_en": "x", "nome_es": "y"},
     ):
         migrar_catalogo(db, dry_run=False)
@@ -470,7 +470,7 @@ def test_migrar_catalogo_apply_usa_batch_nao_update_direto():
 
 def test_migrar_catalogo_apply_desativar_usa_batch():
     """Apply: DESATIVAR usa batch.update, nunca doc.reference.update direto."""
-    from scripts.migrar_setores_catalogo import migrar_catalogo
+    from scripts.migrations.migrar_setores_catalogo import migrar_catalogo
 
     doc = _make_doc({"nome_pt": "Produção - Usinagem", "ativo": True})
     batch = MagicMock()
@@ -491,7 +491,7 @@ def test_migrar_catalogo_apply_desativar_usa_batch():
 
 def test_migrar_gates_apply_usa_batch_set_nao_save():
     """Apply: batch.commit chamado via db.batch(), gate.save() NÃO chamado."""
-    import scripts.migrar_gates_subetapas as m
+    import scripts.migrations.migrar_gates_subetapas as m
 
     gate_inst = MagicMock()
     gate_inst.to_dict.return_value = {"nome_pt": "Test Gate", "ativo": True}
@@ -510,7 +510,7 @@ def test_migrar_gates_apply_usa_batch_set_nao_save():
 
 def test_migrar_gates_apply_escreve_checkpoint(tmp_path):
     """Apply com checkpoint_dir: arquivo JSON de checkpoint é criado."""
-    import scripts.migrar_gates_subetapas as m
+    import scripts.migrations.migrar_gates_subetapas as m
 
     gate_inst = MagicMock()
     gate_inst.to_dict.return_value = {"nome_pt": "Test Gate"}
@@ -532,7 +532,7 @@ def test_migrar_gates_apply_escreve_checkpoint(tmp_path):
 
 def test_migrar_gates_dry_run_nao_escreve_checkpoint(tmp_path):
     """Dry-run: nenhum checkpoint criado mesmo com checkpoint_dir fornecido."""
-    import scripts.migrar_gates_subetapas as m
+    import scripts.migrations.migrar_gates_subetapas as m
 
     gate_inst = MagicMock()
     mock_db = MagicMock()
@@ -587,7 +587,7 @@ def test_migrar_grupos_rl_apply_usa_batch_nao_update_loop():
     mock_grupo = MagicMock()
     mock_grupo.id = "g1"
 
-    import scripts.migrar_grupos_rl as m
+    import scripts.migrations.migrar_grupos_rl as m
 
     with patch.object(m, "db", mock_db), patch.object(m, "GrupoRL") as mock_rl:
         mock_rl.get_or_create.return_value = mock_grupo
@@ -624,7 +624,7 @@ def test_migrar_grupos_rl_apply_escreve_checkpoint(tmp_path):
     mock_grupo = MagicMock()
     mock_grupo.id = "g1"
 
-    import scripts.migrar_grupos_rl as m
+    import scripts.migrations.migrar_grupos_rl as m
 
     with patch.object(m, "db", mock_db), patch.object(m, "GrupoRL") as mock_rl:
         mock_rl.get_or_create.return_value = mock_grupo
@@ -650,7 +650,7 @@ def test_migrar_grupos_rl_dry_run_nao_escreve_checkpoint(tmp_path):
     mock_db = MagicMock()
     mock_db.collection.return_value = mock_chamados_ref
 
-    import scripts.migrar_grupos_rl as m
+    import scripts.migrations.migrar_grupos_rl as m
 
     with patch.object(m, "db", mock_db), patch.object(m, "GrupoRL") as mock_rl:
         mock_rl.get_or_create.return_value = MagicMock()
@@ -671,7 +671,7 @@ def test_migrar_grupos_rl_dry_run_nao_escreve_checkpoint(tmp_path):
 
 def test_migrar_setor_area_dry_run_nao_grava():
     """Dry-run: nenhuma escrita no Firestore (ref.set não chamado)."""
-    from scripts.migrar_setor_area import executar
+    from scripts.migrations.migrar_setor_area import executar
 
     mock_db = MagicMock()
     resultado = executar(mock_db, dry_run=True)
@@ -684,7 +684,7 @@ def test_migrar_setor_area_dry_run_nao_grava():
 
 def test_migrar_setor_area_apply_grava_mapa(tmp_path):
     """Apply: grava doc config/setor_para_area com campo mapa correto."""
-    from scripts.migrar_setor_area import MAPA_INICIAL, executar
+    from scripts.migrations.migrar_setor_area import MAPA_INICIAL, executar
 
     mock_ref = MagicMock()
     mock_db = MagicMock()
@@ -701,7 +701,7 @@ def test_migrar_setor_area_apply_grava_mapa(tmp_path):
 
 def test_migrar_setor_area_apply_escreve_checkpoint(tmp_path):
     """Apply: checkpoint JSON é criado após gravação."""
-    from scripts.migrar_setor_area import executar
+    from scripts.migrations.migrar_setor_area import executar
 
     mock_db = MagicMock()
     executar(mock_db, dry_run=False, checkpoint_dir=tmp_path)
@@ -716,7 +716,7 @@ def test_migrar_setor_area_apply_escreve_checkpoint(tmp_path):
 
 def test_migrar_setor_area_dry_run_nao_escreve_checkpoint(tmp_path):
     """Dry-run: nenhum checkpoint criado mesmo com checkpoint_dir fornecido."""
-    from scripts.migrar_setor_area import executar
+    from scripts.migrations.migrar_setor_area import executar
 
     mock_db = MagicMock()
     executar(mock_db, dry_run=True, checkpoint_dir=tmp_path)
@@ -729,7 +729,7 @@ def test_migrar_setor_area_dry_run_nao_escreve_checkpoint(tmp_path):
 
 def test_iter_collection_paginated_1200_docs():
     """1200 docs em páginas de 500: limit(500) chamado ≥3×, total 1200 docs."""
-    from scripts._migration_utils import _iter_collection_paginated
+    from scripts.migrations._migration_utils import _iter_collection_paginated
 
     page1 = [MagicMock() for _ in range(500)]
     page2 = [MagicMock() for _ in range(500)]
@@ -781,7 +781,7 @@ def _make_mock_db_with_users(chamado_docs, usuario_docs):
 
 def test_migrar_supervisor_ids_dry_run_nao_grava():
     """--dry-run não deve gravar nenhum dado no Firestore."""
-    from scripts.migrar_supervisor_ids_com_acesso import migrar_supervisor_ids
+    from scripts.migrations.migrar_supervisor_ids_com_acesso import migrar_supervisor_ids
 
     sup_doc = _make_doc({"perfil": "supervisor", "areas": ["Engenharia"]})
     sup_doc.id = "id_julia"
@@ -799,7 +799,7 @@ def test_migrar_supervisor_ids_dry_run_nao_grava():
 
 def test_migrar_supervisor_ids_apply_grava_ids():
     """--apply deve gravar supervisor_ids_com_acesso usando batch.update."""
-    from scripts.migrar_supervisor_ids_com_acesso import migrar_supervisor_ids
+    from scripts.migrations.migrar_supervisor_ids_com_acesso import migrar_supervisor_ids
 
     sup_doc = _make_doc({"perfil": "supervisor", "areas": ["Engenharia"]})
     sup_doc.id = "id_julia"
@@ -818,7 +818,7 @@ def test_migrar_supervisor_ids_apply_grava_ids():
 
 def test_migrar_supervisor_ids_ja_ok_nao_atualiza():
     """Chamado já com supervisor_ids_com_acesso correto não deve ser reescrito."""
-    from scripts.migrar_supervisor_ids_com_acesso import migrar_supervisor_ids
+    from scripts.migrations.migrar_supervisor_ids_com_acesso import migrar_supervisor_ids
 
     sup_doc = _make_doc({"perfil": "supervisor", "areas": ["Engenharia"]})
     sup_doc.id = "id_julia"
@@ -844,7 +844,7 @@ def test_migrar_supervisor_ids_ja_ok_nao_atualiza():
 
 def test_migrar_supervisor_ids_com_owner_usa_responsavel():
     """Chamado com owner: supervisor_ids_com_acesso = [owner_id]."""
-    from scripts.migrar_supervisor_ids_com_acesso import migrar_supervisor_ids
+    from scripts.migrations.migrar_supervisor_ids_com_acesso import migrar_supervisor_ids
 
     chamado_doc = _make_doc(
         {
@@ -911,7 +911,7 @@ def _sup_firestore_doc(id_: str, areas: list[str]) -> MagicMock:
 
 def test_migrar_participantes_dry_run_nao_grava():
     """dry-run: não escreve no Firestore."""
-    from scripts.migrar_participantes import migrar_participantes
+    from scripts.migrations.migrar_participantes import migrar_participantes
 
     chamado_doc = _make_doc(
         {
@@ -934,7 +934,7 @@ def test_migrar_participantes_dry_run_nao_grava():
 
 def test_migrar_participantes_apply_grava_e_checkpoint():
     """apply: escreve via batch e grava checkpoint."""
-    from scripts.migrar_participantes import migrar_participantes
+    from scripts.migrations.migrar_participantes import migrar_participantes
 
     chamado_doc = _make_doc(
         {
@@ -948,7 +948,7 @@ def test_migrar_participantes_apply_grava_e_checkpoint():
     sup_doc = _sup_firestore_doc("ti_sup_1", ["TI"])
     db, batch = _make_db_participantes([chamado_doc], [sup_doc])
 
-    with patch("scripts.migrar_participantes._write_checkpoint") as mock_checkpoint:
+    with patch("scripts.migrations.migrar_participantes._write_checkpoint") as mock_checkpoint:
         stats = migrar_participantes(db, dry_run=False)
 
     batch.commit.assert_called()
@@ -958,7 +958,7 @@ def test_migrar_participantes_apply_grava_e_checkpoint():
 
 def test_migrar_participantes_skip_ja_tem_participantes():
     """Chamado com participantes[] populado é ignorado."""
-    from scripts.migrar_participantes import migrar_participantes
+    from scripts.migrations.migrar_participantes import migrar_participantes
 
     chamado_doc = _make_doc(
         {
@@ -977,7 +977,7 @@ def test_migrar_participantes_skip_ja_tem_participantes():
 
 def test_migrar_participantes_skip_sem_setores():
     """Chamado sem setores_adicionais é ignorado."""
-    from scripts.migrar_participantes import migrar_participantes
+    from scripts.migrations.migrar_participantes import migrar_participantes
 
     chamado_doc = _make_doc(
         {

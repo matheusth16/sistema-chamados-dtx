@@ -28,7 +28,7 @@ def _mock_resultado(id_esc: str, status: str = "PASS") -> MagicMock:
 
 def test_executar_qa_escalonamento_retorna_lista_com_10_itens():
     """executar_checks() deve retornar exatamente 10 Resultado."""
-    import scripts.executar_qa_escalonamento as m
+    import scripts.qa.executar_qa_escalonamento as m
 
     checks = [
         "check_esc_01",
@@ -71,7 +71,7 @@ def test_executar_qa_escalonamento_retorna_lista_com_10_itens():
 
 def test_executar_qa_escalonamento_todos_pass_com_mocks():
     """Com todos os checks mockados como PASS, nenhum deve ser FAIL ou SKIP."""
-    import scripts.executar_qa_escalonamento as m
+    import scripts.qa.executar_qa_escalonamento as m
 
     checks_names = [
         "check_esc_01",
@@ -112,7 +112,7 @@ def test_executar_qa_escalonamento_todos_pass_com_mocks():
 
 def test_main_exit_code_0_quando_sem_fail():
     """main() retorna 0 quando todos os checks são PASS."""
-    import scripts.executar_qa_escalonamento as m
+    import scripts.qa.executar_qa_escalonamento as m
 
     resultados_pass = [_mock_resultado(f"ESC-{i:02d}", "PASS") for i in range(1, 11)]
 
@@ -127,7 +127,7 @@ def test_main_exit_code_0_quando_sem_fail():
 
 def test_main_exit_code_1_quando_tem_fail():
     """main() retorna 1 quando pelo menos um check é FAIL."""
-    import scripts.executar_qa_escalonamento as m
+    import scripts.qa.executar_qa_escalonamento as m
 
     resultados = [_mock_resultado(f"ESC-{i:02d}", "PASS") for i in range(1, 10)]
     resultados.append(_mock_resultado("ESC-10", "FAIL"))
@@ -144,8 +144,8 @@ def test_main_exit_code_1_quando_tem_fail():
 def test_main_saida_json_valida(capsys):
     """main() com --json produz JSON válido com as chaves esperadas."""
 
-    import scripts.executar_qa_escalonamento as m
-    from scripts.executar_qa_escalonamento import Resultado
+    import scripts.qa.executar_qa_escalonamento as m
+    from scripts.qa.executar_qa_escalonamento import Resultado
 
     resultados_reais = [
         Resultado(id_esc=f"ESC-{i:02d}", descricao=f"Cenário {i}", status="PASS", detalhe="ok")

@@ -6,8 +6,8 @@ Flags:
   --apply     Executa as inserções no Firestore.
 
 Execução (da raiz do projeto):
-    python scripts/migrar_gates_subetapas.py          # dry-run
-    python scripts/migrar_gates_subetapas.py --apply  # aplica
+    python scripts/migrations/migrar_gates_subetapas.py          # dry-run
+    python scripts/migrations/migrar_gates_subetapas.py --apply  # aplica
 
 Características:
 - Não duplica: verifica por nome_pt antes de criar.
@@ -19,7 +19,7 @@ import os
 import sys
 from pathlib import Path
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 os.chdir(ROOT)
@@ -27,7 +27,7 @@ os.chdir(ROOT)
 from app.database import db  # noqa: E402
 from app.gates_config import GATE_SUBETAPAS  # noqa: E402
 from app.models_categorias import CategoriaGate  # noqa: E402
-from scripts._migration_utils import _commit_batch_set, _write_checkpoint  # noqa: E402
+from scripts.migrations._migration_utils import _commit_batch_set, _write_checkpoint  # noqa: E402
 
 _CHECKPOINT_DIR = Path(ROOT) / "scripts" / ".checkpoints"
 

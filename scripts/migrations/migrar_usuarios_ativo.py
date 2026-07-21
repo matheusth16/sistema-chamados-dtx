@@ -12,8 +12,8 @@ Flags:
 Idempotente: docs que já têm `ativo` (true ou false) são pulados.
 
 Uso:
-  python scripts/migrar_usuarios_ativo.py           # dry-run
-  python scripts/migrar_usuarios_ativo.py --apply   # executa
+  python scripts/migrations/migrar_usuarios_ativo.py           # dry-run
+  python scripts/migrations/migrar_usuarios_ativo.py --apply   # executa
 """
 
 from __future__ import annotations
@@ -21,14 +21,14 @@ from __future__ import annotations
 import os
 import sys
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.chdir(ROOT)
 sys.path.insert(0, ROOT)
 
 import firebase_admin  # noqa: E402
 from firebase_admin import credentials, firestore  # noqa: E402
 
-from scripts._migration_utils import _commit_batch, _iter_collection_paginated  # noqa: E402
+from scripts.migrations._migration_utils import _commit_batch, _iter_collection_paginated  # noqa: E402
 
 
 def _init_firebase() -> None:

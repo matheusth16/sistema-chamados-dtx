@@ -6,8 +6,8 @@ Firestore como fonte de verdade em vez do dict hardcoded (F-30).
 Por padrão roda em modo dry-run: mostra o que seria gravado sem escrever.
 
 Uso:
-    python scripts/migrar_setor_area.py          # dry-run (mostra payload)
-    python scripts/migrar_setor_area.py --apply  # grava no Firestore
+    python scripts/migrations/migrar_setor_area.py          # dry-run (mostra payload)
+    python scripts/migrations/migrar_setor_area.py --apply  # grava no Firestore
 """
 
 from __future__ import annotations
@@ -18,12 +18,12 @@ import os
 import sys
 from pathlib import Path
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
-_CHECKPOINT_DIR = Path(__file__).parent / ".checkpoints"
+_CHECKPOINT_DIR = Path(__file__).resolve().parent.parent / ".checkpoints"
 
 MAPA_INICIAL = {
     "Material Indireto / Compras": "Material",
@@ -50,7 +50,7 @@ def executar(db, dry_run: bool = True, checkpoint_dir: Path = _CHECKPOINT_DIR) -
     ref.set({"mapa": MAPA_INICIAL})
     logger.info("Documento config/setor_para_area gravado com sucesso.")
 
-    from scripts._migration_utils import _write_checkpoint
+    from scripts.migrations._migration_utils import _write_checkpoint
 
     _write_checkpoint(
         checkpoint_dir,

@@ -2,8 +2,8 @@
 """Playbook QA Onda 6 — Escalonamento e SLA (10 cenários ESC-*).
 
 Uso:
-    python scripts/executar_qa_escalonamento.py
-    python scripts/executar_qa_escalonamento.py --json > docs/evidencias/qa_escalonamento_resultado.json
+    python scripts/qa/executar_qa_escalonamento.py
+    python scripts/qa/executar_qa_escalonamento.py --json > docs/evidencias/qa_escalonamento_resultado.json
 
 Cenários implementados via test client + mocks (sem Firestore real).
 ESC-07 e ESC-08 testam business_time diretamente com datetimes fixos.
@@ -21,7 +21,7 @@ from typing import Literal
 from unittest.mock import MagicMock, patch
 from zoneinfo import ZoneInfo
 
-_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 

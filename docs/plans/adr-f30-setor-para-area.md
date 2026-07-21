@@ -115,7 +115,7 @@ setor_para_area(setor_nome)
 
 ### Script de migração
 
-`scripts/migrar_setor_area.py --apply` grava o documento inicial no Firestore.
+`scripts/migrations/migrar_setor_area.py --apply` grava o documento inicial no Firestore.
 Sem `--apply`: dry-run (mostra o que seria gravado, sem escrever).
 
 ---
@@ -131,7 +131,7 @@ adicional de código é necessária.
 ## Ordem de deploy recomendada
 
 1. Fazer deploy da nova versão de `app/utils_areas.py` (com fallback = SETOR_PARA_AREA)
-2. Executar `python scripts/migrar_setor_area.py --apply` (semeia o Firestore)
+2. Executar `python scripts/migrations/migrar_setor_area.py --apply` (semeia o Firestore)
 3. O cache se aquece no próximo request
 
 Esta ordem garante que em produção nunca há uma janela onde o Firestore tem dados mas o código

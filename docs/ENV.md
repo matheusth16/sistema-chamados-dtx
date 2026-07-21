@@ -154,10 +154,10 @@ firebase deploy --only firestore:indexes
 #    OU Firebase Console > Firestore > Indexes > Single-field: usuarios / email_lookup_hash (ASC)
 
 # 3. Dry-run (sem alterar dados)
-ENCRYPTION_KEY=<chave> python scripts/migrar_pii_criptografia.py
+ENCRYPTION_KEY=<chave> python scripts/migrations/migrar_pii_criptografia.py
 
 # 4. Aplicar migração (app pode continuar rodando durante a migração)
-ENCRYPT_PII_AT_REST=true ENCRYPTION_KEY=<chave> python scripts/migrar_pii_criptografia.py --apply
+ENCRYPT_PII_AT_REST=true ENCRYPTION_KEY=<chave> python scripts/migrations/migrar_pii_criptografia.py --apply
 
 # 5. Smoke test: login com usuário migrado
 

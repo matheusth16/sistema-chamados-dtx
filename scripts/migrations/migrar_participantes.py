@@ -13,8 +13,8 @@ Flags:
   --apply    Executa as alterações no Firestore em batches de 500.
 
 Uso:
-  python scripts/migrar_participantes.py --dry-run
-  python scripts/migrar_participantes.py --apply
+  python scripts/migrations/migrar_participantes.py --dry-run
+  python scripts/migrations/migrar_participantes.py --apply
 """
 
 from __future__ import annotations
@@ -23,13 +23,13 @@ import os
 import sys
 from pathlib import Path
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.chdir(ROOT)
 sys.path.insert(0, ROOT)
 
 import firebase_admin  # noqa: E402, I001
 from firebase_admin import credentials, firestore as fs  # noqa: E402
-from scripts._migration_utils import (  # noqa: E402
+from scripts.migrations._migration_utils import (  # noqa: E402
     _commit_batch,
     _iter_collection_paginated,
     _write_checkpoint,

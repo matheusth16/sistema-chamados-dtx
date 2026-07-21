@@ -2,8 +2,8 @@
 """Executa o playbook QA manual CWI (11 sub-itens) contra a app local via test client.
 
 Uso:
-    python scripts/executar_qa_manual_cwi.py
-    python scripts/executar_qa_manual_cwi.py --json
+    python scripts/qa/executar_qa_manual_cwi.py
+    python scripts/qa/executar_qa_manual_cwi.py --json
 
 Itens que exigem infra externa (VPN em HML real, Firestore prod, host HTTPS prod)
 são marcados como SKIP com motivo — não falham a execução local.
@@ -22,7 +22,7 @@ from typing import Literal
 from unittest.mock import MagicMock, patch
 
 # Garante import do projeto
-_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 

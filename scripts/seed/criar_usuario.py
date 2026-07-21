@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """
 Script para criar usuários no sistema de chamados
-Uso: python scripts/criar_usuario.py (a partir da raiz do projeto)
+Uso: python scripts/seed/criar_usuario.py (a partir da raiz do projeto)
 """
 
 import os
 import sys
 from getpass import getpass
 
-# Adiciona a raiz do projeto ao path (script está em scripts/)
-_raiz = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# Adiciona a raiz do projeto ao path (script está em scripts/seed/)
+_raiz = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, _raiz)
 
 from app.database import db  # noqa: E402

@@ -2,14 +2,14 @@
 Script para inicializar categorias padrão no Firestore.
 Use este script para popular dados de exemplo se o banco estiver vazio.
 
-Uso (a partir da raiz do projeto): python scripts/init_categorias.py
+Uso (a partir da raiz do projeto): python scripts/seed/init_categorias.py
 """
 
 import os
 import sys
 
 # Adiciona a raiz do projeto ao path (funciona em qualquer SO)
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 os.chdir(ROOT)
@@ -40,7 +40,7 @@ def criar_setores_padrao():
 
 def criar_gates_padrao():
     """Cria sub-etapas de gate padrão se não existirem (usa migrar_gates_subetapas)."""
-    from scripts.migrar_gates_subetapas import migrar
+    from scripts.migrations.migrar_gates_subetapas import migrar
 
     migrar()
 

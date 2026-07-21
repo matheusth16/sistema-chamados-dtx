@@ -4,7 +4,7 @@ NÃO é um teste de correção — não faz assertions, apenas navega logado com
 cada usuário demo e salva recortes de tela em app/static/img/onboarding/.
 
 Pré-requisitos:
-    1. python scripts/seed_dados_demo_onboarding.py   (cria os usuários/chamados demo)
+    1. python scripts/seed/seed_dados_demo_onboarding.py   (cria os usuários/chamados demo)
     2. flask run (ou equivalente) rodando localmente com credentials.json real
     3. .env.test preenchido com as credenciais dos usuários demo (ver .env.test.example)
 

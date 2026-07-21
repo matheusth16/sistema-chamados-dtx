@@ -83,10 +83,10 @@ Acesse: `http://localhost:5000`
 ### 7. Scripts utilitários (opcional)
 
 ```bash
-python scripts/criar_usuario.py              # Criar usuário no sistema
+python scripts/seed/criar_usuario.py              # Criar usuário no sistema
 python scripts/gerar_vapid_keys.py           # Chaves Web Push
 python scripts/gerar_chave_criptografia.py   # Chave para criptografia de PII (LGPD)
-python scripts/atualizar_traducoes_setores.py # Sincronizar traduções EN/ES no Firestore
+python scripts/migrations/atualizar_traducoes_setores.py # Sincronizar traduções EN/ES no Firestore
 ```
 
 ## Perfis de Usuário
@@ -298,6 +298,7 @@ Ou crie manualmente no console:
 
 | Documento | Descrição |
 |-----------|-----------|
+| [docs/README.md](docs/README.md) | Índice completo da documentação |
 | [docs/ENV.md](docs/ENV.md) | Variáveis de ambiente (.env) |
 | [docs/API.md](docs/API.md) | Referência completa da API |
 | [docs/QA_DEBUG_PLAYBOOK.md](docs/QA_DEBUG_PLAYBOOK.md) | Playbook de triagem sistemática de falhas de teste |
@@ -338,7 +339,7 @@ Ou crie manualmente no console:
 ### Setor/área aparece em português na interface EN/ES
 
 **Causa:** Setor cadastrado antes das traduções serem adicionadas ao `SECTOR_KEYS_MAP`.
-**Solução:** Rodar `python scripts/atualizar_traducoes_setores.py` para sincronizar `nome_en`/`nome_es` no Firestore.
+**Solução:** Rodar `python scripts/migrations/atualizar_traducoes_setores.py` para sincronizar `nome_en`/`nome_es` no Firestore.
 
 ### Dependências
 

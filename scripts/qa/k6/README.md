@@ -25,7 +25,7 @@ k6 version
 ### 1. Smoke test (antes de qualquer deploy)
 
 ```bash
-k6 run -e BASE_URL=http://localhost:5000 scripts/k6/smoke.js
+k6 run -e BASE_URL=http://localhost:5000 scripts/qa/k6/smoke.js
 ```
 
 ### 2. Load test (antes do go-live)
@@ -37,7 +37,7 @@ k6 run \
   -e ADMIN_SENHA=SUA_SENHA \
   -e SUP_EMAIL=supervisor@dtx.aero \
   -e SUP_SENHA=SUA_SENHA \
-  scripts/k6/load.js
+  scripts/qa/k6/load.js
 ```
 
 ### 3. Stress test (encontrar limite do Cloud Run)
@@ -45,7 +45,7 @@ k6 run \
 ```bash
 k6 run \
   -e BASE_URL=https://SEU_DOMINIO \
-  scripts/k6/stress.js
+  scripts/qa/k6/stress.js
 ```
 
 ## SLOs esperados (Cloud Run: 1 CPU, 512Mi, 1 worker + 8 threads)

@@ -5,7 +5,7 @@ Isso ajuda a "ver visualmente" os botões/layout no seu navegador/email client
 sem depender do Power Automate ou de SMTP externo.
 
 Uso:
-  python scripts/gerar_email_visual_snapshots.py
+  python scripts/qa/gerar_email_visual_snapshots.py
 """
 
 from __future__ import annotations
@@ -43,7 +43,7 @@ def _wrap_for_browser(title: str, body_html: str) -> str:
 
 def main() -> None:
     # Garante que a raiz do projeto esteja no sys.path (para importar `app`).
-    root = Path(__file__).resolve().parent.parent
+    root = Path(__file__).resolve().parent.parent.parent
     root_str = str(root)
     if root_str not in sys.path:
         sys.path.insert(0, root_str)
@@ -63,7 +63,7 @@ def main() -> None:
     app.config["SECRET_KEY"] = "test-secret"
     app.config["APP_BASE_URL"] = "https://example.test"
 
-    out_dir = Path(__file__).resolve().parent.parent / "tmp" / "email_visual_snapshots"
+    out_dir = Path(__file__).resolve().parent.parent.parent / "tmp" / "email_visual_snapshots"
     out_dir.mkdir(parents=True, exist_ok=True)
 
     captured: dict[str, dict[str, Any]] = {}
