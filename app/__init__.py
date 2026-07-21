@@ -491,7 +491,7 @@ def _configurar_seguranca(app: Flask) -> None:
             nonce = g.get("csp_nonce", "")
             csp = (
                 "default-src 'self'; "
-                "script-src 'self' https://cdn.tailwindcss.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net 'nonce-{nonce}'; "
+                "script-src 'self' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net 'nonce-{nonce}'; "
                 "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; "
                 "img-src 'self' data: https: blob:; "
                 "font-src 'self' https://cdn.jsdelivr.net https://fonts.gstatic.com; "
