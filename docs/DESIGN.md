@@ -26,7 +26,20 @@ colors:
   surface-base: "#FFFFFF"
   surface-raised: "#E8ECF2"
   surface-border: "#C4CDD9"
-  surface-muted: "#8B9EC0"
+  surface-muted: "#5F6E8C"
+  bento-danger: "#e11d48"
+  bento-danger-deep: "#be123c"
+  bento-danger-bg: "#fecdd3"
+  bento-warning: "#b45309"
+  bento-warning-deep: "#92400e"
+  bento-warning-icon: "#d97706"
+  bento-warning-bg: "#fde68a"
+  bento-success: "#047857"
+  bento-success-deep: "#059669"
+  bento-purple: "#7e22ce"
+  bento-purple-bg: "#f3e8ff"
+  bento-violet: "#7c3aed"
+  bento-teal: "#0f766e"
 typography:
   display:
     fontFamily: "Manrope, sans-serif"
@@ -55,6 +68,10 @@ rounded:
   xl: "24px"
   badge: "4px"
   full: "9999px"
+  bento-sm: "10px"
+  bento-md: "14px"
+  bento-lg: "16px"
+  bento-xl: "20px"
 spacing:
   row: "1rem"
   card-padding: "1rem"
@@ -121,17 +138,26 @@ A segunda camada de cor não é decorativa: é o vocabulário de estado dos cham
 - **Rosa Cancelado** (`#9F1239` texto / `#FFF1F2` fundo): chamado cancelado.
 - **Cinza Pendente** (`#475569` texto / `#F8FAFC` fundo): estado neutro/indefinido, fallback.
 
+### Tertiary — Vocabulário Estendido "Bento" (tags, riscos, participação)
+Camada de cor introduzida pelo redesign visual "bento" (2026-07), portada literalmente dos mockups aprovados — não é drift, é vocabulário real, só não estava documentado até agora. Usada em badges de risco/tag e estados de colaboração que vão além dos 4 status de chamado.
+- **Rosa Perigo** (`#e11d48` texto/borda / `#be123c` variante escura / `#fecdd3` fundo claro): campo obrigatório (RL), cancelamento, risco "danger" em cards de risco/SLA atrasado.
+- **Âmbar Alerta** (`#b45309` texto / `#92400e` variante escura / `#d97706` ícone/borda / `#fde68a` fundo claro): aviso não-crítico, risco "warn", SLA em risco.
+- **Verde Confirmação** (`#047857` texto / `#059669` ícone/variante): confirmação de ação, SLA "ok" — distinto do Verde Concluído de status (`#065F46`), usado em contexto de ação pontual, não de estado do chamado.
+- **Roxo Admin Global** (`#7e22ce` texto / `#f3e8ff` fundo claro): badge de perfil `admin_global` e tag "multi-setor".
+- **Violeta Alteração de Dados** (`#7c3aed`): marcador de evento "dados alterados" na timeline de histórico — distingue de "status alterado" (Azul DTX) e "criação" (Verde).
+- **Teal Colaboração** (`#0f766e`): estados de participação/co-atendimento (escalonamento pra colega, "concluir minha parte").
+
 ### Neutral
 - **Canvas** (`#F2F4F7`): fundo geral da aplicação — cinza-azulado frio, "papel técnico aeroespacial".
 - **Base** (`#FFFFFF`): cards, modais, formulários.
 - **Raised** (`#E8ECF2`): cabeçalhos de tabela, seções elevadas.
 - **Border** (`#C4CDD9`): divisórias estruturais.
-- **Muted** (`#8B9EC0`): texto desativado, placeholders.
+- **Muted** (`#5F6E8C`): texto desativado, placeholders, hints de formulário. *(Corrigido em 2026-07-21: valor anterior `#8B9EC0` tinha contraste 2.71:1 sobre branco — falhava WCAG AA. Novo valor: 5.1:1.)*
 
 ### Named Rules
 **A Regra da Cor-Como-Dado.** O Azul DTX nunca decora — ele marca ação (botão primário), seleção (linha ativa, foco) ou estrutura de marca (navbar). Se uma cor não está comunicando estado ou hierarquia, ela é cinza neutro.
 
-**A Regra do Token Único.** Todo token de cor vive em `:root` sob um nome de variável CSS semântico (`--color-dtx-*`, `--color-surface-*`, `--color-status-*`). Nenhum componente hardcoda hex; ele só referencia o token — isso mantém a paleta trocável num só lugar, mesmo sem variante de tema.
+**A Regra do Token Único.** Todo token de cor vive em `:root` sob um nome de variável CSS semântico (`--color-dtx-*`, `--color-surface-*`, `--color-status-*`). Nenhum componente hardcoda hex; ele só referencia o token — isso mantém a paleta trocável num só lugar, mesmo sem variante de tema. *(O vocabulário "bento" em Tertiary é a exceção documentada: hex literal por ser porte fiel de mockup, não drift — ver Do's e Don'ts.)*
 
 ## 3. Typography
 
@@ -181,9 +207,9 @@ O sistema é **em camadas (layered)**, não flat. Sombras têm papel estrutural:
 
 ### Cards / Containers
 - **Canto:** `rounded-dtx-md` (8px) nas superfícies de densidade (tabelas, dashboards, formulários administrativos).
-- **Canto — superfícies "bento" (redesign visual):** `rounded-dtx-xl` (24px), com sub-blocos internos em `rounded-dtx-lg` (12px). Introduzido em 2026-07, hoje em `login.html` e `formulario.html`; demais páginas migram pra esse padrão conforme o rollout avança (ver plano de redesign).
+- **Canto — superfícies "bento" (redesign visual):** escala própria, portada literalmente do mockup — `10px`/`14px`/`16px`/`20px` conforme o componente (não os tokens `rounded-dtx-*` originais). Hoje presente na maior parte do sistema (formulários, navegação, cards de risco/SLA, timeline); demais páginas migram pra esse padrão conforme o rollout avança.
 - **Fundo:** `surface-base` (branco).
-- **Sombra:** `dtx` em repouso; `.dtx-card-raised` adiciona `border-top: 3px solid dtx-500` + sombra `dtx-md` para cards de destaque/métrica.
+- **Sombra:** `dtx` em repouso; `.dtx-card-raised` (e equivalentes bento: `.bento-rl-field`, `.bento-stat-card.active`, `.bento-timeline-detail`, `.bento-sla-card`, `.bento-risk-card`) adiciona `border-top: 3px solid <cor>` + **cantos superiores retos** (`border-top-left-radius:0; border-top-right-radius:0`) para o destaque não colidir com o arredondamento — checagem obrigatória sempre que uma borda de destaque for adicionada a um elemento já arredondado.
 - **Borda:** 1px `surface-border`.
 - **Padding interno:** `1rem` (16px) como base.
 
@@ -214,7 +240,9 @@ A tabela de chamados é o componente mais denso do sistema — funciona como tel
 
 ### Don't:
 - **Don't** reintroduzir dark mode (`html.dark`, toggle, `prefers-color-scheme`). *(Removido em 2026-07-01 por decisão de produto: sistema é light-only; acessibilidade pro chão de fábrica vem de contraste alto dentro do próprio tema claro — ver PRODUCT.md.)*
-- **Don't** usar `border-left`/`border-right` colorido como faixa de destaque — é a versão lateral do `.dtx-card-raised` e está banida pelo sistema. *(Resolvido em 2026-07-01: as 8 ocorrências foram migradas para borda-superior em boxes/cards ou fundo tintado em linhas de tabela — ver Do's acima.)*
+- **Don't** usar `border-left`/`border-right` colorido como faixa de destaque — é a versão lateral do `.dtx-card-raised` e está banida pelo sistema. *(Resolvido em 2026-07-01: as 8 ocorrências foram migradas para borda-superior em boxes/cards ou fundo tintado em linhas de tabela. Regressão pontual encontrada e corrigida em 2026-07-21: `.bento-risk-card` ainda usava `border-left:3px` — migrado pro mesmo padrão de borda-superior + cantos retos.)*
+- **Don't** adicionar borda de destaque (`border-top`/`.dtx-card-raised` e variantes bento) num elemento arredondado sem zerar o `border-radius` dos cantos onde a borda entra — a borda colide visualmente com o arredondamento. *(Corrigido em 2026-07-21 em `.bento-rl-field`, `.bento-stat-card`, `.bento-timeline-detail`, `.bento-sla-card`.)*
+- **Don't** usar classes cinza cruas do Tailwind (`text-gray-400`–`text-gray-900`, `#374151`, `#6b7280`, `#9ca3af`) fora dos tokens `surface-muted`/`text-muted` — apareceram soltas em alguns componentes (nav, botão secundário) sem passar pelo token semântico. Preferir sempre `var(--color-text-muted)`/`var(--color-surface-muted)`.
 - **Don't** deixar a paleta "conservadora demais" — o Azul DTX hoje só aparece em `dtx-600`/navbar na maior parte das telas; cor de status deve carregar mais peso informativo nas tabelas e dashboards, não só nos badges.
 - **Don't** usar valores de z-index arbitrários (`z-[N]`) quando a escala semântica existe. *(Resolvido em 2026-07-01: navbar, dropdowns, toasts, banners, modais e cabeçalhos sticky de tabela foram migrados para `z-sticky`/`z-nav`/`z-dropdown`/`z-modal`/`z-toast`. Como parte do fix, os banners de web push — antes em `z-[190]`, abaixo dos dropdowns da navbar — foram promovidos para o mesmo nível `z-toast` das flash messages, corrigindo uma inconsistência real onde dois elementos igualmente "toast" tinham prioridades de empilhamento diferentes.)*
 - **Don't** carregar JetBrains Mono sem aplicá-la de forma consistente — hoje a fonte está no `<link>` do `base.html` e usada em apenas 5 templates administrativos; ou ela vira o padrão para todo ID/timestamp técnico (incluindo o número do chamado na tabela do dashboard), ou o `<link>` deve ser removido para não pagar o custo de carregamento de uma fonte não utilizada.

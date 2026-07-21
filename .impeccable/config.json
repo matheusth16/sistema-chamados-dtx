@@ -1,0 +1,13 @@
+{
+  "detector": {
+    "ignoreRules": [
+      "single-font",
+      "flat-type-hierarchy"
+    ],
+    "ignoreFiles": [
+      "app/templates/relatorios.html",
+      "app/static/css/tailwind.min.css"
+    ],
+    "ignoreValues": []
+  }
+}
