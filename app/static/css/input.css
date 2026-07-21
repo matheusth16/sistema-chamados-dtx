@@ -51,6 +51,26 @@
 
     /* Gradiente hero (login, páginas de marketing) */
     --gradient-dtx: linear-gradient(135deg, #070f1d 0%, #13274b 55%, #284e95 100%);
+
+    /* Vocabulário "bento" (redesign 2026-07) — tags de risco, participação, ver DESIGN.md → Colors → Tertiary */
+    --color-bento-danger:       #e11d48;
+    --color-bento-danger-deep:  #be123c;
+    --color-bento-danger-bg:    #fecdd3;
+    --color-bento-warning:      #b45309;
+    --color-bento-warning-deep: #92400e;
+    --color-bento-warning-icon: #d97706;
+    --color-bento-warning-bg:   #fde68a;
+    --color-bento-success:      #047857;
+    --color-bento-success-deep: #059669;
+    --color-bento-purple:       #7e22ce;
+    --color-bento-purple-bg:    #f3e8ff;
+    --color-bento-violet:       #7c3aed;
+    --color-bento-teal:         #0f766e;
+    --color-bento-info:         #1e40af;
+    --color-bento-info-bg:      #eff6ff;
+    --color-bento-info-bg-deep: #dbeafe;
+
+    --color-text-primary: #1a1e2e;
   }
 
   html {
@@ -60,7 +80,7 @@
   body {
     font-family: 'Manrope', sans-serif;
     background-color: var(--color-surface-canvas);
-    color: #1a1e2e;
+    color: var(--color-text-primary);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     transition: background-color 0.2s ease, color 0.2s ease;
@@ -97,7 +117,7 @@
 
   .dtx-label {
     @apply block text-sm font-medium mb-1;
-    color: #374151;
+    color: var(--color-text-muted);
   }
 
   .dtx-input {

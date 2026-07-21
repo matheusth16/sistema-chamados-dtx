@@ -81,7 +81,7 @@
             <div id="div_rl" class="bento-rl-field hidden">
                 <label for="rl_codigo">{{ t('rl_code_label') }} *</label>
                 <input type="text" name="rl_codigo" id="rl_codigo" maxlength="100" placeholder="{{ t('rl_code_example') }}">
-                <p class="text-[11px] font-bold mt-2 flex items-center gap-1" style="color:#e11d48">
+                <p class="text-[11px] font-bold mt-2 flex items-center gap-1" style="color:var(--color-bento-danger)">
                     <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                     {{ t('rl_required') }}
                 </p>
@@ -194,7 +194,7 @@
                             {{ t('external_link_add_btn') }}
                         </button>
                     </div>
-                    <p id="msg_link_invalido" class="hidden text-xs mt-1" style="color:#e11d48">{{ t('external_link_invalid') }}</p>
+                    <p id="msg_link_invalido" class="hidden text-xs mt-1" style="color:var(--color-bento-danger)">{{ t('external_link_invalid') }}</p>
                 </div>
                 <!-- Hidden inputs para links externos confirmados (inseridos por JS) -->
                 <div id="container_links_externos"></div>
@@ -541,7 +541,7 @@
             li.setAttribute('data-link-url', url);
             var span = document.createElement('span');
             span.className = 'flex items-center gap-2 truncate';
-            span.innerHTML = '<svg class="w-4 h-4 shrink-0" style="color:#1e40af" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>';
+            span.innerHTML = '<svg class="w-4 h-4 shrink-0" style="color:var(--color-bento-info)" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>';
             var nome = document.createElement('span');
             nome.className = 'font-medium truncate';
             nome.textContent = labelLinkAdicionado + ': ' + url.replace(/^https?:\/\//, '').substring(0, 50) + (url.length > 60 ? '…' : '');
@@ -571,7 +571,7 @@
                     var li = document.createElement('li');
                     var span = document.createElement('span');
                     span.className = 'flex items-center gap-2 truncate';
-                    span.innerHTML = '<svg class="w-4 h-4 shrink-0" style="color:#047857" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>';
+                    span.innerHTML = '<svg class="w-4 h-4 shrink-0" style="color:var(--color-bento-success)" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>';
                     var nome = document.createElement('span');
                     nome.className = 'font-medium truncate';
                     nome.textContent = arq.name;

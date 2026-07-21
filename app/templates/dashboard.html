@@ -175,11 +175,11 @@
                 <textarea id="motivo-cancelamento-texto" rows="4" required
                     placeholder="{{ t('cancellation_reason_placeholder') }}"
                     aria-describedby="modal-cancelamento-erro"></textarea>
-                <p id="modal-cancelamento-erro" class="hidden mt-2 text-sm font-medium" style="color:#e11d48;" role="alert"></p>
+                <p id="modal-cancelamento-erro" class="hidden mt-2 text-sm font-medium" style="color:var(--color-bento-danger);" role="alert"></p>
             </div>
             <div style="display:flex; justify-content:flex-end; gap:8px; flex-wrap:wrap;">
                 <button type="button" id="btn-voltar-cancelamento" class="bento-btn-ghost">{{ t('back') }}</button>
-                <button type="button" id="btn-confirmar-cancelamento" class="bento-btn-primary" style="background:#e11d48;">{{ t('apply') }}</button>
+                <button type="button" id="btn-confirmar-cancelamento" class="bento-btn-primary" style="background:var(--color-bento-danger);">{{ t('apply') }}</button>
             </div>
         </div>
     </dialog>

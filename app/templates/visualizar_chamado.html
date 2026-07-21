@@ -350,7 +350,7 @@
                             </button>
                             {% endif %}
                             {% if pode_cancelar %}
-                            <button type="button" data-action="abrir-escalonamento" data-target="modal-cancelar-admin" class="bento-btn-outline" style="color:#be123c; border-color:#fecdd3;">
+                            <button type="button" data-action="abrir-escalonamento" data-target="modal-cancelar-admin" class="bento-btn-outline" style="color:var(--color-bento-danger-deep); border-color:var(--color-bento-danger-bg);">
                                 <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                                 {{ t('ticket_cancel_frozen_btn') if t else 'Cancelar chamado' }}
                             </button>
@@ -378,13 +378,13 @@
                                     <option value="Cancelado" {% if chamado.status == 'Cancelado' %}selected{% endif %}>{{ t('option_cancelled') if t else 'Cancelado' }}</option>
                                 </select>
                                 {% if tem_participantes_pendentes %}
-                                <p style="font-size:11px; color:#b45309; margin-top:6px; font-weight:600; display:flex; align-items:center; gap:5px;">
+                                <p style="font-size:11px; color:var(--color-bento-warning); margin-top:6px; font-weight:600; display:flex; align-items:center; gap:5px;">
                                     <svg width="14" height="14" style="flex-shrink:0;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
                                     {{ t('participantes_pendentes_aviso') if t else 'Há participantes com parte pendente — status Concluído bloqueado.' }}
                                 </p>
                                 {% endif %}
                                 <div id="wrap-motivo-cancelamento" class="{% if chamado.status != 'Cancelado' %}hidden{% endif %}" style="margin-top:14px;">
-                                    <label for="motivo_cancelamento" class="bento-field-label">{% set _cr = t('cancellation_reason') %}{{ _cr if _cr != 'cancellation_reason' else 'Motivo do cancelamento' }} <span style="color:#e11d48;">*</span></label>
+                                    <label for="motivo_cancelamento" class="bento-field-label">{% set _cr = t('cancellation_reason') %}{{ _cr if _cr != 'cancellation_reason' else 'Motivo do cancelamento' }} <span style="color:var(--color-bento-danger);">*</span></label>
                                     <textarea id="motivo_cancelamento" form="form-status" name="motivo_cancelamento" rows="2" maxlength="500"
                                         placeholder="{% set _crp = t('cancellation_reason_placeholder') %}{{ _crp if _crp != 'cancellation_reason_placeholder' else 'Informe o motivo do cancelamento' }}">{{ chamado.motivo_cancelamento or '' }}</textarea>
                                 </div>
@@ -487,7 +487,7 @@
                             {% if chamado.status == 'Cancelado' and chamado.motivo_cancelamento %}
                             <div>
                                 <label class="bento-field-label" style="margin-bottom:8px;">{% set _cr2 = t('cancellation_reason') %}{{ _cr2 if _cr2 != 'cancellation_reason' else 'Motivo do cancelamento' }}</label>
-                                <div style="font-size:13px; font-weight:600; background:#fff1f2; border:1px solid #fecdd3; border-radius:14px; padding:14px;">{{ chamado.motivo_cancelamento }}</div>
+                                <div style="font-size:13px; font-weight:600; background:#fff1f2; border:1px solid var(--color-bento-danger-bg); border-radius:14px; padding:14px;">{{ chamado.motivo_cancelamento }}</div>
                                 {% if chamado.data_cancelamento_formatada() and chamado.data_cancelamento_formatada() != '-' %}
                                 <p style="font-size:11px; color:var(--color-surface-muted); font-weight:600; margin-top:8px;">{{ t('cancelled_on') if t else 'Cancelado em' }}: {{ chamado.data_cancelamento_formatada() }}</p>
                                 {% endif %}
@@ -563,7 +563,7 @@
 
                                 <div id="form-reabrir" class="hidden" style="margin-top:14px;">
                                     <label class="bento-field-label" style="margin-bottom:6px;">
-                                        {{ t('reopen_reason_label') if t else 'O que ainda precisa ser resolvido?' }} <span style="color:#e11d48;">*</span>
+                                        {{ t('reopen_reason_label') if t else 'O que ainda precisa ser resolvido?' }} <span style="color:var(--color-bento-danger);">*</span>
                                     </label>
                                     <textarea id="motivo-reabrir" rows="3" maxlength="500"
                                         placeholder="{{ t('reopen_reason_placeholder') if t else 'Descreva o que ficou pendente...' }}"
@@ -585,7 +585,7 @@
                                 <div id="bloco-editar-descricao" class="bento-action-box amber">
                                     <div class="flex items-center justify-between" style="margin-bottom:6px;">
                                         <p class="title" style="margin-bottom:0;">{{ t('edit_description_sol_title') if t else 'Editar descrição' }}</p>
-                                        <span class="bento-active-chip on" style="background:var(--color-status-open-bg); color:#b45309; display:inline-flex; align-items:center; gap:4px;">
+                                        <span class="bento-active-chip on" style="background:var(--color-status-open-bg); color:var(--color-bento-warning); display:inline-flex; align-items:center; gap:4px;">
                                             <svg width="10" height="10" style="flex-shrink:0;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                                             <span id="sol-countdown">--:--</span>
                                         </span>
@@ -677,7 +677,7 @@
         <div class="space-y-4" style="padding:24px;">
             <p style="font-size:12px; color:var(--color-surface-muted); line-height:1.4; margin-top:-4px;">{{ t('escalation_transfer_area_help') if t else 'Muda a área dona e o responsável pelo chamado — o chamado deixa de ser seu e passa para o novo responsável escolhido.' }}</p>
             <div>
-                <label for="transferir-area-select" class="bento-field-label" style="margin-bottom:6px;">{{ t('escalation_dest_area_label') if t else 'Área Destino' }} <span style="color:#e11d48;">*</span></label>
+                <label for="transferir-area-select" class="bento-field-label" style="margin-bottom:6px;">{{ t('escalation_dest_area_label') if t else 'Área Destino' }} <span style="color:var(--color-bento-danger);">*</span></label>
                 <select id="transferir-area-select"
                     style="width:100%; background:var(--color-surface-canvas); border:1.5px solid transparent; border-radius:14px; padding:11px 14px; font-family:inherit; font-size:14px;">
                     <option value="">{{ t('escalation_select_area') if t else 'Selecione uma área...' }}</option>
@@ -689,14 +689,14 @@
                 </select>
             </div>
             <div>
-                <label for="transferir-supervisor-select" class="bento-field-label" style="margin-bottom:6px;">{{ t('escalation_dest_responsible_label') if t else 'Responsável Destino' }} <span style="color:#e11d48;">*</span></label>
+                <label for="transferir-supervisor-select" class="bento-field-label" style="margin-bottom:6px;">{{ t('escalation_dest_responsible_label') if t else 'Responsável Destino' }} <span style="color:var(--color-bento-danger);">*</span></label>
                 <select id="transferir-supervisor-select" disabled
                     style="width:100%; background:var(--color-surface-canvas); border:1.5px solid transparent; border-radius:14px; padding:11px 14px; font-family:inherit; font-size:14px;">
                     <option value="">{{ t('escalation_select_area_first') if t else 'Selecione a área primeiro...' }}</option>
                 </select>
             </div>
             <div>
-                <label for="transferir-motivo" class="bento-field-label" style="margin-bottom:6px;">{{ t('escalation_reason_label') if t else 'Motivo' }} <span style="color:#e11d48;">*</span></label>
+                <label for="transferir-motivo" class="bento-field-label" style="margin-bottom:6px;">{{ t('escalation_reason_label') if t else 'Motivo' }} <span style="color:var(--color-bento-danger);">*</span></label>
                 <textarea id="transferir-motivo" rows="3" maxlength="500"
                     placeholder="{{ t('escalation_transfer_reason_placeholder') if t else 'Descreva o motivo da transferência...' }}"
                     style="width:100%; background:var(--color-surface-canvas); border:1.5px solid transparent; border-radius:14px; padding:11px 14px; font-family:inherit; font-size:14px; resize:none;"></textarea>
@@ -726,14 +726,14 @@
         </div>
         <div class="space-y-4" style="padding:24px;">
             <div>
-                <label for="escalonar-supervisor-select" class="bento-field-label" style="margin-bottom:6px;">{{ t('escalation_colleague_label') if t else 'Colega' }} ({{ chamado.area }}) <span style="color:#e11d48;">*</span></label>
+                <label for="escalonar-supervisor-select" class="bento-field-label" style="margin-bottom:6px;">{{ t('escalation_colleague_label') if t else 'Colega' }} ({{ chamado.area }}) <span style="color:var(--color-bento-danger);">*</span></label>
                 <select id="escalonar-supervisor-select" disabled
                     style="width:100%; background:var(--color-surface-canvas); border:1.5px solid transparent; border-radius:14px; padding:11px 14px; font-family:inherit; font-size:14px;">
                     <option value="">{{ t('loading_generic') if t else 'Carregando...' }}</option>
                 </select>
             </div>
             <div>
-                <label for="escalonar-motivo" class="bento-field-label" style="margin-bottom:6px;">{{ t('escalation_reason_label') if t else 'Motivo' }} <span style="color:#e11d48;">*</span></label>
+                <label for="escalonar-motivo" class="bento-field-label" style="margin-bottom:6px;">{{ t('escalation_reason_label') if t else 'Motivo' }} <span style="color:var(--color-bento-danger);">*</span></label>
                 <textarea id="escalonar-motivo" rows="3" maxlength="500"
                     placeholder="{{ t('escalation_escalate_reason_placeholder') if t else 'Descreva o motivo do escalonamento...' }}"
                     style="width:100%; background:var(--color-surface-canvas); border:1.5px solid transparent; border-radius:14px; padding:11px 14px; font-family:inherit; font-size:14px; resize:none;"></textarea>
@@ -744,7 +744,7 @@
             <button type="button" data-action="fechar-escalonamento" data-target="modal-escalonar-colega" class="bento-btn-outline" style="flex:1; justify-content:center;">
                 {{ t('cancel') if t else 'Cancelar' }}
             </button>
-            <button type="button" data-action="executar-escalonar-colega" class="bento-btn-block" style="flex:1; background:#7c3aed; color:#fff;">
+            <button type="button" data-action="executar-escalonar-colega" class="bento-btn-block" style="flex:1; background:var(--color-bento-violet); color:#fff;">
                 {{ t('escalation_escalate_confirm_btn') if t else 'Escalonar' }}
             </button>
         </div>
@@ -764,7 +764,7 @@
         <div class="space-y-4" style="padding:24px;">
             <p style="font-size:12px; color:var(--color-surface-muted); line-height:1.4; margin-top:-4px;">{{ t('escalation_include_supervisors_help') if t else 'Colaborar com acesso — os supervisores incluídos acompanham o chamado individualmente, sem tirar a sua responsabilidade por ele.' }}</p>
             <div>
-                <label for="incluir-area-select" class="bento-field-label" style="margin-bottom:6px;">{{ t('escalation_area_label') if t else 'Área' }} <span style="color:#e11d48;">*</span></label>
+                <label for="incluir-area-select" class="bento-field-label" style="margin-bottom:6px;">{{ t('escalation_area_label') if t else 'Área' }} <span style="color:var(--color-bento-danger);">*</span></label>
                 <select id="incluir-area-select"
                     style="width:100%; background:var(--color-surface-canvas); border:1.5px solid transparent; border-radius:14px; padding:11px 14px; font-family:inherit; font-size:14px;">
                     <option value="">{{ t('escalation_select_area') if t else 'Selecione uma área...' }}</option>
@@ -774,7 +774,7 @@
                 </select>
             </div>
             <div>
-                <label for="incluir-supervisor-select" class="bento-field-label" style="margin-bottom:6px;">{{ t('escalation_supervisor_label') if t else 'Supervisor' }} <span style="color:#e11d48;">*</span></label>
+                <label for="incluir-supervisor-select" class="bento-field-label" style="margin-bottom:6px;">{{ t('escalation_supervisor_label') if t else 'Supervisor' }} <span style="color:var(--color-bento-danger);">*</span></label>
                 <div class="flex gap-2">
                     <select id="incluir-supervisor-select" disabled
                         style="flex:1; background:var(--color-surface-canvas); border:1.5px solid transparent; border-radius:14px; padding:11px 14px; font-family:inherit; font-size:14px;">
@@ -811,12 +811,12 @@
         </div>
         <div class="space-y-4" style="padding:24px;">
             <div>
-                <label for="previsao-atendimento-data" class="bento-field-label" style="margin-bottom:6px;">{{ t('attendance_forecast_label') if t else 'Previsão de atendimento' }} <span style="color:#e11d48;">*</span></label>
+                <label for="previsao-atendimento-data" class="bento-field-label" style="margin-bottom:6px;">{{ t('attendance_forecast_label') if t else 'Previsão de atendimento' }} <span style="color:var(--color-bento-danger);">*</span></label>
                 <input type="datetime-local" id="previsao-atendimento-data"
                     style="width:100%; background:var(--color-surface-canvas); border:1.5px solid transparent; border-radius:14px; padding:11px 14px; font-family:inherit; font-size:14px;">
             </div>
             <div>
-                <label for="previsao-atendimento-motivo" class="bento-field-label" style="margin-bottom:6px;">{{ t('escalation_reason_label') if t else 'Motivo' }} <span style="color:#e11d48;">*</span></label>
+                <label for="previsao-atendimento-motivo" class="bento-field-label" style="margin-bottom:6px;">{{ t('escalation_reason_label') if t else 'Motivo' }} <span style="color:var(--color-bento-danger);">*</span></label>
                 <textarea id="previsao-atendimento-motivo" rows="3" maxlength="500"
                     placeholder="{{ t('attendance_forecast_reason_placeholder') if t else 'Ex: combinei com o gestor, preciso de mais tempo antes de atender' }}"
                     style="width:100%; background:var(--color-surface-canvas); border:1.5px solid transparent; border-radius:14px; padding:11px 14px; font-family:inherit; font-size:14px; resize:none;"></textarea>
@@ -1099,7 +1099,7 @@ Object.assign(window.DTX_MSGS, {
         var html = '';
         _participantesSelecionados.forEach(function(p, i) {
             html += '<div class="bento-participant-row" style="background:#f0fdfa; border-color:#99f6e4;">'
-                + '<span style="font-weight:600; color:#0f766e; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">' + _escapeHtml(p.nome) + ' <span style="color:#14b8a6; font-size:11px;">(' + _escapeHtml(p.area) + ')</span></span>'
+                + '<span style="font-weight:600; color:var(--color-bento-teal); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">' + _escapeHtml(p.nome) + ' <span style="color:#14b8a6; font-size:11px;">(' + _escapeHtml(p.area) + ')</span></span>'
                 + '<button type="button" data-action="remover-participante" data-idx="' + i + '" style="color:#fb7185; background:none; border:none; cursor:pointer; flex-shrink:0;" title="' + _escapeHtml({{ t('remove_action') | tojson }}) + '">'
                 + '<svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>'
                 + '</button></div>';
@@ -1149,11 +1149,11 @@ Object.assign(window.DTX_MSGS, {
     <div class="bento-card" style="background:#f0fdfa; border-color:#99f6e4;">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-                <h4 style="font-size:14px; font-weight:800; color:#0f766e; display:flex; align-items:center; gap:8px;">
+                <h4 style="font-size:14px; font-weight:800; color:var(--color-bento-teal); display:flex; align-items:center; gap:8px;">
                     <svg width="16" height="16" style="color:#0d9488;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                     {{ t('participant_you_are_participant') if t else 'Você é participante deste chamado' }}
                 </h4>
-                <p style="font-size:12px; color:#0f766e; margin-top:4px;">{{ t('participant_finish_hint') if t else 'Quando terminar sua parte, clique em "Concluí minha parte" para notificar o responsável.' }}</p>
+                <p style="font-size:12px; color:var(--color-bento-teal); margin-top:4px;">{{ t('participant_finish_hint') if t else 'Quando terminar sua parte, clique em "Concluí minha parte" para notificar o responsável.' }}</p>
             </div>
             <button type="button" id="btn-concluir-minha-parte" data-action="executar-concluir-minha-parte" class="bento-btn-block solid-teal" style="width:auto; flex-shrink:0; padding:11px 22px;">
                 <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
@@ -1262,7 +1262,7 @@ Object.assign(window.DTX_MSGS, {
         </div>
         <div class="space-y-4" style="padding:24px;">
             <label class="bento-field-label" style="margin-bottom:6px;">
-                {{ t('reopen_reason_label') if t else 'Motivo da reabertura' }} <span style="color:#e11d48;">*</span>
+                {{ t('reopen_reason_label') if t else 'Motivo da reabertura' }} <span style="color:var(--color-bento-danger);">*</span>
             </label>
             <textarea id="motivo-reabrir-admin" rows="3" maxlength="500"
                 placeholder="{{ t('reopen_reason_placeholder') if t else 'Descreva o motivo para reabrir este chamado...' }}"
@@ -1305,14 +1305,14 @@ function reabrirChamadoAdmin() {
     <div class="bento-modal-backdrop"></div>
     <div class="bento-modal-panel" style="position:relative; z-index:1;">
         <div class="head">
-            <h3 id="modal-cancelar-admin-titulo" class="font-display" style="font-weight:800; font-size:15px; color:#be123c;">{{ t('ticket_cancel_frozen_btn') if t else 'Cancelar chamado' }}</h3>
+            <h3 id="modal-cancelar-admin-titulo" class="font-display" style="font-weight:800; font-size:15px; color:var(--color-bento-danger-deep);">{{ t('ticket_cancel_frozen_btn') if t else 'Cancelar chamado' }}</h3>
             <button type="button" data-action="fechar-escalonamento" data-target="modal-cancelar-admin" class="bento-modal-close">
                 <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
             </button>
         </div>
         <div class="space-y-4" style="padding:24px;">
             <label class="bento-field-label" style="margin-bottom:6px;">
-                {{ t('ticket_cancel_frozen_confirm') if t else 'Informe o motivo do cancelamento' }} <span style="color:#e11d48;">*</span>
+                {{ t('ticket_cancel_frozen_confirm') if t else 'Informe o motivo do cancelamento' }} <span style="color:var(--color-bento-danger);">*</span>
             </label>
             <textarea id="motivo-cancelar-admin" rows="3" maxlength="500"
                 placeholder="{{ t('ticket_cancel_frozen_confirm') if t else 'Descreva o motivo para cancelar este chamado...' }}"
@@ -1365,7 +1365,7 @@ function cancelarChamadoAdmin() {
         <p style="font-size:13px; font-weight:600;">{{ t('cancel_ticket_sol_hint') if t else 'Informe o motivo do cancelamento (obrigatório).' }}</p>
         <div>
             <label class="bento-field-label" style="margin-bottom:6px;">
-                {% set _cr = t('cancellation_reason') %}{{ _cr if _cr != 'cancellation_reason' else 'Motivo' }} <span style="color:#e11d48;">*</span>
+                {% set _cr = t('cancellation_reason') %}{{ _cr if _cr != 'cancellation_reason' else 'Motivo' }} <span style="color:var(--color-bento-danger);">*</span>
             </label>
             <textarea id="sol-motivo-cancelar" rows="3" maxlength="500"
                 placeholder="{{ t('cancellation_reason_placeholder') if t else 'Informe o motivo do cancelamento' }}"

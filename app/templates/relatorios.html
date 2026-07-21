@@ -3,7 +3,7 @@
 {% block content %}
 <div class="space-y-4">
     {% if erro_relatorio %}
-    <div class="bento-notice" style="background:#fff1f2; color:#be123c;" role="alert">
+    <div class="bento-notice" style="background:#fff1f2; color:var(--color-bento-danger-deep);" role="alert">
         <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
         <p style="flex:1; font-weight:600;">{{ t('error_generating_reports') }}</p>
         <a href="{{ url_for('main.relatorios', dias=dias, atualizar=1) }}" class="bento-btn-primary">{{ t('retry') }}</a>
@@ -278,18 +278,18 @@
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div class="bento-sla-card ok gsap-scroll-reveal-item">
                 <p style="font-size:11px; font-weight:800; color:var(--color-text-muted); text-transform:uppercase; letter-spacing:.06em; margin-bottom:4px;">{{ t('on_time') }}</p>
-                <p class="font-display" style="font-size:2rem; font-weight:800; color:#059669;">{{ metricas_gerais.resumo_sla.no_prazo }}</p>
+                <p class="font-display" style="font-size:2rem; font-weight:800; color:var(--color-bento-success-deep);">{{ metricas_gerais.resumo_sla.no_prazo }}</p>
                 <p style="font-size:10px; font-weight:700; color:var(--color-surface-muted); text-transform:uppercase; margin-top:4px;">{{ t('completed_on_time') }}</p>
             </div>
             <div class="bento-sla-card warn gsap-scroll-reveal-item">
                 <p style="font-size:11px; font-weight:800; color:var(--color-text-muted); text-transform:uppercase; letter-spacing:.06em; margin-bottom:4px;">{{ t('delayed') }}</p>
-                <p class="font-display" style="font-size:2rem; font-weight:800; color:#e11d48;">{{ metricas_gerais.resumo_sla.atrasado }}</p>
+                <p class="font-display" style="font-size:2rem; font-weight:800; color:var(--color-bento-danger);">{{ metricas_gerais.resumo_sla.atrasado }}</p>
                 <p style="font-size:10px; font-weight:700; color:var(--color-surface-muted); text-transform:uppercase; margin-top:4px;">{{ t('overdue') }}</p>
             </div>
             <div class="bento-sla-card risk gsap-scroll-reveal-item">
-                <p style="font-size:11px; font-weight:800; color:#92400e; text-transform:uppercase; letter-spacing:.06em; margin-bottom:4px;">{{ t('at_risk') }}</p>
-                <p class="font-display" style="font-size:2rem; font-weight:800; color:#d97706;">{{ metricas_gerais.resumo_sla.em_risco }}</p>
-                <p style="font-size:10px; font-weight:700; color:#92400e; opacity:.7; text-transform:uppercase; margin-top:4px;">{{ t('due_in_1_day') }}</p>
+                <p style="font-size:11px; font-weight:800; color:var(--color-bento-warning-deep); text-transform:uppercase; letter-spacing:.06em; margin-bottom:4px;">{{ t('at_risk') }}</p>
+                <p class="font-display" style="font-size:2rem; font-weight:800; color:var(--color-bento-warning-icon);">{{ metricas_gerais.resumo_sla.em_risco }}</p>
+                <p style="font-size:10px; font-weight:700; color:var(--color-bento-warning-deep); opacity:.7; text-transform:uppercase; margin-top:4px;">{{ t('due_in_1_day') }}</p>
             </div>
         </div>
     </div>
@@ -405,7 +405,7 @@
                                 <td style="text-align:center;">
                                     <span class="bento-mini-badge {% if sup.carga_atual > 10 %}danger{% elif sup.carga_atual > 5 %}warn{% endif %}">{{ sup.carga_atual }}</span>
                                 </td>
-                                <td style="text-align:center; font-weight:700; color:#059669; font-size:13px;">{{ sup.concluidos }}</td>
+                                <td style="text-align:center; font-weight:700; color:var(--color-bento-success-deep); font-size:13px;">{{ sup.concluidos }}</td>
                                 <td>
                                     <div class="flex items-center gap-2">
                                         <div class="bento-progress-track"><div class="bento-progress-fill" data-width="{{ sup.taxa_resolucao_percentual }}" style="width:0;"></div></div>
@@ -415,7 +415,7 @@
                                 <td style="text-align:right; font-family:var(--font-mono,monospace); color:var(--color-surface-muted); font-size:12px;">{{ sup.tempo_medio_resolucao_horas }}h</td>
                                 <td style="text-align:right;">
                                     {% if sup.percentual_dentro_sla is not none %}
-                                    <span style="font-weight:700; font-size:12px; color:{% if sup.percentual_dentro_sla >= 80 %}#059669{% elif sup.percentual_dentro_sla >= 60 %}#0d9488{% else %}#d97706{% endif %};">{{ sup.percentual_dentro_sla }}%</span>
+                                    <span style="font-weight:700; font-size:12px; color:{% if sup.percentual_dentro_sla >= 80 %}var(--color-bento-success-deep){% elif sup.percentual_dentro_sla >= 60 %}#0d9488{% else %}var(--color-bento-warning-icon){% endif %};">{{ sup.percentual_dentro_sla }}%</span>
                                     {% else %}
                                     <span style="color:var(--color-surface-muted); font-size:12px;">—</span>
                                     {% endif %}

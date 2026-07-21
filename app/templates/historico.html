@@ -129,7 +129,7 @@
                                     <div class="bento-timeline-detail dados space-y-3">
                                         {% if evento.campo_alterado in ('anexo', 'novo anexo') %}
                                             <p style="font-size:13px;">
-                                                <span style="font-weight:700; color:#7c3aed;">{{ t('history_attachment_added') }}:</span>
+                                                <span style="font-weight:700; color:var(--color-bento-violet);">{{ t('history_attachment_added') }}:</span>
                                                 <span style="font-weight:600;">{{ evento.detalhe or (evento.valor_novo.split('/')[-1] if evento.valor_novo else '') }}</span>
                                             </p>
                                             {% if evento.valor_novo and (evento.valor_novo.startswith('http') or evento.valor_novo.startswith('/')) %}
@@ -155,7 +155,7 @@
                                             </div>
                                         {% else %}
                                             <p style="font-size:13px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-                                                <span style="font-weight:700; color:#7c3aed;">{{ t('changed_field') }}</span>
+                                                <span style="font-weight:700; color:var(--color-bento-violet);">{{ t('changed_field') }}</span>
                                                 <span class="bento-diff-chip neutral small">{{ evento.campo_alterado|translate_field_label }}</span>
                                                 {% if evento.valor_anterior or evento.valor_novo %}
                                                 <span style="color:var(--color-surface-muted);">—</span>
@@ -167,12 +167,12 @@
                                         {% endif %}
                                     </div>
                                 {% elif evento.acao == 'criacao' %}
-                                    <div class="bento-timeline-detail" style="border-top-color:#059669;">
+                                    <div class="bento-timeline-detail" style="border-top-color:var(--color-bento-success-deep);">
                                         <p style="font-size:13px; display:flex; align-items:center; gap:8px;">
-                                            <svg width="16" height="16" style="color:#059669;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <svg width="16" height="16" style="color:var(--color-bento-success-deep);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                                             </svg>
-                                            <span style="font-weight:700; color:#047857;">{{ t('ticket_started_successfully') }}</span>
+                                            <span style="font-weight:700; color:var(--color-bento-success);">{{ t('ticket_started_successfully') }}</span>
                                         </p>
                                     </div>
                                 {% endif %}

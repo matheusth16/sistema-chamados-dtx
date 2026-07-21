@@ -4,7 +4,7 @@
     data-detail-url="{{ url_for('main.visualizar_detalhe_chamado', chamado_id=chamado.id) }}"
     class="hoverable{% if chamado.categoria == 'Projetos' %} bento-tr-projeto{% elif chamado.categoria == 'AOG' %} bento-tr-aog{% endif %}">
     <td style="overflow:visible;">
-        <label style="display:inline-flex; align-items:center; justify-content:center; min-width:32px; min-height:32px; cursor:pointer;">
+        <label style="display:inline-flex; align-items:center; justify-content:center; min-width:44px; min-height:44px; cursor:pointer;">
             <input type="checkbox" class="bulk-cb bento-checkbox"
                 value="{{ chamado.id }}" data-id="{{ chamado.id }}" aria-label="{{ t('select_ticket') if t and t('select_ticket') != 'select_ticket' else 'Selecionar chamado' }}">
         </label>

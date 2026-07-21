@@ -6,7 +6,7 @@
 
   <div class="bento-card">
     {% call page_header(t('admin_global_title')) %}
-      <span class="bento-status-pill role-supervisor" style="background:#f3e8ff; color:#7e22ce;">
+      <span class="bento-status-pill role-supervisor" style="background:var(--color-bento-purple-bg); color:var(--color-bento-purple);">
         <svg width="12" height="12" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 1a4.5 4.5 0 00-4.5 4.5V9H5a2 2 0 00-2 2v6a2 2 0 002 2h10a2 2 0 002-2v-6a2 2 0 00-2-2h-.5V5.5A4.5 4.5 0 0010 1zm3 8V5.5a3 3 0 10-6 0V9h6z" clip-rule="evenodd"/></svg>
         {{ t('profile_admin_global') }}
       </span>
@@ -25,7 +25,7 @@
     </div>
     <div class="bento-card">
       <p style="font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.06em; color:var(--color-text-muted); margin-bottom:4px;">{{ t('active_sub_admins') }}</p>
-      <p style="font-size:1.75rem; font-weight:800; color:#7e22ce;">{{ sub_admins | length }}</p>
+      <p style="font-size:1.75rem; font-weight:800; color:var(--color-bento-purple);">{{ sub_admins | length }}</p>
     </div>
   </div>
 
@@ -90,7 +90,7 @@
           <td>
             <form method="POST" action="{{ url_for('main.admin_global_promover_supervisor', usuario_id=u.id) }}" class="inline" data-confirm="{{ t('confirm_promote_to_admin', nome=u.nome) }}">
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-              <button type="submit" class="bento-row-btn" style="background:#faf5ff; color:#7e22ce;">
+              <button type="submit" class="bento-row-btn" style="background:#faf5ff; color:var(--color-bento-purple);">
                 {{ t('promote_to_admin_btn') }}
               </button>
             </form>

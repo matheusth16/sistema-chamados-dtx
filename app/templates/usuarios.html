@@ -56,7 +56,7 @@
                 {% if current_user.perfil == 'admin' %}
                 <form method="POST" action="{{ url_for('main.resetar_exp_usuario', usuario_id=usuario.id) }}" data-confirm="{{ t('confirm_reset_exp', nome=usuario.nome) }}">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                  <button type="submit" class="bento-row-btn" style="background:var(--color-status-open-bg); color:#b45309;" title="{{ t('reset_exp_btn_title') }}">
+                  <button type="submit" class="bento-row-btn" style="background:var(--color-status-open-bg); color:var(--color-bento-warning);" title="{{ t('reset_exp_btn_title') }}">
                     {{ t('reset_exp_btn') }}
                   </button>
                 </form>

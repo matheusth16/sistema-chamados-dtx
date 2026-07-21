@@ -40,6 +40,10 @@ colors:
   bento-purple-bg: "#f3e8ff"
   bento-violet: "#7c3aed"
   bento-teal: "#0f766e"
+  bento-info: "#1e40af"
+  bento-info-bg: "#eff6ff"
+  bento-info-bg-deep: "#dbeafe"
+  text-primary: "#1a1e2e"
 typography:
   display:
     fontFamily: "Manrope, sans-serif"
@@ -146,8 +150,10 @@ Camada de cor introduzida pelo redesign visual "bento" (2026-07), portada litera
 - **Roxo Admin Global** (`#7e22ce` texto / `#f3e8ff` fundo claro): badge de perfil `admin_global` e tag "multi-setor".
 - **Violeta Alteração de Dados** (`#7c3aed`): marcador de evento "dados alterados" na timeline de histórico — distingue de "status alterado" (Azul DTX) e "criação" (Verde).
 - **Teal Colaboração** (`#0f766e`): estados de participação/co-atendimento (escalonamento pra colega, "concluir minha parte").
+- **Azul Informativo** (`#1e40af` texto / `#eff6ff` fundo claro / `#dbeafe` fundo profundo): anexos do tipo link (OneDrive/SharePoint), avisos informativos, status "em atendimento" de participante.
 
 ### Neutral
+- **Texto Primário** (`#1a1e2e`): cor de texto base do `body` — quase-preto azulado, não preto puro.
 - **Canvas** (`#F2F4F7`): fundo geral da aplicação — cinza-azulado frio, "papel técnico aeroespacial".
 - **Base** (`#FFFFFF`): cards, modais, formulários.
 - **Raised** (`#E8ECF2`): cabeçalhos de tabela, seções elevadas.
@@ -182,10 +188,11 @@ Camada de cor introduzida pelo redesign visual "bento" (2026-07), portada litera
 O sistema é **em camadas (layered)**, não flat. Sombras têm papel estrutural: cards descansam levemente acima do canvas, e o botão primário ganha profundidade tátil via gradiente + highlight interno — não para decoração, mas para sinalizar "isto é a ação principal desta tela".
 
 ### Shadow Vocabulary
-- **dtx-sm** (`0 1px 2px 0 rgb(0 0 0 / 0.05)`): elevação mínima — inputs, elementos quase no plano do canvas.
-- **dtx** (`0 1px 3px 0 rgb(0 0 0 / 0.08), 0 1px 2px -1px rgb(0 0 0 / 0.05)`): elevação padrão de `.dtx-card` — cards, dropdowns, toasts.
-- **dtx-md** (`0 4px 12px 0 rgb(0 0 0 / 0.10), 0 2px 4px -1px rgb(0 0 0 / 0.06)`): elevação de destaque — `.dtx-card-raised`, modais.
+*(Corrigido em 2026-07-21: os valores abaixo foram conferidos contra o CSS real — a versão anterior deste documento citava um terceiro nível "dtx-sm" que não existe no código, e os valores de "dtx"/"dtx-md" estavam levemente errados.)*
+- **dtx** (`0 2px 8px rgb(0 0 0 / 0.06), 0 1px 2px rgb(0 0 0 / 0.04)`): elevação padrão de `.dtx-card` — cards, dropdowns, toasts.
+- **dtx-md** (`0 4px 16px rgb(0 0 0 / 0.10)`, adicionada sobre `dtx`): elevação de destaque — `.dtx-card-raised`, modais.
 - **Botão primário** (`linear-gradient(180deg, dtx-400→dtx-700) + box-shadow 0 1px 3px rgb(0 0 0 / 0.3) + inset 0 1px 0 rgb(255 255 255 / 0.1)`): a única superfície com gradiente real no sistema — reservada para a ação primária (submit de login, CTAs principais).
+- **Família "bento" (redesign 2026-07):** vocabulário de sombra próprio, com tinta de marca em vez de preto neutro — base `rgba(20,30,60, X)`, X variando de `.05` (ícones pequenos) a `.25` (modais/dropdowns). Não convertida em tokens CSS individuais pela quantidade de variações finas de peso visual; usar o valor já existente mais próximo em vez de inventar um novo ao adicionar componente.
 
 ### Named Rules
 **A Regra do Destaque Único.** Gradiente é reservado para no máximo uma ação por tela — o botão primário. Cards, badges e navegação secundária permanecem em cor sólida.
@@ -245,6 +252,6 @@ A tabela de chamados é o componente mais denso do sistema — funciona como tel
 - **Don't** usar classes cinza cruas do Tailwind (`text-gray-400`–`text-gray-900`, `#374151`, `#6b7280`, `#9ca3af`) fora dos tokens `surface-muted`/`text-muted` — apareceram soltas em alguns componentes (nav, botão secundário) sem passar pelo token semântico. Preferir sempre `var(--color-text-muted)`/`var(--color-surface-muted)`.
 - **Don't** deixar a paleta "conservadora demais" — o Azul DTX hoje só aparece em `dtx-600`/navbar na maior parte das telas; cor de status deve carregar mais peso informativo nas tabelas e dashboards, não só nos badges.
 - **Don't** usar valores de z-index arbitrários (`z-[N]`) quando a escala semântica existe. *(Resolvido em 2026-07-01: navbar, dropdowns, toasts, banners, modais e cabeçalhos sticky de tabela foram migrados para `z-sticky`/`z-nav`/`z-dropdown`/`z-modal`/`z-toast`. Como parte do fix, os banners de web push — antes em `z-[190]`, abaixo dos dropdowns da navbar — foram promovidos para o mesmo nível `z-toast` das flash messages, corrigindo uma inconsistência real onde dois elementos igualmente "toast" tinham prioridades de empilhamento diferentes.)*
-- **Don't** carregar JetBrains Mono sem aplicá-la de forma consistente — hoje a fonte está no `<link>` do `base.html` e usada em apenas 5 templates administrativos; ou ela vira o padrão para todo ID/timestamp técnico (incluindo o número do chamado na tabela do dashboard), ou o `<link>` deve ser removido para não pagar o custo de carregamento de uma fonte não utilizada.
+- **Don't** deixar JetBrains Mono inconsistente — regra: todo identificador/código técnico (números de chamado, IDs, códigos MFA, timestamps de auditoria) usa mono. *(Resolvido em 2026-07-21: aplicada também ao número do chamado nas tabelas de dashboard/meus-chamados — antes só em 6 templates administrativos.)*
 - **Don't** referenciar o nome de produto "Digital Andon" em código novo — o nome foi descontinuado; o nome oficial atual é **DTX Service Portal**. *(Resolvido: a navbar (`components/navbar.html`) já exibe "Service Portal" como rótulo da marca.)*
 - **Don't** parecer um SaaS genérico: nada de cards flutuantes sem propósito, paleta usada como decoração, ou flat design sem hierarquia (anti-referência direta do PRODUCT.md).
