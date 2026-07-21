@@ -1,7 +1,7 @@
 # CLAUDE.md — Convenções do Projeto sistema_chamados
 
 ## Stack
-- **Backend:** Flask 3.1 + Firestore (firebase-admin), Flask-Login, Flask-WTF (CSRF)
+- **Backend:** Flask 3.1 + Firestore (firebase-admin), Flask-Login, Flask-WTF (CSRF), Flask-Limiter (rate limiting em auth/API/dashboard, ver `app/limiter.py`)
 - **Frontend:** Tailwind CSS (compilado via CLI, `npm run build:css` — não é CDN), GSAP 3 (ScrollTrigger, ScrollToPlugin)
 - **Python:** 3.14, pytest + unittest.mock
 - **Blueprint:** único `main` — todos os módulos de rota registram nele
