@@ -621,6 +621,8 @@ curl -I http://hml-host/health
 
 - [x] **Implementação app — Onda 5 (2026-06-23)** | **Validação ops HML — 2026-06-23 (CWI 4.1)**
 
+> **Status atual (2026-07-21) — risco aceito:** não existe ambiente HML separado provisionado no Azure hoje (confirmado: `az containerapp list` retorna só o Container App de produção `sistema-chamados`). A validação ops de 2026-06-23 acima reflete um estado pontual anterior, não infra viva. Middleware e os 9 testes seguem prontos para quando um HML real for (re)criado; decisão de provisionar um segundo Container App + projeto Firebase só para staging foi conscientemente adiada — custo/manutenção extra não justificado pra escala atual de dev solo. Risco baixo, não bloqueante.
+
 ---
 
 ## Seção 11 — Frontend e JavaScript
@@ -1250,7 +1252,7 @@ Os itens deste checklist mapeiam para o OWASP Top 10 (2021):
 | **1.3** | IDOR — só recursos próprios (URL, body, anexo) | Sim | `tests/test_services/test_permissions.py`, `tests/test_routes/test_download_idor.py`, `test_api.py` | `[x]` 2026-06-23 — `GET /api/chamado/<id_alheio>` → 403 (+ pytest IDOR) |
 | **2.1** | HTTPS em produção (redirect HTTP→HTTPS) | Sim | `tests/test_config_production.py::test_cwi21_https_redirect_em_producao`, `tests/test_app_init.py` | `[x]` 2026-06-23 — prod simulada → 301 `https://` |
 | **2.2** | Senhas com hash forte (Werkzeug scrypt/pbkdf2) | Doc + teste | `tests/test_services/test_models_usuario.py::test_senha_hash_usa_formato_werkzeug_nao_plaintext`; `CHECKLIST_SEGURANCA.md §1.4` | `[x]` 2026-06-23 — Firestore `usuarios.senha_hash` prefixo `scrypt:32768:8:1$…` (não plaintext) |
-| **2.3** | PII minimizado/oculto nas respostas e criptografado em repouso | Sim | `tests/test_routes/test_api_security_responses.py` (respostas HTTP); `tests/test_services/test_pii_encryption.py` + `test_models_usuario.py` (Onda 4 Fernet) | `[x]` 2026-06-23 — resposta API sem `senha_hash`; mecanismo Fernet `fernet:v1:` pronto para `nome`/`email` — **`ENCRYPT_PII_AT_REST=false` é o default real** (`.env.example`), deliberado por segurança de boot; ativar em produção exige `ENCRYPTION_KEY` + migração prévia (ver §9.2) |
+| **2.3** | PII minimizado/oculto nas respostas e criptografado em repouso | Sim | `tests/test_routes/test_api_security_responses.py` (respostas HTTP); `tests/test_services/test_pii_encryption.py` + `test_models_usuario.py` (Onda 4 Fernet) | `[x]` 2026-06-23 — resposta API sem `senha_hash`; mecanismo Fernet `fernet:v1:` pronto para `nome`/`email` — **ativado em produção 2026-07-20** (`ENCRYPT_PII_AT_REST=true`, `.env.example` continua com default `false` por segurança de boot em novos ambientes); 100% dos docs `usuarios` migrados, confirmado 2026-07-21 |
 | **3.1** | SQL/NoSQL injection | Sim | `tests/test_security/test_injection_regression.py` — 33 testes parametrizados (SQL, NoSQL, editar-chamado) | `[x]` 2026-06-23 — `search=' OR 1=1--` → 200 (+ 33 pytest) |
 | **3.2** | Erros genéricos (sem stack/tecnologia nas respostas) | Sim | `tests/test_routes/test_api_security_responses.py` (500 handlers com `ERRO_INTERNO_MSG`); `CHECKLIST_SEGURANCA.md §8.4` | `[x]` 2026-06-23 — 500 → `Erro interno. Tente novamente.` |
 | **4.1** | Ambientes de teste não acessíveis publicamente | Sim (app) + ops (rede) | `tests/test_routes/test_staging_auth.py` — 9 testes; VPN/firewall + Basic Auth fallback | `[x]` 2026-06-23 — camada rede (VPN/firewall) + camada app (Basic Auth staging) validadas ops |
@@ -1261,7 +1263,7 @@ Os itens deste checklist mapeiam para o OWASP Top 10 (2021):
 | Meta | Status | Dependências pendentes |
 |---|---|---|
 | **CWI básico (execução QA 2026-06-23)** | ✅ **11/11 sub-itens CWI** | — |
-| **CWI 2.3 completo (Fernet/LGPD)** | ✅ **Mecanismo completo** (Onda 4); rollout de 2/2 usuários migrados foi feito em ambiente de teste pontual — `ENCRYPT_PII_AT_REST=false` é o default em `.env.example`/produção real (correção 2026-07-06) | Ativar em produção: `ENCRYPTION_KEY` + `scripts/migrar_pii_criptografia.py --apply` |
+| **CWI 2.3 completo (Fernet/LGPD)** | ✅ **Ativo em produção** (`ENCRYPT_PII_AT_REST=true`, confirmado 2026-07-21) — 100% dos usuários migrados, índice `email_lookup_hash` deployado | — |
 | **CWI + baseline DTX** | ✅ Implementado | Onda 2 (`ativo=false`) implementada |
 
 > **Última execução QA manual:** 2026-06-23 — `python scripts/executar_qa_manual_cwi.py` → 15 PASS, 0 FAIL, 2 SKIP. Evidência: `docs/evidencias/QA_MANUAL_CWI_EVIDENCIA.md`
