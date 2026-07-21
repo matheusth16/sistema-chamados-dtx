@@ -1,11 +1,14 @@
 # CLAUDE.md — Convenções do Projeto sistema_chamados
 
 ## Stack
-- **Backend:** Flask 3.1 + Firestore (firebase-admin), Flask-Login, Flask-WTF (CSRF), Flask-Limiter (rate limiting em auth/API/dashboard, ver `app/limiter.py`)
+- **Backend:** Flask 3.1 + Firestore (firebase-admin), Flask-Login, Flask-WTF (CSRF), Flask-Limiter (rate limiting em auth/API/dashboard, ver `app/limiter.py`), gunicorn (WSGI em produção)
 - **Frontend:** Tailwind CSS (compilado via CLI, `npm run build:css` — não é CDN), GSAP 3 (ScrollTrigger, ScrollToPlugin)
 - **Python:** 3.14, pytest + unittest.mock
 - **Blueprint:** único `main` — todos os módulos de rota registram nele
-- **Serviços externos:** Firebase/Firestore (banco), Cloudflare R2 (anexos — bucket privado, URLs pré-assinadas), Microsoft Graph API (e-mail)
+- **Autenticação/Segurança:** MFA via TOTP + QR code (`pyotp`, `segno`, ver `app/routes/mfa.py`), SSO Microsoft/Entra ID (`msal`, ver `app/services/sso_microsoft_service.py`), criptografia de PII em repouso — LGPD (`cryptography`, ver `app/services/pii_encryption.py`)
+- **Serviços externos:** Firebase/Firestore (banco), Cloudflare R2 via boto3 (anexos — bucket privado, URLs pré-assinadas), Microsoft Graph API (e-mail), Web Push (`pywebpush`, ver `app/services/webpush_service.py`)
+- **Infra:** Redis (cache/backend do rate limiter, ver `app/cache.py`), APScheduler (jobs agendados, ver `app/__init__.py`)
+- **Exportação:** Excel via `openpyxl` (ver `app/services/excel_export_service.py`)
 
 ## Perfis de usuário
 - `solicitante` — cria e acompanha os próprios chamados
@@ -134,3 +137,13 @@ tests/
 - Não adicionar lógica de negócio diretamente nas rotas — usar services
 - Não commitar sem passar o ciclo de qualidade acima
 - Não usar `git add .` sozinho — revisar o que está sendo commitado
+
+## Skills padrão deste projeto
+Base gerada por `/aas` (bootstrap) em 2026-07-21 — ponto de partida pra qualquer `/aas <tema>` futuro.
+
+- **Segurança** (obrigatória): `backend-security-coder`, `auth-implementation-patterns`, `secrets-management`, `privacy-by-design`, `sast-configuration` — auth combina Flask-Login + MFA (pyotp) + SSO Microsoft (msal); PII criptografado em repouso (LGPD); múltiplos segredos (Firebase, R2, MSAL, chave Fernet)
+- **Dados/storage**: `nosql-expert` — Firestore é NoSQL, não relacional
+- **Testes/qualidade**: `pytest-skill`, `test-driven-development` — TDD é regra explícita deste arquivo
+- **UX/Acessibilidade**: `tailwind-patterns`, `ui-a11y` — design system real é Tailwind; acessibilidade nunca auditada formalmente
+- **Deploy/operações**: `docker-expert`, `azd-deployment` — produção roda em Azure Container Apps
+- **Manutenção**: `git-pushing`, `lint-and-validate` — já é o fluxo real (`smart_commit.sh` no ciclo de qualidade acima)
