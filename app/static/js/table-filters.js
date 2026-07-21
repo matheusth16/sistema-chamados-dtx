@@ -46,10 +46,17 @@
      */
     function bindHeaderEvents() {
         document.querySelectorAll('th.sortable[data-column]').forEach(th => {
-            th.addEventListener('click', () => {
+            const ativar = () => {
                 const columnIndex = parseInt(th.dataset.column, 10);
                 const type = th.dataset.sortType || 'text';
                 window.sortTable(columnIndex, type);
+            };
+            th.addEventListener('click', ativar);
+            th.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    ativar();
+                }
             });
         });
 
@@ -213,9 +220,11 @@
             if (colIndex === activeColumn) {
                 icon.innerHTML = direction === 'asc' ? '↑' : '↓';
                 icon.classList.add('active');
+                th.setAttribute('aria-sort', direction === 'asc' ? 'ascending' : 'descending');
             } else {
                 icon.innerHTML = '↕';
                 icon.classList.remove('active');
+                th.setAttribute('aria-sort', 'none');
             }
         });
     }

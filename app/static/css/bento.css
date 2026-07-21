@@ -351,7 +351,9 @@ dialog.bento-modal textarea:focus{ outline:none; border-color:var(--color-dtx-50
 /* Dropdowns puramente CSS (idioma, perfil) — hover no wrapper, sem JS */
 .bento-nav-hover-wrap{ position:relative; }
 .bento-nav-hover-wrap .bento-nav-dropdown{ opacity:0; visibility:hidden; transform:translateY(8px) scale(.95); transition:all .2s ease-out; }
-.bento-nav-hover-wrap:hover .bento-nav-dropdown{ opacity:1; visibility:visible; transform:translateY(0) scale(1); }
+.bento-nav-hover-wrap:hover .bento-nav-dropdown,
+.bento-nav-hover-wrap:focus-within .bento-nav-dropdown,
+.bento-nav-hover-wrap.open .bento-nav-dropdown{ opacity:1; visibility:visible; transform:translateY(0) scale(1); }
 
 .bento-nav-lang-item{ display:flex; align-items:center; justify-content:space-between; padding:10px 12px; border-radius:12px; font-size:14px; text-decoration:none; color:#4b5563; font-weight:500; border:1px solid transparent; transition:all .15s; }
 .bento-nav-lang-item:hover{ background:var(--color-surface-raised); color:#111827; }

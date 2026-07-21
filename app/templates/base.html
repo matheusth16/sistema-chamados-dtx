@@ -72,6 +72,8 @@
       get_flashed_messages(with_categories=true) %} {% if messages %}
       <div
         id="flash-messages"
+        role="status"
+        aria-live="polite"
         class="fixed top-20 right-4 z-toast flex flex-col gap-3 pointer-events-none w-full max-w-sm"
       >
         {% for category, message in messages %} {% set icon_path =
@@ -564,6 +566,45 @@
       })();
     </script>
     {% endif %}
+
+    <!-- Toggle por teclado dos dropdowns de idioma/perfil (CSS já abre no :hover;
+         aqui cobrimos clique/Enter e fechamento por Escape/clique fora, já que
+         :focus-within sozinho não cobre navegação por teclado até o fim). -->
+    <script nonce="{{ csp_nonce }}">
+      (function () {
+        document.querySelectorAll(".bento-nav-hover-wrap > button").forEach(function (btn) {
+          var wrap = btn.parentElement;
+          btn.addEventListener("click", function (e) {
+            e.stopPropagation();
+            var abrir = !wrap.classList.contains("open");
+            document.querySelectorAll(".bento-nav-hover-wrap.open").forEach(function (w) {
+              w.classList.remove("open");
+              var b = w.querySelector("button");
+              if (b) b.setAttribute("aria-expanded", "false");
+            });
+            if (abrir) {
+              wrap.classList.add("open");
+              btn.setAttribute("aria-expanded", "true");
+            }
+          });
+        });
+        document.addEventListener("click", function () {
+          document.querySelectorAll(".bento-nav-hover-wrap.open").forEach(function (w) {
+            w.classList.remove("open");
+            var b = w.querySelector("button");
+            if (b) b.setAttribute("aria-expanded", "false");
+          });
+        });
+        document.addEventListener("keydown", function (e) {
+          if (e.key !== "Escape") return;
+          document.querySelectorAll(".bento-nav-hover-wrap.open").forEach(function (w) {
+            w.classList.remove("open");
+            var b = w.querySelector("button");
+            if (b) b.setAttribute("aria-expanded", "false");
+          });
+        });
+      })();
+    </script>
 
     <!-- Toggle menu hamburger (supervisor/admin) -->
     <script nonce="{{ csp_nonce }}">

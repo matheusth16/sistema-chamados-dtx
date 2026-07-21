@@ -29,7 +29,7 @@
     --color-surface-base:   #FFFFFF;
     --color-surface-raised: #E8ECF2;
     --color-surface-border: #C4CDD9;
-    --color-surface-muted:  #8B9EC0;
+    --color-surface-muted:  #5F6E8C;   /* 5.1:1 sobre branco (WCAG AA) — era #8B9EC0 (2.71:1, falhava) */
     --color-text-muted:     #697084;   /* texto secundário legível (labels, hints) — distinto de surface-muted (placeholder/disabled) */
 
     /* Status */

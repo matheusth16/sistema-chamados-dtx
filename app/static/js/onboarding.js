@@ -761,6 +761,7 @@
     card.setAttribute('role', 'dialog');
     card.setAttribute('aria-modal', 'true');
     card.setAttribute('aria-label', ui.done_title);
+    card.setAttribute('tabindex', '-1');
     Object.assign(card.style, {
       position: 'fixed', zIndex: '9001',
       maxWidth: '400px', width: 'calc(100vw - 32px)',
@@ -789,6 +790,25 @@
   function onKeyDown(e) {
     if (e.key === 'Escape') { skipTour(); return; }
     if (e.key === 'ArrowRight') nextStep();
+    if (e.key === 'Tab') _trapFocus(e);
+  }
+
+  // Focus trap: Tab/Shift+Tab não deve sair do card enquanto o tour está aberto
+  // (mesmo padrão usado nos modais de escalonamento em visualizar_chamado.html).
+  function _trapFocus(e) {
+    var focaveis = Array.prototype.slice
+      .call(card.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'))
+      .filter(function (el) { return !el.disabled && el.offsetParent !== null; });
+    if (focaveis.length === 0) { e.preventDefault(); card.focus({ preventScroll: true }); return; }
+    var primeiro = focaveis[0];
+    var ultimo = focaveis[focaveis.length - 1];
+    if (e.shiftKey && document.activeElement === primeiro) {
+      ultimo.focus();
+      e.preventDefault();
+    } else if (!e.shiftKey && (document.activeElement === ultimo || document.activeElement === card)) {
+      primeiro.focus();
+      e.preventDefault();
+    }
   }
 
   // ─── Resize ────────────────────────────────────────────────────────────────
@@ -813,6 +833,7 @@
     clearHighlight();
     card.innerHTML = buildCardHTML(step, index);
     bindCardEvents(index);
+    card.focus({ preventScroll: true });
 
     var targetEl = step.selector ? document.querySelector(step.selector) : null;
     if (targetEl) { highlightTarget(targetEl); positionCard(targetEl); }
