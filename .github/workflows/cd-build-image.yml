@@ -51,7 +51,7 @@ jobs:
       # Não-bloqueante: só reporta, não falha o deploy. Endurecer para bloqueante
       # depois de um período rodando e triando os achados.
       - name: Trivy — scan de vulnerabilidades na imagem
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.28.0
         continue-on-error: true
         with:
           image-ref: ghcr.io/${{ github.repository }}@${{ steps.build.outputs.digest }}
