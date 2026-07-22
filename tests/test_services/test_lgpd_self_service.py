@@ -210,3 +210,66 @@ def test_listar_usuarios_com_solicitacao_pendente_retorna_vazio_quando_firestore
     resultado = listar_usuarios_com_solicitacao_pendente()
 
     assert resultado == set()
+
+
+# ── resolver_solicitacoes_exclusao_pendentes (fecha o loop quando admin age) ─
+
+
+def _doc_solicitacao(status="pendente"):
+    doc = MagicMock()
+    doc.to_dict.return_value = {"status": status}
+    return doc
+
+
+def test_resolver_solicitacoes_marca_pendente_como_concluida(mock_db):
+    from app.services.lgpd_self_service import resolver_solicitacoes_exclusao_pendentes
+
+    doc = _doc_solicitacao(status="pendente")
+    mock_db.collection.return_value.where.return_value.limit.return_value.stream.return_value = [
+        doc
+    ]
+
+    resultado = resolver_solicitacoes_exclusao_pendentes("u1", admin_id="a1", admin_nome="Admin")
+
+    assert resultado == 1
+    doc.reference.update.assert_called_once()
+    payload = doc.reference.update.call_args[0][0]
+    assert payload["status"] == "concluida"
+    assert payload["admin_id"] == "a1"
+    assert payload["admin_nome"] == "Admin"
+
+
+def test_resolver_solicitacoes_ignora_as_ja_concluidas(mock_db):
+    from app.services.lgpd_self_service import resolver_solicitacoes_exclusao_pendentes
+
+    doc = _doc_solicitacao(status="concluida")
+    mock_db.collection.return_value.where.return_value.limit.return_value.stream.return_value = [
+        doc
+    ]
+
+    resultado = resolver_solicitacoes_exclusao_pendentes("u1", admin_id="a1", admin_nome="Admin")
+
+    assert resultado == 0
+    doc.reference.update.assert_not_called()
+
+
+def test_resolver_solicitacoes_retorna_zero_quando_nao_ha_pedido(mock_db):
+    from app.services.lgpd_self_service import resolver_solicitacoes_exclusao_pendentes
+
+    mock_db.collection.return_value.where.return_value.limit.return_value.stream.return_value = []
+
+    resultado = resolver_solicitacoes_exclusao_pendentes("u1", admin_id="a1", admin_nome="Admin")
+
+    assert resultado == 0
+
+
+def test_resolver_solicitacoes_retorna_zero_quando_firestore_falha(mock_db):
+    from app.services.lgpd_self_service import resolver_solicitacoes_exclusao_pendentes
+
+    mock_db.collection.return_value.where.return_value.limit.return_value.stream.side_effect = (
+        Exception("err")
+    )
+
+    resultado = resolver_solicitacoes_exclusao_pendentes("u1", admin_id="a1", admin_nome="Admin")
+
+    assert resultado == 0

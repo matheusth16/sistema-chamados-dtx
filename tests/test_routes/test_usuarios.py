@@ -492,6 +492,25 @@ def test_deletar_usuario_sucesso_registra_historico(client_logado_admin):
     assert kwargs["usuario_alvo_id"] == "u3"
 
 
+def test_deletar_usuario_sucesso_resolve_solicitacao_lgpd_pendente(client_logado_admin):
+    """POST deletar com sucesso fecha eventual solicitação de exclusão LGPD pendente."""
+    fake = _usuario_fake(uid="u3", email="u3@dtx.aero", nome="A Deletar")
+    fake.delete = lambda: None
+    with (
+        patch(
+            "app.models_usuario.Usuario.get_by_id", side_effect=_get_by_id_side_effect("u3", fake)
+        ),
+        patch("app.routes.usuarios.Usuario.invalidar_cache_supervisores_por_area"),
+        patch(
+            "app.services.lgpd_self_service.resolver_solicitacoes_exclusao_pendentes"
+        ) as mock_resolver,
+    ):
+        client_logado_admin.post("/admin/usuarios/u3/deletar", follow_redirects=False)
+
+    mock_resolver.assert_called_once()
+    assert mock_resolver.call_args.args[0] == "u3"
+
+
 def test_deletar_usuario_nao_encontrado_redireciona(client_logado_admin):
     """POST deletar com ID inexistente redireciona com erro user_not_found."""
     admin = _admin_mock_para_flask_login()
@@ -1544,6 +1563,28 @@ def test_anonimizar_usuario_desativado_sucesso(client_logado_admin):
     assert "u_anon" in kwargs["email"]
     mock_hist.assert_called_once()
     assert mock_hist.call_args.kwargs["acao"] == "anonimizacao"
+
+
+def test_anonimizar_usuario_sucesso_resolve_solicitacao_lgpd_pendente(client_logado_admin):
+    """POST anonimizar com sucesso fecha eventual solicitação de exclusão LGPD pendente."""
+    fake = _usuario_fake(uid="u_anon", email="u_anon@dtx.aero", nome="Pessoa Real")
+    fake.ativo = False
+    fake.update = MagicMock(return_value=True)
+    with (
+        patch(
+            "app.models_usuario.Usuario.get_by_id",
+            side_effect=_get_by_id_side_effect("u_anon", fake),
+        ),
+        patch("app.routes.usuarios.Usuario.invalidar_cache_supervisores_por_area"),
+        patch("app.routes.usuarios.cache_delete"),
+        patch(
+            "app.services.lgpd_self_service.resolver_solicitacoes_exclusao_pendentes"
+        ) as mock_resolver,
+    ):
+        client_logado_admin.post("/admin/usuarios/u_anon/anonimizar", follow_redirects=False)
+
+    mock_resolver.assert_called_once()
+    assert mock_resolver.call_args.args[0] == "u_anon"
 
 
 def test_anonimizar_usuario_ativo_bloqueado(client_logado_admin):

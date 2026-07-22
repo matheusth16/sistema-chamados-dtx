@@ -291,6 +291,8 @@ def deletar_usuario(usuario_id: str) -> Response:
         )
         if bloqueio:
             return bloqueio
+        from app.services.lgpd_self_service import resolver_solicitacoes_exclusao_pendentes
+
         nome_usuario = usuario.nome
         usuario.delete()
         cache_delete(CACHE_KEY_USUARIOS)
@@ -302,6 +304,9 @@ def deletar_usuario(usuario_id: str) -> Response:
             admin_id=current_user.id,
             admin_nome=current_user.nome,
             acao="exclusao",
+        )
+        resolver_solicitacoes_exclusao_pendentes(
+            usuario_id, admin_id=current_user.id, admin_nome=current_user.nome
         )
         flash_t("user_deleted_success", "success", nome=nome_usuario)
         return redirect(url_for("main.gerenciar_usuarios"))
@@ -524,6 +529,8 @@ def anonimizar_usuario(usuario_id: str) -> Response:
             flash_t("must_deactivate_before_anonymize", "danger")
             return redirect(url_for("main.gerenciar_usuarios"))
 
+        from app.services.lgpd_self_service import resolver_solicitacoes_exclusao_pendentes
+
         nome_anonimizado = "Usuário Removido"
         email_anonimizado = f"removido-{usuario_id}@anonimizado.invalid"
         usuario.update(nome=nome_anonimizado, email=email_anonimizado)
@@ -536,6 +543,9 @@ def anonimizar_usuario(usuario_id: str) -> Response:
             admin_id=current_user.id,
             admin_nome=current_user.nome,
             acao="anonimizacao",
+        )
+        resolver_solicitacoes_exclusao_pendentes(
+            usuario_id, admin_id=current_user.id, admin_nome=current_user.nome
         )
         flash_t("user_anonymized_success", "success")
         return redirect(url_for("main.gerenciar_usuarios"))

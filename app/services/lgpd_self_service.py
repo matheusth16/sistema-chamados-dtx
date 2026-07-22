@@ -144,3 +144,40 @@ def listar_usuarios_com_solicitacao_pendente() -> set[str]:
     except Exception:
         logger.exception("Erro ao listar solicitações de exclusão LGPD pendentes")
         return set()
+
+
+def resolver_solicitacoes_exclusao_pendentes(
+    usuario_id: str, admin_id: str, admin_nome: str
+) -> int:
+    """Marca como concluídas as solicitações de exclusão LGPD pendentes de um usuário.
+
+    Chamado quando um admin executa a ação que atende o pedido (deletar ou
+    anonimizar a conta) — fecha o loop pra não deixar o badge em /admin/usuarios
+    preso indefinidamente. Retorna quantas solicitações foram resolvidas.
+    """
+    try:
+        docs = (
+            db.collection(COLLECTION_SOLICITACOES)
+            .where(filter=FieldFilter("usuario_id", "==", usuario_id))
+            .limit(_LIMITE_SOLICITACOES_USUARIO)
+            .stream()
+        )
+        resolvidas = 0
+        for doc in docs:
+            if (doc.to_dict() or {}).get("status") != "pendente":
+                continue
+            doc.reference.update(
+                {
+                    "status": "concluida",
+                    "data_resolucao": firestore.SERVER_TIMESTAMP,
+                    "admin_id": admin_id,
+                    "admin_nome": admin_nome,
+                }
+            )
+            resolvidas += 1
+        return resolvidas
+    except Exception:
+        logger.exception(
+            "Erro ao resolver solicitações de exclusão LGPD pendentes: usuario_id=%s", usuario_id
+        )
+        return 0
