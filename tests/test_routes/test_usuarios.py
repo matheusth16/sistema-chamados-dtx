@@ -58,6 +58,24 @@ def test_admin_usuarios_com_admin_retorna_200(client_logado_admin):
     assert b"usuarios" in r.data.lower() or b"user" in r.data.lower()
 
 
+def test_admin_usuarios_mostra_badge_lgpd_para_usuario_com_solicitacao_pendente(
+    client_logado_admin,
+):
+    """Usuário com solicitação de exclusão LGPD pendente aparece sinalizado na listagem."""
+    usuario_com_pedido = _usuario_fake(uid="u_pedido", nome="Com Pedido Pendente")
+    with (
+        patch("app.routes.usuarios.Usuario.get_all", return_value=[usuario_com_pedido]),
+        patch(
+            "app.services.lgpd_self_service.listar_usuarios_com_solicitacao_pendente",
+            return_value={"u_pedido"},
+        ),
+    ):
+        r = client_logado_admin.get("/admin/usuarios", follow_redirects=False)
+
+    assert r.status_code == 200
+    assert b'class="lgpd-pending-badge"' in r.data
+
+
 def test_admin_usuarios_novo_sem_login_redireciona(client):
     """GET /admin/usuarios/novo sem login redireciona para login."""
     r = client.get("/admin/usuarios/novo", follow_redirects=False)

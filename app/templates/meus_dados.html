@@ -63,7 +63,31 @@
             </div>
         </dl>
 
-        <div style="margin-top:28px;">
+        <div style="margin-top:28px; padding-top:24px; border-top:1px solid var(--color-border);">
+            <h2 class="font-display" style="font-size:1rem; font-weight:800;">{{ t('lgpd_rights_section_title') }}</h2>
+            <p style="margin-top:4px; font-size:13px; color:var(--color-text-muted);">{{ t('lgpd_rights_section_subtitle') }}</p>
+
+            <div style="display:flex; flex-direction:column; gap:12px; margin-top:16px;">
+                <a href="{{ url_for('main.exportar_meus_dados') }}" class="bento-btn-outline" style="width:100%; justify-content:center;">
+                    {{ t('export_my_data') }}
+                </a>
+
+                {% if exclusao_pendente %}
+                <p style="font-size:13px; color:var(--color-bento-warning); text-align:center; margin:0;">
+                    {{ t('lgpd_exclusion_request_already_pending') }}
+                </p>
+                {% else %}
+                <form method="POST" action="{{ url_for('main.solicitar_exclusao_meus_dados') }}" data-confirm="{{ t('confirm_request_data_deletion') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <button type="submit" class="bento-row-btn delete" style="width:100%; justify-content:center;">
+                        {{ t('request_data_deletion') }}
+                    </button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+
+        <div style="margin-top:16px;">
             <a href="{{ url_for('main.index') }}" class="bento-btn-outline" style="width:100%; justify-content:center;">
                 {{ t('back') }}
             </a>
@@ -71,4 +95,14 @@
 
     </div>
 </div>
+
+<script nonce="{{ csp_nonce }}">
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('form[data-confirm]').forEach(function(form) {
+        form.addEventListener('submit', function(e) {
+            if (!confirm(form.dataset.confirm)) e.preventDefault();
+        });
+    });
+});
+</script>
 {% endblock %}

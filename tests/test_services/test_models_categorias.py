@@ -190,7 +190,10 @@ def test_setor_get_all_incluindo_inativos_retorna_ativos_e_inativos():
         patch("app.models_categorias.traduzir_categoria", return_value={"en": "X", "es": "X"}),
         patch("app.models_categorias.db") as mock_db,
     ):
-        mock_db.collection.return_value.stream.return_value = [doc_ativo, doc_inativo]
+        mock_db.collection.return_value.limit.return_value.stream.return_value = [
+            doc_ativo,
+            doc_inativo,
+        ]
         result = CategoriaSetor.get_all_incluindo_inativos()
 
     assert len(result) == 2
@@ -205,10 +208,21 @@ def test_setor_get_all_incluindo_inativos_retorna_vazio_quando_excecao():
     from app.models_categorias import CategoriaSetor
 
     with patch("app.models_categorias.db") as mock_db:
-        mock_db.collection.return_value.stream.side_effect = Exception("err")
+        mock_db.collection.return_value.limit.return_value.stream.side_effect = Exception("err")
         result = CategoriaSetor.get_all_incluindo_inativos()
 
     assert result == []
+
+
+def test_setor_get_all_incluindo_inativos_aplica_limite_de_seguranca():
+    """get_all_incluindo_inativos chama .limit(MAX_CATEGORIAS) antes de stream()."""
+    from app.models_categorias import MAX_CATEGORIAS, CategoriaSetor
+
+    with patch("app.models_categorias.db") as mock_db:
+        mock_db.collection.return_value.limit.return_value.stream.return_value = []
+        CategoriaSetor.get_all_incluindo_inativos()
+
+    mock_db.collection.return_value.limit.assert_called_once_with(MAX_CATEGORIAS)
 
 
 # ── CategoriaGate ─────────────────────────────────────────────────────────────
@@ -268,7 +282,7 @@ def test_gate_get_all_retorna_lista_ordenada():
         patch("app.models_categorias.traduzir_categoria", return_value={"en": "G", "es": "G"}),
         patch("app.models_categorias.db") as mock_db,
     ):
-        mock_db.collection.return_value.stream.return_value = [doc1, doc2]
+        mock_db.collection.return_value.limit.return_value.stream.return_value = [doc1, doc2]
         result = CategoriaGate.get_all()
 
     assert result[0].ordem == 1
@@ -280,10 +294,21 @@ def test_gate_get_all_retorna_vazio_quando_excecao():
     from app.models_categorias import CategoriaGate
 
     with patch("app.models_categorias.db") as mock_db:
-        mock_db.collection.return_value.stream.side_effect = Exception("err")
+        mock_db.collection.return_value.limit.return_value.stream.side_effect = Exception("err")
         result = CategoriaGate.get_all()
 
     assert result == []
+
+
+def test_gate_get_all_aplica_limite_de_seguranca():
+    """CategoriaGate.get_all chama .limit(MAX_CATEGORIAS) antes de stream()."""
+    from app.models_categorias import MAX_CATEGORIAS, CategoriaGate
+
+    with patch("app.models_categorias.db") as mock_db:
+        mock_db.collection.return_value.limit.return_value.stream.return_value = []
+        CategoriaGate.get_all()
+
+    mock_db.collection.return_value.limit.assert_called_once_with(MAX_CATEGORIAS)
 
 
 def test_gate_get_by_id_encontrado():
@@ -398,7 +423,10 @@ def test_impacto_get_all_incluindo_inativos_retorna_ativos_e_inativos():
         patch("app.models_categorias.traduzir_categoria", return_value={"en": "X", "es": "X"}),
         patch("app.models_categorias.db") as mock_db,
     ):
-        mock_db.collection.return_value.stream.return_value = [doc_ativo, doc_inativo]
+        mock_db.collection.return_value.limit.return_value.stream.return_value = [
+            doc_ativo,
+            doc_inativo,
+        ]
         result = CategoriaImpacto.get_all_incluindo_inativos()
 
     assert len(result) == 2
@@ -411,10 +439,21 @@ def test_impacto_get_all_incluindo_inativos_retorna_vazio_quando_excecao():
     from app.models_categorias import CategoriaImpacto
 
     with patch("app.models_categorias.db") as mock_db:
-        mock_db.collection.return_value.stream.side_effect = Exception("err")
+        mock_db.collection.return_value.limit.return_value.stream.side_effect = Exception("err")
         result = CategoriaImpacto.get_all_incluindo_inativos()
 
     assert result == []
+
+
+def test_impacto_get_all_incluindo_inativos_aplica_limite_de_seguranca():
+    """get_all_incluindo_inativos chama .limit(MAX_CATEGORIAS) antes de stream()."""
+    from app.models_categorias import MAX_CATEGORIAS, CategoriaImpacto
+
+    with patch("app.models_categorias.db") as mock_db:
+        mock_db.collection.return_value.limit.return_value.stream.return_value = []
+        CategoriaImpacto.get_all_incluindo_inativos()
+
+    mock_db.collection.return_value.limit.assert_called_once_with(MAX_CATEGORIAS)
 
 
 def test_impacto_get_all_retorna_vazio_quando_excecao():
@@ -788,7 +827,7 @@ def test_setor_nome_existe_encontrado_case_insensitive():
     from app.models_categorias import CategoriaSetor
 
     with patch("app.models_categorias.db") as mock_db:
-        mock_db.collection.return_value.stream.return_value = _docs_nome_existe(
+        mock_db.collection.return_value.limit.return_value.stream.return_value = _docs_nome_existe(
             {"s1": "Manutenção"}
         )
         result = CategoriaSetor.nome_existe("  manutenção  ")
@@ -801,7 +840,7 @@ def test_setor_nome_existe_ignora_id_atual():
     from app.models_categorias import CategoriaSetor
 
     with patch("app.models_categorias.db") as mock_db:
-        mock_db.collection.return_value.stream.return_value = _docs_nome_existe(
+        mock_db.collection.return_value.limit.return_value.stream.return_value = _docs_nome_existe(
             {"s1": "Manutenção"}
         )
         result = CategoriaSetor.nome_existe("Manutenção", id_atual="s1")
@@ -813,7 +852,9 @@ def test_setor_nome_existe_nao_encontrado_retorna_false():
     from app.models_categorias import CategoriaSetor
 
     with patch("app.models_categorias.db") as mock_db:
-        mock_db.collection.return_value.stream.return_value = _docs_nome_existe({"s1": "TI"})
+        mock_db.collection.return_value.limit.return_value.stream.return_value = _docs_nome_existe(
+            {"s1": "TI"}
+        )
         result = CategoriaSetor.nome_existe("Qualidade")
 
     assert result is False
@@ -823,17 +864,27 @@ def test_setor_nome_existe_excecao_retorna_false():
     from app.models_categorias import CategoriaSetor
 
     with patch("app.models_categorias.db") as mock_db:
-        mock_db.collection.return_value.stream.side_effect = Exception("err")
+        mock_db.collection.return_value.limit.return_value.stream.side_effect = Exception("err")
         result = CategoriaSetor.nome_existe("Qualquer")
 
     assert result is False
+
+
+def test_setor_nome_existe_aplica_limite_de_seguranca():
+    from app.models_categorias import MAX_CATEGORIAS, CategoriaSetor
+
+    with patch("app.models_categorias.db") as mock_db:
+        mock_db.collection.return_value.limit.return_value.stream.return_value = []
+        CategoriaSetor.nome_existe("Qualquer")
+
+    mock_db.collection.return_value.limit.assert_called_once_with(MAX_CATEGORIAS)
 
 
 def test_gate_nome_existe_encontrado():
     from app.models_categorias import CategoriaGate
 
     with patch("app.models_categorias.db") as mock_db:
-        mock_db.collection.return_value.stream.return_value = _docs_nome_existe(
+        mock_db.collection.return_value.limit.return_value.stream.return_value = _docs_nome_existe(
             {"g1": "Gate 1 - Desmontagem"}
         )
         result = CategoriaGate.nome_existe("Gate 1 - Desmontagem")
@@ -845,7 +896,7 @@ def test_gate_nome_existe_ignora_id_atual():
     from app.models_categorias import CategoriaGate
 
     with patch("app.models_categorias.db") as mock_db:
-        mock_db.collection.return_value.stream.return_value = _docs_nome_existe(
+        mock_db.collection.return_value.limit.return_value.stream.return_value = _docs_nome_existe(
             {"g1": "Gate 1 - Desmontagem"}
         )
         result = CategoriaGate.nome_existe("Gate 1 - Desmontagem", id_atual="g1")
@@ -867,7 +918,7 @@ def test_gate_nome_existe_nao_encontrado_retorna_false():
     from app.models_categorias import CategoriaGate
 
     with patch("app.models_categorias.db") as mock_db:
-        mock_db.collection.return_value.stream.return_value = _docs_nome_existe(
+        mock_db.collection.return_value.limit.return_value.stream.return_value = _docs_nome_existe(
             {"g1": "Gate 1 - Desmontagem"}
         )
         result = CategoriaGate.nome_existe("Gate 2 - Montagem")
@@ -879,17 +930,29 @@ def test_gate_nome_existe_excecao_retorna_false():
     from app.models_categorias import CategoriaGate
 
     with patch("app.models_categorias.db") as mock_db:
-        mock_db.collection.return_value.stream.side_effect = Exception("err")
+        mock_db.collection.return_value.limit.return_value.stream.side_effect = Exception("err")
         result = CategoriaGate.nome_existe("Qualquer")
 
     assert result is False
+
+
+def test_gate_nome_existe_aplica_limite_de_seguranca():
+    from app.models_categorias import MAX_CATEGORIAS, CategoriaGate
+
+    with patch("app.models_categorias.db") as mock_db:
+        mock_db.collection.return_value.limit.return_value.stream.return_value = []
+        CategoriaGate.nome_existe("Qualquer")
+
+    mock_db.collection.return_value.limit.assert_called_once_with(MAX_CATEGORIAS)
 
 
 def test_impacto_nome_existe_encontrado():
     from app.models_categorias import CategoriaImpacto
 
     with patch("app.models_categorias.db") as mock_db:
-        mock_db.collection.return_value.stream.return_value = _docs_nome_existe({"i1": "Crítico"})
+        mock_db.collection.return_value.limit.return_value.stream.return_value = _docs_nome_existe(
+            {"i1": "Crítico"}
+        )
         result = CategoriaImpacto.nome_existe("crítico")
 
     assert result is True
@@ -909,7 +972,9 @@ def test_impacto_nome_existe_ignora_id_atual():
     from app.models_categorias import CategoriaImpacto
 
     with patch("app.models_categorias.db") as mock_db:
-        mock_db.collection.return_value.stream.return_value = _docs_nome_existe({"i1": "Crítico"})
+        mock_db.collection.return_value.limit.return_value.stream.return_value = _docs_nome_existe(
+            {"i1": "Crítico"}
+        )
         result = CategoriaImpacto.nome_existe("Crítico", id_atual="i1")
 
     assert result is False
@@ -919,7 +984,17 @@ def test_impacto_nome_existe_excecao_retorna_false():
     from app.models_categorias import CategoriaImpacto
 
     with patch("app.models_categorias.db") as mock_db:
-        mock_db.collection.return_value.stream.side_effect = Exception("err")
+        mock_db.collection.return_value.limit.return_value.stream.side_effect = Exception("err")
         result = CategoriaImpacto.nome_existe("Qualquer")
 
     assert result is False
+
+
+def test_impacto_nome_existe_aplica_limite_de_seguranca():
+    from app.models_categorias import MAX_CATEGORIAS, CategoriaImpacto
+
+    with patch("app.models_categorias.db") as mock_db:
+        mock_db.collection.return_value.limit.return_value.stream.return_value = []
+        CategoriaImpacto.nome_existe("Qualquer")
+
+    mock_db.collection.return_value.limit.assert_called_once_with(MAX_CATEGORIAS)

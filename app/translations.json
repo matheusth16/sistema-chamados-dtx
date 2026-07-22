@@ -1829,6 +1829,46 @@
     "en": "Error exporting data. Please try again.",
     "es": "Error al exportar datos. Por favor inténtalo de nuevo."
   },
+  "export_my_data": {
+    "pt_BR": "Exportar meus dados",
+    "en": "Export my data",
+    "es": "Exportar mis datos"
+  },
+  "lgpd_rights_section_title": {
+    "pt_BR": "Seus direitos LGPD",
+    "en": "Your LGPD rights",
+    "es": "Sus derechos LGPD"
+  },
+  "lgpd_rights_section_subtitle": {
+    "pt_BR": "Você pode baixar uma cópia dos seus dados pessoais ou solicitar a exclusão da sua conta a qualquer momento.",
+    "en": "You can download a copy of your personal data or request account deletion at any time.",
+    "es": "Puede descargar una copia de sus datos personales o solicitar la eliminación de su cuenta en cualquier momento."
+  },
+  "request_data_deletion": {
+    "pt_BR": "Solicitar exclusão da minha conta",
+    "en": "Request account deletion",
+    "es": "Solicitar eliminación de mi cuenta"
+  },
+  "confirm_request_data_deletion": {
+    "pt_BR": "Tem certeza que deseja solicitar a exclusão da sua conta? Um administrador vai revisar o pedido.",
+    "en": "Are you sure you want to request deletion of your account? An administrator will review the request.",
+    "es": "¿Está seguro de que desea solicitar la eliminación de su cuenta? Un administrador revisará la solicitud."
+  },
+  "lgpd_exclusion_request_success": {
+    "pt_BR": "Solicitação de exclusão registrada. Um administrador vai revisar em breve.",
+    "en": "Deletion request submitted. An administrator will review it shortly.",
+    "es": "Solicitud de eliminación registrada. Un administrador la revisará en breve."
+  },
+  "lgpd_exclusion_request_already_pending": {
+    "pt_BR": "Você já tem uma solicitação de exclusão pendente. Um administrador vai revisar em breve.",
+    "en": "You already have a pending deletion request. An administrator will review it shortly.",
+    "es": "Ya tiene una solicitud de eliminación pendiente. Un administrador la revisará en breve."
+  },
+  "lgpd_deletion_pending_badge": {
+    "pt_BR": "Exclusão LGPD solicitada",
+    "en": "LGPD deletion requested",
+    "es": "Eliminación LGPD solicitada"
+  },
   "error_exporting_report": {
     "pt_BR": "Erro ao exportar relatório. Tente novamente.",
     "en": "Error exporting report. Please try again.",

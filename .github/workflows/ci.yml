@@ -51,6 +51,24 @@ jobs:
       - name: pip-audit — vulnerabilidades em dependências
         run: pip-audit -r requirements.txt --progress-spinner off
 
+      # Gitleaks — scan de segredos. Não-bloqueante (--exit-code=0): só reporta,
+      # não falha o CI. Vai acusar a credencial fake do GOOGLE_CREDENTIALS_JSON
+      # acima (é uma chave RSA de fixture, não um segredo real) — achado esperado.
+      - name: Gitleaks — scan de segredos
+        continue-on-error: true
+        run: |
+          docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:latest \
+            detect --source=/repo --no-banner --exit-code=0 \
+            --report-format=sarif --report-path=/repo/gitleaks-report.sarif
+
+      - name: Upload relatório Gitleaks
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gitleaks-scan-report
+          path: gitleaks-report.sarif
+          retention-days: 30
+
       # ── Testes com cobertura ───────────────────────────────────────────────
       - name: Pytest — suite completa com gate de cobertura
         run: |

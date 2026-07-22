@@ -414,7 +414,54 @@ def logout() -> Response:
 @login_required
 def meus_dados() -> Response:
     """Autovisualização dos próprios dados pessoais (LGPD — direito de acesso)."""
-    return render_template("meus_dados.html", usuario=current_user)
+    from app.services.lgpd_self_service import possui_solicitacao_exclusao_pendente
+
+    exclusao_pendente = possui_solicitacao_exclusao_pendente(current_user.id)
+    return render_template(
+        "meus_dados.html", usuario=current_user, exclusao_pendente=exclusao_pendente
+    )
+
+
+@main.route("/meus-dados/exportar")
+@login_required
+@limiter.limit("5 per hour")
+def exportar_meus_dados() -> Response:
+    """Exporta em JSON os dados pessoais do próprio usuário (LGPD — portabilidade)."""
+    import json
+
+    from app.services.lgpd_self_service import exportar_dados_usuario
+
+    try:
+        dados = exportar_dados_usuario(current_user)
+        ts = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
+        return Response(
+            json.dumps(dados, ensure_ascii=False, indent=2),
+            mimetype="application/json",
+            headers={"Content-Disposition": f"attachment; filename=meus_dados_{ts}.json"},
+        )
+    except Exception as e:
+        logger.exception("Erro ao exportar dados do usuário %s: %s", current_user.id, e)
+        flash_t("error_exporting_data", "danger")
+        return redirect(url_for("main.meus_dados"))
+
+
+@main.route("/meus-dados/solicitar-exclusao", methods=["POST"])
+@login_required
+@limiter.limit("3 per hour", methods=["POST"])
+def solicitar_exclusao_meus_dados() -> Response:
+    """Registra pedido de exclusão da própria conta (LGPD — direito de exclusão).
+
+    Não exclui na hora — cria uma solicitação pendente que um admin revisa e
+    executa via os fluxos existentes (desativar + anonimizar).
+    """
+    from app.services.lgpd_self_service import solicitar_exclusao_propria
+
+    resultado = solicitar_exclusao_propria(current_user)
+    if resultado["sucesso"]:
+        flash_t("lgpd_exclusion_request_success", "success")
+    else:
+        flash_t(resultado.get("erro_key", "internal_error_retry"), "danger")
+    return redirect(url_for("main.meus_dados"))
 
 
 @main.route("/alterar-senha-obrigatoria", methods=["GET", "POST"])

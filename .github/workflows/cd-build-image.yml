@@ -47,6 +47,26 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      # ── Segurança ──────────────────────────────────────────────────────────
+      # Não-bloqueante: só reporta, não falha o deploy. Endurecer para bloqueante
+      # depois de um período rodando e triando os achados.
+      - name: Trivy — scan de vulnerabilidades na imagem
+        uses: aquasecurity/trivy-action@0.28.0
+        continue-on-error: true
+        with:
+          image-ref: ghcr.io/${{ github.repository }}@${{ steps.build.outputs.digest }}
+          format: sarif
+          output: trivy-results.sarif
+          exit-code: "0"
+
+      - name: Upload relatório Trivy
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-scan-report
+          path: trivy-results.sarif
+          retention-days: 30
+
       - name: Login no Azure
         uses: azure/login@v2
         with:

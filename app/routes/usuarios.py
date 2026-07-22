@@ -141,8 +141,13 @@ def gerenciar_usuarios() -> Response:
             flash_t("error_creating_user", "danger", error=str(e))
             return redirect(url_for("main.gerenciar_usuarios"))
     try:
+        from app.services.lgpd_self_service import listar_usuarios_com_solicitacao_pendente
+
         usuarios = Usuario.get_all()
-        return render_template("usuarios.html", usuarios=usuarios)
+        ids_com_solicitacao_lgpd = listar_usuarios_com_solicitacao_pendente()
+        return render_template(
+            "usuarios.html", usuarios=usuarios, ids_com_solicitacao_lgpd=ids_com_solicitacao_lgpd
+        )
     except Exception as e:
         logger.exception("Erro ao listar usuários: %s", e)
         flash_t("error_loading_users", "danger")

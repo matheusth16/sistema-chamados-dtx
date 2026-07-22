@@ -310,7 +310,9 @@ def test_get_all_retorna_lista_de_usuarios():
         patch("app.models_usuario.db") as mock_db,
         patch("app.models_usuario.is_pii_encryption_enabled", return_value=False),
     ):
-        mock_db.collection.return_value.order_by.return_value.stream.return_value = [doc]
+        mock_db.collection.return_value.order_by.return_value.limit.return_value.stream.return_value = [
+            doc
+        ]
         result = Usuario.get_all()
 
     assert len(result) == 1
@@ -322,10 +324,55 @@ def test_get_all_retorna_lista_vazia_quando_firestore_falha():
     from app.models_usuario import Usuario
 
     with patch("app.models_usuario.db") as mock_db:
-        mock_db.collection.return_value.order_by.return_value.stream.side_effect = Exception("err")
+        mock_db.collection.return_value.order_by.return_value.limit.return_value.stream.side_effect = Exception(
+            "err"
+        )
         result = Usuario.get_all()
 
     assert result == []
+
+
+def test_get_all_aplica_limite_de_seguranca_encryption_off():
+    """get_all chama .limit(MAX_USUARIOS_GET_ALL) antes de stream() quando encryption OFF."""
+    from app.models_usuario import MAX_USUARIOS_GET_ALL, Usuario
+
+    with (
+        patch("app.models_usuario.db") as mock_db,
+        patch("app.models_usuario.is_pii_encryption_enabled", return_value=False),
+    ):
+        mock_db.collection.return_value.order_by.return_value.limit.return_value.stream.return_value = []
+        Usuario.get_all()
+
+    mock_db.collection.return_value.order_by.return_value.limit.assert_called_once_with(
+        MAX_USUARIOS_GET_ALL
+    )
+
+
+def test_get_all_loga_warning_quando_atinge_limite():
+    """get_all loga warning quando a quantidade retornada atinge o teto de segurança."""
+    from app.models_usuario import MAX_USUARIOS_GET_ALL, Usuario
+
+    docs = []
+    for i in range(MAX_USUARIOS_GET_ALL):
+        doc = MagicMock()
+        doc.id = f"u{i}"
+        doc.to_dict.return_value = {
+            "email": f"u{i}@dtx.aero",
+            "nome": f"U{i}",
+            "perfil": "solicitante",
+        }
+        docs.append(doc)
+
+    with (
+        patch("app.models_usuario.db") as mock_db,
+        patch("app.models_usuario.is_pii_encryption_enabled", return_value=False),
+        patch("app.models_usuario.logger") as mock_logger,
+    ):
+        mock_db.collection.return_value.order_by.return_value.limit.return_value.stream.return_value = docs
+        result = Usuario.get_all()
+
+    assert len(result) == MAX_USUARIOS_GET_ALL
+    mock_logger.warning.assert_called_once()
 
 
 # ── email_existe ───────────────────────────────────────────────────────────────
@@ -737,7 +784,7 @@ def test_get_all_ordena_em_python_quando_encryption_enabled():
             side_effect=lambda x: x.replace("fernet:v1:", "") if x.startswith("fernet:v1:") else x,
         ),
     ):
-        mock_db.collection.return_value.stream.return_value = [doc_b, doc_a]
+        mock_db.collection.return_value.limit.return_value.stream.return_value = [doc_b, doc_a]
         result = Usuario.get_all()
 
     # order_by do Firestore NÃO deve ter sido chamado
@@ -745,6 +792,20 @@ def test_get_all_ordena_em_python_quando_encryption_enabled():
     # Resultado ordenado por nome em Python: Abel < Zorro
     assert result[0].id == "ua"
     assert result[1].id == "ub"
+
+
+def test_get_all_aplica_limite_de_seguranca_encryption_on():
+    """get_all chama .limit(MAX_USUARIOS_GET_ALL) antes de stream() quando encryption ON."""
+    from app.models_usuario import MAX_USUARIOS_GET_ALL, Usuario
+
+    with (
+        patch("app.models_usuario.db") as mock_db,
+        patch("app.models_usuario.is_pii_encryption_enabled", return_value=True),
+    ):
+        mock_db.collection.return_value.limit.return_value.stream.return_value = []
+        Usuario.get_all()
+
+    mock_db.collection.return_value.limit.assert_called_once_with(MAX_USUARIOS_GET_ALL)
 
 
 def test_update_email_recalcula_hash_quando_encryption_enabled():

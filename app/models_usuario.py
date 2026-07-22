@@ -28,6 +28,9 @@ AUTH_PROVIDERS_VALIDOS = frozenset({"local", "microsoft"})
 # Perfis válidos — usado para validar onboarding_perfis_vistos
 PERFIS_VALIDOS = frozenset({"solicitante", "supervisor", "admin", "admin_global"})
 
+# Teto de segurança para get_all() — evita stream() sem limite em produção
+MAX_USUARIOS_GET_ALL = 2000
+
 
 class Usuario(UserMixin):
     """Representação de um usuário do sistema"""
@@ -447,12 +450,25 @@ class Usuario(UserMixin):
         """
         try:
             if is_pii_encryption_enabled():
-                docs = db.collection("usuarios").stream()
+                docs = db.collection("usuarios").limit(MAX_USUARIOS_GET_ALL).stream()
                 usuarios = [cls.from_dict(doc.to_dict(), doc.id) for doc in docs]
+                if len(usuarios) >= MAX_USUARIOS_GET_ALL:
+                    logger.warning(
+                        "Usuario.get_all() atingiu o teto de segurança (%d) — resultado pode estar incompleto",
+                        MAX_USUARIOS_GET_ALL,
+                    )
                 return sorted(usuarios, key=lambda u: (u.nome or "").lower())
             else:
-                docs = db.collection("usuarios").order_by("nome").stream()
-                return [cls.from_dict(doc.to_dict(), doc.id) for doc in docs]
+                docs = (
+                    db.collection("usuarios").order_by("nome").limit(MAX_USUARIOS_GET_ALL).stream()
+                )
+                usuarios = [cls.from_dict(doc.to_dict(), doc.id) for doc in docs]
+                if len(usuarios) >= MAX_USUARIOS_GET_ALL:
+                    logger.warning(
+                        "Usuario.get_all() atingiu o teto de segurança (%d) — resultado pode estar incompleto",
+                        MAX_USUARIOS_GET_ALL,
+                    )
+                return usuarios
         except Exception as e:
             logger.exception("Erro ao buscar usuários: %s", e)
             return []

@@ -18,6 +18,9 @@ logger = logging.getLogger(__name__)
 # Chaves de cache para listas de categorias (usadas em cache_delete nas rotas)
 CACHE_KEY_SETORES = "categorias_setores_list"
 CACHE_KEY_GATES = "categorias_gates_list"
+
+# Teto de segurança para stream() sem filtro — evita leitura sem limite em produção
+MAX_CATEGORIAS = 1000
 CACHE_KEY_IMPACTOS = "categorias_impactos_list"
 
 # Chaves do static_cache usadas em chamados.py / __init__.py
@@ -119,7 +122,7 @@ class CategoriaSetor:
     def get_all_incluindo_inativos(cls):
         """Retorna todos os setores (ativos e inativos). Para a interface de administração."""
         try:
-            docs = db.collection("categorias_setores").stream()
+            docs = db.collection("categorias_setores").limit(MAX_CATEGORIAS).stream()
             return [cls.from_dict(doc.to_dict(), doc.id) for doc in docs]
         except Exception as e:
             logger.error("Erro ao buscar setores (incluindo inativos): %s", e)
@@ -149,7 +152,7 @@ class CategoriaSetor:
         if not nome_norm:
             return False
         try:
-            docs = db.collection("categorias_setores").stream()
+            docs = db.collection("categorias_setores").limit(MAX_CATEGORIAS).stream()
             for doc in docs:
                 if id_atual and doc.id == id_atual:
                     continue
@@ -255,7 +258,7 @@ class CategoriaGate:
     def get_all(cls):
         """Retorna todos os gates ordenados por gate_pai + ordem (admin: inclui inativos)"""
         try:
-            docs = db.collection("categorias_gates").stream()
+            docs = db.collection("categorias_gates").limit(MAX_CATEGORIAS).stream()
             gates = [cls.from_dict(doc.to_dict(), doc.id) for doc in docs]
             return sorted(gates, key=lambda x: (x.gate_pai or "", x.ordem))
         except Exception as e:
@@ -301,7 +304,7 @@ class CategoriaGate:
         if not nome_norm:
             return False
         try:
-            docs = db.collection("categorias_gates").stream()
+            docs = db.collection("categorias_gates").limit(MAX_CATEGORIAS).stream()
             for doc in docs:
                 if id_atual and doc.id == id_atual:
                     continue
@@ -414,7 +417,7 @@ class CategoriaImpacto:
     def get_all_incluindo_inativos(cls):
         """Retorna todos os impactos (ativos e inativos). Para a interface de administração."""
         try:
-            docs = db.collection("categorias_impactos").stream()
+            docs = db.collection("categorias_impactos").limit(MAX_CATEGORIAS).stream()
             return [cls.from_dict(doc.to_dict(), doc.id) for doc in docs]
         except Exception as e:
             logger.error("Erro ao buscar impactos (incluindo inativos): %s", e)
@@ -444,7 +447,7 @@ class CategoriaImpacto:
         if not nome_norm:
             return False
         try:
-            docs = db.collection("categorias_impactos").stream()
+            docs = db.collection("categorias_impactos").limit(MAX_CATEGORIAS).stream()
             for doc in docs:
                 if id_atual and doc.id == id_atual:
                     continue
