@@ -23,6 +23,18 @@ mês inteiro. HTTPS gerenciado incluso no domínio `*.azurecontainerapps.io`.
 cold start (alguns segundos para o container subir). Para eliminar isso seria preciso
 `min-replicas=1`, o que sai da faixa gratuita (~US$10-15/mês estimado).
 
+**Trade-off #2 (achado F-83, resolvido 2026-07-22):** o mesmo scale-to-zero mata o
+APScheduler in-process — jobs agendados só disparam enquanto o container está de pé,
+o que raramente dura os 10 minutos contínuos que o job crítico `sla_escalacao`
+precisa. Em vez de manter o container sempre ligado (reintroduz o custo de
+`min-replicas=1`), esse job específico passou a ser disparado por
+`POST /internal/cron/sla-escalacao` (autenticado por `CRON_SECRET`, header
+`X-Cron-Token`), chamado a cada 10 min pelo workflow
+`.github/workflows/cron-sla-escalacao.yml` — acorda o container só pelo tempo do job
+(~4.320 execuções/mês, bem dentro da cota free). Requer `CRON_SECRET` configurado
+tanto no GitHub Secrets (o workflow usa pra autenticar) quanto como variável de
+ambiente no Container App (a rota usa pra validar).
+
 ### B.1 — Build automático da imagem (já configurado)
 
 O workflow `.github/workflows/cd-build-image.yml` builda a imagem a cada push em

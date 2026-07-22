@@ -627,6 +627,7 @@ sequenceDiagram
 - Com múltiplos workers Gunicorn, cada worker tem sua própria instância do APScheduler, podendo disparar jobs N vezes (ver F-02). **Resolvido 2026-06-18:** `app/services/scheduler_lock.py` — todos os jobs usam `executar_job_com_lock()` com Redis lock (timeout=300s, blocking_timeout=0).
 - Se o processo Flask cair durante um job, o job pode não completar. Para os jobs atuais (idempotentes), isso é aceitável.
 - Se o volume de jobs crescer significativamente (> 20 jobs únicos, alta frequência, jobs com retry), migrar para Celery deve ser reconsiderado.
+- Em produção com `min-replicas=0` (Container Apps free tier), o processo Flask raramente fica de pé pelos 10 min contínuos que o job `sla_escalacao` precisa — ele nunca dispara na prática (ver F-83). **Resolvido 2026-07-22:** para esse job crítico, o disparo passou a ser via HTTP (`POST /internal/cron/sla-escalacao`, autenticado por `CRON_SECRET`) chamado por um workflow externo do GitHub Actions a cada 10 min, que acorda o container só pelo tempo do job. O APScheduler in-process continua registrado como fallback (o lock Redis evita dupla execução se ambos disparar juntos); os demais jobs (baixa frequência/baixo impacto) seguem só no APScheduler in-process.
 
 ---
 
@@ -701,6 +702,7 @@ sequenceDiagram
 | tailwind.min.css commitado e re-gerado | Build dual | F-11 | **Resolvido 2026-06-18** — arquivo adicionado ao `.gitignore`; `DEV_SETUP.md` documenta `npm run build:css` obrigatório; Dockerfile regenera no build | — |
 | APScheduler sem persistência | Jobs perdidos em restart | — | Restart rápido pelo container | Aceitar (jobs idempotentes) |
 | Notificações em thread sem retry | Simplicidade | — | Log de erro + `notify_retry.py` com backoff | Fila Redis se taxa de falha crescer |
+| APScheduler in-process não dispara com `min-replicas=0` | Scale-to-zero mata o processo antes do job crítico (`sla_escalacao`, a cada 10min) completar um ciclo ocioso | F-83 | **Resolvido 2026-07-22** — rota `POST /internal/cron/sla-escalacao` (auth `CRON_SECRET`) + workflow `cron-sla-escalacao.yml` (GitHub Actions, cron a cada 10 min) acordam o container só pelo tempo do job, reaproveitando `scheduler_lock.py` | Estender o mesmo mecanismo a `reset_ranking_semanal`/`limpar_contadores_uso` se scale-to-zero também afetá-los na prática |
 | Colisão em `gerar_numero_chamado` | Leitura e escrita do contador em duas operações separadas | F-58 | **Resolvido 2026-06-18** — `test_gerar_numero_chamado_concorrencia_gera_numeros_unicos` (5 threads, mock serializado, assert uniqueness) | Transação atômica Firestore |
 | Scripts destrutivos sem dry-run | `atualizar_firebase.py` e `atualizar_setores_from_print.py` | F-71/72 | **Resolvido 2026-06-17** — flags `--dry-run`/`--apply`; obsoleto documentado em `scripts/README.md` | — |
 | Strings hardcoded em JS | Mensagens PT-BR no frontend | F-34, F-36–F-38, F-44, F-46 | **Resolvido 2026-06-17** — `DTX_MSGS`/`DTX_URLS`/`DTX_STATUS_VALIDOS` via servidor | — |

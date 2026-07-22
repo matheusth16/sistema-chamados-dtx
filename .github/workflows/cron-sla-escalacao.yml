@@ -1,0 +1,38 @@
+name: Cron - SLA Escalonamento
+
+# Acorda o Container App (min-replicas=0, free tier) a cada 10 min só pelo
+# tempo de rodar o job de escalonamento SLA. O APScheduler in-process
+# (app/__init__.py:_iniciar_scheduler) não é confiável em scale-to-zero —
+# ver auditoria de CI/CD de 2026-07-21. Chama /internal/cron/sla-escalacao,
+# autenticado por CRON_SECRET (header X-Cron-Token), que reaproveita o lock
+# Redis existente (executar_job_com_lock) contra dupla execução.
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+jobs:
+  chamar-cron-sla-escalacao:
+    name: Dispara job de escalonamento SLA via HTTP
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verificar secrets configurados
+        run: |
+          if [ -z "${{ secrets.PRODUCTION_URL }}" ] || [ -z "${{ secrets.CRON_SECRET }}" ]; then
+            echo "⚠️ PRODUCTION_URL ou CRON_SECRET não configurados nos secrets do repositório."
+            exit 1
+          fi
+
+      - name: POST /internal/cron/sla-escalacao
+        run: |
+          status=$(curl -s -o /tmp/resp.json -w "%{http_code}" \
+            -X POST \
+            -H "X-Cron-Token: ${{ secrets.CRON_SECRET }}" \
+            --max-time 60 \
+            "${{ secrets.PRODUCTION_URL }}/internal/cron/sla-escalacao")
+          echo "HTTP status: $status"
+          cat /tmp/resp.json
+          if [ "$status" -ne 200 ]; then
+            exit 1
+          fi

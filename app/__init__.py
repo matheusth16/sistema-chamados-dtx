@@ -362,13 +362,13 @@ def _proteger_staging(app: Flask) -> None:
     - Requer STAGING_AUTH_ENABLED=true no ambiente
     - Requer STAGING_AUTH_USER e STAGING_AUTH_PASSWORD configurados
 
-    Rotas excluídas: /health, /login, /sw.js
+    Rotas excluídas: /health, /login, /sw.js, /internal/cron/sla-escalacao
     Credencial ausente ou inválida → 401 + WWW-Authenticate: Basic realm="DTX Staging"
     Comparação timing-safe via hmac.compare_digest — senha nunca logada.
     """
     from flask import current_app, make_response
 
-    _excluidas_staging = frozenset({"/health", "/login", "/sw.js"})
+    _excluidas_staging = frozenset({"/health", "/login", "/sw.js", "/internal/cron/sla-escalacao"})
 
     def _resposta_401_staging():
         resp = make_response("Acesso restrito ao ambiente de staging.", 401)

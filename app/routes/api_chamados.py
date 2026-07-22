@@ -215,6 +215,70 @@ def health():
     return jsonify(payload), status_code
 
 
+def _obter_cron_token_request() -> str:
+    """Lê token de autenticação do endpoint de cron interno (header X-Cron-Token)."""
+    return request.headers.get("X-Cron-Token", "").strip()
+
+
+@main.route("/internal/cron/sla-escalacao", methods=["POST"])
+def cron_sla_escalacao():
+    """Executa sob demanda o job de escalonamento SLA (Escada A + avisos + Escada B).
+
+    Existe porque o Container App roda com min-replicas=0 (scale-to-zero, free
+    tier): o APScheduler in-process (`app/__init__.py:_iniciar_scheduler`) só
+    dispara enquanto o container está de pé, o que na prática quase nunca
+    acontece por 10 minutos seguidos sem tráfego. Um workflow do GitHub
+    Actions chama esta rota a cada 10 min pra acordar o container só pelo
+    tempo de rodar o job, reaproveitando o lock Redis já existente
+    (`executar_job_com_lock`) pra não duplicar execução com o scheduler
+    in-process quando o container já está acordado por outro motivo.
+
+    Autenticação: header X-Cron-Token: <CRON_SECRET>.
+    Sem CRON_SECRET configurado, a rota nunca fica aberta por engano.
+
+    Returns:
+        200 {"sucesso": true, "dados": {...}}  — job executado
+        401                                     — token ausente ou inválido
+        503                                     — CRON_SECRET não configurado
+    """
+    secret = os.getenv("CRON_SECRET", "").strip()
+    if not secret:
+        logger.error("cron_sla_escalacao chamado sem CRON_SECRET configurado no ambiente")
+        return jsonify({"sucesso": False, "erro": "cron não configurado"}), 503
+
+    provided = _obter_cron_token_request()
+    if not provided or not hmac.compare_digest(provided, secret):
+        abort(401)
+
+    from app.services.scheduler_lock import executar_job_com_lock
+    from app.services.sla_escalacao_service import (
+        processar_avisos_resolucao,
+        processar_escada_a,
+        processar_escada_b,
+    )
+
+    resultado: dict = {}
+    erro: Exception | None = None
+
+    def _job():
+        nonlocal erro
+        try:
+            resultado["escada_a"] = processar_escada_a()
+            resultado["avisos_resolucao"] = processar_avisos_resolucao()
+            resultado["escada_b"] = processar_escada_b()
+        except Exception as exc:  # noqa: BLE001 — convertido em 500 genérico abaixo
+            erro = exc
+
+    executar_job_com_lock(current_app._get_current_object(), "sla_escalacao", _job)
+
+    if erro is not None:
+        logger.exception("Erro no job SLA Escalonamento via cron HTTP: %s", erro)
+        return jsonify({"sucesso": False, "erro": "erro ao processar escalonamento"}), 500
+
+    logger.info("cron_sla_escalacao executado via HTTP: %s", resultado)
+    return jsonify({"sucesso": True, "dados": resultado}), 200
+
+
 @main.route("/api/atualizar-status", methods=["POST"])
 @login_required
 @limiter.limit("30 per minute", methods=["POST"])

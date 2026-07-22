@@ -42,7 +42,7 @@ Este documento deve ser consultado em **duas situações**:
 13. [Seção 13 — Scripts operacionais](#seção-13--scripts-operacionais)
 14. [Seção 14 — Qualidade de testes](#seção-14--qualidade-de-testes)
 15. [Seção 15 — CSS e design system](#seção-15--css-e-design-system)
-16. [Achados ativos (F-01 a F-82)](#achados-ativos-f-01-a-f-82)
+16. [Achados ativos (F-01 a F-83)](#achados-ativos-f-01-a-f-82)
 17. [Resultado da última auditoria](#resultado-da-última-auditoria-2026-06-16)
 18. [Procedimento de resposta a incidente](#procedimento-de-resposta-a-incidente-de-segurança)
 19. [Referências OWASP](#referências-owasp)
@@ -736,6 +736,15 @@ curl -I http://hml-host/health
   - Como verificar: `grep -n "executar_job_com_lock" app/__init__.py`
   - Status atual: **Resolvido 2026-06-18** (S4-01 / F-02)
 
+### 12.5 APScheduler in-process vs. scale-to-zero (Container Apps `min-replicas=0`)
+
+- [x] **`sla_escalacao` não dependia mais só do APScheduler in-process — job crítico agora também disparado via HTTP autenticado, imune a scale-to-zero**
+  - Causa raiz: com `min-replicas=0` (free tier), o container fica de pé só em rajadas curtas de tráfego; o job `sla_escalacao` roda a cada 10 min via APScheduler in-process (`app/__init__.py:_iniciar_scheduler`), mas o processo quase nunca sobrevive 10 min contínuos sem tráfego — job efetivamente nunca dispara em produção.
+  - Arquivo de referência: rota `POST /internal/cron/sla-escalacao` (`app/routes/api_chamados.py`), workflow `.github/workflows/cron-sla-escalacao.yml`
+  - Auth: header `X-Cron-Token` comparado via `hmac.compare_digest` contra `CRON_SECRET` (env var) — mesmo padrão do `HEALTH_SECRET` em `/health`. Reaproveita `executar_job_com_lock` para não duplicar execução se o container já estiver de pé por outro motivo.
+  - Como verificar: `grep -n "CRON_SECRET" app/routes/api_chamados.py`
+  - Status atual: **Resolvido 2026-07-22** (F-83) — escopo só do job crítico; `reset_ranking_semanal` e `limpar_contadores_uso` (baixo impacto) seguem só no APScheduler in-process, mesmo mecanismo pode ser estendido depois se necessário.
+
 ---
 
 ## Seção 13 — Scripts operacionais
@@ -893,7 +902,7 @@ curl -I http://hml-host/health
 
 ---
 
-## Achados ativos (F-01 a F-82)
+## Achados ativos (F-01 a F-83)
 
 > **Atenção:** Itens com status "Aberto" representam riscos conhecidos em produção. Cada achado tem uma tarefa correspondente no `docs/PLANO_SPRINT.md`.
 
@@ -916,6 +925,7 @@ curl -I http://hml-host/health
 | **F-52** | **URL E2E `/relatorios` em `test_fluxo_admin.py:53` — rota real é `/admin/relatorios`** | `tests/e2e/test_fluxo_admin.py` | **Resolvido** 2026-06-17 — URL corrigida | S0-02 |
 | **F-71** | **`atualizar_firebase.py` apaga coleções inteiras sem dry-run, sem confirmação e sem checar ambiente** | `scripts/migrations/atualizar_firebase.py` | **Resolvido** 2026-06-17 — flags `--dry-run` e `--apply`; marcado obsoleto em `scripts/README.md` | S1-07 |
 | **F-72** | **`atualizar_setores_from_print.py` apaga `categorias_setores` sem dry-run nem confirmação** | `scripts/migrations/atualizar_setores_from_print.py` | **Resolvido** 2026-06-17 — flags `--dry-run` e `--apply` | S1-08 |
+| **F-83** | **`sla_escalacao` (Escada A/B) nunca dispara em produção — `min-replicas=0` mata o APScheduler in-process antes dos 10 min do intervalo do job** | `app/__init__.py:_iniciar_scheduler`, `sla_escalacao_service.py` | **Resolvido** 2026-07-22 — auditoria de CI/CD (2026-07-21) confirmou via Log Analytics; fix: rota `POST /internal/cron/sla-escalacao` (auth `CRON_SECRET`, reaproveita `scheduler_lock.py`) + workflow `cron-sla-escalacao.yml` (GitHub Actions, a cada 10 min) | — |
 
 ### Achados de Média Severidade
 
