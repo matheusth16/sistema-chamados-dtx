@@ -80,3 +80,39 @@ def test_cron_sla_escalacao_token_correto_executa_job(client, _sem_redis):
 def test_cron_sla_escalacao_metodo_get_nao_permitido(client, _sem_redis):
     resp = client.get("/internal/cron/sla-escalacao")
     assert resp.status_code == 405
+
+
+def test_cron_sla_escalacao_isento_de_csrf():
+    """POST /internal/cron/sla-escalacao deve funcionar mesmo com CSRF protection ativa.
+
+    O GitHub Actions chama essa rota via curl puro (sem sessão de navegador nem
+    token CSRF) — a rota precisa estar isenta ou toda chamada do workflow vira
+    400 "CSRF token is missing" (bug real encontrado ao validar o workflow
+    manualmente em produção, 2026-07-22).
+    """
+    import os
+    from unittest.mock import patch
+
+    from app import create_app
+
+    app = create_app()
+    app.config["TESTING"] = True
+    app.config["WTF_CSRF_ENABLED"] = True
+    app.config["SECRET_KEY"] = "test-secret"
+    app.config["APP_BASE_URL"] = ""
+    app.config["SSO_REDIRECT_URI"] = ""
+    app.config["REDIS_URL"] = ""
+    client_csrf = app.test_client()
+
+    secret = "segredo-teste-cron-valido-32ch"
+    with (
+        patch.dict(os.environ, {"CRON_SECRET": secret, "REDIS_URL": ""}, clear=False),
+        patch("app.services.sla_escalacao_service.processar_escada_a", return_value={}),
+        patch("app.services.sla_escalacao_service.processar_avisos_resolucao", return_value={}),
+        patch("app.services.sla_escalacao_service.processar_escada_b", return_value={}),
+    ):
+        resp = client_csrf.post(
+            "/internal/cron/sla-escalacao",
+            headers={"X-Cron-Token": secret},
+        )
+    assert resp.status_code == 200

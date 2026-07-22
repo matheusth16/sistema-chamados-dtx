@@ -92,13 +92,17 @@ def create_app():
     _configurar_i18n(app)
 
     # Importa e registra as rotas
-    from app.routes import csp_report, main
+    from app.routes import cron_sla_escalacao, csp_report, main
 
     app.register_blueprint(main)
 
     # /api/csp-report recebe POST nativo do browser (mecanismo report-uri da CSP),
     # sem token CSRF anexado — precisa ficar isento ou toda violação vira 400.
     csrf.exempt(csp_report)
+
+    # /internal/cron/sla-escalacao é chamada pelo GitHub Actions via curl puro
+    # (sem sessão/token CSRF) — autenticação é feita por CRON_SECRET, não CSRF.
+    csrf.exempt(cron_sla_escalacao)
 
     # Segurança: headers e validação Origin/Referer em POST sensíveis
     _configurar_seguranca(app)
