@@ -52,13 +52,15 @@ jobs:
         run: pip-audit -r requirements.txt --progress-spinner off
 
       # Gitleaks — scan de segredos. Não-bloqueante (--exit-code=0): só reporta,
-      # não falha o CI. Vai acusar a credencial fake do GOOGLE_CREDENTIALS_JSON
-      # acima (é uma chave RSA de fixture, não um segredo real) — achado esperado.
+      # não falha o CI. .gitleaks.toml na raiz aplica allowlist restrito aos
+      # arquivos com fixture de teste/exemplo de doc conhecidos (ver comentários
+      # no próprio .gitleaks.toml) — achados fora dessa lista continuam visíveis.
       - name: Gitleaks — scan de segredos
         continue-on-error: true
         run: |
           docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:latest \
             detect --source=/repo --no-banner --exit-code=0 \
+            --config=/repo/.gitleaks.toml \
             --report-format=sarif --report-path=/repo/gitleaks-report.sarif
 
       - name: Upload relatório Gitleaks

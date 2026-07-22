@@ -1,0 +1,27 @@
+title = "sistema_chamados — configuração do gitleaks"
+
+# Usa as regras padrão do gitleaks (private-key, generic-api-key,
+# curl-auth-user, etc.) e só adiciona um allowlist restrito por arquivo.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Fixtures de teste e exemplos de documentação — não são segredos reais. Cada arquivo já documenta isso em comentário próprio."
+paths = [
+  # Chave RSA 100% fake de service account (GOOGLE_CREDENTIALS_JSON) usada
+  # só para o Firebase Admin SDK conseguir inicializar em CI, sem acesso a
+  # nenhum projeto GCP real — ver comentário no próprio arquivo.
+  '''^\.github/workflows/ci\.yml$''',
+  # Mesma chave fake + TOTP secrets de contas de teste que só existem no
+  # stub em memória (tests/e2e/conftest.py) — ver comentário no arquivo.
+  '''^\.github/workflows/e2e\.yml$''',
+  # Exemplos de comando `curl -u hml_user:senha` — credencial de exemplo
+  # literal, não uma credencial real.
+  '''^docs/ENV\.md$''',
+  '''^docs/DEPLOYMENT_PLAN\.md$''',
+  '''^docs/evidencias/ONDA5_DOD_EVIDENCIA\.md$''',
+  # CRON_SECRET / HEALTH_SECRET de teste, valor literal "segredo-teste-*",
+  # usados só via patch.dict(os.environ) dentro do próprio teste.
+  '''^tests/test_routes/test_cron_sla_escalacao\.py$''',
+  '''^tests/test_routes/test_staging_auth\.py$''',
+]
