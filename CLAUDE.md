@@ -127,7 +127,7 @@ tests/
 ├── test_routes/
 ├── test_services/
 ├── test_integration/
-├── test_e2e/
+├── e2e/
 └── test_regression/
 ```
 
@@ -139,11 +139,12 @@ tests/
 - Não usar `git add .` sozinho — revisar o que está sendo commitado
 
 ## Skills padrão deste projeto
-Base gerada por `/aas` (bootstrap) em 2026-07-21 — ponto de partida pra qualquer `/aas <tema>` futuro.
+Base gerada por `/aas` (bootstrap) em 2026-07-21, revisada em 2026-07-22 — ponto de partida pra qualquer `/aas <tema>` futuro.
 
 - **Segurança** (obrigatória): `backend-security-coder`, `auth-implementation-patterns`, `secrets-management`, `privacy-by-design`, `sast-configuration` — auth combina Flask-Login + MFA (pyotp) + SSO Microsoft (msal); PII criptografado em repouso (LGPD); múltiplos segredos (Firebase, R2, MSAL, chave Fernet)
 - **Dados/storage**: `nosql-expert` — Firestore é NoSQL, não relacional
-- **Testes/qualidade**: `pytest-skill`, `test-driven-development` — TDD é regra explícita deste arquivo
-- **UX/Acessibilidade**: `tailwind-patterns`, `ui-a11y` — design system real é Tailwind; acessibilidade nunca auditada formalmente
-- **Deploy/operações**: `docker-expert`, `azd-deployment` — produção roda em Azure Container Apps
+- **Testes/qualidade**: `pytest-skill`, `test-driven-development`, `playwright-skill`, `k6-load-testing` — TDD é regra explícita deste arquivo; `pytest-playwright` real em `requirements-dev.txt` com suíte em `tests/e2e/` (CI `e2e.yml` bloqueia merge); `scripts/qa/k6/{smoke,load,stress}.js` + workflow semanal `k6-smoke.yml` contra produção
+- **UX/Acessibilidade**: `tailwind-patterns`, `ui-a11y` — design system real é Tailwind; acessibilidade já auditada (WCAG 2.1 AA, 2026-07-21)
+- **Internacionalização**: `i18n-localization` — app já suporta PT-BR/EN/ES de verdade (`app/i18n.py`, `translations.json`); convenção do projeto exige traduzir todo texto novo nos 3 idiomas ao implementar qualquer feature
+- **Deploy/operações**: `docker-expert`, `github-actions-templates` — produção roda em Azure Container Apps, mas o deploy real é via GitHub Actions (`cd-build-image.yml`: build→push GHCR→`az containerapp update` com digest), não a CLI `azd`; `azd-deployment` removido por não corresponder ao fluxo real
 - **Manutenção**: `git-pushing`, `lint-and-validate` — já é o fluxo real (`smart_commit.sh` no ciclo de qualidade acima)
