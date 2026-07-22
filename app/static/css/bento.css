@@ -258,7 +258,7 @@ dialog.bento-modal textarea:focus{ outline:none; border-color:var(--color-dtx-50
 
 /* usuarios.html — tabela de 5 colunas, ações com vários botões de texto precisa de mais espaço */
 .bento-table-scope table.users-table th:nth-child(1), .bento-table-scope table.users-table td:nth-child(1){ width:14%; }
-.bento-table-scope table.users-table th:nth-child(2), .bento-table-scope table.users-table td:nth-child(2){ width:16%; }
+.bento-table-scope table.users-table th:nth-child(2), .bento-table-scope table.users-table td:nth-child(2){ width:16%; white-space:normal; }
 .bento-table-scope table.users-table th:nth-child(3), .bento-table-scope table.users-table td:nth-child(3){ width:12%; overflow:visible; text-overflow:clip; }
 .bento-table-scope table.users-table th:nth-child(4), .bento-table-scope table.users-table td:nth-child(4){ width:20%; }
 .bento-table-scope table.users-table th:nth-child(5), .bento-table-scope table.users-table td:nth-child(5){ width:38%; white-space:normal; }
