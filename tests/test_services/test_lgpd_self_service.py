@@ -53,7 +53,12 @@ def test_exportar_dados_usuario_inclui_chamados_criados(mock_db):
     from app.services.lgpd_self_service import exportar_dados_usuario
 
     doc1 = _chamado_doc(
-        "ch1", numero_chamado="0001", titulo="Impressora quebrada", categoria="TI", status="Aberto"
+        "ch1",
+        numero_chamado="0001",
+        tipo_solicitacao="Impressora quebrada",
+        descricao="Impressora do 2o andar nao liga",
+        categoria="TI",
+        status="Aberto",
     )
     mock_db.collection.return_value.where.return_value.limit.return_value.stream.return_value = [
         doc1
@@ -65,6 +70,67 @@ def test_exportar_dados_usuario_inclui_chamados_criados(mock_db):
     assert len(resultado["chamados_criados"]) == 1
     assert resultado["chamados_criados"][0]["id"] == "ch1"
     assert resultado["chamados_criados"][0]["numero_chamado"] == "0001"
+    assert resultado["chamados_criados"][0]["tipo_solicitacao"] == "Impressora quebrada"
+    assert resultado["chamados_criados"][0]["descricao"] == "Impressora do 2o andar nao liga"
+
+
+def test_exportar_dados_usuario_csv_contem_secao_conta(mock_db):
+    from app.services.lgpd_self_service import exportar_dados_usuario_csv
+
+    mock_db.collection.return_value.where.return_value.limit.return_value.stream.return_value = []
+    usuario = _usuario_mock()
+
+    csv_texto = exportar_dados_usuario_csv(usuario)
+
+    assert "u1" in csv_texto
+    assert "fulano@dtx.aero" in csv_texto
+    assert "solicitante" in csv_texto
+
+
+def test_exportar_dados_usuario_csv_contem_chamados(mock_db):
+    from app.services.lgpd_self_service import exportar_dados_usuario_csv
+
+    doc1 = _chamado_doc(
+        "ch1",
+        numero_chamado="0001",
+        tipo_solicitacao="Impressora quebrada",
+        descricao="Impressora do 2o andar nao liga",
+        categoria="TI",
+        status="Aberto",
+    )
+    mock_db.collection.return_value.where.return_value.limit.return_value.stream.return_value = [
+        doc1
+    ]
+    usuario = _usuario_mock()
+
+    csv_texto = exportar_dados_usuario_csv(usuario)
+
+    assert "0001" in csv_texto
+    assert "Impressora quebrada" in csv_texto
+
+
+def test_exportar_dados_usuario_csv_sanitiza_formula_injection(mock_db):
+    """Título de chamado começando com '=' não deve virar fórmula executável no Excel."""
+    from app.services.lgpd_self_service import exportar_dados_usuario_csv
+
+    doc1 = _chamado_doc(
+        "ch1",
+        numero_chamado="0001",
+        tipo_solicitacao="=cmd|'/c calc'!A1",
+        descricao="normal",
+        categoria="TI",
+        status="Aberto",
+    )
+    mock_db.collection.return_value.where.return_value.limit.return_value.stream.return_value = [
+        doc1
+    ]
+    usuario = _usuario_mock()
+
+    csv_texto = exportar_dados_usuario_csv(usuario)
+
+    assert "'=cmd" in csv_texto
+    assert "\n=cmd" not in csv_texto
+    assert ",=cmd" not in csv_texto
 
 
 def test_exportar_dados_usuario_filtra_apenas_chamados_do_proprio_usuario(mock_db):

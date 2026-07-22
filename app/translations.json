@@ -1834,6 +1834,11 @@
     "en": "Export my data",
     "es": "Exportar mis datos"
   },
+  "export_my_data_csv": {
+    "pt_BR": "Exportar meus dados (CSV)",
+    "en": "Export my data (CSV)",
+    "es": "Exportar mis datos (CSV)"
+  },
   "lgpd_rights_section_title": {
     "pt_BR": "Seus direitos LGPD",
     "en": "Your LGPD rights",

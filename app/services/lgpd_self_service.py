@@ -7,6 +7,8 @@ em app/routes/usuarios.py), mesmo padrão de segurança usado hoje para ações
 administrativas irreversíveis sobre contas.
 """
 
+import csv
+import io
 import logging
 
 from firebase_admin import firestore
@@ -18,6 +20,9 @@ from app.services.historico_usuario_service import registrar_historico_usuario
 logger = logging.getLogger(__name__)
 
 COLLECTION_SOLICITACOES = "solicitacoes_lgpd"
+
+# Neutraliza CSV/Excel formula injection — mesma lista de excel_export_service._safe_cell.
+_FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
 
 # Um solicitante nunca terá mais que isso de chamados próprios — evita ler a
 # coleção inteira; mesmo padrão de chamados_listagem_service._FALLBACK_LIMIT.
@@ -45,7 +50,8 @@ def exportar_dados_usuario(usuario) -> dict:
             {
                 "id": doc.id,
                 "numero_chamado": d.get("numero_chamado"),
-                "titulo": d.get("titulo"),
+                "tipo_solicitacao": d.get("tipo_solicitacao"),
+                "descricao": d.get("descricao"),
                 "categoria": d.get("categoria"),
                 "status": d.get("status"),
                 "data_criacao": str(d.get("data_criacao")) if d.get("data_criacao") else None,
@@ -66,6 +72,42 @@ def exportar_dados_usuario(usuario) -> dict:
         },
         "chamados_criados": chamados,
     }
+
+
+def _safe_cell(valor):
+    """Previne CSV/Excel formula injection — prefixa aspa simples em valores
+    que começam com caractere de fórmula (Excel/Sheets interpretam como texto)."""
+    if isinstance(valor, str) and valor.startswith(_FORMULA_PREFIXES):
+        return "'" + valor
+    return valor
+
+
+def exportar_dados_usuario_csv(usuario) -> str:
+    """Mesmos dados de exportar_dados_usuario(), em CSV (LGPD — portabilidade)."""
+    dados = exportar_dados_usuario(usuario)
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    writer.writerow(["Conta"])
+    for chave, valor in dados["conta"].items():
+        writer.writerow([chave, _safe_cell(valor)])
+
+    writer.writerow([])
+    writer.writerow(["Chamados Criados"])
+    colunas = [
+        "id",
+        "numero_chamado",
+        "tipo_solicitacao",
+        "descricao",
+        "categoria",
+        "status",
+        "data_criacao",
+    ]
+    writer.writerow(colunas)
+    for chamado in dados["chamados_criados"]:
+        writer.writerow([_safe_cell(chamado.get(coluna)) for coluna in colunas])
+
+    return output.getvalue()
 
 
 def possui_solicitacao_exclusao_pendente(usuario_id: str) -> bool:

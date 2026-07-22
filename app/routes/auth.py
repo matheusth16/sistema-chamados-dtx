@@ -426,14 +426,25 @@ def meus_dados() -> Response:
 @login_required
 @limiter.limit("5 per hour")
 def exportar_meus_dados() -> Response:
-    """Exporta em JSON os dados pessoais do próprio usuário (LGPD — portabilidade)."""
+    """Exporta os dados pessoais do próprio usuário (LGPD — portabilidade).
+
+    ?formato=csv baixa em CSV; qualquer outro valor (ou ausência) baixa em JSON.
+    """
     import json
 
-    from app.services.lgpd_self_service import exportar_dados_usuario
+    from app.services.lgpd_self_service import exportar_dados_usuario, exportar_dados_usuario_csv
 
+    formato = request.args.get("formato", "").strip().lower()
+    ts = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
     try:
+        if formato == "csv":
+            csv_texto = exportar_dados_usuario_csv(current_user)
+            return Response(
+                csv_texto,
+                mimetype="text/csv",
+                headers={"Content-Disposition": f"attachment; filename=meus_dados_{ts}.csv"},
+            )
         dados = exportar_dados_usuario(current_user)
-        ts = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
         return Response(
             json.dumps(dados, ensure_ascii=False, indent=2),
             mimetype="application/json",

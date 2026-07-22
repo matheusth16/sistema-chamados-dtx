@@ -58,6 +58,33 @@ def test_exportar_meus_dados_retorna_json_para_download(client_logado_solicitant
     mock_export.assert_called_once()
 
 
+def test_exportar_meus_dados_csv_retorna_csv_para_download(client_logado_solicitante):
+    with patch(
+        "app.services.lgpd_self_service.exportar_dados_usuario_csv",
+        return_value="Conta\nid,sol_1\n",
+    ) as mock_export_csv:
+        r = client_logado_solicitante.get("/meus-dados/exportar?formato=csv")
+
+    assert r.status_code == 200
+    assert r.mimetype == "text/csv"
+    assert "attachment" in r.headers.get("Content-Disposition", "")
+    assert b"sol_1" in r.data
+    mock_export_csv.assert_called_once()
+
+
+def test_exportar_meus_dados_formato_invalido_retorna_json(client_logado_solicitante):
+    """formato desconhecido cai no padrão (JSON), não quebra."""
+    with patch(
+        "app.services.lgpd_self_service.exportar_dados_usuario",
+        return_value={"conta": {"id": "sol_1"}, "chamados_criados": []},
+    ) as mock_export:
+        r = client_logado_solicitante.get("/meus-dados/exportar?formato=xml")
+
+    assert r.status_code == 200
+    assert r.mimetype == "application/json"
+    mock_export.assert_called_once()
+
+
 def test_exportar_meus_dados_erro_interno_redireciona_com_flash(client_logado_solicitante):
     with patch(
         "app.services.lgpd_self_service.exportar_dados_usuario",

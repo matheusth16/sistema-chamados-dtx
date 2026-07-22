@@ -72,6 +72,10 @@
                     {{ t('export_my_data') }}
                 </a>
 
+                <a href="{{ url_for('main.exportar_meus_dados', formato='csv') }}" class="bento-btn-outline" style="width:100%; justify-content:center;">
+                    {{ t('export_my_data_csv') }}
+                </a>
+
                 {% if exclusao_pendente %}
                 <p style="font-size:13px; color:var(--color-bento-warning); text-align:center; margin:0;">
                     {{ t('lgpd_exclusion_request_already_pending') }}
