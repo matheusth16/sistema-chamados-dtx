@@ -4,9 +4,12 @@ Suporta: Português-BR, Inglês e Espanhol.
 """
 
 import json
+import logging
 import os
 
 from flask import flash, session
+
+logger = logging.getLogger(__name__)
 
 # Cache do dicionário de traduções e caminho do arquivo
 _TRANSLATIONS_CACHE = None
@@ -24,7 +27,7 @@ def get_translations_dict():
             with open(_TRANSLATIONS_FILE, encoding="utf-8") as f:
                 _TRANSLATIONS_CACHE = json.load(f)
     except Exception as e:
-        print(f"Erro ao carregar traduções: {e}")
+        logger.error("Erro ao carregar traduções: %s", e)
         if _TRANSLATIONS_CACHE is None:
             _TRANSLATIONS_CACHE = {}
     return _TRANSLATIONS_CACHE
