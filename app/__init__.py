@@ -445,8 +445,13 @@ def _configurar_seguranca(app: Flask) -> None:
         Verifica X-Forwarded-Proto além de request.is_secure porque proxies
         reversos (nginx, load balancers) terminam TLS e repassam HTTP
         internamente — request.is_secure seria sempre False nesses casos.
+
+        Pulado quando REQUIRE_HTTPS=False (opt-in explícito de deploy LAN-only,
+        sem exposição à internet — ver config.py).
         """
         if current_app.config.get("ENV") != "production":
+            return None
+        if not current_app.config.get("REQUIRE_HTTPS", True):
             return None
         is_https = request.is_secure or request.headers.get("X-Forwarded-Proto") == "https"
         if not is_https:
@@ -705,6 +710,7 @@ def _configurar_i18n(app: Flask) -> None:
             },
             "extensoes_permitidas": extensoes_permitidas,
             "accept_anexo": accept_anexo,
+            "sso_microsoft_enabled": app.config.get("SSO_MICROSOFT_ENABLED", True),
         }
 
     @app.context_processor

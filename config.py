@@ -51,6 +51,7 @@ def _validar_config_producao(
     redis_url: str,
     require_redis: bool,
     gunicorn_workers: int,
+    require_https: bool = True,
 ) -> None:
     """Valida configurações obrigatórias em produção (fail-fast no boot).
 
@@ -61,6 +62,10 @@ def _validar_config_producao(
     - Ausente + 1 worker + REQUIRE_REDIS=false → warning (cenário DTX atual)
     - Ausente + workers > 1 → ValueError (rate limit não compartilhado)
     - Ausente + REQUIRE_REDIS=true → ValueError (opt-in explícito)
+
+    require_https=False é um opt-in explícito para implantação LAN-only, sem
+    exposição à internet (ex: rede interna sem HTTPS/domínio) — não afeta a
+    obrigatoriedade de APP_BASE_URL em si, só a exigência do esquema https://.
     """
     if env != "production":
         return
@@ -70,10 +75,12 @@ def _validar_config_producao(
             "Em produção, APP_BASE_URL é obrigatória (ex: https://chamados.empresa.com). "
             "Defina a variável de ambiente APP_BASE_URL."
         )
-    if not app_base_url.startswith("https://"):
+    if require_https and not app_base_url.startswith("https://"):
         raise ValueError(
             f"Em produção, APP_BASE_URL deve usar HTTPS (https://...). "
-            f"Valor atual: '{app_base_url}'. Corrija para evitar mixed-content e falhas CWI 2.1."
+            f"Valor atual: '{app_base_url}'. Corrija para evitar mixed-content e falhas CWI 2.1. "
+            "Se este é um deploy LAN-only intencional (sem exposição à internet), "
+            "defina REQUIRE_HTTPS=false explicitamente."
         )
 
     if not health_secret:
@@ -137,6 +144,7 @@ _validar_config_producao(
     redis_url=os.getenv("REDIS_URL", "").strip(),
     require_redis=_to_bool(os.getenv("REQUIRE_REDIS"), default=False),
     gunicorn_workers=int(os.getenv("GUNICORN_WORKERS", "1")),
+    require_https=_to_bool(os.getenv("REQUIRE_HTTPS"), default=True),
 )
 _validar_fernet_key(
     env=_env,
@@ -237,6 +245,10 @@ class Config:
     GUNICORN_WORKERS = int(os.getenv("GUNICORN_WORKERS", "1"))
     # REQUIRE_REDIS: true força fail-fast se REDIS_URL ausente (opt-in explícito)
     REQUIRE_REDIS = _to_bool(os.getenv("REQUIRE_REDIS"), default=False)
+    # REQUIRE_HTTPS: false é opt-in explícito pra deploy LAN-only (sem exposição à
+    # internet, sem domínio) — desativa o fail-fast de APP_BASE_URL https:// e o
+    # redirecionamento HTTP→HTTPS. Default True preserva o comportamento padrão.
+    REQUIRE_HTTPS = _to_bool(os.getenv("REQUIRE_HTTPS"), default=True)
 
     # Microsoft Graph API (envio de e-mail via client credentials)
     GRAPH_TENANT_ID = os.getenv("GRAPH_TENANT_ID", "").strip()

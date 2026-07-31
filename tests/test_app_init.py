@@ -325,6 +325,14 @@ def test_forcar_https_redireciona_em_producao(app, client):
     assert r.location.startswith("https://")
 
 
+def test_forcar_https_nao_redireciona_com_require_https_false(app, client):
+    """Modo LAN-only: produção + REQUIRE_HTTPS=False → não redireciona pra HTTPS."""
+    app.config["ENV"] = "production"
+    app.config["REQUIRE_HTTPS"] = False
+    r = client.get("/login")
+    assert r.status_code == 200
+
+
 def test_headers_hsts_csp_em_producao_https(app, client):
     """Em produção com X-Forwarded-Proto: https → HSTS + CSP nos headers."""
     app.config["ENV"] = "production"

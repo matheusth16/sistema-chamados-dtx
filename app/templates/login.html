@@ -99,6 +99,7 @@
                 </button>
             </form>
 
+            {% if sso_microsoft_enabled %}
             <div class="flex items-center gap-3 my-4">
                 <span class="flex-1 h-px" style="background-color: var(--color-surface-border)"></span>
                 <span class="text-xs font-semibold" style="color: var(--color-surface-muted)">{{ t('or_divider') }}</span>
@@ -116,6 +117,7 @@
                 </svg>
                 {{ t('sign_in_with_microsoft') }}
             </a>
+            {% endif %}
 
             <!-- Flash messages -->
             {% with messages = get_flashed_messages(with_categories=true) %}

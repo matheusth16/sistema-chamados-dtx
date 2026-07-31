@@ -88,6 +88,23 @@ def test_prod_app_base_url_http_raises():
         _validar_config_producao(**args)
 
 
+def test_prod_app_base_url_http_com_require_https_false_nao_raise():
+    """Prod com APP_BASE_URL=http:// + REQUIRE_HTTPS=false → não levanta (modo LAN-only)."""
+    args = _args_prod_ok()
+    args["app_base_url"] = "http://10.20.0.199:8080"
+    args["require_https"] = False
+    _validar_config_producao(**args)  # não deve levantar
+
+
+def test_prod_app_base_url_vazia_com_require_https_false_ainda_raise():
+    """REQUIRE_HTTPS=false não isenta APP_BASE_URL de ser obrigatória."""
+    args = _args_prod_ok()
+    args["app_base_url"] = ""
+    args["require_https"] = False
+    with pytest.raises(ValueError, match="APP_BASE_URL"):
+        _validar_config_producao(**args)
+
+
 def test_prod_sem_health_secret_raises():
     """Prod sem HEALTH_SECRET → ValueError com menção a HEALTH_SECRET."""
     args = _args_prod_ok()
@@ -244,6 +261,22 @@ def test_import_config_producao_com_vars_validas_sobe():
         # CWI 2.1: cookies Secure default True em prod
         assert config_mod.Config.SESSION_COOKIE_SECURE is True
         assert config_mod.Config.REMEMBER_COOKIE_SECURE is True
+    finally:
+        _restaurar_config()
+
+
+def test_import_config_producao_require_https_false_com_http_sobe():
+    """Boot real simulado: REQUIRE_HTTPS=false + APP_BASE_URL http:// → sem exceção (modo LAN-only)."""
+    config_mod = sys.modules["config"]
+    env = {
+        **_PROD_ENV_VALIDO,
+        "APP_BASE_URL": "http://10.20.0.199:8080",
+        "REQUIRE_HTTPS": "false",
+    }
+    try:
+        with patch.dict(os.environ, env, clear=False):
+            importlib.reload(config_mod)
+        assert config_mod.Config.REQUIRE_HTTPS is False
     finally:
         _restaurar_config()
 

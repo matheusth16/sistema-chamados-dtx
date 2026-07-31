@@ -12,6 +12,20 @@ def test_login_get_retorna_200(client):
     assert b"login" in r.data.lower() or b"email" in r.data.lower() or b"Email" in r.data
 
 
+def test_login_get_mostra_botao_sso_quando_habilitado(client, app):
+    """SSO_MICROSOFT_ENABLED=True (default) — botão "Entrar com Microsoft" aparece."""
+    app.config["SSO_MICROSOFT_ENABLED"] = True
+    r = client.get("/login")
+    assert b"sso-microsoft-btn" in r.data
+
+
+def test_login_get_esconde_botao_sso_quando_desabilitado(client, app):
+    """Modo LAN-only: SSO_MICROSOFT_ENABLED=False — botão "Entrar com Microsoft" some."""
+    app.config["SSO_MICROSOFT_ENABLED"] = False
+    r = client.get("/login")
+    assert b"sso-microsoft-btn" not in r.data
+
+
 def test_login_post_sem_credenciais_redireciona_com_flash(client):
     """POST /login sem email/senha redireciona para login."""
     r = client.post("/login", data={}, follow_redirects=False)

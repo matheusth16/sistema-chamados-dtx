@@ -1,0 +1,27 @@
+# Docker Compose — produção no servidor físico local
+# Uso: docker compose -f docker-compose.prod.yml up -d
+#
+# Diferente do docker-compose.yml (dev): usa a imagem já buildada pelo CI no GHCR
+# em vez de buildar localmente. Porta publicada em todas as interfaces (0.0.0.0)
+# — TESTE de acesso via IP da rede local (10.20.0.199:8080), sem exposição à
+# internet. Ver [[project_migracao_servidor_local]] antes de expor além da LAN.
+#
+# Requisito: .env criado direto no servidor (nunca commitado). Credencial do
+# Firebase vai via GOOGLE_CREDENTIALS_JSON dentro do .env (mesmo padrão já usado
+# no Azure Container Apps — ver app/database.py) — não precisa de arquivo
+# credentials.json montado.
+
+services:
+  web:
+    image: ghcr.io/matheusth16/sistema-chamados-dtx:latest
+    ports:
+      - "0.0.0.0:8080:8080"
+    env_file:
+      - .env
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped
