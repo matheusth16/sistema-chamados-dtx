@@ -25,3 +25,12 @@ services:
       retries: 3
       start_period: 15s
     restart: unless-stopped
+
+  # Atualiza automaticamente a imagem do "web" quando o CI publica uma versão nova
+  # no GHCR. Checa a cada 1h, remove a imagem antiga depois de trocar.
+  watchtower:
+    image: containrrr/watchtower
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: --interval 3600 --cleanup sistema_chamados-web-1
+    restart: unless-stopped
