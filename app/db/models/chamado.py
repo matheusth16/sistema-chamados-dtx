@@ -91,6 +91,9 @@ class ChamadoRow(Base):
 
 
 class ChamadoParticipanteRow(Base):
+    """status só assume 'pendente' (na inclusão) ou 'concluido' (após
+    concluir_minha_parte) — ver app/services/escalonamento_service.py."""
+
     __tablename__ = "chamados_participantes"
     __table_args__ = (
         UniqueConstraint("chamado_id", "supervisor_id", name="uq_participante_chamado_supervisor"),
@@ -102,6 +105,8 @@ class ChamadoParticipanteRow(Base):
     )
     supervisor_id: Mapped[str] = mapped_column(Text, nullable=False)
     area: Mapped[str | None] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(Text, nullable=False, default="pendente")
+    concluido_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class ChamadoObservadorRow(Base):

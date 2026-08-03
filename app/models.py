@@ -1,9 +1,15 @@
+import logging
 from datetime import datetime
 
 import pytz
 from firebase_admin import firestore
+from sqlalchemy import delete, select
 
+from app import db as db_module
+from app.db.models.chamado import ChamadoObservadorRow, ChamadoParticipanteRow, ChamadoRow
 from app.exceptions import ValidacaoChamadoError
+
+logger = logging.getLogger(__name__)
 
 
 class Chamado:
@@ -276,6 +282,233 @@ class Chamado:
             previsao_atendimento=data.get("previsao_atendimento"),
             motivo_previsao_atendimento=data.get("motivo_previsao_atendimento"),
         )
+
+    def to_row_kwargs(self) -> dict:
+        """Campos escalares pra insert/update em ChamadoRow — participantes/
+        observadores são sincronizados à parte (tabela-junção, ver salvar())."""
+        return {
+            "numero_chamado": self.numero_chamado,
+            "categoria": self.categoria,
+            "tipo_solicitacao": self.tipo_solicitacao,
+            "descricao": self.descricao,
+            "responsavel": self.responsavel,
+            "responsavel_id": self.responsavel_id,
+            "motivo_atribuicao": self.motivo_atribuicao,
+            "solicitante_id": self.solicitante_id,
+            "solicitante_nome": self.solicitante_nome,
+            "area": self.area,
+            "rl_codigo": self.rl_codigo,
+            "grupo_rl_id": self.grupo_rl_id,
+            "gate": self.gate,
+            "impacto": self.impacto,
+            "anexo": self.anexo,
+            "anexos": self.anexos,
+            "setores_adicionais": self.setores_adicionais,
+            "supervisor_ids_com_acesso": self.supervisor_ids_com_acesso,
+            "prioridade": self.prioridade,
+            "status": self.status,
+            "data_conclusao": self.data_conclusao,
+            "data_cancelamento": self.data_cancelamento,
+            "data_em_atendimento": self.data_em_atendimento,
+            "previsao_atendimento": self.previsao_atendimento,
+            "motivo_previsao_atendimento": self.motivo_previsao_atendimento,
+            "motivo_cancelamento": self.motivo_cancelamento,
+            "motivo_ultima_escalacao": self.motivo_ultima_escalacao,
+            "sla_dias": self.sla_dias,
+            "confirmacao_solicitante": self.confirmacao_solicitante,
+            "escalacao_resposta_nivel": self.escalacao_resposta_nivel,
+            "escalacao_resolucao_nivel": self.escalacao_resolucao_nivel,
+            "alerta_supervisor_50_enviado": self.alerta_supervisor_50_enviado,
+            "alerta_supervisor_80_enviado": self.alerta_supervisor_80_enviado,
+        }
+
+    @classmethod
+    def _from_row(cls, row: ChamadoRow, participantes=None, observadores=None) -> "Chamado":
+        return cls(
+            id=row.id,
+            numero_chamado=row.numero_chamado,
+            categoria=row.categoria,
+            tipo_solicitacao=row.tipo_solicitacao,
+            descricao=row.descricao,
+            responsavel=row.responsavel,
+            responsavel_id=row.responsavel_id,
+            motivo_atribuicao=row.motivo_atribuicao,
+            solicitante_id=row.solicitante_id,
+            solicitante_nome=row.solicitante_nome,
+            area=row.area,
+            rl_codigo=row.rl_codigo,
+            grupo_rl_id=row.grupo_rl_id,
+            gate=row.gate,
+            impacto=row.impacto,
+            anexo=row.anexo,
+            anexos=list(row.anexos or []),
+            prioridade=row.prioridade,
+            status=row.status,
+            data_abertura=row.data_abertura,
+            data_conclusao=row.data_conclusao,
+            setores_adicionais=list(row.setores_adicionais or []),
+            motivo_cancelamento=row.motivo_cancelamento,
+            data_cancelamento=row.data_cancelamento,
+            sla_dias=row.sla_dias,
+            confirmacao_solicitante=row.confirmacao_solicitante,
+            supervisor_ids_com_acesso=list(row.supervisor_ids_com_acesso or []),
+            data_em_atendimento=row.data_em_atendimento,
+            escalacao_resposta_nivel=row.escalacao_resposta_nivel,
+            participantes=participantes or [],
+            motivo_ultima_escalacao=row.motivo_ultima_escalacao,
+            escalacao_resolucao_nivel=row.escalacao_resolucao_nivel,
+            alerta_supervisor_50_enviado=row.alerta_supervisor_50_enviado,
+            alerta_supervisor_80_enviado=row.alerta_supervisor_80_enviado,
+            observadores=observadores or [],
+            previsao_atendimento=row.previsao_atendimento,
+            motivo_previsao_atendimento=row.motivo_previsao_atendimento,
+        )
+
+    @staticmethod
+    def _carregar_participantes(session, chamado_id: int) -> list[dict]:
+        rows = (
+            session.execute(
+                select(ChamadoParticipanteRow).where(
+                    ChamadoParticipanteRow.chamado_id == chamado_id
+                )
+            )
+            .scalars()
+            .all()
+        )
+        return [
+            {
+                "supervisor_id": r.supervisor_id,
+                "area": r.area,
+                "status": r.status,
+                "concluido_em": r.concluido_em,
+            }
+            for r in rows
+        ]
+
+    @staticmethod
+    def _carregar_observadores(session, chamado_id: int) -> list[dict]:
+        rows = (
+            session.execute(
+                select(ChamadoObservadorRow).where(ChamadoObservadorRow.chamado_id == chamado_id)
+            )
+            .scalars()
+            .all()
+        )
+        return [{"usuario_id": r.usuario_id, "nome": r.nome, "email": r.email} for r in rows]
+
+    @classmethod
+    def get_by_id(cls, chamado_id) -> "Chamado | None":
+        """Busca um chamado pelo ID, com participantes/observadores carregados."""
+        try:
+            cid = int(chamado_id)
+        except (TypeError, ValueError):
+            return None
+        try:
+            with db_module.SessionLocal() as session:
+                row = session.get(ChamadoRow, cid)
+                if row is None:
+                    return None
+                participantes = cls._carregar_participantes(session, cid)
+                observadores = cls._carregar_observadores(session, cid)
+                return cls._from_row(row, participantes, observadores)
+        except Exception as e:
+            logger.exception("Erro ao buscar chamado %s: %s", chamado_id, e)
+            return None
+
+    def _sincronizar_participantes(self, session) -> None:
+        """Substitui todos os participantes do chamado pelo estado atual de
+        self.participantes (delete-all + reinsert — a lista é sempre o
+        estado completo desejado, não um delta)."""
+        session.execute(
+            delete(ChamadoParticipanteRow).where(ChamadoParticipanteRow.chamado_id == self.id)
+        )
+        for p in self.participantes:
+            session.add(
+                ChamadoParticipanteRow(
+                    chamado_id=self.id,
+                    supervisor_id=p["supervisor_id"],
+                    area=p.get("area"),
+                    status=p.get("status") or "pendente",
+                    concluido_em=p.get("concluido_em"),
+                )
+            )
+
+    def _sincronizar_observadores(self, session) -> None:
+        """Substitui todos os observadores do chamado pelo estado atual de
+        self.observadores (delete-all + reinsert)."""
+        session.execute(
+            delete(ChamadoObservadorRow).where(ChamadoObservadorRow.chamado_id == self.id)
+        )
+        for o in self.observadores:
+            session.add(
+                ChamadoObservadorRow(
+                    chamado_id=self.id,
+                    usuario_id=o["usuario_id"],
+                    nome=o.get("nome") or "",
+                    email=o.get("email") or "",
+                )
+            )
+
+    def salvar(self) -> int | None:
+        """Insere (sem id) ou atualiza (com id) o chamado, sincronizando
+        participantes/observadores pro estado atual do objeto Python.
+        Retorna o id (novo ou existente), ou None em falha."""
+        try:
+            with db_module.SessionLocal() as session, session.begin():
+                if self.id:
+                    row = session.get(ChamadoRow, self.id)
+                    if row is None:
+                        raise ValueError(f"Chamado {self.id} não encontrado")
+                else:
+                    row = ChamadoRow()
+                    session.add(row)
+                for k, v in self.to_row_kwargs().items():
+                    setattr(row, k, v)
+                session.flush()
+                self.id = row.id
+                if row.data_abertura:
+                    self.data_abertura = row.data_abertura
+                self._sincronizar_participantes(session)
+                self._sincronizar_observadores(session)
+            return self.id
+        except Exception as e:
+            logger.exception("Erro ao salvar chamado %s: %s", self.id, e)
+            return None
+
+    def atualizar_campos(self, **kwargs) -> bool:
+        """Atualiza campos escalares específicos (equivalente ao antigo
+        db.collection('chamados').document(id).update(...)). Não mexe em
+        participantes/observadores — use salvar() ou os métodos dedicados."""
+        if not self.id:
+            return False
+        campos_validos = set(self.to_row_kwargs().keys())
+        alteracoes = {k: v for k, v in kwargs.items() if k in campos_validos}
+        if not alteracoes:
+            return False
+        try:
+            with db_module.SessionLocal() as session, session.begin():
+                row = session.get(ChamadoRow, self.id)
+                if row is None:
+                    return False
+                for k, v in alteracoes.items():
+                    setattr(row, k, v)
+                    setattr(self, k, v)
+            return True
+        except Exception as e:
+            logger.exception("Erro ao atualizar chamado %s: %s", self.id, e)
+            return False
+
+    def deletar(self) -> bool:
+        """Remove o chamado (participantes/observadores somem via ON DELETE CASCADE)."""
+        try:
+            with db_module.SessionLocal() as session, session.begin():
+                row = session.get(ChamadoRow, self.id)
+                if row is not None:
+                    session.delete(row)
+            return True
+        except Exception as e:
+            logger.exception("Erro ao deletar chamado %s: %s", self.id, e)
+            return False
 
     def __repr__(self):
         return f"<Chamado {self.id} - {self.categoria}>"

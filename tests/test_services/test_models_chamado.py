@@ -1,10 +1,15 @@
-"""Testes para models.py — Chamado.to_dict, from_dict e helpers de data."""
+"""Testes para models.py — Chamado.to_dict, from_dict e helpers de data.
+
+Fase 2 (Marco 7) — salvar/get_by_id/atualizar_campos/deletar rodam contra
+Postgres real (db_session)."""
 
 from datetime import datetime
 from unittest.mock import MagicMock
 
 import pytest
 import pytz
+
+pytestmark = pytest.mark.usefixtures("db_session")
 
 
 def _chamado(**kwargs):
@@ -439,3 +444,174 @@ def test_chamado_from_dict_campos_escada_b_ausentes_usa_defaults():
     assert c.escalacao_resolucao_nivel == 0
     assert c.alerta_supervisor_50_enviado is False
     assert c.alerta_supervisor_80_enviado is False
+
+
+# ── Persistência (Fase 2 — Postgres real) ────────────────────────────────────
+
+
+def test_salvar_novo_persiste_e_retorna_id(app):
+    c = _chamado(numero_chamado="CHM-0001")
+    novo_id = c.salvar()
+
+    assert novo_id is not None
+    assert c.id == novo_id
+
+
+def test_get_by_id_recupera_chamado_salvo(app):
+    c = _chamado(numero_chamado="CHM-0002", descricao="Descrição original")
+    c.salvar()
+
+    recarregado = _chamado_get_by_id(c.id)
+
+    assert recarregado is not None
+    assert recarregado.descricao == "Descrição original"
+    assert recarregado.categoria == "TI"
+
+
+def test_get_by_id_nao_encontrado_retorna_none(app):
+    assert _chamado_get_by_id(999999) is None
+
+
+def test_get_by_id_id_invalido_retorna_none(app):
+    assert _chamado_get_by_id("nao-e-um-numero") is None
+
+
+def test_salvar_existente_atualiza_campos(app):
+    c = _chamado(numero_chamado="CHM-0003", status="Aberto")
+    c.salvar()
+
+    c.status = "Em Atendimento"
+    c.salvar()
+
+    recarregado = _chamado_get_by_id(c.id)
+    assert recarregado.status == "Em Atendimento"
+
+
+def test_atualizar_campos_persiste_subset(app):
+    c = _chamado(numero_chamado="CHM-0004", status="Aberto")
+    c.salvar()
+
+    resultado = c.atualizar_campos(status="Concluído", motivo_cancelamento=None)
+
+    assert resultado is True
+    recarregado = _chamado_get_by_id(c.id)
+    assert recarregado.status == "Concluído"
+
+
+def test_atualizar_campos_sem_id_retorna_false(app):
+    c = _chamado()
+    assert c.atualizar_campos(status="Concluído") is False
+
+
+def test_atualizar_campos_ignora_chaves_invalidas(app):
+    c = _chamado(numero_chamado="CHM-0005")
+    c.salvar()
+
+    assert c.atualizar_campos(campo_que_nao_existe="x") is False
+
+
+def test_deletar_remove_chamado(app):
+    c = _chamado(numero_chamado="CHM-0006")
+    c.salvar()
+    chamado_id = c.id
+
+    assert c.deletar() is True
+    assert _chamado_get_by_id(chamado_id) is None
+
+
+# ── Participantes / Observadores (tabela-junção) ─────────────────────────────
+
+
+def test_salvar_persiste_participantes(app):
+    c = _chamado(
+        numero_chamado="CHM-0007",
+        participantes=[{"supervisor_id": "sup1", "area": "TI", "status": "pendente"}],
+    )
+    c.salvar()
+
+    recarregado = _chamado_get_by_id(c.id)
+    assert len(recarregado.participantes) == 1
+    assert recarregado.participantes[0]["supervisor_id"] == "sup1"
+    assert recarregado.participantes[0]["area"] == "TI"
+    assert recarregado.participantes[0]["status"] == "pendente"
+    assert recarregado.participantes[0]["concluido_em"] is None
+
+
+def test_salvar_persiste_participante_concluido_com_timestamp(app):
+    agora = datetime.now(pytz.timezone("America/Sao_Paulo"))
+    c = _chamado(
+        numero_chamado="CHM-0008",
+        participantes=[
+            {"supervisor_id": "sup1", "area": "TI", "status": "concluido", "concluido_em": agora}
+        ],
+    )
+    c.salvar()
+
+    recarregado = _chamado_get_by_id(c.id)
+    assert recarregado.participantes[0]["status"] == "concluido"
+    assert recarregado.participantes[0]["concluido_em"] is not None
+
+
+def test_salvar_substitui_participantes_ao_resalvar(app):
+    """participantes é sempre o estado completo desejado — resalvar com lista
+    menor remove os que saíram."""
+    c = _chamado(
+        numero_chamado="CHM-0009",
+        participantes=[{"supervisor_id": "sup1", "area": "TI"}],
+    )
+    c.salvar()
+
+    c.participantes = [
+        {"supervisor_id": "sup1", "area": "TI"},
+        {"supervisor_id": "sup2", "area": "RH"},
+    ]
+    c.salvar()
+
+    recarregado = _chamado_get_by_id(c.id)
+    ids = {p["supervisor_id"] for p in recarregado.participantes}
+    assert ids == {"sup1", "sup2"}
+
+
+def test_salvar_persiste_observadores(app):
+    c = _chamado(
+        numero_chamado="CHM-0010",
+        observadores=[{"usuario_id": "u1", "nome": "Fulano", "email": "f@b.com"}],
+    )
+    c.salvar()
+
+    recarregado = _chamado_get_by_id(c.id)
+    assert len(recarregado.observadores) == 1
+    assert recarregado.observadores[0]["usuario_id"] == "u1"
+    assert recarregado.observadores[0]["nome"] == "Fulano"
+    assert recarregado.observadores[0]["email"] == "f@b.com"
+
+
+def test_deletar_remove_participantes_e_observadores_via_cascade(app):
+    from app.db.models.chamado import ChamadoObservadorRow, ChamadoParticipanteRow
+    from app.models import db_module as models_db_module
+
+    c = _chamado(
+        numero_chamado="CHM-0011",
+        participantes=[{"supervisor_id": "sup1", "area": "TI"}],
+        observadores=[{"usuario_id": "u1", "nome": "F", "email": "f@b.com"}],
+    )
+    c.salvar()
+    chamado_id = c.id
+
+    c.deletar()
+
+    with models_db_module.SessionLocal() as session:
+        participantes_restantes = (
+            session.query(ChamadoParticipanteRow).filter_by(chamado_id=chamado_id).all()
+        )
+        observadores_restantes = (
+            session.query(ChamadoObservadorRow).filter_by(chamado_id=chamado_id).all()
+        )
+    assert participantes_restantes == []
+    assert observadores_restantes == []
+
+
+def _chamado_get_by_id(chamado_id):
+    from app.models import Chamado
+
+    return Chamado.get_by_id(chamado_id)
