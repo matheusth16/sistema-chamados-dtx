@@ -305,6 +305,27 @@ O Firebase é inicializado em `app/database.py`:
 
 ---
 
+## PostgreSQL (Fase 2 — migração gradual do Firestore)
+
+Banco de dados sendo migrado do Firestore pra PostgreSQL (branch `feature/fase2-postgres`), marco
+a marco (ver plano de migração). Camada de acesso em `app/db/` (SQLAlchemy 2.0 + Alembic),
+inicializada em `create_app()` via `app.db.init_engine(app)` — **no-op** enquanto `DATABASE_URL`
+não estiver configurada (Firestore continua sendo o banco ativo até o corte final do Marco 12).
+
+| Variável | Descrição | Padrão |
+|----------|-----------|--------|
+| `DATABASE_URL` | String de conexão Postgres em produção (`postgresql://user:senha@host:5432/db`). | (vazio — Postgres inativo) |
+| `TEST_DATABASE_URL` | String de conexão do Postgres **de teste** (real, não mock) — usada pela suíte pytest e por `alembic upgrade head`/`downgrade base`. No CI, setada automaticamente pelo serviço `postgres:16-alpine` (`.github/workflows/ci.yml`). Em dev local, aponte pra um banco dedicado do projeto — não reutilize um banco de outro projeto na mesma instância. | (vazio) |
+
+Comandos úteis (rodar na raiz do projeto, com `TEST_DATABASE_URL` no ambiente):
+```bash
+alembic upgrade head      # aplica todas as migrations
+alembic downgrade base    # reverte tudo (schema vazio)
+alembic revision --autogenerate -m "descrição"   # gera migration a partir dos models em app/db/models/
+```
+
+---
+
 ## Resumo rápido (.env de desenvolvimento)
 
 ```env

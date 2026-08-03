@@ -11,7 +11,26 @@ jobs:
     name: Lint, Testes e Segurança
     runs-on: ubuntu-latest
 
+    services:
+      # Postgres real de teste (Fase 2 — migração Firestore → PostgreSQL).
+      # Schema usa TEXT[]/JSONB/GIN/SEQUENCE nativa, não replicáveis fielmente
+      # em SQLite — testamos contra o motor real, igual produção.
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+
     env:
+      TEST_DATABASE_URL: postgresql://postgres:test@localhost:5432/test
       # Variáveis mínimas para o app Flask subir em modo de teste
       FLASK_ENV: testing
       SECRET_KEY: ci-test-secret-key
@@ -70,6 +89,10 @@ jobs:
           name: gitleaks-scan-report
           path: gitleaks-report.sarif
           retention-days: 30
+
+      # ── Schema Postgres (Fase 2) ─────────────────────────────────────────────
+      - name: Alembic — aplica migrations no Postgres de teste
+        run: alembic upgrade head
 
       # ── Testes com cobertura ───────────────────────────────────────────────
       - name: Pytest — suite completa com gate de cobertura

@@ -1,5 +1,6 @@
 """Configuração pytest e fixtures compartilhadas."""
 
+import contextlib
 import os
 from unittest.mock import MagicMock, patch
 
@@ -7,6 +8,109 @@ import pytest
 
 # Garante que o app seja importável (FLASK_ENV=testing evita exigência de SECRET_KEY de produção)
 os.environ.setdefault("FLASK_ENV", "testing")
+
+# Módulos que fazem "from app.database import db" — cada um cria seu próprio
+# binding, então precisam ser mockados individualmente (patch("app.database.db")
+# sozinho NÃO afeta esses). app.utils_areas fica de fora: já tem fixture
+# dedicada abaixo com comportamento específico (doc.exists=False).
+_MODULOS_COM_DB_FIRESTORE = [
+    "app.database",
+    "app.routes.api_solicitante",
+    "app.routes.api_chamados",
+    "app.routes.api_colaboracao",
+    "app.routes.dashboard",
+    "app.routes.chamados",
+    "app.routes.admin_global",
+    "app.models_usuario",
+    "app.models_historico",
+    "app.models_grupo_rl",
+    "app.services.lgpd_self_service",
+    "app.services.sla_escalacao_service",
+    "app.services.edicao_chamado_service",
+    "app.services.gestor_dashboard_service",
+    "app.services.solicitante_edicao_service",
+    "app.services.dashboard_service",
+    "app.services.escalonamento_service",
+    "app.services.cancelamento_solicitante_service",
+    "app.services.chamados_listagem_service",
+    "app.services.chamados_criacao_service",
+    "app.services.report_service",
+    "app.services.onboarding_service",
+    "app.services.historico_usuario_service",
+    "app.services.status_service",
+    "app.services.notifications_inapp",
+    "app.services.contadores_uso",
+    "app.services.assignment",
+    "app.utils",
+    "app.services.lembrete_confirmacao_service",
+    "app.services.webpush_service",
+    "app.services.gamification_service",
+]
+
+
+def _levanta_acesso_real(*args, **kwargs):
+    raise RuntimeError(
+        "Firestore REAL acessado em teste sem mock explícito. Use "
+        "patch('app.<modulo>.db') dentro do teste (ver CLAUDE.md — "
+        "'Mock de Firestore'). Incidente 2026-08-03: testes sem mock "
+        "escreveram dados de teste em produção."
+    )
+
+
+# Nomes de método que de fato tocam rede no Firestore real. Métodos de
+# travessia (collection/document/where/order_by/limit/start_after/...) NÃO
+# entram aqui — construir uma referência de query é sempre seguro (não bate
+# na rede); só a CHAMADA de um destes é que precisa ser bloqueada. Isso
+# importa porque parte do código passa a referência não-invocada adiante
+# (ex.: execute_with_retry(db.collection(x).document(y).update, dados)) —
+# nesse caso "update" nunca é de fato chamado se o wrapper for mockado.
+_METODOS_TERMINAIS_FIRESTORE = {
+    "get",
+    "stream",
+    "add",
+    "set",
+    "update",
+    "delete",
+    "get_all",
+    "transaction",
+    "batch",
+}
+
+
+class _FirestoreVenenoso(MagicMock):
+    """MagicMock que levanta ao CHAMAR qualquer método terminal do Firestore,
+    em qualquer profundidade da cadeia — mas permite montar a cadeia
+    (.collection()/.document()/.where()/.limit()/...) livremente até lá."""
+
+    def _get_child_mock(self, **kw):
+        if kw.get("name") in _METODOS_TERMINAIS_FIRESTORE:
+            return MagicMock(side_effect=_levanta_acesso_real)
+        return _FirestoreVenenoso(**kw)
+
+
+def _mock_db_venenoso():
+    return _FirestoreVenenoso()
+
+
+@pytest.fixture(autouse=True)
+def _bloqueia_firestore_real_sem_mock():
+    """Rede de segurança: acesso não-mockado a qualquer app.<módulo>.db levanta
+    erro na hora, em vez de silenciosamente tocar o Firestore de PRODUÇÃO.
+
+    Motivo (incidente 2026-08-03): um teste novo da Fase 2 (Postgres) usava a
+    fixture db_session mas exercitava um model que ainda não tinha sido
+    migrado — o código antigo caiu no Firestore real (credentials.json local
+    aponta pra produção) e escreveu 20 documentos de teste lá, sem que
+    nenhum teste tivesse mockado app.<modulo>.db explicitamente.
+
+    Testes que fazem patch("app.<modulo>.db") localmente não são afetados —
+    o patch do teste (aplicado dentro do corpo do teste) tem precedência
+    sobre este autouse.
+    """
+    with contextlib.ExitStack() as stack:
+        for modulo in _MODULOS_COM_DB_FIRESTORE:
+            stack.enter_context(patch(f"{modulo}.db", _mock_db_venenoso()))
+        yield
 
 
 def pytest_configure(config):
@@ -220,11 +324,70 @@ def client_logado_gestor(client, app):
         yield client
 
 
+def _alembic_config():
+    """Config do Alembic apontando pra raiz do projeto (alembic.ini/alembic/)."""
+    from pathlib import Path
+
+    from alembic.config import Config as AlembicConfig
+
+    root = Path(__file__).resolve().parent.parent
+    cfg = AlembicConfig(str(root / "alembic.ini"))
+    cfg.set_main_option("script_location", str(root / "alembic"))
+    return cfg
+
+
+@pytest.fixture(scope="session")
+def db_engine():
+    """Engine de teste (Fase 2 — Postgres real, não mock) com o schema aplicado.
+
+    Requer TEST_DATABASE_URL no ambiente (setado automaticamente no CI via
+    serviço postgres:16-alpine; em dev local, ver docs/ENV.md). Roda todas as
+    migrations do Alembic uma única vez por sessão de teste.
+    """
+    from sqlalchemy import create_engine
+
+    from alembic import command
+
+    test_url = os.environ.get("TEST_DATABASE_URL")
+    if not test_url:
+        pytest.skip("TEST_DATABASE_URL não configurada — testes de Postgres pulados.")
+
+    command.upgrade(_alembic_config(), "head")
+    engine = create_engine(test_url)
+    yield engine
+    engine.dispose()
+
+
 @pytest.fixture
-def mock_firestore():
-    """
-    Mock do Firestore para testes que não devem acessar o banco real.
-    Use: def test_x(mock_firestore): ... (o mock está em app.database.db).
-    """
-    with patch("app.database.db", MagicMock()) as mock_db:
-        yield mock_db
+def db_session(db_engine, monkeypatch, app):
+    """Sessão de teste isolada por savepoint — cada teste começa e termina em
+    estado limpo (rollback), sem recriar o schema. Substitui app.db.SessionLocal
+    pra que o código de produção use esta sessão de teste durante o teste.
+
+    Depende explicitamente de `app`: create_app() chama init_engine(app), que
+    sobrescreve app.db.SessionLocal com uma sessão real (sem savepoint) sempre
+    que DATABASE_URL está configurada — e em modo teste ela resolve pro mesmo
+    valor de TEST_DATABASE_URL (ver config.py). Sem essa dependência explícita,
+    se um teste também usar a fixture `app`, a ordem de setup do pytest pode
+    rodar create_app() DEPOIS deste monkeypatch, anulando o isolamento e
+    fazendo escritas serem commitadas de verdade no banco de teste (achado ao
+    investigar dados órfãos sobrevivendo a rollback em 2026-08-03)."""
+    from sqlalchemy.orm import scoped_session, sessionmaker
+
+    connection = db_engine.connect()
+    trans = connection.begin()
+    test_session_factory = scoped_session(
+        sessionmaker(
+            bind=connection,
+            join_transaction_mode="create_savepoint",
+            autoflush=False,
+            expire_on_commit=False,
+        )
+    )
+    monkeypatch.setattr("app.db.SessionLocal", test_session_factory)
+
+    yield test_session_factory()
+
+    test_session_factory.remove()
+    trans.rollback()
+    connection.close()

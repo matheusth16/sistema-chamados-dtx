@@ -160,6 +160,12 @@ class Config:
     # Ambiente: use sempre app.config.get('ENV') (development, production, testing)
     ENV = _env
 
+    # PostgreSQL (Fase 2 — substitui Firestore, ver docs/ENV.md). Em testes, usa
+    # TEST_DATABASE_URL (banco real de teste, não mock) em vez de DATABASE_URL.
+    DATABASE_URL = os.getenv(
+        "TEST_DATABASE_URL" if _env == "testing" else "DATABASE_URL", ""
+    ).strip()
+
     # 2. Caminho ABSOLUTO para a pasta de uploads (Evita erros no Windows/OneDrive)
     UPLOAD_FOLDER = os.path.join(basedir, "app", "static", "uploads")
 

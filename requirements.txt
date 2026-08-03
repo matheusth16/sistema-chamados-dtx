@@ -10,6 +10,11 @@ Flask-Limiter==4.1.1
 firebase_admin==7.1.0
 google-cloud-storage==3.9.0
 
+# --- PostgreSQL (Fase 2 — substitui Firestore, ver docs/ENV.md) ---
+SQLAlchemy==2.0.46
+alembic==1.18.5
+psycopg[binary]==3.3.4
+
 # --- WSGI Server ---
 gunicorn==25.1.0
 

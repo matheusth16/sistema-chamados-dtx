@@ -48,6 +48,13 @@ def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
 
+    # PostgreSQL (Fase 2 — migração gradual do Firestore, ver docs/ENV.md).
+    # No-op se DATABASE_URL não estiver configurada (ainda o caso em produção
+    # até o corte do Marco 12); em testes, usa TEST_DATABASE_URL.
+    from app.db import init_engine
+
+    init_engine(app)
+
     # ProxyFix: faz request.remote_addr refletir o IP real do cliente quando há
     # um proxy reverso (nginx) na frente. Sem isso, X-Forwarded-For seria lido
     # diretamente nas rotas, permitindo que atacantes forjem o IP via header.
