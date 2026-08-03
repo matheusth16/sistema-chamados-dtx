@@ -10,11 +10,6 @@ Decisão de design (sem gestor cadastrado):
   de e-mail. Isso evita que chamados fiquem presos tentando re-notificar um
   destinatário inexistente a cada execução do job. O comportamento é
   registrado em log warning para diagnóstico operacional.
-
-Índice Firestore necessário (composite):
-  Collection: chamados
-  Fields: status ASC, escalacao_resposta_nivel ASC
-  Ver: docs/INDICES_FIRESTORE.md
 """
 
 from __future__ import annotations
@@ -23,9 +18,11 @@ import logging
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from google.cloud.firestore_v1.base_query import FieldFilter
+from sqlalchemy import select
 
-from app.database import db
+from app import db as db_module
+from app.db.models.chamado import ChamadoRow
+from app.models import Chamado
 from app.services.business_time import (
     adicionar_dias_uteis,
     minutos_corridos_entre,
@@ -108,40 +105,42 @@ def processar_escada_a(agora: datetime | None = None) -> dict:
     mapa_niveis_superiores = _construir_mapa_niveis_superiores()
 
     try:
-        docs = (
-            db.collection("chamados")
-            .where(filter=FieldFilter("status", "==", "Aberto"))
-            .where(filter=FieldFilter("escalacao_resposta_nivel", "<", 4))
-            .limit(500)
-            .stream()
-        )
+        with db_module.SessionLocal() as session:
+            stmt = (
+                select(ChamadoRow)
+                .where(ChamadoRow.status == "Aberto", ChamadoRow.escalacao_resposta_nivel < 4)
+                .limit(500)
+            )
+            rows = session.execute(stmt).scalars().all()
     except Exception as exc:
-        logger.exception("Escada A: erro ao consultar Firestore: %s", exc)
+        logger.exception("Escada A: erro ao consultar chamados: %s", exc)
         stats["erros"] += 1
         return stats
 
-    for doc in docs:
+    for row in rows:
         stats["processados"] += 1
         try:
             _processar_chamado_escada_a(
-                doc, agora, stats, mapa_gestor_setor, mapa_niveis_superiores
+                row, agora, stats, mapa_gestor_setor, mapa_niveis_superiores
             )
         except Exception as exc:
-            logger.exception("Escada A: erro ao processar chamado %s: %s", doc.id, exc)
+            logger.exception("Escada A: erro ao processar chamado %s: %s", row.id, exc)
             stats["erros"] += 1
 
     return stats
 
 
 def _processar_chamado_escada_a(
-    doc,
+    row: ChamadoRow,
     agora: datetime,
     stats: dict,
     mapa_gestor_setor: dict[str, str],
     mapa_niveis_superiores: dict[str, str],
 ) -> None:
     """Avalia e (se aplicável) escala um único chamado na Escada A."""
-    data = doc.to_dict()
+    chamado = Chamado._from_row(row)
+    data = chamado.to_dict()
+    chamado_id = chamado.id
 
     # Guard: só processa Abertos (a query filtra, mas defensivo contra dados inconsistentes)
     if data.get("status") != "Aberto":
@@ -158,7 +157,7 @@ def _processar_chamado_escada_a(
 
     data_abertura = data.get("data_abertura")
     if data_abertura is None:
-        logger.warning("Escada A: chamado %s sem data_abertura; ignorado.", doc.id)
+        logger.warning("Escada A: chamado %s sem data_abertura; ignorado.", chamado_id)
         return
 
     minutos = minutos_uteis_entre(data_abertura, agora)
@@ -184,7 +183,7 @@ def _processar_chamado_escada_a(
         try:
             notificar_escalada_resposta_gerencial(
                 chamado_data=data,
-                chamado_id=doc.id,
+                chamado_id=chamado_id,
                 nivel=novo_nivel,
                 email_dest=email_dest,
             )
@@ -194,7 +193,7 @@ def _processar_chamado_escada_a(
                 "Escada A: falha ao enviar e-mail nível %d para %s (chamado %s): %s",
                 novo_nivel,
                 email_dest,
-                doc.id,
+                chamado_id,
                 exc,
             )
     else:
@@ -204,17 +203,17 @@ def _processar_chamado_escada_a(
         logger.warning(
             "Escada A: chamado %s → nível %d: nenhum usuário ativo com nivel_gestao='%s' "
             "cadastrado. Incrementando nível sem e-mail.",
-            doc.id,
+            chamado_id,
             novo_nivel,
             chave_gestor,
         )
 
-    db.collection("chamados").document(doc.id).update({"escalacao_resposta_nivel": novo_nivel})
+    chamado.atualizar_campos(escalacao_resposta_nivel=novo_nivel)
     stats["escalados"] += 1
 
     logger.info(
         "Escada A: chamado %s escalado %d→%d (min_uteis=%d, chave=%s, email_ok=%s)",
-        doc.id,
+        chamado_id,
         nivel_atual,
         novo_nivel,
         minutos,
@@ -301,31 +300,30 @@ def processar_avisos_resolucao(agora: datetime | None = None) -> dict:
     }
 
     try:
-        docs = (
-            db.collection("chamados")
-            .where(filter=FieldFilter("status", "==", "Em Atendimento"))
-            .limit(500)
-            .stream()
-        )
+        with db_module.SessionLocal() as session:
+            stmt = select(ChamadoRow).where(ChamadoRow.status == "Em Atendimento").limit(500)
+            rows = session.execute(stmt).scalars().all()
     except Exception as exc:
-        logger.exception("Avisos resolução: erro ao consultar Firestore: %s", exc)
+        logger.exception("Avisos resolução: erro ao consultar chamados: %s", exc)
         stats["erros"] += 1
         return stats
 
-    for doc in docs:
+    for row in rows:
         stats["processados"] += 1
         try:
-            _processar_aviso_resolucao(doc, agora, stats)
+            _processar_aviso_resolucao(row, agora, stats)
         except Exception as exc:
-            logger.exception("Avisos resolução: erro ao processar chamado %s: %s", doc.id, exc)
+            logger.exception("Avisos resolução: erro ao processar chamado %s: %s", row.id, exc)
             stats["erros"] += 1
 
     return stats
 
 
-def _processar_aviso_resolucao(doc, agora: datetime, stats: dict) -> None:
+def _processar_aviso_resolucao(row: ChamadoRow, agora: datetime, stats: dict) -> None:
     """Avalia e (se aplicável) envia aviso de SLA de resolução para um único chamado."""
-    data = doc.to_dict()
+    chamado = Chamado._from_row(row)
+    data = chamado.to_dict()
+    chamado_id = chamado.id
 
     responsavel_id = data.get("responsavel_id")
     if not responsavel_id:
@@ -333,7 +331,9 @@ def _processar_aviso_resolucao(doc, agora: datetime, stats: dict) -> None:
 
     data_em_atendimento = data.get("data_em_atendimento")
     if data_em_atendimento is None:
-        logger.warning("Avisos resolução: chamado %s sem data_em_atendimento; ignorado.", doc.id)
+        logger.warning(
+            "Avisos resolução: chamado %s sem data_em_atendimento; ignorado.", chamado_id
+        )
         return
 
     alerta_50 = bool(data.get("alerta_supervisor_50_enviado"))
@@ -366,7 +366,7 @@ def _processar_aviso_resolucao(doc, agora: datetime, stats: dict) -> None:
     if threshold_50:
         notificar_aviso_resolucao_supervisor(
             chamado_data=data,
-            chamado_id=doc.id,
+            chamado_id=chamado_id,
             marco=50,
             responsavel_id=responsavel_id,
             email_dest=email_resp,
@@ -378,7 +378,7 @@ def _processar_aviso_resolucao(doc, agora: datetime, stats: dict) -> None:
     if threshold_80:
         notificar_aviso_resolucao_supervisor(
             chamado_data=data,
-            chamado_id=doc.id,
+            chamado_id=chamado_id,
             marco=80,
             responsavel_id=responsavel_id,
             email_dest=email_resp,
@@ -387,10 +387,10 @@ def _processar_aviso_resolucao(doc, agora: datetime, stats: dict) -> None:
         updates["alerta_supervisor_80_enviado"] = True
 
     if updates:
-        db.collection("chamados").document(doc.id).update(updates)
+        chamado.atualizar_campos(**updates)
         logger.info(
             "Avisos resolução: chamado %s atualizado (pct=%.0f%%), flags=%s",
-            doc.id,
+            chamado_id,
             pct * 100,
             list(updates.keys()),
         )
@@ -442,40 +442,44 @@ def processar_escada_b(agora: datetime | None = None) -> dict:
     mapa_niveis_superiores = _construir_mapa_niveis_superiores()
 
     try:
-        docs = (
-            db.collection("chamados")
-            .where(filter=FieldFilter("status", "==", "Em Atendimento"))
-            .where(filter=FieldFilter("escalacao_resolucao_nivel", "<", 4))
-            .limit(500)
-            .stream()
-        )
+        with db_module.SessionLocal() as session:
+            stmt = (
+                select(ChamadoRow)
+                .where(
+                    ChamadoRow.status == "Em Atendimento", ChamadoRow.escalacao_resolucao_nivel < 4
+                )
+                .limit(500)
+            )
+            rows = session.execute(stmt).scalars().all()
     except Exception as exc:
-        logger.exception("Escada B: erro ao consultar Firestore: %s", exc)
+        logger.exception("Escada B: erro ao consultar chamados: %s", exc)
         stats["erros"] += 1
         return stats
 
-    for doc in docs:
+    for row in rows:
         stats["processados"] += 1
         try:
             _processar_chamado_escada_b(
-                doc, agora, stats, mapa_gestor_setor, mapa_niveis_superiores
+                row, agora, stats, mapa_gestor_setor, mapa_niveis_superiores
             )
         except Exception as exc:
-            logger.exception("Escada B: erro ao processar chamado %s: %s", doc.id, exc)
+            logger.exception("Escada B: erro ao processar chamado %s: %s", row.id, exc)
             stats["erros"] += 1
 
     return stats
 
 
 def _processar_chamado_escada_b(
-    doc,
+    row: ChamadoRow,
     agora: datetime,
     stats: dict,
     mapa_gestor_setor: dict[str, str],
     mapa_niveis_superiores: dict[str, str],
 ) -> None:
     """Avalia e (se aplicável) escala um único chamado na Escada B."""
-    data = doc.to_dict()
+    chamado = Chamado._from_row(row)
+    data = chamado.to_dict()
+    chamado_id = chamado.id
 
     # Previsão de atendimento: silencia a escalada inteira até a data passar
     # (mesma regra da Escada A — ver _processar_chamado_escada_a).
@@ -488,7 +492,7 @@ def _processar_chamado_escada_b(
 
     data_em_atendimento = data.get("data_em_atendimento")
     if data_em_atendimento is None:
-        logger.warning("Escada B: chamado %s sem data_em_atendimento; ignorado.", doc.id)
+        logger.warning("Escada B: chamado %s sem data_em_atendimento; ignorado.", chamado_id)
         return
 
     categoria = data.get("categoria") or ""
@@ -529,7 +533,7 @@ def _processar_chamado_escada_b(
         try:
             notificar_escalada_resolucao_gerencial(
                 chamado_data=data,
-                chamado_id=doc.id,
+                chamado_id=chamado_id,
                 nivel=novo_nivel,
                 email_dest=email_dest,
             )
@@ -539,24 +543,24 @@ def _processar_chamado_escada_b(
                 "Escada B: falha ao enviar e-mail nível %d para %s (chamado %s): %s",
                 novo_nivel,
                 email_dest,
-                doc.id,
+                chamado_id,
                 exc,
             )
     else:
         logger.warning(
             "Escada B: chamado %s → nível %d: nenhum usuário ativo com nivel_gestao='%s' "
             "cadastrado. Incrementando nível sem e-mail.",
-            doc.id,
+            chamado_id,
             novo_nivel,
             chave_gestor,
         )
 
-    db.collection("chamados").document(doc.id).update({"escalacao_resolucao_nivel": novo_nivel})
+    chamado.atualizar_campos(escalacao_resolucao_nivel=novo_nivel)
     stats["escalados"] += 1
 
     logger.info(
         "Escada B: chamado %s escalado %d→%d (min_apos_deadline=%d, chave=%s, email_ok=%s)",
-        doc.id,
+        chamado_id,
         nivel_atual,
         novo_nivel,
         minutos_apos,
