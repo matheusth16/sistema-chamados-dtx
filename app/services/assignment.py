@@ -15,9 +15,10 @@ import logging
 import os
 import random
 
-from google.cloud.firestore_v1.base_query import FieldFilter
+from sqlalchemy import func, select
 
-from app.database import db
+from app import db as db_module
+from app.db.models.chamado import ChamadoRow
 from app.i18n import get_translation_session
 from app.models_usuario import Usuario
 from app.utils_areas import setor_para_area
@@ -27,10 +28,6 @@ logger = logging.getLogger(__name__)
 
 def _t(key, **kwargs):
     return get_translation_session(key, **kwargs)
-
-
-# Limite máximo de chamados varridos por chunk de supervisor (evita scan ilimitado)
-MAX_CHAMADOS_ATRIB = 500
 
 
 class AtribuidorAutomatico:
@@ -180,8 +177,8 @@ class AtribuidorAutomatico:
         """
         Conta quantos chamados abertos cada supervisor tem.
 
-        Usa uma única query IN (em chunks de 30) em vez de uma query por supervisor,
-        eliminando o N+1 original.
+        Usa uma única query agregada (GROUP BY responsavel) em vez de uma
+        query por supervisor, eliminando o N+1 original.
 
         Returns: Lista com dicts contendo usuario e chamados_abertos
         """
@@ -192,22 +189,18 @@ class AtribuidorAutomatico:
         contagem: dict[str, int] = {nome: 0 for nome in nomes}
 
         try:
-            # Firestore IN suporta até 30 valores por query
-            _chunk = 30
-            for i in range(0, len(nomes), _chunk):
-                chunk = nomes[i : i + _chunk]
-                docs = (
-                    db.collection("chamados")
-                    .where(filter=FieldFilter("responsavel", "in", chunk))
-                    .limit(MAX_CHAMADOS_ATRIB)
-                    .stream()
+            with db_module.SessionLocal() as session:
+                stmt = (
+                    select(ChamadoRow.responsavel, func.count())
+                    .where(
+                        ChamadoRow.responsavel.in_(nomes),
+                        ChamadoRow.status.notin_(("Concluído", "Cancelado")),
+                    )
+                    .group_by(ChamadoRow.responsavel)
                 )
-                for doc in docs:
-                    d = doc.to_dict()
-                    if d.get("status") not in ("Concluído", "Cancelado"):
-                        resp = d.get("responsavel")
-                        if resp in contagem:
-                            contagem[resp] += 1
+                for responsavel, total in session.execute(stmt):
+                    if responsavel in contagem:
+                        contagem[responsavel] = total
         except Exception as e:
             logger.warning("Erro ao contar chamados em batch: %s", e)
 

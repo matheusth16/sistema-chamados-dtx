@@ -30,7 +30,6 @@ _MODULOS_COM_DB_FIRESTORE = [
     "app.services.report_service",
     "app.services.onboarding_service",
     "app.services.notifications_inapp",
-    "app.services.assignment",
     "app.utils",
     "app.services.gamification_service",
 ]
