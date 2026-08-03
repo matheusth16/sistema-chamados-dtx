@@ -6,7 +6,6 @@ import threading
 from flask import current_app, session
 
 from app.database import db
-from app.firebase_retry import execute_with_retry
 from app.i18n import get_translation
 from app.models import Chamado
 from app.models_historico import Historico
@@ -51,12 +50,11 @@ def processar_edicao_chamado(
     if not pode_mutar:
         return {"sucesso": False, "erro": _t(msg_erro), "codigo": 403}
 
-    doc_chamado = db.collection("chamados").document(chamado_id).get()
-    if not doc_chamado.exists:
+    chamado_obj = Chamado.get_by_id(chamado_id)
+    if chamado_obj is None:
         return {"sucesso": False, "erro": _t("ticket_not_found"), "codigo": 404}
 
-    data_chamado = doc_chamado.to_dict()
-    chamado_obj = Chamado.from_dict(data_chamado, chamado_id)
+    data_chamado = chamado_obj.to_dict()
 
     # Validação de Permissão de ESCRITA — mais restritiva que a de leitura usada pra
     # exibir o chamado. Leitura (usuario_pode_ver_chamado) libera dono/responsável/
@@ -198,9 +196,7 @@ def processar_edicao_chamado(
                     }
 
             if novo_sla != sla_atual:
-                from firebase_admin import firestore as fs_admin
-
-                update_data["sla_dias"] = fs_admin.DELETE_FIELD if novo_sla is None else novo_sla
+                update_data["sla_dias"] = novo_sla
                 historico_pendente.append(
                     Historico(
                         chamado_id=chamado_id,
@@ -312,9 +308,8 @@ def processar_edicao_chamado(
 
         # Efetivar as alterações de Dados
         if update_data:
-            execute_with_retry(
-                db.collection("chamados").document(chamado_id).update, update_data, max_retries=3
-            )
+            if not chamado_obj.atualizar_campos(**update_data):
+                return {"sucesso": False, "erro": _t("internal_error_saving_changes")}
             mensagens.insert(0, _t("changes_saved"))
             return {"sucesso": True, "mensagem": " ".join(mensagens), "dados": update_data}
         else:

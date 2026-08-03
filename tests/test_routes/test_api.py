@@ -48,9 +48,11 @@ def test_api_editar_chamado_supervisor_outra_area_retorna_403(client_logado_supe
     supervisor_user = _usuario_mock(
         "sup_1", "sup@test.com", "Supervisor Teste", "supervisor", "Manutencao"
     )
-    mock_doc = MagicMock()
-    mock_doc.exists = True
-    mock_doc.to_dict.return_value = {
+    mock_chamado = MagicMock()
+    mock_chamado.area = "TI"
+    mock_chamado.status = "Aberto"
+    mock_chamado.confirmacao_solicitante = None
+    mock_chamado.to_dict.return_value = {
         "area": "TI",
         "status": "Aberto",
         "descricao": "Desc",
@@ -63,18 +65,19 @@ def test_api_editar_chamado_supervisor_outra_area_retorna_403(client_logado_supe
             return supervisor_user
         return None
 
-    # O serviço usa app.services.edicao_chamado_service.db, não app.routes.api_chamados.db
-    with patch("app.services.edicao_chamado_service.db") as mock_db:
-        mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
-        with patch(
+    # O serviço usa app.services.edicao_chamado_service.Chamado.get_by_id (Postgres)
+    with (
+        patch("app.services.edicao_chamado_service.Chamado.get_by_id", return_value=mock_chamado),
+        patch(
             "app.services.edicao_chamado_service.Usuario.get_by_id",
             side_effect=get_by_id_side_effect,
-        ):
-            r = client_logado_supervisor.post(
-                "/api/editar-chamado",
-                data={"chamado_id": "ch_ti_123"},
-                content_type="multipart/form-data",
-            )
+        ),
+    ):
+        r = client_logado_supervisor.post(
+            "/api/editar-chamado",
+            data={"chamado_id": "ch_ti_123"},
+            content_type="multipart/form-data",
+        )
     assert r.status_code == 403
     data = r.get_json()
     assert data is not None and (

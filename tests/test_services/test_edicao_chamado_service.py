@@ -1,9 +1,33 @@
 """
 Testes do serviço de edição de chamados (processar_edicao_chamado).
-Segue ciclo TDD: comportamento especificado antes de validar contra o código.
+
+Fase 2 (Marco 7): a leitura/escrita do CHAMADO usa Chamado.get_by_id()/
+atualizar_campos() (Postgres) — db.collection("chamados") não existe mais
+aqui. Historico continua em Firestore (Marco 8), então `db` ainda é
+mockado só para o batch de histórico. Chamado é mockado como classe (não
+precisa de Postgres real neste arquivo — só o contrato get_by_id/
+atualizar_campos importa aqui).
 """
 
 from unittest.mock import MagicMock, patch
+
+
+def _default_data():
+    return {
+        "numero_chamado": "CHM-001",
+        "status": "Aberto",
+        "descricao": "Descrição original",
+        "responsavel": "Resp Atual",
+        "responsavel_id": "resp1",
+        "area": "Manutencao",
+        "sla_dias": None,
+        "anexo": None,
+        "anexos": [],
+        "setores_adicionais": [],
+        "categoria": "Manutencao",
+        "tipo_solicitacao": "Corretiva",
+        "solicitante_nome": "Sol Teste",
+    }
 
 
 def _make_usuario(perfil="admin", uid="admin1", areas=None):
@@ -21,25 +45,27 @@ def _make_usuario(perfil="admin", uid="admin1", areas=None):
     return u
 
 
-def _make_doc(exists=True, data=None):
-    doc = MagicMock()
-    doc.exists = exists
-    doc.to_dict.return_value = data or {
-        "numero_chamado": "CHM-001",
-        "status": "Aberto",
-        "descricao": "Descrição original",
-        "responsavel": "Resp Atual",
-        "responsavel_id": "resp1",
-        "area": "Manutencao",
-        "sla_dias": None,
-        "anexo": None,
-        "anexos": [],
-        "setores_adicionais": [],
-        "categoria": "Manutencao",
-        "tipo_solicitacao": "Corretiva",
-        "solicitante_nome": "Sol Teste",
-    }
-    return doc
+def _make_chamado_mock(data=None, **attrs):
+    """MagicMock que imita o retorno de Chamado.get_by_id(): to_dict() + atributos
+    usados diretamente pelo service (area/status/confirmacao_solicitante/...)."""
+    data = data if data is not None else _default_data()
+    m = MagicMock()
+    m.to_dict.return_value = data
+    m.area = data.get("area")
+    m.status = data.get("status")
+    m.confirmacao_solicitante = data.get("confirmacao_solicitante")
+    m.numero_chamado = data.get("numero_chamado")
+    m.categoria = data.get("categoria")
+    m.tipo_solicitacao = data.get("tipo_solicitacao")
+    m.solicitante_nome = data.get("solicitante_nome")
+    m.atualizar_campos.return_value = True
+    for k, v in attrs.items():
+        setattr(m, k, v)
+    return m
+
+
+def _patch_batch(mock_db):
+    mock_db.batch.return_value = MagicMock()
 
 
 # ── Guardas de entrada ─────────────────────────────────────────────────────────
@@ -71,13 +97,13 @@ def test_processar_edicao_chamado_nao_encontrado_retorna_404(app):
     from app.services.edicao_chamado_service import processar_edicao_chamado
 
     u = _make_usuario()
-    doc_nao_existe = _make_doc(exists=False)
 
     with (
         app.app_context(),
-        patch("app.services.edicao_chamado_service.db") as mock_db,
+        patch("app.services.edicao_chamado_service.db"),
+        patch("app.services.edicao_chamado_service.Chamado") as mock_chamado_cls,
     ):
-        mock_db.collection.return_value.document.return_value.get.return_value = doc_nao_existe
+        mock_chamado_cls.get_by_id.return_value = None
         result = processar_edicao_chamado(
             usuario_atual=u,
             chamado_id="ch_inexistente",
@@ -98,16 +124,14 @@ def test_processar_edicao_supervisor_sem_permissao_retorna_403(app):
     from app.services.edicao_chamado_service import processar_edicao_chamado
 
     supervisor = _make_usuario(perfil="supervisor", uid="sup1", areas=["Qualidade"])
-    doc = _make_doc()
 
     with (
         app.app_context(),
-        patch("app.services.edicao_chamado_service.db") as mock_db,
+        patch("app.services.edicao_chamado_service.db"),
         patch("app.services.edicao_chamado_service.Chamado") as mock_chamado_cls,
         patch("app.services.permissions.usuario_pode_ver_chamado", return_value=False),
     ):
-        mock_db.collection.return_value.document.return_value.get.return_value = doc
-        mock_chamado_cls.from_dict.return_value = MagicMock()
+        mock_chamado_cls.get_by_id.return_value = _make_chamado_mock()
         result = processar_edicao_chamado(
             usuario_atual=supervisor,
             chamado_id="ch1",
@@ -137,23 +161,19 @@ def test_processar_edicao_supervisor_observador_fora_da_area_retorna_403(app):
     from app.services.edicao_chamado_service import processar_edicao_chamado
 
     supervisor_observador = _make_usuario(perfil="supervisor", uid="sup_obs", areas=["Qualidade"])
-    doc = _make_doc()  # area="Manutencao" — fora das áreas do supervisor
 
     with (
         app.app_context(),
-        patch("app.services.edicao_chamado_service.db") as mock_db,
+        patch("app.services.edicao_chamado_service.db"),
         patch("app.services.edicao_chamado_service.Chamado") as mock_chamado_cls,
         patch("app.services.edicao_chamado_service.atualizar_status_chamado") as mock_status,
         # Simula o que usuario_pode_ver_chamado retorna de verdade pra um observador:
         # True (ele pode VER o chamado por estar em cópia), mesmo fora da área.
         patch("app.services.permissions.usuario_pode_ver_chamado", return_value=True),
     ):
-        mock_db.collection.return_value.document.return_value.get.return_value = doc
-        mock_chamado = MagicMock()
-        mock_chamado.status = "Aberto"
-        mock_chamado.confirmacao_solicitante = None
-        mock_chamado.area = "Manutencao"
-        mock_chamado_cls.from_dict.return_value = mock_chamado
+        mock_chamado_cls.get_by_id.return_value = _make_chamado_mock(
+            area="Manutencao"  # fora das áreas do supervisor
+        )
         mock_status.return_value = {"sucesso": True, "mensagem": "Status atualizado"}
 
         result = processar_edicao_chamado(
@@ -179,24 +199,17 @@ def test_processar_edicao_concluido_pendente_retorna_403(app):
     from app.services.edicao_chamado_service import processar_edicao_chamado
 
     admin = _make_usuario(perfil="admin")
-    doc = _make_doc(
-        data={
-            **_make_doc().to_dict(),
-            "status": "Concluído",
-            "confirmacao_solicitante": "pendente",
-        }
-    )
 
     with (
         app.app_context(),
-        patch("app.services.edicao_chamado_service.db") as mock_db,
+        patch("app.services.edicao_chamado_service.db"),
         patch("app.services.edicao_chamado_service.Chamado") as mock_chamado_cls,
     ):
-        mock_db.collection.return_value.document.return_value.get.return_value = doc
-        mock_chamado = MagicMock()
-        mock_chamado.status = "Concluído"
-        mock_chamado.confirmacao_solicitante = "pendente"
-        mock_chamado_cls.from_dict.return_value = mock_chamado
+        mock_chamado_cls.get_by_id.return_value = _make_chamado_mock(
+            data={**_default_data(), "status": "Concluído", "confirmacao_solicitante": "pendente"},
+            status="Concluído",
+            confirmacao_solicitante="pendente",
+        )
 
         result = processar_edicao_chamado(
             usuario_atual=admin,
@@ -218,20 +231,16 @@ def test_processar_edicao_concluido_confirmado_retorna_403(app):
     from app.services.edicao_chamado_service import processar_edicao_chamado
 
     sup = _make_usuario(perfil="supervisor")
-    doc = _make_doc()
 
     with (
         app.app_context(),
-        patch("app.services.edicao_chamado_service.db") as mock_db,
+        patch("app.services.edicao_chamado_service.db"),
         patch("app.services.edicao_chamado_service.Chamado") as mock_chamado_cls,
         patch("app.services.permissions.usuario_pode_ver_chamado", return_value=True),
     ):
-        mock_db.collection.return_value.document.return_value.get.return_value = doc
-        mock_chamado = MagicMock()
-        mock_chamado.status = "Concluído"
-        mock_chamado.confirmacao_solicitante = "confirmado"
-        mock_chamado.area = "Manutencao"
-        mock_chamado_cls.from_dict.return_value = mock_chamado
+        mock_chamado_cls.get_by_id.return_value = _make_chamado_mock(
+            status="Concluído", confirmacao_solicitante="confirmado", area="Manutencao"
+        )
 
         result = processar_edicao_chamado(
             usuario_atual=sup,
@@ -256,15 +265,13 @@ def test_processar_edicao_sem_alteracoes_retorna_sucesso(app):
     from app.services.edicao_chamado_service import processar_edicao_chamado
 
     u = _make_usuario()
-    doc = _make_doc()
 
     with (
         app.app_context(),
-        patch("app.services.edicao_chamado_service.db") as mock_db,
+        patch("app.services.edicao_chamado_service.db"),
         patch("app.services.edicao_chamado_service.Chamado") as mock_chamado_cls,
     ):
-        mock_db.collection.return_value.document.return_value.get.return_value = doc
-        mock_chamado_cls.from_dict.return_value = MagicMock()
+        mock_chamado_cls.get_by_id.return_value = _make_chamado_mock()
         result = processar_edicao_chamado(
             usuario_atual=u,
             chamado_id="ch1",
@@ -287,18 +294,15 @@ def test_processar_edicao_muda_status_com_sucesso(app):
     from app.services.edicao_chamado_service import processar_edicao_chamado
 
     u = _make_usuario()
-    doc = _make_doc()
 
     with (
         app.app_context(),
         patch("app.services.edicao_chamado_service.db") as mock_db,
         patch("app.services.edicao_chamado_service.Chamado") as mock_chamado_cls,
         patch("app.services.edicao_chamado_service.atualizar_status_chamado") as mock_status,
-        patch("app.services.edicao_chamado_service.execute_with_retry"),
     ):
-        mock_db.collection.return_value.document.return_value.get.return_value = doc
-        mock_db.batch.return_value = MagicMock()
-        mock_chamado_cls.from_dict.return_value = MagicMock()
+        _patch_batch(mock_db)
+        mock_chamado_cls.get_by_id.return_value = _make_chamado_mock()
         mock_status.return_value = {"sucesso": True, "mensagem": "Status atualizado"}
         result = processar_edicao_chamado(
             usuario_atual=u,
@@ -320,15 +324,13 @@ def test_processar_edicao_cancelamento_sem_motivo_retorna_erro(app):
     from app.services.edicao_chamado_service import processar_edicao_chamado
 
     u = _make_usuario()
-    doc = _make_doc()
 
     with (
         app.app_context(),
-        patch("app.services.edicao_chamado_service.db") as mock_db,
+        patch("app.services.edicao_chamado_service.db"),
         patch("app.services.edicao_chamado_service.Chamado") as mock_chamado_cls,
     ):
-        mock_db.collection.return_value.document.return_value.get.return_value = doc
-        mock_chamado_cls.from_dict.return_value = MagicMock()
+        mock_chamado_cls.get_by_id.return_value = _make_chamado_mock()
         result = processar_edicao_chamado(
             usuario_atual=u,
             chamado_id="ch1",
@@ -349,18 +351,15 @@ def test_processar_edicao_cancelamento_com_motivo_chama_status(app):
     from app.services.edicao_chamado_service import processar_edicao_chamado
 
     u = _make_usuario()
-    doc = _make_doc()
 
     with (
         app.app_context(),
         patch("app.services.edicao_chamado_service.db") as mock_db,
         patch("app.services.edicao_chamado_service.Chamado") as mock_chamado_cls,
         patch("app.services.edicao_chamado_service.atualizar_status_chamado") as mock_status,
-        patch("app.services.edicao_chamado_service.execute_with_retry"),
     ):
-        mock_db.collection.return_value.document.return_value.get.return_value = doc
-        mock_db.batch.return_value = MagicMock()
-        mock_chamado_cls.from_dict.return_value = MagicMock()
+        _patch_batch(mock_db)
+        mock_chamado_cls.get_by_id.return_value = _make_chamado_mock()
         mock_status.return_value = {"sucesso": True, "mensagem": "Cancelado"}
         result = processar_edicao_chamado(
             usuario_atual=u,
@@ -386,15 +385,13 @@ def test_processar_edicao_sla_invalido_retorna_erro(app):
     from app.services.edicao_chamado_service import processar_edicao_chamado
 
     u = _make_usuario()
-    doc = _make_doc()
 
     with (
         app.app_context(),
-        patch("app.services.edicao_chamado_service.db") as mock_db,
+        patch("app.services.edicao_chamado_service.db"),
         patch("app.services.edicao_chamado_service.Chamado") as mock_chamado_cls,
     ):
-        mock_db.collection.return_value.document.return_value.get.return_value = doc
-        mock_chamado_cls.from_dict.return_value = MagicMock()
+        mock_chamado_cls.get_by_id.return_value = _make_chamado_mock()
         result = processar_edicao_chamado(
             usuario_atual=u,
             chamado_id="ch1",
@@ -411,23 +408,19 @@ def test_processar_edicao_sla_invalido_retorna_erro(app):
 
 
 def test_processar_edicao_sla_zero_reseta_para_padrao(app):
-    """processar_edicao_chamado com sla_str='0' remove o campo sla_dias."""
+    """processar_edicao_chamado com sla_str='0' zera o campo sla_dias (None, sem sentinela Firestore)."""
     from app.services.edicao_chamado_service import processar_edicao_chamado
 
     u = _make_usuario()
-    doc = _make_doc(data={**_make_doc().to_dict(), "sla_dias": 7})
 
     with (
         app.app_context(),
         patch("app.services.edicao_chamado_service.db") as mock_db,
         patch("app.services.edicao_chamado_service.Chamado") as mock_chamado_cls,
-        patch("app.services.edicao_chamado_service.execute_with_retry"),
-        patch("firebase_admin.firestore") as mock_fs,
     ):
-        mock_db.collection.return_value.document.return_value.get.return_value = doc
-        mock_db.batch.return_value = MagicMock()
-        mock_chamado_cls.from_dict.return_value = MagicMock()
-        mock_fs.DELETE_FIELD = "DELETE"
+        _patch_batch(mock_db)
+        mock_chamado = _make_chamado_mock(data={**_default_data(), "sla_dias": 7})
+        mock_chamado_cls.get_by_id.return_value = mock_chamado
         result = processar_edicao_chamado(
             usuario_atual=u,
             chamado_id="ch1",
@@ -440,6 +433,8 @@ def test_processar_edicao_sla_zero_reseta_para_padrao(app):
             setores_adicionais_lista=[],
         )
     assert result["sucesso"] is True
+    update_data = mock_chamado.atualizar_campos.call_args.kwargs
+    assert update_data.get("sla_dias") is None
 
 
 # ── Descrição ─────────────────────────────────────────────────────────────────
@@ -450,17 +445,15 @@ def test_processar_edicao_nova_descricao_diferente_salva(app):
     from app.services.edicao_chamado_service import processar_edicao_chamado
 
     u = _make_usuario()
-    doc = _make_doc()
 
     with (
         app.app_context(),
         patch("app.services.edicao_chamado_service.db") as mock_db,
         patch("app.services.edicao_chamado_service.Chamado") as mock_chamado_cls,
-        patch("app.services.edicao_chamado_service.execute_with_retry") as mock_retry,
     ):
-        mock_db.collection.return_value.document.return_value.get.return_value = doc
-        mock_db.batch.return_value = MagicMock()
-        mock_chamado_cls.from_dict.return_value = MagicMock()
+        _patch_batch(mock_db)
+        mock_chamado = _make_chamado_mock()
+        mock_chamado_cls.get_by_id.return_value = mock_chamado
         result = processar_edicao_chamado(
             usuario_atual=u,
             chamado_id="ch1",
@@ -473,8 +466,8 @@ def test_processar_edicao_nova_descricao_diferente_salva(app):
             setores_adicionais_lista=[],
         )
     assert result["sucesso"] is True
-    mock_retry.assert_called_once()
-    update_data = mock_retry.call_args[0][1]
+    mock_chamado.atualizar_campos.assert_called_once()
+    update_data = mock_chamado.atualizar_campos.call_args.kwargs
     assert "descricao" in update_data
 
 
@@ -486,7 +479,6 @@ def test_processar_edicao_novo_responsavel_atualiza_dados(app):
     from app.services.edicao_chamado_service import processar_edicao_chamado
 
     u = _make_usuario()
-    doc = _make_doc()
     novo_resp = MagicMock()
     novo_resp.id = "resp2"
     novo_resp.nome = "Novo Responsavel"
@@ -498,11 +490,10 @@ def test_processar_edicao_novo_responsavel_atualiza_dados(app):
         patch("app.services.edicao_chamado_service.db") as mock_db,
         patch("app.services.edicao_chamado_service.Chamado") as mock_chamado_cls,
         patch("app.services.edicao_chamado_service.Usuario") as mock_usuario_cls,
-        patch("app.services.edicao_chamado_service.execute_with_retry") as mock_retry,
     ):
-        mock_db.collection.return_value.document.return_value.get.return_value = doc
-        mock_db.batch.return_value = MagicMock()
-        mock_chamado_cls.from_dict.return_value = MagicMock()
+        _patch_batch(mock_db)
+        mock_chamado = _make_chamado_mock()
+        mock_chamado_cls.get_by_id.return_value = mock_chamado
         mock_usuario_cls.get_by_id.return_value = novo_resp
         result = processar_edicao_chamado(
             usuario_atual=u,
@@ -516,7 +507,7 @@ def test_processar_edicao_novo_responsavel_atualiza_dados(app):
             setores_adicionais_lista=[],
         )
     assert result["sucesso"] is True
-    update_data = mock_retry.call_args[0][1]
+    update_data = mock_chamado.atualizar_campos.call_args.kwargs
     assert update_data.get("responsavel") == "Novo Responsavel"
 
 
@@ -525,7 +516,6 @@ def test_edicao_troca_responsavel_atualiza_supervisor_ids_com_acesso(app):
     from app.services.edicao_chamado_service import processar_edicao_chamado
 
     u = _make_usuario()
-    doc = _make_doc()
     novo_resp = MagicMock()
     novo_resp.id = "resp2"
     novo_resp.nome = "Novo Responsavel"
@@ -537,15 +527,14 @@ def test_edicao_troca_responsavel_atualiza_supervisor_ids_com_acesso(app):
         patch("app.services.edicao_chamado_service.db") as mock_db,
         patch("app.services.edicao_chamado_service.Chamado") as mock_chamado_cls,
         patch("app.services.edicao_chamado_service.Usuario") as mock_usuario_cls,
-        patch("app.services.edicao_chamado_service.execute_with_retry") as mock_retry,
         patch(
             "app.services.edicao_chamado_service.calcular_supervisor_ids_com_acesso",
             return_value=["resp2"],
         ) as mock_calc,
     ):
-        mock_db.collection.return_value.document.return_value.get.return_value = doc
-        mock_db.batch.return_value = MagicMock()
-        mock_chamado_cls.from_dict.return_value = MagicMock()
+        _patch_batch(mock_db)
+        mock_chamado = _make_chamado_mock()
+        mock_chamado_cls.get_by_id.return_value = mock_chamado
         mock_usuario_cls.get_by_id.return_value = novo_resp
         result = processar_edicao_chamado(
             usuario_atual=u,
@@ -560,7 +549,7 @@ def test_edicao_troca_responsavel_atualiza_supervisor_ids_com_acesso(app):
         )
 
     assert result["sucesso"] is True
-    update_data = mock_retry.call_args[0][1]
+    update_data = mock_chamado.atualizar_campos.call_args.kwargs
     assert "supervisor_ids_com_acesso" in update_data
     assert update_data["supervisor_ids_com_acesso"] == ["resp2"]
     mock_calc.assert_called_once()
@@ -575,18 +564,15 @@ def test_processar_edicao_setores_adicionais_dispara_notificacao(app):
     from app.services.edicao_chamado_service import processar_edicao_chamado
 
     u = _make_usuario()
-    doc = _make_doc()  # setores_adicionais = []
 
     with (
         app.app_context(),
         patch("app.services.edicao_chamado_service.db") as mock_db,
         patch("app.services.edicao_chamado_service.Chamado") as mock_chamado_cls,
-        patch("app.services.edicao_chamado_service.execute_with_retry"),
         patch("app.services.edicao_chamado_service.threading") as mock_threading,
     ):
-        mock_db.collection.return_value.document.return_value.get.return_value = doc
-        mock_db.batch.return_value = MagicMock()
-        mock_chamado_cls.from_dict.return_value = MagicMock()
+        _patch_batch(mock_db)
+        mock_chamado_cls.get_by_id.return_value = _make_chamado_mock()  # setores_adicionais = []
         result = processar_edicao_chamado(
             usuario_atual=u,
             chamado_id="ch1",
@@ -611,12 +597,13 @@ def _arq(nome: str):
     return f
 
 
-def _base_patches(mock_db, mock_chamado_cls, doc=None):
-    """Configura mocks de DB/Chamado comuns nos testes de anexo."""
-    d = doc or _make_doc()
-    mock_db.collection.return_value.document.return_value.get.return_value = d
-    mock_db.batch.return_value = MagicMock()
-    mock_chamado_cls.from_dict.return_value = MagicMock()
+def _base_patches(mock_db, mock_chamado_cls, data=None):
+    """Configura mocks de DB/Chamado comuns nos testes de anexo. Retorna o mock
+    do Chamado (para inspecionar atualizar_campos.call_args depois)."""
+    _patch_batch(mock_db)
+    mock_chamado = _make_chamado_mock(data=data)
+    mock_chamado_cls.get_by_id.return_value = mock_chamado
+    return mock_chamado
 
 
 def test_edicao_aceita_arquivos_novos_como_lista(app):
@@ -637,9 +624,8 @@ def test_edicao_aceita_arquivos_novos_como_lista(app):
             "app.services.edicao_chamado_service.salvar_anexo",
             side_effect=["r2:relatorio.pdf", "r2:foto.png"],
         ) as mock_salvar,
-        patch("app.services.edicao_chamado_service.execute_with_retry") as mock_retry,
     ):
-        _base_patches(mock_db, mock_chamado_cls)
+        mock_chamado = _base_patches(mock_db, mock_chamado_cls)
         result = processar_edicao_chamado(
             usuario_atual=u,
             chamado_id="ch1",
@@ -654,7 +640,7 @@ def test_edicao_aceita_arquivos_novos_como_lista(app):
 
     assert result["sucesso"] is True
     assert mock_salvar.call_count == 2
-    update_data = mock_retry.call_args[0][1]
+    update_data = mock_chamado.atualizar_campos.call_args.kwargs
     assert "r2:relatorio.pdf" in update_data.get("anexos", [])
     assert "r2:foto.png" in update_data.get("anexos", [])
 
@@ -693,7 +679,7 @@ def test_edicao_lista_vazia_nao_altera_anexos(app):
 def test_edicao_falha_em_um_arquivo_retorna_erro_sem_persistir(app):
     """
     Se salvar_anexo levantar ValueError em qualquer arquivo da lista,
-    retorna erro e não persiste o chamado (execute_with_retry não chamado).
+    retorna erro e não persiste o chamado (atualizar_campos não chamado).
     """
     from app.services.edicao_chamado_service import processar_edicao_chamado
 
@@ -708,9 +694,8 @@ def test_edicao_falha_em_um_arquivo_retorna_erro_sem_persistir(app):
             "app.services.edicao_chamado_service.salvar_anexo",
             side_effect=["r2:bom.pdf", ValueError("Extensão não permitida")],
         ),
-        patch("app.services.edicao_chamado_service.execute_with_retry") as mock_retry,
     ):
-        _base_patches(mock_db, mock_chamado_cls)
+        mock_chamado = _base_patches(mock_db, mock_chamado_cls)
         result = processar_edicao_chamado(
             usuario_atual=u,
             chamado_id="ch1",
@@ -728,7 +713,7 @@ def test_edicao_falha_em_um_arquivo_retorna_erro_sem_persistir(app):
         "extensão" in result.get("erro", "").lower()
         or "permitida" in result.get("erro", "").lower()
     )
-    mock_retry.assert_not_called()
+    mock_chamado.atualizar_campos.assert_not_called()
 
 
 def test_edicao_historico_criado_por_arquivo_adicionado(app):
@@ -759,11 +744,9 @@ def test_edicao_historico_criado_por_arquivo_adicionado(app):
             side_effect=["r2:doc1.pdf", "r2:doc2.xlsx"],
         ),
         patch("app.services.edicao_chamado_service.Historico", side_effect=_FakeHistorico),
-        patch("app.services.edicao_chamado_service.execute_with_retry"),
     ):
         _base_patches(mock_db, mock_chamado_cls)
         mock_db.batch.return_value = batch_mock
-        mock_db.collection.return_value.document.return_value = MagicMock()
 
         result = processar_edicao_chamado(
             usuario_atual=u,
@@ -793,27 +776,22 @@ def test_edicao_historico_criado_por_arquivo_adicionado(app):
 # ── F-25: Truncar nova_descricao em 3000 chars antes de salvar ────────────────
 
 
-def _base_patches_for_f25(mock_db, mock_chamado_cls):
-    doc = _make_doc(
-        data={
-            "numero_chamado": "CHM-F25",
-            "status": "Aberto",
-            "descricao": "desc curta",
-            "responsavel": "Resp",
-            "responsavel_id": "r1",
-            "area": "Manutencao",
-            "sla_dias": None,
-            "anexo": None,
-            "anexos": [],
-            "setores_adicionais": [],
-            "categoria": "Manutencao",
-            "tipo_solicitacao": "Corretiva",
-            "solicitante_nome": "Sol",
-        }
-    )
-    mock_db.collection.return_value.document.return_value.get.return_value = doc
-    mock_db.batch.return_value = MagicMock()
-    mock_chamado_cls.from_dict.return_value = MagicMock()
+def _data_f25():
+    return {
+        "numero_chamado": "CHM-F25",
+        "status": "Aberto",
+        "descricao": "desc curta",
+        "responsavel": "Resp",
+        "responsavel_id": "r1",
+        "area": "Manutencao",
+        "sla_dias": None,
+        "anexo": None,
+        "anexos": [],
+        "setores_adicionais": [],
+        "categoria": "Manutencao",
+        "tipo_solicitacao": "Corretiva",
+        "solicitante_nome": "Sol",
+    }
 
 
 def test_processar_edicao_descricao_acima_de_3000_chars_e_truncada(app):
@@ -827,9 +805,8 @@ def test_processar_edicao_descricao_acima_de_3000_chars_e_truncada(app):
         app.app_context(),
         patch("app.services.edicao_chamado_service.db") as mock_db,
         patch("app.services.edicao_chamado_service.Chamado") as mock_chamado_cls,
-        patch("app.services.edicao_chamado_service.execute_with_retry") as mock_retry,
     ):
-        _base_patches_for_f25(mock_db, mock_chamado_cls)
+        mock_chamado = _base_patches(mock_db, mock_chamado_cls, data=_data_f25())
         result = processar_edicao_chamado(
             usuario_atual=u,
             chamado_id="ch_f25",
@@ -843,7 +820,7 @@ def test_processar_edicao_descricao_acima_de_3000_chars_e_truncada(app):
         )
 
     assert result["sucesso"] is True
-    update_data = mock_retry.call_args[0][1]
+    update_data = mock_chamado.atualizar_campos.call_args.kwargs
     assert "descricao" in update_data
     assert len(update_data["descricao"]) <= 3000
 
@@ -858,21 +835,17 @@ def test_supervisor_nao_pode_editar_descricao_do_solicitante(app):
     from app.services.edicao_chamado_service import processar_edicao_chamado
 
     sup = _make_usuario(perfil="supervisor", uid="sup1", areas=["Manutencao"])
-    doc = _make_doc()
 
     with (
         app.app_context(),
         patch("app.services.edicao_chamado_service.db") as mock_db,
         patch("app.services.edicao_chamado_service.Chamado") as mock_chamado_cls,
-        patch("app.services.edicao_chamado_service.execute_with_retry") as mock_retry,
     ):
-        mock_db.collection.return_value.document.return_value.get.return_value = doc
-        mock_db.batch.return_value = MagicMock()
-        mock_chamado = MagicMock()
-        mock_chamado.status = "Aberto"
-        mock_chamado.confirmacao_solicitante = None
-        mock_chamado.area = "Manutencao"
-        mock_chamado_cls.from_dict.return_value = mock_chamado
+        _patch_batch(mock_db)
+        mock_chamado = _make_chamado_mock(
+            status="Aberto", confirmacao_solicitante=None, area="Manutencao"
+        )
+        mock_chamado_cls.get_by_id.return_value = mock_chamado
 
         result = processar_edicao_chamado(
             usuario_atual=sup,
@@ -888,7 +861,7 @@ def test_supervisor_nao_pode_editar_descricao_do_solicitante(app):
 
     assert result["sucesso"] is False
     assert result.get("codigo") == 403
-    mock_retry.assert_not_called()
+    mock_chamado.atualizar_campos.assert_not_called()
 
 
 def test_admin_ainda_pode_editar_descricao_do_solicitante(app):
@@ -896,17 +869,13 @@ def test_admin_ainda_pode_editar_descricao_do_solicitante(app):
     from app.services.edicao_chamado_service import processar_edicao_chamado
 
     admin = _make_usuario(perfil="admin")
-    doc = _make_doc()
 
     with (
         app.app_context(),
         patch("app.services.edicao_chamado_service.db") as mock_db,
         patch("app.services.edicao_chamado_service.Chamado") as mock_chamado_cls,
-        patch("app.services.edicao_chamado_service.execute_with_retry") as mock_retry,
     ):
-        mock_db.collection.return_value.document.return_value.get.return_value = doc
-        mock_db.batch.return_value = MagicMock()
-        mock_chamado_cls.from_dict.return_value = MagicMock()
+        mock_chamado = _base_patches(mock_db, mock_chamado_cls)
 
         result = processar_edicao_chamado(
             usuario_atual=admin,
@@ -921,7 +890,7 @@ def test_admin_ainda_pode_editar_descricao_do_solicitante(app):
         )
 
     assert result["sucesso"] is True
-    update_data = mock_retry.call_args[0][1]
+    update_data = mock_chamado.atualizar_campos.call_args.kwargs
     assert update_data.get("descricao") == "Descrição corrigida pelo admin"
 
 
@@ -930,22 +899,18 @@ def test_supervisor_pode_editar_outros_campos_sem_tocar_descricao(app):
     from app.services.edicao_chamado_service import processar_edicao_chamado
 
     sup = _make_usuario(perfil="supervisor", uid="sup1", areas=["Manutencao"])
-    doc = _make_doc()
 
     with (
         app.app_context(),
         patch("app.services.edicao_chamado_service.db") as mock_db,
         patch("app.services.edicao_chamado_service.Chamado") as mock_chamado_cls,
         patch("app.services.edicao_chamado_service.atualizar_status_chamado") as mock_status,
-        patch("app.services.edicao_chamado_service.execute_with_retry"),
     ):
-        mock_db.collection.return_value.document.return_value.get.return_value = doc
-        mock_db.batch.return_value = MagicMock()
-        mock_chamado = MagicMock()
-        mock_chamado.status = "Aberto"
-        mock_chamado.confirmacao_solicitante = None
-        mock_chamado.area = "Manutencao"
-        mock_chamado_cls.from_dict.return_value = mock_chamado
+        _patch_batch(mock_db)
+        mock_chamado = _make_chamado_mock(
+            status="Aberto", confirmacao_solicitante=None, area="Manutencao"
+        )
+        mock_chamado_cls.get_by_id.return_value = mock_chamado
         mock_status.return_value = {"sucesso": True, "mensagem": "Status atualizado"}
 
         result = processar_edicao_chamado(
@@ -975,9 +940,8 @@ def test_processar_edicao_descricao_menor_que_3000_nao_e_alterada(app):
         app.app_context(),
         patch("app.services.edicao_chamado_service.db") as mock_db,
         patch("app.services.edicao_chamado_service.Chamado") as mock_chamado_cls,
-        patch("app.services.edicao_chamado_service.execute_with_retry") as mock_retry,
     ):
-        _base_patches_for_f25(mock_db, mock_chamado_cls)
+        mock_chamado = _base_patches(mock_db, mock_chamado_cls, data=_data_f25())
         result = processar_edicao_chamado(
             usuario_atual=u,
             chamado_id="ch_f25b",
@@ -991,7 +955,7 @@ def test_processar_edicao_descricao_menor_que_3000_nao_e_alterada(app):
         )
 
     assert result["sucesso"] is True
-    update_data = mock_retry.call_args[0][1]
+    update_data = mock_chamado.atualizar_campos.call_args.kwargs
     assert update_data.get("descricao") == descricao_normal
 
 
@@ -1012,9 +976,8 @@ def test_edicao_descricao_nao_altera_data_em_atendimento(app):
         app.app_context(),
         patch("app.services.edicao_chamado_service.db") as mock_db,
         patch("app.services.edicao_chamado_service.Chamado") as mock_chamado_cls,
-        patch("app.services.edicao_chamado_service.execute_with_retry") as mock_retry,
     ):
-        _base_patches_for_f25(mock_db, mock_chamado_cls)
+        mock_chamado = _base_patches(mock_db, mock_chamado_cls, data=_data_f25())
         result = processar_edicao_chamado(
             usuario_atual=u,
             chamado_id="ch_reg_1",
@@ -1028,5 +991,5 @@ def test_edicao_descricao_nao_altera_data_em_atendimento(app):
         )
 
     assert result["sucesso"] is True
-    update_data = mock_retry.call_args[0][1]
+    update_data = mock_chamado.atualizar_campos.call_args.kwargs
     assert "data_em_atendimento" not in update_data
