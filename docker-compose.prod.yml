@@ -44,5 +44,5 @@ services:
       WATCHTOWER_HTTP_API_TOKEN: ${WATCHTOWER_HTTP_API_TOKEN}
     ports:
       - "127.0.0.1:8081:8080"
-    command: --http-api-update --cleanup sistema_chamados-web-1
+    command: --http-api-endpoints=update --cleanup sistema_chamados-web-1
     restart: unless-stopped
