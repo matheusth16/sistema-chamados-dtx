@@ -6,12 +6,13 @@ Cancelamento de chamado iniciado pelo próprio solicitante.
 """
 
 import logging
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
-from firebase_admin import firestore
-
-from app.database import db
 from app.i18n import get_translation_session
+from app.models import Chamado
 from app.models_historico import Historico
+from config import Config
 
 logger = logging.getLogger(__name__)
 
@@ -25,11 +26,11 @@ def _t(key, **kwargs):
 
 def cancelar_chamado_solicitante(chamado_id: str, motivo: str, usuario) -> dict:
     """Cancela um chamado a pedido do solicitante dono."""
-    doc = db.collection("chamados").document(chamado_id).get()
-    if not doc.exists:
+    chamado = Chamado.get_by_id(chamado_id)
+    if chamado is None:
         return {"sucesso": False, "erro": _t("ticket_not_found_dot"), "codigo": 404}
 
-    data = doc.to_dict()
+    data = chamado.to_dict()
     solicitante_id = data.get("solicitante_id")
     status_atual = data.get("status", "")
 
@@ -56,13 +57,16 @@ def cancelar_chamado_solicitante(chamado_id: str, motivo: str, usuario) -> dict:
         }
 
     try:
-        db.collection("chamados").document(chamado_id).update(
-            {
-                "status": "Cancelado",
-                "motivo_cancelamento": motivo,
-                "data_cancelamento": firestore.SERVER_TIMESTAMP,
+        if not chamado.atualizar_campos(
+            status="Cancelado",
+            motivo_cancelamento=motivo,
+            data_cancelamento=datetime.now(ZoneInfo(Config.SLA_TIMEZONE)),
+        ):
+            return {
+                "sucesso": False,
+                "erro": _t("internal_error_canceling_ticket"),
+                "codigo": 500,
             }
-        )
 
         Historico(
             chamado_id=chamado_id,

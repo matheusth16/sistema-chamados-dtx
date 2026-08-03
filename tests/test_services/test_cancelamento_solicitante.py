@@ -1,5 +1,5 @@
 """
-Fase 4 — TDD: cancelamento de chamado pelo solicitante.
+Fase 4 — cancelamento de chamado pelo solicitante.
 
 Regras:
 - Só o solicitante dono pode cancelar
@@ -8,9 +8,21 @@ Regras:
 - Concluído e Cancelado → 403
 - Observadores NÃO podem cancelar
 - Notificação deve ser disparada (responsável + observadores)
+
+Fase 2 (Marco 7): persistência real contra Postgres (fixture db_session) via
+Chamado.salvar()/get_by_id() — substitui o antigo mock de
+db.collection("chamados").document(id).get()/.update(...).
 """
 
 from unittest.mock import MagicMock, patch
+
+import pytest
+
+from app.models import Chamado
+
+pytestmark = pytest.mark.usefixtures("db_session")
+
+_ID_INEXISTENTE = 999999999
 
 
 def _usuario_mock(uid="sol_1", perfil="solicitante"):
@@ -46,25 +58,29 @@ class _UsuarioContextoLimitado:
         return self._nome
 
 
-def _mock_doc(
+def _criar_chamado_real(
     solicitante_id="sol_1",
     status="Aberto",
     responsavel_id="sup_1",
     numero_chamado="CH-001",
     categoria="TI",
     observadores=None,
-):
-    doc = MagicMock()
-    doc.exists = True
-    doc.to_dict.return_value = {
-        "solicitante_id": solicitante_id,
-        "status": status,
-        "responsavel_id": responsavel_id,
-        "numero_chamado": numero_chamado,
-        "categoria": categoria,
-        "observadores": observadores or [],
-    }
-    return doc
+) -> int:
+    chamado = Chamado(
+        categoria=categoria,
+        tipo_solicitacao="Suporte",
+        descricao="Descrição de teste",
+        responsavel="Responsável",
+        responsavel_id=responsavel_id,
+        solicitante_id=solicitante_id,
+        solicitante_nome="Solicitante Teste",
+        numero_chamado=numero_chamado,
+        status=status,
+        observadores=observadores or [],
+    )
+    chamado_id = chamado.salvar()
+    assert chamado_id is not None
+    return chamado_id
 
 
 class TestCancelarChamadoSolicitante:
@@ -73,18 +89,16 @@ class TestCancelarChamadoSolicitante:
         from app.services.cancelamento_solicitante_service import cancelar_chamado_solicitante
 
         user = _usuario_mock()
+        chamado_id = _criar_chamado_real()
 
         with (
-            patch("app.services.cancelamento_solicitante_service.db") as mock_db,
             patch("app.services.cancelamento_solicitante_service.Historico") as mock_hist,
             patch("app.services.cancelamento_solicitante_service._notificar_cancelamento"),
         ):
-            mock_db.collection.return_value.document.return_value.get.return_value = _mock_doc()
-            mock_db.collection.return_value.document.return_value.update.return_value = None
             mock_hist.return_value.save.return_value = True
 
             resultado = cancelar_chamado_solicitante(
-                chamado_id="ch_1",
+                chamado_id=chamado_id,
                 motivo="Problema resolvido por outra via",
                 usuario=user,
             )
@@ -96,20 +110,16 @@ class TestCancelarChamadoSolicitante:
         from app.services.cancelamento_solicitante_service import cancelar_chamado_solicitante
 
         user = _usuario_mock()
+        chamado_id = _criar_chamado_real(status="Em Atendimento")
 
         with (
-            patch("app.services.cancelamento_solicitante_service.db") as mock_db,
             patch("app.services.cancelamento_solicitante_service.Historico") as mock_hist,
             patch("app.services.cancelamento_solicitante_service._notificar_cancelamento"),
         ):
-            mock_db.collection.return_value.document.return_value.get.return_value = _mock_doc(
-                status="Em Atendimento"
-            )
-            mock_db.collection.return_value.document.return_value.update.return_value = None
             mock_hist.return_value.save.return_value = True
 
             resultado = cancelar_chamado_solicitante(
-                chamado_id="ch_1",
+                chamado_id=chamado_id,
                 motivo="Problema resolvido por outra via",
                 usuario=user,
             )
@@ -121,16 +131,13 @@ class TestCancelarChamadoSolicitante:
         from app.services.cancelamento_solicitante_service import cancelar_chamado_solicitante
 
         user = _usuario_mock(uid="outro")
+        chamado_id = _criar_chamado_real(solicitante_id="dono_real")
 
-        with patch("app.services.cancelamento_solicitante_service.db") as mock_db:
-            mock_db.collection.return_value.document.return_value.get.return_value = _mock_doc(
-                solicitante_id="dono_real"
-            )
-            resultado = cancelar_chamado_solicitante(
-                chamado_id="ch_1",
-                motivo="Motivo válido aqui",
-                usuario=user,
-            )
+        resultado = cancelar_chamado_solicitante(
+            chamado_id=chamado_id,
+            motivo="Motivo válido aqui",
+            usuario=user,
+        )
 
         assert resultado["sucesso"] is False
         assert resultado.get("codigo") == 403
@@ -140,14 +147,13 @@ class TestCancelarChamadoSolicitante:
         from app.services.cancelamento_solicitante_service import cancelar_chamado_solicitante
 
         user = _usuario_mock()
+        chamado_id = _criar_chamado_real()
 
-        with patch("app.services.cancelamento_solicitante_service.db") as mock_db:
-            mock_db.collection.return_value.document.return_value.get.return_value = _mock_doc()
-            resultado = cancelar_chamado_solicitante(
-                chamado_id="ch_1",
-                motivo="",
-                usuario=user,
-            )
+        resultado = cancelar_chamado_solicitante(
+            chamado_id=chamado_id,
+            motivo="",
+            usuario=user,
+        )
 
         assert resultado["sucesso"] is False
         assert resultado.get("codigo") == 400
@@ -157,16 +163,13 @@ class TestCancelarChamadoSolicitante:
         from app.services.cancelamento_solicitante_service import cancelar_chamado_solicitante
 
         user = _usuario_mock()
+        chamado_id = _criar_chamado_real(status="Concluído")
 
-        with patch("app.services.cancelamento_solicitante_service.db") as mock_db:
-            mock_db.collection.return_value.document.return_value.get.return_value = _mock_doc(
-                status="Concluído"
-            )
-            resultado = cancelar_chamado_solicitante(
-                chamado_id="ch_1",
-                motivo="Motivo suficientemente longo",
-                usuario=user,
-            )
+        resultado = cancelar_chamado_solicitante(
+            chamado_id=chamado_id,
+            motivo="Motivo suficientemente longo",
+            usuario=user,
+        )
 
         assert resultado["sucesso"] is False
         assert resultado.get("codigo") == 403
@@ -176,16 +179,13 @@ class TestCancelarChamadoSolicitante:
         from app.services.cancelamento_solicitante_service import cancelar_chamado_solicitante
 
         user = _usuario_mock()
+        chamado_id = _criar_chamado_real(status="Cancelado")
 
-        with patch("app.services.cancelamento_solicitante_service.db") as mock_db:
-            mock_db.collection.return_value.document.return_value.get.return_value = _mock_doc(
-                status="Cancelado"
-            )
-            resultado = cancelar_chamado_solicitante(
-                chamado_id="ch_1",
-                motivo="Motivo suficientemente longo",
-                usuario=user,
-            )
+        resultado = cancelar_chamado_solicitante(
+            chamado_id=chamado_id,
+            motivo="Motivo suficientemente longo",
+            usuario=user,
+        )
 
         assert resultado["sucesso"] is False
         assert resultado.get("codigo") == 403
@@ -195,20 +195,18 @@ class TestCancelarChamadoSolicitante:
         from app.services.cancelamento_solicitante_service import cancelar_chamado_solicitante
 
         user = _usuario_mock()
+        chamado_id = _criar_chamado_real()
 
         with (
-            patch("app.services.cancelamento_solicitante_service.db") as mock_db,
             patch("app.services.cancelamento_solicitante_service.Historico") as mock_hist,
             patch(
                 "app.services.cancelamento_solicitante_service._notificar_cancelamento"
             ) as mock_notif,
         ):
-            mock_db.collection.return_value.document.return_value.get.return_value = _mock_doc()
-            mock_db.collection.return_value.document.return_value.update.return_value = None
             mock_hist.return_value.save.return_value = True
 
             cancelar_chamado_solicitante(
-                chamado_id="ch_1",
+                chamado_id=chamado_id,
                 motivo="Cancelamento justificado",
                 usuario=user,
             )
@@ -220,6 +218,7 @@ class TestCancelarChamadoSolicitante:
         from app.services.cancelamento_solicitante_service import cancelar_chamado_solicitante
 
         user = _usuario_mock()
+        chamado_id = _criar_chamado_real()
         historicos = []
 
         def capturar(**kwargs):
@@ -229,18 +228,14 @@ class TestCancelarChamadoSolicitante:
             return h
 
         with (
-            patch("app.services.cancelamento_solicitante_service.db") as mock_db,
             patch(
                 "app.services.cancelamento_solicitante_service.Historico",
                 side_effect=capturar,
             ),
             patch("app.services.cancelamento_solicitante_service._notificar_cancelamento"),
         ):
-            mock_db.collection.return_value.document.return_value.get.return_value = _mock_doc()
-            mock_db.collection.return_value.document.return_value.update.return_value = None
-
             cancelar_chamado_solicitante(
-                chamado_id="ch_1",
+                chamado_id=chamado_id,
                 motivo="Cancelamento justificado",
                 usuario=user,
             )
@@ -251,38 +246,27 @@ class TestCancelarChamadoSolicitante:
 
 
 class TestCancelarDataCancelamento:
-    def test_data_cancelamento_gravada_no_update(self):
-        """CT-REQ-11: update deve incluir data_cancelamento (SERVER_TIMESTAMP)."""
+    def test_data_cancelamento_gravada(self):
+        """CT-REQ-11: data_cancelamento deve ser persistida no Postgres."""
         from app.services.cancelamento_solicitante_service import cancelar_chamado_solicitante
 
         user = _usuario_mock()
-        update_calls = []
-
-        def capturar_update(payload):
-            update_calls.append(payload)
+        chamado_id = _criar_chamado_real()
 
         with (
-            patch("app.services.cancelamento_solicitante_service.db") as mock_db,
             patch("app.services.cancelamento_solicitante_service.Historico") as mock_hist,
             patch("app.services.cancelamento_solicitante_service._notificar_cancelamento"),
         ):
-            mock_db.collection.return_value.document.return_value.get.return_value = _mock_doc()
-            mock_db.collection.return_value.document.return_value.update.side_effect = (
-                capturar_update
-            )
             mock_hist.return_value.save.return_value = True
 
             resultado = cancelar_chamado_solicitante(
-                chamado_id="ch_1",
+                chamado_id=chamado_id,
                 motivo="Cancelamento justificado",
                 usuario=user,
             )
 
         assert resultado["sucesso"] is True
-        assert len(update_calls) == 1
-        assert "data_cancelamento" in update_calls[0], (
-            "data_cancelamento deve estar presente no payload do update"
-        )
+        assert Chamado.get_by_id(chamado_id).data_cancelamento is not None
 
 
 class TestCancelarCoverage:
@@ -291,34 +275,24 @@ class TestCancelarCoverage:
         from app.services.cancelamento_solicitante_service import cancelar_chamado_solicitante
 
         user = _usuario_mock()
-        doc_nao_encontrado = MagicMock()
-        doc_nao_encontrado.exists = False
 
-        with patch("app.services.cancelamento_solicitante_service.db") as mock_db:
-            mock_db.collection.return_value.document.return_value.get.return_value = (
-                doc_nao_encontrado
-            )
-            resultado = cancelar_chamado_solicitante("ch_x", "motivo válido aqui", user)
+        resultado = cancelar_chamado_solicitante(_ID_INEXISTENTE, "motivo válido aqui", user)
 
         assert resultado["sucesso"] is False
         assert resultado.get("codigo") == 404
 
     def test_excecao_retorna_500(self):
-        """Exceção durante update → 500."""
+        """Exceção durante criação do Historico → 500."""
         from app.services.cancelamento_solicitante_service import cancelar_chamado_solicitante
 
         user = _usuario_mock()
+        chamado_id = _criar_chamado_real()
 
-        with (
-            patch("app.services.cancelamento_solicitante_service.db") as mock_db,
-            patch(
-                "app.services.cancelamento_solicitante_service.Historico",
-                side_effect=RuntimeError("boom"),
-            ),
+        with patch(
+            "app.services.cancelamento_solicitante_service.Historico",
+            side_effect=RuntimeError("boom"),
         ):
-            mock_db.collection.return_value.document.return_value.get.return_value = _mock_doc()
-            mock_db.collection.return_value.document.return_value.update.return_value = None
-            resultado = cancelar_chamado_solicitante("ch_1", "motivo suficiente aqui", user)
+            resultado = cancelar_chamado_solicitante(chamado_id, "motivo suficiente aqui", user)
 
         assert resultado["sucesso"] is False
         assert resultado.get("codigo") == 500

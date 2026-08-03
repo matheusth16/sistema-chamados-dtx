@@ -1,8 +1,19 @@
-"""Testes de caracterização: cancelamento_solicitante_service."""
+"""Testes de cancelamento_solicitante_service.
+
+Fase 2 (Marco 7): persistência real contra Postgres (fixture db_session)
+via Chamado.salvar()/get_by_id()/atualizar_campos() — substitui o antigo
+mock de db.collection("chamados").document(id).update(...).
+"""
 
 from unittest.mock import MagicMock, patch
 
 import pytest
+
+from app.models import Chamado
+
+pytestmark = pytest.mark.usefixtures("db_session")
+
+_ID_INEXISTENTE = 999999999
 
 
 def _usuario_mock(uid="sol_1", nome="Solicitante Teste"):
@@ -12,81 +23,81 @@ def _usuario_mock(uid="sol_1", nome="Solicitante Teste"):
     return u
 
 
-def _doc_mock(exists=True, **dados):
-    doc = MagicMock()
-    doc.exists = exists
-    doc.to_dict.return_value = dados
-    return doc
+def _criar_chamado_real(solicitante_id="sol_1", status="Aberto", **overrides) -> int:
+    defaults = {
+        "categoria": "TI",
+        "tipo_solicitacao": "Suporte",
+        "descricao": "Descrição de teste",
+        "responsavel": "Responsável",
+        "solicitante_id": solicitante_id,
+        "solicitante_nome": "Solicitante Teste",
+        "status": status,
+    }
+    defaults.update(overrides)
+    chamado = Chamado(**defaults)
+    chamado_id = chamado.salvar()
+    assert chamado_id is not None
+    return chamado_id
 
 
-@pytest.fixture
-def mock_db():
-    with patch("app.services.cancelamento_solicitante_service.db") as mock_db:
-        yield mock_db
-
-
-def test_cancelar_chamado_inexistente_retorna_404(app, mock_db):
+def test_cancelar_chamado_inexistente_retorna_404(app):
     from app.services.cancelamento_solicitante_service import cancelar_chamado_solicitante
 
-    mock_db.collection.return_value.document.return_value.get.return_value = _doc_mock(exists=False)
-
     with app.app_context():
-        resultado = cancelar_chamado_solicitante("ch1", "Motivo qualquer aqui", _usuario_mock())
+        resultado = cancelar_chamado_solicitante(
+            _ID_INEXISTENTE, "Motivo qualquer aqui", _usuario_mock()
+        )
 
     assert resultado["sucesso"] is False
     assert resultado["codigo"] == 404
 
 
-def test_cancelar_chamado_de_outro_solicitante_retorna_403(app, mock_db):
+def test_cancelar_chamado_de_outro_solicitante_retorna_403(app):
     from app.services.cancelamento_solicitante_service import cancelar_chamado_solicitante
 
-    mock_db.collection.return_value.document.return_value.get.return_value = _doc_mock(
-        solicitante_id="sol_dono", status="Aberto"
-    )
+    chamado_id = _criar_chamado_real(solicitante_id="sol_dono", status="Aberto")
 
     with app.app_context():
         resultado = cancelar_chamado_solicitante(
-            "ch1", "Motivo qualquer aqui", _usuario_mock(uid="sol_intruso")
+            chamado_id, "Motivo qualquer aqui", _usuario_mock(uid="sol_intruso")
         )
 
     assert resultado["sucesso"] is False
     assert resultado["codigo"] == 403
 
 
-def test_cancelar_chamado_motivo_curto_retorna_400(app, mock_db):
+def test_cancelar_chamado_motivo_curto_retorna_400(app):
     from app.services.cancelamento_solicitante_service import cancelar_chamado_solicitante
 
-    mock_db.collection.return_value.document.return_value.get.return_value = _doc_mock(
-        solicitante_id="sol_1", status="Aberto"
-    )
+    chamado_id = _criar_chamado_real(solicitante_id="sol_1", status="Aberto")
 
     with app.app_context():
-        resultado = cancelar_chamado_solicitante("ch1", "curto", _usuario_mock())
+        resultado = cancelar_chamado_solicitante(chamado_id, "curto", _usuario_mock())
 
     assert resultado["sucesso"] is False
     assert resultado["codigo"] == 400
 
 
 @pytest.mark.parametrize("status_bloqueado", ["Concluído", "Cancelado"])
-def test_cancelar_chamado_status_nao_cancelavel_retorna_403(app, mock_db, status_bloqueado):
+def test_cancelar_chamado_status_nao_cancelavel_retorna_403(app, status_bloqueado):
     from app.services.cancelamento_solicitante_service import cancelar_chamado_solicitante
 
-    mock_db.collection.return_value.document.return_value.get.return_value = _doc_mock(
-        solicitante_id="sol_1", status=status_bloqueado
-    )
+    chamado_id = _criar_chamado_real(solicitante_id="sol_1", status=status_bloqueado)
 
     with app.app_context():
-        resultado = cancelar_chamado_solicitante("ch1", "Motivo qualquer aqui", _usuario_mock())
+        resultado = cancelar_chamado_solicitante(
+            chamado_id, "Motivo qualquer aqui", _usuario_mock()
+        )
 
     assert resultado["sucesso"] is False
     assert resultado["codigo"] == 403
 
 
 @pytest.mark.parametrize("status_ok", ["Aberto", "Em Atendimento", "Aguardando Informação"])
-def test_cancelar_chamado_sucesso_atualiza_status_e_grava_historico(app, mock_db, status_ok):
+def test_cancelar_chamado_sucesso_atualiza_status_e_grava_historico(app, status_ok):
     from app.services.cancelamento_solicitante_service import cancelar_chamado_solicitante
 
-    mock_db.collection.return_value.document.return_value.get.return_value = _doc_mock(
+    chamado_id = _criar_chamado_real(
         solicitante_id="sol_1", status=status_ok, numero_chamado="CH-001", categoria="TI"
     )
 
@@ -95,29 +106,31 @@ def test_cancelar_chamado_sucesso_atualiza_status_e_grava_historico(app, mock_db
         patch("app.services.cancelamento_solicitante_service.Historico") as mock_historico,
         patch("threading.Thread"),
     ):
-        resultado = cancelar_chamado_solicitante("ch1", "Motivo qualquer aqui", _usuario_mock())
+        resultado = cancelar_chamado_solicitante(
+            chamado_id, "Motivo qualquer aqui", _usuario_mock()
+        )
 
     assert resultado == {"sucesso": True}
-    update_kwargs = mock_db.collection.return_value.document.return_value.update.call_args[0][0]
-    assert update_kwargs["status"] == "Cancelado"
-    assert update_kwargs["motivo_cancelamento"] == "Motivo qualquer aqui"
+    atualizado = Chamado.get_by_id(chamado_id)
+    assert atualizado.status == "Cancelado"
+    assert atualizado.motivo_cancelamento == "Motivo qualquer aqui"
     mock_historico.assert_called_once()
     assert mock_historico.call_args.kwargs["valor_anterior"] == status_ok
     assert mock_historico.call_args.kwargs["valor_novo"] == "Cancelado"
 
 
-def test_cancelar_chamado_erro_no_update_retorna_500(app, mock_db):
+def test_cancelar_chamado_erro_no_update_retorna_500(app):
     from app.services.cancelamento_solicitante_service import cancelar_chamado_solicitante
 
-    mock_db.collection.return_value.document.return_value.get.return_value = _doc_mock(
-        solicitante_id="sol_1", status="Aberto"
-    )
-    mock_db.collection.return_value.document.return_value.update.side_effect = RuntimeError(
-        "firestore down"
-    )
+    chamado_id = _criar_chamado_real(solicitante_id="sol_1", status="Aberto")
 
-    with app.app_context():
-        resultado = cancelar_chamado_solicitante("ch1", "Motivo qualquer aqui", _usuario_mock())
+    with (
+        app.app_context(),
+        patch("app.models.Chamado.atualizar_campos", return_value=False),
+    ):
+        resultado = cancelar_chamado_solicitante(
+            chamado_id, "Motivo qualquer aqui", _usuario_mock()
+        )
 
     assert resultado["sucesso"] is False
     assert resultado["codigo"] == 500
