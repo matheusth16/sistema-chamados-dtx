@@ -1,21 +1,29 @@
-"""Testes do serviço de analytics/relatórios."""
+"""Testes do serviço de analytics/relatórios.
+
+Fase 2 (Marco 7): a busca de chamados agora passa por
+AnalisadorChamados._buscar_chamados_dicts() (Postgres, via db_session) em vez
+de self.get_db().collection("chamados")...stream() — get_db() foi removido.
+Testes que já usavam chamados_pre_carregados (lista de dicts real) não
+precisam mudar a lógica de negócio, só remover o mock de get_db, que ficou
+morto (a função nunca chega a consultar o banco quando os dados já vêm
+pré-carregados). Testes que exercitavam a query direta agora mockam
+_buscar_chamados_dicts (retorna lista de dicts, não docs Firestore) ou usam o
+banco de teste real (vazio por padrão) via fixture db_session.
+"""
 
 from unittest.mock import MagicMock, patch
+
+import pytest
+
+pytestmark = pytest.mark.usefixtures("db_session")
 
 
 def test_obter_metricas_gerais_retorna_dict_com_chaves_esperadas():
     """obter_metricas_gerais retorna dict com periodo_dias, total_chamados, etc."""
     from app.services.analytics import AnalisadorChamados
 
-    mock_where = MagicMock()
-    mock_where.stream.return_value = []  # lista vazia = nenhum chamado
-    mock_collection = MagicMock()
-    mock_collection.where.return_value = mock_where
-    mock_db = MagicMock()
-    mock_db.collection.return_value = mock_collection
-    with patch.object(AnalisadorChamados, "get_db", return_value=mock_db):
-        a = AnalisadorChamados()
-        r = a.obter_metricas_gerais(dias=30)
+    a = AnalisadorChamados()
+    r = a.obter_metricas_gerais(dias=30)
     assert isinstance(r, dict)
     assert "periodo_dias" in r
     assert "total_chamados" in r
@@ -32,14 +40,7 @@ def test_obter_relatorio_completo_retorna_dict_com_secoes():
     """obter_relatorio_completo retorna dict com metricas_gerais, insights, metricas_delta, etc."""
     from app.services.analytics import AnalisadorChamados
 
-    mock_db = MagicMock()
-    mock_col = MagicMock()
-    mock_col.limit.return_value = mock_col
-    mock_col.stream.return_value = iter([])
-    mock_db.collection.return_value = mock_col
-
     with (
-        patch.object(AnalisadorChamados, "get_db", return_value=mock_db),
         patch.object(AnalisadorChamados, "obter_metricas_gerais", return_value={}),
         patch.object(AnalisadorChamados, "obter_metricas_periodo_anterior", return_value={}),
         patch.object(AnalisadorChamados, "obter_metricas_supervisores", return_value=[]),
@@ -97,9 +98,7 @@ def test_calcular_deltas_inclui_concluidos_mas_nao_abertos_em_andamento():
 
 
 def test_obter_metricas_supervisores_usa_dados_pre_carregados_sem_query():
-    """Com chamados_pre_carregados, obter_metricas_supervisores não deve chamar .stream()."""
-    from unittest.mock import MagicMock, patch
-
+    """Com chamados_pre_carregados, obter_metricas_supervisores não deve consultar o banco."""
     from app.services.analytics import AnalisadorChamados
 
     sup_mock = MagicMock()
@@ -126,9 +125,8 @@ def test_obter_metricas_supervisores_usa_dados_pre_carregados_sem_query():
         },
     ]
 
-    mock_db = MagicMock()
     with (
-        patch.object(AnalisadorChamados, "get_db", return_value=mock_db),
+        patch.object(AnalisadorChamados, "_buscar_chamados_dicts") as mock_buscar,
         patch("app.models_usuario.Usuario") as mock_usuario,
     ):
         mock_usuario.get_all.return_value = [sup_mock]
@@ -136,7 +134,7 @@ def test_obter_metricas_supervisores_usa_dados_pre_carregados_sem_query():
         resultado = a.obter_metricas_supervisores(chamados_pre_carregados=chamados)
 
     # Nenhuma query de chamados deve ter sido feita
-    mock_db.collection.assert_not_called()
+    mock_buscar.assert_not_called()
     assert len(resultado) == 1
     assert resultado[0]["supervisor_id"] == "sup1"
     assert resultado[0]["total_chamados"] == 2
@@ -145,26 +143,14 @@ def test_obter_metricas_supervisores_usa_dados_pre_carregados_sem_query():
 
 
 def test_obter_metricas_areas_usa_dados_pre_carregados_sem_query_chamados():
-    """Com chamados_pre_carregados, obter_metricas_areas faz apenas 1 query (usuarios)."""
-    from unittest.mock import MagicMock, patch
-
+    """Com chamados_pre_carregados, obter_metricas_areas não deve consultar chamados (só Usuario.get_all)."""
     from app.services.analytics import AnalisadorChamados
 
-    # Simular resultado de .stream() para usuários
-    doc_sup = MagicMock()
-    doc_sup.id = "sup1"
-    doc_sup.to_dict.return_value = {
-        "perfil": "supervisor",
-        "areas": ["TI"],
-        "email": "ana@dtx.aero",
-    }
-
-    mock_stream = MagicMock(return_value=iter([doc_sup]))
-    mock_collection = MagicMock()
-    mock_collection.where.return_value = mock_collection  # suporta encadeamento
-    mock_collection.stream = mock_stream
-    mock_db = MagicMock()
-    mock_db.collection.return_value = mock_collection
+    sup_mock = MagicMock()
+    sup_mock.id = "sup1"
+    sup_mock.perfil = "supervisor"
+    sup_mock.areas = ["TI"]
+    sup_mock.area = None
 
     chamados = [
         {
@@ -183,15 +169,14 @@ def test_obter_metricas_areas_usa_dados_pre_carregados_sem_query_chamados():
         },
     ]
 
-    with patch.object(AnalisadorChamados, "get_db", return_value=mock_db):
+    with (
+        patch.object(AnalisadorChamados, "_buscar_chamados_dicts") as mock_buscar,
+        patch("app.models_usuario.Usuario.get_all", return_value=[sup_mock]),
+    ):
         a = AnalisadorChamados()
         resultado = a.obter_metricas_areas(chamados_pre_carregados=chamados)
 
-    # Deve ter chamado .collection() apenas para "usuarios" (não para "chamados")
-    calls_collection = [str(c) for c in mock_db.collection.call_args_list]
-    assert any("usuarios" in c for c in calls_collection), "Esperava query de usuarios"
-    assert not any("chamados" in c for c in calls_collection), "Não devia ter query de chamados"
-
+    mock_buscar.assert_not_called()
     assert len(resultado) == 1
     assert resultado[0]["area"] == "TI"
     assert resultado[0]["total_chamados"] == 2
@@ -199,9 +184,8 @@ def test_obter_metricas_areas_usa_dados_pre_carregados_sem_query_chamados():
 
 
 def test_obter_metricas_gerais_usa_chamados_pre_carregados_sem_query():
-    """Com chamados_pre_carregados, obter_metricas_gerais não deve chamar get_db."""
+    """Com chamados_pre_carregados, obter_metricas_gerais não deve consultar o banco."""
     from datetime import UTC, datetime, timedelta
-    from unittest.mock import MagicMock, patch
 
     from app.services.analytics import AnalisadorChamados
 
@@ -223,24 +207,21 @@ def test_obter_metricas_gerais_usa_chamados_pre_carregados_sem_query():
             "sla_dias": None,
         },
     ]
-    mock_db = MagicMock()
-    with patch.object(AnalisadorChamados, "get_db", return_value=mock_db):
+    with patch.object(AnalisadorChamados, "_buscar_chamados_dicts") as mock_buscar:
         a = AnalisadorChamados()
         r = a.obter_metricas_gerais(dias=30, chamados_pre_carregados=chamados)
 
-    mock_db.collection.assert_not_called()
+    mock_buscar.assert_not_called()
     assert r["total_chamados"] == 2
     assert r["abertos"] == 1
     assert r["concluidos"] == 1
 
 
 def test_obter_metricas_gerais_com_data_abertura_tz_aware_nao_retorna_vazio():
-    """Firestore sempre devolve data_abertura tz-aware (UTC); comparar com
-    datetime.now() naive (sem tz) causa TypeError, engolido pelo except geral,
-    que faz obter_metricas_gerais retornar {} e os gráficos ficarem vazios.
-    """
+    """data_abertura tz-aware (UTC) comparado com datetime.now() naive (sem tz)
+    causaria TypeError, engolido pelo except geral — obter_metricas_gerais
+    retornaria {} e os gráficos ficariam vazios."""
     from datetime import UTC, datetime, timedelta
-    from unittest.mock import MagicMock, patch
 
     from app.services.analytics import AnalisadorChamados
 
@@ -254,10 +235,8 @@ def test_obter_metricas_gerais_com_data_abertura_tz_aware_nao_retorna_vazio():
             "prioridade": 1,
         },
     ]
-    mock_db = MagicMock()
-    with patch.object(AnalisadorChamados, "get_db", return_value=mock_db):
-        a = AnalisadorChamados()
-        r = a.obter_metricas_gerais(dias=30, chamados_pre_carregados=chamados)
+    a = AnalisadorChamados()
+    r = a.obter_metricas_gerais(dias=30, chamados_pre_carregados=chamados)
 
     assert r != {}
     assert r["total_chamados"] == 1
@@ -267,7 +246,6 @@ def test_obter_metricas_periodo_anterior_com_data_abertura_tz_aware_nao_retorna_
     """Mesmo bug de datetime naive vs aware, agora em obter_metricas_periodo_anterior
     (usado para calcular os deltas/badges de tendência dos relatórios)."""
     from datetime import UTC, datetime, timedelta
-    from unittest.mock import MagicMock, patch
 
     from app.services.analytics import AnalisadorChamados
 
@@ -281,10 +259,8 @@ def test_obter_metricas_periodo_anterior_com_data_abertura_tz_aware_nao_retorna_
             "sla_dias": None,
         },
     ]
-    mock_db = MagicMock()
-    with patch.object(AnalisadorChamados, "get_db", return_value=mock_db):
-        a = AnalisadorChamados()
-        r = a.obter_metricas_periodo_anterior(chamados_pre_carregados=chamados)
+    a = AnalisadorChamados()
+    r = a.obter_metricas_periodo_anterior(chamados_pre_carregados=chamados)
 
     assert r != {}
     assert r["total_chamados"] == 1
@@ -297,7 +273,6 @@ def test_obter_metricas_gerais_distribuicao_prioridade_chaves_sempre_str():
     chaves do dict devem ser sempre do mesmo tipo (str) para serializar com
     segurança."""
     from datetime import UTC, datetime, timedelta
-    from unittest.mock import MagicMock, patch
 
     from app.services.analytics import AnalisadorChamados
 
@@ -316,10 +291,8 @@ def test_obter_metricas_gerais_distribuicao_prioridade_chaves_sempre_str():
             # sem "prioridade" — chamado legado, cai no fallback "Indefinido"
         },
     ]
-    mock_db = MagicMock()
-    with patch.object(AnalisadorChamados, "get_db", return_value=mock_db):
-        a = AnalisadorChamados()
-        r = a.obter_metricas_gerais(dias=30, chamados_pre_carregados=chamados)
+    a = AnalisadorChamados()
+    r = a.obter_metricas_gerais(dias=30, chamados_pre_carregados=chamados)
 
     dp = r["distribuicao_prioridade"]
     assert all(isinstance(k, str) for k in dp)
@@ -329,9 +302,8 @@ def test_obter_metricas_gerais_distribuicao_prioridade_chaves_sempre_str():
 
 
 def test_obter_metricas_periodo_anterior_usa_chamados_pre_carregados_sem_query():
-    """Com chamados_pre_carregados, obter_metricas_periodo_anterior não deve chamar get_db."""
+    """Com chamados_pre_carregados, obter_metricas_periodo_anterior não deve consultar o banco."""
     from datetime import UTC, datetime, timedelta
-    from unittest.mock import MagicMock, patch
 
     from app.services.analytics import AnalisadorChamados
 
@@ -352,12 +324,11 @@ def test_obter_metricas_periodo_anterior_usa_chamados_pre_carregados_sem_query()
             "sla_dias": None,
         },
     ]
-    mock_db = MagicMock()
-    with patch.object(AnalisadorChamados, "get_db", return_value=mock_db):
+    with patch.object(AnalisadorChamados, "_buscar_chamados_dicts") as mock_buscar:
         a = AnalisadorChamados()
         r = a.obter_metricas_periodo_anterior(chamados_pre_carregados=chamados)
 
-    mock_db.collection.assert_not_called()
+    mock_buscar.assert_not_called()
     assert r["total_chamados"] == 1
     assert r["taxa_resolucao_percentual"] == 100.0
 
@@ -369,7 +340,6 @@ def test_obter_metricas_periodo_anterior_usa_janela_proporcional_ao_dias():
     ficaria fora da janela 30-60 usada quando dias=30 (o antigo hardcode).
     """
     from datetime import UTC, datetime, timedelta
-    from unittest.mock import MagicMock, patch
 
     from app.services.analytics import AnalisadorChamados
 
@@ -382,11 +352,9 @@ def test_obter_metricas_periodo_anterior_usa_janela_proporcional_ao_dias():
             "categoria": "TI",
         },
     ]
-    mock_db = MagicMock()
-    with patch.object(AnalisadorChamados, "get_db", return_value=mock_db):
-        a = AnalisadorChamados()
-        r_7 = a.obter_metricas_periodo_anterior(chamados_pre_carregados=chamados, dias=7)
-        r_30 = a.obter_metricas_periodo_anterior(chamados_pre_carregados=chamados, dias=30)
+    a = AnalisadorChamados()
+    r_7 = a.obter_metricas_periodo_anterior(chamados_pre_carregados=chamados, dias=7)
+    r_30 = a.obter_metricas_periodo_anterior(chamados_pre_carregados=chamados, dias=30)
 
     assert r_7["total_chamados"] == 1
     assert r_30["total_chamados"] == 0
@@ -396,7 +364,6 @@ def test_obter_metricas_periodo_anterior_inclui_concluidos():
     """obter_metricas_periodo_anterior retorna 'concluidos' pro delta do card
     de concluídos (antes só tinha total_chamados/taxa/sla/tempo)."""
     from datetime import UTC, datetime, timedelta
-    from unittest.mock import MagicMock, patch
 
     from app.services.analytics import AnalisadorChamados
 
@@ -416,56 +383,49 @@ def test_obter_metricas_periodo_anterior_inclui_concluidos():
             "categoria": "TI",
         },
     ]
-    mock_db = MagicMock()
-    with patch.object(AnalisadorChamados, "get_db", return_value=mock_db):
-        a = AnalisadorChamados()
-        r = a.obter_metricas_periodo_anterior(chamados_pre_carregados=chamados, dias=30)
+    a = AnalisadorChamados()
+    r = a.obter_metricas_periodo_anterior(chamados_pre_carregados=chamados, dias=30)
 
     assert r["concluidos"] == 1
 
 
-def test_obter_metricas_areas_filtra_usuarios_por_perfil_supervisor():
-    """obter_metricas_areas deve filtrar usuarios com perfil==supervisor na query Firestore."""
-    from unittest.mock import MagicMock, patch
-
+def test_obter_metricas_areas_filtra_por_perfil_supervisor():
+    """obter_metricas_areas deve filtrar Usuario.get_all() por perfil==supervisor."""
     from app.services.analytics import AnalisadorChamados
 
-    mock_col = MagicMock()
-    mock_col.where.return_value = mock_col
-    mock_col.stream.return_value = iter([])
-    mock_db = MagicMock()
-    mock_db.collection.return_value = mock_col
+    sup = MagicMock()
+    sup.id = "sup1"
+    sup.perfil = "supervisor"
+    sup.areas = ["TI"]
+    sup.area = None
+    solicitante = MagicMock()
+    solicitante.id = "sol1"
+    solicitante.perfil = "solicitante"
+    solicitante.areas = ["TI"]
+    solicitante.area = None
 
-    with patch.object(AnalisadorChamados, "get_db", return_value=mock_db):
+    with patch("app.models_usuario.Usuario.get_all", return_value=[sup, solicitante]):
         a = AnalisadorChamados()
-        a.obter_metricas_areas(chamados_pre_carregados=[])
+        resultado = a.obter_metricas_areas(chamados_pre_carregados=[])
 
-    assert mock_col.where.called, "obter_metricas_areas deve chamar .where() na query de usuarios"
-    # FieldFilter não tem repr legível — inspeciona o atributo .value diretamente
-    call_args = mock_col.where.call_args_list[0]
-    filter_arg = call_args.kwargs.get("filter") or (call_args.args[0] if call_args.args else None)
-    assert filter_arg is not None and getattr(filter_arg, "value", None) == "supervisor", (
-        "obter_metricas_areas deve filtrar usuarios por perfil==supervisor na query"
+    assert len(resultado) == 1
+    assert resultado[0]["area"] == "TI"
+    assert resultado[0]["supervisores_alocados"] == 1, (
+        "Só o usuário com perfil=='supervisor' deve contar como supervisor alocado"
     )
 
 
 def test_carregar_chamados_analytics_retorna_lista_e_usa_cache(app):
     """_carregar_chamados_analytics deve retornar lista de dicts e armazenar em cache."""
-    from unittest.mock import MagicMock, patch
-
     from app.services.analytics import AnalisadorChamados
-
-    mock_doc = MagicMock()
-    mock_doc.to_dict.return_value = {"status": "Aberto", "area": "TI"}
-    mock_col = MagicMock()
-    mock_col.limit.return_value = mock_col
-    mock_col.stream.return_value = iter([mock_doc])
-    mock_db = MagicMock()
-    mock_db.collection.return_value = mock_col
 
     with (
         app.app_context(),
-        patch.object(AnalisadorChamados, "get_db", return_value=mock_db),
+        patch.object(
+            AnalisadorChamados,
+            "_buscar_chamados_dicts",
+            return_value=[{"status": "Aberto", "area": "TI"}],
+        ),
         patch("app.cache.cache_get", return_value=None),
         patch("app.cache.cache_set") as mock_cache_set,
     ):
@@ -480,41 +440,24 @@ def test_carregar_chamados_analytics_retorna_lista_e_usa_cache(app):
 
 def test_obter_relatorio_completo_faz_unica_query_chamados_para_metricas(app):
     """obter_relatorio_completo deve reusar chamados entre supervisores e áreas (N+1 eliminado)."""
-    from unittest.mock import MagicMock, patch
-
     from app.services.analytics import AnalisadorChamados
-
-    # Contagem de chamadas a .collection("chamados")
-    chamados_queries = []
-
-    def _mock_collection(name):
-        if name == "chamados":
-            chamados_queries.append(name)
-        mock_col = MagicMock()
-        mock_col.where.return_value = mock_col
-        mock_col.limit.return_value = mock_col
-        mock_col.stream.return_value = iter([])
-        return mock_col
-
-    mock_db = MagicMock()
-    mock_db.collection.side_effect = _mock_collection
 
     with (
         app.app_context(),
-        patch.object(AnalisadorChamados, "get_db", return_value=mock_db),
-        patch("app.models_usuario.Usuario") as mock_usuario,
+        patch.object(AnalisadorChamados, "_buscar_chamados_dicts", return_value=[]) as mock_buscar,
+        patch("app.models_usuario.Usuario.get_all", return_value=[]),
         patch("app.cache.cache_get", return_value=None),
         patch("app.cache.cache_set"),
     ):
-        mock_usuario.get_all.return_value = []
         a = AnalisadorChamados()
         a.obter_relatorio_completo(usar_cache=False)
 
-    # O número de chamadas a collection("chamados") deve ser pequeno e fixo,
-    # não crescer com o número de supervisores ou áreas.
-    assert len(chamados_queries) <= 4, (
-        f"N+1 detectado: {len(chamados_queries)} queries a 'chamados' "
-        "(esperado <= 4 independente do número de supervisores/áreas)"
+    # A busca de chamados deve ser feita uma única vez (via
+    # _carregar_chamados_analytics), reaproveitada entre supervisores e áreas —
+    # não deve crescer com o número de supervisores/áreas.
+    assert mock_buscar.call_count == 1, (
+        f"N+1 detectado: _buscar_chamados_dicts chamado {mock_buscar.call_count}x "
+        "(esperado exatamente 1x, reaproveitado entre todas as métricas)"
     )
 
 
@@ -604,7 +547,6 @@ def test_to_datetime_datetime_retorna_mesmo():
 
 def test_to_datetime_firestore_timestamp_chama_to_pydatetime():
     from datetime import datetime
-    from unittest.mock import MagicMock
 
     from app.services.analytics import _to_datetime
 
@@ -855,34 +797,11 @@ def test_obter_sla_tz_aware_abertura():
     assert r["label"] == "Atrasado"
 
 
-# ── Onda 3: get_db lazy init ───────────────────────────────────────────────────
-
-
-def test_get_db_lazy_init_inicializa_firestore():
-    """get_db() inicializa self.db via firestore.client() na primeira chamada."""
-    from unittest.mock import MagicMock, patch
-
-    from app.services.analytics import AnalisadorChamados
-
-    mock_client = MagicMock()
-    with patch("app.services.analytics.firestore.client", return_value=mock_client):
-        a = AnalisadorChamados()
-        assert a.db is None
-        db = a.get_db()
-        assert db is mock_client
-        assert a.db is mock_client
-        # Segunda chamada retorna o mesmo
-        db2 = a.get_db()
-        assert db2 is mock_client
-
-
 # ── Onda 3: cache hits ─────────────────────────────────────────────────────────
 
 
 def test_obter_metricas_gerais_retorna_cache_quando_disponivel(app):
     """obter_metricas_gerais retorna cached quando cache_get devolve dados."""
-    from unittest.mock import patch
-
     from app.services.analytics import AnalisadorChamados
 
     cached_data = {"periodo_dias": 30, "total_chamados": 99}
@@ -896,21 +815,12 @@ def test_obter_metricas_gerais_retorna_cache_quando_disponivel(app):
 
 
 def test_obter_metricas_gerais_salva_em_cache_sem_pre_carregados(app):
-    """obter_metricas_gerais sem pre_carregados faz query ao Firestore e salva cache."""
-    from unittest.mock import MagicMock, patch
-
+    """obter_metricas_gerais sem pre_carregados faz query ao banco e salva cache."""
     from app.services.analytics import AnalisadorChamados
-
-    mock_col = MagicMock()
-    mock_col.where.return_value = mock_col
-    mock_col.limit.return_value = mock_col
-    mock_col.stream.return_value = iter([])
-    mock_db = MagicMock()
-    mock_db.collection.return_value = mock_col
 
     with (
         app.app_context(),
-        patch.object(AnalisadorChamados, "get_db", return_value=mock_db),
+        patch.object(AnalisadorChamados, "_buscar_chamados_dicts", return_value=[]),
         patch("app.cache.cache_get", return_value=None),
         patch("app.cache.cache_set") as mock_set,
     ):
@@ -923,16 +833,13 @@ def test_obter_metricas_gerais_salva_em_cache_sem_pre_carregados(app):
 
 def test_obter_metricas_gerais_exception_retorna_dict_vazio(app):
     """obter_metricas_gerais retorna {} quando ocorre exceção (cache miss + db falha)."""
-    from unittest.mock import MagicMock, patch
-
     from app.services.analytics import AnalisadorChamados
-
-    mock_db = MagicMock()
-    mock_db.collection.side_effect = Exception("timeout")
 
     with (
         app.app_context(),
-        patch.object(AnalisadorChamados, "get_db", return_value=mock_db),
+        patch.object(
+            AnalisadorChamados, "_buscar_chamados_dicts", side_effect=Exception("timeout")
+        ),
         patch("app.cache.cache_get", return_value=None),
     ):
         a = AnalisadorChamados()
@@ -947,7 +854,6 @@ def test_obter_metricas_gerais_exception_retorna_dict_vazio(app):
 def test_obter_metricas_gerais_calcula_sla_e_em_risco():
     """obter_metricas_gerais calcula concluidos_dentro_sla e em_risco corretamente."""
     from datetime import UTC, datetime, timedelta
-    from unittest.mock import MagicMock, patch
 
     from app.services.analytics import AnalisadorChamados
 
@@ -978,10 +884,8 @@ def test_obter_metricas_gerais_calcula_sla_e_em_risco():
             "sla_dias": None,
         },
     ]
-    mock_db = MagicMock()
-    with patch.object(AnalisadorChamados, "get_db", return_value=mock_db):
-        a = AnalisadorChamados()
-        r = a.obter_metricas_gerais(dias=30, chamados_pre_carregados=chamados)
+    a = AnalisadorChamados()
+    r = a.obter_metricas_gerais(dias=30, chamados_pre_carregados=chamados)
 
     assert r["concluidos_dentro_sla"] == 1
     assert r["concluidos_fora_sla"] == 1
@@ -994,7 +898,6 @@ def test_obter_metricas_gerais_calcula_sla_e_em_risco():
 def test_obter_metricas_supervisores_calcula_sla_e_tempo():
     """obter_metricas_supervisores calcula tempo médio e SLA com chamados concretos."""
     from datetime import datetime, timedelta
-    from unittest.mock import MagicMock, patch
 
     from app.services.analytics import AnalisadorChamados
 
@@ -1025,11 +928,7 @@ def test_obter_metricas_supervisores_calcula_sla_e_tempo():
         },
     ]
 
-    mock_db = MagicMock()
-    with (
-        patch.object(AnalisadorChamados, "get_db", return_value=mock_db),
-        patch("app.models_usuario.Usuario") as mock_usuario,
-    ):
+    with patch("app.models_usuario.Usuario") as mock_usuario:
         mock_usuario.get_all.return_value = [sup_mock]
         a = AnalisadorChamados()
         resultado = a.obter_metricas_supervisores(chamados_pre_carregados=chamados)
@@ -1041,41 +940,27 @@ def test_obter_metricas_supervisores_calcula_sla_e_tempo():
     assert r["percentual_dentro_sla"] is not None
 
 
-def test_obter_metricas_supervisores_query_firestore_sem_pre_carregados():
-    """obter_metricas_supervisores faz query quando chamados_pre_carregados=None."""
-    from unittest.mock import MagicMock, patch
-
+def test_obter_metricas_supervisores_query_sem_pre_carregados():
+    """obter_metricas_supervisores faz query ao banco quando chamados_pre_carregados=None."""
     from app.services.analytics import AnalisadorChamados
 
-    mock_col = MagicMock()
-    mock_col.limit.return_value = mock_col
-    mock_col.stream.return_value = iter([])
-    mock_db = MagicMock()
-    mock_db.collection.return_value = mock_col
-
     with (
-        patch.object(AnalisadorChamados, "get_db", return_value=mock_db),
+        patch.object(AnalisadorChamados, "_buscar_chamados_dicts", return_value=[]) as mock_buscar,
         patch("app.models_usuario.Usuario") as mock_usuario,
     ):
         mock_usuario.get_all.return_value = []
         a = AnalisadorChamados()
         resultado = a.obter_metricas_supervisores()
 
-    mock_db.collection.assert_called()
+    mock_buscar.assert_called_once()
     assert resultado == []
 
 
 def test_obter_metricas_supervisores_exception_retorna_lista_vazia():
     """obter_metricas_supervisores retorna [] quando ocorre exceção."""
-    from unittest.mock import MagicMock, patch
-
     from app.services.analytics import AnalisadorChamados
 
-    mock_db = MagicMock()
-    with (
-        patch.object(AnalisadorChamados, "get_db", return_value=mock_db),
-        patch("app.models_usuario.Usuario") as mock_usuario,
-    ):
+    with patch("app.models_usuario.Usuario") as mock_usuario:
         mock_usuario.get_all.side_effect = Exception("db error")
         a = AnalisadorChamados()
         resultado = a.obter_metricas_supervisores()
@@ -1087,17 +972,16 @@ def test_obter_metricas_supervisores_exception_retorna_lista_vazia():
 
 
 def test_obter_metricas_areas_query_sem_pre_carregados():
-    """obter_metricas_areas sem pre_carregados faz query de chamados ao Firestore."""
-    from unittest.mock import MagicMock, patch
-
+    """obter_metricas_areas sem pre_carregados busca supervisores e chamados reais."""
     from app.services.analytics import AnalisadorChamados
 
-    doc_sup = MagicMock()
-    doc_sup.id = "sup1"
-    doc_sup.to_dict.return_value = {"perfil": "supervisor", "areas": ["TI"]}
+    sup = MagicMock()
+    sup.id = "sup1"
+    sup.perfil = "supervisor"
+    sup.areas = ["TI"]
+    sup.area = None
 
-    mock_chamado = MagicMock()
-    mock_chamado.to_dict.return_value = {
+    chamado_dict = {
         "area": "TI",
         "status": "Concluído",
         "data_abertura": None,
@@ -1105,27 +989,16 @@ def test_obter_metricas_areas_query_sem_pre_carregados():
         "motivo_atribuicao": "",
     }
 
-    call_count = []
-
-    def make_col(name):
-        mc = MagicMock()
-        mc.where.return_value = mc
-        mc.limit.return_value = mc
-        if name == "usuarios":
-            mc.stream.return_value = iter([doc_sup])
-        else:
-            call_count.append(name)
-            mc.stream.return_value = iter([mock_chamado])
-        return mc
-
-    mock_db = MagicMock()
-    mock_db.collection.side_effect = make_col
-
-    with patch.object(AnalisadorChamados, "get_db", return_value=mock_db):
+    with (
+        patch("app.models_usuario.Usuario.get_all", return_value=[sup]),
+        patch.object(
+            AnalisadorChamados, "_buscar_chamados_dicts", return_value=[chamado_dict]
+        ) as mock_buscar,
+    ):
         a = AnalisadorChamados()
         resultado = a.obter_metricas_areas()
 
-    assert "chamados" in call_count
+    mock_buscar.assert_called_once()
     assert len(resultado) == 1
     assert resultado[0]["area"] == "TI"
 
@@ -1133,20 +1006,15 @@ def test_obter_metricas_areas_query_sem_pre_carregados():
 def test_obter_metricas_areas_calcula_tempo_medio():
     """obter_metricas_areas calcula tempo_medio_resolucao_horas para concluídos."""
     from datetime import datetime, timedelta
-    from unittest.mock import MagicMock, patch
 
     from app.services.analytics import AnalisadorChamados
 
     agora = datetime.now()
-    doc_sup = MagicMock()
-    doc_sup.id = "sup1"
-    doc_sup.to_dict.return_value = {"perfil": "supervisor", "areas": ["TI"]}
-
-    mock_col = MagicMock()
-    mock_col.where.return_value = mock_col
-    mock_col.stream.return_value = iter([doc_sup])
-    mock_db = MagicMock()
-    mock_db.collection.return_value = mock_col
+    sup = MagicMock()
+    sup.id = "sup1"
+    sup.perfil = "supervisor"
+    sup.areas = ["TI"]
+    sup.area = None
 
     chamados = [
         {
@@ -1158,7 +1026,7 @@ def test_obter_metricas_areas_calcula_tempo_medio():
         }
     ]
 
-    with patch.object(AnalisadorChamados, "get_db", return_value=mock_db):
+    with patch("app.models_usuario.Usuario.get_all", return_value=[sup]):
         a = AnalisadorChamados()
         resultado = a.obter_metricas_areas(chamados_pre_carregados=chamados)
 
@@ -1169,14 +1037,9 @@ def test_obter_metricas_areas_calcula_tempo_medio():
 
 def test_obter_metricas_areas_exception_retorna_lista_vazia():
     """obter_metricas_areas retorna [] quando ocorre exceção."""
-    from unittest.mock import MagicMock, patch
-
     from app.services.analytics import AnalisadorChamados
 
-    mock_db = MagicMock()
-    mock_db.collection.side_effect = Exception("db error")
-
-    with patch.object(AnalisadorChamados, "get_db", return_value=mock_db):
+    with patch("app.models_usuario.Usuario.get_all", side_effect=Exception("db error")):
         a = AnalisadorChamados()
         resultado = a.obter_metricas_areas()
 
@@ -1187,38 +1050,29 @@ def test_obter_metricas_areas_exception_retorna_lista_vazia():
 
 
 def test_obter_analise_atribuicao_retorna_estrutura_com_docs():
-    """obter_analise_atribuicao calcula estatísticas para docs automáticos e manuais."""
+    """obter_analise_atribuicao calcula estatísticas para chamados automáticos e manuais."""
     from datetime import datetime, timedelta
-    from unittest.mock import MagicMock, patch
 
     from app.services.analytics import AnalisadorChamados
 
     agora = datetime.now()
 
-    doc_auto = MagicMock()
-    doc_auto.to_dict.return_value = {
-        "motivo_atribuicao": "Atribuído automaticamente por regra X",
-        "status": "Concluído",
-        "data_abertura": agora - timedelta(hours=10),
-        "data_conclusao": agora - timedelta(hours=5),
-    }
+    chamados = [
+        {
+            "motivo_atribuicao": "Atribuído automaticamente por regra X",
+            "status": "Concluído",
+            "data_abertura": agora - timedelta(hours=10),
+            "data_conclusao": agora - timedelta(hours=5),
+        },
+        {
+            "motivo_atribuicao": "Atribuído manualmente pelo admin",
+            "status": "Aberto",
+            "data_abertura": agora - timedelta(hours=8),
+            "data_conclusao": None,
+        },
+    ]
 
-    doc_manual = MagicMock()
-    doc_manual.to_dict.return_value = {
-        "motivo_atribuicao": "Atribuído manualmente pelo admin",
-        "status": "Aberto",
-        "data_abertura": agora - timedelta(hours=8),
-        "data_conclusao": None,
-    }
-
-    mock_ref = MagicMock()
-    mock_ref.where.return_value = mock_ref
-    mock_ref.limit.return_value = mock_ref
-    mock_ref.stream.return_value = iter([doc_auto, doc_manual])
-    mock_db = MagicMock()
-    mock_db.collection.return_value = mock_ref
-
-    with patch.object(AnalisadorChamados, "get_db", return_value=mock_db):
+    with patch.object(AnalisadorChamados, "_buscar_chamados_dicts", return_value=chamados):
         a = AnalisadorChamados()
         r = a.obter_analise_atribuicao()
 
@@ -1237,18 +1091,9 @@ def test_obter_analise_atribuicao_retorna_estrutura_com_docs():
 
 def test_obter_analise_atribuicao_lista_vazia():
     """obter_analise_atribuicao com zero chamados retorna percentual_automatico=0."""
-    from unittest.mock import MagicMock, patch
-
     from app.services.analytics import AnalisadorChamados
 
-    mock_ref = MagicMock()
-    mock_ref.where.return_value = mock_ref
-    mock_ref.limit.return_value = mock_ref
-    mock_ref.stream.return_value = iter([])
-    mock_db = MagicMock()
-    mock_db.collection.return_value = mock_ref
-
-    with patch.object(AnalisadorChamados, "get_db", return_value=mock_db):
+    with patch.object(AnalisadorChamados, "_buscar_chamados_dicts", return_value=[]):
         a = AnalisadorChamados()
         r = a.obter_analise_atribuicao()
 
@@ -1261,35 +1106,27 @@ def test_obter_analise_atribuicao_lista_vazia():
 def test_obter_analise_atribuicao_calcula_tempo_medio():
     """obter_analise_atribuicao calcula tempo_medio_resolucao_horas para concluídos."""
     from datetime import datetime, timedelta
-    from unittest.mock import MagicMock, patch
 
     from app.services.analytics import AnalisadorChamados
 
     agora = datetime.now()
 
-    doc_auto1 = MagicMock()
-    doc_auto1.to_dict.return_value = {
-        "motivo_atribuicao": "Atribuído automaticamente",
-        "status": "Concluído",
-        "data_abertura": agora - timedelta(hours=10),
-        "data_conclusao": agora - timedelta(hours=6),
-    }
-    doc_auto2 = MagicMock()
-    doc_auto2.to_dict.return_value = {
-        "motivo_atribuicao": "Atribuído automaticamente",
-        "status": "Concluído",
-        "data_abertura": agora - timedelta(hours=8),
-        "data_conclusao": agora - timedelta(hours=4),
-    }
+    chamados = [
+        {
+            "motivo_atribuicao": "Atribuído automaticamente",
+            "status": "Concluído",
+            "data_abertura": agora - timedelta(hours=10),
+            "data_conclusao": agora - timedelta(hours=6),
+        },
+        {
+            "motivo_atribuicao": "Atribuído automaticamente",
+            "status": "Concluído",
+            "data_abertura": agora - timedelta(hours=8),
+            "data_conclusao": agora - timedelta(hours=4),
+        },
+    ]
 
-    mock_ref = MagicMock()
-    mock_ref.where.return_value = mock_ref
-    mock_ref.limit.return_value = mock_ref
-    mock_ref.stream.return_value = iter([doc_auto1, doc_auto2])
-    mock_db = MagicMock()
-    mock_db.collection.return_value = mock_ref
-
-    with patch.object(AnalisadorChamados, "get_db", return_value=mock_db):
+    with patch.object(AnalisadorChamados, "_buscar_chamados_dicts", return_value=chamados):
         a = AnalisadorChamados()
         r = a.obter_analise_atribuicao()
 
@@ -1300,14 +1137,11 @@ def test_obter_analise_atribuicao_calcula_tempo_medio():
 
 def test_obter_analise_atribuicao_exception_retorna_dict_vazio():
     """obter_analise_atribuicao retorna {} quando ocorre exceção."""
-    from unittest.mock import MagicMock, patch
-
     from app.services.analytics import AnalisadorChamados
 
-    mock_db = MagicMock()
-    mock_db.collection.side_effect = Exception("timeout")
-
-    with patch.object(AnalisadorChamados, "get_db", return_value=mock_db):
+    with patch.object(
+        AnalisadorChamados, "_buscar_chamados_dicts", side_effect=Exception("timeout")
+    ):
         a = AnalisadorChamados()
         r = a.obter_analise_atribuicao()
 
@@ -1319,20 +1153,16 @@ def test_obter_analise_atribuicao_exception_retorna_dict_vazio():
 
 def test_obter_insights_sla_ok_quando_percentual_alto():
     """obter_insights gera insight_sla_ok quando percentual_dentro_sla >= 80."""
-    from unittest.mock import MagicMock, patch
-
     from app.services.analytics import AnalisadorChamados
 
     sups = [{"supervisor_nome": "João", "taxa_resolucao_percentual": 90.0, "carga_atual": 5}]
     areas = [{"area": "TI", "taxa_resolucao_percentual": 70.0}]
     gerais = {"percentual_dentro_sla": 85.0}
 
-    mock_db = MagicMock()
-    with patch.object(AnalisadorChamados, "get_db", return_value=mock_db):
-        a = AnalisadorChamados()
-        insights = a.obter_insights(
-            metricas_supervisores=sups, metricas_areas=areas, metricas_gerais=gerais
-        )
+    a = AnalisadorChamados()
+    insights = a.obter_insights(
+        metricas_supervisores=sups, metricas_areas=areas, metricas_gerais=gerais
+    )
 
     titulo_keys = [i.get("titulo_key") for i in insights]
     assert any("sla_ok" in k for k in titulo_keys)
@@ -1340,20 +1170,16 @@ def test_obter_insights_sla_ok_quando_percentual_alto():
 
 def test_obter_insights_sla_low_quando_percentual_baixo():
     """obter_insights gera insight_sla_low quando percentual_dentro_sla < 60."""
-    from unittest.mock import MagicMock, patch
-
     from app.services.analytics import AnalisadorChamados
 
     sups = [{"supervisor_nome": "João", "taxa_resolucao_percentual": 90.0, "carga_atual": 5}]
     areas = [{"area": "TI", "taxa_resolucao_percentual": 70.0}]
     gerais = {"percentual_dentro_sla": 50.0}
 
-    mock_db = MagicMock()
-    with patch.object(AnalisadorChamados, "get_db", return_value=mock_db):
-        a = AnalisadorChamados()
-        insights = a.obter_insights(
-            metricas_supervisores=sups, metricas_areas=areas, metricas_gerais=gerais
-        )
+    a = AnalisadorChamados()
+    insights = a.obter_insights(
+        metricas_supervisores=sups, metricas_areas=areas, metricas_gerais=gerais
+    )
 
     titulo_keys = [i.get("titulo_key") for i in insights]
     assert any("sla_low" in k for k in titulo_keys)
@@ -1361,8 +1187,6 @@ def test_obter_insights_sla_low_quando_percentual_baixo():
 
 def test_obter_insights_supervisor_sobrecarregado():
     """obter_insights gera insight de supervisor sobrecarregado quando carga_atual > 10."""
-    from unittest.mock import MagicMock, patch
-
     from app.services.analytics import AnalisadorChamados
 
     sups = [
@@ -1374,10 +1198,8 @@ def test_obter_insights_supervisor_sobrecarregado():
     ]
     areas = [{"area": "TI", "taxa_resolucao_percentual": 70.0}]
 
-    mock_db = MagicMock()
-    with patch.object(AnalisadorChamados, "get_db", return_value=mock_db):
-        a = AnalisadorChamados()
-        insights = a.obter_insights(metricas_supervisores=sups, metricas_areas=areas)
+    a = AnalisadorChamados()
+    insights = a.obter_insights(metricas_supervisores=sups, metricas_areas=areas)
 
     titulo_keys = [i.get("titulo_key") for i in insights]
     assert any("overloaded" in k for k in titulo_keys)
@@ -1385,17 +1207,13 @@ def test_obter_insights_supervisor_sobrecarregado():
 
 def test_obter_insights_area_baixa_performance():
     """obter_insights gera insight de área baixa quando taxa_resolucao < 40."""
-    from unittest.mock import MagicMock, patch
-
     from app.services.analytics import AnalisadorChamados
 
     sups = [{"supervisor_nome": "João", "taxa_resolucao_percentual": 90.0, "carga_atual": 3}]
     areas = [{"area": "RH", "taxa_resolucao_percentual": 20.0}]
 
-    mock_db = MagicMock()
-    with patch.object(AnalisadorChamados, "get_db", return_value=mock_db):
-        a = AnalisadorChamados()
-        insights = a.obter_insights(metricas_supervisores=sups, metricas_areas=areas)
+    a = AnalisadorChamados()
+    insights = a.obter_insights(metricas_supervisores=sups, metricas_areas=areas)
 
     titulo_keys = [i.get("titulo_key") for i in insights]
     assert any("low_area" in k for k in titulo_keys)
@@ -1403,43 +1221,33 @@ def test_obter_insights_area_baixa_performance():
 
 def test_obter_insights_exception_retorna_lista_vazia():
     """obter_insights retorna [] quando ocorre exceção interna."""
-    from unittest.mock import MagicMock, patch
-
     from app.services.analytics import AnalisadorChamados
 
-    mock_db = MagicMock()
-    with patch.object(AnalisadorChamados, "get_db", return_value=mock_db):
-        a = AnalisadorChamados()
-        # Passa estrutura inválida para forçar KeyError dentro de obter_insights
-        insights = a.obter_insights(
-            metricas_supervisores=[{"missing_key": "no_carga"}],
-            metricas_areas=[],
-        )
+    a = AnalisadorChamados()
+    # Passa estrutura inválida para forçar KeyError dentro de obter_insights
+    insights = a.obter_insights(
+        metricas_supervisores=[{"missing_key": "no_carga"}],
+        metricas_areas=[],
+    )
 
     assert insights == []
 
 
 def test_obter_insights_sem_metricas_supervisores_chama_metodo():
     """obter_insights sem metricas_supervisores chama self.obter_metricas_supervisores()."""
-    from unittest.mock import MagicMock, patch
-
     from app.services.analytics import AnalisadorChamados
 
-    mock_db = MagicMock()
-    with patch.object(AnalisadorChamados, "get_db", return_value=mock_db):
-        a = AnalisadorChamados()
-        with patch.object(a, "obter_metricas_supervisores", return_value=[]) as mock_sup:
-            a.obter_insights(metricas_areas=[], metricas_gerais={})
-        mock_sup.assert_called_once()
+    a = AnalisadorChamados()
+    with patch.object(a, "obter_metricas_supervisores", return_value=[]) as mock_sup:
+        a.obter_insights(metricas_areas=[], metricas_gerais={})
+    mock_sup.assert_called_once()
 
 
 # ── Onda 3: obter_metricas_periodo_anterior ────────────────────────────────────
 
 
 def test_obter_metricas_periodo_anterior_retorna_cache_quando_disponivel(app):
-    """obter_metricas_periodo_anterior retorna cached sem query ao Firestore."""
-    from unittest.mock import patch
-
+    """obter_metricas_periodo_anterior retorna cached sem query ao banco."""
     from app.services.analytics import AnalisadorChamados
 
     cached_data = {"total_chamados": 10, "taxa_resolucao_percentual": 80.0}
@@ -1453,22 +1261,13 @@ def test_obter_metricas_periodo_anterior_retorna_cache_quando_disponivel(app):
     assert r == cached_data
 
 
-def test_obter_metricas_periodo_anterior_query_firestore(app):
-    """obter_metricas_periodo_anterior sem cache faz query ao Firestore."""
-    from unittest.mock import MagicMock, patch
-
+def test_obter_metricas_periodo_anterior_query_sem_cache(app):
+    """obter_metricas_periodo_anterior sem cache faz query ao banco."""
     from app.services.analytics import AnalisadorChamados
-
-    mock_col = MagicMock()
-    mock_col.where.return_value = mock_col
-    mock_col.limit.return_value = mock_col
-    mock_col.stream.return_value = iter([])
-    mock_db = MagicMock()
-    mock_db.collection.return_value = mock_col
 
     with (
         app.app_context(),
-        patch.object(AnalisadorChamados, "get_db", return_value=mock_db),
+        patch.object(AnalisadorChamados, "_buscar_chamados_dicts", return_value=[]) as mock_buscar,
         patch("app.cache.cache_get", return_value=None),
         patch("app.cache.cache_set"),
     ):
@@ -1477,19 +1276,16 @@ def test_obter_metricas_periodo_anterior_query_firestore(app):
 
     assert isinstance(r, dict)
     assert "total_chamados" in r
-    mock_db.collection.assert_called()
+    mock_buscar.assert_called_once()
 
 
 def test_obter_metricas_periodo_anterior_exception_retorna_dict_vazio():
     """obter_metricas_periodo_anterior retorna {} quando ocorre exceção."""
-    from unittest.mock import MagicMock, patch
-
     from app.services.analytics import AnalisadorChamados
 
-    mock_db = MagicMock()
-    mock_db.collection.side_effect = Exception("db error")
-
-    with patch.object(AnalisadorChamados, "get_db", return_value=mock_db):
+    with patch.object(
+        AnalisadorChamados, "_buscar_chamados_dicts", side_effect=Exception("db error")
+    ):
         a = AnalisadorChamados()
         r = a.obter_metricas_periodo_anterior()
 
@@ -1500,24 +1296,21 @@ def test_obter_metricas_periodo_anterior_exception_retorna_dict_vazio():
 
 
 def test_carregar_chamados_analytics_retorna_cache_hit(app):
-    """_carregar_chamados_analytics retorna dados do cache sem query ao Firestore."""
-    from unittest.mock import MagicMock, patch
-
+    """_carregar_chamados_analytics retorna dados do cache sem query ao banco."""
     from app.services.analytics import AnalisadorChamados
 
     cached = [{"status": "Aberto", "area": "TI"}]
-    mock_db = MagicMock()
 
     with (
         app.app_context(),
-        patch.object(AnalisadorChamados, "get_db", return_value=mock_db),
+        patch.object(AnalisadorChamados, "_buscar_chamados_dicts") as mock_buscar,
         patch("app.cache.cache_get", return_value=cached),
     ):
         a = AnalisadorChamados()
         result = a._carregar_chamados_analytics()
 
     assert result == cached
-    mock_db.collection.assert_not_called()
+    mock_buscar.assert_not_called()
 
 
 # ── Onda 3: obter_relatorio_completo cache paths ───────────────────────────────
@@ -1525,8 +1318,6 @@ def test_carregar_chamados_analytics_retorna_cache_hit(app):
 
 def test_obter_relatorio_completo_retorna_cache_redis(app):
     """obter_relatorio_completo retorna cached do Redis quando disponível."""
-    from unittest.mock import patch
-
     from app.services.analytics import AnalisadorChamados
 
     cached = {
@@ -1549,19 +1340,10 @@ def test_obter_relatorio_completo_retorna_cache_redis(app):
 
 def test_obter_relatorio_completo_salva_cache_e_memoria(app):
     """obter_relatorio_completo sem cache calcula e salva em cache Redis + memória."""
-    from unittest.mock import MagicMock, patch
-
     from app.services.analytics import AnalisadorChamados
-
-    mock_db = MagicMock()
-    mock_col = MagicMock()
-    mock_col.limit.return_value = mock_col
-    mock_col.stream.return_value = iter([])
-    mock_db.collection.return_value = mock_col
 
     with (
         app.app_context(),
-        patch.object(AnalisadorChamados, "get_db", return_value=mock_db),
         patch.object(AnalisadorChamados, "obter_metricas_gerais", return_value={}),
         patch.object(AnalisadorChamados, "obter_metricas_periodo_anterior", return_value={}),
         patch.object(AnalisadorChamados, "obter_metricas_supervisores", return_value=[]),
@@ -1581,19 +1363,10 @@ def test_obter_relatorio_completo_propaga_dias_para_metricas_gerais_e_delta(app)
     """obter_relatorio_completo(dias=7) deve usar 7 dias tanto na Visão Geral
     quanto no cálculo de delta (período anterior), e não misturar cache com
     outros períodos (ex.: 30 dias)."""
-    from unittest.mock import MagicMock, patch
-
     from app.services.analytics import AnalisadorChamados
-
-    mock_db = MagicMock()
-    mock_col = MagicMock()
-    mock_col.limit.return_value = mock_col
-    mock_col.stream.return_value = iter([])
-    mock_db.collection.return_value = mock_col
 
     with (
         app.app_context(),
-        patch.object(AnalisadorChamados, "get_db", return_value=mock_db),
         patch.object(AnalisadorChamados, "obter_metricas_gerais", return_value={}) as mock_mg,
         patch.object(
             AnalisadorChamados, "obter_metricas_periodo_anterior", return_value={}
@@ -1613,8 +1386,6 @@ def test_obter_relatorio_completo_propaga_dias_para_metricas_gerais_e_delta(app)
 
 def test_obter_relatorio_completo_exception_retorna_estrutura_vazia(app):
     """obter_relatorio_completo retorna estrutura vazia quando ocorre exceção."""
-    from unittest.mock import patch
-
     from app.services.analytics import AnalisadorChamados
 
     with (
@@ -1623,7 +1394,7 @@ def test_obter_relatorio_completo_exception_retorna_estrutura_vazia(app):
         patch.object(
             AnalisadorChamados,
             "_carregar_chamados_analytics",
-            side_effect=Exception("firestore down"),
+            side_effect=Exception("db down"),
         ),
     ):
         a = AnalisadorChamados()
@@ -1665,7 +1436,6 @@ def test_em_atendimento_sem_data_em_atendimento_usa_logica_calendario():
 def test_em_atendimento_dentro_prazo_usa_percentual_resolucao():
     """Em Atendimento com data_em_atendimento recente usa percentual_prazo_resolucao e retorna No prazo."""
     from datetime import datetime, timedelta
-    from unittest.mock import patch
 
     from app.services.analytics import obter_sla_para_exibicao
 
@@ -1695,7 +1465,6 @@ def test_em_atendimento_dentro_prazo_usa_percentual_resolucao():
 def test_em_atendimento_atrasado_usa_percentual_resolucao():
     """Em Atendimento com data_em_atendimento passada usa percentual_prazo_resolucao e retorna Atrasado."""
     from datetime import datetime, timedelta
-    from unittest.mock import patch
 
     from app.services.analytics import obter_sla_para_exibicao
 
@@ -1725,7 +1494,6 @@ def test_em_atendimento_atrasado_usa_percentual_resolucao():
 def test_em_atendimento_em_risco_quando_percentual_50():
     """percentual=0.55 → label 'Em risco', em_risco=True, dentro_prazo=None."""
     from datetime import datetime, timedelta
-    from unittest.mock import patch
 
     from app.services.analytics import obter_sla_para_exibicao
 
@@ -1753,7 +1521,6 @@ def test_em_atendimento_em_risco_quando_percentual_50():
 def test_em_atendimento_em_risco_quando_percentual_79():
     """percentual=0.79 → 'Em risco' (threshold agora é 50%, não mais 80%)."""
     from datetime import datetime, timedelta
-    from unittest.mock import patch
 
     from app.services.analytics import obter_sla_para_exibicao
 
@@ -1780,7 +1547,6 @@ def test_em_atendimento_em_risco_quando_percentual_79():
 def test_obter_metricas_gerais_em_atendimento_em_risco_por_percentual_resolucao():
     """Chamado Em Atendimento com data_em_atendimento → em_risco via percentual_prazo_resolucao."""
     from datetime import UTC, datetime, timedelta
-    from unittest.mock import MagicMock, patch
 
     from app.services.analytics import AnalisadorChamados
 
@@ -1797,14 +1563,8 @@ def test_obter_metricas_gerais_em_atendimento_em_risco_por_percentual_resolucao(
         },
     ]
 
-    mock_db = MagicMock()
-    with (
-        patch.object(AnalisadorChamados, "get_db", return_value=mock_db),
-        patch("app.services.analytics.percentual_prazo_resolucao", return_value=0.6),
-    ):
+    with patch("app.services.analytics.percentual_prazo_resolucao", return_value=0.6):
         a = AnalisadorChamados()
         r = a.obter_metricas_gerais(dias=30, chamados_pre_carregados=chamados)
 
-    mock_db.collection.assert_not_called()
     assert r["resumo_sla"]["em_risco"] == 1
-    assert r["resumo_sla"]["atrasado"] == 0

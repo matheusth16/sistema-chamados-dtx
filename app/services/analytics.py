@@ -15,9 +15,10 @@ from datetime import UTC, datetime, timedelta
 from statistics import mean
 from typing import Any
 
-from firebase_admin import firestore
-from google.cloud.firestore_v1.base_query import FieldFilter
+from sqlalchemy import select
 
+from app import db as db_module
+from app.db.models.chamado import ChamadoRow
 from app.services.business_time import percentual_prazo_resolucao
 
 logger = logging.getLogger(__name__)
@@ -143,14 +144,24 @@ def obter_sla_para_exibicao(chamado: Any) -> dict[str, Any] | None:
 class AnalisadorChamados:
     """Análise de performance e insights dos chamados"""
 
-    def __init__(self):
-        self.db = None
+    @staticmethod
+    def _buscar_chamados_dicts(
+        data_abertura_gte: datetime | None = None,
+        data_abertura_lt: datetime | None = None,
+    ) -> list[dict[str, Any]]:
+        """Busca chamados no Postgres e retorna como lista de dicts (mesmo
+        shape de Chamado.to_dict()) — preserva a lógica de métricas abaixo,
+        que opera inteiramente sobre dicts."""
+        from app.models import Chamado
 
-    def get_db(self):
-        """Retorna o cliente Firestore (lazy initialization)."""
-        if self.db is None:
-            self.db = firestore.client()
-        return self.db
+        with db_module.SessionLocal() as session:
+            stmt = select(ChamadoRow).limit(MAX_CHAMADOS_ANALYTICS)
+            if data_abertura_gte is not None:
+                stmt = stmt.where(ChamadoRow.data_abertura >= data_abertura_gte)
+            if data_abertura_lt is not None:
+                stmt = stmt.where(ChamadoRow.data_abertura < data_abertura_lt)
+            rows = session.execute(stmt).scalars().all()
+        return [Chamado._from_row(row).to_dict() for row in rows]
 
     # ========== MÉTRICAS GERAIS ==========
 
@@ -182,13 +193,7 @@ class AnalisadorChamados:
                     if (_to_datetime(c.get("data_abertura")) or _DATETIME_MIN_UTC) >= data_limite
                 ]
             else:
-                chamados_ref = (
-                    self.get_db()
-                    .collection("chamados")
-                    .where(filter=FieldFilter("data_abertura", ">=", data_limite))
-                    .limit(MAX_CHAMADOS_ANALYTICS)
-                )
-                todos_chamados = [doc.to_dict() for doc in chamados_ref.stream()]
+                todos_chamados = self._buscar_chamados_dicts(data_abertura_gte=data_limite)
 
             total = len(todos_chamados)
             abertos = sum(1 for c in todos_chamados if c.get("status") == "Aberto")
@@ -324,10 +329,7 @@ class AnalisadorChamados:
 
             # Única query quando nenhum dado pré-carregado for fornecido
             if chamados_pre_carregados is None:
-                docs = list(
-                    self.get_db().collection("chamados").limit(MAX_CHAMADOS_ANALYTICS).stream()
-                )
-                todos_chamados = [doc.to_dict() for doc in docs]
+                todos_chamados = self._buscar_chamados_dicts()
             else:
                 todos_chamados = chamados_pre_carregados
 
@@ -413,30 +415,22 @@ class AnalisadorChamados:
         é feita — elimina o N+1 anterior que fazia 1 query por área.
         """
         try:
-            # Filtra supervisores diretamente no Firestore — evita varrer toda a coleção
-            usuarios_ref = (
-                self.get_db()
-                .collection("usuarios")
-                .where(filter=FieldFilter("perfil", "==", "supervisor"))
-                .stream()
-            )
+            from app.models_usuario import Usuario
+
+            supervisores = [u for u in Usuario.get_all() if u.perfil == "supervisor"]
             areas_uniques: set[str] = set()
             area_to_supervisor_ids: dict[str, set] = defaultdict(set)
-            for doc in usuarios_ref:
-                usuario = doc.to_dict()
-                areas_list = usuario.get("areas") or []
-                if not areas_list and usuario.get("area"):
-                    areas_list = [usuario.get("area")]
+            for usuario in supervisores:
+                areas_list = getattr(usuario, "areas", None) or []
+                if not areas_list and getattr(usuario, "area", None):
+                    areas_list = [usuario.area]
                 for a in areas_list:
                     areas_uniques.add(a)
-                    area_to_supervisor_ids[a].add(doc.id)
+                    area_to_supervisor_ids[a].add(usuario.id)
 
             # Única query de chamados quando nenhum dado pré-carregado for fornecido
             if chamados_pre_carregados is None:
-                docs = list(
-                    self.get_db().collection("chamados").limit(MAX_CHAMADOS_ANALYTICS).stream()
-                )
-                todos_chamados = [doc.to_dict() for doc in docs]
+                todos_chamados = self._buscar_chamados_dicts()
             else:
                 todos_chamados = chamados_pre_carregados
 
@@ -515,29 +509,23 @@ class AnalisadorChamados:
         """
         try:
             data_limite = datetime.now() - timedelta(days=dias)
-            chamados_ref = (
-                self.get_db()
-                .collection("chamados")
-                .where(filter=FieldFilter("data_abertura", ">=", data_limite))
-                .limit(MAX_CHAMADOS_ANALYTICS)
-            )
-            chamados = list(chamados_ref.stream())
+            chamados = self._buscar_chamados_dicts(data_abertura_gte=data_limite)
 
             # Separar automáticos e manuais
             chamados_auto = [
-                doc
-                for doc in chamados
-                if "Atribuído automaticamente" in doc.to_dict().get("motivo_atribuicao", "")
+                c
+                for c in chamados
+                if "Atribuído automaticamente" in (c.get("motivo_atribuicao") or "")
             ]
             chamados_manual = [
-                doc
-                for doc in chamados
-                if "Atribuído automaticamente" not in doc.to_dict().get("motivo_atribuicao", "")
+                c
+                for c in chamados
+                if "Atribuído automaticamente" not in (c.get("motivo_atribuicao") or "")
             ]
 
-            def calcular_stats(docs):
+            def calcular_stats(lista_chamados):
                 """Helper para calcular estatísticas"""
-                if not docs:
+                if not lista_chamados:
                     return {
                         "total": 0,
                         "concluidos": 0,
@@ -545,13 +533,14 @@ class AnalisadorChamados:
                         "tempo_medio_resolucao_horas": 0,
                     }
 
-                total = len(docs)
-                concluidos = sum(1 for doc in docs if doc.to_dict().get("status") == "Concluído")
+                total = len(lista_chamados)
+                concluidos = sum(
+                    1 for chamado in lista_chamados if chamado.get("status") == "Concluído"
+                )
                 taxa = (concluidos / total * 100) if total > 0 else 0
 
                 tempos = []
-                for doc in docs:
-                    chamado = doc.to_dict()
+                for chamado in lista_chamados:
                     if chamado.get("status") == "Concluído" and chamado.get("data_conclusao"):
                         data_abertura = chamado.get("data_abertura", datetime.now())
                         data_conclusao = chamado.get("data_conclusao", datetime.now())
@@ -742,14 +731,9 @@ class AnalisadorChamados:
                     )
                 ]
             else:
-                chamados_ref = (
-                    self.get_db()
-                    .collection("chamados")
-                    .where(filter=FieldFilter("data_abertura", ">=", data_inicio))
-                    .where(filter=FieldFilter("data_abertura", "<", data_fim))
-                    .limit(MAX_CHAMADOS_ANALYTICS)
+                todos_chamados = self._buscar_chamados_dicts(
+                    data_abertura_gte=data_inicio, data_abertura_lt=data_fim
                 )
-                todos_chamados = [doc.to_dict() for doc in chamados_ref.stream()]
 
             total = len(todos_chamados)
             concluidos = sum(1 for c in todos_chamados if c.get("status") == "Concluído")
@@ -846,8 +830,7 @@ class AnalisadorChamados:
                 return cached
         except Exception as e:
             logger.debug("Cache indisponível (analytics): %s", e)
-        docs = list(self.get_db().collection("chamados").limit(MAX_CHAMADOS_ANALYTICS).stream())
-        chamados = [doc.to_dict() for doc in docs]
+        chamados = self._buscar_chamados_dicts()
         try:
             from app.cache import cache_set
 
