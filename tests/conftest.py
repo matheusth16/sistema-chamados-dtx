@@ -58,6 +58,12 @@ def app():
     # padrão, que não bate com o valor do .env local (ex.: http://localhost:5000/...).
     # Testes do fluxo de SSO definem SSO_REDIRECT_URI explicitamente quando precisam.
     app.config["SSO_REDIRECT_URI"] = ""
+    # Idem para REQUIRE_HTTPS/SSO_MICROSOFT_ENABLED: fixa os defaults de produção
+    # (ambos True) pra não depender do .env local, que pode ter o modo LAN-only
+    # ativado (REQUIRE_HTTPS=false, SSO_MICROSOFT_ENABLED=false). Testes que
+    # exercitam o modo desativado sobrescrevem explicitamente.
+    app.config["REQUIRE_HTTPS"] = True
+    app.config["SSO_MICROSOFT_ENABLED"] = True
     return app
 
 
