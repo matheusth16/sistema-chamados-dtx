@@ -19,7 +19,17 @@ services:
     env_file:
       - .env
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')"]
+      # Envia X-Health-Token lendo HEALTH_SECRET do próprio ambiente do container
+      # (env_file acima) — a rota /health exige o token quando HEALTH_SECRET está
+      # configurado (ver app/routes/api_chamados.py). Sem HEALTH_SECRET, o header
+      # vai vazio e a rota não exige autenticação (mesmo comportamento de antes).
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import os, urllib.request; req = urllib.request.Request('http://localhost:8080/health', headers={'X-Health-Token': os.environ.get('HEALTH_SECRET', '')}); urllib.request.urlopen(req)",
+        ]
       interval: 20s
       timeout: 5s
       retries: 3

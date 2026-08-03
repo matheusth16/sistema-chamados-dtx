@@ -4,6 +4,21 @@ import os
 from unittest.mock import MagicMock, patch
 
 
+def test_health_isento_de_rate_limit(app):
+    """GET /health deve ser isento do RATELIMIT_DEFAULT global (config.py).
+
+    O healthcheck do Docker bate em /health a cada 20s (~4300 req/dia), o que
+    estoura o limite padrão de "2000 per day" aplicado a rotas sem decorador
+    próprio — derrubando o container pra "unhealthy" mesmo com a app saudável.
+    """
+    from flask_limiter.constants import ExemptionScope
+
+    from app.limiter import limiter
+
+    scope = limiter.limit_manager.exemption_scope(app, "main.health", "main")
+    assert ExemptionScope.DEFAULT in scope
+
+
 def test_health_check_retorna_200_e_ok(client):
     """CT-HEALTH-01: GET /health retorna 200 e { status: 'ok' } sem autenticação."""
     r = client.get("/health")

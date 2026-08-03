@@ -143,6 +143,7 @@ def _obter_health_token_request() -> str:
 
 
 @main.route("/health", methods=["GET"])
+@limiter.exempt
 def health():
     """Health check para monitoramento externo.
 
