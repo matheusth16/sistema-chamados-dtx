@@ -45,10 +45,17 @@ A maioria dos scripts que tocam o banco requer `credentials.json` na raiz.
 | **atualizar_setores_from_print.py** | **Destrutivo one-shot:** reset de setores. Tem `--apply` (padrão dry-run) |
 | **fix_logger_fstrings.py** | Ferramenta de refactor: converter f-strings de logging |
 | **verificar_dependencias.py** | Audit de dependências + suíte de testes |
+| **watchtower_trigger.sh** | Dispara deploy manual em produção via HTTP API do Watchtower (servidor físico) |
 
 > **Nota sobre deploy:** o projeto roda em container Docker (ver `Dockerfile` e
 > `docker-compose.yml`). Não há mais scripts de deploy para GCP/Cloud Run.
 > Para subir: `docker compose up -d --build`.
+>
+> **Produção (servidor físico):** o CI publica a imagem `latest` no GHCR a
+> cada push, mas o Watchtower roda em modo manual (`--http-api-update`, sem
+> polling) — o container só atualiza quando alguém dispara
+> `bash scripts/watchtower_trigger.sh` no servidor. Ver comentário em
+> `docker-compose.prod.yml`.
 
 ---
 
