@@ -2,11 +2,11 @@ import logging
 from datetime import datetime
 
 from flask_login import UserMixin
-from google.cloud.firestore_v1.base_query import FieldFilter
+from sqlalchemy import select
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from app.database import db
-from app.firebase_retry import firebase_retry
+from app import db as db_module
+from app.db.models.usuario import UsuarioRow
 from app.services.pii_encryption import (
     email_lookup_hash,
     is_pii_encryption_enabled,
@@ -28,12 +28,17 @@ AUTH_PROVIDERS_VALIDOS = frozenset({"local", "microsoft"})
 # Perfis válidos — usado para validar onboarding_perfis_vistos
 PERFIS_VALIDOS = frozenset({"solicitante", "supervisor", "admin", "admin_global"})
 
-# Teto de segurança para get_all() — evita stream() sem limite em produção
+# Teto de segurança para get_all() — evita ler a tabela inteira sem limite
 MAX_USUARIOS_GET_ALL = 2000
 
 
 class Usuario(UserMixin):
-    """Representação de um usuário do sistema"""
+    """Representação de um usuário do sistema.
+
+    Fase 2: armazenamento migrado de Firestore para PostgreSQL. id continua
+    string (não vira serial) — referenciado por várias coleções ainda não
+    migradas (chamados.solicitante_id, historico_usuarios.admin_id, etc.).
+    """
 
     def __init__(
         self,
@@ -135,7 +140,7 @@ class Usuario(UserMixin):
         return check_password_hash(self.senha_hash, senha) if self.senha_hash else False
 
     def to_dict(self):
-        """Converte para dicionário para salvar no Firestore.
+        """Converte para dicionário (compatibilidade com callers existentes).
 
         Quando ENCRYPT_PII_AT_REST=true: criptografa email/nome e inclui email_lookup_hash.
         Quando falso: formato plaintext original (retrocompatível).
@@ -182,7 +187,7 @@ class Usuario(UserMixin):
 
     @classmethod
     def from_dict(cls, data: dict, id: str = None):
-        """Cria um objeto Usuario a partir de um dicionário do Firestore"""
+        """Cria um objeto Usuario a partir de um dicionário (Firestore legado)."""
         areas = data.get("areas", [])
         # Migração: se tem area string mas não tem areas array
         if not areas and data.get("area"):
@@ -198,9 +203,6 @@ class Usuario(UserMixin):
 
         perfil = data.get("perfil", "solicitante")
 
-        # Retrocompat: docs antigos tinham só onboarding_completo (bool), sem a lista
-        # por perfil. Se a lista nova não existe mas o antigo flag era True, assume
-        # que o usuário já viu o tour do perfil atual (evita reaparecer do nada).
         onboarding_perfis_vistos = data.get("onboarding_perfis_vistos")
         if onboarding_perfis_vistos is None:
             onboarding_perfis_vistos = [perfil] if data.get("onboarding_completo") else []
@@ -219,9 +221,7 @@ class Usuario(UserMixin):
             password_changed_at=password_changed_at,
             onboarding_perfis_vistos=onboarding_perfis_vistos,
             onboarding_passo=data.get("onboarding_passo", 0),
-            # Docs sem campo ativo (legado) tratados como ativos — retrocompat.
             ativo=data.get("ativo", True),
-            # Fase 5: nivel_gestao — valores inválidos normalizados para None pelo __init__
             nivel_gestao=data.get("nivel_gestao"),
             mfa_enabled=data.get("mfa_enabled", False),
             mfa_secret=(maybe_decrypt(data["mfa_secret"]) if data.get("mfa_secret") else None),
@@ -232,14 +232,62 @@ class Usuario(UserMixin):
         return usuario
 
     @classmethod
-    def _stream_by_email_lookup(cls, email: str):
-        """Query Firestore por email_lookup_hash (email normalizado)."""
-        lookup = email_lookup_hash(email)
-        return (
-            db.collection("usuarios")
-            .where(filter=FieldFilter("email_lookup_hash", "==", lookup))
-            .stream()
+    def _from_row(cls, row: UsuarioRow) -> "Usuario":
+        usuario = cls(
+            id=row.id,
+            email=maybe_decrypt(row.email or ""),
+            nome=maybe_decrypt(row.nome or ""),
+            perfil=row.perfil,
+            areas=list(row.areas or []),
+            exp_total=row.exp_total,
+            exp_semanal=row.exp_semanal,
+            level=row.level,
+            conquistas=list(row.conquistas or []),
+            must_change_password=row.must_change_password,
+            password_changed_at=row.password_changed_at,
+            onboarding_perfis_vistos=list(row.onboarding_perfis_vistos or []),
+            onboarding_passo=row.onboarding_passo,
+            ativo=row.ativo,
+            nivel_gestao=row.nivel_gestao,
+            mfa_enabled=row.mfa_enabled,
+            mfa_secret=(maybe_decrypt(row.mfa_secret) if row.mfa_secret else None),
+            mfa_backup_codes=list(row.mfa_backup_codes or []),
+            auth_provider=row.auth_provider,
         )
+        usuario.senha_hash = row.senha_hash
+        return usuario
+
+    def _preencher_row(self, row: UsuarioRow) -> None:
+        """Aplica o estado atual do objeto num UsuarioRow (insert ou update)."""
+        row.email = maybe_encrypt(self.email)
+        row.nome = maybe_encrypt(self.nome)
+        row.email_lookup_hash = (
+            email_lookup_hash(self.email) if is_pii_encryption_enabled() else None
+        )
+        row.perfil = self.perfil
+        row.areas = self.areas
+        row.senha_hash = self.senha_hash
+        row.must_change_password = self.must_change_password
+        row.password_changed_at = self.password_changed_at
+        row.exp_total = self.exp_total
+        row.exp_semanal = self.exp_semanal
+        row.level = self.level
+        row.conquistas = self.conquistas
+        row.onboarding_perfis_vistos = self.onboarding_perfis_vistos
+        row.onboarding_passo = self.onboarding_passo
+        row.ativo = self.ativo
+        row.nivel_gestao = self.nivel_gestao
+        row.mfa_enabled = self.mfa_enabled
+        row.mfa_secret = maybe_encrypt(self.mfa_secret) if self.mfa_secret else None
+        row.mfa_backup_codes = self.mfa_backup_codes
+        row.auth_provider = self.auth_provider
+
+    @classmethod
+    def _buscar_por_email_lookup(cls, session, email_norm: str) -> UsuarioRow | None:
+        lookup = email_lookup_hash(email_norm)
+        return session.execute(
+            select(UsuarioRow).where(UsuarioRow.email_lookup_hash == lookup)
+        ).scalar_one_or_none()
 
     @classmethod
     def get_by_email(cls, email: str):
@@ -247,29 +295,22 @@ class Usuario(UserMixin):
 
         Quando encryption ON: consulta email_lookup_hash (sha256 do email normalizado).
         Quando encryption OFF: consulta campo email plaintext; se vazio, fallback
-        por hash (docs já migrados com email criptografado no Firestore).
+        por hash (linhas já migradas com email criptografado).
         """
         email_norm = (email or "").strip().lower()
         if not email_norm:
             return None
         try:
-            if is_pii_encryption_enabled():
-                docs = cls._stream_by_email_lookup(email_norm)
-            else:
-                docs = (
-                    db.collection("usuarios")
-                    .where(filter=FieldFilter("email", "==", email_norm))
-                    .stream()
-                )
-                first = next(iter(docs), None)
-                if first is not None:
-                    return cls.from_dict(first.to_dict(), first.id)
-                # Docs migrados: email no Firestore é fernet:v1:… — usar hash
-                docs = cls._stream_by_email_lookup(email_norm)
-
-            for doc in docs:
-                data = doc.to_dict()
-                return cls.from_dict(data, doc.id)
+            with db_module.SessionLocal() as session:
+                if is_pii_encryption_enabled():
+                    row = cls._buscar_por_email_lookup(session, email_norm)
+                else:
+                    row = session.execute(
+                        select(UsuarioRow).where(UsuarioRow.email == email_norm)
+                    ).scalar_one_or_none()
+                    if row is None:
+                        row = cls._buscar_por_email_lookup(session, email_norm)
+                return cls._from_row(row) if row is not None else None
         except Exception as e:
             logger.exception("Erro ao buscar usuário por email: %s", e)
         return None
@@ -278,139 +319,159 @@ class Usuario(UserMixin):
     def get_by_id(cls, user_id: str):
         """Busca usuário por ID"""
         try:
-            doc = db.collection("usuarios").document(user_id).get()
-            if doc.exists:
-                data = doc.to_dict()
-                return cls.from_dict(data, doc.id)
+            with db_module.SessionLocal() as session:
+                row = session.get(UsuarioRow, user_id)
+                return cls._from_row(row) if row is not None else None
         except Exception as e:
             logger.exception("Erro ao buscar usuário por ID: %s", e)
         return None
 
-    @firebase_retry(max_retries=3)
     def save(self):
-        """Salva o usuário no Firestore com retry automático"""
+        """Salva o usuário no Postgres (upsert — mesma semântica do antigo
+        Firestore .set(), que sempre sobrescreve o documento inteiro)."""
         try:
-            db.collection("usuarios").document(self.id).set(self.to_dict())
+            with db_module.SessionLocal() as session, session.begin():
+                row = session.get(UsuarioRow, self.id)
+                if row is None:
+                    row = UsuarioRow(id=self.id)
+                    session.add(row)
+                self._preencher_row(row)
             return True
         except Exception as e:
             logger.exception("Erro ao salvar usuário: %s", e)
             return False
 
-    @firebase_retry(max_retries=3)
     def update(self, **kwargs):
-        """Atualiza campos específicos do usuário no Firestore com retry automático
+        """Atualiza campos específicos do usuário no Postgres.
 
         Args:
-            **kwargs: Campos a atualizar (email, nome, perfil, area, senha)
+            **kwargs: Campos a atualizar (email, nome, perfil, areas, senha, ...)
         """
         try:
-            update_data = {}
+            with db_module.SessionLocal() as session, session.begin():
+                row = session.get(UsuarioRow, self.id)
+                if row is None:
+                    return False
 
-            # Aceita atualizações de campos específicos
-            if "email" in kwargs:
-                self.email = kwargs["email"]
-                update_data["email"] = maybe_encrypt(kwargs["email"])
-                if is_pii_encryption_enabled():
-                    update_data["email_lookup_hash"] = email_lookup_hash(kwargs["email"])
+                atualizou = False
 
-            if "nome" in kwargs:
-                self.nome = kwargs["nome"]
-                update_data["nome"] = maybe_encrypt(kwargs["nome"])
+                if "email" in kwargs:
+                    self.email = kwargs["email"]
+                    row.email = maybe_encrypt(kwargs["email"])
+                    if is_pii_encryption_enabled():
+                        row.email_lookup_hash = email_lookup_hash(kwargs["email"])
+                    atualizou = True
 
-            if "perfil" in kwargs:
-                self.perfil = kwargs["perfil"]
-                update_data["perfil"] = kwargs["perfil"]
+                if "nome" in kwargs:
+                    self.nome = kwargs["nome"]
+                    row.nome = maybe_encrypt(kwargs["nome"])
+                    atualizou = True
 
-            if "areas" in kwargs:
-                self.areas = kwargs["areas"]
-                update_data["areas"] = kwargs["areas"]
+                if "perfil" in kwargs:
+                    self.perfil = kwargs["perfil"]
+                    row.perfil = kwargs["perfil"]
+                    atualizou = True
 
-            if "senha" in kwargs and kwargs["senha"]:
-                self.set_password(kwargs["senha"])
-                update_data["senha_hash"] = self.senha_hash
+                if "areas" in kwargs:
+                    self.areas = kwargs["areas"]
+                    row.areas = kwargs["areas"]
+                    atualizou = True
 
-            if "must_change_password" in kwargs:
-                self.must_change_password = kwargs["must_change_password"]
-                update_data["must_change_password"] = kwargs["must_change_password"]
+                if "senha" in kwargs and kwargs["senha"]:
+                    self.set_password(kwargs["senha"])
+                    row.senha_hash = self.senha_hash
+                    atualizou = True
 
-            if "password_changed_at" in kwargs:
-                self.password_changed_at = kwargs["password_changed_at"]
-                update_data["password_changed_at"] = (
-                    kwargs["password_changed_at"].isoformat()
-                    if kwargs["password_changed_at"]
-                    else None
-                )
+                if "must_change_password" in kwargs:
+                    self.must_change_password = kwargs["must_change_password"]
+                    row.must_change_password = kwargs["must_change_password"]
+                    atualizou = True
 
-            if "onboarding_perfis_vistos" in kwargs:
-                valor = [
-                    p for p in (kwargs["onboarding_perfis_vistos"] or []) if p in PERFIS_VALIDOS
-                ]
-                self.onboarding_perfis_vistos = valor
-                update_data["onboarding_perfis_vistos"] = valor
+                if "password_changed_at" in kwargs:
+                    self.password_changed_at = kwargs["password_changed_at"]
+                    row.password_changed_at = kwargs["password_changed_at"]
+                    atualizou = True
 
-            if "onboarding_passo" in kwargs:
-                self.onboarding_passo = kwargs["onboarding_passo"]
-                update_data["onboarding_passo"] = kwargs["onboarding_passo"]
+                if "onboarding_perfis_vistos" in kwargs:
+                    valor = [
+                        p for p in (kwargs["onboarding_perfis_vistos"] or []) if p in PERFIS_VALIDOS
+                    ]
+                    self.onboarding_perfis_vistos = valor
+                    row.onboarding_perfis_vistos = valor
+                    atualizou = True
 
-            if "ativo" in kwargs:
-                self.ativo = kwargs["ativo"]
-                update_data["ativo"] = kwargs["ativo"]
+                if "onboarding_passo" in kwargs:
+                    self.onboarding_passo = kwargs["onboarding_passo"]
+                    row.onboarding_passo = kwargs["onboarding_passo"]
+                    atualizou = True
 
-            if "nivel_gestao" in kwargs:
-                raw = kwargs["nivel_gestao"]
-                valor = raw if raw in NIVEIS_GESTAO_VALIDOS else None
-                self.nivel_gestao = valor
-                update_data["nivel_gestao"] = valor
+                if "ativo" in kwargs:
+                    self.ativo = kwargs["ativo"]
+                    row.ativo = kwargs["ativo"]
+                    atualizou = True
 
-            if "mfa_enabled" in kwargs:
-                self.mfa_enabled = kwargs["mfa_enabled"]
-                update_data["mfa_enabled"] = kwargs["mfa_enabled"]
+                if "nivel_gestao" in kwargs:
+                    raw = kwargs["nivel_gestao"]
+                    valor = raw if raw in NIVEIS_GESTAO_VALIDOS else None
+                    self.nivel_gestao = valor
+                    row.nivel_gestao = valor
+                    atualizou = True
 
-            if "mfa_secret" in kwargs:
-                self.mfa_secret = kwargs["mfa_secret"]
-                update_data["mfa_secret"] = (
-                    maybe_encrypt(kwargs["mfa_secret"]) if kwargs["mfa_secret"] else None
-                )
+                if "mfa_enabled" in kwargs:
+                    self.mfa_enabled = kwargs["mfa_enabled"]
+                    row.mfa_enabled = kwargs["mfa_enabled"]
+                    atualizou = True
 
-            if "mfa_backup_codes" in kwargs:
-                self.mfa_backup_codes = kwargs["mfa_backup_codes"] or []
-                update_data["mfa_backup_codes"] = self.mfa_backup_codes
+                if "mfa_secret" in kwargs:
+                    self.mfa_secret = kwargs["mfa_secret"]
+                    row.mfa_secret = (
+                        maybe_encrypt(kwargs["mfa_secret"]) if kwargs["mfa_secret"] else None
+                    )
+                    atualizou = True
 
-            if "auth_provider" in kwargs:
-                raw = kwargs["auth_provider"]
-                valor = raw if raw in AUTH_PROVIDERS_VALIDOS else "local"
-                self.auth_provider = valor
-                update_data["auth_provider"] = valor
+                if "mfa_backup_codes" in kwargs:
+                    self.mfa_backup_codes = kwargs["mfa_backup_codes"] or []
+                    row.mfa_backup_codes = self.mfa_backup_codes
+                    atualizou = True
 
-            if "gamification" in kwargs:
-                g_data = kwargs["gamification"]
-                if "exp_total" in g_data:
-                    self.exp_total = g_data["exp_total"]
-                    update_data["exp_total"] = g_data["exp_total"]
-                if "exp_semanal" in g_data:
-                    self.exp_semanal = g_data["exp_semanal"]
-                    update_data["exp_semanal"] = g_data["exp_semanal"]
-                if "level" in g_data:
-                    self.level = g_data["level"]
-                    update_data["level"] = g_data["level"]
-                if "conquistas" in g_data:
-                    self.conquistas = g_data["conquistas"]
-                    update_data["conquistas"] = g_data["conquistas"]
+                if "auth_provider" in kwargs:
+                    raw = kwargs["auth_provider"]
+                    valor = raw if raw in AUTH_PROVIDERS_VALIDOS else "local"
+                    self.auth_provider = valor
+                    row.auth_provider = valor
+                    atualizou = True
 
-            if update_data:
-                db.collection("usuarios").document(self.id).update(update_data)
-                return True
+                if "gamification" in kwargs:
+                    g_data = kwargs["gamification"]
+                    if "exp_total" in g_data:
+                        self.exp_total = g_data["exp_total"]
+                        row.exp_total = g_data["exp_total"]
+                        atualizou = True
+                    if "exp_semanal" in g_data:
+                        self.exp_semanal = g_data["exp_semanal"]
+                        row.exp_semanal = g_data["exp_semanal"]
+                        atualizou = True
+                    if "level" in g_data:
+                        self.level = g_data["level"]
+                        row.level = g_data["level"]
+                        atualizou = True
+                    if "conquistas" in g_data:
+                        self.conquistas = g_data["conquistas"]
+                        row.conquistas = g_data["conquistas"]
+                        atualizou = True
 
-            return False
+                return atualizou
         except Exception as e:
             logger.exception("Erro ao atualizar usuário: %s", e)
             return False
 
-    @firebase_retry(max_retries=3)
     def delete(self):
-        """Deleta o usuário do Firestore com retry automático"""
+        """Deleta o usuário do Postgres."""
         try:
-            db.collection("usuarios").document(self.id).delete()
+            with db_module.SessionLocal() as session, session.begin():
+                row = session.get(UsuarioRow, self.id)
+                if row is not None:
+                    session.delete(row)
             return True
         except Exception as e:
             logger.exception("Erro ao deletar usuário: %s", e)
@@ -419,7 +480,7 @@ class Usuario(UserMixin):
     @classmethod
     def get_by_ids(cls, ids: list[str]) -> dict[str, "Usuario"]:
         """
-        Busca múltiplos usuários em um único round-trip via batch read do Firestore.
+        Busca múltiplos usuários em um único round-trip (WHERE id IN (...)).
 
         Substitui o loop com N chamadas a get_by_id, reduzindo queries N+1.
 
@@ -429,13 +490,13 @@ class Usuario(UserMixin):
         if not ids:
             return {}
         try:
-            refs = [db.collection("usuarios").document(uid) for uid in ids]
-            snapshots = db.get_all(refs)
-            result = {}
-            for snap in snapshots:
-                if snap.exists:
-                    result[snap.id] = cls.from_dict(snap.to_dict(), snap.id)
-            return result
+            with db_module.SessionLocal() as session:
+                rows = (
+                    session.execute(select(UsuarioRow).where(UsuarioRow.id.in_(ids)))
+                    .scalars()
+                    .all()
+                )
+                return {row.id: cls._from_row(row) for row in rows}
         except Exception as e:
             logger.exception("Erro ao buscar usuários em lote: %s", e)
             return {}
@@ -444,38 +505,47 @@ class Usuario(UserMixin):
     def get_all(cls):
         """Retorna lista de todos os usuários ordenada por nome.
 
-        Quando encryption ON: Firestore não pode ordenar por campo criptografado,
-        então faz stream() sem order_by e ordena em Python após decrypt.
-        Quando encryption OFF: usa order_by("nome") do Firestore (comportamento legado).
+        Quando encryption ON: Postgres não pode ordenar por campo criptografado,
+        então busca sem order_by e ordena em Python após decrypt.
+        Quando encryption OFF: usa ORDER BY nome nativo do Postgres.
         """
         try:
-            if is_pii_encryption_enabled():
-                docs = db.collection("usuarios").limit(MAX_USUARIOS_GET_ALL).stream()
-                usuarios = [cls.from_dict(doc.to_dict(), doc.id) for doc in docs]
-                if len(usuarios) >= MAX_USUARIOS_GET_ALL:
-                    logger.warning(
-                        "Usuario.get_all() atingiu o teto de segurança (%d) — resultado pode estar incompleto",
-                        MAX_USUARIOS_GET_ALL,
+            with db_module.SessionLocal() as session:
+                if is_pii_encryption_enabled():
+                    rows = (
+                        session.execute(select(UsuarioRow).limit(MAX_USUARIOS_GET_ALL))
+                        .scalars()
+                        .all()
                     )
-                return sorted(usuarios, key=lambda u: (u.nome or "").lower())
-            else:
-                docs = (
-                    db.collection("usuarios").order_by("nome").limit(MAX_USUARIOS_GET_ALL).stream()
-                )
-                usuarios = [cls.from_dict(doc.to_dict(), doc.id) for doc in docs]
-                if len(usuarios) >= MAX_USUARIOS_GET_ALL:
-                    logger.warning(
-                        "Usuario.get_all() atingiu o teto de segurança (%d) — resultado pode estar incompleto",
-                        MAX_USUARIOS_GET_ALL,
+                    usuarios = [cls._from_row(row) for row in rows]
+                    if len(usuarios) >= MAX_USUARIOS_GET_ALL:
+                        logger.warning(
+                            "Usuario.get_all() atingiu o teto de segurança (%d) — resultado pode estar incompleto",
+                            MAX_USUARIOS_GET_ALL,
+                        )
+                    return sorted(usuarios, key=lambda u: (u.nome or "").lower())
+                else:
+                    rows = (
+                        session.execute(
+                            select(UsuarioRow).order_by(UsuarioRow.nome).limit(MAX_USUARIOS_GET_ALL)
+                        )
+                        .scalars()
+                        .all()
                     )
-                return usuarios
+                    usuarios = [cls._from_row(row) for row in rows]
+                    if len(usuarios) >= MAX_USUARIOS_GET_ALL:
+                        logger.warning(
+                            "Usuario.get_all() atingiu o teto de segurança (%d) — resultado pode estar incompleto",
+                            MAX_USUARIOS_GET_ALL,
+                        )
+                    return usuarios
         except Exception as e:
             logger.exception("Erro ao buscar usuários: %s", e)
             return []
 
     @classmethod
     def email_existe(cls, email: str, id_atual: str = None) -> bool:
-        """Verifica se um email já existe (excluindo é um ID específico).
+        """Verifica se um email já existe (excluindo um ID específico).
 
         Quando encryption ON: consulta email_lookup_hash.
         Quando encryption OFF: consulta campo email diretamente.
@@ -484,18 +554,18 @@ class Usuario(UserMixin):
         if not email_norm:
             return False
         try:
-            if is_pii_encryption_enabled():
-                docs = cls._stream_by_email_lookup(email_norm)
-            else:
-                docs = (
-                    db.collection("usuarios")
-                    .where(filter=FieldFilter("email", "==", email_norm))
-                    .stream()
-                )
-                if any(id_atual is None or doc.id != id_atual for doc in docs):
-                    return True
-                docs = cls._stream_by_email_lookup(email_norm)
-            return any(id_atual is None or doc.id != id_atual for doc in docs)
+            with db_module.SessionLocal() as session:
+                if is_pii_encryption_enabled():
+                    row = cls._buscar_por_email_lookup(session, email_norm)
+                    return row is not None and (id_atual is None or row.id != id_atual)
+                row = session.execute(
+                    select(UsuarioRow).where(UsuarioRow.email == email_norm)
+                ).scalar_one_or_none()
+                if row is not None:
+                    return id_atual is None or row.id != id_atual
+                # Linhas migradas: email no Postgres é fernet:v1:… — usar hash
+                row = cls._buscar_por_email_lookup(session, email_norm)
+                return row is not None and (id_atual is None or row.id != id_atual)
         except Exception as e:
             logger.exception("Erro ao verificar email: %s", e)
             return False
@@ -510,7 +580,6 @@ class Usuario(UserMixin):
         """Busca usuários ativos cujo nome ou e-mail contém q (case-insensitive).
 
         Usa get_all() com filtragem em Python para compatibilidade com PII encryption.
-        Máximo 200 candidatos lidos — busca interna de baixo volume.
         """
         q_low = (q or "").strip().lower()
         if not q_low:
@@ -534,20 +603,21 @@ class Usuario(UserMixin):
     def get_supervisores_por_area(cls, area: str):
         """Retorna supervisores e admins de uma área específica.
 
-        Usa array_contains no campo areas[] (1 query vs 2 full-scans anteriores).
-        O índice single-field em areas[] é criado automaticamente pelo Firestore.
+        Usa o operador de contenção de array (ARRAY @> ARRAY[area]) — 1 query,
+        aproveitando o índice GIN em areas[].
         """
         try:
             usuarios = []
-            docs = (
-                db.collection("usuarios")
-                .where(filter=FieldFilter("areas", "array_contains", area))
-                .stream()
-            )
-            for doc in docs:
-                usuario = cls.from_dict(doc.to_dict(), doc.id)
-                if usuario.perfil in ("supervisor", "admin"):
-                    usuarios.append(usuario)
+            with db_module.SessionLocal() as session:
+                rows = (
+                    session.execute(select(UsuarioRow).where(UsuarioRow.areas.contains([area])))
+                    .scalars()
+                    .all()
+                )
+                for row in rows:
+                    usuario = cls._from_row(row)
+                    if usuario.perfil in ("supervisor", "admin"):
+                        usuarios.append(usuario)
             return usuarios
         except Exception as e:
             logger.exception("Erro ao buscar supervisores: %s", e)

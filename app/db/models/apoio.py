@@ -5,7 +5,7 @@ push_subscriptions, historico_usuarios, solicitacoes_lgpd, contadores_uso.
 
 from datetime import date, datetime
 
-from sqlalchemy import Date, DateTime, Integer, Text, UniqueConstraint, func
+from sqlalchemy import Date, DateTime, Index, Integer, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -30,6 +30,7 @@ class PushSubscriptionRow(Base):
 
 class HistoricoUsuarioRow(Base):
     __tablename__ = "historico_usuarios"
+    __table_args__ = (Index("idx_historico_usuarios_alvo_data", "usuario_alvo_id", "data_acao"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     usuario_alvo_id: Mapped[str] = mapped_column(Text, nullable=False)
@@ -45,6 +46,10 @@ class HistoricoUsuarioRow(Base):
 
 class SolicitacaoLgpdRow(Base):
     __tablename__ = "solicitacoes_lgpd"
+    __table_args__ = (
+        Index("idx_solicitacoes_lgpd_usuario", "usuario_id"),
+        Index("idx_solicitacoes_lgpd_status", "status"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     usuario_id: Mapped[str] = mapped_column(Text, nullable=False)
@@ -62,6 +67,7 @@ class SolicitacaoLgpdRow(Base):
 
 class ContadorUsoRow(Base):
     __tablename__ = "contadores_uso"
+    __table_args__ = (Index("idx_contadores_uso_data", "data"),)
 
     user_id: Mapped[str] = mapped_column(Text, primary_key=True)
     data: Mapped[date] = mapped_column(Date, primary_key=True)

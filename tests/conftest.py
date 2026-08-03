@@ -21,7 +21,6 @@ _MODULOS_COM_DB_FIRESTORE = [
     "app.routes.dashboard",
     "app.routes.chamados",
     "app.routes.admin_global",
-    "app.models_usuario",
     "app.models_historico",
     "app.services.lgpd_self_service",
     "app.services.sla_escalacao_service",

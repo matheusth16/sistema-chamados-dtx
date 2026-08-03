@@ -2,52 +2,45 @@
 
 from unittest.mock import MagicMock, patch
 
+import pytest
+
+pytestmark = pytest.mark.usefixtures("db_session")
+
 
 def test_itens_por_pagina_dashboard_reduzido_para_economizar_leituras():
-    """ITENS_POR_PAGINA_DASHBOARD deve ser <= 25 — reduz leituras Firestore por
-    visita ao dashboard (cada item de página = 1 leitura), relevante no free tier."""
+    """ITENS_POR_PAGINA_DASHBOARD deve ser <= 25 — reduz leituras por visita
+    ao dashboard (cada item de página = 1 leitura)."""
     from config import Config
 
     assert Config.ITENS_POR_PAGINA_DASHBOARD <= 25
 
 
-def test_usuario_get_by_ids_retorna_dict_vazio_para_lista_vazia():
-    """get_by_ids com lista vazia retorna {} sem acessar o Firestore."""
+def test_usuario_get_by_ids_retorna_dict_vazio_para_lista_vazia(app):
+    """get_by_ids com lista vazia retorna {} sem consultar o banco."""
     from app.models_usuario import Usuario
 
-    with patch("app.models_usuario.db") as mock_db:
-        result = Usuario.get_by_ids([])
+    result = Usuario.get_by_ids([])
     assert result == {}
-    mock_db.get_all.assert_not_called()
 
 
-def test_usuario_get_by_ids_usa_batch_read():
-    """get_by_ids chama db.get_all com as refs corretas e retorna dict {id: Usuario}."""
+def test_usuario_get_by_ids_retorna_apenas_encontrados(app):
+    """get_by_ids retorna dict {id: Usuario} só com os IDs que existem."""
     from app.models_usuario import Usuario
 
-    snap1 = MagicMock()
-    snap1.exists = True
-    snap1.id = "user_abc"
-    snap1.to_dict.return_value = {
-        "email": "a@dtx.aero",
-        "nome": "Alpha",
-        "perfil": "supervisor",
-        "areas": ["Manutencao"],
-        "senha_hash": None,
-    }
-    snap2 = MagicMock()
-    snap2.exists = False  # não encontrado
-    snap2.id = "user_xyz"
+    with patch("app.models_usuario.is_pii_encryption_enabled", return_value=False):
+        Usuario(
+            id="user_abc",
+            email="a@dtx.aero",
+            nome="Alpha",
+            perfil="supervisor",
+            areas=["Manutencao"],
+        ).save()
 
-    with patch("app.models_usuario.db") as mock_db:
-        mock_db.collection.return_value.document.side_effect = lambda uid: MagicMock()
-        mock_db.get_all.return_value = [snap1, snap2]
-        result = Usuario.get_by_ids(["user_abc", "user_xyz"])
+    result = Usuario.get_by_ids(["user_abc", "user_xyz_nao_existe"])
 
     assert "user_abc" in result
-    assert "user_xyz" not in result  # snap2.exists = False
+    assert "user_xyz_nao_existe" not in result
     assert result["user_abc"].email == "a@dtx.aero"
-    mock_db.get_all.assert_called_once()
 
 
 def test_obter_contexto_admin_retorna_dict_com_chaves_esperadas():

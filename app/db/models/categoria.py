@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Integer, String, Text, func
+from sqlalchemy import Boolean, DateTime, Index, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -59,3 +59,8 @@ class CategoriaImpactoRow(Base):
     data_criacao: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
+
+
+Index("idx_setores_nome_pt_lower", func.lower(CategoriaSetorRow.nome_pt))
+Index("idx_gates_nome_pt_lower", func.lower(CategoriaGateRow.nome_pt))
+Index("idx_impactos_nome_pt_lower", func.lower(CategoriaImpactoRow.nome_pt))
