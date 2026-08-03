@@ -249,6 +249,7 @@
                                     <div class="flex flex-col gap-2">
                                         {% for anx in anexos_unicos %}
                                             {% set is_r2 = anx.startswith('r2:') %}
+                                            {% set is_local = anx.startswith('local:') %}
                                             {% set is_onedrive = anx.startswith('onedrive:') %}
                                             {% set is_url = anx.startswith('http://') or anx.startswith('https://') %}
 
@@ -263,14 +264,16 @@
                                                 {% set nome_limpo = nome_limpo[:25] + '...' + nome_limpo[-12:] %}
                                             {% endif %}
 
-                                            {% if is_r2 %}
+                                            {% if is_r2 or is_local %}
                                                 {% set href_anexo = url_for('main.download_anexo', chamado_id=chamado.id, chave=anx) %}
                                             {% elif is_onedrive %}
                                                 {% set href_anexo = anx[9:] %}
                                             {% elif is_url %}
                                                 {% set href_anexo = anx %}
                                             {% else %}
-                                                {% set href_anexo = url_for('static', filename='uploads/' + anx) %}
+                                                {# Legado: anexo salvo em disco antes da Fase 1, sem prefixo — servido
+                                                   via rota autenticada (fecha gap de acesso público em static/uploads) #}
+                                                {% set href_anexo = url_for('main.download_anexo', chamado_id=chamado.id, chave=anx) %}
                                             {% endif %}
 
                                             {% if is_onedrive %}

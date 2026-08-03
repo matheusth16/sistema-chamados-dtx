@@ -321,3 +321,118 @@ def test_salvar_anexo_magic_bytes_invalidos_levanta_valueerror(app):
         pytest.raises(ValueError),
     ):
         salvar_anexo(fake_file)
+
+
+# ── _upload_local (Fase 1 on-premise) ────────────────────────────────────────
+
+
+def test_upload_local_sucesso_retorna_chave_local(app):
+    """_upload_local salva no ANEXO_LOCAL_DIR e retorna 'local:<nome>'."""
+    from app.services.upload import _upload_local
+
+    app.config["ANEXO_LOCAL_DIR"] = "/tmp/test_anexos_local"
+    fake_file = MagicMock()
+    fake_file.stream = BytesIO(b"conteudo")
+    fake_file.stream.seek = MagicMock()
+    fake_file.save = MagicMock()
+
+    with (
+        patch("app.services.upload.current_app", app),
+        patch("app.services.upload.os.makedirs"),
+    ):
+        result = _upload_local(fake_file, "20260101_doc.pdf")
+
+    assert result == "local:20260101_doc.pdf"
+    fake_file.save.assert_called_once()
+
+
+def test_upload_local_sem_config_retorna_none(app):
+    """_upload_local sem ANEXO_LOCAL_DIR configurado retorna None."""
+    from app.services.upload import _upload_local
+
+    app.config["ANEXO_LOCAL_DIR"] = ""
+    with patch("app.services.upload.current_app", app):
+        result = _upload_local(MagicMock(), "x.pdf")
+    assert result is None
+
+
+def test_upload_local_oserror_retorna_none(app):
+    """_upload_local com falha de disco (OSError) retorna None (permite fallback)."""
+    from app.services.upload import _upload_local
+
+    app.config["ANEXO_LOCAL_DIR"] = "/caminho/qualquer"
+    fake_file = MagicMock()
+    fake_file.stream = BytesIO(b"x")
+    fake_file.save.side_effect = OSError("disco cheio")
+
+    with (
+        patch("app.services.upload.current_app", app),
+        patch("app.services.upload.os.makedirs"),
+    ):
+        result = _upload_local(fake_file, "x.pdf")
+
+    assert result is None
+
+
+# ── salvar_anexo com ANEXO_STORAGE_BACKEND=local ─────────────────────────────
+
+
+def test_salvar_anexo_backend_local_tem_prioridade(app):
+    """ANEXO_STORAGE_BACKEND=local usa disco local e não chama R2/Firebase."""
+    app.config["ANEXO_STORAGE_BACKEND"] = "local"
+    fake_file = MagicMock()
+    fake_file.filename = "doc.pdf"
+    fake_file.stream = BytesIO(b"%PDF-1.4 minimal")
+    fake_file.stream.seek = MagicMock()
+
+    with (
+        patch("app.services.upload.current_app", app),
+        patch(
+            "app.services.upload._upload_local", return_value="local:20260101_doc.pdf"
+        ) as mock_local,
+        patch("app.services.upload._upload_r2") as mock_r2,
+        patch("app.services.upload._upload_firebase_storage") as mock_fb,
+    ):
+        result = salvar_anexo(fake_file)
+
+    assert result == "local:20260101_doc.pdf"
+    mock_local.assert_called_once()
+    mock_r2.assert_not_called()
+    mock_fb.assert_not_called()
+
+
+def test_salvar_anexo_backend_local_falha_cai_para_r2(app):
+    """ANEXO_STORAGE_BACKEND=local: se disco falhar, cascata cai em R2."""
+    app.config["ANEXO_STORAGE_BACKEND"] = "local"
+    fake_file = MagicMock()
+    fake_file.filename = "doc.pdf"
+    fake_file.stream = BytesIO(b"%PDF-1.4 minimal")
+    fake_file.stream.seek = MagicMock()
+
+    with (
+        patch("app.services.upload.current_app", app),
+        patch("app.services.upload._upload_local", return_value=None),
+        patch("app.services.upload._upload_r2", return_value="r2:chamados/x.pdf"),
+        patch("app.services.upload._upload_firebase_storage") as mock_fb,
+    ):
+        result = salvar_anexo(fake_file)
+
+    assert result == "r2:chamados/x.pdf"
+    mock_fb.assert_not_called()
+
+
+def test_salvar_anexo_backend_default_ignora_local(app):
+    """Sem ANEXO_STORAGE_BACKEND=local, _upload_local nunca é chamada (regressão)."""
+    fake_file = MagicMock()
+    fake_file.filename = "doc.pdf"
+    fake_file.stream = BytesIO(b"%PDF-1.4 minimal")
+    fake_file.stream.seek = MagicMock()
+
+    with (
+        patch("app.services.upload.current_app", app),
+        patch("app.services.upload._upload_local") as mock_local,
+        patch("app.services.upload._upload_r2", return_value="r2:chamados/x.pdf"),
+    ):
+        salvar_anexo(fake_file)
+
+    mock_local.assert_not_called()

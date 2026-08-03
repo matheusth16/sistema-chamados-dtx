@@ -76,6 +76,59 @@ def test_verificar_upload_folder_sem_permissao_escrita(app, tmp_path):
         _verificar_upload_folder(app)
 
 
+# ── _verificar_anexo_local_dir (Fase 1 on-premise) ──────────────────────────
+
+
+def test_verificar_anexo_local_dir_sem_config_nao_falha(app):
+    """Sem ANEXO_LOCAL_DIR configurado → retorna None sem chamar makedirs."""
+    from app import _verificar_anexo_local_dir
+
+    app.config["ANEXO_LOCAL_DIR"] = ""
+    with patch("os.makedirs") as mock_mkdirs:
+        result = _verificar_anexo_local_dir(app)
+    assert result is None
+    mock_mkdirs.assert_not_called()
+
+
+def test_verificar_anexo_local_dir_igual_upload_folder_pula_checagem(app):
+    """Em dev (default), ANEXO_LOCAL_DIR == UPLOAD_FOLDER — não precisa checar de novo."""
+    app.config["UPLOAD_FOLDER"] = "/x"
+    app.config["ANEXO_LOCAL_DIR"] = "/x"
+    from app import _verificar_anexo_local_dir
+
+    with patch("os.makedirs") as mock_mkdirs:
+        _verificar_anexo_local_dir(app)
+    mock_mkdirs.assert_not_called()
+
+
+def test_verificar_anexo_local_dir_oserror_levanta_runtimeerror(app, tmp_path):
+    """ANEXO_LOCAL_DIR diferente de UPLOAD_FOLDER e os.makedirs falha → RuntimeError."""
+    app.config["UPLOAD_FOLDER"] = "/outro"
+    app.config["ANEXO_LOCAL_DIR"] = str(tmp_path / "anexos_novo")
+    from app import _verificar_anexo_local_dir
+
+    with (
+        patch("os.makedirs", side_effect=OSError("sem permissão")),
+        pytest.raises(RuntimeError, match="Não foi possível criar"),
+    ):
+        _verificar_anexo_local_dir(app)
+
+
+def test_verificar_anexo_local_dir_sem_permissao_escrita(app, tmp_path):
+    """ANEXO_LOCAL_DIR existe mas sem permissão de escrita → RuntimeError."""
+    app.config["UPLOAD_FOLDER"] = "/outro"
+    anexo_dir = tmp_path / "anexos_ro"
+    anexo_dir.mkdir()
+    app.config["ANEXO_LOCAL_DIR"] = str(anexo_dir)
+    from app import _verificar_anexo_local_dir
+
+    with (
+        patch("os.access", return_value=False),
+        pytest.raises(RuntimeError, match="permissão de escrita"),
+    ):
+        _verificar_anexo_local_dir(app)
+
+
 # ── scheduler guard: Werkzeug reloader ─────────────────────────────────────
 
 

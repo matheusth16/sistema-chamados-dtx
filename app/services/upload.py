@@ -172,6 +172,35 @@ def _upload_firebase_storage(arquivo: Any, nome_final: str) -> str | None:
         return None
 
 
+def _upload_local(arquivo: Any, nome_final: str) -> str | None:
+    """
+    Salva o arquivo em disco local persistente (ANEXO_LOCAL_DIR).
+    Retorna 'local:<nome_final>' em sucesso, ou None em falha (permite a
+    cascata em salvar_anexo continuar para R2/Firebase).
+    """
+    pasta = current_app.config.get("ANEXO_LOCAL_DIR")
+    if not pasta:
+        return None
+
+    try:
+        os.makedirs(pasta, exist_ok=True)
+        caminho_completo = os.path.join(pasta, nome_final)
+        if hasattr(arquivo.stream, "seek"):
+            arquivo.stream.seek(0)
+        arquivo.save(caminho_completo)
+        logger.info("Anexo salvo em disco local: %s", nome_final)
+        return f"local:{nome_final}"
+    except OSError as e:
+        logger.warning(
+            "Falha ao salvar anexo em disco local (%s): %s - %s",
+            nome_final,
+            type(e).__name__,
+            e,
+            exc_info=True,
+        )
+        return None
+
+
 def salvar_anexo(arquivo: Any) -> str | None:
     """
     Salva o anexo e retorna o identificador para guardar no chamado:
@@ -200,6 +229,18 @@ def salvar_anexo(arquivo: Any) -> str | None:
     nome_seguro = secure_filename(arquivo.filename)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     nome_final = f"{timestamp}_{nome_seguro}"
+
+    # 0) Backend "local" tem prioridade quando configurado explicitamente (Fase 1 on-premise)
+    if current_app.config.get("ANEXO_STORAGE_BACKEND") == "local":
+        if hasattr(arquivo.stream, "seek"):
+            arquivo.stream.seek(0)
+        chave_local = _upload_local(arquivo, nome_final)
+        if chave_local:
+            return chave_local
+        logger.warning(
+            "ANEXO_STORAGE_BACKEND=local falhou ao salvar %s; tentando fallback R2/Firebase.",
+            nome_final,
+        )
 
     # 1) Tenta Cloudflare R2 (preferencial em produção)
     if hasattr(arquivo.stream, "seek"):

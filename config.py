@@ -163,6 +163,20 @@ class Config:
     # 2. Caminho ABSOLUTO para a pasta de uploads (Evita erros no Windows/OneDrive)
     UPLOAD_FOLDER = os.path.join(basedir, "app", "static", "uploads")
 
+    # 2b. Armazenamento local persistente de anexos novos (Fase 1 on-premise).
+    # Separado de UPLOAD_FOLDER: em produção aponta para um bind-mount fora do
+    # container (HD dedicado do servidor físico). Sem ANEXO_LOCAL_DIR, cai no
+    # mesmo caminho de UPLOAD_FOLDER (não muda nada em dev).
+    ANEXO_LOCAL_DIR = os.getenv("ANEXO_LOCAL_DIR", "").strip() or UPLOAD_FOLDER
+
+    # Backend tentado PRIMEIRO para anexos NOVOS (não afeta leitura de anexos
+    # antigos no R2/Firebase, que continuam funcionando via seus prefixos):
+    #   "local" -> tenta disco local (ANEXO_LOCAL_DIR) primeiro; R2/Firebase
+    #              viram fallback só se o disco local falhar.
+    #   default "r2" -> cascata legada inalterada: R2 -> Firebase -> disco
+    #              local só em dev / falha em produção.
+    ANEXO_STORAGE_BACKEND = os.getenv("ANEXO_STORAGE_BACKEND", "r2").strip().lower()
+
     # 3. Limites de upload
     # MAX_ANEXO_BYTES: regra de negócio — cada arquivo individualmente pode ter até 10 MB.
     # MAX_CONTENT_LENGTH: guardrail de infraestrutura — teto total do request HTTP.

@@ -1,9 +1,11 @@
 """Rotas de self-service do solicitante: download de anexo, edição, cancelamento, resposta, busca de usuários."""
 
 import logging
+import os
 
-from flask import abort, jsonify, redirect, request, session
+from flask import abort, current_app, jsonify, redirect, request, send_from_directory, session
 from flask_login import current_user, login_required
+from werkzeug.utils import secure_filename
 
 from app.database import db
 from app.i18n import get_translation
@@ -27,16 +29,30 @@ def _t(key, **kwargs):
     return get_translation(key, session.get("language", "en"), **kwargs)
 
 
+def _enviar_anexo_local(pasta: str, nome_arquivo: str):
+    """Serve um anexo local autenticado, com defesa contra path traversal."""
+    nome_seguro = secure_filename(nome_arquivo)
+    if not nome_seguro or nome_seguro != nome_arquivo:
+        abort(400)
+    caminho = os.path.realpath(os.path.join(pasta, nome_seguro))
+    if not caminho.startswith(os.path.realpath(pasta) + os.sep):
+        abort(400)
+    if not os.path.isfile(caminho):
+        abort(404)
+    return send_from_directory(pasta, nome_seguro, as_attachment=True)
+
+
 @main.route("/api/download-anexo", methods=["GET"])
 @login_required
 def download_anexo():
-    """Gera URL pré-assinada temporária (1h) para download de anexo privado no R2."""
+    """Gera acesso autenticado a um anexo: URL pré-assinada (R2) ou arquivo
+    local servido diretamente (disco local novo ou legado sem prefixo)."""
     from app.services.upload import gerar_url_presignada
 
     chamado_id = request.args.get("chamado_id", "").strip()
     chave = request.args.get("chave", "").strip()
 
-    if not chamado_id or not chave or not chave.startswith("r2:"):
+    if not chamado_id or not chave:
         abort(400)
 
     doc = db.collection("chamados").document(chamado_id).get()
@@ -55,18 +71,32 @@ def download_anexo():
     if not usuario_pode_ver_chamado(current_user, chamado):
         abort(403)
 
-    url = gerar_url_presignada(chave)
-    if not url:
-        logger.error("Falha ao gerar URL pré-assinada para chave %s", chave)
-        abort(503)
-
     logger.info(
         "Acesso a anexo: usuario=%s chamado_id=%s chave=%s",
         current_user.email,
         chamado_id,
         chave,
     )
-    return redirect(url)
+
+    if chave.startswith("r2:"):
+        url = gerar_url_presignada(chave)
+        if not url:
+            logger.error("Falha ao gerar URL pré-assinada para chave %s", chave)
+            abort(503)
+        return redirect(url)
+
+    if chave.startswith("local:"):
+        return _enviar_anexo_local(current_app.config["ANEXO_LOCAL_DIR"], chave[len("local:") :])
+
+    if chave.startswith(("http://", "https://", "onedrive:")):
+        # Firebase (URL pública) e OneDrive/SharePoint não são proxeados por
+        # este endpoint — o template já linka direto para eles.
+        abort(400)
+
+    # Legado: anexo salvo em disco antes da Fase 1 (dev, sem prefixo) — mesmo
+    # tratamento de segurança do "local:", lendo de UPLOAD_FOLDER (onde esses
+    # arquivos foram efetivamente gravados).
+    return _enviar_anexo_local(current_app.config["UPLOAD_FOLDER"], chave)
 
 
 @main.route("/api/usuarios/buscar", methods=["GET"])

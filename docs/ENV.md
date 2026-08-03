@@ -187,6 +187,36 @@ Quando o R2 não está configurado ou indisponível, o sistema cai no **Firebase
 
 ---
 
+## Armazenamento de Anexos — Disco Local (Fase 1 on-premise)
+
+| Variável | Descrição | Padrão |
+|----------|-----------|--------|
+| `ANEXO_STORAGE_BACKEND` | `local` faz uploads **novos** irem para disco local primeiro (R2/Firebase viram fallback só se o disco falhar). Qualquer outro valor mantém a cascata legada (R2 → Firebase). | `r2` |
+| `ANEXO_LOCAL_DIR` | Diretório de disco onde anexos novos são salvos quando o backend `local` está ativo. Em produção deve ser um bind-mount fora do container (ver `docker-compose.prod.yml`, HD dedicado `/var/anexos_chamados`). | mesmo caminho de `UPLOAD_FOLDER` |
+
+Anexos já existentes no R2/Firebase **não são migrados** — continuam lidos normalmente pelos seus
+prefixos originais (Opção A do plano de migração, ver `~/.claude/plans/unified-mixing-torvalds.md`).
+
+No startup, `_verificar_anexo_local_dir` (`app/__init__.py`) falha rápido (RuntimeError) se
+`ANEXO_LOCAL_DIR` não puder ser criado ou não tiver permissão de escrita — mesmo comportamento de
+fail-fast já usado para `UPLOAD_FOLDER`.
+
+### Backup do diretório de anexos
+
+`scripts/backup_anexos.sh` faz `rsync` do `ANEXO_LOCAL_DIR` para um segundo disco (HD `/srv`,
+~466GB) mais snapshots diários via hardlink com retenção configurável. Roda no **host físico**, via
+cron, fora do container:
+
+```
+0 2 * * * /caminho/para/sistema_chamados/scripts/backup_anexos.sh
+```
+
+Variáveis opcionais do script (default entre parênteses): `ANEXO_LOCAL_DIR` (origem),
+`ANEXO_BACKUP_DIR` (`/srv/backup_anexos_chamados`), `ANEXO_BACKUP_LOG`
+(`/var/log/backup_anexos_chamados.log`), `ANEXO_BACKUP_RETENCAO_DIAS` (`7`).
+
+---
+
 ## Limites de uso por usuário
 
 | Variável | Descrição | Padrão |

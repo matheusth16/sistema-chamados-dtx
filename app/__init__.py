@@ -120,6 +120,8 @@ def create_app():
 
     # Garante que UPLOAD_FOLDER existe e tem permissão de escrita
     _verificar_upload_folder(app)
+    # Idem para ANEXO_LOCAL_DIR (Fase 1 on-premise), se configurado
+    _verificar_anexo_local_dir(app)
 
     # Firebase é inicializado em app/database.py
     # Não há tabelas para criar (Firestore é NoSQL)
@@ -169,26 +171,37 @@ def create_app():
     return app
 
 
-def _verificar_upload_folder(app: Flask) -> None:
-    """Garante que UPLOAD_FOLDER existe e tem permissão de escrita.
+def _verificar_diretorio_gravavel(caminho: str, nome_var: str) -> None:
+    """Garante que um diretório de config existe e tem permissão de escrita.
 
     Falha rapidamente no startup se o diretório não puder ser criado ou
     se não tiver permissão de escrita, evitando erros silenciosos em runtime.
     """
-    upload_folder = app.config.get("UPLOAD_FOLDER")
-    if not upload_folder:
+    if not caminho:
         return
     try:
-        os.makedirs(upload_folder, exist_ok=True)
+        os.makedirs(caminho, exist_ok=True)
     except OSError as exc:
-        raise RuntimeError(
-            f"Não foi possível criar UPLOAD_FOLDER '{upload_folder}': {exc}"
-        ) from exc
-    if not os.access(upload_folder, os.W_OK):
-        raise RuntimeError(
-            f"UPLOAD_FOLDER '{upload_folder}' existe mas não tem permissão de escrita."
-        )
-    logging.getLogger(__name__).debug("UPLOAD_FOLDER verificado: %s", upload_folder)
+        raise RuntimeError(f"Não foi possível criar {nome_var} '{caminho}': {exc}") from exc
+    if not os.access(caminho, os.W_OK):
+        raise RuntimeError(f"{nome_var} '{caminho}' existe mas não tem permissão de escrita.")
+    logging.getLogger(__name__).debug("%s verificado: %s", nome_var, caminho)
+
+
+def _verificar_upload_folder(app: Flask) -> None:
+    """Garante que UPLOAD_FOLDER existe e tem permissão de escrita."""
+    _verificar_diretorio_gravavel(app.config.get("UPLOAD_FOLDER"), "UPLOAD_FOLDER")
+
+
+def _verificar_anexo_local_dir(app: Flask) -> None:
+    """Garante que ANEXO_LOCAL_DIR existe e tem permissão de escrita (Fase 1 on-premise).
+
+    Em dev, ANEXO_LOCAL_DIR coincide com UPLOAD_FOLDER por padrão — pula a
+    checagem duplicada nesse caso, já feita por _verificar_upload_folder.
+    """
+    caminho = app.config.get("ANEXO_LOCAL_DIR")
+    if caminho and caminho != app.config.get("UPLOAD_FOLDER"):
+        _verificar_diretorio_gravavel(caminho, "ANEXO_LOCAL_DIR")
 
 
 def _iniciar_scheduler(app: Flask) -> None:

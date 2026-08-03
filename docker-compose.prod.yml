@@ -18,6 +18,13 @@ services:
       - "0.0.0.0:8080:8080"
     env_file:
       - .env
+    volumes:
+      # Anexos novos (Fase 1 on-premise) — bind-mount pro HD dedicado do host
+      # físico (~932GB, ver [[project_migracao_servidor_local]]). O caminho
+      # dentro do container deve bater com ANEXO_LOCAL_DIR no .env do servidor.
+      # Pré-requisito no host: sudo mkdir -p /var/anexos_chamados &&
+      # sudo chown -R 1001:1001 /var/anexos_chamados (appuser não-root do Dockerfile).
+      - /var/anexos_chamados:/var/anexos_chamados
     healthcheck:
       # Envia X-Health-Token lendo HEALTH_SECRET do próprio ambiente do container
       # (env_file acima) — a rota /health exige o token quando HEALTH_SECRET está
