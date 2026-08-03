@@ -32,8 +32,12 @@ services:
   # troca quando alguém chama a API explicitamente.
   # Disparar com: bash scripts/watchtower_trigger.sh (rodar no servidor).
   # API exposta só em loopback (127.0.0.1) — não acessível pela LAN.
+  #
+  # Imagem: containrrr/watchtower foi arquivada (o cliente Docker embutido nela
+  # só fala API v1.25, incompatível com Docker Engine mais recentes que exigem
+  # v1.40+). Usamos o fork mantido nicholas-fedor/watchtower.
   watchtower:
-    image: containrrr/watchtower
+    image: ghcr.io/nicholas-fedor/watchtower:latest
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
