@@ -26,7 +26,6 @@ _MODULOS_COM_DB_FIRESTORE = [
     "app.services.gestor_dashboard_service",
     "app.services.solicitante_edicao_service",
     "app.services.dashboard_service",
-    "app.services.report_service",
     "app.services.onboarding_service",
     "app.services.notifications_inapp",
     "app.utils",

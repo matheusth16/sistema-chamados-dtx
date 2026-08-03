@@ -2,31 +2,31 @@
 
 from unittest.mock import MagicMock, patch
 
+import pytest
+
+from app.models import Chamado
 from app.services.report_service import enviar_alertas_prazo_24h
+
+pytestmark = pytest.mark.usefixtures("db_session")
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 
-def _make_chamado_doc(numero="CH-001", status="Aberto", responsavel_id="sup1"):
-    """Cria mock de Firestore doc para um chamado."""
-    doc = MagicMock()
-    doc.id = "doc_id_1"
-    doc.to_dict.return_value = {
-        "numero_chamado": numero,
-        "status": status,
-        "categoria": "Projetos",
-        "tipo_solicitacao": "Manutenção",
-        "area": "Manutenção",
-        "responsavel": "Supervisor",
-        "responsavel_id": responsavel_id,
-        "solicitante_nome": "Solicitante",
-        "data_abertura": None,
-        "data_conclusao": None,
-        "data_cancelamento": None,
-        "sla_dias": None,
-        "alerta_prazo_24h_enviado_em": None,
-    }
-    return doc
+def _criar_chamado_real(numero="CH-001", status="Aberto", responsavel_id="sup1") -> int:
+    chamado = Chamado(
+        categoria="Projetos",
+        tipo_solicitacao="Manutenção",
+        descricao="Descrição de teste",
+        responsavel="Supervisor",
+        responsavel_id=responsavel_id,
+        area="Manutenção",
+        solicitante_nome="Solicitante",
+        status=status,
+        numero_chamado=numero,
+    )
+    chamado_id = chamado.salvar()
+    assert chamado_id is not None
+    return chamado_id
 
 
 def _make_usuario(email="sup@test.com", nome="Supervisor", perfil="supervisor"):
@@ -62,8 +62,9 @@ def test_alerta_24h_nao_reenvia_quando_ja_marcado():
 
 def test_alerta_24h_marca_chamado_apos_envio():
     """Após envio do alerta 24h, deve marcar o chamado para evitar duplicidade."""
+    chamado_id = _criar_chamado_real(numero="2026-002", responsavel_id="sup2")
     chamado = {
-        "id": "c2",
+        "id": chamado_id,
         "numero": "2026-002",
         "categoria": "Projetos",
         "tipo": "Manutencao",
@@ -80,14 +81,13 @@ def test_alerta_24h_marca_chamado_apos_envio():
         patch("app.services.report_service.buscar_chamados_abertos", return_value=[chamado]),
         patch("app.services.report_service.Usuario.get_by_id", return_value=usuario),
         patch("app.services.report_service.notificar_responsavel_prazo_24h") as mock_notificar,
-        patch("app.services.report_service.db") as mock_db,
     ):
         resultado = enviar_alertas_prazo_24h()
 
     assert resultado["elegiveis"] == 1
     assert resultado["enviados"] == 1
     mock_notificar.assert_called_once()
-    mock_db.collection.assert_called_once_with("chamados")
+    assert Chamado.get_by_id(chamado_id).alerta_prazo_24h_enviado_em is not None
 
 
 # ── buscar_chamados_abertos ───────────────────────────────────────────────────
@@ -97,31 +97,9 @@ def test_buscar_chamados_abertos_retorna_lista():
     """buscar_chamados_abertos retorna lista de dicts enriquecidos."""
     from app.services.report_service import buscar_chamados_abertos
 
-    doc = _make_chamado_doc()
-    mock_db = MagicMock()
-    mock_db.collection.return_value.where.return_value.limit.return_value.stream.return_value = [
-        doc
-    ]
+    _criar_chamado_real()
 
-    with (
-        patch("app.services.report_service.db", mock_db),
-        patch(
-            "app.services.report_service.Chamado.from_dict",
-            return_value=MagicMock(
-                numero_chamado="CH-001",
-                categoria="Projetos",
-                tipo_solicitacao="Manutenção",
-                area="Manutenção",
-                responsavel="Supervisor",
-                responsavel_id="sup1",
-                solicitante_nome="Solicitante",
-                status="Aberto",
-                data_abertura=None,
-                sla_dias=None,
-            ),
-        ),
-        patch("app.services.report_service.obter_sla_para_exibicao", return_value={"label": "Ok"}),
-    ):
+    with patch("app.services.report_service.obter_sla_para_exibicao", return_value={"label": "Ok"}):
         result = buscar_chamados_abertos()
 
     assert isinstance(result, list)
@@ -133,28 +111,20 @@ def test_buscar_chamados_abertos_retorna_vazio_sem_docs():
     """buscar_chamados_abertos retorna [] quando não há chamados."""
     from app.services.report_service import buscar_chamados_abertos
 
-    mock_db = MagicMock()
-    mock_db.collection.return_value.where.return_value.limit.return_value.stream.return_value = []
-
-    with patch("app.services.report_service.db", mock_db):
-        result = buscar_chamados_abertos()
+    result = buscar_chamados_abertos()
 
     assert result == []
 
 
 def test_buscar_chamados_abertos_tolera_excecao():
-    """buscar_chamados_abertos retorna [] parcial se Firestore lançar exceção."""
+    """buscar_chamados_abertos retorna [] se a consulta ao banco lançar exceção."""
     from app.services.report_service import buscar_chamados_abertos
 
-    mock_db = MagicMock()
-    mock_db.collection.return_value.where.return_value.limit.return_value.stream.side_effect = (
-        Exception("Firestore error")
-    )
-
-    with patch("app.services.report_service.db", mock_db):
+    with patch("app.services.report_service.db_module") as mock_db_module:
+        mock_db_module.SessionLocal.side_effect = Exception("Postgres error")
         result = buscar_chamados_abertos()
 
-    assert isinstance(result, list)
+    assert result == []
 
 
 # ── enviar_relatorio_semanal ──────────────────────────────────────────────────

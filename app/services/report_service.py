@@ -11,12 +11,13 @@ from collections import defaultdict
 from datetime import UTC, datetime
 from html import escape
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import pytz
-from firebase_admin import firestore as fs_admin
-from google.cloud.firestore_v1.base_query import FieldFilter
+from sqlalchemy import select
 
-from app.database import db
+from app import db as db_module
+from app.db.models.chamado import ChamadoRow
 from app.i18n import get_translated_status
 from app.models import Chamado
 from app.models_usuario import Usuario
@@ -27,6 +28,7 @@ from app.services.notifications import (
     enviar_email,
     notificar_responsavel_prazo_24h,
 )
+from config import Config
 
 _SLA_EN = {
     "Em risco": "At risk",
@@ -77,41 +79,40 @@ def buscar_chamados_abertos() -> list[dict[str, Any]]:
     Retorna todos os chamados Abertos / Em Atendimento enriquecidos com SLA.
     """
     resultado: list[dict[str, Any]] = []
-    for status in ("Aberto", "Em Atendimento"):
-        try:
-            docs = (
-                db.collection("chamados")
-                .where(filter=FieldFilter("status", "==", status))
+    try:
+        with db_module.SessionLocal() as session:
+            stmt = (
+                select(ChamadoRow)
+                .where(ChamadoRow.status.in_(("Aberto", "Em Atendimento")))
                 .limit(MAX_DOCS)
-                .stream()
             )
-            for doc in docs:
-                data = doc.to_dict()
-                if not data:
-                    continue
-                chamado = Chamado.from_dict(data, doc.id)
-                sla_info = obter_sla_para_exibicao(chamado) or {}
-                resultado.append(
-                    {
-                        "id": doc.id,
-                        "numero": chamado.numero_chamado or doc.id,
-                        "categoria": chamado.categoria or "—",
-                        "tipo": chamado.tipo_solicitacao or "—",
-                        "area": chamado.area or "—",
-                        "responsavel": chamado.responsavel or "—",
-                        "responsavel_id": chamado.responsavel_id or "",
-                        "solicitante": chamado.solicitante_nome or "—",
-                        "status": chamado.status,
-                        "data_abertura_fmt": _formatar_data(chamado.data_abertura),
-                        "dias_aberto": _dias_aberto(chamado.data_abertura),
-                        "sla_label": sla_info.get("label", ""),
-                        "atrasado": sla_info.get("label") == "Atrasado",
-                        "sla_dias": chamado.sla_dias,
-                        "alerta_prazo_24h_enviado_em": data.get("alerta_prazo_24h_enviado_em"),
-                    }
-                )
-        except Exception as exc:
-            logger.exception("Erro ao buscar chamados status=%s: %s", status, exc)
+            rows = session.execute(stmt).scalars().all()
+    except Exception as exc:
+        logger.exception("Erro ao buscar chamados abertos: %s", exc)
+        return resultado
+
+    for row in rows:
+        chamado = Chamado._from_row(row)
+        sla_info = obter_sla_para_exibicao(chamado) or {}
+        resultado.append(
+            {
+                "id": chamado.id,
+                "numero": chamado.numero_chamado or chamado.id,
+                "categoria": chamado.categoria or "—",
+                "tipo": chamado.tipo_solicitacao or "—",
+                "area": chamado.area or "—",
+                "responsavel": chamado.responsavel or "—",
+                "responsavel_id": chamado.responsavel_id or "",
+                "solicitante": chamado.solicitante_nome or "—",
+                "status": chamado.status,
+                "data_abertura_fmt": _formatar_data(chamado.data_abertura),
+                "dias_aberto": _dias_aberto(chamado.data_abertura),
+                "sla_label": sla_info.get("label", ""),
+                "atrasado": sla_info.get("label") == "Atrasado",
+                "sla_dias": chamado.sla_dias,
+                "alerta_prazo_24h_enviado_em": chamado.alerta_prazo_24h_enviado_em,
+            }
+        )
     return resultado
 
 
@@ -443,12 +444,13 @@ def enviar_alertas_prazo_24h() -> dict[str, Any]:
                 solicitante_nome=c.get("solicitante", ""),
                 descricao_resumo="",
             )
-            if c.get("id"):
-                db.collection("chamados").document(c["id"]).update(
-                    {
-                        "alerta_prazo_24h_enviado_em": fs_admin.SERVER_TIMESTAMP,
-                    }
-                )
+            chamado_id = c.get("id")
+            if chamado_id:
+                chamado_atual = Chamado.get_by_id(chamado_id)
+                if chamado_atual is not None:
+                    chamado_atual.atualizar_campos(
+                        alerta_prazo_24h_enviado_em=datetime.now(ZoneInfo(Config.SLA_TIMEZONE))
+                    )
             enviados += 1
         except Exception as exc:
             erros += 1
