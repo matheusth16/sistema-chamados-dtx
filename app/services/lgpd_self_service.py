@@ -5,21 +5,24 @@ A exclusão em si NÃO é executada aqui — este serviço só registra o pedido
 Um admin revisa e executa via os fluxos já existentes (desativar + anonimizar
 em app/routes/usuarios.py), mesmo padrão de segurança usado hoje para ações
 administrativas irreversíveis sobre contas.
+
+Fase 2: solicitacoes_lgpd migrado pra PostgreSQL. exportar_dados_usuario()
+ainda lê a coleção `chamados` do Firestore — Chamado só migra no Marco 7.
 """
 
 import csv
 import io
 import logging
 
-from firebase_admin import firestore
 from google.cloud.firestore_v1.base_query import FieldFilter
+from sqlalchemy import func, select, update
 
+from app import db as db_module
 from app.database import db
+from app.db.models.apoio import SolicitacaoLgpdRow
 from app.services.historico_usuario_service import registrar_historico_usuario
 
 logger = logging.getLogger(__name__)
-
-COLLECTION_SOLICITACOES = "solicitacoes_lgpd"
 
 # Neutraliza CSV/Excel formula injection — mesma lista de excel_export_service._safe_cell.
 _FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
@@ -111,20 +114,18 @@ def exportar_dados_usuario_csv(usuario) -> str:
 
 
 def possui_solicitacao_exclusao_pendente(usuario_id: str) -> bool:
-    """Verifica se o usuário já tem uma solicitação de exclusão em aberto.
-
-    Filtra 'status' em Python (não em query composta) para não depender de
-    índice composto novo no Firestore — coleção pequena por natureza (no
-    máximo algumas dezenas de solicitações por usuário ao longo da vida da conta).
-    """
+    """Verifica se o usuário já tem uma solicitação de exclusão em aberto."""
     try:
-        docs = (
-            db.collection(COLLECTION_SOLICITACOES)
-            .where(filter=FieldFilter("usuario_id", "==", usuario_id))
-            .limit(_LIMITE_SOLICITACOES_USUARIO)
-            .stream()
-        )
-        return any((doc.to_dict() or {}).get("status") == "pendente" for doc in docs)
+        with db_module.SessionLocal() as session:
+            return (
+                session.execute(
+                    select(SolicitacaoLgpdRow.id)
+                    .where(SolicitacaoLgpdRow.usuario_id == usuario_id)
+                    .where(SolicitacaoLgpdRow.status == "pendente")
+                    .limit(1)
+                ).first()
+                is not None
+            )
     except Exception:
         logger.exception(
             "Erro ao verificar solicitação de exclusão pendente: usuario_id=%s", usuario_id
@@ -142,16 +143,15 @@ def solicitar_exclusao_propria(usuario) -> dict:
         return {"sucesso": False, "erro_key": "lgpd_exclusion_request_already_pending"}
 
     try:
-        db.collection(COLLECTION_SOLICITACOES).add(
-            {
-                "usuario_id": usuario.id,
-                "usuario_nome": usuario.nome,
-                "usuario_email": usuario.email,
-                "tipo": "exclusao",
-                "status": "pendente",
-                "data_solicitacao": firestore.SERVER_TIMESTAMP,
-            }
-        )
+        with db_module.SessionLocal() as session, session.begin():
+            row = SolicitacaoLgpdRow(
+                usuario_id=usuario.id,
+                usuario_nome=usuario.nome,
+                usuario_email=usuario.email,
+                tipo="exclusao",
+                status="pendente",
+            )
+            session.add(row)
         registrar_historico_usuario(
             usuario_alvo_id=usuario.id,
             usuario_alvo_nome=usuario.nome,
@@ -174,15 +174,17 @@ def listar_usuarios_com_solicitacao_pendente() -> set[str]:
     Uso administrativo — sinaliza na listagem de usuários quem tem pedido em aberto.
     """
     try:
-        docs = (
-            db.collection(COLLECTION_SOLICITACOES)
-            .where(filter=FieldFilter("status", "==", "pendente"))
-            .limit(_LIMITE_SOLICITACOES_PENDENTES)
-            .stream()
-        )
-        return {
-            usuario_id for doc in docs if (usuario_id := (doc.to_dict() or {}).get("usuario_id"))
-        }
+        with db_module.SessionLocal() as session:
+            rows = (
+                session.execute(
+                    select(SolicitacaoLgpdRow.usuario_id)
+                    .where(SolicitacaoLgpdRow.status == "pendente")
+                    .limit(_LIMITE_SOLICITACOES_PENDENTES)
+                )
+                .scalars()
+                .all()
+            )
+            return set(rows)
     except Exception:
         logger.exception("Erro ao listar solicitações de exclusão LGPD pendentes")
         return set()
@@ -198,26 +200,19 @@ def resolver_solicitacoes_exclusao_pendentes(
     preso indefinidamente. Retorna quantas solicitações foram resolvidas.
     """
     try:
-        docs = (
-            db.collection(COLLECTION_SOLICITACOES)
-            .where(filter=FieldFilter("usuario_id", "==", usuario_id))
-            .limit(_LIMITE_SOLICITACOES_USUARIO)
-            .stream()
-        )
-        resolvidas = 0
-        for doc in docs:
-            if (doc.to_dict() or {}).get("status") != "pendente":
-                continue
-            doc.reference.update(
-                {
-                    "status": "concluida",
-                    "data_resolucao": firestore.SERVER_TIMESTAMP,
-                    "admin_id": admin_id,
-                    "admin_nome": admin_nome,
-                }
+        with db_module.SessionLocal() as session, session.begin():
+            resultado = session.execute(
+                update(SolicitacaoLgpdRow)
+                .where(SolicitacaoLgpdRow.usuario_id == usuario_id)
+                .where(SolicitacaoLgpdRow.status == "pendente")
+                .values(
+                    status="concluida",
+                    data_resolucao=func.now(),
+                    admin_id=admin_id,
+                    admin_nome=admin_nome,
+                )
             )
-            resolvidas += 1
-        return resolvidas
+            return resultado.rowcount
     except Exception:
         logger.exception(
             "Erro ao resolver solicitações de exclusão LGPD pendentes: usuario_id=%s", usuario_id

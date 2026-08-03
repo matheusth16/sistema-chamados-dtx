@@ -1,5 +1,11 @@
 """Models SQLAlchemy (Fase 2). Um módulo por tabela, adicionados marco a marco."""
 
+from app.db.models.apoio import (  # noqa: F401
+    ContadorUsoRow,
+    HistoricoUsuarioRow,
+    PushSubscriptionRow,
+    SolicitacaoLgpdRow,
+)
 from app.db.models.categoria import (  # noqa: F401
     CategoriaGateRow,
     CategoriaImpactoRow,

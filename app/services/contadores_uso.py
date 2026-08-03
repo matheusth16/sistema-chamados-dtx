@@ -5,23 +5,24 @@ Usado para limite opcional por usuário: cada um pode gerar no máximo N
 "ações pesadas" por dia (atualizar relatório, exportar Excel), evitando
 limite global injusto quando todos compartilham o mesmo sistema.
 
-A verificação e o incremento são feitos dentro de uma transação Firestore
-(@firestore.transactional) para evitar race conditions (F-13): sem transação,
-dois requests simultâneos podem ler o mesmo contador e ambos passarem no limite.
+Fase 2: armazenamento migrado de Firestore para PostgreSQL. A verificação e o
+incremento são feitos numa única query atômica (INSERT ... ON CONFLICT DO
+UPDATE ... WHERE contador < limite RETURNING) — sem transação explícita, o
+próprio Postgres garante atomicidade contra requests simultâneos (F-13).
 """
 
 import logging
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 
-from firebase_admin import firestore
-from google.cloud.firestore_v1 import Increment
+from sqlalchemy import delete, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-from app.database import db
+from app import db as db_module
+from app.db.models.apoio import ContadorUsoRow
 from app.i18n import get_translation_session
 
 logger = logging.getLogger(__name__)
 
-COLLECTION = "contadores_uso"
 CAMPO_RELATORIO = "relatorio_geracoes"
 CAMPO_EXPORT = "export_excel_geracoes"
 
@@ -30,34 +31,32 @@ def _t(key, **kwargs):
     return get_translation_session(key, **kwargs)
 
 
-def _doc_id(user_id: str) -> str:
-    """ID do documento: user_id + data YYYY-MM-DD."""
-    hoje = datetime.now(UTC).strftime("%Y-%m-%d")
-    return f"{user_id}_{hoje}"
+def _hoje() -> date:
+    return datetime.now(UTC).date()
 
 
-@firestore.transactional
-def _verificar_incrementar_tx(transaction, doc_ref, campo, limite, user_id, data_str):
-    """Verifica o limite e incrementa o contador atomicamente dentro de uma transação.
+def _verificar_incrementar(campo: str, limite: int, user_id: str) -> bool:
+    """Verifica o limite e incrementa o contador atomicamente.
 
-    Retorna True se a ação foi permitida, False se o limite foi atingido.
+    Retorna True se a ação foi permitida (contador incrementado), False se o
+    limite já havia sido atingido.
     """
-    doc = doc_ref.get(transaction=transaction)
-    atual = doc.to_dict().get(campo, 0) if doc.exists else 0
-    if atual >= limite:
-        return False
-    if doc.exists:
-        transaction.update(doc_ref, {campo: Increment(1)})
-    else:
-        transaction.set(
-            doc_ref,
-            {
-                "user_id": user_id,
-                "data": data_str,
-                campo: 1,
-            },
+    tabela = ContadorUsoRow.__table__
+    campo_col = tabela.c[campo]
+    hoje = _hoje()
+
+    stmt = (
+        pg_insert(ContadorUsoRow)
+        .values(user_id=user_id, data=hoje, **{campo: 1})
+        .on_conflict_do_update(
+            index_elements=["user_id", "data"],
+            set_={campo: campo_col + 1},
+            where=campo_col < limite,
         )
-    return True
+        .returning(campo_col)
+    )
+    with db_module.SessionLocal() as session, session.begin():
+        return session.execute(stmt).first() is not None
 
 
 def verificar_e_incrementar_relatorio(user_id: str, limite_diario: int) -> tuple[bool, str | None]:
@@ -69,86 +68,14 @@ def verificar_e_incrementar_relatorio(user_id: str, limite_diario: int) -> tuple
     """
     if not user_id or limite_diario <= 0:
         return (True, None)
-    doc_id = _doc_id(user_id)
     try:
-        doc_ref = db.collection(COLLECTION).document(doc_id)
-        data_str = datetime.now(UTC).strftime("%Y-%m-%d")
-        transaction = db.transaction()
-        permitido = _verificar_incrementar_tx(
-            transaction, doc_ref, CAMPO_RELATORIO, limite_diario, user_id, data_str
-        )
+        permitido = _verificar_incrementar(CAMPO_RELATORIO, limite_diario, user_id)
         if not permitido:
-            return (
-                False,
-                _t("report_update_limit_reached", limite=limite_diario),
-            )
+            return (False, _t("report_update_limit_reached", limite=limite_diario))
         return (True, None)
     except Exception as e:
         logger.warning("Contador de uso (relatório): %s", e)
         return (True, None)
-
-
-_BATCH_SIZE = 500
-
-
-def limpar_contadores_antigos(dias: int = 90, dry_run: bool = True) -> dict:
-    """Remove documentos de contadores_uso com mais de `dias` dias.
-
-    Política de retenção: 90 dias (ver docs/ARQUITETURA.md).
-    Operação em batch Firestore (≤500 por commit) para respeitar limites da API.
-
-    Args:
-        dias: Documentos mais antigos que este número de dias serão removidos.
-        dry_run: Se True, apenas conta e loga sem deletar (padrão seguro).
-
-    Returns:
-        {"removidos": int, "dry_run": bool, "erros": int}
-    """
-    corte = datetime.now(UTC) - timedelta(days=dias)
-    corte_str = corte.strftime("%Y-%m-%d")
-
-    removidos = 0
-    erros = 0
-
-    query = db.collection(COLLECTION).where("data", "<", corte_str)
-
-    if dry_run:
-        for _doc in query.stream():
-            removidos += 1
-        logger.info(
-            "limpar_contadores_antigos (dry-run): dias=%d corte=%s encontrados=%d",
-            dias,
-            corte_str,
-            removidos,
-        )
-        return {"removidos": removidos, "dry_run": True, "erros": erros}
-
-    batch = None
-    batch_count = 0
-
-    for doc in query.stream():
-        if batch is None:
-            batch = db.batch()
-        batch.delete(doc.reference)
-        batch_count += 1
-        if batch_count >= _BATCH_SIZE:
-            batch.commit()
-            removidos += batch_count
-            batch = db.batch()
-            batch_count = 0
-
-    if batch is not None and batch_count > 0:
-        batch.commit()
-        removidos += batch_count
-
-    logger.info(
-        "limpar_contadores_antigos: dias=%d corte=%s removidos=%d erros=%d",
-        dias,
-        corte_str,
-        removidos,
-        erros,
-    )
-    return {"removidos": removidos, "dry_run": False, "erros": erros}
 
 
 def verificar_e_incrementar_export(user_id: str, limite_diario: int) -> tuple[bool, str | None]:
@@ -159,20 +86,55 @@ def verificar_e_incrementar_export(user_id: str, limite_diario: int) -> tuple[bo
     """
     if not user_id or limite_diario <= 0:
         return (True, None)
-    doc_id = _doc_id(user_id)
     try:
-        doc_ref = db.collection(COLLECTION).document(doc_id)
-        data_str = datetime.now(UTC).strftime("%Y-%m-%d")
-        transaction = db.transaction()
-        permitido = _verificar_incrementar_tx(
-            transaction, doc_ref, CAMPO_EXPORT, limite_diario, user_id, data_str
-        )
+        permitido = _verificar_incrementar(CAMPO_EXPORT, limite_diario, user_id)
         if not permitido:
-            return (
-                False,
-                _t("export_limit_reached", limite=limite_diario),
-            )
+            return (False, _t("export_limit_reached", limite=limite_diario))
         return (True, None)
     except Exception as e:
         logger.warning("Contador de uso (export): %s", e)
         return (True, None)
+
+
+def limpar_contadores_antigos(dias: int = 90, dry_run: bool = True) -> dict:
+    """Remove registros de contadores_uso com mais de `dias` dias.
+
+    Política de retenção: 90 dias (ver docs/ARQUITETURA.md).
+
+    Args:
+        dias: Registros mais antigos que este número de dias serão removidos.
+        dry_run: Se True, apenas conta e loga sem deletar (padrão seguro).
+
+    Returns:
+        {"removidos": int, "dry_run": bool, "erros": int}
+    """
+    corte = (datetime.now(UTC) - timedelta(days=dias)).date()
+
+    try:
+        with db_module.SessionLocal() as session, session.begin():
+            if dry_run:
+                removidos = (
+                    session.execute(
+                        select(ContadorUsoRow.user_id).where(ContadorUsoRow.data < corte)
+                    )
+                    .scalars()
+                    .all()
+                )
+                total = len(removidos)
+                logger.info(
+                    "limpar_contadores_antigos (dry-run): dias=%d corte=%s encontrados=%d",
+                    dias,
+                    corte,
+                    total,
+                )
+                return {"removidos": total, "dry_run": True, "erros": 0}
+
+            resultado = session.execute(delete(ContadorUsoRow).where(ContadorUsoRow.data < corte))
+            total = resultado.rowcount
+        logger.info(
+            "limpar_contadores_antigos: dias=%d corte=%s removidos=%d erros=0", dias, corte, total
+        )
+        return {"removidos": total, "dry_run": False, "erros": 0}
+    except Exception as e:
+        logger.exception("Erro ao limpar contadores antigos: %s", e)
+        return {"removidos": 0, "dry_run": dry_run, "erros": 1}

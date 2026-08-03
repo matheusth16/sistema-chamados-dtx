@@ -1,16 +1,19 @@
 """
 Web Push: salvar inscrições (subscriptions) e enviar notificações ao navegador.
 Requer VAPID_PUBLIC_KEY e VAPID_PRIVATE_KEY no .env (gerar com: python -m vapid --gen).
+
+Fase 2: armazenamento migrado de Firestore para PostgreSQL.
 """
 
 import json
 import logging
 from typing import Any
 
-from firebase_admin import firestore
-from google.cloud.firestore_v1.base_query import FieldFilter
+from sqlalchemy import func, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-from app.database import db
+from app import db as db_module
+from app.db.models.apoio import PushSubscriptionRow
 
 logger = logging.getLogger(__name__)
 
@@ -27,35 +30,28 @@ def salvar_inscricao(usuario_id: str, subscription: dict[str, Any]) -> bool:
     try:
         keys = subscription.get("keys") or {}
         endpoint = subscription["endpoint"]
-        # Deduplicação: se o endpoint já existe para o usuário, atualiza em vez de duplicar.
-        existing = list(
-            db.collection("push_subscriptions")
-            .where(filter=FieldFilter("usuario_id", "==", usuario_id))
-            .where(filter=FieldFilter("endpoint", "==", endpoint))
-            .limit(1)
-            .stream()
-        )
-        if existing:
-            existing[0].reference.set(
-                {
-                    "p256dh": keys.get("p256dh"),
-                    "auth": keys.get("auth"),
-                    "updated_at": firestore.SERVER_TIMESTAMP,
-                },
-                merge=True,
+        with db_module.SessionLocal() as session, session.begin():
+            # Deduplicação: se usuario_id+endpoint já existe, atualiza em vez
+            # de duplicar (mesma semântica do antigo .set(merge=True)).
+            stmt = (
+                pg_insert(PushSubscriptionRow)
+                .values(
+                    usuario_id=usuario_id,
+                    endpoint=endpoint,
+                    p256dh=keys.get("p256dh"),
+                    auth=keys.get("auth"),
+                )
+                .on_conflict_do_update(
+                    index_elements=["usuario_id", "endpoint"],
+                    set_={
+                        "p256dh": keys.get("p256dh"),
+                        "auth": keys.get("auth"),
+                        "updated_at": func.now(),
+                    },
+                )
             )
-            logger.debug("Web Push: inscrição atualizada para usuario=%s", usuario_id)
-            return True
-        db.collection("push_subscriptions").add(
-            {
-                "usuario_id": usuario_id,
-                "endpoint": endpoint,
-                "p256dh": keys.get("p256dh"),
-                "auth": keys.get("auth"),
-                "created_at": firestore.SERVER_TIMESTAMP,
-            }
-        )
-        logger.debug("Web Push: inscrição salva para usuario=%s", usuario_id)
+            session.execute(stmt)
+        logger.debug("Web Push: inscrição salva/atualizada para usuario=%s", usuario_id)
         return True
     except Exception as e:
         logger.exception("Erro ao salvar inscrição Web Push: %s", e)
@@ -67,44 +63,46 @@ def obter_inscricoes(usuario_id: str) -> list[dict[str, Any]]:
     if not usuario_id:
         return []
     try:
-        docs = list(
-            db.collection("push_subscriptions")
-            .where(filter=FieldFilter("usuario_id", "==", usuario_id))
-            .limit(MAX_INSCRICOES)
-            .stream()
-        )
-        if len(docs) >= MAX_INSCRICOES:
+        with db_module.SessionLocal() as session:
+            rows = (
+                session.execute(
+                    select(PushSubscriptionRow)
+                    .where(PushSubscriptionRow.usuario_id == usuario_id)
+                    .limit(MAX_INSCRICOES)
+                )
+                .scalars()
+                .all()
+            )
+        if len(rows) >= MAX_INSCRICOES:
             logger.warning(
                 "Web Push: limite de inscrições atingido (%d) para usuario=%s",
                 MAX_INSCRICOES,
                 usuario_id,
             )
-        out = []
-        for doc in docs:
-            d = doc.to_dict()
-            out.append(
-                {
-                    "doc_id": doc.id,
-                    "endpoint": d.get("endpoint"),
-                    "keys": {
-                        "p256dh": d.get("p256dh"),
-                        "auth": d.get("auth"),
-                    },
-                }
-            )
+        out = [
+            {
+                "doc_id": row.id,
+                "endpoint": row.endpoint,
+                "keys": {"p256dh": row.p256dh, "auth": row.auth},
+            }
+            for row in rows
+        ]
         return [o for o in out if o.get("endpoint") and o.get("keys", {}).get("p256dh")]
     except Exception as e:
         logger.exception("Erro ao obter inscrições Web Push: %s", e)
         return []
 
 
-def _deletar_subscricao(doc_id: str) -> None:
-    """Remove uma inscrição expirada/revogada do Firestore."""
+def _deletar_subscricao(doc_id) -> None:
+    """Remove uma inscrição expirada/revogada."""
     if not doc_id:
         return
     try:
-        db.collection("push_subscriptions").document(doc_id).delete()
-        logger.debug("Web Push: inscrição expirada removida doc=%s", doc_id)
+        with db_module.SessionLocal() as session, session.begin():
+            row = session.get(PushSubscriptionRow, int(doc_id))
+            if row is not None:
+                session.delete(row)
+        logger.debug("Web Push: inscrição expirada removida id=%s", doc_id)
     except Exception as exc:
         logger.warning("Erro ao remover subscription expirada: %s", exc)
 

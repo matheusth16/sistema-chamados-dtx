@@ -1,16 +1,17 @@
 """Histórico persistente de ações administrativas sobre contas de usuário
-(criação, edição, desativação, ativação, exclusão) — auditoria LGPD/CWI."""
+(criação, edição, desativação, ativação, exclusão) — auditoria LGPD/CWI.
+
+Fase 2: armazenamento migrado de Firestore para PostgreSQL.
+"""
 
 import logging
 
-from firebase_admin import firestore
-from google.cloud.firestore_v1.base_query import FieldFilter
+from sqlalchemy import select
 
-from app.database import db
+from app import db as db_module
+from app.db.models.apoio import HistoricoUsuarioRow
 
 logger = logging.getLogger(__name__)
-
-COLLECTION = "historico_usuarios"
 
 
 def registrar_historico_usuario(
@@ -25,19 +26,17 @@ def registrar_historico_usuario(
 
     acao: 'criacao', 'edicao', 'desativacao', 'ativacao', 'exclusao', 'anonimizacao'
     """
-    payload = {
-        "usuario_alvo_id": usuario_alvo_id,
-        "usuario_alvo_nome": usuario_alvo_nome,
-        "admin_id": admin_id,
-        "admin_nome": admin_nome,
-        "acao": acao,
-        "data_acao": firestore.SERVER_TIMESTAMP,
-    }
-    if detalhe is not None:
-        payload["detalhe"] = detalhe
-
     try:
-        db.collection(COLLECTION).add(payload)
+        with db_module.SessionLocal() as session, session.begin():
+            row = HistoricoUsuarioRow(
+                usuario_alvo_id=usuario_alvo_id,
+                usuario_alvo_nome=usuario_alvo_nome,
+                admin_id=admin_id,
+                admin_nome=admin_nome,
+                acao=acao,
+                detalhe=detalhe,
+            )
+            session.add(row)
         return True
     except Exception:
         logger.exception(
@@ -51,13 +50,28 @@ def registrar_historico_usuario(
 def obter_historico_usuario(usuario_alvo_id: str) -> list[dict]:
     """Retorna o histórico administrativo de um usuário, mais recente primeiro."""
     try:
-        docs = (
-            db.collection(COLLECTION)
-            .where(filter=FieldFilter("usuario_alvo_id", "==", usuario_alvo_id))
-            .order_by("data_acao", direction=firestore.Query.DESCENDING)
-            .stream()
-        )
-        return [doc.to_dict() for doc in docs]
+        with db_module.SessionLocal() as session:
+            rows = (
+                session.execute(
+                    select(HistoricoUsuarioRow)
+                    .where(HistoricoUsuarioRow.usuario_alvo_id == usuario_alvo_id)
+                    .order_by(HistoricoUsuarioRow.data_acao.desc(), HistoricoUsuarioRow.id.desc())
+                )
+                .scalars()
+                .all()
+            )
+            return [
+                {
+                    "usuario_alvo_id": row.usuario_alvo_id,
+                    "usuario_alvo_nome": row.usuario_alvo_nome,
+                    "admin_id": row.admin_id,
+                    "admin_nome": row.admin_nome,
+                    "acao": row.acao,
+                    "detalhe": row.detalhe,
+                    "data_acao": row.data_acao,
+                }
+                for row in rows
+            ]
     except Exception:
         logger.exception("Erro ao buscar histórico do usuário: usuario_alvo_id=%s", usuario_alvo_id)
         return []

@@ -35,14 +35,11 @@ _MODULOS_COM_DB_FIRESTORE = [
     "app.services.chamados_criacao_service",
     "app.services.report_service",
     "app.services.onboarding_service",
-    "app.services.historico_usuario_service",
     "app.services.status_service",
     "app.services.notifications_inapp",
-    "app.services.contadores_uso",
     "app.services.assignment",
     "app.utils",
     "app.services.lembrete_confirmacao_service",
-    "app.services.webpush_service",
     "app.services.gamification_service",
 ]
 

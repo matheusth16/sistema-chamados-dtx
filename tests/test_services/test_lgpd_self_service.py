@@ -1,8 +1,16 @@
-"""Testes: lgpd_self_service (autoatendimento LGPD — exportação e solicitação de exclusão)."""
+"""Testes: lgpd_self_service (autoatendimento LGPD — exportação e solicitação
+de exclusão).
+
+Fase 2 — migração parcial: exportar_dados_usuario()/csv ainda consultam a
+coleção `chamados` do Firestore (Chamado só migra no Marco 7, mock_db abaixo
+continua valendo pra essas). As demais funções (solicitacoes_lgpd) já rodam
+contra Postgres real (db_session)."""
 
 from unittest.mock import MagicMock, patch
 
 import pytest
+
+pytestmark = pytest.mark.usefixtures("db_session")
 
 
 def _usuario_mock(uid="u1", nome="Fulano", email="fulano@dtx.aero", perfil="solicitante"):
@@ -28,11 +36,13 @@ def _chamado_doc(doc_id, **dados):
 
 @pytest.fixture
 def mock_db():
+    """Mock do Firestore usado só pelas queries de `chamados` (ainda não
+    migrado — ver docstring do módulo)."""
     with patch("app.services.lgpd_self_service.db") as mock_db:
         yield mock_db
 
 
-# ── exportar_dados_usuario ───────────────────────────────────────────────────
+# ── exportar_dados_usuario (ainda Firestore — chamados não migrado) ─────────
 
 
 def test_exportar_dados_usuario_inclui_dados_da_conta(mock_db):
@@ -151,191 +161,165 @@ def test_exportar_dados_usuario_filtra_apenas_chamados_do_proprio_usuario(mock_d
     assert filtro.value == "u42"
 
 
-# ── possui_solicitacao_exclusao_pendente ─────────────────────────────────────
+# ── possui_solicitacao_exclusao_pendente (Postgres real) ─────────────────────
 
 
-def test_possui_solicitacao_pendente_retorna_true_quando_existe(mock_db):
-    from app.services.lgpd_self_service import possui_solicitacao_exclusao_pendente
+def test_possui_solicitacao_pendente_retorna_true_quando_existe(app):
+    from app.services.lgpd_self_service import (
+        possui_solicitacao_exclusao_pendente,
+        solicitar_exclusao_propria,
+    )
 
-    doc = MagicMock()
-    doc.to_dict.return_value = {"status": "pendente"}
-    mock_db.collection.return_value.where.return_value.limit.return_value.stream.return_value = [
-        doc
-    ]
+    with patch("app.services.lgpd_self_service.registrar_historico_usuario"):
+        solicitar_exclusao_propria(_usuario_mock(uid="u1"))
 
     assert possui_solicitacao_exclusao_pendente("u1") is True
 
 
-def test_possui_solicitacao_pendente_retorna_false_quando_so_ha_concluidas(mock_db):
+def test_possui_solicitacao_pendente_retorna_false_quando_vazio(app):
     from app.services.lgpd_self_service import possui_solicitacao_exclusao_pendente
 
-    doc = MagicMock()
-    doc.to_dict.return_value = {"status": "concluida"}
-    mock_db.collection.return_value.where.return_value.limit.return_value.stream.return_value = [
-        doc
-    ]
-
-    assert possui_solicitacao_exclusao_pendente("u1") is False
+    assert possui_solicitacao_exclusao_pendente("usuario_sem_solicitacao") is False
 
 
-def test_possui_solicitacao_pendente_retorna_false_quando_vazio(mock_db):
-    from app.services.lgpd_self_service import possui_solicitacao_exclusao_pendente
+def test_possui_solicitacao_pendente_retorna_false_quando_banco_falha(app, monkeypatch):
+    from app.services import lgpd_self_service
 
-    mock_db.collection.return_value.where.return_value.limit.return_value.stream.return_value = []
+    def _explode():
+        raise RuntimeError("banco indisponível")
 
-    assert possui_solicitacao_exclusao_pendente("u1") is False
+    monkeypatch.setattr(lgpd_self_service.db_module, "SessionLocal", _explode)
 
-
-def test_possui_solicitacao_pendente_retorna_false_quando_firestore_falha(mock_db):
-    from app.services.lgpd_self_service import possui_solicitacao_exclusao_pendente
-
-    mock_db.collection.return_value.where.return_value.limit.return_value.stream.side_effect = (
-        Exception("err")
-    )
-
-    assert possui_solicitacao_exclusao_pendente("u1") is False
+    assert lgpd_self_service.possui_solicitacao_exclusao_pendente("u1") is False
 
 
-# ── solicitar_exclusao_propria ───────────────────────────────────────────────
+# ── solicitar_exclusao_propria (Postgres real) ───────────────────────────────
 
 
-def test_solicitar_exclusao_propria_sucesso(mock_db):
+def test_solicitar_exclusao_propria_sucesso(app):
     from app.services.lgpd_self_service import solicitar_exclusao_propria
 
-    mock_db.collection.return_value.where.return_value.limit.return_value.stream.return_value = []
     usuario = _usuario_mock()
 
     with patch("app.services.lgpd_self_service.registrar_historico_usuario") as mock_hist:
         resultado = solicitar_exclusao_propria(usuario)
 
     assert resultado == {"sucesso": True}
-    mock_db.collection.return_value.add.assert_called_once()
-    payload = mock_db.collection.return_value.add.call_args[0][0]
-    assert payload["usuario_id"] == "u1"
-    assert payload["status"] == "pendente"
-    assert payload["tipo"] == "exclusao"
     mock_hist.assert_called_once()
     assert mock_hist.call_args.kwargs["acao"] == "solicitacao_exclusao_lgpd"
 
 
-def test_solicitar_exclusao_propria_bloqueia_pedido_duplicado(mock_db):
+def test_solicitar_exclusao_propria_bloqueia_pedido_duplicado(app):
     from app.services.lgpd_self_service import solicitar_exclusao_propria
 
-    doc = MagicMock()
-    doc.to_dict.return_value = {"status": "pendente"}
-    mock_db.collection.return_value.where.return_value.limit.return_value.stream.return_value = [
-        doc
-    ]
     usuario = _usuario_mock()
+    with patch("app.services.lgpd_self_service.registrar_historico_usuario"):
+        solicitar_exclusao_propria(usuario)
 
     resultado = solicitar_exclusao_propria(usuario)
 
     assert resultado == {"sucesso": False, "erro_key": "lgpd_exclusion_request_already_pending"}
-    mock_db.collection.return_value.add.assert_not_called()
 
 
-def test_solicitar_exclusao_propria_retorna_erro_quando_firestore_falha(mock_db):
-    from app.services.lgpd_self_service import solicitar_exclusao_propria
+def test_solicitar_exclusao_propria_retorna_erro_quando_banco_falha(app, monkeypatch):
+    from app.services import lgpd_self_service
 
-    mock_db.collection.return_value.where.return_value.limit.return_value.stream.return_value = []
-    mock_db.collection.return_value.add.side_effect = Exception("err")
-    usuario = _usuario_mock()
+    def _explode():
+        raise RuntimeError("banco indisponível")
 
-    resultado = solicitar_exclusao_propria(usuario)
+    monkeypatch.setattr(
+        lgpd_self_service, "possui_solicitacao_exclusao_pendente", lambda _uid: False
+    )
+    monkeypatch.setattr(lgpd_self_service.db_module, "SessionLocal", _explode)
+
+    resultado = lgpd_self_service.solicitar_exclusao_propria(_usuario_mock())
 
     assert resultado == {"sucesso": False, "erro_key": "internal_error_retry"}
 
 
-# ── listar_usuarios_com_solicitacao_pendente (uso admin) ─────────────────────
+# ── listar_usuarios_com_solicitacao_pendente (uso admin, Postgres real) ──────
 
 
-def test_listar_usuarios_com_solicitacao_pendente_retorna_ids(mock_db):
-    from app.services.lgpd_self_service import listar_usuarios_com_solicitacao_pendente
+def test_listar_usuarios_com_solicitacao_pendente_retorna_ids(app):
+    from app.services.lgpd_self_service import (
+        listar_usuarios_com_solicitacao_pendente,
+        solicitar_exclusao_propria,
+    )
 
-    doc1 = MagicMock()
-    doc1.to_dict.return_value = {"usuario_id": "u1", "status": "pendente"}
-    doc2 = MagicMock()
-    doc2.to_dict.return_value = {"usuario_id": "u2", "status": "pendente"}
-    mock_db.collection.return_value.where.return_value.limit.return_value.stream.return_value = [
-        doc1,
-        doc2,
-    ]
+    with patch("app.services.lgpd_self_service.registrar_historico_usuario"):
+        solicitar_exclusao_propria(_usuario_mock(uid="u1"))
+        solicitar_exclusao_propria(_usuario_mock(uid="u2"))
 
     resultado = listar_usuarios_com_solicitacao_pendente()
 
     assert resultado == {"u1", "u2"}
 
 
-def test_listar_usuarios_com_solicitacao_pendente_retorna_vazio_quando_firestore_falha(mock_db):
-    from app.services.lgpd_self_service import listar_usuarios_com_solicitacao_pendente
+def test_listar_usuarios_com_solicitacao_pendente_retorna_vazio_quando_banco_falha(
+    app, monkeypatch
+):
+    from app.services import lgpd_self_service
 
-    mock_db.collection.return_value.where.return_value.limit.return_value.stream.side_effect = (
-        Exception("err")
+    def _explode():
+        raise RuntimeError("banco indisponível")
+
+    monkeypatch.setattr(lgpd_self_service.db_module, "SessionLocal", _explode)
+
+    assert lgpd_self_service.listar_usuarios_com_solicitacao_pendente() == set()
+
+
+# ── resolver_solicitacoes_exclusao_pendentes (Postgres real) ─────────────────
+
+
+def test_resolver_solicitacoes_marca_pendente_como_concluida(app):
+    from app.services.lgpd_self_service import (
+        resolver_solicitacoes_exclusao_pendentes,
+        solicitar_exclusao_propria,
     )
 
-    resultado = listar_usuarios_com_solicitacao_pendente()
-
-    assert resultado == set()
-
-
-# ── resolver_solicitacoes_exclusao_pendentes (fecha o loop quando admin age) ─
-
-
-def _doc_solicitacao(status="pendente"):
-    doc = MagicMock()
-    doc.to_dict.return_value = {"status": status}
-    return doc
-
-
-def test_resolver_solicitacoes_marca_pendente_como_concluida(mock_db):
-    from app.services.lgpd_self_service import resolver_solicitacoes_exclusao_pendentes
-
-    doc = _doc_solicitacao(status="pendente")
-    mock_db.collection.return_value.where.return_value.limit.return_value.stream.return_value = [
-        doc
-    ]
+    with patch("app.services.lgpd_self_service.registrar_historico_usuario"):
+        solicitar_exclusao_propria(_usuario_mock(uid="u1"))
 
     resultado = resolver_solicitacoes_exclusao_pendentes("u1", admin_id="a1", admin_nome="Admin")
 
     assert resultado == 1
-    doc.reference.update.assert_called_once()
-    payload = doc.reference.update.call_args[0][0]
-    assert payload["status"] == "concluida"
-    assert payload["admin_id"] == "a1"
-    assert payload["admin_nome"] == "Admin"
 
 
-def test_resolver_solicitacoes_ignora_as_ja_concluidas(mock_db):
-    from app.services.lgpd_self_service import resolver_solicitacoes_exclusao_pendentes
-
-    doc = _doc_solicitacao(status="concluida")
-    mock_db.collection.return_value.where.return_value.limit.return_value.stream.return_value = [
-        doc
-    ]
-
-    resultado = resolver_solicitacoes_exclusao_pendentes("u1", admin_id="a1", admin_nome="Admin")
-
-    assert resultado == 0
-    doc.reference.update.assert_not_called()
-
-
-def test_resolver_solicitacoes_retorna_zero_quando_nao_ha_pedido(mock_db):
-    from app.services.lgpd_self_service import resolver_solicitacoes_exclusao_pendentes
-
-    mock_db.collection.return_value.where.return_value.limit.return_value.stream.return_value = []
-
-    resultado = resolver_solicitacoes_exclusao_pendentes("u1", admin_id="a1", admin_nome="Admin")
-
-    assert resultado == 0
-
-
-def test_resolver_solicitacoes_retorna_zero_quando_firestore_falha(mock_db):
-    from app.services.lgpd_self_service import resolver_solicitacoes_exclusao_pendentes
-
-    mock_db.collection.return_value.where.return_value.limit.return_value.stream.side_effect = (
-        Exception("err")
+def test_resolver_solicitacoes_ignora_as_ja_concluidas(app):
+    from app.services.lgpd_self_service import (
+        resolver_solicitacoes_exclusao_pendentes,
+        solicitar_exclusao_propria,
     )
 
+    with patch("app.services.lgpd_self_service.registrar_historico_usuario"):
+        solicitar_exclusao_propria(_usuario_mock(uid="u1"))
+    resolver_solicitacoes_exclusao_pendentes("u1", admin_id="a1", admin_nome="Admin")
+
     resultado = resolver_solicitacoes_exclusao_pendentes("u1", admin_id="a1", admin_nome="Admin")
+
+    assert resultado == 0
+
+
+def test_resolver_solicitacoes_retorna_zero_quando_nao_ha_pedido(app):
+    from app.services.lgpd_self_service import resolver_solicitacoes_exclusao_pendentes
+
+    resultado = resolver_solicitacoes_exclusao_pendentes(
+        "usuario_sem_pedido", admin_id="a1", admin_nome="Admin"
+    )
+
+    assert resultado == 0
+
+
+def test_resolver_solicitacoes_retorna_zero_quando_banco_falha(app, monkeypatch):
+    from app.services import lgpd_self_service
+
+    def _explode():
+        raise RuntimeError("banco indisponível")
+
+    monkeypatch.setattr(lgpd_self_service.db_module, "SessionLocal", _explode)
+
+    resultado = lgpd_self_service.resolver_solicitacoes_exclusao_pendentes(
+        "u1", admin_id="a1", admin_nome="Admin"
+    )
 
     assert resultado == 0

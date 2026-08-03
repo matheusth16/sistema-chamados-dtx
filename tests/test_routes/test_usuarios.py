@@ -7,10 +7,13 @@ import pytest
 
 
 @pytest.fixture(autouse=True)
-def _mock_historico_usuario_db():
-    """Evita chamada real ao Firestore quando a rota registra histórico de auditoria
-    e o teste não mocka `registrar_historico_usuario` explicitamente."""
-    with patch("app.services.historico_usuario_service.db", MagicMock()):
+def _mock_registrar_historico_usuario():
+    """Evita escrita real em historico_usuarios (Postgres, Fase 2) quando o
+    teste não mocka registrar_historico_usuario explicitamente pra fazer
+    asserções sobre ela — mesmo papel que a fixture homônima tinha pro
+    Firestore antes da migração (patch aqui é sobrescrito pelos testes que
+    fazem seu próprio `patch(...) as mock_hist` dentro do corpo do teste)."""
+    with patch("app.routes.usuarios.registrar_historico_usuario"):
         yield
 
 
