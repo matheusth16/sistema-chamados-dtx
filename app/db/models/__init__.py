@@ -11,5 +11,10 @@ from app.db.models.categoria import (  # noqa: F401
     CategoriaImpactoRow,
     CategoriaSetorRow,
 )
+from app.db.models.chamado import (  # noqa: F401
+    ChamadoObservadorRow,
+    ChamadoParticipanteRow,
+    ChamadoRow,
+)
 from app.db.models.grupo_rl import GrupoRLRow  # noqa: F401
 from app.db.models.usuario import UsuarioRow  # noqa: F401
