@@ -42,7 +42,10 @@ def test_formulario_com_login_retorna_200(client_logado_solicitante):
     with patch("app.routes.chamados.get_static_cached") as mock_cache:
         mock_cache.return_value = []
         with (
-            patch("app.routes.chamados.obter_total_por_contagem", return_value=0),
+            patch(
+                "app.routes.chamados.contar_status_por_solicitante",
+                return_value={"Aberto": 0, "Em Atendimento": 0, "Concluído": 0, "Cancelado": 0},
+            ),
             patch("app.routes.chamados._build_gate_subetapas", return_value={}),
         ):
             r = client_logado_solicitante.get("/", follow_redirects=False)
@@ -58,7 +61,10 @@ def test_formulario_usa_cache_para_setores(client_logado_solicitante):
     do formulário (F-XX economia de leituras Firestore no free tier)."""
     with (
         patch("app.routes.chamados.get_static_cached") as mock_cache,
-        patch("app.routes.chamados.obter_total_por_contagem", return_value=0),
+        patch(
+            "app.routes.chamados.contar_status_por_solicitante",
+            return_value={"Aberto": 0, "Em Atendimento": 0, "Concluído": 0, "Cancelado": 0},
+        ),
         patch("app.routes.chamados._build_gate_subetapas", return_value={}),
     ):
         mock_cache.return_value = []
@@ -147,30 +153,6 @@ def test_post_criar_chamado_com_aviso_exibe_mensagem(client_logado_solicitante):
     assert r.status_code == 302
 
 
-def test_meus_chamados_fallback_quando_indice_ausente(client_logado_solicitante):
-    """GET /meus-chamados usa fallback quando listar_meus_chamados lança erro de índice."""
-    with (
-        patch(
-            "app.routes.chamados.listar_meus_chamados",
-            side_effect=Exception("index building failed_precondition"),
-        ),
-        patch("app.routes.chamados.listar_meus_chamados_fallback") as mock_fallback,
-        patch("app.routes.chamados.listar_chamados_como_observador", return_value=[]),
-    ):
-        mock_fallback.return_value = {
-            "chamados": [],
-            "pagina_atual": 1,
-            "total_paginas": 1,
-            "total_chamados": 0,
-            "status_counts": {"Aberto": 0, "Em Atendimento": 0, "Concluído": 0, "Cancelado": 0},
-            "cursor_next": None,
-            "cursor_prev": None,
-        }
-        r = client_logado_solicitante.get("/meus-chamados", follow_redirects=False)
-    assert r.status_code == 200
-    mock_fallback.assert_called_once()
-
-
 def test_meus_chamados_excecao_generica_redireciona(client_logado_solicitante):
     """GET /meus-chamados com exceção genérica redireciona para /."""
     with patch(
@@ -185,7 +167,10 @@ def test_formulario_variante_b_renderiza_contador(client_logado_solicitante):
     """Variante B inclui elemento contador de caracteres no HTML."""
     with (
         patch("app.routes.chamados.get_static_cached", return_value=[]),
-        patch("app.routes.chamados.obter_total_por_contagem", return_value=0),
+        patch(
+            "app.routes.chamados.contar_status_por_solicitante",
+            return_value={"Aberto": 0, "Em Atendimento": 0, "Concluído": 0, "Cancelado": 0},
+        ),
         patch("app.routes.chamados._build_gate_subetapas", return_value={}),
         patch("app.services.ab_service.get_variante", return_value="B"),
     ):
@@ -198,7 +183,10 @@ def test_formulario_variante_a_sem_contador(client_logado_solicitante):
     """Variante A não inclui contador de caracteres."""
     with (
         patch("app.routes.chamados.get_static_cached", return_value=[]),
-        patch("app.routes.chamados.obter_total_por_contagem", return_value=0),
+        patch(
+            "app.routes.chamados.contar_status_por_solicitante",
+            return_value={"Aberto": 0, "Em Atendimento": 0, "Concluído": 0, "Cancelado": 0},
+        ),
         patch("app.routes.chamados._build_gate_subetapas", return_value={}),
         patch("app.services.ab_service.get_variante", return_value="A"),
     ):

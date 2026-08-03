@@ -4,22 +4,18 @@ import logging
 
 from flask import Response, flash, redirect, render_template, request, url_for
 from flask_login import current_user
-from google.cloud.firestore_v1.base_query import FieldFilter
 
 from app.cache import get_static_cached
-from app.database import db
 from app.decoradores import requer_solicitante
 from app.i18n import flash_t
 from app.models_categorias import CategoriaImpacto, CategoriaSetor
 from app.routes import main
 from app.services.chamados_criacao_service import criar_chamado
 from app.services.chamados_listagem_service import (
-    _eh_erro_indice_firestore,
+    contar_status_por_solicitante,
     listar_chamados_como_observador,
     listar_meus_chamados,
-    listar_meus_chamados_fallback,
 )
-from app.services.pagination import obter_total_por_contagem
 from app.services.validators import validar_novo_chamado
 
 logger = logging.getLogger(__name__)
@@ -39,7 +35,7 @@ def _build_gate_subetapas():
 @main.route("/", methods=["GET", "POST"])
 @requer_solicitante
 def index() -> Response:
-    """GET: formulário de novo chamado. POST: processa e salva no Firestore."""
+    """GET: formulário de novo chamado. POST: processa e salva o chamado."""
     if request.method != "POST":
         from app.services.ab_service import get_variante
 
@@ -49,17 +45,10 @@ def index() -> Response:
         )
         ab_variante = get_variante(current_user.id, "AB-001")
 
-        # Contagem por agregação (count) — sem ler documentos
+        # Contagem por agregação (count) — sem carregar chamados
         status_counts = {"Aberto": 0, "Em Atendimento": 0, "Concluído": 0, "Cancelado": 0}
         try:
-            for st in ("Aberto", "Em Atendimento", "Concluído", "Cancelado"):
-                q = (
-                    db.collection("chamados")
-                    .where(filter=FieldFilter("solicitante_id", "==", current_user.id))
-                    .where(filter=FieldFilter("status", "==", st))
-                )
-                c = obter_total_por_contagem(q)
-                status_counts[st] = c if c is not None else 0
+            status_counts = contar_status_por_solicitante(current_user.id)
         except Exception as e:
             logger.warning("Erro ao contar chamados do solicitante: %s", e)
 
@@ -123,7 +112,7 @@ def index() -> Response:
 @main.route("/meus-chamados")
 @requer_solicitante
 def meus_chamados() -> Response:
-    """GET: lista de chamados do solicitante com paginação por cursor (menos leituras no Firestore)."""
+    """GET: lista de chamados do solicitante com paginação por cursor."""
     if not getattr(current_user, "id", None):
         logger.warning("meus_chamados: current_user.id ausente")
         flash_t("error_loading_tickets_session", "danger")
@@ -156,27 +145,6 @@ def meus_chamados() -> Response:
             **resultado,
         )
     except Exception as e:
-        if _eh_erro_indice_firestore(e):
-            logger.warning(
-                "Índice Firestore indisponível, usando fallback para meus_chamados: %s", e
-            )
-            try:
-                resultado = listar_meus_chamados_fallback(
-                    current_user.id, status_filtro, itens_por_pagina, pagina_atual, rl_codigo
-                )
-                chamados_em_copia_fb = listar_chamados_como_observador(current_user.id)
-                return render_template(
-                    "meus_chamados.html",
-                    itens_por_pagina=itens_por_pagina,
-                    status_filtro=status_filtro,
-                    rl_codigo=rl_codigo,
-                    chamados_em_copia=chamados_em_copia_fb,
-                    **resultado,
-                )
-            except Exception as fallback_err:
-                logger.exception("Fallback meus_chamados também falhou: %s", fallback_err)
-                flash_t("error_loading_tickets_retry", "danger")
-                return redirect(url_for("main.index"))
         logger.exception("Erro ao buscar chamados do solicitante: %s", e)
         flash_t("error_loading_tickets_logs", "danger")
         return redirect(url_for("main.index"))

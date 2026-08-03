@@ -201,7 +201,10 @@ def test_template_inclui_onboarding_na_home_do_perfil_para_usuario_novo(
         patch("app.routes.auth._dispositivo_confiavel", return_value=True),
         patch("app.routes.chamados.get_static_cached", return_value=[]),
         patch("app.routes.chamados._build_gate_subetapas", return_value={}),
-        patch("app.routes.chamados.obter_total_por_contagem", return_value=0),
+        patch(
+            "app.routes.chamados.contar_status_por_solicitante",
+            return_value={"Aberto": 0, "Em Atendimento": 0, "Concluído": 0, "Cancelado": 0},
+        ),
         patch("app.routes.dashboard.obter_contexto_admin", return_value={}),
         patch("app.routes.dashboard.get_static_cached", return_value=[]),
     ):
@@ -236,7 +239,10 @@ def test_template_omite_onboarding_para_usuario_que_ja_fez(client, app):
         patch("app.routes.auth._dispositivo_confiavel", return_value=True),
         patch("app.routes.chamados.get_static_cached", return_value=[]),
         patch("app.routes.chamados._build_gate_subetapas", return_value={}),
-        patch("app.routes.chamados.obter_total_por_contagem", return_value=0),
+        patch(
+            "app.routes.chamados.contar_status_por_solicitante",
+            return_value={"Aberto": 0, "Em Atendimento": 0, "Concluído": 0, "Cancelado": 0},
+        ),
     ):
         client.post("/login", data={"email": "ob@test.com", "senha": "ok"})
         r = client.get("/")
@@ -263,7 +269,10 @@ def test_template_emite_data_lang_correto(client, app, lang, expected):
         patch("app.routes.auth._dispositivo_confiavel", return_value=True),
         patch("app.routes.chamados.get_static_cached", return_value=[]),
         patch("app.routes.chamados._build_gate_subetapas", return_value={}),
-        patch("app.routes.chamados.obter_total_por_contagem", return_value=0),
+        patch(
+            "app.routes.chamados.contar_status_por_solicitante",
+            return_value={"Aberto": 0, "Em Atendimento": 0, "Concluído": 0, "Cancelado": 0},
+        ),
     ):
         client.post("/login", data={"email": "ob@test.com", "senha": "ok"})
         r = client.get("/?lang=" + lang)
@@ -301,7 +310,10 @@ def test_template_omite_onboarding_sem_replay_quando_ja_concluido(client, app):
         patch("app.routes.auth._dispositivo_confiavel", return_value=True),
         patch("app.routes.chamados.get_static_cached", return_value=[]),
         patch("app.routes.chamados._build_gate_subetapas", return_value={}),
-        patch("app.routes.chamados.obter_total_por_contagem", return_value=0),
+        patch(
+            "app.routes.chamados.contar_status_por_solicitante",
+            return_value={"Aberto": 0, "Em Atendimento": 0, "Concluído": 0, "Cancelado": 0},
+        ),
     ):
         client.post("/login", data={"email": "ob@test.com", "senha": "ok"})
         r = client.get("/")
@@ -334,7 +346,10 @@ def test_template_data_modo_inicial_no_primeiro_acesso(client, app):
         patch("app.routes.auth._dispositivo_confiavel", return_value=True),
         patch("app.routes.chamados.get_static_cached", return_value=[]),
         patch("app.routes.chamados._build_gate_subetapas", return_value={}),
-        patch("app.routes.chamados.obter_total_por_contagem", return_value=0),
+        patch(
+            "app.routes.chamados.contar_status_por_solicitante",
+            return_value={"Aberto": 0, "Em Atendimento": 0, "Concluído": 0, "Cancelado": 0},
+        ),
     ):
         client.post("/login", data={"email": "ob@test.com", "senha": "ok"})
         r = client.get("/")

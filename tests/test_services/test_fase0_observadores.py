@@ -6,6 +6,8 @@ Testes escritos ANTES da implementação (Red → Green → Refactor).
 
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -250,58 +252,45 @@ class TestValidarObservadores:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.usefixtures("db_session")
 class TestListagemObservador:
     def test_listar_chamados_como_observador(self):
-        """listar_chamados_observador retorna chamados onde user está em observadores[]."""
+        """listar_chamados_como_observador retorna chamados onde user está em observadores[]."""
+        from app.models import Chamado
         from app.services.chamados_listagem_service import listar_chamados_como_observador
 
-        obs_doc = MagicMock()
-        obs_doc.id = "chamado_obs_1"
-        obs_doc.to_dict.return_value = {
-            "categoria": "TI",
-            "tipo_solicitacao": "Suporte",
-            "descricao": "X",
-            "responsavel": "sup",
-            "status": "Aberto",
-            "observadores": [{"usuario_id": "u_obs", "nome": "Obs", "email": "o@t.com"}],
-        }
+        chamado = Chamado(
+            categoria="TI",
+            tipo_solicitacao="Suporte",
+            descricao="X",
+            responsavel="sup",
+            solicitante_id="sol_1",
+            status="Aberto",
+            observadores=[{"usuario_id": "u_obs", "nome": "Obs", "email": "o@t.com"}],
+        )
+        chamado_id = chamado.salvar()
 
-        mock_query = MagicMock()
-        mock_query.where.return_value = mock_query
-        mock_query.order_by.return_value = mock_query
-        mock_query.limit.return_value = mock_query
-        mock_query.stream.return_value = [obs_doc]
-
-        with patch("app.services.chamados_listagem_service.db") as mock_db:
-            mock_db.collection.return_value.where.return_value = mock_query
-            chamados = listar_chamados_como_observador(user_id="u_obs")
+        chamados = listar_chamados_como_observador(user_id="u_obs")
 
         assert len(chamados) == 1
-        assert chamados[0].id == "chamado_obs_1"
+        assert chamados[0].id == chamado_id
 
     def test_chamados_como_observador_marcados(self):
         """Chamados retornados por listar_chamados_como_observador têm flag em_copia=True."""
+        from app.models import Chamado
         from app.services.chamados_listagem_service import listar_chamados_como_observador
 
-        obs_doc = MagicMock()
-        obs_doc.id = "ch_1"
-        obs_doc.to_dict.return_value = {
-            "categoria": "TI",
-            "tipo_solicitacao": "Suporte",
-            "descricao": "X",
-            "responsavel": "sup",
-            "status": "Aberto",
-            "observadores": [{"usuario_id": "u_obs"}],
-        }
+        chamado = Chamado(
+            categoria="TI",
+            tipo_solicitacao="Suporte",
+            descricao="X",
+            responsavel="sup",
+            solicitante_id="sol_1",
+            status="Aberto",
+            observadores=[{"usuario_id": "u_obs", "nome": "", "email": ""}],
+        )
+        chamado.salvar()
 
-        mock_query = MagicMock()
-        mock_query.where.return_value = mock_query
-        mock_query.order_by.return_value = mock_query
-        mock_query.limit.return_value = mock_query
-        mock_query.stream.return_value = [obs_doc]
-
-        with patch("app.services.chamados_listagem_service.db") as mock_db:
-            mock_db.collection.return_value.where.return_value = mock_query
-            chamados = listar_chamados_como_observador(user_id="u_obs")
+        chamados = listar_chamados_como_observador(user_id="u_obs")
 
         assert chamados[0].em_copia is True

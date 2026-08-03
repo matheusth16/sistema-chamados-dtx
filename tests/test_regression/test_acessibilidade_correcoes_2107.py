@@ -77,7 +77,10 @@ def test_observadores_autocomplete_tem_semantica_combobox(client_logado_solicita
     """Campo de busca de observadores precisa expor role=combobox/listbox para leitor de tela."""
     with (
         patch("app.routes.chamados.get_static_cached", return_value=[]),
-        patch("app.routes.chamados.obter_total_por_contagem", return_value=0),
+        patch(
+            "app.routes.chamados.contar_status_por_solicitante",
+            return_value={"Aberto": 0, "Em Atendimento": 0, "Concluído": 0, "Cancelado": 0},
+        ),
         patch("app.routes.chamados._build_gate_subetapas", return_value={}),
     ):
         r = client_logado_solicitante.get("/")

@@ -1,103 +1,86 @@
 """
 Serviço de listagem de chamados.
 
-Centraliza a lógica de listagem para "Meus chamados" (solicitante) com
-paginação por cursor, contagens por status e fallback quando o índice Firestore não existe.
+Centraliza a lógica de listagem para "Meus chamados" (solicitante), com
+paginação por cursor (keyset sobre prioridade/data_abertura/id) e contagens
+por status via aggregation query no Postgres.
 """
 
 import logging
-from concurrent.futures import ThreadPoolExecutor
+from collections import defaultdict
 from typing import Any
 
-from firebase_admin import firestore
-from google.cloud.firestore_v1.base_query import FieldFilter
+from sqlalchemy import and_, func, or_, select
 
-from app.database import db
+from app import db as db_module
+from app.db.models.chamado import ChamadoObservadorRow, ChamadoParticipanteRow, ChamadoRow
 from app.models import Chamado
-from app.services.pagination import obter_total_por_contagem
-
-# Limite máximo de docs no fallback (sem índice composto). Um solicitante raramente
-# terá mais chamados que isso; evita ler a coleção inteira caso o índice seja removido.
-_FALLBACK_LIMIT = 200
 
 logger = logging.getLogger(__name__)
 
-
-def _eh_erro_indice_firestore(exc: Exception) -> bool:
-    """Verifica se a exceção é de índice do Firestore (FAILED_PRECONDITION / index)."""
-    msg = (getattr(exc, "message", "") or str(exc) or "").lower()
-    return "failed_precondition" in msg or "index" in msg or "requires an index" in msg
+_STATUS = ("Aberto", "Em Atendimento", "Concluído", "Cancelado")
 
 
-def listar_meus_chamados_fallback(
-    user_id: str,
-    status_filtro: str,
-    itens_por_pagina: int,
-    pagina_atual: int,
-    rl_codigo: str = "",
-) -> dict[str, Any]:
-    """
-    Fallback quando a query com order_by falha por falta de índice:
-    busca só por solicitante_id (não exige índice composto), ordena em memória e pagina.
-    """
-    q = (
-        db.collection("chamados")
-        .where(filter=FieldFilter("solicitante_id", "==", user_id))
-        .limit(_FALLBACK_LIMIT)
+def _carregar_participantes_observadores_em_lote(
+    session, chamado_ids: list[int]
+) -> tuple[dict[int, list[dict]], dict[int, list[dict]]]:
+    """Batch-load de participantes/observadores pra evitar N+1 queries na listagem."""
+    participantes_por_chamado: dict[int, list[dict]] = defaultdict(list)
+    observadores_por_chamado: dict[int, list[dict]] = defaultdict(list)
+    if not chamado_ids:
+        return participantes_por_chamado, observadores_por_chamado
+
+    rows_part = (
+        session.execute(
+            select(ChamadoParticipanteRow).where(ChamadoParticipanteRow.chamado_id.in_(chamado_ids))
+        )
+        .scalars()
+        .all()
     )
-    docs = list(q.stream())
-    if status_filtro:
-        docs = [d for d in docs if (d.to_dict() or {}).get("status") == status_filtro]
-    rl_codigo = (rl_codigo or "").strip()
-    if rl_codigo:
-        docs = [d for d in docs if (d.to_dict() or {}).get("rl_codigo") == rl_codigo]
+    for r in rows_part:
+        participantes_por_chamado[r.chamado_id].append(
+            {
+                "supervisor_id": r.supervisor_id,
+                "area": r.area,
+                "status": r.status,
+                "concluido_em": r.concluido_em,
+            }
+        )
 
-    def _data_key(d):
-        data = (d.to_dict() or {}).get("data_abertura")
-        if data is None or data == firestore.SERVER_TIMESTAMP:
-            return None
-        if hasattr(data, "to_pydatetime"):
-            return data.to_pydatetime()
-        return data
+    rows_obs = (
+        session.execute(
+            select(ChamadoObservadorRow).where(ChamadoObservadorRow.chamado_id.in_(chamado_ids))
+        )
+        .scalars()
+        .all()
+    )
+    for r in rows_obs:
+        observadores_por_chamado[r.chamado_id].append(
+            {"usuario_id": r.usuario_id, "nome": r.nome, "email": r.email}
+        )
 
-    # Ordena por prioridade (0=Projetos primeiro) e depois por data
-    def _sort_key(d):
-        data_dict = d.to_dict() or {}
-        prioridade = data_dict.get("prioridade", 1)
-        data = _data_key(d)
-        return (prioridade, data is None, -(data.timestamp() if data else 0))
+    return participantes_por_chamado, observadores_por_chamado
 
-    docs.sort(key=_sort_key)
-    status_counts = {"Aberto": 0, "Em Atendimento": 0, "Concluído": 0, "Cancelado": 0}
-    for d in docs:
-        st = (d.to_dict() or {}).get("status", "Aberto")
-        if st in status_counts:
-            status_counts[st] += 1
-    total_chamados = len(docs)
-    total_paginas = max(1, (total_chamados + itens_por_pagina - 1) // itens_por_pagina)
-    pagina_atual = max(1, min(pagina_atual, total_paginas))
-    inicio = (pagina_atual - 1) * itens_por_pagina
-    fim = inicio + itens_por_pagina
-    docs_pagina = docs[inicio:fim]
+
+def _rows_para_chamados(session, rows: list[ChamadoRow]) -> list[Chamado]:
+    """Converte ChamadoRow em Chamado, carregando participantes/observadores em lote."""
+    ids = [r.id for r in rows]
+    participantes_map, observadores_map = _carregar_participantes_observadores_em_lote(session, ids)
     chamados: list[Chamado] = []
-    for doc in docs_pagina:
+    for row in rows:
         try:
-            data = doc.to_dict()
-            if not data:
-                continue
-            chamados.append(Chamado.from_dict(data, doc.id))
-        except Exception as doc_err:
-            logger.warning("Chamado %s ignorado (dados inválidos): %s", doc.id, doc_err)
-    cursor_next = (
-        docs_pagina[-1].id
-        if len(docs_pagina) == itens_por_pagina and fim < total_chamados
-        else None
-    )
-    cursor_prev = docs_pagina[0].id if inicio > 0 else None
+            chamados.append(
+                Chamado._from_row(
+                    row, participantes_map.get(row.id, []), observadores_map.get(row.id, [])
+                )
+            )
+        except Exception as exc:
+            logger.warning("Chamado %s ignorado (dados inválidos): %s", row.id, exc)
+    return chamados
 
-    # Calcula grupo_key para ordenar grupos AOG/Projetos antes dos demais no Jinja groupby
-    from collections import defaultdict
 
+def _aplicar_grupo_key(chamados: list[Chamado]) -> None:
+    """Calcula grupo_key para ordenar grupos AOG/Projetos antes dos demais no Jinja groupby."""
     _grupo_prio: dict = defaultdict(lambda: 1)
     for c in chamados:
         rl = c.rl_codigo or ""
@@ -108,78 +91,44 @@ def listar_meus_chamados_fallback(
         rl = c.rl_codigo or ""
         c.grupo_key = f"{_grupo_prio[rl]}|{rl}"
 
-    return {
-        "chamados": chamados,
-        "pagina_atual": pagina_atual,
-        "total_paginas": total_paginas,
-        "total_chamados": total_chamados,
-        "status_counts": status_counts,
-        "cursor_next": cursor_next,
-        "cursor_prev": cursor_prev,
-    }
+
+def contar_status_por_solicitante(user_id: str) -> dict[str, int]:
+    """Contagem por status dos chamados do solicitante (aggregation query, sem
+    carregar documentos) — usada no badge do formulário de novo chamado."""
+    with db_module.SessionLocal() as session:
+        status_counts = {}
+        for st in _STATUS:
+            stmt = (
+                select(func.count())
+                .select_from(ChamadoRow)
+                .where(ChamadoRow.solicitante_id == user_id, ChamadoRow.status == st)
+            )
+            status_counts[st] = session.execute(stmt).scalar() or 0
+    return status_counts
 
 
 def listar_chamados_como_observador(
     user_id: str,
     limite: int = 200,
 ) -> list:
-    """Retorna chamados onde user_id consta em observadores[*].usuario_id.
-
-    Usa array-contains query do Firestore com o campo de lookup desnormalizado
-    (observadores_ids — lista de IDs pura, para compatibilidade com índices).
-    Fallback: quando a query retorna vazio, escaneia os 200 docs mais recentes
-    e filtra em memória por observadores[*].usuario_id.
+    """Retorna chamados onde user_id consta como observador (chamados_observadores).
 
     Returns:
         Lista de objetos Chamado com atributo extra em_copia=True.
     """
-    try:
-        q = (
-            db.collection("chamados")
-            .where(filter=FieldFilter("observadores_ids", "array_contains", user_id))
+    with db_module.SessionLocal() as session:
+        stmt = (
+            select(ChamadoRow)
+            .join(ChamadoObservadorRow, ChamadoObservadorRow.chamado_id == ChamadoRow.id)
+            .where(ChamadoObservadorRow.usuario_id == user_id)
+            .order_by(ChamadoRow.data_abertura.desc())
             .limit(limite)
         )
-        docs = list(q.stream())
-    except Exception as exc:
-        logger.debug("Query observadores_ids falhou (%s); usando fallback em memória.", exc)
-        docs = []
+        rows = session.execute(stmt).scalars().all()
+        chamados = _rows_para_chamados(session, rows)
 
-    if not docs:
-        try:
-            raw = list(
-                db.collection("chamados")
-                .order_by("data_abertura", direction=firestore.Query.DESCENDING)
-                .limit(limite)
-                .stream()
-            )
-        except Exception as exc2:
-            logger.debug("Fallback scan observador falhou (%s).", exc2)
-            raw = []
-        docs = [
-            d
-            for d in raw
-            if any(
-                (
-                    obs.get("usuario_id")
-                    if isinstance(obs, dict)
-                    else getattr(obs, "usuario_id", None)
-                )
-                == user_id
-                for obs in (d.to_dict() or {}).get("observadores") or []
-            )
-        ]
-
-    chamados = []
-    for doc in docs:
-        try:
-            data = doc.to_dict()
-            if not data:
-                continue
-            c = Chamado.from_dict(data, doc.id)
-            c.em_copia = True
-            chamados.append(c)
-        except Exception as doc_err:
-            logger.warning("Chamado observador %s ignorado: %s", doc.id, doc_err)
+    for c in chamados:
+        c.em_copia = True
     return chamados
 
 
@@ -193,110 +142,101 @@ def listar_meus_chamados(
     itens_por_pagina: int = 10,
 ) -> dict[str, Any]:
     """
-    Lista chamados do solicitante com paginação por cursor.
+    Lista chamados do solicitante com paginação por cursor (keyset).
 
     Returns:
         Dict com: chamados, pagina_atual, total_paginas, total_chamados,
         status_counts, cursor_next, cursor_prev.
     """
     rl_codigo = (rl_codigo or "").strip()
-    q = db.collection("chamados").where(filter=FieldFilter("solicitante_id", "==", user_id))
-    if status_filtro:
-        q = q.where(filter=FieldFilter("status", "==", status_filtro))
-    if rl_codigo:
-        q = q.where(filter=FieldFilter("rl_codigo", "==", rl_codigo))
-    # Ordena por prioridade (Projetos=0 primeiro) e depois por data_abertura
-    q = q.order_by("prioridade").order_by("data_abertura", direction=firestore.Query.DESCENDING)
 
-    base_ref = db.collection("chamados").where(filter=FieldFilter("solicitante_id", "==", user_id))
-    if rl_codigo:
-        base_ref = base_ref.where(filter=FieldFilter("rl_codigo", "==", rl_codigo))
+    with db_module.SessionLocal() as session:
+        base_filters = [ChamadoRow.solicitante_id == user_id]
+        if rl_codigo:
+            base_filters.append(ChamadoRow.rl_codigo == rl_codigo)
 
-    _status = ("Aberto", "Em Atendimento", "Concluído", "Cancelado")
+        filtros = list(base_filters)
+        if status_filtro:
+            filtros.append(ChamadoRow.status == status_filtro)
 
-    # Cache status_counts por (user_id, rl_codigo) — evita 4 aggregation queries por request
-    _status_cache_key = f"status_counts:{user_id}:{rl_codigo}"
-    try:
-        from app.cache import cache_get
-
-        status_counts = cache_get(_status_cache_key)
-    except Exception:
-        status_counts = None
-
-    if status_counts is not None:
-        # Deriva total a partir do cache — elimina a 5ª query (contar_total) também
-        total_chamados = (
-            status_counts.get(status_filtro, 0) if status_filtro else sum(status_counts.values())
-        )
-    else:
-
-        def _contar_total():
-            return obter_total_por_contagem(q) or 0
-
-        def _contar_status(st):
-            return st, obter_total_por_contagem(
-                base_ref.where(filter=FieldFilter("status", "==", st))
-            ) or 0
-
-        # 5 aggregation queries independentes → rodam concorrentemente
-        with ThreadPoolExecutor(max_workers=5) as ex:
-            fut_total = ex.submit(_contar_total)
-            fut_status = [ex.submit(_contar_status, st) for st in _status]
-            total_chamados = fut_total.result()
-            status_counts = dict(f.result() for f in fut_status)
-
+        # Cache status_counts por (user_id, rl_codigo) — evita 4 aggregation queries por request
+        _status_cache_key = f"status_counts:{user_id}:{rl_codigo}"
         try:
-            from app.cache import cache_set
+            from app.cache import cache_get
 
-            cache_set(_status_cache_key, status_counts, 45)
-        except Exception as e:
-            logger.debug("Cache indisponível ao salvar status_counts: %s", e)
+            status_counts = cache_get(_status_cache_key)
+        except Exception:
+            status_counts = None
 
-    total_paginas = max(1, (total_chamados + itens_por_pagina - 1) // itens_por_pagina)
-    pagina_atual = max(1, min(pagina_atual, total_paginas))
+        def _contar(filtros_extra) -> int:
+            stmt = select(func.count()).select_from(ChamadoRow).where(*filtros_extra)
+            return session.execute(stmt).scalar() or 0
 
-    if cursor:
-        try:
-            cursor_doc = db.collection("chamados").document(cursor).get()
-            if cursor_doc.exists:
-                q_page = q.start_after(cursor_doc).limit(itens_por_pagina + 1)
-            else:
-                q_page = q.limit(itens_por_pagina + 1)
-        except Exception as e:
-            logger.debug("Cursor inválido em meus_chamados: %s", e)
-            q_page = q.limit(itens_por_pagina + 1)
-    else:
-        q_page = q.limit(itens_por_pagina + 1)
+        if status_counts is not None:
+            # Deriva total a partir do cache — elimina a 5ª query (contar_total) também
+            total_chamados = (
+                status_counts.get(status_filtro, 0)
+                if status_filtro
+                else sum(status_counts.values())
+            )
+        else:
+            total_chamados = _contar(filtros)
+            status_counts = {
+                st: _contar([*base_filters, ChamadoRow.status == st]) for st in _STATUS
+            }
 
-    docs = list(q_page.stream())
-    tem_proxima = len(docs) > itens_por_pagina
-    if tem_proxima:
-        docs = docs[:itens_por_pagina]
-    cursor_next = docs[-1].id if docs and tem_proxima else None
-    cursor_prev = docs[0].id if docs and cursor else None
+            try:
+                from app.cache import cache_set
 
-    chamados = []
-    for doc in docs:
-        try:
-            data = doc.to_dict()
-            if not data:
-                continue
-            chamados.append(Chamado.from_dict(data, doc.id))
-        except Exception as doc_err:
-            logger.warning("Chamado %s ignorado (dados inválidos): %s", doc.id, doc_err)
+                cache_set(_status_cache_key, status_counts, 45)
+            except Exception as e:
+                logger.debug("Cache indisponível ao salvar status_counts: %s", e)
 
-    # Calcula grupo_key para ordenar grupos AOG/Projetos antes dos demais no Jinja groupby
-    from collections import defaultdict
+        total_paginas = max(1, (total_chamados + itens_por_pagina - 1) // itens_por_pagina)
+        pagina_atual = max(1, min(pagina_atual, total_paginas))
 
-    _grupo_prio: dict = defaultdict(lambda: 1)
-    for c in chamados:
-        rl = c.rl_codigo or ""
-        prio = getattr(c, "prioridade", 1)
-        if prio < _grupo_prio[rl]:
-            _grupo_prio[rl] = prio
-    for c in chamados:
-        rl = c.rl_codigo or ""
-        c.grupo_key = f"{_grupo_prio[rl]}|{rl}"
+        stmt = select(ChamadoRow).where(*filtros)
+
+        cursor_row = None
+        if cursor:
+            try:
+                cursor_row = session.get(ChamadoRow, int(cursor))
+            except (TypeError, ValueError) as e:
+                logger.debug("Cursor inválido em meus_chamados: %s", e)
+                cursor_row = None
+
+        if cursor_row is not None:
+            p0, d0, id0 = cursor_row.prioridade, cursor_row.data_abertura, cursor_row.id
+            stmt = stmt.where(
+                or_(
+                    ChamadoRow.prioridade > p0,
+                    and_(ChamadoRow.prioridade == p0, ChamadoRow.data_abertura < d0),
+                    and_(
+                        ChamadoRow.prioridade == p0,
+                        ChamadoRow.data_abertura == d0,
+                        ChamadoRow.id > id0,
+                    ),
+                )
+            )
+
+        # Ordena por prioridade (Projetos=0 primeiro), depois data_abertura desc,
+        # com id como desempate estável (data_abertura pode empatar dentro da
+        # mesma transação — server_default now() é por transação, não por statement).
+        stmt = stmt.order_by(
+            ChamadoRow.prioridade.asc(), ChamadoRow.data_abertura.desc(), ChamadoRow.id.asc()
+        ).limit(itens_por_pagina + 1)
+
+        rows = list(session.execute(stmt).scalars().all())
+        tem_proxima = len(rows) > itens_por_pagina
+        if tem_proxima:
+            rows = rows[:itens_por_pagina]
+
+        cursor_next = str(rows[-1].id) if rows and tem_proxima else None
+        cursor_prev_resultado = str(rows[0].id) if rows and cursor else None
+
+        chamados = _rows_para_chamados(session, rows)
+
+    _aplicar_grupo_key(chamados)
 
     return {
         "chamados": chamados,
@@ -305,5 +245,5 @@ def listar_meus_chamados(
         "total_chamados": total_chamados,
         "status_counts": status_counts,
         "cursor_next": cursor_next,
-        "cursor_prev": cursor_prev,
+        "cursor_prev": cursor_prev_resultado,
     }

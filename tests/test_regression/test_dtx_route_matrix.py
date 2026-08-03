@@ -66,7 +66,10 @@ def _mock_meus_chamados():
 def _mock_formulario():
     with (
         patch("app.routes.chamados.get_static_cached", return_value=[]),
-        patch("app.routes.chamados.obter_total_por_contagem", return_value=0),
+        patch(
+            "app.routes.chamados.contar_status_por_solicitante",
+            return_value={"Aberto": 0, "Em Atendimento": 0, "Concluído": 0, "Cancelado": 0},
+        ),
         patch("app.routes.chamados._build_gate_subetapas", return_value={}),
     ):
         yield
