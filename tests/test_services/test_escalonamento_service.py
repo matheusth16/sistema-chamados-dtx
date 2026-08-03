@@ -1,12 +1,22 @@
-"""Testes TDD para escalonamento_service: transferir_area e escalonar_colega.
+"""Testes de escalonamento_service: transferir_area, escalonar_colega,
+incluir_participantes, concluir_minha_parte, definir_previsao_atendimento.
 
-Ordem TDD: estes testes são escritos ANTES da implementação do serviço.
-Mock strategy: patch('app.services.escalonamento_service.db') conforme padrão do projeto.
+Fase 2 (Marco 7): persistência real contra Postgres (fixture db_session) via
+Chamado.salvar()/get_by_id()/atualizar_campos() — substitui o antigo mock de
+db.collection("chamados").document(id).update(...) capturado num dict.
+Historico/Usuario continuam mockados (Historico ainda é Firestore — Marco 8;
+Usuario.get_supervisores_por_area é lookup independente do chamado em si).
 """
 
 from unittest.mock import MagicMock, patch
 
 import pytest
+
+from app.models import Chamado
+
+pytestmark = pytest.mark.usefixtures("db_session")
+
+_ID_INEXISTENTE = 999999999
 
 # ── helpers de mock ───────────────────────────────────────────────────────────
 
@@ -27,41 +37,26 @@ ADMIN = _usuario("id_admin", "Admin User", "admin")
 NAO_OWNER = _usuario("id_nao_owner", "Outro Supervisor", areas=["Outra Area"])
 
 
-def _chamado_dict(
+def _criar_chamado_real(
     area="Engenharia",
     responsavel_id="id_julia",
     responsavel="Julia Silva",
     participantes=None,
     status="Em Atendimento",
-):
-    return {
-        "area": area,
-        "responsavel_id": responsavel_id,
-        "responsavel": responsavel,
-        "motivo_ultima_escalacao": None,
-        "supervisor_ids_com_acesso": [responsavel_id] if responsavel_id else [],
-        "participantes": participantes or [],
-        "categoria": "Manutencao",
-        "tipo_solicitacao": "Corretiva",
-        "descricao": "Descrição teste",
-        "status": status,
-    }
-
-
-def _make_db_mock(chamado_data=None, doc_exists=True):
-    """Retorna (mock_db, dict_atualizado) onde dict_atualizado captura o .update()."""
-    mock_db = MagicMock()
-    mock_doc = MagicMock()
-    mock_doc.exists = doc_exists
-    mock_doc.to_dict.return_value = chamado_data or _chamado_dict()
-    mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
-
-    updated = {}
-    mock_db.collection.return_value.document.return_value.update.side_effect = (
-        lambda d: updated.update(d)
+) -> int:
+    chamado = Chamado(
+        categoria="Manutencao",
+        tipo_solicitacao="Corretiva",
+        descricao="Descrição teste",
+        responsavel=responsavel,
+        responsavel_id=responsavel_id,
+        area=area,
+        status=status,
+        participantes=participantes or [],
     )
-
-    return mock_db, updated
+    chamado_id = chamado.salvar()
+    assert chamado_id is not None
+    return chamado_id
 
 
 def _sup_mock(uid, nome, areas=None):
@@ -79,16 +74,13 @@ class TestTransferirArea:
     """Testes da função transferir_area."""
 
     def test_transferir_area_muda_area_e_owner(self):
-        """Transferência muda area e responsavel_id no Firestore."""
+        """Transferência muda area e responsavel_id no Postgres."""
         from app.services.escalonamento_service import transferir_area
 
-        mock_db, updated = _make_db_mock(
-            _chamado_dict(area="Engenharia", responsavel_id="id_julia")
-        )
+        chamado_id = _criar_chamado_real(area="Engenharia", responsavel_id="id_julia")
         sup_dest = _sup_mock("id_matheus", "Matheus Costa", areas=["Planejamento"])
 
         with (
-            patch("app.services.escalonamento_service.db", mock_db),
             patch("app.services.escalonamento_service.Usuario") as mock_usuario,
             patch("app.services.escalonamento_service.Historico"),
             patch(
@@ -98,26 +90,23 @@ class TestTransferirArea:
         ):
             mock_usuario.get_supervisores_por_area.return_value = [sup_dest]
             resultado = transferir_area(
-                "id_chamado", "Planejamento", "id_matheus", "Precisa de PPCP", JULIA
+                chamado_id, "Planejamento", "id_matheus", "Precisa de PPCP", JULIA
             )
 
         assert resultado["sucesso"] is True
-        assert updated["area"] == "Planejamento"
-        assert updated["responsavel_id"] == "id_matheus"
+        atualizado = Chamado.get_by_id(chamado_id)
+        assert atualizado.area == "Planejamento"
+        assert atualizado.responsavel_id == "id_matheus"
 
     def test_transferir_area_ex_owner_perde_acesso(self):
         """Após transferência, ex-owner (julia, área Engenharia) não pode mais ver o chamado."""
-        from app.models import Chamado
         from app.services.escalonamento_service import transferir_area
         from app.services.permissions import usuario_pode_ver_chamado
 
-        mock_db, updated = _make_db_mock(
-            _chamado_dict(area="Engenharia", responsavel_id="id_julia")
-        )
+        chamado_id = _criar_chamado_real(area="Engenharia", responsavel_id="id_julia")
         sup_dest = _sup_mock("id_matheus", "Matheus Costa", areas=["Planejamento"])
 
         with (
-            patch("app.services.escalonamento_service.db", mock_db),
             patch("app.services.escalonamento_service.Usuario") as mock_usuario,
             patch("app.services.escalonamento_service.Historico"),
             patch(
@@ -126,28 +115,21 @@ class TestTransferirArea:
             ),
         ):
             mock_usuario.get_supervisores_por_area.return_value = [sup_dest]
-            transferir_area("id_chamado", "Planejamento", "id_matheus", "motivo", JULIA)
+            transferir_area(chamado_id, "Planejamento", "id_matheus", "motivo", JULIA)
 
-        # Constrói chamado atualizado com o que foi gravado
-        chamado_dict_atualizado = {**_chamado_dict(), **updated}
-        chamado_atualizado = Chamado.from_dict(chamado_dict_atualizado, "id_chamado")
-
+        chamado_atualizado = Chamado.get_by_id(chamado_id)
         julia_user = _usuario("id_julia", "Julia", areas=["Engenharia"])
         assert usuario_pode_ver_chamado(julia_user, chamado_atualizado) is False
 
     def test_transferir_area_novo_owner_ganha_acesso(self):
         """Após transferência, novo owner (matheus, área Planejamento) passa a ver o chamado."""
-        from app.models import Chamado
         from app.services.escalonamento_service import transferir_area
         from app.services.permissions import usuario_pode_ver_chamado
 
-        mock_db, updated = _make_db_mock(
-            _chamado_dict(area="Engenharia", responsavel_id="id_julia")
-        )
+        chamado_id = _criar_chamado_real(area="Engenharia", responsavel_id="id_julia")
         sup_dest = _sup_mock("id_matheus", "Matheus Costa", areas=["Planejamento"])
 
         with (
-            patch("app.services.escalonamento_service.db", mock_db),
             patch("app.services.escalonamento_service.Usuario") as mock_usuario,
             patch("app.services.escalonamento_service.Historico"),
             patch(
@@ -156,11 +138,9 @@ class TestTransferirArea:
             ),
         ):
             mock_usuario.get_supervisores_por_area.return_value = [sup_dest]
-            transferir_area("id_chamado", "Planejamento", "id_matheus", "motivo", JULIA)
+            transferir_area(chamado_id, "Planejamento", "id_matheus", "motivo", JULIA)
 
-        chamado_dict_atualizado = {**_chamado_dict(), **updated}
-        chamado_atualizado = Chamado.from_dict(chamado_dict_atualizado, "id_chamado")
-
+        chamado_atualizado = Chamado.get_by_id(chamado_id)
         matheus_user = _usuario("id_matheus", "Matheus", areas=["Planejamento"])
         assert usuario_pode_ver_chamado(matheus_user, chamado_atualizado) is True
 
@@ -169,18 +149,17 @@ class TestTransferirArea:
         from app.services.escalonamento_service import transferir_area
 
         with pytest.raises(ValueError, match="supervisor_id obrigatório"):
-            transferir_area("id_chamado", "Planejamento", None, "motivo", JULIA)
+            transferir_area(_ID_INEXISTENTE, "Planejamento", None, "motivo", JULIA)
 
     def test_transferir_area_registra_historico(self):
         """Transferência deve registrar histórico com acao='transferencia_area'."""
         from app.services.escalonamento_service import transferir_area
 
-        mock_db, _ = _make_db_mock(_chamado_dict(area="Engenharia", responsavel_id="id_julia"))
+        chamado_id = _criar_chamado_real(area="Engenharia", responsavel_id="id_julia")
         sup_dest = _sup_mock("id_matheus", "Matheus Costa", areas=["Planejamento"])
         hist_instancia = MagicMock()
 
         with (
-            patch("app.services.escalonamento_service.db", mock_db),
             patch("app.services.escalonamento_service.Usuario") as mock_usuario,
             patch("app.services.escalonamento_service.Historico") as mock_hist_cls,
             patch(
@@ -190,7 +169,7 @@ class TestTransferirArea:
         ):
             mock_usuario.get_supervisores_por_area.return_value = [sup_dest]
             mock_hist_cls.return_value = hist_instancia
-            transferir_area("id_chamado", "Planejamento", "id_matheus", "motivo válido", JULIA)
+            transferir_area(chamado_id, "Planejamento", "id_matheus", "motivo válido", JULIA)
 
         args, kwargs = mock_hist_cls.call_args
         assert kwargs.get("acao") == "transferencia_area"
@@ -204,13 +183,10 @@ class TestTransferirArea:
         """supervisor_ids_com_acesso deve ser recalculado após transferência."""
         from app.services.escalonamento_service import transferir_area
 
-        mock_db, updated = _make_db_mock(
-            _chamado_dict(area="Engenharia", responsavel_id="id_julia")
-        )
+        chamado_id = _criar_chamado_real(area="Engenharia", responsavel_id="id_julia")
         sup_dest = _sup_mock("id_matheus", "Matheus Costa", areas=["Planejamento"])
 
         with (
-            patch("app.services.escalonamento_service.db", mock_db),
             patch("app.services.escalonamento_service.Usuario") as mock_usuario,
             patch("app.services.escalonamento_service.Historico"),
             patch(
@@ -219,21 +195,18 @@ class TestTransferirArea:
         ):
             mock_usuario.get_supervisores_por_area.return_value = [sup_dest]
             mock_calc.return_value = ["id_matheus"]
-            transferir_area("id_chamado", "Planejamento", "id_matheus", "motivo", JULIA)
+            transferir_area(chamado_id, "Planejamento", "id_matheus", "motivo", JULIA)
 
         mock_calc.assert_called_once_with("Planejamento", "id_matheus", [])
-        assert updated["supervisor_ids_com_acesso"] == ["id_matheus"]
+        assert Chamado.get_by_id(chamado_id).supervisor_ids_com_acesso == ["id_matheus"]
 
     def test_transferir_area_nao_owner_retorna_erro(self):
         """Supervisor que não é owner não pode transferir — retorna sucesso=False."""
         from app.services.escalonamento_service import transferir_area
 
-        mock_db, _ = _make_db_mock(_chamado_dict(area="Engenharia", responsavel_id="id_julia"))
+        chamado_id = _criar_chamado_real(area="Engenharia", responsavel_id="id_julia")
 
-        with patch("app.services.escalonamento_service.db", mock_db):
-            resultado = transferir_area(
-                "id_chamado", "Planejamento", "id_matheus", "motivo", NAO_OWNER
-            )
+        resultado = transferir_area(chamado_id, "Planejamento", "id_matheus", "motivo", NAO_OWNER)
 
         assert resultado["sucesso"] is False
         assert "permission" in resultado["erro"].lower() or "access" in resultado["erro"].lower()
@@ -243,25 +216,20 @@ class TestTransferirArea:
         from app.services.escalonamento_service import transferir_area
 
         with pytest.raises(ValueError, match="motivo"):
-            transferir_area("id_chamado", "Planejamento", "id_matheus", "   ", JULIA)
+            transferir_area(_ID_INEXISTENTE, "Planejamento", "id_matheus", "   ", JULIA)
 
     def test_transferir_area_area_vazia_lanca_erro(self):
         """Área vazia deve levantar ValueError."""
         from app.services.escalonamento_service import transferir_area
 
         with pytest.raises(ValueError, match="área"):
-            transferir_area("id_chamado", "", "id_matheus", "motivo", JULIA)
+            transferir_area(_ID_INEXISTENTE, "", "id_matheus", "motivo", JULIA)
 
     def test_transferir_area_chamado_nao_encontrado(self):
         """Chamado inexistente retorna sucesso=False."""
         from app.services.escalonamento_service import transferir_area
 
-        mock_db, _ = _make_db_mock(doc_exists=False)
-
-        with patch("app.services.escalonamento_service.db", mock_db):
-            resultado = transferir_area(
-                "id_inexistente", "Planejamento", "id_matheus", "motivo", JULIA
-            )
+        resultado = transferir_area(_ID_INEXISTENTE, "Planejamento", "id_matheus", "motivo", JULIA)
 
         assert resultado["sucesso"] is False
         assert "not found" in resultado["erro"].lower()
@@ -270,16 +238,13 @@ class TestTransferirArea:
         """Supervisor destino que não pertence à área destino retorna erro."""
         from app.services.escalonamento_service import transferir_area
 
-        mock_db, _ = _make_db_mock(_chamado_dict(area="Engenharia", responsavel_id="id_julia"))
+        chamado_id = _criar_chamado_real(area="Engenharia", responsavel_id="id_julia")
 
-        with (
-            patch("app.services.escalonamento_service.db", mock_db),
-            patch("app.services.escalonamento_service.Usuario") as mock_usuario,
-        ):
+        with patch("app.services.escalonamento_service.Usuario") as mock_usuario:
             # Lista vazia — supervisor_id não está na área destino
             mock_usuario.get_supervisores_por_area.return_value = []
             resultado = transferir_area(
-                "id_chamado", "Planejamento", "id_desconhecido", "motivo", JULIA
+                chamado_id, "Planejamento", "id_desconhecido", "motivo", JULIA
             )
 
         assert resultado["sucesso"] is False
@@ -289,13 +254,10 @@ class TestTransferirArea:
         """Admin pode transferir mesmo sem ser o owner do chamado."""
         from app.services.escalonamento_service import transferir_area
 
-        mock_db, updated = _make_db_mock(
-            _chamado_dict(area="Engenharia", responsavel_id="id_julia")
-        )
+        chamado_id = _criar_chamado_real(area="Engenharia", responsavel_id="id_julia")
         sup_dest = _sup_mock("id_matheus", "Matheus Costa", areas=["Planejamento"])
 
         with (
-            patch("app.services.escalonamento_service.db", mock_db),
             patch("app.services.escalonamento_service.Usuario") as mock_usuario,
             patch("app.services.escalonamento_service.Historico"),
             patch(
@@ -304,10 +266,10 @@ class TestTransferirArea:
             ),
         ):
             mock_usuario.get_supervisores_por_area.return_value = [sup_dest]
-            resultado = transferir_area("id_chamado", "Planejamento", "id_matheus", "motivo", ADMIN)
+            resultado = transferir_area(chamado_id, "Planejamento", "id_matheus", "motivo", ADMIN)
 
         assert resultado["sucesso"] is True
-        assert updated["area"] == "Planejamento"
+        assert Chamado.get_by_id(chamado_id).area == "Planejamento"
 
 
 # ── Task 3.2: escalonar_colega ────────────────────────────────────────────────
@@ -320,13 +282,10 @@ class TestEscalonarColega:
         """Escalonamento troca responsavel_id mantendo a área."""
         from app.services.escalonamento_service import escalonar_colega
 
-        mock_db, updated = _make_db_mock(
-            _chamado_dict(area="Engenharia", responsavel_id="id_julia")
-        )
+        chamado_id = _criar_chamado_real(area="Engenharia", responsavel_id="id_julia")
         colega = _sup_mock("id_matheus", "Matheus Costa", areas=["Engenharia"])
 
         with (
-            patch("app.services.escalonamento_service.db", mock_db),
             patch("app.services.escalonamento_service.Usuario") as mock_usuario,
             patch("app.services.escalonamento_service.Historico"),
             patch(
@@ -336,23 +295,20 @@ class TestEscalonarColega:
         ):
             mock_usuario.get_supervisores_por_area.return_value = [colega]
             resultado = escalonar_colega(
-                "id_chamado", "id_matheus", "Matheus tem especialidade X", JULIA
+                chamado_id, "id_matheus", "Matheus tem especialidade X", JULIA
             )
 
         assert resultado["sucesso"] is True
-        assert updated["responsavel_id"] == "id_matheus"
+        assert Chamado.get_by_id(chamado_id).responsavel_id == "id_matheus"
 
     def test_escalonar_colega_area_permanece(self):
         """Escalonamento de colega não altera a área do chamado."""
         from app.services.escalonamento_service import escalonar_colega
 
-        mock_db, updated = _make_db_mock(
-            _chamado_dict(area="Engenharia", responsavel_id="id_julia")
-        )
+        chamado_id = _criar_chamado_real(area="Engenharia", responsavel_id="id_julia")
         colega = _sup_mock("id_matheus", "Matheus Costa", areas=["Engenharia"])
 
         with (
-            patch("app.services.escalonamento_service.db", mock_db),
             patch("app.services.escalonamento_service.Usuario") as mock_usuario,
             patch("app.services.escalonamento_service.Historico"),
             patch(
@@ -361,20 +317,19 @@ class TestEscalonarColega:
             ),
         ):
             mock_usuario.get_supervisores_por_area.return_value = [colega]
-            escalonar_colega("id_chamado", "id_matheus", "motivo", JULIA)
+            escalonar_colega(chamado_id, "id_matheus", "motivo", JULIA)
 
-        assert "area" not in updated  # área não foi atualizada
+        assert Chamado.get_by_id(chamado_id).area == "Engenharia"
 
     def test_escalonar_colega_registra_historico(self):
         """Escalonamento deve registrar histórico com acao='escalonamento_colega'."""
         from app.services.escalonamento_service import escalonar_colega
 
-        mock_db, _ = _make_db_mock(_chamado_dict(area="Engenharia", responsavel_id="id_julia"))
+        chamado_id = _criar_chamado_real(area="Engenharia", responsavel_id="id_julia")
         colega = _sup_mock("id_matheus", "Matheus Costa", areas=["Engenharia"])
         hist_instancia = MagicMock()
 
         with (
-            patch("app.services.escalonamento_service.db", mock_db),
             patch("app.services.escalonamento_service.Usuario") as mock_usuario,
             patch("app.services.escalonamento_service.Historico") as mock_hist_cls,
             patch(
@@ -384,7 +339,7 @@ class TestEscalonarColega:
         ):
             mock_usuario.get_supervisores_por_area.return_value = [colega]
             mock_hist_cls.return_value = hist_instancia
-            escalonar_colega("id_chamado", "id_matheus", "motivo", JULIA)
+            escalonar_colega(chamado_id, "id_matheus", "motivo", JULIA)
 
         args, kwargs = mock_hist_cls.call_args
         assert kwargs.get("acao") == "escalonamento_colega"
@@ -396,19 +351,16 @@ class TestEscalonarColega:
         from app.services.escalonamento_service import escalonar_colega
 
         with pytest.raises(ValueError, match="motivo"):
-            escalonar_colega("id_chamado", "id_matheus", "", JULIA)
+            escalonar_colega(_ID_INEXISTENTE, "id_matheus", "", JULIA)
 
     def test_escalonar_colega_recalcula_supervisor_ids_com_acesso(self):
         """supervisor_ids_com_acesso deve ser recalculado após escalonamento."""
         from app.services.escalonamento_service import escalonar_colega
 
-        mock_db, updated = _make_db_mock(
-            _chamado_dict(area="Engenharia", responsavel_id="id_julia")
-        )
+        chamado_id = _criar_chamado_real(area="Engenharia", responsavel_id="id_julia")
         colega = _sup_mock("id_matheus", "Matheus Costa", areas=["Engenharia"])
 
         with (
-            patch("app.services.escalonamento_service.db", mock_db),
             patch("app.services.escalonamento_service.Usuario") as mock_usuario,
             patch("app.services.escalonamento_service.Historico"),
             patch(
@@ -417,24 +369,21 @@ class TestEscalonarColega:
         ):
             mock_usuario.get_supervisores_por_area.return_value = [colega]
             mock_calc.return_value = ["id_matheus"]
-            escalonar_colega("id_chamado", "id_matheus", "motivo", JULIA)
+            escalonar_colega(chamado_id, "id_matheus", "motivo", JULIA)
 
         mock_calc.assert_called_once_with("Engenharia", "id_matheus", [])
-        assert updated["supervisor_ids_com_acesso"] == ["id_matheus"]
+        assert Chamado.get_by_id(chamado_id).supervisor_ids_com_acesso == ["id_matheus"]
 
     def test_escalonar_colega_colega_outra_area_invalido(self):
         """Supervisor destino de área diferente retorna erro."""
         from app.services.escalonamento_service import escalonar_colega
 
-        mock_db, _ = _make_db_mock(_chamado_dict(area="Engenharia", responsavel_id="id_julia"))
+        chamado_id = _criar_chamado_real(area="Engenharia", responsavel_id="id_julia")
 
-        with (
-            patch("app.services.escalonamento_service.db", mock_db),
-            patch("app.services.escalonamento_service.Usuario") as mock_usuario,
-        ):
+        with patch("app.services.escalonamento_service.Usuario") as mock_usuario:
             # Colega não está na área (lista vazia)
             mock_usuario.get_supervisores_por_area.return_value = []
-            resultado = escalonar_colega("id_chamado", "id_outro_area", "motivo", JULIA)
+            resultado = escalonar_colega(chamado_id, "id_outro_area", "motivo", JULIA)
 
         assert resultado["sucesso"] is False
         assert "área" in resultado["erro"].lower() or "supervisor" in resultado["erro"].lower()
@@ -443,10 +392,9 @@ class TestEscalonarColega:
         """Destino igual ao owner atual retorna erro."""
         from app.services.escalonamento_service import escalonar_colega
 
-        mock_db, _ = _make_db_mock(_chamado_dict(area="Engenharia", responsavel_id="id_julia"))
+        chamado_id = _criar_chamado_real(area="Engenharia", responsavel_id="id_julia")
 
-        with patch("app.services.escalonamento_service.db", mock_db):
-            resultado = escalonar_colega("id_chamado", "id_julia", "motivo", JULIA)
+        resultado = escalonar_colega(chamado_id, "id_julia", "motivo", JULIA)
 
         assert resultado["sucesso"] is False
         assert (
@@ -459,10 +407,9 @@ class TestEscalonarColega:
         """Supervisor que não é owner não pode escalonar."""
         from app.services.escalonamento_service import escalonar_colega
 
-        mock_db, _ = _make_db_mock(_chamado_dict(area="Engenharia", responsavel_id="id_julia"))
+        chamado_id = _criar_chamado_real(area="Engenharia", responsavel_id="id_julia")
 
-        with patch("app.services.escalonamento_service.db", mock_db):
-            resultado = escalonar_colega("id_chamado", "id_matheus", "motivo", NAO_OWNER)
+        resultado = escalonar_colega(chamado_id, "id_matheus", "motivo", NAO_OWNER)
 
         assert resultado["sucesso"] is False
 
@@ -471,7 +418,7 @@ class TestEscalonarColega:
         from app.services.escalonamento_service import escalonar_colega
 
         with pytest.raises(ValueError, match="supervisor_id"):
-            escalonar_colega("id_chamado", None, "motivo", JULIA)
+            escalonar_colega(_ID_INEXISTENTE, None, "motivo", JULIA)
 
 
 # ── Task 4.2: incluir_participantes e concluir_minha_parte ───────────────────
@@ -488,11 +435,10 @@ class TestIncluirParticipantes:
         """Adiciona participante novo à lista."""
         from app.services.escalonamento_service import incluir_participantes
 
-        mock_db, updated = _make_db_mock(_chamado_dict(responsavel_id="id_julia", participantes=[]))
+        chamado_id = _criar_chamado_real(responsavel_id="id_julia", participantes=[])
         sup_pedro = _sup_mock("id_pedro", "Pedro Alves", areas=["Logistica"])
 
         with (
-            patch("app.services.escalonamento_service.db", mock_db),
             patch("app.services.escalonamento_service.Usuario") as mock_usuario,
             patch("app.services.escalonamento_service.Historico"),
             patch(
@@ -502,23 +448,23 @@ class TestIncluirParticipantes:
         ):
             mock_usuario.get_supervisores_por_area.return_value = [sup_pedro]
             resultado = incluir_participantes(
-                "id_chamado",
+                chamado_id,
                 [{"supervisor_id": "id_pedro", "area": "Logistica"}],
                 JULIA,
             )
 
         assert resultado["sucesso"] is True
-        assert any(p["supervisor_id"] == "id_pedro" for p in updated["participantes"])
+        participantes = Chamado.get_by_id(chamado_id).participantes
+        assert any(p["supervisor_id"] == "id_pedro" for p in participantes)
 
     def test_incluir_participantes_status_pendente(self):
         """Participante incluído recebe status='pendente'."""
         from app.services.escalonamento_service import incluir_participantes
 
-        mock_db, updated = _make_db_mock(_chamado_dict(responsavel_id="id_julia", participantes=[]))
+        chamado_id = _criar_chamado_real(responsavel_id="id_julia", participantes=[])
         sup_pedro = _sup_mock("id_pedro", "Pedro Alves", areas=["Logistica"])
 
         with (
-            patch("app.services.escalonamento_service.db", mock_db),
             patch("app.services.escalonamento_service.Usuario") as mock_usuario,
             patch("app.services.escalonamento_service.Historico"),
             patch(
@@ -528,12 +474,13 @@ class TestIncluirParticipantes:
         ):
             mock_usuario.get_supervisores_por_area.return_value = [sup_pedro]
             incluir_participantes(
-                "id_chamado",
+                chamado_id,
                 [{"supervisor_id": "id_pedro", "area": "Logistica"}],
                 JULIA,
             )
 
-        novo_p = next(p for p in updated["participantes"] if p["supervisor_id"] == "id_pedro")
+        participantes = Chamado.get_by_id(chamado_id).participantes
+        novo_p = next(p for p in participantes if p["supervisor_id"] == "id_pedro")
         assert novo_p["status"] == "pendente"
         assert novo_p["concluido_em"] is None
 
@@ -541,11 +488,10 @@ class TestIncluirParticipantes:
         """Após incluir participante, supervisor_ids_com_acesso é recalculado."""
         from app.services.escalonamento_service import incluir_participantes
 
-        mock_db, updated = _make_db_mock(_chamado_dict(responsavel_id="id_julia", participantes=[]))
+        chamado_id = _criar_chamado_real(responsavel_id="id_julia", participantes=[])
         sup_pedro = _sup_mock("id_pedro", "Pedro Alves", areas=["Logistica"])
 
         with (
-            patch("app.services.escalonamento_service.db", mock_db),
             patch("app.services.escalonamento_service.Usuario") as mock_usuario,
             patch("app.services.escalonamento_service.Historico"),
             patch(
@@ -555,35 +501,35 @@ class TestIncluirParticipantes:
             mock_usuario.get_supervisores_por_area.return_value = [sup_pedro]
             mock_calc.return_value = ["id_julia", "id_pedro"]
             incluir_participantes(
-                "id_chamado",
+                chamado_id,
                 [{"supervisor_id": "id_pedro", "area": "Logistica"}],
                 JULIA,
             )
 
         mock_calc.assert_called_once()
-        assert updated["supervisor_ids_com_acesso"] == ["id_julia", "id_pedro"]
+        assert Chamado.get_by_id(chamado_id).supervisor_ids_com_acesso == [
+            "id_julia",
+            "id_pedro",
+        ]
 
     def test_incluir_participantes_nao_duplica_supervisor(self):
         """Não inclui supervisor_id já presente em participantes."""
         from app.services.escalonamento_service import incluir_participantes
 
-        mock_db, updated = _make_db_mock(
-            _chamado_dict(
-                responsavel_id="id_julia",
-                participantes=[
-                    {
-                        "supervisor_id": "id_pedro",
-                        "area": "Logistica",
-                        "status": "pendente",
-                        "concluido_em": None,
-                    }
-                ],
-            )
+        chamado_id = _criar_chamado_real(
+            responsavel_id="id_julia",
+            participantes=[
+                {
+                    "supervisor_id": "id_pedro",
+                    "area": "Logistica",
+                    "status": "pendente",
+                    "concluido_em": None,
+                }
+            ],
         )
         sup_pedro = _sup_mock("id_pedro", "Pedro Alves", areas=["Logistica"])
 
         with (
-            patch("app.services.escalonamento_service.db", mock_db),
             patch("app.services.escalonamento_service.Usuario") as mock_usuario,
             patch("app.services.escalonamento_service.Historico"),
             patch(
@@ -593,7 +539,7 @@ class TestIncluirParticipantes:
         ):
             mock_usuario.get_supervisores_por_area.return_value = [sup_pedro]
             resultado = incluir_participantes(
-                "id_chamado",
+                chamado_id,
                 [{"supervisor_id": "id_pedro", "area": "Logistica"}],
                 JULIA,
             )
@@ -606,14 +552,13 @@ class TestIncluirParticipantes:
         """Supervisor que não é owner não pode incluir participantes."""
         from app.services.escalonamento_service import incluir_participantes
 
-        mock_db, _ = _make_db_mock(_chamado_dict(responsavel_id="id_julia", participantes=[]))
+        chamado_id = _criar_chamado_real(responsavel_id="id_julia", participantes=[])
 
-        with patch("app.services.escalonamento_service.db", mock_db):
-            resultado = incluir_participantes(
-                "id_chamado",
-                [{"supervisor_id": "id_pedro", "area": "Logistica"}],
-                NAO_OWNER,
-            )
+        resultado = incluir_participantes(
+            chamado_id,
+            [{"supervisor_id": "id_pedro", "area": "Logistica"}],
+            NAO_OWNER,
+        )
 
         assert resultado["sucesso"] is False
         assert "permission" in resultado["erro"].lower()
@@ -622,10 +567,7 @@ class TestIncluirParticipantes:
         """Lista vazia de participantes retorna erro."""
         from app.services.escalonamento_service import incluir_participantes
 
-        mock_db, _ = _make_db_mock(_chamado_dict(responsavel_id="id_julia", participantes=[]))
-
-        with patch("app.services.escalonamento_service.db", mock_db):
-            resultado = incluir_participantes("id_chamado", [], JULIA)
+        resultado = incluir_participantes(_ID_INEXISTENTE, [], JULIA)
 
         assert resultado["sucesso"] is False
 
@@ -633,11 +575,10 @@ class TestIncluirParticipantes:
         """Owner não pode ser adicionado como participante."""
         from app.services.escalonamento_service import incluir_participantes
 
-        mock_db, _ = _make_db_mock(_chamado_dict(responsavel_id="id_julia", participantes=[]))
+        chamado_id = _criar_chamado_real(responsavel_id="id_julia", participantes=[])
         sup_julia = _sup_mock("id_julia", "Julia Silva", areas=["Engenharia"])
 
         with (
-            patch("app.services.escalonamento_service.db", mock_db),
             patch("app.services.escalonamento_service.Usuario") as mock_usuario,
             patch("app.services.escalonamento_service.Historico"),
             patch(
@@ -647,7 +588,7 @@ class TestIncluirParticipantes:
         ):
             mock_usuario.get_supervisores_por_area.return_value = [sup_julia]
             resultado = incluir_participantes(
-                "id_chamado",
+                chamado_id,
                 [{"supervisor_id": "id_julia", "area": "Engenharia"}],
                 JULIA,
             )
@@ -659,11 +600,10 @@ class TestIncluirParticipantes:
         """Admin pode incluir participantes mesmo sem ser owner."""
         from app.services.escalonamento_service import incluir_participantes
 
-        mock_db, updated = _make_db_mock(_chamado_dict(responsavel_id="id_julia", participantes=[]))
+        chamado_id = _criar_chamado_real(responsavel_id="id_julia", participantes=[])
         sup_pedro = _sup_mock("id_pedro", "Pedro Alves", areas=["Logistica"])
 
         with (
-            patch("app.services.escalonamento_service.db", mock_db),
             patch("app.services.escalonamento_service.Usuario") as mock_usuario,
             patch("app.services.escalonamento_service.Historico"),
             patch(
@@ -673,7 +613,7 @@ class TestIncluirParticipantes:
         ):
             mock_usuario.get_supervisores_por_area.return_value = [sup_pedro]
             resultado = incluir_participantes(
-                "id_chamado",
+                chamado_id,
                 [{"supervisor_id": "id_pedro", "area": "Logistica"}],
                 ADMIN,
             )
@@ -684,16 +624,15 @@ class TestIncluirParticipantes:
         """supervisor_id que não pertence à área informada retorna erro."""
         from app.services.escalonamento_service import incluir_participantes
 
-        mock_db, _ = _make_db_mock(_chamado_dict(responsavel_id="id_julia", participantes=[]))
+        chamado_id = _criar_chamado_real(responsavel_id="id_julia", participantes=[])
 
         with (
-            patch("app.services.escalonamento_service.db", mock_db),
             patch("app.services.escalonamento_service.Usuario") as mock_usuario,
             patch("app.services.escalonamento_service.Historico"),
         ):
             mock_usuario.get_supervisores_por_area.return_value = []
             resultado = incluir_participantes(
-                "id_chamado",
+                chamado_id,
                 [{"supervisor_id": "id_desconhecido", "area": "Logistica"}],
                 JULIA,
             )
@@ -704,12 +643,11 @@ class TestIncluirParticipantes:
         """incluir_participantes registra histórico com acao='inclusao_participantes'."""
         from app.services.escalonamento_service import incluir_participantes
 
-        mock_db, _ = _make_db_mock(_chamado_dict(responsavel_id="id_julia", participantes=[]))
+        chamado_id = _criar_chamado_real(responsavel_id="id_julia", participantes=[])
         sup_pedro = _sup_mock("id_pedro", "Pedro Alves", areas=["Logistica"])
         hist_instancia = MagicMock()
 
         with (
-            patch("app.services.escalonamento_service.db", mock_db),
             patch("app.services.escalonamento_service.Usuario") as mock_usuario,
             patch("app.services.escalonamento_service.Historico") as mock_hist_cls,
             patch(
@@ -720,7 +658,7 @@ class TestIncluirParticipantes:
             mock_usuario.get_supervisores_por_area.return_value = [sup_pedro]
             mock_hist_cls.return_value = hist_instancia
             incluir_participantes(
-                "id_chamado",
+                chamado_id,
                 [{"supervisor_id": "id_pedro", "area": "Logistica"}],
                 JULIA,
             )
@@ -737,7 +675,7 @@ class TestConcluirMinhaParte:
         """concluir_minha_parte atualiza status do participante para 'concluido'."""
         from app.services.escalonamento_service import concluir_minha_parte
 
-        chamado = _chamado_dict(
+        chamado_id = _criar_chamado_real(
             responsavel_id="id_julia",
             participantes=[
                 {
@@ -748,23 +686,20 @@ class TestConcluirMinhaParte:
                 }
             ],
         )
-        mock_db, updated = _make_db_mock(chamado)
 
-        with (
-            patch("app.services.escalonamento_service.db", mock_db),
-            patch("app.services.escalonamento_service.Historico"),
-        ):
-            resultado = concluir_minha_parte("id_chamado", PEDRO)
+        with patch("app.services.escalonamento_service.Historico"):
+            resultado = concluir_minha_parte(chamado_id, PEDRO)
 
         assert resultado["sucesso"] is True
-        p = next(p for p in updated["participantes"] if p["supervisor_id"] == "id_pedro")
+        participantes = Chamado.get_by_id(chamado_id).participantes
+        p = next(p for p in participantes if p["supervisor_id"] == "id_pedro")
         assert p["status"] == "concluido"
 
     def test_concluir_minha_parte_grava_concluido_em(self):
         """concluir_minha_parte grava concluido_em com datetime."""
         from app.services.escalonamento_service import concluir_minha_parte
 
-        chamado = _chamado_dict(
+        chamado_id = _criar_chamado_real(
             responsavel_id="id_julia",
             participantes=[
                 {
@@ -775,22 +710,19 @@ class TestConcluirMinhaParte:
                 }
             ],
         )
-        mock_db, updated = _make_db_mock(chamado)
 
-        with (
-            patch("app.services.escalonamento_service.db", mock_db),
-            patch("app.services.escalonamento_service.Historico"),
-        ):
-            concluir_minha_parte("id_chamado", PEDRO)
+        with patch("app.services.escalonamento_service.Historico"):
+            concluir_minha_parte(chamado_id, PEDRO)
 
-        p = next(p for p in updated["participantes"] if p["supervisor_id"] == "id_pedro")
+        participantes = Chamado.get_by_id(chamado_id).participantes
+        p = next(p for p in participantes if p["supervisor_id"] == "id_pedro")
         assert p["concluido_em"] is not None
 
     def test_concluir_minha_parte_nao_participante_retorna_erro(self):
         """Usuário que não é participante recebe erro."""
         from app.services.escalonamento_service import concluir_minha_parte
 
-        chamado = _chamado_dict(
+        chamado_id = _criar_chamado_real(
             responsavel_id="id_julia",
             participantes=[
                 {
@@ -801,10 +733,8 @@ class TestConcluirMinhaParte:
                 }
             ],
         )
-        mock_db, _ = _make_db_mock(chamado)
 
-        with patch("app.services.escalonamento_service.db", mock_db):
-            resultado = concluir_minha_parte("id_chamado", FERNANDA)
+        resultado = concluir_minha_parte(chamado_id, FERNANDA)
 
         assert resultado["sucesso"] is False
         assert "participant" in resultado["erro"].lower()
@@ -813,7 +743,7 @@ class TestConcluirMinhaParte:
         """Participante que já concluiu não pode concluir novamente."""
         from app.services.escalonamento_service import concluir_minha_parte
 
-        chamado = _chamado_dict(
+        chamado_id = _criar_chamado_real(
             responsavel_id="id_julia",
             participantes=[
                 {
@@ -824,10 +754,8 @@ class TestConcluirMinhaParte:
                 }
             ],
         )
-        mock_db, _ = _make_db_mock(chamado)
 
-        with patch("app.services.escalonamento_service.db", mock_db):
-            resultado = concluir_minha_parte("id_chamado", PEDRO)
+        resultado = concluir_minha_parte(chamado_id, PEDRO)
 
         assert resultado["sucesso"] is False
 
@@ -835,7 +763,7 @@ class TestConcluirMinhaParte:
         """concluir_minha_parte registra histórico."""
         from app.services.escalonamento_service import concluir_minha_parte
 
-        chamado = _chamado_dict(
+        chamado_id = _criar_chamado_real(
             responsavel_id="id_julia",
             participantes=[
                 {
@@ -846,29 +774,25 @@ class TestConcluirMinhaParte:
                 }
             ],
         )
-        mock_db, _ = _make_db_mock(chamado)
         hist_instancia = MagicMock()
 
-        with (
-            patch("app.services.escalonamento_service.db", mock_db),
-            patch("app.services.escalonamento_service.Historico") as mock_hist_cls,
-        ):
+        with patch("app.services.escalonamento_service.Historico") as mock_hist_cls:
             mock_hist_cls.return_value = hist_instancia
-            concluir_minha_parte("id_chamado", PEDRO)
+            concluir_minha_parte(chamado_id, PEDRO)
 
         args, kwargs = mock_hist_cls.call_args
         assert kwargs.get("acao") == "conclusao_parte_participante"
         hist_instancia.save.assert_called_once()
 
     def test_concluir_minha_parte_nao_altera_data_em_atendimento(self):
-        """Fase 7 regressão: concluir_minha_parte NÃO deve incluir data_em_atendimento no update.
+        """Fase 7 regressão: concluir_minha_parte NÃO deve alterar data_em_atendimento.
 
         Garante que o deadline de resolução (calculado a partir de data_em_atendimento)
         não seja alterado acidentalmente ao marcar parte como concluída.
         """
         from app.services.escalonamento_service import concluir_minha_parte
 
-        chamado = _chamado_dict(
+        chamado_id = _criar_chamado_real(
             responsavel_id="id_julia",
             participantes=[
                 {
@@ -879,23 +803,19 @@ class TestConcluirMinhaParte:
                 }
             ],
         )
-        mock_db, updated = _make_db_mock(chamado)
+        antes = Chamado.get_by_id(chamado_id).data_em_atendimento
 
-        with (
-            patch("app.services.escalonamento_service.db", mock_db),
-            patch("app.services.escalonamento_service.Historico"),
-        ):
-            resultado = concluir_minha_parte("id_chamado", PEDRO)
+        with patch("app.services.escalonamento_service.Historico"):
+            resultado = concluir_minha_parte(chamado_id, PEDRO)
 
         assert resultado["sucesso"] is True
-        assert "data_em_atendimento" not in updated
+        assert Chamado.get_by_id(chamado_id).data_em_atendimento == antes
 
 
 class TestPodeConcluirGlobal:
     """Testes dos helpers pode_concluir_global e todos_participantes_concluidos."""
 
     def test_pode_concluir_sem_participantes(self):
-        from app.models import Chamado
         from app.services.escalonamento_service import pode_concluir_global
 
         c = Chamado.from_dict(
@@ -910,7 +830,6 @@ class TestPodeConcluirGlobal:
         assert pode_concluir_global(c) is True
 
     def test_pode_concluir_todos_concluidos(self):
-        from app.models import Chamado
         from app.services.escalonamento_service import pode_concluir_global
 
         c = Chamado.from_dict(
@@ -938,7 +857,6 @@ class TestPodeConcluirGlobal:
         assert pode_concluir_global(c) is True
 
     def test_nao_pode_concluir_com_pendente(self):
-        from app.models import Chamado
         from app.services.escalonamento_service import pode_concluir_global
 
         c = Chamado.from_dict(
@@ -979,28 +897,26 @@ class TestDefinirPrevisaoAtendimento:
     lendo o campo, não aqui).
     """
 
-    def test_definir_previsao_grava_campos_no_firestore(self):
+    def test_definir_previsao_grava_campos(self):
         from datetime import datetime, timedelta
 
         from app.services.escalonamento_service import definir_previsao_atendimento
 
-        mock_db, updated = _make_db_mock(
-            _chamado_dict(area="Engenharia", responsavel_id="id_julia")
-        )
+        chamado_id = _criar_chamado_real(area="Engenharia", responsavel_id="id_julia")
         previsao = datetime.now() + timedelta(days=2)
 
-        with (
-            patch("app.services.escalonamento_service.db", mock_db),
-            patch("app.services.escalonamento_service.Historico"),
-        ):
+        with patch("app.services.escalonamento_service.Historico"):
             resultado = definir_previsao_atendimento(
-                "id_chamado", previsao, "Combinado com o gestor, preciso de mais tempo", JULIA
+                chamado_id, previsao, "Combinado com o gestor, preciso de mais tempo", JULIA
             )
 
         assert resultado["sucesso"] is True
-        assert updated["previsao_atendimento"] == previsao
+        atualizado = Chamado.get_by_id(chamado_id)
+        # Postgres normaliza timestamptz pro timezone da sessão ao ler de volta —
+        # compara o wall-clock (sem tzinfo), não o tzname literal.
+        assert atualizado.previsao_atendimento.replace(tzinfo=None) == previsao
         assert (
-            updated["motivo_previsao_atendimento"]
+            atualizado.motivo_previsao_atendimento
             == "Combinado com o gestor, preciso de mais tempo"
         )
 
@@ -1009,16 +925,13 @@ class TestDefinirPrevisaoAtendimento:
 
         from app.services.escalonamento_service import definir_previsao_atendimento
 
-        mock_db, _ = _make_db_mock(_chamado_dict(area="Engenharia", responsavel_id="id_julia"))
+        chamado_id = _criar_chamado_real(area="Engenharia", responsavel_id="id_julia")
         hist_instancia = MagicMock()
         previsao = datetime.now() + timedelta(days=1)
 
-        with (
-            patch("app.services.escalonamento_service.db", mock_db),
-            patch("app.services.escalonamento_service.Historico") as mock_hist_cls,
-        ):
+        with patch("app.services.escalonamento_service.Historico") as mock_hist_cls:
             mock_hist_cls.return_value = hist_instancia
-            definir_previsao_atendimento("id_chamado", previsao, "motivo", JULIA)
+            definir_previsao_atendimento(chamado_id, previsao, "motivo", JULIA)
 
         args, kwargs = mock_hist_cls.call_args
         assert kwargs.get("acao") == "definicao_previsao_atendimento"
@@ -1032,13 +945,13 @@ class TestDefinirPrevisaoAtendimento:
 
         previsao = datetime.now() + timedelta(days=1)
         with pytest.raises(ValueError, match="motivo"):
-            definir_previsao_atendimento("id_chamado", previsao, "", JULIA)
+            definir_previsao_atendimento(_ID_INEXISTENTE, previsao, "", JULIA)
 
     def test_definir_previsao_data_obrigatoria(self):
         from app.services.escalonamento_service import definir_previsao_atendimento
 
         with pytest.raises(ValueError, match="previsao"):
-            definir_previsao_atendimento("id_chamado", None, "motivo", JULIA)
+            definir_previsao_atendimento(_ID_INEXISTENTE, None, "motivo", JULIA)
 
     def test_definir_previsao_no_passado_retorna_erro(self):
         from datetime import datetime, timedelta
@@ -1047,17 +960,14 @@ class TestDefinirPrevisaoAtendimento:
         from app.services.escalonamento_service import definir_previsao_atendimento
         from config import Config
 
-        mock_db, _ = _make_db_mock(_chamado_dict(area="Engenharia", responsavel_id="id_julia"))
+        chamado_id = _criar_chamado_real(area="Engenharia", responsavel_id="id_julia")
         # "Passado" tem que ser em relação ao fuso de negócio (SLA_TIMEZONE), não
         # ao relógio naive do runner — em CI (UTC), "agora - 1h" ainda pode estar
         # no futuro em Brasília (UTC-3), fazendo o teste passar por acidente.
         agora_fuso_negocio = datetime.now(ZoneInfo(Config.SLA_TIMEZONE)).replace(tzinfo=None)
         previsao_passada = agora_fuso_negocio - timedelta(hours=1)
 
-        with patch("app.services.escalonamento_service.db", mock_db):
-            resultado = definir_previsao_atendimento(
-                "id_chamado", previsao_passada, "motivo", JULIA
-            )
+        resultado = definir_previsao_atendimento(chamado_id, previsao_passada, "motivo", JULIA)
 
         assert resultado["sucesso"] is False
 
@@ -1078,9 +988,7 @@ class TestDefinirPrevisaoAtendimento:
 
         from app.services.escalonamento_service import definir_previsao_atendimento
 
-        mock_db, updated = _make_db_mock(
-            _chamado_dict(area="Engenharia", responsavel_id="id_julia")
-        )
+        chamado_id = _criar_chamado_real(area="Engenharia", responsavel_id="id_julia")
 
         # Momento real: 09:00 em Brasília (UTC-3) == 12:00 UTC.
         # Supervisor define previsão pra 11:00 em Brasília — 2h no futuro, de verdade.
@@ -1097,12 +1005,11 @@ class TestDefinirPrevisaoAtendimento:
         mock_datetime.now.side_effect = _now_mock
 
         with (
-            patch("app.services.escalonamento_service.db", mock_db),
             patch("app.services.escalonamento_service.datetime", mock_datetime),
             patch("app.services.escalonamento_service.Historico"),
         ):
             resultado = definir_previsao_atendimento(
-                "id_chamado", previsao_11h_brasilia, "motivo valido", JULIA
+                chamado_id, previsao_11h_brasilia, "motivo valido", JULIA
             )
 
         assert resultado["sucesso"] is True, (
@@ -1115,11 +1022,10 @@ class TestDefinirPrevisaoAtendimento:
 
         from app.services.escalonamento_service import definir_previsao_atendimento
 
-        mock_db, _ = _make_db_mock(_chamado_dict(area="Engenharia", responsavel_id="id_julia"))
+        chamado_id = _criar_chamado_real(area="Engenharia", responsavel_id="id_julia")
         previsao = datetime.now() + timedelta(days=1)
 
-        with patch("app.services.escalonamento_service.db", mock_db):
-            resultado = definir_previsao_atendimento("id_chamado", previsao, "motivo", NAO_OWNER)
+        resultado = definir_previsao_atendimento(chamado_id, previsao, "motivo", NAO_OWNER)
 
         assert resultado["sucesso"] is False
 
@@ -1130,11 +1036,10 @@ class TestDefinirPrevisaoAtendimento:
 
         from app.services.escalonamento_service import definir_previsao_atendimento
 
-        mock_db, _ = _make_db_mock(_chamado_dict(area="Engenharia", responsavel_id=SOLICITANTE.id))
+        chamado_id = _criar_chamado_real(area="Engenharia", responsavel_id=SOLICITANTE.id)
         previsao = datetime.now() + timedelta(days=1)
 
-        with patch("app.services.escalonamento_service.db", mock_db):
-            resultado = definir_previsao_atendimento("id_chamado", previsao, "motivo", SOLICITANTE)
+        resultado = definir_previsao_atendimento(chamado_id, previsao, "motivo", SOLICITANTE)
 
         assert resultado["sucesso"] is False
 
@@ -1144,19 +1049,14 @@ class TestDefinirPrevisaoAtendimento:
 
         from app.services.escalonamento_service import definir_previsao_atendimento
 
-        mock_db, updated = _make_db_mock(
-            _chamado_dict(area="Engenharia", responsavel_id="id_julia")
-        )
+        chamado_id = _criar_chamado_real(area="Engenharia", responsavel_id="id_julia")
         previsao = datetime.now() + timedelta(days=1)
 
-        with (
-            patch("app.services.escalonamento_service.db", mock_db),
-            patch("app.services.escalonamento_service.Historico"),
-        ):
-            resultado = definir_previsao_atendimento("id_chamado", previsao, "motivo", ADMIN)
+        with patch("app.services.escalonamento_service.Historico"):
+            resultado = definir_previsao_atendimento(chamado_id, previsao, "motivo", ADMIN)
 
         assert resultado["sucesso"] is True
-        assert updated["previsao_atendimento"] == previsao
+        assert Chamado.get_by_id(chamado_id).previsao_atendimento.replace(tzinfo=None) == previsao
 
     def test_definir_previsao_sem_teto_maximo(self):
         """Não há limite de dias — previsão bem distante no futuro é aceita."""
@@ -1164,31 +1064,25 @@ class TestDefinirPrevisaoAtendimento:
 
         from app.services.escalonamento_service import definir_previsao_atendimento
 
-        mock_db, updated = _make_db_mock(
-            _chamado_dict(area="Engenharia", responsavel_id="id_julia")
-        )
+        chamado_id = _criar_chamado_real(area="Engenharia", responsavel_id="id_julia")
         previsao_distante = datetime.now() + timedelta(days=90)
 
-        with (
-            patch("app.services.escalonamento_service.db", mock_db),
-            patch("app.services.escalonamento_service.Historico"),
-        ):
-            resultado = definir_previsao_atendimento(
-                "id_chamado", previsao_distante, "motivo", JULIA
-            )
+        with patch("app.services.escalonamento_service.Historico"):
+            resultado = definir_previsao_atendimento(chamado_id, previsao_distante, "motivo", JULIA)
 
         assert resultado["sucesso"] is True
-        assert updated["previsao_atendimento"] == previsao_distante
+        assert (
+            Chamado.get_by_id(chamado_id).previsao_atendimento.replace(tzinfo=None)
+            == previsao_distante
+        )
 
     def test_definir_previsao_chamado_nao_encontrado(self):
         from datetime import datetime, timedelta
 
         from app.services.escalonamento_service import definir_previsao_atendimento
 
-        mock_db, _ = _make_db_mock(doc_exists=False)
         previsao = datetime.now() + timedelta(days=1)
 
-        with patch("app.services.escalonamento_service.db", mock_db):
-            resultado = definir_previsao_atendimento("id_chamado", previsao, "motivo", JULIA)
+        resultado = definir_previsao_atendimento(_ID_INEXISTENTE, previsao, "motivo", JULIA)
 
         assert resultado["sucesso"] is False

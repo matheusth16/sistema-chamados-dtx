@@ -14,8 +14,6 @@ import logging
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from app.database import db
-from app.firebase_retry import execute_with_retry
 from app.i18n import get_translation_session
 from app.models import Chamado
 from app.models_historico import Historico
@@ -80,12 +78,9 @@ def transferir_area(
         raise ValueError("área obrigatória")
 
     # ── carrega chamado ──────────────────────────────────────────────────────
-    doc = db.collection("chamados").document(chamado_id).get()
-    if not doc.exists:
+    chamado = Chamado.get_by_id(chamado_id)
+    if chamado is None:
         return {"sucesso": False, "erro": _t("ticket_not_found")}
-
-    dados = doc.to_dict() or {}
-    chamado = Chamado.from_dict(dados, chamado_id)
 
     # ── verifica permissão (owner ou admin) ──────────────────────────────────
     if not (chamado.responsavel_id == usuario.id or usuario.is_admin_or_above):
@@ -111,16 +106,12 @@ def transferir_area(
     area_anterior = chamado.area
 
     # ── update atômico ───────────────────────────────────────────────────────
-    execute_with_retry(
-        db.collection("chamados").document(chamado_id).update,
-        {
-            "area": area,
-            "responsavel_id": supervisor_id,
-            "responsavel": sup_destino.nome,
-            "motivo_ultima_escalacao": motivo[:500],
-            "supervisor_ids_com_acesso": novos_ids,
-        },
-        max_retries=3,
+    chamado.atualizar_campos(
+        area=area,
+        responsavel_id=supervisor_id,
+        responsavel=sup_destino.nome,
+        motivo_ultima_escalacao=motivo[:500],
+        supervisor_ids_com_acesso=novos_ids,
     )
 
     # ── histórico ────────────────────────────────────────────────────────────
@@ -175,12 +166,9 @@ def escalonar_colega(
         raise ValueError("motivo obrigatório")
 
     # ── carrega chamado ──────────────────────────────────────────────────────
-    doc = db.collection("chamados").document(chamado_id).get()
-    if not doc.exists:
+    chamado = Chamado.get_by_id(chamado_id)
+    if chamado is None:
         return {"sucesso": False, "erro": _t("ticket_not_found")}
-
-    dados = doc.to_dict() or {}
-    chamado = Chamado.from_dict(dados, chamado_id)
 
     # ── verifica permissão (owner ou admin) ──────────────────────────────────
     if not (chamado.responsavel_id == usuario.id or usuario.is_admin_or_above):
@@ -215,15 +203,11 @@ def escalonar_colega(
     responsavel_anterior = chamado.responsavel_id
 
     # ── update atômico (área inalterada) ─────────────────────────────────────
-    execute_with_retry(
-        db.collection("chamados").document(chamado_id).update,
-        {
-            "responsavel_id": supervisor_id,
-            "responsavel": colega.nome,
-            "motivo_ultima_escalacao": motivo[:500],
-            "supervisor_ids_com_acesso": novos_ids,
-        },
-        max_retries=3,
+    chamado.atualizar_campos(
+        responsavel_id=supervisor_id,
+        responsavel=colega.nome,
+        motivo_ultima_escalacao=motivo[:500],
+        supervisor_ids_com_acesso=novos_ids,
     )
 
     # ── histórico ────────────────────────────────────────────────────────────
@@ -274,12 +258,9 @@ def incluir_participantes(
     if not participantes_novos:
         return {"sucesso": False, "erro": _t("participants_list_cannot_be_empty")}
 
-    doc = db.collection("chamados").document(chamado_id).get()
-    if not doc.exists:
+    chamado = Chamado.get_by_id(chamado_id)
+    if chamado is None:
         return {"sucesso": False, "erro": _t("ticket_not_found")}
-
-    dados = doc.to_dict() or {}
-    chamado = Chamado.from_dict(dados, chamado_id)
 
     if not (chamado.responsavel_id == usuario.id or usuario.is_admin_or_above):
         logger.warning(
@@ -340,14 +321,10 @@ def incluir_participantes(
         chamado.area, chamado.responsavel_id, participantes_atuais
     )
 
-    execute_with_retry(
-        db.collection("chamados").document(chamado_id).update,
-        {
-            "participantes": participantes_atuais,
-            "supervisor_ids_com_acesso": novos_ids,
-        },
-        max_retries=3,
-    )
+    total_anterior = len(chamado.participantes or [])
+    chamado.participantes = participantes_atuais
+    chamado.supervisor_ids_com_acesso = novos_ids
+    chamado.salvar()
 
     nomes_adicionados = (
         ", ".join(f"{a['nome']} ({a['area']})" for a in adicionados) or "nenhum novo"
@@ -358,7 +335,7 @@ def incluir_participantes(
         usuario_nome=usuario.nome,
         acao="inclusao_participantes",
         campo_alterado="participantes",
-        valor_anterior=str(len(chamado.participantes or [])),
+        valor_anterior=str(total_anterior),
         valor_novo=str(len(participantes_atuais)),
         detalhe=f"Participantes incluídos: {nomes_adicionados}",
     )
@@ -392,12 +369,9 @@ def concluir_minha_parte(chamado_id: str, usuario) -> dict:
         {"sucesso": True, "dados": {"pode_concluir_global": bool}}
         ou {"sucesso": False, "erro": "..."}.
     """
-    doc = db.collection("chamados").document(chamado_id).get()
-    if not doc.exists:
+    chamado = Chamado.get_by_id(chamado_id)
+    if chamado is None:
         return {"sucesso": False, "erro": _t("ticket_not_found")}
-
-    dados = doc.to_dict() or {}
-    chamado = Chamado.from_dict(dados, chamado_id)
 
     participantes = list(chamado.participantes or [])
     idx = next(
@@ -414,11 +388,8 @@ def concluir_minha_parte(chamado_id: str, usuario) -> dict:
     agora = datetime.now(ZoneInfo(Config.SLA_TIMEZONE))
     participantes[idx] = {**participantes[idx], "status": "concluido", "concluido_em": agora}
 
-    execute_with_retry(
-        db.collection("chamados").document(chamado_id).update,
-        {"participantes": participantes},
-        max_retries=3,
-    )
+    chamado.participantes = participantes
+    chamado.salvar()
 
     hist = Historico(
         chamado_id=chamado_id,
@@ -432,8 +403,7 @@ def concluir_minha_parte(chamado_id: str, usuario) -> dict:
     )
     hist.save()
 
-    chamado_atualizado = Chamado.from_dict({**dados, "participantes": participantes}, chamado_id)
-    todos_ok = pode_concluir_global(chamado_atualizado)
+    todos_ok = pode_concluir_global(chamado)
 
     logger.info(
         "Chamado %s: participante %s concluiu sua parte (pode_concluir_global=%s)",
@@ -482,12 +452,9 @@ def definir_previsao_atendimento(
         raise ValueError("motivo obrigatório")
 
     # ── carrega chamado ──────────────────────────────────────────────────────
-    doc = db.collection("chamados").document(chamado_id).get()
-    if not doc.exists:
+    chamado = Chamado.get_by_id(chamado_id)
+    if chamado is None:
         return {"sucesso": False, "erro": _t("ticket_not_found")}
-
-    dados = doc.to_dict() or {}
-    chamado = Chamado.from_dict(dados, chamado_id)
 
     # ── verifica permissão (owner ou admin, E supervisor+) ────────────────────
     eh_supervisor_ou_acima = getattr(usuario, "perfil", None) in (
@@ -514,13 +481,9 @@ def definir_previsao_atendimento(
         return {"sucesso": False, "erro": _t("attendance_forecast_must_be_future")}
 
     # ── update atômico ───────────────────────────────────────────────────────
-    execute_with_retry(
-        db.collection("chamados").document(chamado_id).update,
-        {
-            "previsao_atendimento": previsao,
-            "motivo_previsao_atendimento": motivo[:500],
-        },
-        max_retries=3,
+    chamado.atualizar_campos(
+        previsao_atendimento=previsao,
+        motivo_previsao_atendimento=motivo[:500],
     )
 
     # ── histórico ────────────────────────────────────────────────────────────
