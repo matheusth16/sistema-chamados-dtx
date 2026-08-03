@@ -11,8 +11,6 @@ from typing import Any
 
 from flask import current_app
 
-from app.database import db
-from app.firebase_retry import execute_with_retry
 from app.i18n import get_translation_session
 from app.models import Chamado
 from app.models_grupo_rl import GrupoRL
@@ -272,16 +270,10 @@ def criar_chamado(
             # todos_gestores abaixo) — Escada A normal (escalada gradual) não se aplica mais.
             escalacao_resposta_nivel=4 if categoria == "AOG" else 0,
         )
+        chamado_id = novo_chamado.salvar()
+        if chamado_id is None:
+            return (None, None, _t("error_saving_ticket"), None)
         chamado_dict = novo_chamado.to_dict()
-        chamado_dict["observadores_ids"] = [
-            obs.get("usuario_id") for obs in observadores_list if obs.get("usuario_id")
-        ]
-        doc_ref = execute_with_retry(
-            db.collection("chamados").add,
-            chamado_dict,
-            max_retries=3,
-        )
-        chamado_id = doc_ref[1].id
         Historico(
             chamado_id=chamado_id,
             usuario_id=solicitante_id,
@@ -390,11 +382,11 @@ def criar_chamado(
             except Exception as e:
                 logger.exception("Erro na thread de notificações do chamado %s: %s", chamado_id, e)
 
-        threading.Thread(target=_notificar, daemon=True, name=f"notif-{chamado_id[:8]}").start()
+        threading.Thread(target=_notificar, daemon=True, name=f"notif-{chamado_id}").start()
 
         logger.info("Chamado criado: %s (ID: %s)", numero_chamado, chamado_id)
         aviso = motivo_atribuicao if atribuicao_manual else None
         return (chamado_id, numero_chamado, None, aviso)
     except Exception as e:
-        logger.exception("Erro ao salvar chamado no Firestore: %s", e)
+        logger.exception("Erro ao salvar chamado: %s", e)
         return (None, None, _t("error_saving_ticket"), None)

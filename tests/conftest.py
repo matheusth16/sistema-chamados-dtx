@@ -31,7 +31,6 @@ _MODULOS_COM_DB_FIRESTORE = [
     "app.services.escalonamento_service",
     "app.services.cancelamento_solicitante_service",
     "app.services.chamados_listagem_service",
-    "app.services.chamados_criacao_service",
     "app.services.report_service",
     "app.services.onboarding_service",
     "app.services.status_service",

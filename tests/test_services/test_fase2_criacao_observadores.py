@@ -1,5 +1,11 @@
 """
-Fase 2 restante — TDD: persistência de observadores na criação de chamados.
+Fase 2 — TDD: persistência de observadores na criação de chamados.
+
+Persistência roda contra Postgres real (db_session) via Chamado.salvar() —
+não mockamos mais execute_with_retry/db.collection (Marco 7). A antiga
+desnormalização "observadores_ids" (usada pro array-contains do Firestore)
+não existe mais: observadores viram linhas reais em chamados_observadores
+(tabela-junção), verificadas via Chamado.get_by_id(...).observadores.
 """
 
 import json
@@ -7,6 +13,10 @@ from contextlib import ExitStack
 from unittest.mock import MagicMock, patch
 
 import pytest
+
+from app.models import Chamado
+
+pytestmark = pytest.mark.usefixtures("db_session")
 
 
 @pytest.fixture(autouse=True)
@@ -42,24 +52,13 @@ def _fake_atribuidor_result():
     }
 
 
-def _chamado_ref_mock(chamado_id="ch_test_123"):
-    ref = MagicMock()
-    ref.id = chamado_id
-    return ref
-
-
 class TestCriacaoComObservadores:
     def test_observadores_persistidos_no_chamado(self, app):
-        """observadores_json no form → campo observadores no doc salvo."""
+        """observadores_json no form → observadores persistidos na tabela-junção."""
         from app.services.chamados_criacao_service import criar_chamado
 
         obs_list = [{"usuario_id": "obs_1", "nome": "Obs Um", "email": "obs1@test.com"}]
         form = _base_form(json.dumps(obs_list))
-        chamado_dict_salvo = {}
-
-        def capture_execute(fn, doc, **kw):
-            chamado_dict_salvo.update(doc)
-            return (None, _chamado_ref_mock())
 
         with ExitStack() as stack:
             stack.enter_context(
@@ -69,12 +68,6 @@ class TestCriacaoComObservadores:
                 patch(
                     "app.services.chamados_criacao_service.gerar_numero_chamado",
                     return_value="2026-001",
-                )
-            )
-            stack.enter_context(
-                patch(
-                    "app.services.chamados_criacao_service.execute_with_retry",
-                    side_effect=capture_execute,
                 )
             )
             mock_atr = stack.enter_context(
@@ -105,10 +98,10 @@ class TestCriacaoComObservadores:
                 )
 
         assert erro is None
-        assert chamado_dict_salvo.get("observadores") == obs_list
+        assert Chamado.get_by_id(chamado_id).observadores == obs_list
 
-    def test_observadores_ids_desnormalizado_salvo(self, app):
-        """observadores_ids (lista de IDs) deve estar no doc para array-contains."""
+    def test_observadores_multiplos_persistidos_na_tabela_juncao(self, app):
+        """Múltiplos observadores → todos viram linhas em chamados_observadores."""
         from app.services.chamados_criacao_service import criar_chamado
 
         obs_list = [
@@ -116,11 +109,6 @@ class TestCriacaoComObservadores:
             {"usuario_id": "obs_2", "nome": "Obs Dois", "email": "obs2@test.com"},
         ]
         form = _base_form(json.dumps(obs_list))
-        chamado_dict_salvo = {}
-
-        def capture_execute(fn, doc, **kw):
-            chamado_dict_salvo.update(doc)
-            return (None, _chamado_ref_mock())
 
         with ExitStack() as stack:
             stack.enter_context(
@@ -130,12 +118,6 @@ class TestCriacaoComObservadores:
                 patch(
                     "app.services.chamados_criacao_service.gerar_numero_chamado",
                     return_value="2026-001",
-                )
-            )
-            stack.enter_context(
-                patch(
-                    "app.services.chamados_criacao_service.execute_with_retry",
-                    side_effect=capture_execute,
                 )
             )
             mock_atr = stack.enter_context(
@@ -158,26 +140,22 @@ class TestCriacaoComObservadores:
 
             mock_atr.atribuir.return_value = _fake_atribuidor_result()
             with app.app_context():
-                criar_chamado(
+                chamado_id, _, erro, _ = criar_chamado(
                     form=form,
                     files=_files_mock(),
                     solicitante_id="sol_1",
                     solicitante_nome="Solicitante",
                 )
 
-        assert "observadores_ids" in chamado_dict_salvo
-        assert set(chamado_dict_salvo["observadores_ids"]) == {"obs_1", "obs_2"}
+        assert erro is None
+        ids_persistidos = {o["usuario_id"] for o in Chamado.get_by_id(chamado_id).observadores}
+        assert ids_persistidos == {"obs_1", "obs_2"}
 
     def test_observadores_json_invalido_ignorado(self, app):
         """JSON inválido → chamado criado sem observadores, sem retornar erro."""
         from app.services.chamados_criacao_service import criar_chamado
 
         form = _base_form("NAO_EH_JSON_VALIDO")
-        chamado_dict_salvo = {}
-
-        def capture_execute(fn, doc, **kw):
-            chamado_dict_salvo.update(doc)
-            return (None, _chamado_ref_mock())
 
         with ExitStack() as stack:
             stack.enter_context(
@@ -187,12 +165,6 @@ class TestCriacaoComObservadores:
                 patch(
                     "app.services.chamados_criacao_service.gerar_numero_chamado",
                     return_value="2026-001",
-                )
-            )
-            stack.enter_context(
-                patch(
-                    "app.services.chamados_criacao_service.execute_with_retry",
-                    side_effect=capture_execute,
                 )
             )
             mock_atr = stack.enter_context(
@@ -209,6 +181,9 @@ class TestCriacaoComObservadores:
             stack.enter_context(
                 patch("app.services.chamados_criacao_service._notificar_observadores_inclusao")
             )
+            stack.enter_context(
+                patch("app.services.chamados_criacao_service.Usuario.get_by_id", return_value=None)
+            )
 
             mock_atr.atribuir.return_value = _fake_atribuidor_result()
             with app.app_context():
@@ -220,10 +195,10 @@ class TestCriacaoComObservadores:
                 )
 
         assert erro is None
-        assert chamado_dict_salvo.get("observadores") == []
+        assert Chamado.get_by_id(chamado_id).observadores == []
 
     def _enter_full_notif_patches(self, stack, sup_mock):
-        """Adiciona patches de todas as chamadas a Firestore dentro de _notificar."""
+        """Adiciona patches de todas as chamadas dentro de _notificar."""
         stack.enter_context(
             patch("app.services.chamados_criacao_service.Usuario.get_by_id", return_value=sup_mock)
         )
@@ -250,12 +225,6 @@ class TestCriacaoComObservadores:
                     return_value="2026-001",
                 )
             )
-            stack.enter_context(
-                patch(
-                    "app.services.chamados_criacao_service.execute_with_retry",
-                    return_value=(None, _chamado_ref_mock()),
-                )
-            )
             mock_atr = stack.enter_context(
                 patch("app.services.chamados_criacao_service.atribuidor")
             )
@@ -276,7 +245,6 @@ class TestCriacaoComObservadores:
 
             mock_atr.atribuir.return_value = _fake_atribuidor_result()
 
-            # Thread executa target imediatamente para verificar chamada de _notificar_observadores_inclusao
             def fake_thread_cls(target=None, daemon=None, **kw):
                 t = MagicMock()
                 if target:
@@ -312,12 +280,6 @@ class TestCriacaoComObservadores:
                 patch(
                     "app.services.chamados_criacao_service.gerar_numero_chamado",
                     return_value="2026-001",
-                )
-            )
-            stack.enter_context(
-                patch(
-                    "app.services.chamados_criacao_service.execute_with_retry",
-                    return_value=(None, _chamado_ref_mock()),
                 )
             )
             mock_atr = stack.enter_context(

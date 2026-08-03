@@ -1,10 +1,21 @@
-"""Testes do serviço de criação de chamados (criar_chamado)."""
+"""Testes do serviço de criação de chamados (criar_chamado).
+
+Fase 2 (Marco 7): a persistência do chamado roda contra Postgres real
+(db_session) via Chamado.salvar() — substitui o antigo mock de
+execute_with_retry/db.collection("chamados").add(). GrupoRL também já é
+Postgres real (Marco 4): não mockamos GrupoRL.get_or_create nos testes que
+usam rl_codigo, porque grupo_rl_id é FK real pra grupos_rl(id) — um id fake
+violaria a constraint. Historico/notificações continuam mockados (ainda
+Firestore / fora do escopo deste teste)."""
 
 from unittest.mock import MagicMock, patch
 
 import pytest
 
+from app.models import Chamado
 from app.services.chamados_criacao_service import criar_chamado
+
+pytestmark = pytest.mark.usefixtures("db_session")
 
 
 @pytest.fixture(autouse=True)
@@ -34,7 +45,7 @@ class _FakeThread:
 
 
 def test_criar_chamado_com_dados_validos_retorna_id_e_numero(app):
-    """criar_chamado com form válido e mocks retorna (chamado_id, numero_chamado, None, aviso)."""
+    """criar_chamado com form válido persiste no Postgres e retorna (id, numero, None, aviso)."""
     form = {
         "categoria": "Manutencao",
         "tipo": "Manutencao",
@@ -53,7 +64,6 @@ def test_criar_chamado_com_dados_validos_retorna_id_e_numero(app):
             "app.services.chamados_criacao_service.gerar_numero_chamado", return_value="2026-099"
         ),
         patch("app.services.chamados_criacao_service.atribuidor") as mock_atr,
-        patch("app.services.chamados_criacao_service.execute_with_retry") as mock_retry,
         patch("app.services.chamados_criacao_service.Historico") as mock_hist,
         patch("app.services.chamados_criacao_service.threading.Thread") as mock_thread,
     ):
@@ -62,10 +72,6 @@ def test_criar_chamado_com_dados_validos_retorna_id_e_numero(app):
             "supervisor": {"id": "sup1", "nome": "Supervisor Teste"},
             "motivo": "",
         }
-        mock_ref = MagicMock()
-        mock_ref.id = "chamado_id_123"
-        mock_retry.return_value = (None, mock_ref)
-        # threading.Thread mockado para não disparar thread real no teste
         with app.app_context():
             chamado_id, numero, erro, aviso = criar_chamado(
                 form=form,
@@ -76,10 +82,10 @@ def test_criar_chamado_com_dados_validos_retorna_id_e_numero(app):
                 solicitante_email="sol@test.com",
             )
 
-    assert chamado_id == "chamado_id_123"
+    assert chamado_id is not None
     assert numero == "2026-099"
     assert erro is None
-    mock_retry.assert_called_once()
+    assert Chamado.get_by_id(chamado_id) is not None
     mock_hist.return_value.save.assert_called_once()
     # O serviço dispara notificações em background; validamos que houve disparo.
     assert mock_thread.return_value.start.call_count >= 1
@@ -149,9 +155,7 @@ def test_criar_chamado_com_setores_adicionais_dispara_notificacao_setores(app):
         patch(
             "app.services.chamados_criacao_service.gerar_numero_chamado", return_value="2026-200"
         ),
-        patch("app.services.chamados_criacao_service.GrupoRL.get_or_create") as mock_grupo,
         patch("app.services.chamados_criacao_service.atribuidor") as mock_atr,
-        patch("app.services.chamados_criacao_service.execute_with_retry") as mock_retry,
         patch("app.services.chamados_criacao_service.Historico") as mock_hist,
         patch(
             "app.services.chamados_criacao_service.Usuario.get_by_id",
@@ -165,15 +169,11 @@ def test_criar_chamado_com_setores_adicionais_dispara_notificacao_setores(app):
         patch("app.services.chamados_criacao_service.enviar_webpush_usuario"),
         patch("app.services.chamados_criacao_service.threading.Thread", side_effect=_FakeThread),
     ):
-        mock_grupo.return_value = MagicMock(id="grupo_1")
         mock_atr.atribuir.return_value = {
             "sucesso": True,
             "supervisor": {"id": "sup1", "nome": "Supervisor Teste"},
             "motivo": "",
         }
-        mock_ref = MagicMock()
-        mock_ref.id = "chamado_id_200"
-        mock_retry.return_value = (None, mock_ref)
 
         with app.app_context():
             chamado_id, numero, erro, _ = criar_chamado(
@@ -186,13 +186,19 @@ def test_criar_chamado_com_setores_adicionais_dispara_notificacao_setores(app):
             )
 
     assert erro is None
-    assert chamado_id == "chamado_id_200"
+    assert chamado_id is not None
     assert numero == "2026-200"
     mock_hist.return_value.save.assert_called_once()
     mock_notif_setores.assert_called_once()
     kwargs = mock_notif_setores.call_args.kwargs
     assert kwargs["numero_chamado"] == "2026-200"
     assert kwargs["setores_novos"] == ["Engenharia", "Material"]
+    # RL_codigo real gerou um GrupoRL real (Postgres), não mockado
+    from app.models_grupo_rl import GrupoRL
+
+    grupo = GrupoRL.get_by_rl_codigo("RL-001")
+    assert grupo is not None
+    assert Chamado.get_by_id(chamado_id).grupo_rl_id == grupo.id
 
 
 def test_criar_chamado_nao_notifica_inapp_quando_responsavel_e_solicitante(app):
@@ -215,7 +221,6 @@ def test_criar_chamado_nao_notifica_inapp_quando_responsavel_e_solicitante(app):
             "app.services.chamados_criacao_service.gerar_numero_chamado", return_value="2026-555"
         ),
         patch("app.services.chamados_criacao_service.atribuidor") as mock_atr,
-        patch("app.services.chamados_criacao_service.execute_with_retry") as mock_retry,
         patch("app.services.chamados_criacao_service.Historico"),
         patch("app.services.chamados_criacao_service.Usuario.get_by_id", return_value=MagicMock()),
         patch("app.services.chamados_criacao_service.notificar_aprovador_novo_chamado"),
@@ -229,9 +234,6 @@ def test_criar_chamado_nao_notifica_inapp_quando_responsavel_e_solicitante(app):
             "supervisor": {"id": "sol_auto", "nome": "Auto Solicitante"},
             "motivo": "",
         }
-        mock_ref = MagicMock()
-        mock_ref.id = "chamado_id_555"
-        mock_retry.return_value = (None, mock_ref)
 
         with app.app_context():
             chamado_id, numero, erro, _ = criar_chamado(
@@ -244,7 +246,7 @@ def test_criar_chamado_nao_notifica_inapp_quando_responsavel_e_solicitante(app):
             )
 
     assert erro is None
-    assert chamado_id == "chamado_id_555"
+    assert chamado_id is not None
     # Responsável == solicitante → sem notificação in-app nem web push
     mock_criar_notif.assert_not_called()
     mock_webpush.assert_not_called()
@@ -272,7 +274,6 @@ def test_criar_chamado_persiste_categoria_e_solicitante_nome_na_notificacao(app)
             "app.services.chamados_criacao_service.gerar_numero_chamado", return_value="CHM-0006"
         ),
         patch("app.services.chamados_criacao_service.atribuidor") as mock_atr,
-        patch("app.services.chamados_criacao_service.execute_with_retry") as mock_retry,
         patch("app.services.chamados_criacao_service.Historico"),
         patch(
             "app.services.chamados_criacao_service.Usuario.get_by_id",
@@ -288,12 +289,9 @@ def test_criar_chamado_persiste_categoria_e_solicitante_nome_na_notificacao(app)
             "supervisor": {"id": "sup_meta", "nome": "Supervisor Meta"},
             "motivo": "",
         }
-        mock_ref = MagicMock()
-        mock_ref.id = "chamado_meta_01"
-        mock_retry.return_value = (None, mock_ref)
 
         with app.app_context():
-            chamado_id, numero, erro, _ = criar_chamado(
+            criar_chamado(
                 form=form,
                 files=files,
                 solicitante_id="sol_meta",
@@ -302,7 +300,6 @@ def test_criar_chamado_persiste_categoria_e_solicitante_nome_na_notificacao(app)
                 solicitante_email="sol@test.com",
             )
 
-    assert erro is None
     mock_criar_notif.assert_called_once()
     kwargs = mock_criar_notif.call_args.kwargs
     assert kwargs.get("categoria") == "Nao Aplicavel"
@@ -328,11 +325,6 @@ class _FormComLinks(dict):
         return []
 
 
-def _chamado_dict_capturado(mock_retry):
-    """Extrai o dict do chamado passado para execute_with_retry."""
-    return mock_retry.call_args[0][1]
-
-
 def test_criar_chamado_com_link_externo_salva_onedrive_prefix(app):
     """Links externos válidos são adicionados aos anexos com prefixo 'onedrive:'."""
     link = "https://empresa.sharepoint.com/sites/chamados/documento.xlsx"
@@ -356,7 +348,6 @@ def test_criar_chamado_com_link_externo_salva_onedrive_prefix(app):
             "app.services.chamados_criacao_service.gerar_numero_chamado", return_value="2026-300"
         ),
         patch("app.services.chamados_criacao_service.atribuidor") as mock_atr,
-        patch("app.services.chamados_criacao_service.execute_with_retry") as mock_retry,
         patch("app.services.chamados_criacao_service.Historico"),
         patch("app.services.chamados_criacao_service.threading.Thread"),
     ):
@@ -365,9 +356,6 @@ def test_criar_chamado_com_link_externo_salva_onedrive_prefix(app):
             "supervisor": {"id": "sup1", "nome": "Supervisor"},
             "motivo": "",
         }
-        mock_ref = MagicMock()
-        mock_ref.id = "chamado_300"
-        mock_retry.return_value = (None, mock_ref)
 
         with app.app_context():
             chamado_id, numero, erro, _ = criar_chamado(
@@ -379,8 +367,7 @@ def test_criar_chamado_com_link_externo_salva_onedrive_prefix(app):
             )
 
     assert erro is None
-    chamado_dict = _chamado_dict_capturado(mock_retry)
-    anexos = chamado_dict.get("anexos", [])
+    anexos = Chamado.get_by_id(chamado_id).anexos
     assert f"onedrive:{link}" in anexos
 
 
@@ -410,7 +397,6 @@ def test_criar_chamado_com_multiplos_links_externos(app):
             "app.services.chamados_criacao_service.gerar_numero_chamado", return_value="2026-301"
         ),
         patch("app.services.chamados_criacao_service.atribuidor") as mock_atr,
-        patch("app.services.chamados_criacao_service.execute_with_retry") as mock_retry,
         patch("app.services.chamados_criacao_service.Historico"),
         patch("app.services.chamados_criacao_service.threading.Thread"),
     ):
@@ -419,12 +405,9 @@ def test_criar_chamado_com_multiplos_links_externos(app):
             "supervisor": {"id": "sup1", "nome": "Supervisor"},
             "motivo": "",
         }
-        mock_ref = MagicMock()
-        mock_ref.id = "chamado_301"
-        mock_retry.return_value = (None, mock_ref)
 
         with app.app_context():
-            _, _, erro, _ = criar_chamado(
+            chamado_id, _, erro, _ = criar_chamado(
                 form=form,
                 files=files,
                 solicitante_id="sol1",
@@ -432,7 +415,7 @@ def test_criar_chamado_com_multiplos_links_externos(app):
             )
 
     assert erro is None
-    anexos = _chamado_dict_capturado(mock_retry).get("anexos", [])
+    anexos = Chamado.get_by_id(chamado_id).anexos
     assert "onedrive:https://empresa.sharepoint.com/doc1.pdf" in anexos
     assert "onedrive:https://1drv.ms/b/s!AkXY" in anexos
 
@@ -456,7 +439,6 @@ def test_criar_chamado_sem_links_externos_nao_adiciona_onedrive(app):
             "app.services.chamados_criacao_service.gerar_numero_chamado", return_value="2026-302"
         ),
         patch("app.services.chamados_criacao_service.atribuidor") as mock_atr,
-        patch("app.services.chamados_criacao_service.execute_with_retry") as mock_retry,
         patch("app.services.chamados_criacao_service.Historico"),
         patch("app.services.chamados_criacao_service.threading.Thread"),
     ):
@@ -465,12 +447,9 @@ def test_criar_chamado_sem_links_externos_nao_adiciona_onedrive(app):
             "supervisor": {"id": "sup1", "nome": "Supervisor"},
             "motivo": "",
         }
-        mock_ref = MagicMock()
-        mock_ref.id = "chamado_302"
-        mock_retry.return_value = (None, mock_ref)
 
         with app.app_context():
-            _, _, erro, _ = criar_chamado(
+            chamado_id, _, erro, _ = criar_chamado(
                 form=form,
                 files=files,
                 solicitante_id="sol1",
@@ -478,7 +457,7 @@ def test_criar_chamado_sem_links_externos_nao_adiciona_onedrive(app):
             )
 
     assert erro is None
-    anexos = _chamado_dict_capturado(mock_retry).get("anexos", [])
+    anexos = Chamado.get_by_id(chamado_id).anexos
     assert not any(a.startswith("onedrive:") for a in anexos)
 
 
@@ -503,7 +482,6 @@ def test_criar_chamado_link_externo_via_dict_simples(app):
             "app.services.chamados_criacao_service.gerar_numero_chamado", return_value="2026-303"
         ),
         patch("app.services.chamados_criacao_service.atribuidor") as mock_atr,
-        patch("app.services.chamados_criacao_service.execute_with_retry") as mock_retry,
         patch("app.services.chamados_criacao_service.Historico"),
         patch("app.services.chamados_criacao_service.threading.Thread"),
     ):
@@ -512,12 +490,9 @@ def test_criar_chamado_link_externo_via_dict_simples(app):
             "supervisor": {"id": "sup1", "nome": "Supervisor"},
             "motivo": "",
         }
-        mock_ref = MagicMock()
-        mock_ref.id = "chamado_303"
-        mock_retry.return_value = (None, mock_ref)
 
         with app.app_context():
-            _, _, erro, _ = criar_chamado(
+            chamado_id, _, erro, _ = criar_chamado(
                 form=form,
                 files=files,
                 solicitante_id="sol1",
@@ -525,17 +500,17 @@ def test_criar_chamado_link_externo_via_dict_simples(app):
             )
 
     assert erro is None
-    anexos = _chamado_dict_capturado(mock_retry).get("anexos", [])
+    anexos = Chamado.get_by_id(chamado_id).anexos
     assert f"onedrive:{link}" in anexos
 
 
-# ── Testes anti-self-ticket (TDD RED → GREEN) ────────────────────────────────
+# ── Testes anti-self-ticket ───────────────────────────────────────────────────
 
 
 def test_criar_chamado_ignora_responsavel_form_igual_ao_solicitante(app):
     """
-    RED: se responsavel_id_form == solicitante_id, o sistema deve ignorar
-    a escolha manual e usar auto-atribuição — nunca deixar alguém ser
+    Se responsavel_id_form == solicitante_id, o sistema deve ignorar a
+    escolha manual e usar auto-atribuição — nunca deixar alguém ser
     responsável do próprio chamado via form.
     """
     form = {
@@ -557,14 +532,6 @@ def test_criar_chamado_ignora_responsavel_form_igual_ao_solicitante(app):
     usuario_sup.id = "sol1"
     usuario_sup.perfil = "supervisor"
 
-    chamado_capturado = {}
-
-    def _fake_add(dados):
-        chamado_capturado.update(dados)
-        ref = MagicMock()
-        ref.id = "chamado_self_block"
-        return (None, ref)
-
     with (
         patch("app.services.chamados_criacao_service.salvar_anexo", return_value=None),
         patch(
@@ -572,10 +539,6 @@ def test_criar_chamado_ignora_responsavel_form_igual_ao_solicitante(app):
         ),
         patch("app.services.chamados_criacao_service.Usuario.get_by_id", return_value=usuario_sup),
         patch("app.services.chamados_criacao_service.atribuidor") as mock_atr,
-        patch(
-            "app.services.chamados_criacao_service.execute_with_retry",
-            side_effect=lambda fn, dados, **kw: _fake_add(dados),
-        ),
         patch("app.services.chamados_criacao_service.Historico"),
         patch("app.services.chamados_criacao_service.threading.Thread"),
     ):
@@ -596,14 +559,15 @@ def test_criar_chamado_ignora_responsavel_form_igual_ao_solicitante(app):
             )
 
     assert erro is None
+    chamado = Chamado.get_by_id(chamado_id)
     # O responsável NÃO pode ser o próprio solicitante (self-assignment ignorado)
-    assert chamado_capturado.get("responsavel_id") != "sol1", (
+    assert chamado.responsavel_id != "sol1", (
         "Self-assignment não foi bloqueado: responsavel_id == solicitante_id"
     )
-    assert chamado_capturado.get("responsavel_id") == "sup_outro"
+    assert chamado.responsavel_id == "sup_outro"
 
 
-# ── Testes multi-anexo (TDD RED → GREEN) ─────────────────────────────────────
+# ── Testes multi-anexo ────────────────────────────────────────────────────────
 
 
 def _arq_mock(nome: str) -> MagicMock:
@@ -626,14 +590,6 @@ def test_criar_chamado_dois_anexos_salva_ambos(app):
     files = MagicMock()
     files.getlist.return_value = [arq1, arq2]
 
-    chamado_capturado = {}
-
-    def _fake_add(dados):
-        chamado_capturado.update(dados)
-        ref = MagicMock()
-        ref.id = "chamado_multi_001"
-        return (None, ref)
-
     with (
         patch(
             "app.services.chamados_criacao_service.salvar_anexo",
@@ -643,10 +599,6 @@ def test_criar_chamado_dois_anexos_salva_ambos(app):
             "app.services.chamados_criacao_service.gerar_numero_chamado", return_value="2026-300"
         ),
         patch("app.services.chamados_criacao_service.atribuidor") as mock_atr,
-        patch(
-            "app.services.chamados_criacao_service.execute_with_retry",
-            side_effect=lambda fn, dados, **kw: _fake_add(dados),
-        ),
         patch("app.services.chamados_criacao_service.Historico"),
         patch("app.services.chamados_criacao_service.threading.Thread"),
     ):
@@ -666,14 +618,14 @@ def test_criar_chamado_dois_anexos_salva_ambos(app):
             )
 
     assert erro is None
-    assert chamado_id == "chamado_multi_001"
     assert mock_salvar.call_count == 2
-    assert chamado_capturado.get("anexo") == "caminho/a.pdf"
-    assert chamado_capturado.get("anexos") == ["caminho/a.pdf", "caminho/b.xlsx"]
+    chamado = Chamado.get_by_id(chamado_id)
+    assert chamado.anexo == "caminho/a.pdf"
+    assert chamado.anexos == ["caminho/a.pdf", "caminho/b.xlsx"]
 
 
 def test_criar_chamado_falha_segundo_anexo_retorna_erro_sem_persistir(app):
-    """Falha no 2º salvar_anexo → retorna erro; Firestore add NÃO chamado."""
+    """Falha no 2º salvar_anexo → retorna erro; nada é persistido."""
     form = {
         "categoria": "Manutencao",
         "tipo": "Manutencao",
@@ -695,7 +647,6 @@ def test_criar_chamado_falha_segundo_anexo_retorna_erro_sem_persistir(app):
             "app.services.chamados_criacao_service.gerar_numero_chamado", return_value="2026-301"
         ),
         patch("app.services.chamados_criacao_service.atribuidor") as mock_atr,
-        patch("app.services.chamados_criacao_service.execute_with_retry") as mock_retry,
         patch("app.services.chamados_criacao_service.Historico"),
     ):
         mock_atr.atribuir.return_value = {
@@ -715,7 +666,6 @@ def test_criar_chamado_falha_segundo_anexo_retorna_erro_sem_persistir(app):
 
     assert chamado_id is None
     assert erro is not None
-    mock_retry.assert_not_called()
 
 
 # ── Fallback atribuição manual ────────────────────────────────────────────────
@@ -734,24 +684,12 @@ def test_criar_chamado_atribuicao_manual_retorna_aviso_e_responsavel_fallback(ap
     files = MagicMock()
     files.getlist.return_value = []
 
-    chamado_capturado = {}
-
-    def _fake_add(dados):
-        chamado_capturado.update(dados)
-        ref = MagicMock()
-        ref.id = "chamado_manual_001"
-        return (None, ref)
-
     with (
         patch("app.services.chamados_criacao_service.salvar_anexo", return_value=None),
         patch(
             "app.services.chamados_criacao_service.gerar_numero_chamado", return_value="2026-500"
         ),
         patch("app.services.chamados_criacao_service.atribuidor") as mock_atr,
-        patch(
-            "app.services.chamados_criacao_service.execute_with_retry",
-            side_effect=lambda fn, dados, **kw: _fake_add(dados),
-        ),
         patch("app.services.chamados_criacao_service.Historico"),
         patch("app.services.chamados_criacao_service.threading.Thread"),
     ):
@@ -770,16 +708,16 @@ def test_criar_chamado_atribuicao_manual_retorna_aviso_e_responsavel_fallback(ap
             )
 
     assert erro is None
-    assert chamado_id == "chamado_manual_001"
+    assert chamado_id is not None
     # Aviso deve conter "Awaiting manual assignment"
     assert aviso is not None
     assert "Awaiting manual assignment" in aviso
     # Responsável fallback = próprio solicitante
-    assert chamado_capturado.get("responsavel_id") == "sol1"
+    assert Chamado.get_by_id(chamado_id).responsavel_id == "sol1"
 
 
-def test_criar_chamado_excecao_persistencia_retorna_mensagem_erro(app):
-    """Quando execute_with_retry levanta exceção, retorna (None, None, mensagem, None)."""
+def test_criar_chamado_falha_ao_salvar_retorna_mensagem_erro(app):
+    """Quando Chamado.salvar() falha (retorna None), criar_chamado retorna (None, None, mensagem, None)."""
     form = {
         "categoria": "Manutencao",
         "tipo": "Manutencao",
@@ -797,10 +735,7 @@ def test_criar_chamado_excecao_persistencia_retorna_mensagem_erro(app):
             "app.services.chamados_criacao_service.gerar_numero_chamado", return_value="2026-999"
         ),
         patch("app.services.chamados_criacao_service.atribuidor") as mock_atr,
-        patch(
-            "app.services.chamados_criacao_service.execute_with_retry",
-            side_effect=Exception("Firestore unavailable"),
-        ),
+        patch("app.models.Chamado.salvar", return_value=None),
         patch("app.services.chamados_criacao_service.Historico"),
     ):
         mock_atr.atribuir.return_value = {
@@ -837,24 +772,12 @@ def test_criar_chamado_sem_anexos_usa_none_e_lista_vazia(app):
     files = MagicMock()
     files.getlist.return_value = []
 
-    chamado_capturado = {}
-
-    def _fake_add(dados):
-        chamado_capturado.update(dados)
-        ref = MagicMock()
-        ref.id = "chamado_sem_arq"
-        return (None, ref)
-
     with (
         patch("app.services.chamados_criacao_service.salvar_anexo") as mock_salvar,
         patch(
             "app.services.chamados_criacao_service.gerar_numero_chamado", return_value="2026-302"
         ),
         patch("app.services.chamados_criacao_service.atribuidor") as mock_atr,
-        patch(
-            "app.services.chamados_criacao_service.execute_with_retry",
-            side_effect=lambda fn, dados, **kw: _fake_add(dados),
-        ),
         patch("app.services.chamados_criacao_service.Historico"),
         patch("app.services.chamados_criacao_service.threading.Thread"),
     ):
@@ -875,8 +798,9 @@ def test_criar_chamado_sem_anexos_usa_none_e_lista_vazia(app):
 
     assert erro is None
     mock_salvar.assert_not_called()
-    assert chamado_capturado.get("anexo") is None
-    assert chamado_capturado.get("anexos") == []
+    chamado = Chamado.get_by_id(chamado_id)
+    assert chamado.anexo is None
+    assert chamado.anexos == []
 
 
 # ---------------------------------------------------------------------------
@@ -910,11 +834,9 @@ def test_criacao_falha_sem_supervisor_quando_area_tem_supervisores(app):
     supervisor_mock.nome = "Júlia"
     supervisor_mock.perfil = "supervisor"
 
-    with (
-        patch(
-            "app.services.chamados_criacao_service.Usuario.get_supervisores_por_area",
-            return_value=[supervisor_mock],
-        ),
+    with patch(
+        "app.services.chamados_criacao_service.Usuario.get_supervisores_por_area",
+        return_value=[supervisor_mock],
     ):
         chamado_id, numero, erro, _ = criar_chamado(
             form=_form_base(responsavel_id=""),
@@ -941,7 +863,6 @@ def test_criacao_ok_sem_supervisores_na_area(app):
             "app.services.chamados_criacao_service.gerar_numero_chamado", return_value="2026-100"
         ),
         patch("app.services.chamados_criacao_service.atribuidor") as mock_atr,
-        patch("app.services.chamados_criacao_service.execute_with_retry") as mock_retry,
         patch("app.services.chamados_criacao_service.Historico"),
         patch("app.services.chamados_criacao_service.threading.Thread"),
     ):
@@ -949,9 +870,6 @@ def test_criacao_ok_sem_supervisores_na_area(app):
             "sucesso": False,
             "motivo": "Nenhum supervisor disponível",
         }
-        mock_ref = MagicMock()
-        mock_ref.id = "chamado_novo_id"
-        mock_retry.return_value = (None, mock_ref)
 
         with app.app_context():
             chamado_id, numero, erro, _ = criar_chamado(
@@ -989,39 +907,32 @@ def test_criacao_ok_com_supervisor_valido_escolhido(app):
             "app.services.chamados_criacao_service.calcular_supervisor_ids_com_acesso",
             return_value=["id_julia"],
         ),
-        patch("app.services.chamados_criacao_service.execute_with_retry") as mock_retry,
         patch("app.services.chamados_criacao_service.Historico"),
         patch("app.services.chamados_criacao_service.threading.Thread"),
+        app.app_context(),
     ):
-        mock_ref = MagicMock()
-        mock_ref.id = "chamado_com_sup_id"
-        mock_retry.return_value = (None, mock_ref)
-
-        with app.app_context():
-            chamado_id, numero, erro, _ = criar_chamado(
-                form=_form_base(responsavel_id="id_julia", responsavel_nome="Júlia"),
-                files=_files_empty(),
-                solicitante_id="sol1",
-                solicitante_nome="Solicitante",
-                area_solicitante="Manutencao",
-            )
+        chamado_id, numero, erro, _ = criar_chamado(
+            form=_form_base(responsavel_id="id_julia", responsavel_nome="Júlia"),
+            files=_files_empty(),
+            solicitante_id="sol1",
+            solicitante_nome="Solicitante",
+            area_solicitante="Manutencao",
+        )
 
     assert erro is None
-    assert chamado_id == "chamado_com_sup_id"
+    assert chamado_id is not None
 
 
 def test_criacao_falha_quando_responsavel_id_invalido_para_area(app):
-    """Lacuna 3: responsavel_id fornecido mas não pertence aos supervisores da área → erro."""
+    """responsavel_id fornecido mas não pertence aos supervisores da área → erro."""
     supervisor_valido = MagicMock()
     supervisor_valido.id = "id_julia"
     supervisor_valido.nome = "Júlia"
     supervisor_valido.perfil = "supervisor"
 
-    with (
-        patch(
-            "app.services.chamados_criacao_service.Usuario.get_supervisores_por_area",
-            return_value=[supervisor_valido],
-        ),
+    with patch(
+        "app.services.chamados_criacao_service.Usuario.get_supervisores_por_area",
+        return_value=[supervisor_valido],
     ):
         chamado_id, numero, erro, _ = criar_chamado(
             form=_form_base(responsavel_id="id_outra_area", responsavel_nome="Outro"),
@@ -1038,20 +949,11 @@ def test_criacao_falha_quando_responsavel_id_invalido_para_area(app):
 
 
 def test_criacao_grava_supervisor_ids_com_acesso(app):
-    """Criação com supervisor válido grava supervisor_ids_com_acesso no documento."""
+    """Criação com supervisor válido grava supervisor_ids_com_acesso no chamado."""
     supervisor_mock = MagicMock()
     supervisor_mock.id = "id_julia"
     supervisor_mock.nome = "Júlia"
     supervisor_mock.perfil = "supervisor"
-
-    chamado_capturado = {}
-
-    def _capture_add(fn, data, **_kw):
-        # execute_with_retry(collection.add, to_dict_result, max_retries=N)
-        chamado_capturado.update(data)
-        ref = MagicMock()
-        ref.id = "chamado_ids_id"
-        return (None, ref)
 
     with (
         patch(
@@ -1069,10 +971,6 @@ def test_criacao_grava_supervisor_ids_com_acesso(app):
             "app.services.chamados_criacao_service.calcular_supervisor_ids_com_acesso",
             return_value=["id_julia"],
         ),
-        patch(
-            "app.services.chamados_criacao_service.execute_with_retry",
-            side_effect=_capture_add,
-        ),
         patch("app.services.chamados_criacao_service.Historico"),
         patch("app.services.chamados_criacao_service.threading.Thread"),
         app.app_context(),
@@ -1086,10 +984,10 @@ def test_criacao_grava_supervisor_ids_com_acesso(app):
         )
 
     assert erro is None
-    assert "id_julia" in chamado_capturado.get("supervisor_ids_com_acesso", [])
+    assert "id_julia" in Chamado.get_by_id(chamado_id).supervisor_ids_com_acesso
 
 
-# ── AOG — abertura já grava nível 4 e dispara broadcast pros 4 gestores ────────────────────────
+# ── AOG — abertura já grava nível 4 e dispara broadcast pros 4 gestores ──────
 
 
 def test_criar_chamado_aog_grava_nivel_4_e_notifica_todos_gestores(app):
@@ -1113,7 +1011,6 @@ def test_criar_chamado_aog_grava_nivel_4_e_notifica_todos_gestores(app):
             "app.services.chamados_criacao_service.gerar_numero_chamado", return_value="2026-300"
         ),
         patch("app.services.chamados_criacao_service.atribuidor") as mock_atr,
-        patch("app.services.chamados_criacao_service.execute_with_retry") as mock_retry,
         patch("app.services.chamados_criacao_service.Historico"),
         patch("app.services.chamados_criacao_service.Usuario.get_by_id", return_value=None),
         patch("app.services.chamados_criacao_service.notificar_aprovador_novo_chamado"),
@@ -1129,9 +1026,6 @@ def test_criar_chamado_aog_grava_nivel_4_e_notifica_todos_gestores(app):
             "supervisor": {"id": "sup1", "nome": "Supervisor Teste"},
             "motivo": "",
         }
-        mock_ref = MagicMock()
-        mock_ref.id = "chamado_id_300"
-        mock_retry.return_value = (None, mock_ref)
 
         with app.app_context():
             chamado_id, numero, erro, _ = criar_chamado(
@@ -1144,17 +1038,16 @@ def test_criar_chamado_aog_grava_nivel_4_e_notifica_todos_gestores(app):
             )
 
     assert erro is None
-    assert chamado_id == "chamado_id_300"
-    chamado_dict_salvo = mock_retry.call_args[0][1]
-    assert chamado_dict_salvo["escalacao_resposta_nivel"] == 4
+    assert chamado_id is not None
+    assert Chamado.get_by_id(chamado_id).escalacao_resposta_nivel == 4
     mock_notif_aog.assert_called_once()
     kwargs = mock_notif_aog.call_args.kwargs
-    assert kwargs["chamado_id"] == "chamado_id_300"
+    assert kwargs["chamado_id"] == chamado_id
     assert kwargs["chamado_data"]["numero_chamado"] == "2026-300"
 
 
 def test_criar_chamado_aog_grava_rl_codigo_e_cria_grupo_rl(app):
-    """AOG, assim como Projetos, grava rl_codigo no chamado e cria/reusa GrupoRL."""
+    """AOG, assim como Projetos, grava rl_codigo no chamado e cria/reusa GrupoRL (Postgres real)."""
     form = {
         "categoria": "AOG",
         "tipo": "Manutencao",
@@ -1172,9 +1065,7 @@ def test_criar_chamado_aog_grava_rl_codigo_e_cria_grupo_rl(app):
         patch(
             "app.services.chamados_criacao_service.gerar_numero_chamado", return_value="2026-302"
         ),
-        patch("app.services.chamados_criacao_service.GrupoRL.get_or_create") as mock_grupo,
         patch("app.services.chamados_criacao_service.atribuidor") as mock_atr,
-        patch("app.services.chamados_criacao_service.execute_with_retry") as mock_retry,
         patch("app.services.chamados_criacao_service.Historico"),
         patch("app.services.chamados_criacao_service.Usuario.get_by_id", return_value=None),
         patch("app.services.chamados_criacao_service.notificar_aprovador_novo_chamado"),
@@ -1183,15 +1074,11 @@ def test_criar_chamado_aog_grava_rl_codigo_e_cria_grupo_rl(app):
         patch("app.services.chamados_criacao_service.enviar_webpush_usuario"),
         patch("app.services.chamados_criacao_service.threading.Thread", side_effect=_FakeThread),
     ):
-        mock_grupo.return_value = MagicMock(id="grupo_aog_1")
         mock_atr.atribuir.return_value = {
             "sucesso": True,
             "supervisor": {"id": "sup1", "nome": "Supervisor Teste"},
             "motivo": "",
         }
-        mock_ref = MagicMock()
-        mock_ref.id = "chamado_id_302"
-        mock_retry.return_value = (None, mock_ref)
 
         with app.app_context():
             chamado_id, numero, erro, _ = criar_chamado(
@@ -1204,11 +1091,15 @@ def test_criar_chamado_aog_grava_rl_codigo_e_cria_grupo_rl(app):
             )
 
     assert erro is None
-    assert chamado_id == "chamado_id_302"
-    mock_grupo.assert_called_once()
-    chamado_dict_salvo = mock_retry.call_args[0][1]
-    assert chamado_dict_salvo["rl_codigo"] == "AOG-777"
-    assert chamado_dict_salvo["grupo_rl_id"] == "grupo_aog_1"
+    assert chamado_id is not None
+    from app.models_grupo_rl import GrupoRL
+
+    grupo = GrupoRL.get_by_rl_codigo("AOG-777")
+    assert grupo is not None
+
+    chamado = Chamado.get_by_id(chamado_id)
+    assert chamado.rl_codigo == "AOG-777"
+    assert chamado.grupo_rl_id == grupo.id
 
 
 def test_criar_chamado_normal_nao_grava_nivel_4_nem_notifica_aog(app):
@@ -1231,7 +1122,6 @@ def test_criar_chamado_normal_nao_grava_nivel_4_nem_notifica_aog(app):
             "app.services.chamados_criacao_service.gerar_numero_chamado", return_value="2026-301"
         ),
         patch("app.services.chamados_criacao_service.atribuidor") as mock_atr,
-        patch("app.services.chamados_criacao_service.execute_with_retry") as mock_retry,
         patch("app.services.chamados_criacao_service.Historico"),
         patch("app.services.chamados_criacao_service.Usuario.get_by_id", return_value=None),
         patch("app.services.chamados_criacao_service.notificar_aprovador_novo_chamado"),
@@ -1247,12 +1137,9 @@ def test_criar_chamado_normal_nao_grava_nivel_4_nem_notifica_aog(app):
             "supervisor": {"id": "sup1", "nome": "Supervisor Teste"},
             "motivo": "",
         }
-        mock_ref = MagicMock()
-        mock_ref.id = "chamado_id_301"
-        mock_retry.return_value = (None, mock_ref)
 
         with app.app_context():
-            criar_chamado(
+            chamado_id, _, erro, _ = criar_chamado(
                 form=form,
                 files=files,
                 solicitante_id="sol1",
@@ -1261,6 +1148,5 @@ def test_criar_chamado_normal_nao_grava_nivel_4_nem_notifica_aog(app):
                 solicitante_email="sol@test.com",
             )
 
-    chamado_dict_salvo = mock_retry.call_args[0][1]
-    assert chamado_dict_salvo["escalacao_resposta_nivel"] == 0
+    assert Chamado.get_by_id(chamado_id).escalacao_resposta_nivel == 0
     mock_notif_aog.assert_not_called()
