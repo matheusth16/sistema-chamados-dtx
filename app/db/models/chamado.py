@@ -88,6 +88,16 @@ class ChamadoRow(Base):
     alerta_supervisor_80_enviado: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False
     )
+    lembrete_confirmacao_1_enviado: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False
+    )
+    lembrete_confirmacao_2_enviado: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False
+    )
+    alerta_prazo_24h_enviado_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    reaberturas_solicitante_count: Mapped[int] = mapped_column(
+        SmallInteger, nullable=False, default=0
+    )
 
 
 class ChamadoParticipanteRow(Base):

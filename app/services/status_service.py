@@ -12,12 +12,10 @@ import threading
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from firebase_admin import firestore
 from flask import current_app, session
 
-from app.database import db
-from app.firebase_retry import execute_with_retry
 from app.i18n import get_translated_status, get_translation
+from app.models import Chamado
 from app.models_historico import Historico
 from app.models_usuario import Usuario
 from app.services.gamification_service import GamificationService
@@ -56,7 +54,7 @@ def atualizar_status_chamado(
     Para status 'Cancelado', motivo_cancelamento é obrigatório.
 
     Args:
-        chamado_id: ID do chamado no Firestore
+        chamado_id: ID do chamado
         novo_status: Novo status ('Aberto', 'Em Atendimento', 'Concluído', 'Cancelado')
         usuario_id: ID do usuário que está fazendo a alteração
         usuario_nome: Nome do usuário que está fazendo a alteração
@@ -87,11 +85,12 @@ def atualizar_status_chamado(
                 return {"sucesso": False, "erro": _t("cancellation_reason_required_field")}
 
         # Busca dados do chamado se não fornecidos
+        _chamado_row_fetched = None
         if data_chamado is None:
-            doc = db.collection("chamados").document(chamado_id).get()
-            if not doc.exists:
+            _chamado_row_fetched = Chamado.get_by_id(chamado_id)
+            if _chamado_row_fetched is None:
                 return {"sucesso": False, "erro": _t("ticket_not_found"), "codigo": 404}
-            data_chamado = doc.to_dict()
+            data_chamado = _chamado_row_fetched.to_dict()
 
         status_anterior = data_chamado.get("status")
 
@@ -142,7 +141,7 @@ def atualizar_status_chamado(
         # Monta dados de atualização
         update_data = {"status": novo_status}
         if novo_status == "Concluído":
-            update_data["data_conclusao"] = firestore.SERVER_TIMESTAMP
+            update_data["data_conclusao"] = datetime.now(ZoneInfo(Config.SLA_TIMEZONE))
             update_data["confirmacao_solicitante"] = "pendente"
             # Reseta flags de lembrete para que novo ciclo de 24 h/48 h seja enviado
             # (cobre reconclusão após reabertura manual por admin/supervisor)
@@ -158,7 +157,7 @@ def atualizar_status_chamado(
             update_data["lembrete_confirmacao_2_enviado"] = False
         elif novo_status == "Cancelado":
             update_data["motivo_cancelamento"] = (motivo_cancelamento or "").strip()
-            update_data["data_cancelamento"] = firestore.SERVER_TIMESTAMP
+            update_data["data_cancelamento"] = datetime.now(ZoneInfo(Config.SLA_TIMEZONE))
 
         # Fase 2 — Claim ao 1º Em Atendimento
         if novo_status == "Em Atendimento" and status_anterior == "Aberto":
@@ -180,10 +179,12 @@ def atualizar_status_chamado(
             update_data["alerta_supervisor_50_enviado"] = False
             update_data["alerta_supervisor_80_enviado"] = False
 
-        # Atualiza no Firestore com retry
-        execute_with_retry(
-            db.collection("chamados").document(chamado_id).update, update_data, max_retries=3
-        )
+        # Atualiza no Postgres
+        chamado_para_atualizar = _chamado_row_fetched or Chamado.get_by_id(chamado_id)
+        if chamado_para_atualizar is None:
+            return {"sucesso": False, "erro": _t("ticket_not_found"), "codigo": 404}
+        if not chamado_para_atualizar.atualizar_campos(**update_data):
+            return {"sucesso": False, "erro": _t("internal_error_retry"), "codigo": 500}
 
         # Registra histórico se houve mudança
         if status_anterior != novo_status:

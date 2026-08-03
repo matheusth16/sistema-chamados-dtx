@@ -54,6 +54,11 @@ class Chamado:
         escalacao_resolucao_nivel: int = 0,
         alerta_supervisor_50_enviado: bool = False,
         alerta_supervisor_80_enviado: bool = False,
+        # Lembretes de confirmação de resolução (24h/48h após Concluído)
+        lembrete_confirmacao_1_enviado: bool = False,
+        lembrete_confirmacao_2_enviado: bool = False,
+        alerta_prazo_24h_enviado_em=None,
+        reaberturas_solicitante_count: int = 0,
         # Nível 1 — Observadores (em cópia, read-only)
         observadores: list = None,
         # Previsão de atendimento — suspende e-mails de escalonamento (Escada A/B) até a data
@@ -112,6 +117,12 @@ class Chamado:
         )
         self.alerta_supervisor_50_enviado = bool(alerta_supervisor_50_enviado)
         self.alerta_supervisor_80_enviado = bool(alerta_supervisor_80_enviado)
+        self.lembrete_confirmacao_1_enviado = bool(lembrete_confirmacao_1_enviado)
+        self.lembrete_confirmacao_2_enviado = bool(lembrete_confirmacao_2_enviado)
+        self.alerta_prazo_24h_enviado_em = alerta_prazo_24h_enviado_em
+        self.reaberturas_solicitante_count = (
+            reaberturas_solicitante_count if reaberturas_solicitante_count is not None else 0
+        )
         # Nível 1 — Observadores (em cópia, read-only): [{usuario_id, nome, email}]
         self.observadores = observadores if isinstance(observadores, list) else []
         # Previsão de atendimento — suspende e-mails de escalonamento (Escada A/B) até a data
@@ -209,6 +220,10 @@ class Chamado:
             "escalacao_resolucao_nivel": self.escalacao_resolucao_nivel,
             "alerta_supervisor_50_enviado": self.alerta_supervisor_50_enviado,
             "alerta_supervisor_80_enviado": self.alerta_supervisor_80_enviado,
+            "lembrete_confirmacao_1_enviado": self.lembrete_confirmacao_1_enviado,
+            "lembrete_confirmacao_2_enviado": self.lembrete_confirmacao_2_enviado,
+            "alerta_prazo_24h_enviado_em": self.alerta_prazo_24h_enviado_em,
+            "reaberturas_solicitante_count": self.reaberturas_solicitante_count,
             # Nível 1 — Observadores (em cópia)
             "observadores": self.observadores,
             # Previsão de atendimento
@@ -274,6 +289,10 @@ class Chamado:
             escalacao_resolucao_nivel=data.get("escalacao_resolucao_nivel", 0),
             alerta_supervisor_50_enviado=data.get("alerta_supervisor_50_enviado", False),
             alerta_supervisor_80_enviado=data.get("alerta_supervisor_80_enviado", False),
+            lembrete_confirmacao_1_enviado=data.get("lembrete_confirmacao_1_enviado", False),
+            lembrete_confirmacao_2_enviado=data.get("lembrete_confirmacao_2_enviado", False),
+            alerta_prazo_24h_enviado_em=data.get("alerta_prazo_24h_enviado_em"),
+            reaberturas_solicitante_count=data.get("reaberturas_solicitante_count", 0),
             # Nível 1 — Observadores (em cópia)
             observadores=data.get("observadores")
             if isinstance(data.get("observadores"), list)
@@ -320,6 +339,10 @@ class Chamado:
             "escalacao_resolucao_nivel": self.escalacao_resolucao_nivel,
             "alerta_supervisor_50_enviado": self.alerta_supervisor_50_enviado,
             "alerta_supervisor_80_enviado": self.alerta_supervisor_80_enviado,
+            "lembrete_confirmacao_1_enviado": self.lembrete_confirmacao_1_enviado,
+            "lembrete_confirmacao_2_enviado": self.lembrete_confirmacao_2_enviado,
+            "alerta_prazo_24h_enviado_em": self.alerta_prazo_24h_enviado_em,
+            "reaberturas_solicitante_count": self.reaberturas_solicitante_count,
         }
 
     @classmethod
@@ -359,6 +382,10 @@ class Chamado:
             escalacao_resolucao_nivel=row.escalacao_resolucao_nivel,
             alerta_supervisor_50_enviado=row.alerta_supervisor_50_enviado,
             alerta_supervisor_80_enviado=row.alerta_supervisor_80_enviado,
+            lembrete_confirmacao_1_enviado=row.lembrete_confirmacao_1_enviado,
+            lembrete_confirmacao_2_enviado=row.lembrete_confirmacao_2_enviado,
+            alerta_prazo_24h_enviado_em=row.alerta_prazo_24h_enviado_em,
+            reaberturas_solicitante_count=row.reaberturas_solicitante_count,
             observadores=observadores or [],
             previsao_atendimento=row.previsao_atendimento,
             motivo_previsao_atendimento=row.motivo_previsao_atendimento,

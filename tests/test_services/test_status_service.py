@@ -1,40 +1,63 @@
-"""Testes do serviço centralizado de atualização de status (status_service)."""
+"""Testes do serviço centralizado de atualização de status (status_service).
 
+Fase 2 (Marco 7): a persistência roda contra Postgres real (db_session) via
+Chamado.atualizar_campos() — substitui o antigo mock de execute_with_retry/
+db.collection("chamados").document(id).update(...). Testes que antes
+inspecionavam o dict passado a execute_with_retry agora verificam o estado
+real persistido via Chamado.get_by_id(chamado_id)."""
+
+from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 
+import pytest
+
+from app.models import Chamado
 from app.services.status_service import _notificar_solicitante, atualizar_status_chamado
+
+pytestmark = pytest.mark.usefixtures("db_session")
+
+_ID_INEXISTENTE = 999999999
+
+
+def _criar_chamado_real(status: str = "Aberto", **overrides) -> int:
+    defaults = {
+        "categoria": "Manutencao",
+        "tipo_solicitacao": "Manutencao",
+        "descricao": "Descrição de teste",
+        "responsavel": "Responsável Teste",
+        "solicitante_id": "sol1",
+        "solicitante_nome": "Solicitante Teste",
+        "status": status,
+    }
+    defaults.update(overrides)
+    chamado = Chamado(**defaults)
+    chamado_id = chamado.salvar()
+    assert chamado_id is not None
+    return chamado_id
 
 
 def test_atualizar_status_chamado_nao_encontrado_retorna_erro():
-    """Quando o chamado não existe no Firestore, retorna sucesso=False e erro 'Chamado não encontrado'."""
-    mock_db = MagicMock()
-    mock_doc = MagicMock()
-    mock_doc.exists = False
-    mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
-
-    with patch("app.services.status_service.db", mock_db):
-        resultado = atualizar_status_chamado(
-            chamado_id="inexistente",
-            novo_status="Em Atendimento",
-            usuario_id="u1",
-            usuario_nome="Test",
-        )
+    """Quando o chamado não existe no banco, retorna sucesso=False e erro 'Chamado não encontrado'."""
+    resultado = atualizar_status_chamado(
+        chamado_id=_ID_INEXISTENTE,
+        novo_status="Em Atendimento",
+        usuario_id="u1",
+        usuario_nome="Test",
+    )
     assert resultado["sucesso"] is False
     assert resultado["erro"] == "Ticket not found"
 
 
 def test_atualizar_status_chamado_com_data_chamado_atualiza_e_retorna_sucesso():
-    """Com data_chamado informado, não busca no Firestore; atualiza e retorna sucesso."""
-    mock_db = MagicMock()
+    """Com data_chamado informado, não busca no banco antes; atualiza e retorna sucesso."""
+    chamado_id = _criar_chamado_real(status="Em Atendimento")
     with (
-        patch("app.services.status_service.db", mock_db),
-        patch("app.services.status_service.execute_with_retry") as mock_retry,
         patch("app.services.status_service.Historico") as mock_hist,
         patch("app.services.status_service._notificar_solicitante"),
         patch("app.services.status_service.GamificationService") as mock_gamif,
     ):
         resultado = atualizar_status_chamado(
-            chamado_id="ch1",
+            chamado_id=chamado_id,
             novo_status="Concluído",
             usuario_id="u1",
             usuario_nome="Test",
@@ -48,7 +71,6 @@ def test_atualizar_status_chamado_com_data_chamado_atualiza_e_retorna_sucesso():
     assert resultado["sucesso"] is True
     assert resultado["novo_status"] == "Concluído"
     assert "mensagem" in resultado
-    mock_retry.assert_called_once()
     mock_hist.assert_called_once()
     mock_gamif.avaliar_resolucao_chamado.assert_called_once_with(
         "u1",
@@ -59,18 +81,23 @@ def test_atualizar_status_chamado_com_data_chamado_atualiza_e_retorna_sucesso():
             "categoria": "Manutenção",
         },
     )
+    assert Chamado.get_by_id(chamado_id).status == "Concluído"
 
 
 def test_conclusao_reseta_flags_lembrete():
     """Ao ir para Concluído, flags de lembrete devem ser zeradas para novo ciclo de envio."""
+    chamado_id = _criar_chamado_real(
+        status="Em Atendimento",
+        lembrete_confirmacao_1_enviado=True,
+        lembrete_confirmacao_2_enviado=True,
+    )
     with (
-        patch("app.services.status_service.execute_with_retry") as mock_retry,
         patch("app.services.status_service.Historico"),
         patch("app.services.status_service._notificar_solicitante"),
         patch("app.services.status_service.GamificationService"),
     ):
         resultado = atualizar_status_chamado(
-            chamado_id="ch1",
+            chamado_id=chamado_id,
             novo_status="Concluído",
             usuario_id="u1",
             usuario_nome="Test",
@@ -83,21 +110,21 @@ def test_conclusao_reseta_flags_lembrete():
             },
         )
     assert resultado["sucesso"] is True
-    update_data = mock_retry.call_args[0][1]
-    assert update_data.get("lembrete_confirmacao_1_enviado") is False
-    assert update_data.get("lembrete_confirmacao_2_enviado") is False
+    chamado_atualizado = Chamado.get_by_id(chamado_id)
+    assert chamado_atualizado.lembrete_confirmacao_1_enviado is False
+    assert chamado_atualizado.lembrete_confirmacao_2_enviado is False
 
 
 def test_atualizar_status_chamado_mesmo_status_nao_chama_gamificacao():
     """Quando o status não muda (ex.: já era Concluído), não chama gamificação."""
+    chamado_id = _criar_chamado_real(status="Concluído")
     with (
-        patch("app.services.status_service.execute_with_retry"),
         patch("app.services.status_service.Historico"),
         patch("app.services.status_service._notificar_solicitante"),
         patch("app.services.status_service.GamificationService") as mock_gamif,
     ):
         resultado = atualizar_status_chamado(
-            chamado_id="ch1",
+            chamado_id=chamado_id,
             novo_status="Concluído",
             usuario_id="u1",
             usuario_nome="Test",
@@ -116,7 +143,7 @@ def test_atualizar_status_chamado_mesmo_status_nao_chama_gamificacao():
 def test_atualizar_status_invalido_retorna_erro():
     """Status inválido retorna sucesso=False com mensagem de erro."""
     resultado = atualizar_status_chamado(
-        chamado_id="ch1",
+        chamado_id=_ID_INEXISTENTE,
         novo_status="StatusInexistente",
         usuario_id="u1",
         usuario_nome="Test",
@@ -129,7 +156,7 @@ def test_atualizar_status_invalido_retorna_erro():
 def test_atualizar_cancelado_sem_motivo_retorna_erro():
     """Cancelado sem motivo retorna sucesso=False."""
     resultado = atualizar_status_chamado(
-        chamado_id="ch1",
+        chamado_id=_ID_INEXISTENTE,
         novo_status="Cancelado",
         usuario_id="u1",
         usuario_nome="Test",
@@ -142,14 +169,14 @@ def test_atualizar_cancelado_sem_motivo_retorna_erro():
 
 def test_atualizar_cancelado_com_motivo_retorna_sucesso():
     """Cancelado com motivo atualiza status e registra histórico do motivo."""
+    chamado_id = _criar_chamado_real(status="Aberto")
     with (
-        patch("app.services.status_service.execute_with_retry"),
         patch("app.services.status_service.Historico") as mock_hist,
         patch("app.services.status_service._notificar_solicitante"),
         patch("app.services.status_service.GamificationService"),
     ):
         resultado = atualizar_status_chamado(
-            chamado_id="ch1",
+            chamado_id=chamado_id,
             novo_status="Cancelado",
             usuario_id="u1",
             usuario_nome="Test",
@@ -159,18 +186,19 @@ def test_atualizar_cancelado_com_motivo_retorna_sucesso():
     assert resultado["sucesso"] is True
     # Deve ter registrado histórico duas vezes: status + motivo
     assert mock_hist.call_count == 2
+    assert Chamado.get_by_id(chamado_id).status == "Cancelado"
 
 
 def test_atualizar_em_atendimento_chama_gamificacao_inicial():
     """Em Atendimento chama GamificationService.avaliar_atendimento_inicial."""
+    chamado_id = _criar_chamado_real(status="Aberto")
     with (
-        patch("app.services.status_service.execute_with_retry"),
         patch("app.services.status_service.Historico"),
         patch("app.services.status_service._notificar_solicitante"),
         patch("app.services.status_service.GamificationService") as mock_gamif,
     ):
         resultado = atualizar_status_chamado(
-            chamado_id="ch1",
+            chamado_id=chamado_id,
             novo_status="Em Atendimento",
             usuario_id="u1",
             usuario_nome="Test",
@@ -185,15 +213,15 @@ def test_saindo_de_concluido_para_aberto_reseta_confirmacao_solicitante():
     admin_mock = MagicMock()
     admin_mock.perfil = "admin"
     admin_mock.is_admin_or_above = True
+    chamado_id = _criar_chamado_real(status="Concluído", confirmacao_solicitante="pendente")
     with (
-        patch("app.services.status_service.execute_with_retry") as mock_retry,
         patch("app.services.status_service.Historico"),
         patch("app.services.status_service._notificar_solicitante"),
         patch("app.services.status_service.GamificationService"),
         patch("app.services.status_service.Usuario.get_by_id", return_value=admin_mock),
     ):
         resultado = atualizar_status_chamado(
-            chamado_id="ch1",
+            chamado_id=chamado_id,
             novo_status="Aberto",
             usuario_id="u1",
             usuario_nome="Test",
@@ -205,14 +233,13 @@ def test_saindo_de_concluido_para_aberto_reseta_confirmacao_solicitante():
         )
 
     assert resultado["sucesso"] is True
-    update_payload = mock_retry.call_args[0][1]
-    assert update_payload.get("confirmacao_solicitante") is None
+    assert Chamado.get_by_id(chamado_id).confirmacao_solicitante is None
 
 
 def test_concluido_para_em_atendimento_transicao_invalida():
     """Concluído → Em Atendimento deve ser transição inválida (TRANSICOES_VALIDAS)."""
     resultado = atualizar_status_chamado(
-        chamado_id="ch1",
+        chamado_id=_ID_INEXISTENTE,
         novo_status="Em Atendimento",
         usuario_id="u1",
         usuario_nome="Test",
@@ -233,15 +260,15 @@ def test_reabertura_admin_grava_historico_com_motivo():
     admin_mock = MagicMock()
     admin_mock.perfil = "admin"
     admin_mock.is_admin_or_above = True
+    chamado_id = _criar_chamado_real(status="Concluído", confirmacao_solicitante="confirmado")
     with (
-        patch("app.services.status_service.execute_with_retry"),
         patch("app.services.status_service.Historico") as mock_hist,
         patch("app.services.status_service._notificar_solicitante"),
         patch("app.services.status_service.GamificationService"),
         patch("app.services.status_service.Usuario.get_by_id", return_value=admin_mock),
     ):
         resultado = atualizar_status_chamado(
-            chamado_id="ch1",
+            chamado_id=chamado_id,
             novo_status="Aberto",
             usuario_id="admin1",
             usuario_nome="Admin",
@@ -260,12 +287,11 @@ def test_reabertura_admin_grava_historico_com_motivo():
 
 
 def test_atualizar_status_excecao_retorna_falso():
-    """Exceção durante execute_with_retry retorna sucesso=False."""
-    with patch(
-        "app.services.status_service.execute_with_retry", side_effect=Exception("db timeout")
-    ):
+    """Falha ao persistir (atualizar_campos retorna False) retorna sucesso=False."""
+    chamado_id = _criar_chamado_real(status="Em Atendimento")
+    with patch("app.models.Chamado.atualizar_campos", return_value=False):
         resultado = atualizar_status_chamado(
-            chamado_id="ch1",
+            chamado_id=chamado_id,
             novo_status="Aberto",
             usuario_id="u1",
             usuario_nome="Test",
@@ -275,36 +301,29 @@ def test_atualizar_status_excecao_retorna_falso():
     assert "erro" in resultado
 
 
-def test_busca_chamado_no_firestore_quando_data_nao_fornecida():
-    """Quando data_chamado=None e doc.exists=True, chama doc.to_dict() para obter os dados."""
-    mock_doc = MagicMock()
-    mock_doc.exists = True
-    mock_doc.to_dict.return_value = {
-        "status": "Aberto",
-        "solicitante_id": "s1",
-        "numero_chamado": "CHM-001",
-        "categoria": "TI",
-    }
+def test_busca_chamado_no_banco_quando_data_nao_fornecida():
+    """Quando data_chamado=None, busca o chamado real via Chamado.get_by_id."""
+    chamado_id = _criar_chamado_real(
+        status="Aberto", solicitante_id="s1", numero_chamado="CHM-001", categoria="TI"
+    )
     with (
-        patch("app.services.status_service.db") as mock_db,
-        patch("app.services.status_service.execute_with_retry"),
         patch("app.services.status_service.Historico"),
         patch("app.services.status_service._notificar_solicitante"),
         patch("app.services.status_service.GamificationService"),
     ):
-        mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
         resultado = atualizar_status_chamado(
-            chamado_id="ch1",
+            chamado_id=chamado_id,
             novo_status="Concluído",
             usuario_id="u1",
             usuario_nome="Test",
         )
     assert resultado["sucesso"] is True
-    mock_doc.to_dict.assert_called_once()
+    assert Chamado.get_by_id(chamado_id).status == "Concluído"
 
 
 def test_threading_notificacao_lanca_thread_com_app_context(app):
     """Dentro de app_context, a notificação inicia um Thread daemon e executa o closure."""
+    chamado_id = _criar_chamado_real(status="Aberto")
     notif_closure_calls = []
 
     def fake_thread(target, daemon=True):
@@ -314,7 +333,6 @@ def test_threading_notificacao_lanca_thread_com_app_context(app):
         return mock
 
     with (
-        patch("app.services.status_service.execute_with_retry"),
         patch("app.services.status_service.Historico"),
         patch("app.services.status_service.GamificationService"),
         patch("app.services.status_service._notificar_solicitante"),
@@ -322,7 +340,7 @@ def test_threading_notificacao_lanca_thread_com_app_context(app):
         app.app_context(),
     ):
         atualizar_status_chamado(
-            chamado_id="ch1",
+            chamado_id=chamado_id,
             novo_status="Em Atendimento",
             usuario_id="u1",
             usuario_nome="Test",
@@ -394,15 +412,15 @@ def test_atualizar_status_transicao_concluido_para_aberto_valida():
     admin_mock = MagicMock()
     admin_mock.perfil = "admin"
     admin_mock.is_admin_or_above = True
+    chamado_id = _criar_chamado_real(status="Concluído")
     with (
-        patch("app.services.status_service.execute_with_retry"),
         patch("app.services.status_service.Historico"),
         patch("app.services.status_service._notificar_solicitante"),
         patch("app.services.status_service.GamificationService"),
         patch("app.services.status_service.Usuario.get_by_id", return_value=admin_mock),
     ):
         resultado = atualizar_status_chamado(
-            chamado_id="ch1",
+            chamado_id=chamado_id,
             novo_status="Aberto",
             usuario_id="u1",
             usuario_nome="Test",
@@ -413,15 +431,15 @@ def test_atualizar_status_transicao_concluido_para_aberto_valida():
 
 def test_fallback_runtime_error_chama_ambas_notificacoes():
     """Lacuna E: except RuntimeError dispara _notificar_solicitante E _notificar_observadores_status."""
+    chamado_id = _criar_chamado_real(status="Aberto")
     with (
-        patch("app.services.status_service.execute_with_retry"),
         patch("app.services.status_service.Historico"),
         patch("app.services.status_service.GamificationService"),
         patch("app.services.status_service._notificar_solicitante") as mock_sol,
         patch("app.services.status_service._notificar_observadores_status") as mock_obs,
     ):
         resultado = atualizar_status_chamado(
-            chamado_id="ch1",
+            chamado_id=chamado_id,
             novo_status="Em Atendimento",
             usuario_id="u1",
             usuario_nome="Test",
@@ -434,14 +452,14 @@ def test_fallback_runtime_error_chama_ambas_notificacoes():
 
 def test_atualizar_status_mesmo_status_nao_rejeita_transicao():
     """F-63: Transição de um status para ele mesmo deve ser permitida."""
+    chamado_id = _criar_chamado_real(status="Concluído")
     with (
-        patch("app.services.status_service.execute_with_retry"),
         patch("app.services.status_service.Historico"),
         patch("app.services.status_service._notificar_solicitante"),
         patch("app.services.status_service.GamificationService"),
     ):
         resultado = atualizar_status_chamado(
-            chamado_id="ch1",
+            chamado_id=chamado_id,
             novo_status="Concluído",
             usuario_id="u1",
             usuario_nome="Test",
@@ -452,14 +470,14 @@ def test_atualizar_status_mesmo_status_nao_rejeita_transicao():
 
 def test_atualizar_status_sem_status_anterior_nao_rejeita():
     """F-63: Sem status_anterior (campo ausente), transição não é bloqueada."""
+    chamado_id = _criar_chamado_real(status="Aberto")
     with (
-        patch("app.services.status_service.execute_with_retry"),
         patch("app.services.status_service.Historico"),
         patch("app.services.status_service._notificar_solicitante"),
         patch("app.services.status_service.GamificationService"),
     ):
         resultado = atualizar_status_chamado(
-            chamado_id="ch1",
+            chamado_id=chamado_id,
             novo_status="Em Atendimento",
             usuario_id="u1",
             usuario_nome="Test",
@@ -479,15 +497,15 @@ def test_transicoes_validas_permite_fluxo_normal():
         ("Concluído", "Aberto"),
         ("Aberto", "Cancelado"),
     ]:
+        chamado_id = _criar_chamado_real(status=status_ant)
         with (
-            patch("app.services.status_service.execute_with_retry"),
             patch("app.services.status_service.Historico"),
             patch("app.services.status_service._notificar_solicitante"),
             patch("app.services.status_service.GamificationService"),
             patch("app.services.status_service.Usuario.get_by_id", return_value=admin_mock),
         ):
             r = atualizar_status_chamado(
-                chamado_id="ch1",
+                chamado_id=chamado_id,
                 novo_status=status_novo,
                 usuario_id="u1",
                 usuario_nome="Test",
@@ -509,7 +527,7 @@ def test_defesa_profundidade_supervisor_nivel2_cancelar_bloqueado():
     sup.is_admin_or_above = False
 
     resultado = atualizar_status_chamado(
-        chamado_id="ch1",
+        chamado_id=_ID_INEXISTENTE,
         novo_status="Cancelado",
         usuario_id="u1",
         usuario_nome="Supervisor",
@@ -532,7 +550,7 @@ def test_defesa_profundidade_admin_nivel2_cancelar_bloqueado():
     admin.is_admin_or_above = True
 
     resultado = atualizar_status_chamado(
-        chamado_id="ch1",
+        chamado_id=_ID_INEXISTENTE,
         novo_status="Cancelado",
         usuario_id="admin1",
         usuario_nome="Admin",
@@ -553,15 +571,15 @@ def test_defesa_profundidade_admin_nivel2_reabrir_permitido():
     admin = MagicMock()
     admin.perfil = "admin"
     admin.is_admin_or_above = True
+    chamado_id = _criar_chamado_real(status="Concluído", confirmacao_solicitante="confirmado")
 
     with (
-        patch("app.services.status_service.execute_with_retry"),
         patch("app.services.status_service.Historico"),
         patch("app.services.status_service._notificar_solicitante"),
         patch("app.services.status_service.GamificationService"),
     ):
         resultado = atualizar_status_chamado(
-            chamado_id="ch1",
+            chamado_id=chamado_id,
             novo_status="Aberto",
             usuario_id="admin1",
             usuario_nome="Admin",
@@ -578,8 +596,8 @@ def test_defesa_profundidade_admin_nivel2_reabrir_permitido():
 
 def test_defesa_profundidade_usuario_none_nao_bloqueia_sem_db():
     """Lacuna 5: quando usuario=None e Usuario.get_by_id falha, validação é ignorada graciosamente."""
+    chamado_id = _criar_chamado_real(status="Concluído", confirmacao_solicitante="pendente")
     with (
-        patch("app.services.status_service.execute_with_retry"),
         patch("app.services.status_service.Historico"),
         patch("app.services.status_service._notificar_solicitante"),
         patch("app.services.status_service.GamificationService"),
@@ -589,7 +607,7 @@ def test_defesa_profundidade_usuario_none_nao_bloqueia_sem_db():
         ),
     ):
         resultado = atualizar_status_chamado(
-            chamado_id="ch1",
+            chamado_id=chamado_id,
             novo_status="Aberto",
             usuario_id="u1",
             usuario_nome="Test",
@@ -607,34 +625,10 @@ def test_defesa_profundidade_usuario_none_nao_bloqueia_sem_db():
 # ---------------------------------------------------------------------------
 
 
-def _patch_status_service(**extras):
-    """Context manager helper: patches comuns ao status_service para testes de claim."""
-    from contextlib import ExitStack
-    from unittest.mock import patch
-
-    stack = ExitStack()
-    patches = {
-        "execute_with_retry": stack.enter_context(
-            patch("app.services.status_service.execute_with_retry")
-        ),
-        "Historico": stack.enter_context(patch("app.services.status_service.Historico")),
-        "notif": stack.enter_context(patch("app.services.status_service._notificar_solicitante")),
-        "gamif": stack.enter_context(patch("app.services.status_service.GamificationService")),
-        "calc_ids": stack.enter_context(
-            patch(
-                "app.services.status_service.calcular_supervisor_ids_com_acesso",
-                return_value=["id_julia"],
-            )
-        ),
-    }
-    patches.update(extras)
-    return stack, patches
-
-
 def test_claim_atribui_owner_ao_em_atendimento():
     """Aberto sem owner → Em Atendimento atribui responsavel_id ao usuário logado."""
+    chamado_id = _criar_chamado_real(status="Aberto")
     with (
-        patch("app.services.status_service.execute_with_retry") as mock_retry,
         patch("app.services.status_service.Historico"),
         patch("app.services.status_service._notificar_solicitante"),
         patch("app.services.status_service.GamificationService"),
@@ -644,7 +638,7 @@ def test_claim_atribui_owner_ao_em_atendimento():
         ),
     ):
         resultado = atualizar_status_chamado(
-            chamado_id="id_chamado",
+            chamado_id=chamado_id,
             novo_status="Em Atendimento",
             usuario_id="id_julia",
             usuario_nome="Júlia",
@@ -660,15 +654,15 @@ def test_claim_atribui_owner_ao_em_atendimento():
             },
         )
     assert resultado["sucesso"] is True
-    update_data = mock_retry.call_args[0][1]
-    assert update_data["responsavel_id"] == "id_julia"
-    assert update_data["data_em_atendimento"] is not None
+    chamado_atualizado = Chamado.get_by_id(chamado_id)
+    assert chamado_atualizado.responsavel_id == "id_julia"
+    assert chamado_atualizado.data_em_atendimento is not None
 
 
 def test_claim_nao_sobrescreve_owner_existente():
     """Aberto já com owner → Em Atendimento NÃO muda responsavel_id."""
+    chamado_id = _criar_chamado_real(status="Aberto", responsavel_id="id_julia")
     with (
-        patch("app.services.status_service.execute_with_retry") as mock_retry,
         patch("app.services.status_service.Historico"),
         patch("app.services.status_service._notificar_solicitante"),
         patch("app.services.status_service.GamificationService"),
@@ -678,7 +672,7 @@ def test_claim_nao_sobrescreve_owner_existente():
         ),
     ):
         atualizar_status_chamado(
-            chamado_id="id_chamado",
+            chamado_id=chamado_id,
             novo_status="Em Atendimento",
             usuario_id="id_matheus",
             usuario_nome="Matheus",
@@ -693,15 +687,14 @@ def test_claim_nao_sobrescreve_owner_existente():
                 "escalacao_resposta_nivel": 0,
             },
         )
-    update_data = mock_retry.call_args[0][1]
-    # responsavel_id não deve ser sobrescrito — não deve aparecer no update como id_matheus
-    assert update_data.get("responsavel_id") != "id_matheus"
+    # responsavel_id não deve ser sobrescrito
+    assert Chamado.get_by_id(chamado_id).responsavel_id != "id_matheus"
 
 
 def test_escada_a_congelada_ao_virar_em_atendimento():
     """Nível de escalação Escada A não deve ser incrementado ao virar Em Atendimento."""
+    chamado_id = _criar_chamado_real(status="Aberto", escalacao_resposta_nivel=2)
     with (
-        patch("app.services.status_service.execute_with_retry") as mock_retry,
         patch("app.services.status_service.Historico"),
         patch("app.services.status_service._notificar_solicitante"),
         patch("app.services.status_service.GamificationService"),
@@ -711,7 +704,7 @@ def test_escada_a_congelada_ao_virar_em_atendimento():
         ),
     ):
         atualizar_status_chamado(
-            chamado_id="id_chamado",
+            chamado_id=chamado_id,
             novo_status="Em Atendimento",
             usuario_id="id_julia",
             usuario_nome="Júlia",
@@ -726,15 +719,14 @@ def test_escada_a_congelada_ao_virar_em_atendimento():
                 "escalacao_resposta_nivel": 2,
             },
         )
-    update_data = mock_retry.call_args[0][1]
-    # O nível não deve ter sido incrementado — Escada A congela em Em Atendimento
-    assert update_data.get("escalacao_resposta_nivel", 2) == 2
+    # O nível não deve ter sido alterado — Escada A congela em Em Atendimento
+    assert Chamado.get_by_id(chamado_id).escalacao_resposta_nivel == 2
 
 
 def test_claim_atualiza_responsavel_nome():
-    """Lacuna 5: claim (Aberto→Em Atendimento sem owner) deve incluir 'responsavel' no update_data."""
+    """Lacuna 5: claim (Aberto→Em Atendimento sem owner) deve gravar 'responsavel'."""
+    chamado_id = _criar_chamado_real(status="Aberto")
     with (
-        patch("app.services.status_service.execute_with_retry") as mock_retry,
         patch("app.services.status_service.Historico"),
         patch("app.services.status_service._notificar_solicitante"),
         patch("app.services.status_service.GamificationService"),
@@ -744,7 +736,7 @@ def test_claim_atualiza_responsavel_nome():
         ),
     ):
         atualizar_status_chamado(
-            chamado_id="id_chamado",
+            chamado_id=chamado_id,
             novo_status="Em Atendimento",
             usuario_id="id_julia",
             usuario_nome="Júlia Ferreira",
@@ -759,8 +751,7 @@ def test_claim_atualiza_responsavel_nome():
                 "escalacao_resposta_nivel": 0,
             },
         )
-    update_data = mock_retry.call_args[0][1]
-    assert update_data.get("responsavel") == "Júlia Ferreira"
+    assert Chamado.get_by_id(chamado_id).responsavel == "Júlia Ferreira"
 
 
 # ── Fase 4: bloqueio de conclusão com participantes pendentes ─────────────────
@@ -769,7 +760,7 @@ def test_claim_atualiza_responsavel_nome():
 def test_owner_nao_conclui_com_participantes_pendentes():
     """Fase 4: atualizar_status Concluído falha quando há participantes pendentes."""
     resultado = atualizar_status_chamado(
-        chamado_id="ch1",
+        chamado_id=_ID_INEXISTENTE,
         novo_status="Concluído",
         usuario_id="id_julia",
         usuario_nome="Julia",
@@ -793,7 +784,7 @@ def test_owner_nao_conclui_com_participantes_pendentes():
 def test_owner_nao_conclui_com_participante_em_atendimento():
     """Fase 4: participante em_atendimento também bloqueia conclusão global."""
     resultado = atualizar_status_chamado(
-        chamado_id="ch1",
+        chamado_id=_ID_INEXISTENTE,
         novo_status="Concluído",
         usuario_id="id_julia",
         usuario_nome="Julia",
@@ -815,14 +806,14 @@ def test_owner_nao_conclui_com_participante_em_atendimento():
 
 def test_owner_conclui_quando_todos_participantes_concluidos():
     """Fase 4: permite Concluído quando todos participantes têm status='concluido'."""
+    chamado_id = _criar_chamado_real(status="Em Atendimento")
     with (
-        patch("app.services.status_service.execute_with_retry"),
         patch("app.services.status_service.Historico"),
         patch("app.services.status_service._notificar_solicitante"),
         patch("app.services.status_service.GamificationService"),
     ):
         resultado = atualizar_status_chamado(
-            chamado_id="ch1",
+            chamado_id=chamado_id,
             novo_status="Concluído",
             usuario_id="id_julia",
             usuario_nome="Julia",
@@ -844,14 +835,14 @@ def test_owner_conclui_quando_todos_participantes_concluidos():
 
 def test_concluir_global_sem_participantes_continua_funcionando():
     """Fase 4 regressão: lista vazia de participantes não bloqueia conclusão."""
+    chamado_id = _criar_chamado_real(status="Em Atendimento")
     with (
-        patch("app.services.status_service.execute_with_retry"),
         patch("app.services.status_service.Historico"),
         patch("app.services.status_service._notificar_solicitante"),
         patch("app.services.status_service.GamificationService"),
     ):
         resultado = atualizar_status_chamado(
-            chamado_id="ch1",
+            chamado_id=chamado_id,
             novo_status="Concluído",
             usuario_id="u1",
             usuario_nome="Test",
@@ -866,14 +857,14 @@ def test_concluir_global_sem_participantes_continua_funcionando():
 
 def test_concluido_grava_confirmacao_solicitante_pendente():
     """Fase 4 regressão: ao Concluído (sem participantes pendentes), grava confirmacao_solicitante='pendente'."""
+    chamado_id = _criar_chamado_real(status="Em Atendimento")
     with (
-        patch("app.services.status_service.execute_with_retry") as mock_retry,
         patch("app.services.status_service.Historico"),
         patch("app.services.status_service._notificar_solicitante"),
         patch("app.services.status_service.GamificationService"),
     ):
         atualizar_status_chamado(
-            chamado_id="ch1",
+            chamado_id=chamado_id,
             novo_status="Concluído",
             usuario_id="u1",
             usuario_nome="Test",
@@ -883,14 +874,18 @@ def test_concluido_grava_confirmacao_solicitante_pendente():
                 "participantes": [],
             },
         )
-    update_payload = mock_retry.call_args[0][1]
-    assert update_payload.get("confirmacao_solicitante") == "pendente"
+    assert Chamado.get_by_id(chamado_id).confirmacao_solicitante == "pendente"
 
 
 def test_claim_reseta_flags_escada_b():
     """Fase 7 — Escada B: ao Aberto → Em Atendimento (claim), resetar os 3 campos Escada B."""
+    chamado_id = _criar_chamado_real(
+        status="Aberto",
+        escalacao_resolucao_nivel=2,
+        alerta_supervisor_50_enviado=True,
+        alerta_supervisor_80_enviado=True,
+    )
     with (
-        patch("app.services.status_service.execute_with_retry") as mock_retry,
         patch("app.services.status_service.Historico"),
         patch("app.services.status_service._notificar_solicitante"),
         patch("app.services.status_service.GamificationService"),
@@ -900,7 +895,7 @@ def test_claim_reseta_flags_escada_b():
         ),
     ):
         atualizar_status_chamado(
-            chamado_id="id_chamado",
+            chamado_id=chamado_id,
             novo_status="Em Atendimento",
             usuario_id="id_julia",
             usuario_nome="Júlia",
@@ -912,23 +907,26 @@ def test_claim_reseta_flags_escada_b():
                 "solicitante_id": "sol1",
                 "numero_chamado": "CHM-001",
                 "categoria": "Manutenção",
-                # Simula chamado que tinha escalada prévia
                 "escalacao_resolucao_nivel": 2,
                 "alerta_supervisor_50_enviado": True,
                 "alerta_supervisor_80_enviado": True,
             },
         )
-    update_data = mock_retry.call_args[0][1]
-    assert update_data.get("escalacao_resolucao_nivel") == 0
-    assert update_data.get("alerta_supervisor_50_enviado") is False
-    assert update_data.get("alerta_supervisor_80_enviado") is False
+    chamado_atualizado = Chamado.get_by_id(chamado_id)
+    assert chamado_atualizado.escalacao_resolucao_nivel == 0
+    assert chamado_atualizado.alerta_supervisor_50_enviado is False
+    assert chamado_atualizado.alerta_supervisor_80_enviado is False
 
 
 def test_claim_data_em_atendimento_usa_config_sla_timezone():
-    """Lacuna 6: claim deve usar Config.SLA_TIMEZONE, não timezone hardcoded."""
+    """Lacuna 6: claim deve usar Config.SLA_TIMEZONE, não timezone hardcoded.
+
+    O Postgres normaliza timestamptz pro timezone da sessão ao ler de volta
+    (não preserva o tzinfo original de insert) — por isso a asserção compara
+    o instante absoluto (UTC), não o tzname literal."""
+    chamado_id = _criar_chamado_real(status="Aberto")
     with (
         patch("app.services.status_service.Config") as mock_config,
-        patch("app.services.status_service.execute_with_retry") as mock_retry,
         patch("app.services.status_service.Historico"),
         patch("app.services.status_service._notificar_solicitante"),
         patch("app.services.status_service.GamificationService"),
@@ -938,8 +936,9 @@ def test_claim_data_em_atendimento_usa_config_sla_timezone():
         ),
     ):
         mock_config.SLA_TIMEZONE = "UTC"
+        antes = datetime.now(UTC)
         atualizar_status_chamado(
-            chamado_id="id_chamado",
+            chamado_id=chamado_id,
             novo_status="Em Atendimento",
             usuario_id="id_user",
             usuario_nome="User",
@@ -953,10 +952,10 @@ def test_claim_data_em_atendimento_usa_config_sla_timezone():
                 "categoria": "Manutenção",
             },
         )
-    update_data = mock_retry.call_args[0][1]
-    dt = update_data.get("data_em_atendimento")
+        depois = datetime.now(UTC)
+    dt = Chamado.get_by_id(chamado_id).data_em_atendimento
     assert dt is not None
-    assert dt.tzname() == "UTC"
+    assert antes <= dt.astimezone(UTC) <= depois
 
 
 # ── Notificação in-app ao solicitante ─────────────────────────────────────────
@@ -971,8 +970,6 @@ def test_notificar_solicitante_em_atendimento_cria_notificacao_inapp(app):
         patch("app.services.webpush_service.enviar_webpush_usuario"),
         patch("app.services.notifications_inapp.criar_notificacao_solicitante") as mock_inapp,
     ):
-        from app.services.status_service import _notificar_solicitante
-
         _notificar_solicitante(
             "ch1",
             {
@@ -998,8 +995,6 @@ def test_notificar_solicitante_concluido_cria_notificacao_inapp(app):
         patch("app.services.webpush_service.enviar_webpush_usuario"),
         patch("app.services.notifications_inapp.criar_notificacao_solicitante") as mock_inapp,
     ):
-        from app.services.status_service import _notificar_solicitante
-
         _notificar_solicitante(
             "ch1",
             {
@@ -1025,11 +1020,9 @@ def test_notificar_solicitante_inapp_falha_nao_propaga(app):
         patch("app.services.webpush_service.enviar_webpush_usuario"),
         patch(
             "app.services.notifications_inapp.criar_notificacao_solicitante",
-            side_effect=Exception("Firestore down"),
+            side_effect=Exception("banco fora do ar"),
         ),
     ):
-        from app.services.status_service import _notificar_solicitante
-
         # Não deve lançar exceção
         _notificar_solicitante(
             "ch1",
@@ -1050,8 +1043,6 @@ def test_notificar_solicitante_sem_sid_nao_cria_inapp(app):
         patch("app.services.webpush_service.enviar_webpush_usuario"),
         patch("app.services.notifications_inapp.criar_notificacao_solicitante") as mock_inapp,
     ):
-        from app.services.status_service import _notificar_solicitante
-
         _notificar_solicitante(
             "ch1",
             {
@@ -1072,8 +1063,7 @@ def test_notificar_solicitante_sem_sid_nao_cria_inapp(app):
 
 def test_notificacao_observers_disparada_em_background(app):
     """atualizar_status_chamado inclui _notificar_observadores_status na closure do thread."""
-    from app.services.status_service import atualizar_status_chamado
-
+    chamado_id = _criar_chamado_real(status="Aberto")
     notif_closures = []
 
     def fake_thread(target, daemon=True):
@@ -1083,14 +1073,13 @@ def test_notificacao_observers_disparada_em_background(app):
         return m
 
     with (
-        patch("app.services.status_service.execute_with_retry"),
         patch("app.services.status_service.Historico"),
         patch("app.services.status_service.GamificationService"),
         patch("app.services.status_service.threading.Thread", side_effect=fake_thread),
         app.app_context(),
     ):
         atualizar_status_chamado(
-            chamado_id="ch1",
+            chamado_id=chamado_id,
             novo_status="Em Atendimento",
             usuario_id="u1",
             usuario_nome="Test",

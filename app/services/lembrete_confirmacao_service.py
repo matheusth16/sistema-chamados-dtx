@@ -12,9 +12,10 @@ será retentado na próxima execução do job (a cada 6 h).
 import logging
 from datetime import UTC, datetime
 
-from google.cloud.firestore_v1.base_query import FieldFilter
+from sqlalchemy import select
 
-from app.database import db
+from app import db as db_module
+from app.db.models.chamado import ChamadoRow
 from app.models_usuario import Usuario
 from app.services.notifications import notificar_solicitante_lembrete_confirmacao
 
@@ -25,7 +26,7 @@ _LEMBRETE_2_HORAS = 48
 
 
 def _criar_inapp_lembrete(
-    chamado_id: str, solicitante_id: str, numero_chamado: str, categoria: str, numero: int
+    chamado_id: int, solicitante_id: str, numero_chamado: str, categoria: str, numero: int
 ) -> None:
     """Cria notificação in-app de lembrete de confirmação. Falha silenciosa com log."""
     try:
@@ -44,7 +45,7 @@ def _criar_inapp_lembrete(
 
 
 def _ts_para_datetime(ts) -> datetime | None:
-    """Converte um Firestore Timestamp (ou datetime) para datetime UTC aware."""
+    """Converte um timestamp (ou datetime) para datetime UTC aware."""
     if ts is None:
         return None
     if isinstance(ts, datetime):
@@ -54,6 +55,14 @@ def _ts_para_datetime(ts) -> datetime | None:
     if hasattr(ts, "ToDatetime"):
         return ts.ToDatetime(tzinfo=UTC)
     return None
+
+
+def _marcar_lembrete_enviado(chamado_id: int, numero: int) -> None:
+    campo = f"lembrete_confirmacao_{numero}_enviado"
+    with db_module.SessionLocal() as session, session.begin():
+        row = session.get(ChamadoRow, chamado_id)
+        if row is not None:
+            setattr(row, campo, True)
 
 
 def processar_lembretes_confirmacao(agora: datetime | None = None) -> dict:
@@ -70,84 +79,82 @@ def processar_lembretes_confirmacao(agora: datetime | None = None) -> dict:
         # limit(500): cobre o volume esperado em DTX. Se o backlog superar 500 chamados
         # pendentes de confirmação simultaneamente, os excedentes serão processados na
         # próxima execução do job (6 h). Adicione paginação por cursor se isso ocorrer.
-        docs = (
-            db.collection("chamados")
-            .where(filter=FieldFilter("status", "==", "Concluído"))
-            .where(filter=FieldFilter("confirmacao_solicitante", "==", "pendente"))
-            .limit(500)
-            .stream()
-        )
+        with db_module.SessionLocal() as session:
+            stmt = (
+                select(ChamadoRow)
+                .where(
+                    ChamadoRow.status == "Concluído",
+                    ChamadoRow.confirmacao_solicitante == "pendente",
+                )
+                .limit(500)
+            )
+            rows = session.execute(stmt).scalars().all()
     except Exception as exc:
-        logger.exception("Lembretes: erro ao consultar Firestore: %s", exc)
+        logger.exception("Lembretes: erro ao consultar chamados pendentes: %s", exc)
         stats["erros"] += 1
         return stats
 
-    for doc in docs:
+    for row in rows:
         stats["processados"] += 1
         try:
-            _processar_chamado(doc, agora, stats)
+            _processar_chamado(row, agora, stats)
         except Exception as exc:
-            logger.exception("Lembretes: erro ao processar chamado %s: %s", doc.id, exc)
+            logger.exception("Lembretes: erro ao processar chamado %s: %s", row.id, exc)
             stats["erros"] += 1
 
     return stats
 
 
-def _processar_chamado(doc, agora: datetime, stats: dict) -> None:
-    data = doc.to_dict()
-
-    data_conclusao = _ts_para_datetime(data.get("data_conclusao"))
+def _processar_chamado(row: ChamadoRow, agora: datetime, stats: dict) -> None:
+    data_conclusao = _ts_para_datetime(row.data_conclusao)
     if data_conclusao is None:
         return
 
     horas_decorridas = (agora - data_conclusao).total_seconds() / 3600
 
-    enviou_1 = bool(data.get("lembrete_confirmacao_1_enviado"))
-    enviou_2 = bool(data.get("lembrete_confirmacao_2_enviado"))
+    enviou_1 = bool(row.lembrete_confirmacao_1_enviado)
+    enviou_2 = bool(row.lembrete_confirmacao_2_enviado)
 
     if enviou_2:
         return  # ambos os lembretes já enviados
 
-    solicitante_id = data.get("solicitante_id")
-    numero_chamado = data.get("numero_chamado") or "N/A"
-    categoria = data.get("categoria") or "Chamado"
+    chamado_id = row.id
+    solicitante_id = row.solicitante_id
+    numero_chamado = row.numero_chamado or "N/A"
+    categoria = row.categoria or "Chamado"
 
     if not enviou_1 and horas_decorridas >= _LEMBRETE_1_HORAS:
         solicitante = Usuario.get_by_id(solicitante_id) if solicitante_id else None
         enviado = notificar_solicitante_lembrete_confirmacao(
-            chamado_id=doc.id,
+            chamado_id=chamado_id,
             numero_chamado=numero_chamado,
             categoria=categoria,
             solicitante_usuario=solicitante,
             numero_lembrete=1,
         )
         if enviado:
-            db.collection("chamados").document(doc.id).update(
-                {"lembrete_confirmacao_1_enviado": True}
-            )
+            _marcar_lembrete_enviado(chamado_id, 1)
             stats["lembrete_1"] += 1
-            logger.info("Lembrete 1 enviado para chamado %s", doc.id)
+            logger.info("Lembrete 1 enviado para chamado %s", chamado_id)
             if solicitante_id:
-                _criar_inapp_lembrete(doc.id, solicitante_id, numero_chamado, categoria, 1)
+                _criar_inapp_lembrete(chamado_id, solicitante_id, numero_chamado, categoria, 1)
         else:
-            logger.warning("Lembrete 1 falhou para chamado %s — será tentado novamente", doc.id)
+            logger.warning("Lembrete 1 falhou para chamado %s — será tentado novamente", chamado_id)
 
     elif enviou_1 and not enviou_2 and horas_decorridas >= _LEMBRETE_2_HORAS:
         solicitante = Usuario.get_by_id(solicitante_id) if solicitante_id else None
         enviado = notificar_solicitante_lembrete_confirmacao(
-            chamado_id=doc.id,
+            chamado_id=chamado_id,
             numero_chamado=numero_chamado,
             categoria=categoria,
             solicitante_usuario=solicitante,
             numero_lembrete=2,
         )
         if enviado:
-            db.collection("chamados").document(doc.id).update(
-                {"lembrete_confirmacao_2_enviado": True}
-            )
+            _marcar_lembrete_enviado(chamado_id, 2)
             stats["lembrete_2"] += 1
-            logger.info("Lembrete 2 enviado para chamado %s", doc.id)
+            logger.info("Lembrete 2 enviado para chamado %s", chamado_id)
             if solicitante_id:
-                _criar_inapp_lembrete(doc.id, solicitante_id, numero_chamado, categoria, 2)
+                _criar_inapp_lembrete(chamado_id, solicitante_id, numero_chamado, categoria, 2)
         else:
-            logger.warning("Lembrete 2 falhou para chamado %s — será tentado novamente", doc.id)
+            logger.warning("Lembrete 2 falhou para chamado %s — será tentado novamente", chamado_id)
