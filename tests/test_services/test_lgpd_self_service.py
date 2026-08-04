@@ -1,14 +1,15 @@
 """Testes: lgpd_self_service (autoatendimento LGPD — exportação e solicitação
 de exclusão).
 
-Fase 2 — migração parcial: exportar_dados_usuario()/csv ainda consultam a
-coleção `chamados` do Firestore (Chamado só migra no Marco 7, mock_db abaixo
-continua valendo pra essas). As demais funções (solicitacoes_lgpd) já rodam
-contra Postgres real (db_session)."""
+Fase 2, Marco 10: exportar_dados_usuario()/csv rodam contra Postgres real
+(db_session) via tests.factories.make_chamado — assim como as demais
+funções deste módulo (solicitacoes_lgpd)."""
 
 from unittest.mock import MagicMock, patch
 
 import pytest
+
+from tests.factories import make_chamado
 
 pytestmark = pytest.mark.usefixtures("db_session")
 
@@ -27,28 +28,12 @@ def _usuario_mock(uid="u1", nome="Fulano", email="fulano@dtx.aero", perfil="soli
     return u
 
 
-def _chamado_doc(doc_id, **dados):
-    doc = MagicMock()
-    doc.id = doc_id
-    doc.to_dict.return_value = dados
-    return doc
+# ── exportar_dados_usuario (Postgres real) ────────────────────────────────────
 
 
-@pytest.fixture
-def mock_db():
-    """Mock do Firestore usado só pelas queries de `chamados` (ainda não
-    migrado — ver docstring do módulo)."""
-    with patch("app.services.lgpd_self_service.db") as mock_db:
-        yield mock_db
-
-
-# ── exportar_dados_usuario (ainda Firestore — chamados não migrado) ─────────
-
-
-def test_exportar_dados_usuario_inclui_dados_da_conta(mock_db):
+def test_exportar_dados_usuario_inclui_dados_da_conta():
     from app.services.lgpd_self_service import exportar_dados_usuario
 
-    mock_db.collection.return_value.where.return_value.limit.return_value.stream.return_value = []
     usuario = _usuario_mock()
 
     resultado = exportar_dados_usuario(usuario)
@@ -57,37 +42,35 @@ def test_exportar_dados_usuario_inclui_dados_da_conta(mock_db):
     assert resultado["conta"]["nome"] == "Fulano"
     assert resultado["conta"]["email"] == "fulano@dtx.aero"
     assert resultado["conta"]["perfil"] == "solicitante"
+    assert resultado["chamados_criados"] == []
 
 
-def test_exportar_dados_usuario_inclui_chamados_criados(mock_db):
+def test_exportar_dados_usuario_inclui_chamados_criados():
     from app.services.lgpd_self_service import exportar_dados_usuario
 
-    doc1 = _chamado_doc(
-        "ch1",
+    usuario = _usuario_mock(uid="u1")
+    chamado = make_chamado(
+        solicitante_id="u1",
         numero_chamado="0001",
         tipo_solicitacao="Impressora quebrada",
         descricao="Impressora do 2o andar nao liga",
         categoria="TI",
         status="Aberto",
     )
-    mock_db.collection.return_value.where.return_value.limit.return_value.stream.return_value = [
-        doc1
-    ]
-    usuario = _usuario_mock()
 
     resultado = exportar_dados_usuario(usuario)
 
     assert len(resultado["chamados_criados"]) == 1
-    assert resultado["chamados_criados"][0]["id"] == "ch1"
+    assert resultado["chamados_criados"][0]["id"] == chamado.id
     assert resultado["chamados_criados"][0]["numero_chamado"] == "0001"
     assert resultado["chamados_criados"][0]["tipo_solicitacao"] == "Impressora quebrada"
     assert resultado["chamados_criados"][0]["descricao"] == "Impressora do 2o andar nao liga"
+    assert resultado["chamados_criados"][0]["data_criacao"] is not None
 
 
-def test_exportar_dados_usuario_csv_contem_secao_conta(mock_db):
+def test_exportar_dados_usuario_csv_contem_secao_conta():
     from app.services.lgpd_self_service import exportar_dados_usuario_csv
 
-    mock_db.collection.return_value.where.return_value.limit.return_value.stream.return_value = []
     usuario = _usuario_mock()
 
     csv_texto = exportar_dados_usuario_csv(usuario)
@@ -97,21 +80,18 @@ def test_exportar_dados_usuario_csv_contem_secao_conta(mock_db):
     assert "solicitante" in csv_texto
 
 
-def test_exportar_dados_usuario_csv_contem_chamados(mock_db):
+def test_exportar_dados_usuario_csv_contem_chamados():
     from app.services.lgpd_self_service import exportar_dados_usuario_csv
 
-    doc1 = _chamado_doc(
-        "ch1",
+    make_chamado(
+        solicitante_id="u1",
         numero_chamado="0001",
         tipo_solicitacao="Impressora quebrada",
         descricao="Impressora do 2o andar nao liga",
         categoria="TI",
         status="Aberto",
     )
-    mock_db.collection.return_value.where.return_value.limit.return_value.stream.return_value = [
-        doc1
-    ]
-    usuario = _usuario_mock()
+    usuario = _usuario_mock(uid="u1")
 
     csv_texto = exportar_dados_usuario_csv(usuario)
 
@@ -119,22 +99,19 @@ def test_exportar_dados_usuario_csv_contem_chamados(mock_db):
     assert "Impressora quebrada" in csv_texto
 
 
-def test_exportar_dados_usuario_csv_sanitiza_formula_injection(mock_db):
+def test_exportar_dados_usuario_csv_sanitiza_formula_injection():
     """Título de chamado começando com '=' não deve virar fórmula executável no Excel."""
     from app.services.lgpd_self_service import exportar_dados_usuario_csv
 
-    doc1 = _chamado_doc(
-        "ch1",
+    make_chamado(
+        solicitante_id="u1",
         numero_chamado="0001",
         tipo_solicitacao="=cmd|'/c calc'!A1",
         descricao="normal",
         categoria="TI",
         status="Aberto",
     )
-    mock_db.collection.return_value.where.return_value.limit.return_value.stream.return_value = [
-        doc1
-    ]
-    usuario = _usuario_mock()
+    usuario = _usuario_mock(uid="u1")
 
     csv_texto = exportar_dados_usuario_csv(usuario)
 
@@ -143,22 +120,16 @@ def test_exportar_dados_usuario_csv_sanitiza_formula_injection(mock_db):
     assert ",=cmd" not in csv_texto
 
 
-def test_exportar_dados_usuario_filtra_apenas_chamados_do_proprio_usuario(mock_db):
-    """A query deve filtrar por solicitante_id == usuario.id (não vazar dados de outros)."""
-    from google.cloud.firestore_v1.base_query import FieldFilter
-
+def test_exportar_dados_usuario_filtra_apenas_chamados_do_proprio_usuario():
+    """A exportação não deve vazar chamados de outros usuários."""
     from app.services.lgpd_self_service import exportar_dados_usuario
 
-    mock_db.collection.return_value.where.return_value.limit.return_value.stream.return_value = []
+    make_chamado(solicitante_id="outro_usuario", numero_chamado="9999")
     usuario = _usuario_mock(uid="u42")
 
-    exportar_dados_usuario(usuario)
+    resultado = exportar_dados_usuario(usuario)
 
-    call_kwargs = mock_db.collection.return_value.where.call_args.kwargs
-    filtro = call_kwargs["filter"]
-    assert isinstance(filtro, FieldFilter)
-    assert filtro.field_path == "solicitante_id"
-    assert filtro.value == "u42"
+    assert resultado["chamados_criados"] == []
 
 
 # ── possui_solicitacao_exclusao_pendente (Postgres real) ─────────────────────

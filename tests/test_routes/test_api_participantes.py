@@ -1,7 +1,7 @@
 """Testes das rotas POST /api/chamado/<id>/incluir-participantes e /concluir-minha-parte.
 
-Segue padrão do projeto:
-- patch('app.routes.api_colaboracao.db') para simular Firestore na rota
+Segue padrão do projeto (Fase 2, Marco 10):
+- patch('app.routes.api_colaboracao.Chamado') para simular Chamado.get_by_id() (Postgres)
 - patch do serviço importado inline pela rota
 - Usa fixtures do conftest.py
 """
@@ -11,15 +11,23 @@ from unittest.mock import MagicMock, patch
 # ── helpers ───────────────────────────────────────────────────────────────────
 
 
-def _chamado_doc_mock(
+def _mock_chamado_obj(
     area="Manutencao",
     responsavel_id="sup_1",
     participantes=None,
     status="Em Atendimento",
 ):
-    doc = MagicMock()
-    doc.exists = True
-    doc.to_dict.return_value = {
+    """MagicMock de Chamado (retorno de Chamado.get_by_id()) com to_dict()
+    coerente — a rota usa tanto os atributos do objeto quanto o dict
+    (chamado.to_dict()) repassado às notificações em background."""
+    c = MagicMock()
+    c.id = "id_chamado_teste"
+    c.area = area
+    c.responsavel_id = responsavel_id
+    c.solicitante_id = "sol_outro"
+    c.participantes = participantes or []
+    c.supervisor_ids_com_acesso = [responsavel_id] if responsavel_id else []
+    c.to_dict.return_value = {
         "area": area,
         "responsavel_id": responsavel_id,
         "responsavel": "Supervisor Teste",
@@ -31,17 +39,6 @@ def _chamado_doc_mock(
         "tipo_solicitacao": "Corretiva",
         "descricao": "Descrição de teste",
     }
-    return doc
-
-
-def _mock_chamado_obj(area="Manutencao", responsavel_id="sup_1", participantes=None):
-    c = MagicMock()
-    c.id = "id_chamado_teste"
-    c.area = area
-    c.responsavel_id = responsavel_id
-    c.solicitante_id = "sol_outro"
-    c.participantes = participantes or []
-    c.supervisor_ids_com_acesso = [responsavel_id] if responsavel_id else []
     return c
 
 
@@ -51,11 +48,9 @@ def _mock_chamado_obj(area="Manutencao", responsavel_id="sup_1", participantes=N
 class TestIncluirParticipantesRota:
     def test_incluir_sucesso_retorna_200(self, client_logado_supervisor):
         """Owner supervisor inclui participante válido → 200 sucesso=True."""
-        doc = _chamado_doc_mock(area="Manutencao", responsavel_id="sup_1")
         chamado_mock = _mock_chamado_obj(area="Manutencao", responsavel_id="sup_1")
 
         with (
-            patch("app.routes.api_colaboracao.db") as mock_db,
             patch("app.routes.api_colaboracao.Chamado") as mock_chamado_cls,
             patch("app.routes.api_colaboracao.usuario_pode_ver_chamado", return_value=True),
             patch(
@@ -79,8 +74,7 @@ class TestIncluirParticipantesRota:
             ),
             patch("app.routes.api_colaboracao.threading"),
         ):
-            mock_db.collection.return_value.document.return_value.get.return_value = doc
-            mock_chamado_cls.from_dict.return_value = chamado_mock
+            mock_chamado_cls.get_by_id.return_value = chamado_mock
 
             resp = client_logado_supervisor.post(
                 "/api/chamado/id123/incluir-participantes",
@@ -95,16 +89,13 @@ class TestIncluirParticipantesRota:
 
     def test_incluir_lista_vazia_retorna_400(self, client_logado_supervisor):
         """Lista de participantes vazia → 400."""
-        doc = _chamado_doc_mock(area="Manutencao", responsavel_id="sup_1")
         chamado_mock = _mock_chamado_obj(area="Manutencao", responsavel_id="sup_1")
 
         with (
-            patch("app.routes.api_colaboracao.db") as mock_db,
             patch("app.routes.api_colaboracao.Chamado") as mock_chamado_cls,
             patch("app.routes.api_colaboracao.usuario_pode_ver_chamado", return_value=True),
         ):
-            mock_db.collection.return_value.document.return_value.get.return_value = doc
-            mock_chamado_cls.from_dict.return_value = chamado_mock
+            mock_chamado_cls.get_by_id.return_value = chamado_mock
 
             resp = client_logado_supervisor.post(
                 "/api/chamado/id123/incluir-participantes",
@@ -125,16 +116,13 @@ class TestIncluirParticipantesRota:
 
     def test_incluir_nao_owner_supervisor_retorna_403(self, client_logado_supervisor):
         """Supervisor que não é owner → 403."""
-        doc = _chamado_doc_mock(area="Manutencao", responsavel_id="outro_sup")
         chamado_mock = _mock_chamado_obj(area="Manutencao", responsavel_id="outro_sup")
 
         with (
-            patch("app.routes.api_colaboracao.db") as mock_db,
             patch("app.routes.api_colaboracao.Chamado") as mock_chamado_cls,
             patch("app.routes.api_colaboracao.usuario_pode_ver_chamado", return_value=True),
         ):
-            mock_db.collection.return_value.document.return_value.get.return_value = doc
-            mock_chamado_cls.from_dict.return_value = chamado_mock
+            mock_chamado_cls.get_by_id.return_value = chamado_mock
 
             resp = client_logado_supervisor.post(
                 "/api/chamado/id123/incluir-participantes",
@@ -155,16 +143,13 @@ class TestIncluirParticipantesRota:
 
     def test_incluir_idor_supervisor_sem_acesso_retorna_403(self, client_logado_supervisor):
         """Supervisor sem acesso ao chamado (usuario_pode_ver_chamado=False) → 403."""
-        doc = _chamado_doc_mock(area="Manutencao", responsavel_id="outro_sup")
         chamado_mock = _mock_chamado_obj(area="Manutencao", responsavel_id="outro_sup")
 
         with (
-            patch("app.routes.api_colaboracao.db") as mock_db,
             patch("app.routes.api_colaboracao.Chamado") as mock_chamado_cls,
             patch("app.routes.api_colaboracao.usuario_pode_ver_chamado", return_value=False),
         ):
-            mock_db.collection.return_value.document.return_value.get.return_value = doc
-            mock_chamado_cls.from_dict.return_value = chamado_mock
+            mock_chamado_cls.get_by_id.return_value = chamado_mock
 
             resp = client_logado_supervisor.post(
                 "/api/chamado/id123/incluir-participantes",
@@ -176,11 +161,9 @@ class TestIncluirParticipantesRota:
 
     def test_incluir_admin_pode_incluir(self, client_logado_admin):
         """Admin pode incluir mesmo não sendo owner → 200."""
-        doc = _chamado_doc_mock(area="Manutencao", responsavel_id="outro_sup")
         chamado_mock = _mock_chamado_obj(area="Manutencao", responsavel_id="outro_sup")
 
         with (
-            patch("app.routes.api_colaboracao.db") as mock_db,
             patch("app.routes.api_colaboracao.Chamado") as mock_chamado_cls,
             patch("app.routes.api_colaboracao.usuario_pode_ver_chamado", return_value=True),
             patch(
@@ -192,8 +175,7 @@ class TestIncluirParticipantesRota:
             ),
             patch("app.routes.api_colaboracao.threading"),
         ):
-            mock_db.collection.return_value.document.return_value.get.return_value = doc
-            mock_chamado_cls.from_dict.return_value = chamado_mock
+            mock_chamado_cls.get_by_id.return_value = chamado_mock
             # Admin: is_admin_or_above=True no mock conftest
 
             resp = client_logado_admin.post(
@@ -211,18 +193,6 @@ class TestIncluirParticipantesRota:
 class TestConcluirMinhaParteRota:
     def test_concluir_minha_parte_sucesso_retorna_200(self, client_logado_supervisor):
         """Participante conclui sua parte → 200 sucesso=True."""
-        doc = _chamado_doc_mock(
-            area="Manutencao",
-            responsavel_id="outro_sup",
-            participantes=[
-                {
-                    "supervisor_id": "sup_1",
-                    "area": "Manutencao",
-                    "status": "pendente",
-                    "concluido_em": None,
-                }
-            ],
-        )
         chamado_mock = _mock_chamado_obj(
             area="Manutencao",
             responsavel_id="outro_sup",
@@ -237,7 +207,6 @@ class TestConcluirMinhaParteRota:
         )
 
         with (
-            patch("app.routes.api_colaboracao.db") as mock_db,
             patch("app.routes.api_colaboracao.Chamado") as mock_chamado_cls,
             patch("app.routes.api_colaboracao.usuario_pode_ver_chamado", return_value=True),
             patch(
@@ -245,8 +214,7 @@ class TestConcluirMinhaParteRota:
                 return_value={"sucesso": True, "dados": {"pode_concluir_global": False}},
             ),
         ):
-            mock_db.collection.return_value.document.return_value.get.return_value = doc
-            mock_chamado_cls.from_dict.return_value = chamado_mock
+            mock_chamado_cls.get_by_id.return_value = chamado_mock
 
             resp = client_logado_supervisor.post(
                 "/api/chamado/id123/concluir-minha-parte",
@@ -260,11 +228,6 @@ class TestConcluirMinhaParteRota:
 
     def test_concluir_quem_nao_e_participante_retorna_403(self, client_logado_supervisor):
         """Usuário que não é participante → 403."""
-        doc = _chamado_doc_mock(
-            area="Manutencao",
-            responsavel_id="outro_sup",
-            participantes=[],
-        )
         chamado_mock = _mock_chamado_obj(
             area="Manutencao",
             responsavel_id="outro_sup",
@@ -272,12 +235,10 @@ class TestConcluirMinhaParteRota:
         )
 
         with (
-            patch("app.routes.api_colaboracao.db") as mock_db,
             patch("app.routes.api_colaboracao.Chamado") as mock_chamado_cls,
             patch("app.routes.api_colaboracao.usuario_pode_ver_chamado", return_value=True),
         ):
-            mock_db.collection.return_value.document.return_value.get.return_value = doc
-            mock_chamado_cls.from_dict.return_value = chamado_mock
+            mock_chamado_cls.get_by_id.return_value = chamado_mock
 
             resp = client_logado_supervisor.post(
                 "/api/chamado/id123/concluir-minha-parte",
@@ -289,18 +250,6 @@ class TestConcluirMinhaParteRota:
 
     def test_concluir_minha_parte_ultimo_dispara_notificacao_owner(self, client_logado_supervisor):
         """Quando último participante conclui (pode_concluir_global=True), notifica owner."""
-        doc = _chamado_doc_mock(
-            area="Manutencao",
-            responsavel_id="outro_sup",
-            participantes=[
-                {
-                    "supervisor_id": "sup_1",
-                    "area": "Manutencao",
-                    "status": "pendente",
-                    "concluido_em": None,
-                }
-            ],
-        )
         chamado_mock = _mock_chamado_obj(
             area="Manutencao",
             responsavel_id="outro_sup",
@@ -315,7 +264,6 @@ class TestConcluirMinhaParteRota:
         )
 
         with (
-            patch("app.routes.api_colaboracao.db") as mock_db,
             patch("app.routes.api_colaboracao.Chamado") as mock_chamado_cls,
             patch("app.routes.api_colaboracao.usuario_pode_ver_chamado", return_value=True),
             patch(
@@ -324,8 +272,7 @@ class TestConcluirMinhaParteRota:
             ),
             patch("app.routes.api_colaboracao.threading") as mock_threading,
         ):
-            mock_db.collection.return_value.document.return_value.get.return_value = doc
-            mock_chamado_cls.from_dict.return_value = chamado_mock
+            mock_chamado_cls.get_by_id.return_value = chamado_mock
 
             resp = client_logado_supervisor.post(
                 "/api/chamado/id123/concluir-minha-parte",
@@ -343,11 +290,9 @@ class TestConcluirMinhaParteRota:
 class TestNotificacaoTriplaInclusao:
     def test_incluir_dispara_notificacao_tripla_participante(self, client_logado_supervisor):
         """Incluir participante → thread de notificação disparado (cobre e-mail + in-app + web push)."""
-        doc = _chamado_doc_mock(area="Manutencao", responsavel_id="sup_1")
         chamado_mock = _mock_chamado_obj(area="Manutencao", responsavel_id="sup_1")
 
         with (
-            patch("app.routes.api_colaboracao.db") as mock_db,
             patch("app.routes.api_colaboracao.Chamado") as mock_chamado_cls,
             patch("app.routes.api_colaboracao.usuario_pode_ver_chamado", return_value=True),
             patch(
@@ -371,8 +316,7 @@ class TestNotificacaoTriplaInclusao:
             ),
             patch("app.routes.api_colaboracao.threading") as mock_threading,
         ):
-            mock_db.collection.return_value.document.return_value.get.return_value = doc
-            mock_chamado_cls.from_dict.return_value = chamado_mock
+            mock_chamado_cls.get_by_id.return_value = chamado_mock
 
             resp = client_logado_supervisor.post(
                 "/api/chamado/id123/incluir-participantes",
@@ -388,11 +332,9 @@ class TestNotificacaoTriplaInclusao:
 
     def test_incluir_sem_adicionados_nao_dispara_thread(self, client_logado_supervisor):
         """Quando todos participantes são duplicados, não dispara thread de notificação."""
-        doc = _chamado_doc_mock(area="Manutencao", responsavel_id="sup_1")
         chamado_mock = _mock_chamado_obj(area="Manutencao", responsavel_id="sup_1")
 
         with (
-            patch("app.routes.api_colaboracao.db") as mock_db,
             patch("app.routes.api_colaboracao.Chamado") as mock_chamado_cls,
             patch("app.routes.api_colaboracao.usuario_pode_ver_chamado", return_value=True),
             patch(
@@ -404,8 +346,7 @@ class TestNotificacaoTriplaInclusao:
             ),
             patch("app.routes.api_colaboracao.threading") as mock_threading,
         ):
-            mock_db.collection.return_value.document.return_value.get.return_value = doc
-            mock_chamado_cls.from_dict.return_value = chamado_mock
+            mock_chamado_cls.get_by_id.return_value = chamado_mock
 
             resp = client_logado_supervisor.post(
                 "/api/chamado/id123/incluir-participantes",

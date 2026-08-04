@@ -5,8 +5,10 @@ import threading
 
 from flask import Response, current_app, redirect, render_template, url_for
 from flask_login import current_user, login_required
+from sqlalchemy import func, select
 
-from app.database import db
+from app import db as db_module
+from app.db.models.chamado import ChamadoRow
 from app.decoradores import requer_perfil
 from app.i18n import flash_t
 from app.models_usuario import Usuario
@@ -70,8 +72,10 @@ def admin_global_dashboard() -> Response:
 
         total_chamados = 0
         try:
-            resultado_agregacao = db.collection("chamados").count().get()
-            total_chamados = resultado_agregacao[0][0].value
+            with db_module.SessionLocal() as session:
+                total_chamados = session.execute(
+                    select(func.count()).select_from(ChamadoRow)
+                ).scalar_one()
         except Exception as e:
             logger.warning("Erro ao contar total de chamados (admin_global): %s", e)
 

@@ -70,24 +70,21 @@ def test_avancar_passo_nao_inteiro_retorna_400(client_logado_solicitante):
 
 
 def test_avancar_passo_solicitante(client_logado_solicitante):
-    with patch("app.services.onboarding_service.db") as mock_db:
-        mock_db.collection.return_value.document.return_value.update.return_value = None
+    with patch("app.services.onboarding_service.avancar_passo", return_value=True):
         r = _post_json(client_logado_solicitante, "/api/onboarding/avancar", {"passo": 2})
     assert r.status_code == 200
     assert r.get_json()["sucesso"] is True
 
 
 def test_concluir_solicitante(client_logado_solicitante):
-    with patch("app.services.onboarding_service.db") as mock_db:
-        mock_db.collection.return_value.document.return_value.update.return_value = None
+    with patch("app.services.onboarding_service.concluir_onboarding", return_value=True):
         r = _post_json(client_logado_solicitante, "/api/onboarding/concluir")
     assert r.status_code == 200
     assert r.get_json()["sucesso"] is True
 
 
 def test_pular_solicitante(client_logado_solicitante):
-    with patch("app.services.onboarding_service.db") as mock_db:
-        mock_db.collection.return_value.document.return_value.update.return_value = None
+    with patch("app.services.onboarding_service.concluir_onboarding", return_value=True):
         r = _post_json(client_logado_solicitante, "/api/onboarding/pular")
     assert r.status_code == 200
     assert r.get_json()["sucesso"] is True
@@ -97,16 +94,14 @@ def test_pular_solicitante(client_logado_solicitante):
 
 
 def test_avancar_passo_supervisor(client_logado_supervisor):
-    with patch("app.services.onboarding_service.db") as mock_db:
-        mock_db.collection.return_value.document.return_value.update.return_value = None
+    with patch("app.services.onboarding_service.avancar_passo", return_value=True):
         r = _post_json(client_logado_supervisor, "/api/onboarding/avancar", {"passo": 3})
     assert r.status_code == 200
     assert r.get_json()["sucesso"] is True
 
 
 def test_concluir_supervisor(client_logado_supervisor):
-    with patch("app.services.onboarding_service.db") as mock_db:
-        mock_db.collection.return_value.document.return_value.update.return_value = None
+    with patch("app.services.onboarding_service.concluir_onboarding", return_value=True):
         r = _post_json(client_logado_supervisor, "/api/onboarding/concluir")
     assert r.status_code == 200
     assert r.get_json()["sucesso"] is True
@@ -116,44 +111,22 @@ def test_concluir_supervisor(client_logado_supervisor):
 
 
 def test_avancar_passo_admin(client_logado_admin):
-    with patch("app.services.onboarding_service.db") as mock_db:
-        mock_db.collection.return_value.document.return_value.update.return_value = None
+    with patch("app.services.onboarding_service.avancar_passo", return_value=True):
         r = _post_json(client_logado_admin, "/api/onboarding/avancar", {"passo": 5})
     assert r.status_code == 200
     assert r.get_json()["sucesso"] is True
 
 
 def test_concluir_admin(client_logado_admin):
-    with patch("app.services.onboarding_service.db") as mock_db:
-        mock_db.collection.return_value.document.return_value.update.return_value = None
+    with patch("app.services.onboarding_service.concluir_onboarding", return_value=True):
         r = _post_json(client_logado_admin, "/api/onboarding/concluir")
     assert r.status_code == 200
     assert r.get_json()["sucesso"] is True
 
 
-# ─── Serviço: campos persistidos corretamente ─────────────────────────────────
-
-
-def test_service_avancar_persiste_passo():
-    """avancar_passo chama update com o passo correto."""
-    from app.services.onboarding_service import avancar_passo
-
-    with patch("app.services.onboarding_service.db") as mock_db:
-        mock_update = mock_db.collection.return_value.document.return_value.update
-        avancar_passo("uid_test", 4)
-        mock_update.assert_called_once_with({"onboarding_passo": 4})
-
-
-def test_service_concluir_persiste_flag():
-    """concluir_onboarding adiciona o perfil a onboarding_perfis_vistos (via ArrayUnion) e zera o passo."""
-    from app.services.onboarding_service import concluir_onboarding
-
-    with patch("app.services.onboarding_service.db") as mock_db:
-        mock_update = mock_db.collection.return_value.document.return_value.update
-        concluir_onboarding("uid_test", "solicitante")
-        call_args = mock_update.call_args[0][0]
-        assert call_args["onboarding_passo"] == 0
-        assert call_args["onboarding_perfis_vistos"].values == ["solicitante"]
+# ─── Serviço: campos persistidos corretamente (Postgres real) ─────────────────
+# Ver tests/test_services/test_onboarding_service.py para a cobertura completa
+# de avancar_passo/concluir_onboarding contra Postgres real (Fase 2, Marco 10).
 
 
 # ─── Template: componente injetado / omitido — só na home de cada perfil ──────

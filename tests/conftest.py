@@ -11,17 +11,12 @@ os.environ.setdefault("FLASK_ENV", "testing")
 
 # Módulos que fazem "from app.database import db" — cada um cria seu próprio
 # binding, então precisam ser mockados individualmente (patch("app.database.db")
-# sozinho NÃO afeta esses). app.utils_areas fica de fora: já tem fixture
-# dedicada abaixo com comportamento específico (doc.exists=False).
+# sozinho NÃO afeta esses). Fase 2, Marco 10: nenhum módulo de app/ importa mais
+# app.database (só scripts/ ainda usa, pra ferramentas operacionais contra o
+# Firestore de produção, que segue vivo até o corte do Marco 12) — só o próprio
+# app/database.py sobra aqui, como rede de segurança residual.
 _MODULOS_COM_DB_FIRESTORE = [
     "app.database",
-    "app.routes.api_solicitante",
-    "app.routes.api_colaboracao",
-    "app.routes.admin_global",
-    "app.services.lgpd_self_service",
-    "app.services.solicitante_edicao_service",
-    "app.services.onboarding_service",
-    "app.services.gamification_service",
 ]
 
 

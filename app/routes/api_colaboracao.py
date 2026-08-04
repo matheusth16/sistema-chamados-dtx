@@ -6,7 +6,6 @@ import threading
 from flask import current_app, jsonify, request, session
 from flask_login import current_user, login_required
 
-from app.database import db
 from app.decoradores import requer_supervisor_area
 from app.i18n import get_translation
 from app.models import Chamado
@@ -95,12 +94,11 @@ def api_transferir_area(chamado_id: str):
         if not motivo:
             return jsonify({"sucesso": False, "erro": _t("error_reason_required")}), 400
 
-        doc = db.collection("chamados").document(chamado_id).get()
-        if not doc.exists:
+        chamado = Chamado.get_by_id(chamado_id)
+        if not chamado:
             return jsonify({"sucesso": False, "erro": _t("ticket_not_found")}), 404
 
-        dados_chamado = doc.to_dict() or {}
-        chamado = Chamado.from_dict(dados_chamado, chamado_id)
+        dados_chamado = chamado.to_dict()
 
         if not usuario_pode_ver_chamado(current_user, chamado):
             return jsonify({"sucesso": False, "erro": _t("access_denied_generic")}), 403
@@ -175,12 +173,9 @@ def api_definir_previsao_atendimento(chamado_id: str):
         except ValueError:
             return jsonify({"sucesso": False, "erro": _t("invalid_request_data")}), 400
 
-        doc = db.collection("chamados").document(chamado_id).get()
-        if not doc.exists:
+        chamado = Chamado.get_by_id(chamado_id)
+        if not chamado:
             return jsonify({"sucesso": False, "erro": _t("ticket_not_found")}), 404
-
-        dados_chamado = doc.to_dict() or {}
-        chamado = Chamado.from_dict(dados_chamado, chamado_id)
 
         if not usuario_pode_ver_chamado(current_user, chamado):
             return jsonify({"sucesso": False, "erro": _t("access_denied_generic")}), 403
@@ -242,12 +237,11 @@ def api_escalonar_colega(chamado_id: str):
         if not motivo:
             return jsonify({"sucesso": False, "erro": _t("error_reason_required")}), 400
 
-        doc = db.collection("chamados").document(chamado_id).get()
-        if not doc.exists:
+        chamado = Chamado.get_by_id(chamado_id)
+        if not chamado:
             return jsonify({"sucesso": False, "erro": _t("ticket_not_found")}), 404
 
-        dados_chamado = doc.to_dict() or {}
-        chamado = Chamado.from_dict(dados_chamado, chamado_id)
+        dados_chamado = chamado.to_dict()
 
         if not usuario_pode_ver_chamado(current_user, chamado):
             return jsonify({"sucesso": False, "erro": _t("access_denied_generic")}), 403
@@ -434,12 +428,11 @@ def api_incluir_participantes(chamado_id: str):
                 {"sucesso": False, "erro": _t("participants_must_be_nonempty_list")}
             ), 400
 
-        doc = db.collection("chamados").document(chamado_id).get()
-        if not doc.exists:
+        chamado = Chamado.get_by_id(chamado_id)
+        if not chamado:
             return jsonify({"sucesso": False, "erro": _t("ticket_not_found")}), 404
 
-        dados_chamado = doc.to_dict() or {}
-        chamado = Chamado.from_dict(dados_chamado, chamado_id)
+        dados_chamado = chamado.to_dict()
 
         if not usuario_pode_ver_chamado(current_user, chamado):
             return jsonify({"sucesso": False, "erro": _t("access_denied_generic")}), 403
@@ -500,12 +493,11 @@ def api_concluir_minha_parte(chamado_id: str):
     if not pode_mutar:
         return jsonify({"sucesso": False, "erro": _t("access_denied_generic")}), 403
     try:
-        doc = db.collection("chamados").document(chamado_id).get()
-        if not doc.exists:
+        chamado = Chamado.get_by_id(chamado_id)
+        if not chamado:
             return jsonify({"sucesso": False, "erro": _t("ticket_not_found")}), 404
 
-        dados_chamado = doc.to_dict() or {}
-        chamado = Chamado.from_dict(dados_chamado, chamado_id)
+        dados_chamado = chamado.to_dict()
 
         if chamado.status == "Concluído":
             return jsonify({"sucesso": False, "erro": _t("ticket_already_completed")}), 400

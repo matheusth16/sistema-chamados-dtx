@@ -96,14 +96,8 @@ def test_admin_global_navbar_nao_duplica_link_painel_global(client_logado_admin_
     principal) e 'Global Administrator' (hambúrguer) juntos — mesmo destino
     (main.admin_global_dashboard), dois rótulos. O item do hambúrguer deve
     ficar em md:hidden (só mobile, onde a navbar principal já é escondida)."""
-    from unittest.mock import MagicMock
-
-    with (
-        patch("app.routes.admin_global.db") as mock_db,
-        patch("app.routes.admin_global.Usuario") as mock_usuario,
-    ):
+    with patch("app.routes.admin_global.Usuario") as mock_usuario:
         mock_usuario.get_all.return_value = []
-        mock_db.collection.return_value.count.return_value.get.return_value = [[MagicMock(value=0)]]
         r = client_logado_admin_global.get("/admin-global", follow_redirects=False)
 
     assert r.status_code == 200

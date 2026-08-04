@@ -1,13 +1,11 @@
 import logging
 from typing import Any
 
-from app.database import db
-from app.models_usuario import Usuario
+from sqlalchemy import update
 
-try:
-    from google.cloud.firestore_v1 import Increment
-except ImportError:
-    Increment = None  # type: ignore[assignment,misc]
+from app import db as db_module
+from app.db.models.usuario import UsuarioRow
+from app.models_usuario import Usuario
 
 logger = logging.getLogger(__name__)
 
@@ -78,9 +76,9 @@ class GamificationService:
     def _adicionar_exp(usuario_id: str, pontos: int, motivo: str) -> bool:
         """Método interno para adicionar EXP a um usuário e checar level up.
 
-        exp_total e exp_semanal usam Increment(pontos) para evitar race condition (F-14):
-        sem Increment, dois requests simultâneos podem ler o mesmo valor e ambos
-        escreverem o mesmo total — perdendo um dos incrementos.
+        exp_total e exp_semanal são incrementados via UPDATE ... SET x = x + pontos
+        numa única query atômica (F-14): evita que dois requests simultâneos leiam
+        o mesmo valor e ambos escrevam o mesmo total, perdendo um dos incrementos.
         level e conquistas são calculados otimisticamente a partir do valor pré-leitura.
         """
         try:
@@ -100,16 +98,20 @@ class GamificationService:
             )
             conquistas_atualizadas = list(usuario.conquistas or []) + novas_conquistas
 
-            # Increment(pontos) aplica o delta atomicamente no servidor Firestore,
-            # eliminando o race condition de read-then-write (F-14).
-            db.collection("usuarios").document(usuario_id).update(
-                {
-                    "exp_total": Increment(pontos),
-                    "exp_semanal": Increment(pontos),
-                    "level": novo_level,
-                    "conquistas": conquistas_atualizadas,
-                }
-            )
+            # UPDATE ... SET exp_total = exp_total + pontos aplica o delta
+            # atomicamente no Postgres, eliminando o race condition de
+            # read-then-write (F-14) — equivalente ao antigo Increment() do Firestore.
+            with db_module.SessionLocal() as session, session.begin():
+                session.execute(
+                    update(UsuarioRow)
+                    .where(UsuarioRow.id == usuario_id)
+                    .values(
+                        exp_total=UsuarioRow.exp_total + pontos,
+                        exp_semanal=UsuarioRow.exp_semanal + pontos,
+                        level=novo_level,
+                        conquistas=conquistas_atualizadas,
+                    )
+                )
 
             logger.info(
                 "Usuário %s ganhou %s EXP (%s). Novo nível: %s.",
@@ -165,28 +167,16 @@ class GamificationService:
     def resetar_ranking_semanal() -> bool:
         """Zera exp_semanal de todos os usuários. Chamado pelo APScheduler toda segunda-feira.
 
-        Usa batch Firestore (máx 500 ops/batch) para minimizar round-trips.
-        Pula usuários com exp_semanal == 0 para evitar writes desnecessários.
+        Uma única query UPDATE atômica — o teto de 500 ops/batch era limitação
+        do Firestore, sem equivalente no Postgres. Filtro exp_semanal > 0 evita
+        writes desnecessários (mesmo espírito do pulo de doc do código antigo).
         """
         try:
-            usuarios_ref = db.collection("usuarios")
-            docs = usuarios_ref.stream()
-            batch = db.batch()
-            atualizados = 0
-            batch_count = 0
-            for doc in docs:
-                data = doc.to_dict()
-                if (data.get("exp_semanal") or 0) > 0:
-                    batch.update(usuarios_ref.document(doc.id), {"exp_semanal": 0})
-                    atualizados += 1
-                    batch_count += 1
-                    if batch_count >= 500:
-                        batch.commit()
-                        logger.info("Batch comitado: %d usuários", batch_count)
-                        batch = db.batch()
-                        batch_count = 0
-            if batch_count > 0:
-                batch.commit()
+            with db_module.SessionLocal() as session, session.begin():
+                resultado = session.execute(
+                    update(UsuarioRow).where(UsuarioRow.exp_semanal > 0).values(exp_semanal=0)
+                )
+                atualizados = resultado.rowcount
             logger.info("Reset semanal concluído: %d usuários zerados.", atualizados)
             return True
         except Exception:

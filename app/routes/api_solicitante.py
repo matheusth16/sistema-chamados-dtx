@@ -7,7 +7,6 @@ from flask import abort, current_app, jsonify, redirect, request, send_from_dire
 from flask_login import current_user, login_required
 from werkzeug.utils import secure_filename
 
-from app.database import db
 from app.i18n import get_translation
 from app.models import Chamado
 from app.models_usuario import Usuario
@@ -55,19 +54,17 @@ def download_anexo():
     if not chamado_id or not chave:
         abort(400)
 
-    doc = db.collection("chamados").document(chamado_id).get()
-    if not doc.exists:
+    chamado = Chamado.get_by_id(chamado_id)
+    if not chamado:
         abort(404)
 
-    dados = doc.to_dict() or {}
-    todos_anexos = list(dados.get("anexos") or [])
-    if dados.get("anexo"):
-        todos_anexos.append(dados["anexo"])
+    todos_anexos = list(chamado.anexos or [])
+    if chamado.anexo:
+        todos_anexos.append(chamado.anexo)
 
     if chave not in todos_anexos:
         abort(403)
 
-    chamado = Chamado.from_dict(dados, chamado_id)
     if not usuario_pode_ver_chamado(current_user, chamado):
         abort(403)
 

@@ -165,11 +165,7 @@ def test_requer_solicitante_aceita_admin_global(app):
 
 def test_admin_global_acesso_permitido(client_logado_admin_global):
     """GET /admin-global retorna 200 para admin_global."""
-    with (
-        patch("app.routes.admin_global.db") as mock_db,
-        patch("app.routes.admin_global.Usuario") as mock_usuario,
-    ):
-        mock_db.collection.return_value.get.return_value = []
+    with patch("app.routes.admin_global.Usuario") as mock_usuario:
         mock_usuario.get_all.return_value = []
         r = client_logado_admin_global.get("/admin-global", follow_redirects=False)
     assert r.status_code == 200
@@ -200,24 +196,23 @@ def test_admin_global_sem_login_redireciona(client):
     assert "login" in r.location
 
 
-def test_admin_global_conta_chamados_via_agregacao_sem_ler_colecao_inteira(
-    client_logado_admin_global,
+def test_admin_global_dashboard_total_chamados_reflete_contagem_real(
+    client_logado_admin_global, db_session
 ):
-    """GET /admin-global usa count().get() (agregação) para o total de chamados,
-    em vez de baixar todos os documentos da coleção só para contar (F-XX perf)."""
-    mock_agg_result = MagicMock()
-    mock_agg_result.value = 42
-    with (
-        patch("app.routes.admin_global.db") as mock_db,
-        patch("app.routes.admin_global.Usuario") as mock_usuario,
-    ):
+    """GET /admin-global mostra o total real de chamados — SELECT COUNT(*)
+    via SQLAlchemy (Fase 2, Marco 10), nunca materializando as linhas."""
+    from tests.factories import make_chamado
+
+    make_chamado()
+    make_chamado()
+    make_chamado()
+
+    with patch("app.routes.admin_global.Usuario") as mock_usuario:
         mock_usuario.get_all.return_value = []
-        mock_db.collection.return_value.count.return_value.get.return_value = [[mock_agg_result]]
         r = client_logado_admin_global.get("/admin-global", follow_redirects=False)
 
     assert r.status_code == 200
-    assert b"42" in r.data
-    mock_db.collection.return_value.get.assert_not_called()
+    assert b'font-weight:800;">3</p>' in r.data
 
 
 # ---------------------------------------------------------------------------
@@ -290,24 +285,33 @@ def test_requer_admin_global_envolve_com_requer_perfil_admin_global(app):
 # ---------------------------------------------------------------------------
 
 
-def test_admin_global_dashboard_inner_db_exception_ainda_retorna_200(client_logado_admin_global):
-    """Quando db.collection("chamados").get() lança, total_chamados fica 0 mas retorna 200."""
-    with (
-        patch("app.routes.admin_global.db") as mock_db,
-        patch("app.routes.admin_global.Usuario") as mock_usuario,
-    ):
+def test_admin_global_dashboard_inner_db_exception_ainda_retorna_200(
+    client_logado_admin_global, monkeypatch
+):
+    """Quando a contagem de chamados lança, total_chamados fica 0 mas retorna 200."""
+    from app.routes import admin_global
+
+    class _SessionLocalQuebrada:
+        """.remove() é no-op — sem isso, o teardown_appcontext do request quebra
+        ao tentar chamar .remove() no valor monkeypatchado (ver
+        app/db/__init__.py::_remove_session)."""
+
+        def __call__(self):
+            raise RuntimeError("banco fora")
+
+        def remove(self):
+            pass
+
+    with patch("app.routes.admin_global.Usuario") as mock_usuario:
         mock_usuario.get_all.return_value = []
-        mock_db.collection.return_value.get.side_effect = Exception("firestore fora")
+        monkeypatch.setattr(admin_global.db_module, "SessionLocal", _SessionLocalQuebrada())
         r = client_logado_admin_global.get("/admin-global", follow_redirects=False)
     assert r.status_code == 200
 
 
 def test_admin_global_dashboard_outer_exception_redireciona_para_admin(client_logado_admin_global):
     """Quando Usuario.get_all() lança, redireciona para /admin com flash de erro."""
-    with (
-        patch("app.routes.admin_global.db"),
-        patch("app.routes.admin_global.Usuario") as mock_usuario,
-    ):
+    with patch("app.routes.admin_global.Usuario") as mock_usuario:
         mock_usuario.get_all.side_effect = Exception("db down")
         r = client_logado_admin_global.get("/admin-global", follow_redirects=False)
     assert r.status_code == 302
@@ -564,12 +568,10 @@ def test_admin_global_dashboard_agrupa_por_perfil_corretamente(client_logado_adm
     ag_user = _usuario_mock("ag_1", "admin_global")
 
     with (
-        patch("app.routes.admin_global.db") as mock_db,
         patch("app.routes.admin_global.Usuario") as mock_usuario,
         patch("app.models_usuario.Usuario.get_by_id", return_value=ag_user),
     ):
         mock_usuario.get_all.return_value = [admin1, sup1, sol1]
-        mock_db.collection.return_value.get.return_value = [MagicMock(), MagicMock()]
         r = client_logado_admin_global.get("/admin-global", follow_redirects=False)
     assert r.status_code == 200
 

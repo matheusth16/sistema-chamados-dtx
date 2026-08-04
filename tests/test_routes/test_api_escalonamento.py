@@ -1,7 +1,7 @@
 """Testes das rotas POST /api/chamado/<id>/transferir-area e /escalonar-colega.
 
-Segue padrão do projeto:
-- patch('app.routes.api_colaboracao.db') para simular Firestore na rota
+Segue padrão do projeto (Fase 2, Marco 10):
+- patch('app.routes.api_colaboracao.Chamado') para simular Chamado.get_by_id() (Postgres)
 - patch do serviço importado inline pela rota
 - Usa fixtures client_logado_supervisor, client_logado_admin, client_logado_solicitante
 """
@@ -11,16 +11,23 @@ from unittest.mock import MagicMock, patch
 # ── helpers ───────────────────────────────────────────────────────────────────
 
 
-def _chamado_doc_mock(
+def _mock_chamado_obj(
     area="Manutencao",
     responsavel_id="sup_1",
     participantes=None,
     status="Em Atendimento",
 ):
-    """Retorna um mock de documento Firestore para um chamado."""
-    doc = MagicMock()
-    doc.exists = True
-    doc.to_dict.return_value = {
+    """MagicMock de Chamado (retorno de Chamado.get_by_id()) com to_dict()
+    coerente — a rota usa tanto os atributos do objeto quanto o dict
+    (chamado.to_dict()) repassado às notificações em background."""
+    c = MagicMock()
+    c.id = "id_chamado_teste"
+    c.area = area
+    c.responsavel_id = responsavel_id
+    c.solicitante_id = "sol_outro"
+    c.participantes = participantes or []
+    c.supervisor_ids_com_acesso = [responsavel_id] if responsavel_id else []
+    c.to_dict.return_value = {
         "area": area,
         "responsavel_id": responsavel_id,
         "responsavel": "Supervisor Teste",
@@ -32,18 +39,6 @@ def _chamado_doc_mock(
         "tipo_solicitacao": "Corretiva",
         "descricao": "Descrição de teste",
     }
-    return doc
-
-
-def _mock_chamado_obj(area="Manutencao", responsavel_id="sup_1", participantes=None):
-    """Retorna um MagicMock de Chamado (objeto, não doc)."""
-    c = MagicMock()
-    c.id = "id_chamado_teste"
-    c.area = area
-    c.responsavel_id = responsavel_id
-    c.solicitante_id = "sol_outro"
-    c.participantes = participantes or []
-    c.supervisor_ids_com_acesso = [responsavel_id] if responsavel_id else []
     return c
 
 
@@ -53,11 +48,9 @@ def _mock_chamado_obj(area="Manutencao", responsavel_id="sup_1", participantes=N
 class TestTransferirAreaRota:
     def test_transferir_area_sucesso_retorna_200(self, client_logado_supervisor):
         """Owner supervisor pode transferir com payload válido → 200 sucesso=True."""
-        doc = _chamado_doc_mock(area="Manutencao", responsavel_id="sup_1")
         chamado_mock = _mock_chamado_obj(area="Manutencao", responsavel_id="sup_1")
 
         with (
-            patch("app.routes.api_colaboracao.db") as mock_db,
             patch("app.routes.api_colaboracao.Chamado") as mock_chamado_cls,
             patch("app.routes.api_colaboracao.usuario_pode_ver_chamado", return_value=True),
             # Inline import — patch no módulo do serviço (padrão do projeto)
@@ -70,8 +63,7 @@ class TestTransferirAreaRota:
             ),
             patch("app.routes.api_colaboracao.threading"),
         ):
-            mock_db.collection.return_value.document.return_value.get.return_value = doc
-            mock_chamado_cls.from_dict.return_value = chamado_mock
+            mock_chamado_cls.get_by_id.return_value = chamado_mock
 
             resp = client_logado_supervisor.post(
                 "/api/chamado/id123/transferir-area",
@@ -90,16 +82,13 @@ class TestTransferirAreaRota:
 
     def test_transferir_area_sem_motivo_retorna_400(self, client_logado_supervisor):
         """motivo vazio → 400."""
-        doc = _chamado_doc_mock(area="Manutencao", responsavel_id="sup_1")
         chamado_mock = _mock_chamado_obj(area="Manutencao", responsavel_id="sup_1")
 
         with (
-            patch("app.routes.api_colaboracao.db") as mock_db,
             patch("app.routes.api_colaboracao.Chamado") as mock_chamado_cls,
             patch("app.routes.api_colaboracao.usuario_pode_ver_chamado", return_value=True),
         ):
-            mock_db.collection.return_value.document.return_value.get.return_value = doc
-            mock_chamado_cls.from_dict.return_value = chamado_mock
+            mock_chamado_cls.get_by_id.return_value = chamado_mock
 
             resp = client_logado_supervisor.post(
                 "/api/chamado/id123/transferir-area",
@@ -113,16 +102,13 @@ class TestTransferirAreaRota:
 
     def test_transferir_area_sem_supervisor_id_retorna_400(self, client_logado_supervisor):
         """supervisor_id ausente → 400."""
-        doc = _chamado_doc_mock(area="Manutencao", responsavel_id="sup_1")
         chamado_mock = _mock_chamado_obj(area="Manutencao", responsavel_id="sup_1")
 
         with (
-            patch("app.routes.api_colaboracao.db") as mock_db,
             patch("app.routes.api_colaboracao.Chamado") as mock_chamado_cls,
             patch("app.routes.api_colaboracao.usuario_pode_ver_chamado", return_value=True),
         ):
-            mock_db.collection.return_value.document.return_value.get.return_value = doc
-            mock_chamado_cls.from_dict.return_value = chamado_mock
+            mock_chamado_cls.get_by_id.return_value = chamado_mock
 
             resp = client_logado_supervisor.post(
                 "/api/chamado/id123/transferir-area",
@@ -143,19 +129,14 @@ class TestTransferirAreaRota:
 
     def test_transferir_area_nao_owner_supervisor_retorna_403(self, client_logado_supervisor):
         """Supervisor que não é owner do chamado → 403."""
-        doc = _chamado_doc_mock(
-            area="Manutencao", responsavel_id="outro_sup"
-        )  # responsavel != sup_1
         chamado_mock = _mock_chamado_obj(area="Manutencao", responsavel_id="outro_sup")
         chamado_mock.solicitante_id = "sol_outro"  # supervisor não é o solicitante
 
         with (
-            patch("app.routes.api_colaboracao.db") as mock_db,
             patch("app.routes.api_colaboracao.Chamado") as mock_chamado_cls,
             patch("app.routes.api_colaboracao.usuario_pode_ver_chamado", return_value=True),
         ):
-            mock_db.collection.return_value.document.return_value.get.return_value = doc
-            mock_chamado_cls.from_dict.return_value = chamado_mock
+            mock_chamado_cls.get_by_id.return_value = chamado_mock
 
             resp = client_logado_supervisor.post(
                 "/api/chamado/id123/transferir-area",
@@ -167,18 +148,15 @@ class TestTransferirAreaRota:
 
     def test_transferir_area_idor_sem_acesso_retorna_403(self, client_logado_supervisor):
         """Supervisor sem acesso ao chamado (usuario_pode_ver_chamado=False) → 403."""
-        doc = _chamado_doc_mock(area="TI", responsavel_id="outro_sup")
         chamado_mock = _mock_chamado_obj(area="TI", responsavel_id="outro_sup")
 
         with (
-            patch("app.routes.api_colaboracao.db") as mock_db,
             patch("app.routes.api_colaboracao.Chamado") as mock_chamado_cls,
             patch(
                 "app.routes.api_colaboracao.usuario_pode_ver_chamado", return_value=False
             ),  # IDOR
         ):
-            mock_db.collection.return_value.document.return_value.get.return_value = doc
-            mock_chamado_cls.from_dict.return_value = chamado_mock
+            mock_chamado_cls.get_by_id.return_value = chamado_mock
 
             resp = client_logado_supervisor.post(
                 "/api/chamado/id123/transferir-area",
@@ -189,12 +167,9 @@ class TestTransferirAreaRota:
         assert resp.status_code == 403
 
     def test_transferir_area_chamado_nao_encontrado_retorna_404(self, client_logado_supervisor):
-        """Chamado não encontrado no Firestore → 404."""
-        doc_inexistente = MagicMock()
-        doc_inexistente.exists = False
-
-        with patch("app.routes.api_colaboracao.db") as mock_db:
-            mock_db.collection.return_value.document.return_value.get.return_value = doc_inexistente
+        """Chamado não encontrado no banco → 404."""
+        with patch("app.routes.api_colaboracao.Chamado") as mock_chamado_cls:
+            mock_chamado_cls.get_by_id.return_value = None
             resp = client_logado_supervisor.post(
                 "/api/chamado/id_inexistente/transferir-area",
                 json={"area": "Planejamento", "supervisor_id": "id_dest", "motivo": "motivo"},
@@ -209,11 +184,9 @@ class TestTransferirAreaRota:
         Antes do fix: dados_notif pegava area do doc original ("Manutencao").
         Após o fix: dados_notif["area"] == "Planejamento" (área do payload).
         """
-        doc = _chamado_doc_mock(area="Manutencao", responsavel_id="sup_1")
         chamado_mock = _mock_chamado_obj(area="Manutencao", responsavel_id="sup_1")
 
         with (
-            patch("app.routes.api_colaboracao.db") as mock_db,
             patch("app.routes.api_colaboracao.Chamado") as mock_chamado_cls,
             patch("app.routes.api_colaboracao.usuario_pode_ver_chamado", return_value=True),
             patch(
@@ -225,8 +198,7 @@ class TestTransferirAreaRota:
             ),
             patch("app.routes.api_colaboracao._notificar_escalonamento") as mock_notif,
         ):
-            mock_db.collection.return_value.document.return_value.get.return_value = doc
-            mock_chamado_cls.from_dict.return_value = chamado_mock
+            mock_chamado_cls.get_by_id.return_value = chamado_mock
 
             resp = client_logado_supervisor.post(
                 "/api/chamado/id123/transferir-area",
@@ -248,11 +220,9 @@ class TestTransferirAreaRota:
 
     def test_notificacao_transferir_chamada_em_background(self, client_logado_supervisor):
         """L2: após transferência bem-sucedida, notificação é disparada em thread daemon."""
-        doc = _chamado_doc_mock(area="Manutencao", responsavel_id="sup_1")
         chamado_mock = _mock_chamado_obj(area="Manutencao", responsavel_id="sup_1")
 
         with (
-            patch("app.routes.api_colaboracao.db") as mock_db,
             patch("app.routes.api_colaboracao.Chamado") as mock_chamado_cls,
             patch("app.routes.api_colaboracao.usuario_pode_ver_chamado", return_value=True),
             patch(
@@ -264,8 +234,7 @@ class TestTransferirAreaRota:
             ),
             patch("app.routes.api_colaboracao.threading") as mock_threading,
         ):
-            mock_db.collection.return_value.document.return_value.get.return_value = doc
-            mock_chamado_cls.from_dict.return_value = chamado_mock
+            mock_chamado_cls.get_by_id.return_value = chamado_mock
 
             resp = client_logado_supervisor.post(
                 "/api/chamado/id123/transferir-area",
@@ -283,11 +252,9 @@ class TestTransferirAreaRota:
 
     def test_transferir_area_admin_pode_transferir_chamado_alheio(self, client_logado_admin):
         """Admin pode transferir chamado de qualquer supervisor."""
-        doc = _chamado_doc_mock(area="Manutencao", responsavel_id="outro_sup")
         chamado_mock = _mock_chamado_obj(area="Manutencao", responsavel_id="outro_sup")
 
         with (
-            patch("app.routes.api_colaboracao.db") as mock_db,
             patch("app.routes.api_colaboracao.Chamado") as mock_chamado_cls,
             patch("app.routes.api_colaboracao.usuario_pode_ver_chamado", return_value=True),
             patch(
@@ -296,8 +263,7 @@ class TestTransferirAreaRota:
             ),
             patch("app.routes.api_colaboracao.threading"),
         ):
-            mock_db.collection.return_value.document.return_value.get.return_value = doc
-            mock_chamado_cls.from_dict.return_value = chamado_mock
+            mock_chamado_cls.get_by_id.return_value = chamado_mock
 
             resp = client_logado_admin.post(
                 "/api/chamado/id123/transferir-area",
@@ -315,11 +281,9 @@ class TestTransferirAreaRota:
 class TestEscalonarColegaRota:
     def test_escalonar_colega_sucesso_retorna_200(self, client_logado_supervisor):
         """Owner supervisor pode escalonar com payload válido → 200."""
-        doc = _chamado_doc_mock(area="Manutencao", responsavel_id="sup_1")
         chamado_mock = _mock_chamado_obj(area="Manutencao", responsavel_id="sup_1")
 
         with (
-            patch("app.routes.api_colaboracao.db") as mock_db,
             patch("app.routes.api_colaboracao.Chamado") as mock_chamado_cls,
             patch("app.routes.api_colaboracao.usuario_pode_ver_chamado", return_value=True),
             # Inline import — patch no módulo do serviço (padrão do projeto)
@@ -329,8 +293,7 @@ class TestEscalonarColegaRota:
             ),
             patch("app.routes.api_colaboracao.threading"),
         ):
-            mock_db.collection.return_value.document.return_value.get.return_value = doc
-            mock_chamado_cls.from_dict.return_value = chamado_mock
+            mock_chamado_cls.get_by_id.return_value = chamado_mock
 
             resp = client_logado_supervisor.post(
                 "/api/chamado/id123/escalonar-colega",
@@ -344,16 +307,13 @@ class TestEscalonarColegaRota:
 
     def test_escalonar_colega_sem_motivo_retorna_400(self, client_logado_supervisor):
         """motivo vazio → 400."""
-        doc = _chamado_doc_mock(area="Manutencao", responsavel_id="sup_1")
         chamado_mock = _mock_chamado_obj(area="Manutencao", responsavel_id="sup_1")
 
         with (
-            patch("app.routes.api_colaboracao.db") as mock_db,
             patch("app.routes.api_colaboracao.Chamado") as mock_chamado_cls,
             patch("app.routes.api_colaboracao.usuario_pode_ver_chamado", return_value=True),
         ):
-            mock_db.collection.return_value.document.return_value.get.return_value = doc
-            mock_chamado_cls.from_dict.return_value = chamado_mock
+            mock_chamado_cls.get_by_id.return_value = chamado_mock
 
             resp = client_logado_supervisor.post(
                 "/api/chamado/id123/escalonar-colega",
@@ -366,16 +326,13 @@ class TestEscalonarColegaRota:
 
     def test_escalonar_colega_sem_supervisor_id_retorna_400(self, client_logado_supervisor):
         """supervisor_id ausente → 400."""
-        doc = _chamado_doc_mock(area="Manutencao", responsavel_id="sup_1")
         chamado_mock = _mock_chamado_obj(area="Manutencao", responsavel_id="sup_1")
 
         with (
-            patch("app.routes.api_colaboracao.db") as mock_db,
             patch("app.routes.api_colaboracao.Chamado") as mock_chamado_cls,
             patch("app.routes.api_colaboracao.usuario_pode_ver_chamado", return_value=True),
         ):
-            mock_db.collection.return_value.document.return_value.get.return_value = doc
-            mock_chamado_cls.from_dict.return_value = chamado_mock
+            mock_chamado_cls.get_by_id.return_value = chamado_mock
 
             resp = client_logado_supervisor.post(
                 "/api/chamado/id123/escalonar-colega",
@@ -396,16 +353,13 @@ class TestEscalonarColegaRota:
 
     def test_escalonar_colega_idor_sem_acesso_retorna_403(self, client_logado_supervisor):
         """Supervisor sem acesso ao chamado → 403 (IDOR protection)."""
-        doc = _chamado_doc_mock(area="TI", responsavel_id="outro_sup")
         chamado_mock = _mock_chamado_obj(area="TI", responsavel_id="outro_sup")
 
         with (
-            patch("app.routes.api_colaboracao.db") as mock_db,
             patch("app.routes.api_colaboracao.Chamado") as mock_chamado_cls,
             patch("app.routes.api_colaboracao.usuario_pode_ver_chamado", return_value=False),
         ):
-            mock_db.collection.return_value.document.return_value.get.return_value = doc
-            mock_chamado_cls.from_dict.return_value = chamado_mock
+            mock_chamado_cls.get_by_id.return_value = chamado_mock
 
             resp = client_logado_supervisor.post(
                 "/api/chamado/id123/escalonar-colega",
@@ -417,16 +371,13 @@ class TestEscalonarColegaRota:
 
     def test_escalonar_colega_nao_owner_retorna_403(self, client_logado_supervisor):
         """Supervisor que não é owner do chamado → 403."""
-        doc = _chamado_doc_mock(area="Manutencao", responsavel_id="outro_sup")
         chamado_mock = _mock_chamado_obj(area="Manutencao", responsavel_id="outro_sup")
 
         with (
-            patch("app.routes.api_colaboracao.db") as mock_db,
             patch("app.routes.api_colaboracao.Chamado") as mock_chamado_cls,
             patch("app.routes.api_colaboracao.usuario_pode_ver_chamado", return_value=True),
         ):
-            mock_db.collection.return_value.document.return_value.get.return_value = doc
-            mock_chamado_cls.from_dict.return_value = chamado_mock
+            mock_chamado_cls.get_by_id.return_value = chamado_mock
 
             resp = client_logado_supervisor.post(
                 "/api/chamado/id123/escalonar-colega",
@@ -438,11 +389,9 @@ class TestEscalonarColegaRota:
 
     def test_escalonar_colega_servico_retorna_erro_propaga_400(self, client_logado_supervisor):
         """Quando o serviço retorna sucesso=False (ex: destino inválido), a rota retorna 400."""
-        doc = _chamado_doc_mock(area="Manutencao", responsavel_id="sup_1")
         chamado_mock = _mock_chamado_obj(area="Manutencao", responsavel_id="sup_1")
 
         with (
-            patch("app.routes.api_colaboracao.db") as mock_db,
             patch("app.routes.api_colaboracao.Chamado") as mock_chamado_cls,
             patch("app.routes.api_colaboracao.usuario_pode_ver_chamado", return_value=True),
             patch(
@@ -450,8 +399,7 @@ class TestEscalonarColegaRota:
                 return_value={"sucesso": False, "erro": "Supervisor destino não pertence à área"},
             ),
         ):
-            mock_db.collection.return_value.document.return_value.get.return_value = doc
-            mock_chamado_cls.from_dict.return_value = chamado_mock
+            mock_chamado_cls.get_by_id.return_value = chamado_mock
 
             resp = client_logado_supervisor.post(
                 "/api/chamado/id123/escalonar-colega",
@@ -464,11 +412,9 @@ class TestEscalonarColegaRota:
 
     def test_notificacao_escalonar_chamada_em_background(self, client_logado_supervisor):
         """Após escalonamento bem-sucedido, notificação é disparada em thread separada."""
-        doc = _chamado_doc_mock(area="Manutencao", responsavel_id="sup_1")
         chamado_mock = _mock_chamado_obj(area="Manutencao", responsavel_id="sup_1")
 
         with (
-            patch("app.routes.api_colaboracao.db") as mock_db,
             patch("app.routes.api_colaboracao.Chamado") as mock_chamado_cls,
             patch("app.routes.api_colaboracao.usuario_pode_ver_chamado", return_value=True),
             patch(
@@ -477,8 +423,7 @@ class TestEscalonarColegaRota:
             ),
             patch("app.routes.api_colaboracao.threading") as mock_threading,
         ):
-            mock_db.collection.return_value.document.return_value.get.return_value = doc
-            mock_chamado_cls.from_dict.return_value = chamado_mock
+            mock_chamado_cls.get_by_id.return_value = chamado_mock
 
             resp = client_logado_supervisor.post(
                 "/api/chamado/id123/escalonar-colega",

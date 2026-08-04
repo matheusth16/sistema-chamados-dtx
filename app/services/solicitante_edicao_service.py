@@ -10,8 +10,8 @@ from datetime import datetime, timedelta
 
 import pytz
 
-from app.database import db
 from app.i18n import get_translation_session
+from app.models import Chamado
 from app.models_historico import Historico
 
 logger = logging.getLogger(__name__)
@@ -29,8 +29,12 @@ def _t(key, **kwargs):
     return get_translation_session(key, **kwargs)
 
 
-def _get_chamado_doc(chamado_id: str):
-    return db.collection("chamados").document(chamado_id).get()
+def _get_chamado_e_dados(chamado_id: str):
+    """Retorna (Chamado, dict) ou (None, None) se não existir."""
+    chamado = Chamado.get_by_id(chamado_id)
+    if not chamado:
+        return None, None
+    return chamado, chamado.to_dict()
 
 
 def _agora_brasilia() -> datetime:
@@ -69,11 +73,10 @@ def editar_descricao_solicitante(
     Edita a descrição de um chamado dentro da janela de 30 min.
     Só o solicitante dono pode editar; só quando status = Aberto.
     """
-    doc = _get_chamado_doc(chamado_id)
-    if not doc.exists:
+    chamado, data = _get_chamado_e_dados(chamado_id)
+    if not chamado:
         return {"sucesso": False, "erro": _t("ticket_not_found_dot"), "codigo": 404}
 
-    data = doc.to_dict()
     solicitante_id = data.get("solicitante_id")
     status = data.get("status", "")
     descricao_atual = data.get("descricao", "")
@@ -97,7 +100,8 @@ def editar_descricao_solicitante(
         }
 
     try:
-        db.collection("chamados").document(chamado_id).update({"descricao": novo_texto})
+        if not chamado.atualizar_campos(descricao=novo_texto):
+            return {"sucesso": False, "erro": _t("internal_error_saving_edit"), "codigo": 500}
 
         Historico(
             chamado_id=chamado_id,
@@ -171,11 +175,10 @@ def adicionar_anexo_tardio(
     Adiciona um anexo a um chamado já criado.
     Requer motivo (mín. 10 chars) e status não-terminal.
     """
-    doc = _get_chamado_doc(chamado_id)
-    if not doc.exists:
+    chamado, data = _get_chamado_e_dados(chamado_id)
+    if not chamado:
         return {"sucesso": False, "erro": _t("ticket_not_found_dot"), "codigo": 404}
 
-    data = doc.to_dict()
     solicitante_id = data.get("solicitante_id")
     status = data.get("status", "")
 
@@ -198,11 +201,15 @@ def adicionar_anexo_tardio(
         }
 
     try:
-        from google.cloud.firestore_v1 import ArrayUnion
-
-        db.collection("chamados").document(chamado_id).update(
-            {"anexos": ArrayUnion([caminho_anexo])}
-        )
+        anexos_atualizados = list(data.get("anexos") or [])
+        if caminho_anexo not in anexos_atualizados:
+            anexos_atualizados.append(caminho_anexo)
+        if not chamado.atualizar_campos(anexos=anexos_atualizados):
+            return {
+                "sucesso": False,
+                "erro": _t("internal_error_adding_attachment"),
+                "codigo": 500,
+            }
 
         Historico(
             chamado_id=chamado_id,
@@ -278,11 +285,10 @@ def responder_chamado_solicitante(
     Aguardando Informação) sem precisar anexar um arquivo só para poder
     escrever algo no campo de motivo do anexo tardio.
     """
-    doc = _get_chamado_doc(chamado_id)
-    if not doc.exists:
+    chamado, data = _get_chamado_e_dados(chamado_id)
+    if not chamado:
         return {"sucesso": False, "erro": _t("ticket_not_found_dot"), "codigo": 404}
 
-    data = doc.to_dict()
     solicitante_id = data.get("solicitante_id")
     status = data.get("status", "")
 

@@ -7,41 +7,13 @@ api_push_subscribe, api_chamados_paginar, carregar_mais, api_buscar_usuarios,
 api_editar_solicitante/cancelar_solicitante/anexo_solicitante (gestor read-only),
 api_transferir_area, api_escalonar_colega, api_incluir_participantes, api_concluir_minha_parte.
 
-Segue padrão do projeto (Fase 2 — Postgres real): tests/factories.py::make_chamado + fixture
-db_session pros testes que dependem de Chamado.get_by_id; api_colaboracao.py ainda não migrou,
-então patch('app.routes.api_colaboracao.db') continua válido só ali. Patch do serviço no módulo
-de origem, fixtures client_logado_{solicitante,supervisor,admin,gestor}.
+Segue padrão do projeto (Fase 2, Marco 10 — Postgres real): tests/factories.py::make_chamado +
+fixture db_session pros testes que dependem de Chamado.get_by_id; rotas de api_colaboracao.py
+mockam a classe Chamado (patch('app.routes.api_colaboracao.Chamado')). Patch do serviço no
+módulo de origem, fixtures client_logado_{solicitante,supervisor,admin,gestor}.
 """
 
 from unittest.mock import MagicMock, patch
-
-
-def _chamado_doc_mock(
-    area="Manutencao",
-    responsavel_id="sup_1",
-    participantes=None,
-    status="Em Atendimento",
-    solicitante_id="sol_outro",
-    confirmacao_solicitante=None,
-):
-    doc = MagicMock()
-    doc.exists = True
-    doc.to_dict.return_value = {
-        "area": area,
-        "responsavel_id": responsavel_id,
-        "responsavel": "Supervisor Teste",
-        "status": status,
-        "participantes": participantes or [],
-        "supervisor_ids_com_acesso": [responsavel_id] if responsavel_id else [],
-        "motivo_ultima_escalacao": None,
-        "categoria": "Manutencao",
-        "tipo_solicitacao": "Corretiva",
-        "descricao": "Descrição de teste",
-        "solicitante_id": solicitante_id,
-        "numero_chamado": "CHM-001",
-        "confirmacao_solicitante": confirmacao_solicitante,
-    }
-    return doc
 
 
 def _mock_chamado_obj(
@@ -574,16 +546,13 @@ def test_api_transferir_area_sem_area_retorna_400(client_logado_supervisor):
 
 
 def test_api_transferir_area_chamado_concluido_bloqueia_edicao(client_logado_supervisor):
-    doc = _chamado_doc_mock(status="Concluído", confirmacao_solicitante="confirmado")
     chamado_mock = _mock_chamado_obj(status="Concluído")
 
     with (
-        patch("app.routes.api_colaboracao.db") as mock_db,
         patch("app.routes.api_colaboracao.Chamado") as mock_chamado_cls,
         patch("app.routes.api_colaboracao.usuario_pode_ver_chamado", return_value=True),
     ):
-        mock_db.collection.return_value.document.return_value.get.return_value = doc
-        mock_chamado_cls.from_dict.return_value = chamado_mock
+        mock_chamado_cls.get_by_id.return_value = chamado_mock
 
         resp = client_logado_supervisor.post(
             "/api/chamado/ch1/transferir-area",
@@ -595,11 +564,9 @@ def test_api_transferir_area_chamado_concluido_bloqueia_edicao(client_logado_sup
 
 
 def test_api_transferir_area_servico_retorna_erro_400(client_logado_supervisor):
-    doc = _chamado_doc_mock(area="Manutencao", responsavel_id="sup_1")
     chamado_mock = _mock_chamado_obj(area="Manutencao", responsavel_id="sup_1")
 
     with (
-        patch("app.routes.api_colaboracao.db") as mock_db,
         patch("app.routes.api_colaboracao.Chamado") as mock_chamado_cls,
         patch("app.routes.api_colaboracao.usuario_pode_ver_chamado", return_value=True),
         patch(
@@ -607,8 +574,7 @@ def test_api_transferir_area_servico_retorna_erro_400(client_logado_supervisor):
             return_value={"sucesso": False, "erro": "Área destino inválida"},
         ),
     ):
-        mock_db.collection.return_value.document.return_value.get.return_value = doc
-        mock_chamado_cls.from_dict.return_value = chamado_mock
+        mock_chamado_cls.get_by_id.return_value = chamado_mock
 
         resp = client_logado_supervisor.post(
             "/api/chamado/ch1/transferir-area",
@@ -620,11 +586,9 @@ def test_api_transferir_area_servico_retorna_erro_400(client_logado_supervisor):
 
 
 def test_api_transferir_area_value_error_retorna_400(client_logado_supervisor):
-    doc = _chamado_doc_mock(area="Manutencao", responsavel_id="sup_1")
     chamado_mock = _mock_chamado_obj(area="Manutencao", responsavel_id="sup_1")
 
     with (
-        patch("app.routes.api_colaboracao.db") as mock_db,
         patch("app.routes.api_colaboracao.Chamado") as mock_chamado_cls,
         patch("app.routes.api_colaboracao.usuario_pode_ver_chamado", return_value=True),
         patch(
@@ -632,8 +596,7 @@ def test_api_transferir_area_value_error_retorna_400(client_logado_supervisor):
             side_effect=ValueError("dado inválido"),
         ),
     ):
-        mock_db.collection.return_value.document.return_value.get.return_value = doc
-        mock_chamado_cls.from_dict.return_value = chamado_mock
+        mock_chamado_cls.get_by_id.return_value = chamado_mock
 
         resp = client_logado_supervisor.post(
             "/api/chamado/ch1/transferir-area",
@@ -645,11 +608,9 @@ def test_api_transferir_area_value_error_retorna_400(client_logado_supervisor):
 
 
 def test_api_transferir_area_excecao_generica_retorna_500(client_logado_supervisor):
-    doc = _chamado_doc_mock(area="Manutencao", responsavel_id="sup_1")
     chamado_mock = _mock_chamado_obj(area="Manutencao", responsavel_id="sup_1")
 
     with (
-        patch("app.routes.api_colaboracao.db") as mock_db,
         patch("app.routes.api_colaboracao.Chamado") as mock_chamado_cls,
         patch("app.routes.api_colaboracao.usuario_pode_ver_chamado", return_value=True),
         patch(
@@ -657,8 +618,7 @@ def test_api_transferir_area_excecao_generica_retorna_500(client_logado_supervis
             side_effect=RuntimeError("falha inesperada"),
         ),
     ):
-        mock_db.collection.return_value.document.return_value.get.return_value = doc
-        mock_chamado_cls.from_dict.return_value = chamado_mock
+        mock_chamado_cls.get_by_id.return_value = chamado_mock
 
         resp = client_logado_supervisor.post(
             "/api/chamado/ch1/transferir-area",
@@ -680,10 +640,8 @@ def test_api_escalonar_colega_json_vazio_retorna_400(client_logado_supervisor):
 
 
 def test_api_escalonar_colega_chamado_nao_encontrado_retorna_404(client_logado_supervisor):
-    doc = MagicMock()
-    doc.exists = False
-    with patch("app.routes.api_colaboracao.db") as mock_db:
-        mock_db.collection.return_value.document.return_value.get.return_value = doc
+    with patch("app.routes.api_colaboracao.Chamado") as mock_chamado_cls:
+        mock_chamado_cls.get_by_id.return_value = None
         resp = client_logado_supervisor.post(
             "/api/chamado/ch_inexistente/escalonar-colega",
             json={"supervisor_id": "id_colega", "motivo": "motivo válido"},
@@ -693,16 +651,13 @@ def test_api_escalonar_colega_chamado_nao_encontrado_retorna_404(client_logado_s
 
 
 def test_api_escalonar_colega_chamado_concluido_bloqueia_edicao(client_logado_supervisor):
-    doc = _chamado_doc_mock(status="Concluído", confirmacao_solicitante="confirmado")
     chamado_mock = _mock_chamado_obj(status="Concluído")
 
     with (
-        patch("app.routes.api_colaboracao.db") as mock_db,
         patch("app.routes.api_colaboracao.Chamado") as mock_chamado_cls,
         patch("app.routes.api_colaboracao.usuario_pode_ver_chamado", return_value=True),
     ):
-        mock_db.collection.return_value.document.return_value.get.return_value = doc
-        mock_chamado_cls.from_dict.return_value = chamado_mock
+        mock_chamado_cls.get_by_id.return_value = chamado_mock
 
         resp = client_logado_supervisor.post(
             "/api/chamado/ch1/escalonar-colega",
@@ -714,11 +669,9 @@ def test_api_escalonar_colega_chamado_concluido_bloqueia_edicao(client_logado_su
 
 
 def test_api_escalonar_colega_value_error_retorna_400(client_logado_supervisor):
-    doc = _chamado_doc_mock(area="Manutencao", responsavel_id="sup_1")
     chamado_mock = _mock_chamado_obj(area="Manutencao", responsavel_id="sup_1")
 
     with (
-        patch("app.routes.api_colaboracao.db") as mock_db,
         patch("app.routes.api_colaboracao.Chamado") as mock_chamado_cls,
         patch("app.routes.api_colaboracao.usuario_pode_ver_chamado", return_value=True),
         patch(
@@ -726,8 +679,7 @@ def test_api_escalonar_colega_value_error_retorna_400(client_logado_supervisor):
             side_effect=ValueError("dado inválido"),
         ),
     ):
-        mock_db.collection.return_value.document.return_value.get.return_value = doc
-        mock_chamado_cls.from_dict.return_value = chamado_mock
+        mock_chamado_cls.get_by_id.return_value = chamado_mock
 
         resp = client_logado_supervisor.post(
             "/api/chamado/ch1/escalonar-colega",
@@ -739,11 +691,9 @@ def test_api_escalonar_colega_value_error_retorna_400(client_logado_supervisor):
 
 
 def test_api_escalonar_colega_excecao_generica_retorna_500(client_logado_supervisor):
-    doc = _chamado_doc_mock(area="Manutencao", responsavel_id="sup_1")
     chamado_mock = _mock_chamado_obj(area="Manutencao", responsavel_id="sup_1")
 
     with (
-        patch("app.routes.api_colaboracao.db") as mock_db,
         patch("app.routes.api_colaboracao.Chamado") as mock_chamado_cls,
         patch("app.routes.api_colaboracao.usuario_pode_ver_chamado", return_value=True),
         patch(
@@ -751,8 +701,7 @@ def test_api_escalonar_colega_excecao_generica_retorna_500(client_logado_supervi
             side_effect=RuntimeError("falha inesperada"),
         ),
     ):
-        mock_db.collection.return_value.document.return_value.get.return_value = doc
-        mock_chamado_cls.from_dict.return_value = chamado_mock
+        mock_chamado_cls.get_by_id.return_value = chamado_mock
 
         resp = client_logado_supervisor.post(
             "/api/chamado/ch1/escalonar-colega",
@@ -858,10 +807,8 @@ def test_notificar_owner_todos_concluiram_excecao_e_logada_sem_propagar(app):
 
 
 def test_api_incluir_participantes_chamado_nao_encontrado_retorna_404(client_logado_supervisor):
-    doc = MagicMock()
-    doc.exists = False
-    with patch("app.routes.api_colaboracao.db") as mock_db:
-        mock_db.collection.return_value.document.return_value.get.return_value = doc
+    with patch("app.routes.api_colaboracao.Chamado") as mock_chamado_cls:
+        mock_chamado_cls.get_by_id.return_value = None
         resp = client_logado_supervisor.post(
             "/api/chamado/ch_inexistente/incluir-participantes",
             json={"participantes": [{"supervisor_id": "s1", "area": "TI"}]},
@@ -871,16 +818,13 @@ def test_api_incluir_participantes_chamado_nao_encontrado_retorna_404(client_log
 
 
 def test_api_incluir_participantes_chamado_concluido_retorna_403(client_logado_supervisor):
-    doc = _chamado_doc_mock(status="Concluído", confirmacao_solicitante="confirmado")
     chamado_mock = _mock_chamado_obj(status="Concluído")
 
     with (
-        patch("app.routes.api_colaboracao.db") as mock_db,
         patch("app.routes.api_colaboracao.Chamado") as mock_chamado_cls,
         patch("app.routes.api_colaboracao.usuario_pode_ver_chamado", return_value=True),
     ):
-        mock_db.collection.return_value.document.return_value.get.return_value = doc
-        mock_chamado_cls.from_dict.return_value = chamado_mock
+        mock_chamado_cls.get_by_id.return_value = chamado_mock
 
         resp = client_logado_supervisor.post(
             "/api/chamado/ch1/incluir-participantes",
@@ -892,11 +836,9 @@ def test_api_incluir_participantes_chamado_concluido_retorna_403(client_logado_s
 
 
 def test_api_incluir_participantes_value_error_retorna_400(client_logado_supervisor):
-    doc = _chamado_doc_mock(area="Manutencao", responsavel_id="sup_1")
     chamado_mock = _mock_chamado_obj(area="Manutencao", responsavel_id="sup_1")
 
     with (
-        patch("app.routes.api_colaboracao.db") as mock_db,
         patch("app.routes.api_colaboracao.Chamado") as mock_chamado_cls,
         patch("app.routes.api_colaboracao.usuario_pode_ver_chamado", return_value=True),
         patch(
@@ -904,8 +846,7 @@ def test_api_incluir_participantes_value_error_retorna_400(client_logado_supervi
             side_effect=ValueError("dado inválido"),
         ),
     ):
-        mock_db.collection.return_value.document.return_value.get.return_value = doc
-        mock_chamado_cls.from_dict.return_value = chamado_mock
+        mock_chamado_cls.get_by_id.return_value = chamado_mock
 
         resp = client_logado_supervisor.post(
             "/api/chamado/ch1/incluir-participantes",
@@ -917,11 +858,9 @@ def test_api_incluir_participantes_value_error_retorna_400(client_logado_supervi
 
 
 def test_api_incluir_participantes_excecao_generica_retorna_500(client_logado_supervisor):
-    doc = _chamado_doc_mock(area="Manutencao", responsavel_id="sup_1")
     chamado_mock = _mock_chamado_obj(area="Manutencao", responsavel_id="sup_1")
 
     with (
-        patch("app.routes.api_colaboracao.db") as mock_db,
         patch("app.routes.api_colaboracao.Chamado") as mock_chamado_cls,
         patch("app.routes.api_colaboracao.usuario_pode_ver_chamado", return_value=True),
         patch(
@@ -929,8 +868,7 @@ def test_api_incluir_participantes_excecao_generica_retorna_500(client_logado_su
             side_effect=RuntimeError("falha inesperada"),
         ),
     ):
-        mock_db.collection.return_value.document.return_value.get.return_value = doc
-        mock_chamado_cls.from_dict.return_value = chamado_mock
+        mock_chamado_cls.get_by_id.return_value = chamado_mock
 
         resp = client_logado_supervisor.post(
             "/api/chamado/ch1/incluir-participantes",
@@ -945,10 +883,8 @@ def test_api_incluir_participantes_excecao_generica_retorna_500(client_logado_su
 
 
 def test_api_concluir_minha_parte_chamado_nao_encontrado_retorna_404(client_logado_supervisor):
-    doc = MagicMock()
-    doc.exists = False
-    with patch("app.routes.api_colaboracao.db") as mock_db:
-        mock_db.collection.return_value.document.return_value.get.return_value = doc
+    with patch("app.routes.api_colaboracao.Chamado") as mock_chamado_cls:
+        mock_chamado_cls.get_by_id.return_value = None
         resp = client_logado_supervisor.post(
             "/api/chamado/ch_inexistente/concluir-minha-parte",
             json={},
@@ -958,16 +894,8 @@ def test_api_concluir_minha_parte_chamado_nao_encontrado_retorna_404(client_loga
 
 
 def test_api_concluir_minha_parte_chamado_ja_concluido_retorna_400(client_logado_supervisor):
-    doc = _chamado_doc_mock(
-        status="Concluído",
-        participantes=[{"supervisor_id": "sup_1", "area": "TI", "status": "pendente"}],
-    )
-    with (
-        patch("app.routes.api_colaboracao.db") as mock_db,
-        patch("app.routes.api_colaboracao.Chamado") as mock_chamado_cls,
-    ):
-        mock_db.collection.return_value.document.return_value.get.return_value = doc
-        mock_chamado_cls.from_dict.return_value = _mock_chamado_obj(
+    with patch("app.routes.api_colaboracao.Chamado") as mock_chamado_cls:
+        mock_chamado_cls.get_by_id.return_value = _mock_chamado_obj(
             status="Concluído",
             participantes=[{"supervisor_id": "sup_1", "area": "TI", "status": "pendente"}],
         )
@@ -980,21 +908,14 @@ def test_api_concluir_minha_parte_chamado_ja_concluido_retorna_400(client_logado
 
 
 def test_api_concluir_minha_parte_servico_retorna_erro_400(client_logado_supervisor):
-    doc = _chamado_doc_mock(
-        status="Em Atendimento",
-        participantes=[{"supervisor_id": "sup_1", "area": "TI", "status": "pendente"}],
-    )
-
     with (
-        patch("app.routes.api_colaboracao.db") as mock_db,
         patch("app.routes.api_colaboracao.Chamado") as mock_chamado_cls,
         patch(
             "app.services.escalonamento_service.concluir_minha_parte",
             return_value={"sucesso": False, "erro": "Já concluiu sua parte"},
         ),
     ):
-        mock_db.collection.return_value.document.return_value.get.return_value = doc
-        mock_chamado_cls.from_dict.return_value = _mock_chamado_obj(
+        mock_chamado_cls.get_by_id.return_value = _mock_chamado_obj(
             status="Em Atendimento",
             participantes=[{"supervisor_id": "sup_1", "area": "TI", "status": "pendente"}],
         )
@@ -1007,21 +928,14 @@ def test_api_concluir_minha_parte_servico_retorna_erro_400(client_logado_supervi
 
 
 def test_api_concluir_minha_parte_excecao_generica_retorna_500(client_logado_supervisor):
-    doc = _chamado_doc_mock(
-        status="Em Atendimento",
-        participantes=[{"supervisor_id": "sup_1", "area": "TI", "status": "pendente"}],
-    )
-
     with (
-        patch("app.routes.api_colaboracao.db") as mock_db,
         patch("app.routes.api_colaboracao.Chamado") as mock_chamado_cls,
         patch(
             "app.services.escalonamento_service.concluir_minha_parte",
             side_effect=RuntimeError("falha inesperada"),
         ),
     ):
-        mock_db.collection.return_value.document.return_value.get.return_value = doc
-        mock_chamado_cls.from_dict.return_value = _mock_chamado_obj(
+        mock_chamado_cls.get_by_id.return_value = _mock_chamado_obj(
             status="Em Atendimento",
             participantes=[{"supervisor_id": "sup_1", "area": "TI", "status": "pendente"}],
         )

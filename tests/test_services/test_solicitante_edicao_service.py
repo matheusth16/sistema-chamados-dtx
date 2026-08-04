@@ -1,7 +1,10 @@
 """
-Fase 3 — TDD: solicitante_edicao_service (edição texto + anexo tardio).
+solicitante_edicao_service (edição texto + anexo tardio + resposta).
 
-Testes escritos ANTES da implementação (Red → Green → Refactor).
+Fase 2, Marco 10: leitura/escrita do chamado usa Chamado.get_by_id()/
+atualizar_campos() (Postgres) — Chamado é mockado como classe (não precisa
+de Postgres real neste arquivo, só o contrato get_by_id/atualizar_campos
+importa aqui, igual test_edicao_chamado_service.py).
 """
 
 from datetime import datetime, timedelta
@@ -61,7 +64,7 @@ def _data_chamado(
     numero_chamado="CH-001",
     categoria="TI",
 ):
-    """Retorna dict simulando dados do Firestore."""
+    """Retorna dict simulando Chamado.to_dict()."""
     agora = datetime.now(_BRASILIA)
     abertura = agora - timedelta(minutes=minutos_atras)
     return {
@@ -76,6 +79,15 @@ def _data_chamado(
     }
 
 
+def _mock_chamado(chamado_data):
+    """MagicMock que imita o retorno de Chamado.get_by_id(): to_dict() +
+    atualizar_campos() (usado no lugar do antigo doc Firestore)."""
+    m = MagicMock()
+    m.to_dict.return_value = chamado_data
+    m.atualizar_campos.return_value = True
+    return m
+
+
 # ---------------------------------------------------------------------------
 # editar_descricao_solicitante
 # ---------------------------------------------------------------------------
@@ -88,18 +100,14 @@ class TestEditarDescricaoSolicitante:
 
         user = _usuario_mock()
         chamado_data = _data_chamado(minutos_atras=5)
-
-        mock_doc = MagicMock()
-        mock_doc.exists = True
-        mock_doc.to_dict.return_value = chamado_data
+        mock_chamado = _mock_chamado(chamado_data)
 
         with (
-            patch("app.services.solicitante_edicao_service.db") as mock_db,
+            patch("app.services.solicitante_edicao_service.Chamado") as mock_chamado_cls,
             patch("app.services.solicitante_edicao_service.Historico") as mock_hist,
             patch("app.services.solicitante_edicao_service._notificar_edicao_descricao"),
         ):
-            mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
-            mock_db.collection.return_value.document.return_value.update.return_value = None
+            mock_chamado_cls.get_by_id.return_value = mock_chamado
             mock_hist.return_value.save.return_value = True
 
             resultado = editar_descricao_solicitante(
@@ -118,13 +126,10 @@ class TestEditarDescricaoSolicitante:
 
         user = _usuario_mock()
         chamado_data = _data_chamado(minutos_atras=35)
+        mock_chamado = _mock_chamado(chamado_data)
 
-        mock_doc = MagicMock()
-        mock_doc.exists = True
-        mock_doc.to_dict.return_value = chamado_data
-
-        with patch("app.services.solicitante_edicao_service.db") as mock_db:
-            mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
+        with patch("app.services.solicitante_edicao_service.Chamado") as mock_chamado_cls:
+            mock_chamado_cls.get_by_id.return_value = mock_chamado
             resultado = editar_descricao_solicitante(
                 chamado_id="ch_1",
                 novo_texto="Texto novo",
@@ -140,13 +145,10 @@ class TestEditarDescricaoSolicitante:
 
         user = _usuario_mock()
         chamado_data = _data_chamado(status="Em Atendimento", minutos_atras=5)
+        mock_chamado = _mock_chamado(chamado_data)
 
-        mock_doc = MagicMock()
-        mock_doc.exists = True
-        mock_doc.to_dict.return_value = chamado_data
-
-        with patch("app.services.solicitante_edicao_service.db") as mock_db:
-            mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
+        with patch("app.services.solicitante_edicao_service.Chamado") as mock_chamado_cls:
+            mock_chamado_cls.get_by_id.return_value = mock_chamado
             resultado = editar_descricao_solicitante(
                 chamado_id="ch_1",
                 novo_texto="Texto novo",
@@ -161,13 +163,10 @@ class TestEditarDescricaoSolicitante:
 
         user = _usuario_mock(uid="outro_usuario")
         chamado_data = _data_chamado(solicitante_id="dono_real", minutos_atras=5)
+        mock_chamado = _mock_chamado(chamado_data)
 
-        mock_doc = MagicMock()
-        mock_doc.exists = True
-        mock_doc.to_dict.return_value = chamado_data
-
-        with patch("app.services.solicitante_edicao_service.db") as mock_db:
-            mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
+        with patch("app.services.solicitante_edicao_service.Chamado") as mock_chamado_cls:
+            mock_chamado_cls.get_by_id.return_value = mock_chamado
             resultado = editar_descricao_solicitante(
                 chamado_id="ch_1",
                 novo_texto="Texto novo",
@@ -183,10 +182,7 @@ class TestEditarDescricaoSolicitante:
 
         user = _usuario_mock()
         chamado_data = _data_chamado(descricao="Texto original", minutos_atras=5)
-
-        mock_doc = MagicMock()
-        mock_doc.exists = True
-        mock_doc.to_dict.return_value = chamado_data
+        mock_chamado = _mock_chamado(chamado_data)
 
         historicos_criados = []
 
@@ -197,14 +193,13 @@ class TestEditarDescricaoSolicitante:
             return h
 
         with (
-            patch("app.services.solicitante_edicao_service.db") as mock_db,
+            patch("app.services.solicitante_edicao_service.Chamado") as mock_chamado_cls,
             patch(
                 "app.services.solicitante_edicao_service.Historico",
                 side_effect=capturar_historico,
             ),
         ):
-            mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
-            mock_db.collection.return_value.document.return_value.update.return_value = None
+            mock_chamado_cls.get_by_id.return_value = mock_chamado
             editar_descricao_solicitante(
                 chamado_id="ch_1",
                 novo_texto="Texto editado",
@@ -229,13 +224,10 @@ class TestAdicionarAnexoTardio:
 
         user = _usuario_mock()
         chamado_data = _data_chamado(status="Aberto", minutos_atras=5)
+        mock_chamado = _mock_chamado(chamado_data)
 
-        mock_doc = MagicMock()
-        mock_doc.exists = True
-        mock_doc.to_dict.return_value = chamado_data
-
-        with patch("app.services.solicitante_edicao_service.db") as mock_db:
-            mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
+        with patch("app.services.solicitante_edicao_service.Chamado") as mock_chamado_cls:
+            mock_chamado_cls.get_by_id.return_value = mock_chamado
             resultado = adicionar_anexo_tardio(
                 chamado_id="ch_1",
                 caminho_anexo="path/arquivo.pdf",
@@ -252,13 +244,10 @@ class TestAdicionarAnexoTardio:
 
         user = _usuario_mock()
         chamado_data = _data_chamado(status="Concluído", minutos_atras=5)
+        mock_chamado = _mock_chamado(chamado_data)
 
-        mock_doc = MagicMock()
-        mock_doc.exists = True
-        mock_doc.to_dict.return_value = chamado_data
-
-        with patch("app.services.solicitante_edicao_service.db") as mock_db:
-            mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
+        with patch("app.services.solicitante_edicao_service.Chamado") as mock_chamado_cls:
+            mock_chamado_cls.get_by_id.return_value = mock_chamado
             resultado = adicionar_anexo_tardio(
                 chamado_id="ch_1",
                 caminho_anexo="path/arquivo.pdf",
@@ -276,18 +265,14 @@ class TestAdicionarAnexoTardio:
         user = _usuario_mock()
         chamado_data = _data_chamado(status="Aberto", minutos_atras=5)
         chamado_data["anexos"] = []
-
-        mock_doc = MagicMock()
-        mock_doc.exists = True
-        mock_doc.to_dict.return_value = chamado_data
+        mock_chamado = _mock_chamado(chamado_data)
 
         with (
-            patch("app.services.solicitante_edicao_service.db") as mock_db,
+            patch("app.services.solicitante_edicao_service.Chamado") as mock_chamado_cls,
             patch("app.services.solicitante_edicao_service.Historico") as mock_hist,
             patch("app.services.solicitante_edicao_service._notificar_anexo_tardio"),
         ):
-            mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
-            mock_db.collection.return_value.document.return_value.update.return_value = None
+            mock_chamado_cls.get_by_id.return_value = mock_chamado
             mock_hist.return_value.save.return_value = True
 
             resultado = adicionar_anexo_tardio(
@@ -306,18 +291,14 @@ class TestAdicionarAnexoTardio:
         user = _usuario_mock()
         chamado_data = _data_chamado(status="Em Atendimento", minutos_atras=120)
         chamado_data["anexos"] = []
-
-        mock_doc = MagicMock()
-        mock_doc.exists = True
-        mock_doc.to_dict.return_value = chamado_data
+        mock_chamado = _mock_chamado(chamado_data)
 
         with (
-            patch("app.services.solicitante_edicao_service.db") as mock_db,
+            patch("app.services.solicitante_edicao_service.Chamado") as mock_chamado_cls,
             patch("app.services.solicitante_edicao_service.Historico") as mock_hist,
             patch("app.services.solicitante_edicao_service._notificar_anexo_tardio"),
         ):
-            mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
-            mock_db.collection.return_value.document.return_value.update.return_value = None
+            mock_chamado_cls.get_by_id.return_value = mock_chamado
             mock_hist.return_value.save.return_value = True
 
             resultado = adicionar_anexo_tardio(
@@ -335,13 +316,10 @@ class TestAdicionarAnexoTardio:
 
         user = _usuario_mock(uid="nao_owner")
         chamado_data = _data_chamado(solicitante_id="dono_real", status="Aberto")
+        mock_chamado = _mock_chamado(chamado_data)
 
-        mock_doc = MagicMock()
-        mock_doc.exists = True
-        mock_doc.to_dict.return_value = chamado_data
-
-        with patch("app.services.solicitante_edicao_service.db") as mock_db:
-            mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
+        with patch("app.services.solicitante_edicao_service.Chamado") as mock_chamado_cls:
+            mock_chamado_cls.get_by_id.return_value = mock_chamado
             resultado = adicionar_anexo_tardio(
                 chamado_id="ch_1",
                 caminho_anexo="path/arquivo.pdf",
@@ -403,19 +381,12 @@ class TestSegundosRestantesJanelaEdicao:
 
 
 class TestCoberturaGaps:
-    def _mock_doc_nao_encontrado(self):
-        m = MagicMock()
-        m.exists = False
-        return m
-
     def test_editar_chamado_nao_encontrado_retorna_404(self):
         from app.services.solicitante_edicao_service import editar_descricao_solicitante
 
         user = _usuario_mock()
-        with patch("app.services.solicitante_edicao_service.db") as mock_db:
-            mock_db.collection.return_value.document.return_value.get.return_value = (
-                self._mock_doc_nao_encontrado()
-            )
+        with patch("app.services.solicitante_edicao_service.Chamado") as mock_chamado_cls:
+            mock_chamado_cls.get_by_id.return_value = None
             resultado = editar_descricao_solicitante("ch_x", "texto novo válido", user)
 
         assert resultado["sucesso"] is False
@@ -426,19 +397,16 @@ class TestCoberturaGaps:
 
         user = _usuario_mock()
         chamado_data = _data_chamado(minutos_atras=5)
-        mock_doc = MagicMock()
-        mock_doc.exists = True
-        mock_doc.to_dict.return_value = chamado_data
+        mock_chamado = _mock_chamado(chamado_data)
 
         with (
-            patch("app.services.solicitante_edicao_service.db") as mock_db,
+            patch("app.services.solicitante_edicao_service.Chamado") as mock_chamado_cls,
             patch(
                 "app.services.solicitante_edicao_service.Historico",
                 side_effect=RuntimeError("boom"),
             ),
         ):
-            mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
-            mock_db.collection.return_value.document.return_value.update.return_value = None
+            mock_chamado_cls.get_by_id.return_value = mock_chamado
             resultado = editar_descricao_solicitante("ch_1", "texto válido aqui", user)
 
         assert resultado["sucesso"] is False
@@ -448,10 +416,8 @@ class TestCoberturaGaps:
         from app.services.solicitante_edicao_service import adicionar_anexo_tardio
 
         user = _usuario_mock()
-        with patch("app.services.solicitante_edicao_service.db") as mock_db:
-            mock_db.collection.return_value.document.return_value.get.return_value = (
-                self._mock_doc_nao_encontrado()
-            )
+        with patch("app.services.solicitante_edicao_service.Chamado") as mock_chamado_cls:
+            mock_chamado_cls.get_by_id.return_value = None
             resultado = adicionar_anexo_tardio("ch_x", "arquivo.pdf", "motivo suficiente", user)
 
         assert resultado["sucesso"] is False
@@ -463,19 +429,16 @@ class TestCoberturaGaps:
         user = _usuario_mock()
         chamado_data = _data_chamado(status="Aberto", minutos_atras=5)
         chamado_data["anexos"] = []
-        mock_doc = MagicMock()
-        mock_doc.exists = True
-        mock_doc.to_dict.return_value = chamado_data
+        mock_chamado = _mock_chamado(chamado_data)
 
         with (
-            patch("app.services.solicitante_edicao_service.db") as mock_db,
+            patch("app.services.solicitante_edicao_service.Chamado") as mock_chamado_cls,
             patch(
                 "app.services.solicitante_edicao_service.Historico",
                 side_effect=RuntimeError("boom"),
             ),
         ):
-            mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
-            mock_db.collection.return_value.document.return_value.update.return_value = None
+            mock_chamado_cls.get_by_id.return_value = mock_chamado
             resultado = adicionar_anexo_tardio(
                 "ch_1", "arquivo.pdf", "motivo suficiente aqui", user
             )
@@ -496,19 +459,16 @@ class TestNotificacaoEdicaoDescricao:
 
         user = _usuario_mock()
         chamado_data = _data_chamado(minutos_atras=5)
-        mock_doc = MagicMock()
-        mock_doc.exists = True
-        mock_doc.to_dict.return_value = chamado_data
+        mock_chamado = _mock_chamado(chamado_data)
 
         with (
-            patch("app.services.solicitante_edicao_service.db") as mock_db,
+            patch("app.services.solicitante_edicao_service.Chamado") as mock_chamado_cls,
             patch("app.services.solicitante_edicao_service.Historico") as mock_hist,
             patch(
                 "app.services.solicitante_edicao_service._notificar_edicao_descricao"
             ) as mock_notif,
         ):
-            mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
-            mock_db.collection.return_value.document.return_value.update.return_value = None
+            mock_chamado_cls.get_by_id.return_value = mock_chamado
             mock_hist.return_value.save.return_value = True
 
             resultado = editar_descricao_solicitante(
@@ -526,12 +486,10 @@ class TestNotificacaoEdicaoDescricao:
 
         user = _usuario_mock()
         chamado_data = _data_chamado(minutos_atras=5)
-        mock_doc = MagicMock()
-        mock_doc.exists = True
-        mock_doc.to_dict.return_value = chamado_data
+        mock_chamado = _mock_chamado(chamado_data)
 
         with (
-            patch("app.services.solicitante_edicao_service.db") as mock_db,
+            patch("app.services.solicitante_edicao_service.Chamado") as mock_chamado_cls,
             patch(
                 "app.services.solicitante_edicao_service.Historico",
                 side_effect=RuntimeError("db fail"),
@@ -540,8 +498,7 @@ class TestNotificacaoEdicaoDescricao:
                 "app.services.solicitante_edicao_service._notificar_edicao_descricao"
             ) as mock_notif,
         ):
-            mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
-            mock_db.collection.return_value.document.return_value.update.return_value = None
+            mock_chamado_cls.get_by_id.return_value = mock_chamado
 
             resultado = editar_descricao_solicitante(
                 chamado_id="ch_1",
@@ -660,17 +617,14 @@ class TestNotificacaoAnexoTardio:
         user = _usuario_mock()
         chamado_data = _data_chamado(status="Aberto", minutos_atras=5)
         chamado_data["anexos"] = []
-        mock_doc = MagicMock()
-        mock_doc.exists = True
-        mock_doc.to_dict.return_value = chamado_data
+        mock_chamado = _mock_chamado(chamado_data)
 
         with (
-            patch("app.services.solicitante_edicao_service.db") as mock_db,
+            patch("app.services.solicitante_edicao_service.Chamado") as mock_chamado_cls,
             patch("app.services.solicitante_edicao_service.Historico") as mock_hist,
             patch("app.services.solicitante_edicao_service._notificar_anexo_tardio") as mock_notif,
         ):
-            mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
-            mock_db.collection.return_value.document.return_value.update.return_value = None
+            mock_chamado_cls.get_by_id.return_value = mock_chamado
             mock_hist.return_value.save.return_value = True
 
             resultado = adicionar_anexo_tardio(
@@ -690,20 +644,17 @@ class TestNotificacaoAnexoTardio:
         user = _usuario_mock()
         chamado_data = _data_chamado(status="Aberto", minutos_atras=5)
         chamado_data["anexos"] = []
-        mock_doc = MagicMock()
-        mock_doc.exists = True
-        mock_doc.to_dict.return_value = chamado_data
+        mock_chamado = _mock_chamado(chamado_data)
 
         with (
-            patch("app.services.solicitante_edicao_service.db") as mock_db,
+            patch("app.services.solicitante_edicao_service.Chamado") as mock_chamado_cls,
             patch(
                 "app.services.solicitante_edicao_service.Historico",
                 side_effect=RuntimeError("db fail"),
             ),
             patch("app.services.solicitante_edicao_service._notificar_anexo_tardio") as mock_notif,
         ):
-            mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
-            mock_db.collection.return_value.document.return_value.update.return_value = None
+            mock_chamado_cls.get_by_id.return_value = mock_chamado
 
             resultado = adicionar_anexo_tardio(
                 chamado_id="ch_1",
@@ -740,17 +691,14 @@ class TestDentroJanelaCoverage:
             "numero_chamado": "CH-001",
             "categoria": "TI",
         }
-        mock_doc = MagicMock()
-        mock_doc.exists = True
-        mock_doc.to_dict.return_value = chamado_data
+        mock_chamado = _mock_chamado(chamado_data)
 
         with (
-            patch("app.services.solicitante_edicao_service.db") as mock_db,
+            patch("app.services.solicitante_edicao_service.Chamado") as mock_chamado_cls,
             patch("app.services.solicitante_edicao_service.Historico") as mock_hist,
             patch("app.services.solicitante_edicao_service._notificar_edicao_descricao"),
         ):
-            mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
-            mock_db.collection.return_value.document.return_value.update.return_value = None
+            mock_chamado_cls.get_by_id.return_value = mock_chamado
             mock_hist.return_value.save.return_value = True
 
             resultado = editar_descricao_solicitante("ch_1", "Novo texto editado", user)
@@ -769,12 +717,10 @@ class TestDentroJanelaCoverage:
             "data_abertura": None,
             "observadores": [],
         }
-        mock_doc = MagicMock()
-        mock_doc.exists = True
-        mock_doc.to_dict.return_value = chamado_data
+        mock_chamado = _mock_chamado(chamado_data)
 
-        with patch("app.services.solicitante_edicao_service.db") as mock_db:
-            mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
+        with patch("app.services.solicitante_edicao_service.Chamado") as mock_chamado_cls:
+            mock_chamado_cls.get_by_id.return_value = mock_chamado
             resultado = editar_descricao_solicitante("ch_1", "Novo texto", user)
 
         assert resultado["sucesso"] is False
@@ -885,17 +831,14 @@ class TestResponderChamadoSolicitante:
 
         user = _usuario_mock()
         chamado_data = _data_chamado(status="Aguardando Informação")
-
-        mock_doc = MagicMock()
-        mock_doc.exists = True
-        mock_doc.to_dict.return_value = chamado_data
+        mock_chamado = _mock_chamado(chamado_data)
 
         with (
-            patch("app.services.solicitante_edicao_service.db") as mock_db,
+            patch("app.services.solicitante_edicao_service.Chamado") as mock_chamado_cls,
             patch("app.services.solicitante_edicao_service.Historico") as mock_hist,
             patch("app.services.solicitante_edicao_service._notificar_resposta_solicitante"),
         ):
-            mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
+            mock_chamado_cls.get_by_id.return_value = mock_chamado
             mock_hist.return_value.save.return_value = True
 
             resultado = responder_chamado_solicitante(
@@ -908,18 +851,15 @@ class TestResponderChamadoSolicitante:
         mock_hist.return_value.save.assert_called_once()
 
     def test_resposta_sem_mensagem_retorna_400(self):
-        """Mensagem vazia → 400 sem tocar no Firestore."""
+        """Mensagem vazia → 400 sem tocar no banco."""
         from app.services.solicitante_edicao_service import responder_chamado_solicitante
 
         user = _usuario_mock()
         chamado_data = _data_chamado(status="Aguardando Informação")
+        mock_chamado = _mock_chamado(chamado_data)
 
-        mock_doc = MagicMock()
-        mock_doc.exists = True
-        mock_doc.to_dict.return_value = chamado_data
-
-        with patch("app.services.solicitante_edicao_service.db") as mock_db:
-            mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
+        with patch("app.services.solicitante_edicao_service.Chamado") as mock_chamado_cls:
+            mock_chamado_cls.get_by_id.return_value = mock_chamado
             resultado = responder_chamado_solicitante(
                 chamado_id="ch_1",
                 mensagem="  ",
@@ -935,13 +875,10 @@ class TestResponderChamadoSolicitante:
 
         user = _usuario_mock()
         chamado_data = _data_chamado(status="Concluído")
+        mock_chamado = _mock_chamado(chamado_data)
 
-        mock_doc = MagicMock()
-        mock_doc.exists = True
-        mock_doc.to_dict.return_value = chamado_data
-
-        with patch("app.services.solicitante_edicao_service.db") as mock_db:
-            mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
+        with patch("app.services.solicitante_edicao_service.Chamado") as mock_chamado_cls:
+            mock_chamado_cls.get_by_id.return_value = mock_chamado
             resultado = responder_chamado_solicitante(
                 chamado_id="ch_1",
                 mensagem="Resposta qualquer",
@@ -957,13 +894,10 @@ class TestResponderChamadoSolicitante:
 
         user = _usuario_mock(uid="nao_owner")
         chamado_data = _data_chamado(solicitante_id="dono_real", status="Aguardando Informação")
+        mock_chamado = _mock_chamado(chamado_data)
 
-        mock_doc = MagicMock()
-        mock_doc.exists = True
-        mock_doc.to_dict.return_value = chamado_data
-
-        with patch("app.services.solicitante_edicao_service.db") as mock_db:
-            mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
+        with patch("app.services.solicitante_edicao_service.Chamado") as mock_chamado_cls:
+            mock_chamado_cls.get_by_id.return_value = mock_chamado
             resultado = responder_chamado_solicitante(
                 chamado_id="ch_1",
                 mensagem="Resposta qualquer",
@@ -977,11 +911,9 @@ class TestResponderChamadoSolicitante:
         from app.services.solicitante_edicao_service import responder_chamado_solicitante
 
         user = _usuario_mock()
-        mock_doc = MagicMock()
-        mock_doc.exists = False
 
-        with patch("app.services.solicitante_edicao_service.db") as mock_db:
-            mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
+        with patch("app.services.solicitante_edicao_service.Chamado") as mock_chamado_cls:
+            mock_chamado_cls.get_by_id.return_value = None
             resultado = responder_chamado_solicitante("ch_x", "Resposta válida", user)
 
         assert resultado["sucesso"] is False
@@ -992,18 +924,16 @@ class TestResponderChamadoSolicitante:
 
         user = _usuario_mock()
         chamado_data = _data_chamado(status="Aguardando Informação")
-        mock_doc = MagicMock()
-        mock_doc.exists = True
-        mock_doc.to_dict.return_value = chamado_data
+        mock_chamado = _mock_chamado(chamado_data)
 
         with (
-            patch("app.services.solicitante_edicao_service.db") as mock_db,
+            patch("app.services.solicitante_edicao_service.Chamado") as mock_chamado_cls,
             patch(
                 "app.services.solicitante_edicao_service.Historico",
                 side_effect=RuntimeError("boom"),
             ),
         ):
-            mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
+            mock_chamado_cls.get_by_id.return_value = mock_chamado
             resultado = responder_chamado_solicitante("ch_1", "Resposta válida", user)
 
         assert resultado["sucesso"] is False
@@ -1015,18 +945,16 @@ class TestResponderChamadoSolicitante:
 
         user = _usuario_mock()
         chamado_data = _data_chamado(status="Aguardando Informação")
-        mock_doc = MagicMock()
-        mock_doc.exists = True
-        mock_doc.to_dict.return_value = chamado_data
+        mock_chamado = _mock_chamado(chamado_data)
 
         with (
-            patch("app.services.solicitante_edicao_service.db") as mock_db,
+            patch("app.services.solicitante_edicao_service.Chamado") as mock_chamado_cls,
             patch("app.services.solicitante_edicao_service.Historico") as mock_hist,
             patch(
                 "app.services.solicitante_edicao_service._notificar_resposta_solicitante"
             ) as mock_notif,
         ):
-            mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
+            mock_chamado_cls.get_by_id.return_value = mock_chamado
             mock_hist.return_value.save.return_value = True
 
             resultado = responder_chamado_solicitante("ch_1", "Resposta válida", user)
@@ -1037,14 +965,12 @@ class TestResponderChamadoSolicitante:
     def test_resposta_falha_nao_dispara_notificacao(self):
         user = _usuario_mock()
         chamado_data = _data_chamado(status="Aguardando Informação")
-        mock_doc = MagicMock()
-        mock_doc.exists = True
-        mock_doc.to_dict.return_value = chamado_data
+        mock_chamado = _mock_chamado(chamado_data)
 
         from app.services.solicitante_edicao_service import responder_chamado_solicitante
 
         with (
-            patch("app.services.solicitante_edicao_service.db") as mock_db,
+            patch("app.services.solicitante_edicao_service.Chamado") as mock_chamado_cls,
             patch(
                 "app.services.solicitante_edicao_service.Historico",
                 side_effect=RuntimeError("db fail"),
@@ -1053,7 +979,7 @@ class TestResponderChamadoSolicitante:
                 "app.services.solicitante_edicao_service._notificar_resposta_solicitante"
             ) as mock_notif,
         ):
-            mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
+            mock_chamado_cls.get_by_id.return_value = mock_chamado
             resultado = responder_chamado_solicitante("ch_1", "Resposta válida", user)
 
         assert resultado["sucesso"] is False

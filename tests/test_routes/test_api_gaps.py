@@ -2,56 +2,44 @@
 
 from unittest.mock import MagicMock, patch
 
+import pytest
+
+from tests.factories import make_chamado
+
+pytestmark = pytest.mark.usefixtures("db_session")
+
 # ---------------------------------------------------------------------------
 # /api/download-anexo: 404 e 503
 # ---------------------------------------------------------------------------
 
 
 def test_download_anexo_chamado_nao_encontrado_retorna_404(client_logado_solicitante):
-    """GET /api/download-anexo com chamado inexistente retorna 404."""
-    doc = MagicMock()
-    doc.exists = False
-    with patch("app.routes.api_solicitante.db") as mock_db:
-        mock_db.collection.return_value.document.return_value.get.return_value = doc
-        r = client_logado_solicitante.get("/api/download-anexo?chamado_id=ch999&chave=r2:arq.pdf")
+    """GET /api/download-anexo com chamado_id não numérico retorna 404."""
+    r = client_logado_solicitante.get("/api/download-anexo?chamado_id=ch999&chave=r2:arq.pdf")
     assert r.status_code == 404
 
 
 def test_download_anexo_presign_falha_retorna_503(client_logado_solicitante):
     """GET /api/download-anexo quando gerar_url_presignada retorna None retorna 503."""
-    doc = MagicMock()
-    doc.exists = True
-    doc.to_dict.return_value = {"anexos": ["r2:arq.pdf"], "anexo": None, "solicitante_id": "sol_1"}
-    with (
-        patch("app.routes.api_solicitante.db") as mock_db,
-        patch("app.routes.api_solicitante.Chamado.from_dict", return_value=MagicMock()),
-        patch("app.routes.api_solicitante.usuario_pode_ver_chamado", return_value=True),
-        patch("app.services.upload.gerar_url_presignada", return_value=None),
-    ):
-        mock_db.collection.return_value.document.return_value.get.return_value = doc
-        r = client_logado_solicitante.get("/api/download-anexo?chamado_id=ch1&chave=r2:arq.pdf")
+    chamado = make_chamado(solicitante_id="sol_1", anexos=["r2:arq.pdf"], anexo=None)
+
+    with patch("app.services.upload.gerar_url_presignada", return_value=None):
+        r = client_logado_solicitante.get(
+            f"/api/download-anexo?chamado_id={chamado.id}&chave=r2:arq.pdf"
+        )
     assert r.status_code == 503
 
 
 def test_download_anexo_com_campo_legado_anexo_simples(client_logado_solicitante):
     """GET /api/download-anexo: chave no campo legado 'anexo' (não 'anexos') é aceita."""
-    doc = MagicMock()
-    doc.exists = True
-    doc.to_dict.return_value = {
-        "anexos": [],
-        "anexo": "r2:legado.pdf",
-        "solicitante_id": "sol_1",
-    }
-    with (
-        patch("app.routes.api_solicitante.db") as mock_db,
-        patch("app.routes.api_solicitante.Chamado.from_dict", return_value=MagicMock()),
-        patch("app.routes.api_solicitante.usuario_pode_ver_chamado", return_value=True),
-        patch(
-            "app.services.upload.gerar_url_presignada", return_value="https://r2.example.com/l.pdf"
-        ),
+    chamado = make_chamado(solicitante_id="sol_1", anexos=[], anexo="r2:legado.pdf")
+
+    with patch(
+        "app.services.upload.gerar_url_presignada", return_value="https://r2.example.com/l.pdf"
     ):
-        mock_db.collection.return_value.document.return_value.get.return_value = doc
-        r = client_logado_solicitante.get("/api/download-anexo?chamado_id=ch1&chave=r2:legado.pdf")
+        r = client_logado_solicitante.get(
+            f"/api/download-anexo?chamado_id={chamado.id}&chave=r2:legado.pdf"
+        )
     assert r.status_code == 302
     assert "r2.example.com" in (r.location or "")
 
@@ -749,18 +737,13 @@ def test_supervisor_bulk_status_nao_regrediu(client_logado_supervisor, db_sessio
 
 def test_gestor_transferir_area_403(client_logado_gestor):
     """Lacuna 4: gestor não pode transferir área de chamado — 403."""
-    doc = MagicMock()
-    doc.exists = True
-    doc.to_dict.return_value = {}
     chamado_obj = MagicMock()
     chamado_obj.responsavel_id = "gest_1"
 
     with (
-        patch("app.routes.api_colaboracao.db") as mock_db,
         patch("app.routes.api_colaboracao.usuario_pode_ver_chamado", return_value=True),
-        patch("app.routes.api_colaboracao.Chamado.from_dict", return_value=chamado_obj),
+        patch("app.routes.api_colaboracao.Chamado.get_by_id", return_value=chamado_obj),
     ):
-        mock_db.collection.return_value.document.return_value.get.return_value = doc
         resp = client_logado_gestor.post(
             "/api/chamado/ch_001/transferir-area",
             json={"area": "TI", "supervisor_id": "sup_x", "motivo": "Motivo válido"},
@@ -771,18 +754,13 @@ def test_gestor_transferir_area_403(client_logado_gestor):
 
 def test_gestor_escalonar_colega_403(client_logado_gestor):
     """Lacuna 4: gestor não pode escalonar para colega — 403."""
-    doc = MagicMock()
-    doc.exists = True
-    doc.to_dict.return_value = {}
     chamado_obj = MagicMock()
     chamado_obj.responsavel_id = "gest_1"
 
     with (
-        patch("app.routes.api_colaboracao.db") as mock_db,
         patch("app.routes.api_colaboracao.usuario_pode_ver_chamado", return_value=True),
-        patch("app.routes.api_colaboracao.Chamado.from_dict", return_value=chamado_obj),
+        patch("app.routes.api_colaboracao.Chamado.get_by_id", return_value=chamado_obj),
     ):
-        mock_db.collection.return_value.document.return_value.get.return_value = doc
         resp = client_logado_gestor.post(
             "/api/chamado/ch_001/escalonar-colega",
             json={"supervisor_id": "sup_x", "motivo": "Motivo válido"},
@@ -793,18 +771,13 @@ def test_gestor_escalonar_colega_403(client_logado_gestor):
 
 def test_gestor_incluir_participantes_403(client_logado_gestor):
     """Lacuna 4: gestor não pode incluir participantes — 403."""
-    doc = MagicMock()
-    doc.exists = True
-    doc.to_dict.return_value = {}
     chamado_obj = MagicMock()
     chamado_obj.responsavel_id = "gest_1"
 
     with (
-        patch("app.routes.api_colaboracao.db") as mock_db,
         patch("app.routes.api_colaboracao.usuario_pode_ver_chamado", return_value=True),
-        patch("app.routes.api_colaboracao.Chamado.from_dict", return_value=chamado_obj),
+        patch("app.routes.api_colaboracao.Chamado.get_by_id", return_value=chamado_obj),
     ):
-        mock_db.collection.return_value.document.return_value.get.return_value = doc
         resp = client_logado_gestor.post(
             "/api/chamado/ch_001/incluir-participantes",
             json={"participantes": [{"supervisor_id": "sup_x", "area": "TI"}]},
@@ -815,21 +788,12 @@ def test_gestor_incluir_participantes_403(client_logado_gestor):
 
 def test_gestor_concluir_minha_parte_403_mesmo_sendo_participante(client_logado_gestor):
     """Lacuna 4 edge case: gestor bloqueado mesmo estando na lista de participantes."""
-    doc = MagicMock()
-    doc.exists = True
-    doc.to_dict.return_value = {
-        "participantes": [{"supervisor_id": "gest_1", "area": "Geral", "status": "em_atendimento"}]
-    }
     chamado_obj = MagicMock()
     chamado_obj.participantes = [
         {"supervisor_id": "gest_1", "area": "Geral", "status": "em_atendimento"}
     ]
 
-    with (
-        patch("app.routes.api_colaboracao.db") as mock_db,
-        patch("app.routes.api_colaboracao.Chamado.from_dict", return_value=chamado_obj),
-    ):
-        mock_db.collection.return_value.document.return_value.get.return_value = doc
+    with patch("app.routes.api_colaboracao.Chamado.get_by_id", return_value=chamado_obj):
         resp = client_logado_gestor.post("/api/chamado/ch_001/concluir-minha-parte")
     assert resp.status_code == 403
     assert resp.get_json()["sucesso"] is False

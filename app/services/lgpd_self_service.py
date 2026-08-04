@@ -6,20 +6,19 @@ Um admin revisa e executa via os fluxos já existentes (desativar + anonimizar
 em app/routes/usuarios.py), mesmo padrão de segurança usado hoje para ações
 administrativas irreversíveis sobre contas.
 
-Fase 2: solicitacoes_lgpd migrado pra PostgreSQL. exportar_dados_usuario()
-ainda lê a coleção `chamados` do Firestore — Chamado só migra no Marco 7.
+Fase 2 (Marco 10): exportar_dados_usuario() lê a tabela `chamados` do
+Postgres via ChamadoRow — nenhuma função deste módulo toca Firestore.
 """
 
 import csv
 import io
 import logging
 
-from google.cloud.firestore_v1.base_query import FieldFilter
 from sqlalchemy import func, select, update
 
 from app import db as db_module
-from app.database import db
 from app.db.models.apoio import SolicitacaoLgpdRow
+from app.db.models.chamado import ChamadoRow
 from app.services.historico_usuario_service import registrar_historico_usuario
 
 logger = logging.getLogger(__name__)
@@ -40,26 +39,28 @@ _LIMITE_SOLICITACOES_PENDENTES = 1000
 
 def exportar_dados_usuario(usuario) -> dict:
     """Monta o export LGPD (direito de portabilidade) dos dados do próprio usuário."""
-    chamados_docs = (
-        db.collection("chamados")
-        .where(filter=FieldFilter("solicitante_id", "==", usuario.id))
-        .limit(_LIMITE_CHAMADOS_EXPORT)
-        .stream()
-    )
-    chamados = []
-    for doc in chamados_docs:
-        d = doc.to_dict() or {}
-        chamados.append(
-            {
-                "id": doc.id,
-                "numero_chamado": d.get("numero_chamado"),
-                "tipo_solicitacao": d.get("tipo_solicitacao"),
-                "descricao": d.get("descricao"),
-                "categoria": d.get("categoria"),
-                "status": d.get("status"),
-                "data_criacao": str(d.get("data_criacao")) if d.get("data_criacao") else None,
-            }
+    with db_module.SessionLocal() as session:
+        rows = (
+            session.execute(
+                select(ChamadoRow)
+                .where(ChamadoRow.solicitante_id == usuario.id)
+                .limit(_LIMITE_CHAMADOS_EXPORT)
+            )
+            .scalars()
+            .all()
         )
+    chamados = [
+        {
+            "id": row.id,
+            "numero_chamado": row.numero_chamado,
+            "tipo_solicitacao": row.tipo_solicitacao,
+            "descricao": row.descricao,
+            "categoria": row.categoria,
+            "status": row.status,
+            "data_criacao": str(row.data_abertura) if row.data_abertura else None,
+        }
+        for row in rows
+    ]
 
     return {
         "conta": {
