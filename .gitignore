@@ -81,6 +81,10 @@ tmp/
 # --- Checkpoints locais de migração (artefatos de execução, não versionados) ---
 scripts/.checkpoints/
 
+# --- Dump Firestore→Postgres (Fase 2, Marco 11/12) — contém PII real
+# (email/nome/hash de senha), nunca pode ir pro repositório ---
+scripts/migration_dump/
+
 # --- Backup de arquivos não utilizados (análise de código morto) ---
 _backup_nao_utilizados/
 
