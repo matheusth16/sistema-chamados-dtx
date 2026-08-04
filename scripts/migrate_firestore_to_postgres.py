@@ -566,7 +566,16 @@ def _alinhar_sequence() -> None:
                 except ValueError:
                     continue
 
-        session.execute(text("SELECT setval('chamados_numero_seq', :v, true)"), {"v": maior_numero})
+        if maior_numero > 0:
+            session.execute(
+                text("SELECT setval('chamados_numero_seq', :v, true)"), {"v": maior_numero}
+            )
+        else:
+            # Nenhum chamado emitido ainda — setval(1, false) deixa o próximo
+            # nextval() retornar 1 (sequence "nova"), sem cair no caso especial
+            # setval(0, true), que o Postgres rejeita (0 está fora do range
+            # 1..bigint_max da sequence).
+            session.execute(text("SELECT setval('chamados_numero_seq', 1, false)"))
         session.commit()
     logger.info("chamados_numero_seq alinhada em %d", maior_numero)
 
