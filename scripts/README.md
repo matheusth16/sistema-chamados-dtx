@@ -16,6 +16,7 @@ A maioria dos scripts que tocam o banco requer `credentials.json` na raiz.
 |--------|-------------|
 | **executar_qa_manual_cwi.py** | Playbook QA manual CWI (11 sub-itens): validação local via test client; gera JSON em `docs/evidencias/` |
 | **executar_qa_escalonamento.py** | Playbook QA Onda 6 — Escalonamento + SLA Gerencial (10 cenários ESC-01..ESC-10): isolamento, claim, transferência, multi-setor, gestor, tempo útil, deadline imutável; `--json` gera JSON em `docs/evidencias/` |
+| **migrate_firestore_to_postgres.py** | Fase 2, Marco 11 — dump/load/verify da migração completa Firestore → Postgres; **nunca contra produção ao vivo**, só staging restaurado de backup |
 | **check_coverage_per_module.py** | Gate de cobertura >= 85% por módulo em `app/` (lê `coverage.json`) |
 | **verificar_dependencias.py** | Antes de commit/deploy: audit de vulnerabilidades + testes |
 | **criar_usuario.py** | Criar usuário (solicitante, supervisor, admin) no sistema |
@@ -102,6 +103,31 @@ python scripts/qa/executar_qa_manual_cwi.py --json > docs/evidencias/qa_manual_c
 ```
 
 Exit 0 — todos os checks locais PASS. Evidência: `docs/evidencias/QA_MANUAL_CWI_EVIDENCIA.md`.
+
+### migrate_firestore_to_postgres.py
+
+Fase 2, Marco 11 — script de migração completa Firestore → PostgreSQL (dump, load, verify).
+Escrito seguindo `~/.claude/plans/curious-enchanting-corbato.md` §4, mas **ainda não executado
+contra dado real** — os mapeamentos de campo foram derivados dos models já migrados
+(`app/models*.py`, `app/db/models/`), não de uma amostra real do Firestore.
+
+**Nunca rodar contra o Firestore de produção ao vivo.** Primeira execução real sempre contra
+um projeto de staging restaurado de um backup/export do Firestore de produção.
+
+```bash
+python scripts/migrate_firestore_to_postgres.py --dump     # Firestore -> scripts/migration_dump/*.jsonl
+python scripts/migrate_firestore_to_postgres.py --load     # JSONL -> Postgres (schema deve estar vazio)
+python scripts/migrate_firestore_to_postgres.py --verify   # checagens de integridade (contagem, PII, FKs órfãs, sequence)
+```
+
+Antes de `--load`, o schema Postgres de destino precisa estar vazio e atualizado
+(`alembic downgrade base && alembic upgrade head`) — idempotência vem de schema limpo a cada
+rehearsal, não de upsert. PII (`usuarios.email`/`nome`/`mfa_secret`) é copiada byte-a-byte,
+nunca descriptografada nem recriptografada em trânsito. `--verify` bloqueia o cutover (exit 1)
+se qualquer checagem falhar — não modifica dado em nenhuma fase.
+
+Variáveis de ambiente: `GOOGLE_CREDENTIALS_JSON`/`credentials.json` (Firestore de origem —
+staging), `DATABASE_URL` (Postgres de destino).
 
 ### check_coverage_per_module.py
 
