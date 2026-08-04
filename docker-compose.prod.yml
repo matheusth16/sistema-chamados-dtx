@@ -12,6 +12,31 @@
 # credentials.json montado.
 
 services:
+  # Fase 2 (Marco 12 — provisionamento) — Postgres roda no SSD do sistema (/),
+  # reservado pra isso desde a migração pro servidor físico (ver
+  # [[project_migracao_servidor_local]]). Ainda NÃO conectado ao "web": a
+  # imagem em produção continua rodando o código pré-Postgres (branch main)
+  # até o corte real (Marco 12 — cutover). Porta só em loopback: "web" chega
+  # aqui pela rede interna do compose (nome do serviço "postgres"), nunca
+  # precisa de porta publicada na LAN.
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: sistema_chamados
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: sistema_chamados
+    volumes:
+      - /opt/sistema_chamados_postgres_data:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sistema_chamados -d sistema_chamados"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
   web:
     image: ghcr.io/matheusth16/sistema-chamados-dtx:latest
     ports:
