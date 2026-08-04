@@ -12,13 +12,12 @@
 # credentials.json montado.
 
 services:
-  # Fase 2 (Marco 12 — provisionamento) — Postgres roda no SSD do sistema (/),
-  # reservado pra isso desde a migração pro servidor físico (ver
-  # [[project_migracao_servidor_local]]). Ainda NÃO conectado ao "web": a
-  # imagem em produção continua rodando o código pré-Postgres (branch main)
-  # até o corte real (Marco 12 — cutover). Porta só em loopback: "web" chega
-  # aqui pela rede interna do compose (nome do serviço "postgres"), nunca
-  # precisa de porta publicada na LAN.
+  # Fase 2 (Marco 12) — Postgres roda no SSD do sistema (/), reservado pra
+  # isso desde a migração pro servidor físico (ver
+  # [[project_migracao_servidor_local]]). "web" depende deste serviço estar
+  # saudável (depends_on abaixo) e se conecta via DATABASE_URL no .env, pela
+  # rede interna do compose (nome do serviço "postgres") — nunca precisa de
+  # porta publicada na LAN.
   postgres:
     image: postgres:16-alpine
     environment:
@@ -39,6 +38,9 @@ services:
 
   web:
     image: ghcr.io/matheusth16/sistema-chamados-dtx:latest
+    depends_on:
+      postgres:
+        condition: service_healthy
     ports:
       - "0.0.0.0:8080:8080"
     env_file:

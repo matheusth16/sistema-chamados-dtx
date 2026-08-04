@@ -1,4 +1,10 @@
-name: CD - Build, Push & Deploy
+name: CD - Build & Push
+
+# Publica a imagem no GHCR (ghcr.io/matheusth16/sistema-chamados-dtx:latest). O deploy em si
+# não acontece aqui — produção roda no servidor físico on-premise (ver
+# docker-compose.prod.yml) e é atualizada rodando scripts/watchtower_trigger.sh no servidor,
+# que puxa a imagem nova via Watchtower. Deploy no Azure Container Apps foi removido em
+# 2026-08-04 (Marco 12) — recurso parado desde 2026-07-31, produção não usa mais Azure.
 
 on:
   push:
@@ -66,23 +72,3 @@ jobs:
           name: trivy-scan-report
           path: trivy-results.sarif
           retention-days: 30
-
-      - name: Login no Azure
-        uses: azure/login@v2
-        with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
-
-      - name: Atualiza o Container App para a imagem nova
-        run: |
-          # Usa o digest exato (não a tag mutável :latest) e um revision-suffix
-          # único por execução — "az containerapp update" com a mesma string de
-          # tag não cria revisão nova mesmo que a imagem remota tenha mudado.
-          az containerapp update \
-            -n sistema-chamados \
-            -g rg-sistema-chamados \
-            --image ghcr.io/${{ github.repository }}@${{ steps.build.outputs.digest }} \
-            --revision-suffix gh${{ github.run_number }}
-
-      - name: Logout do Azure
-        if: always()
-        run: az logout
