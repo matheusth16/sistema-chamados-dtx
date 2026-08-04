@@ -604,6 +604,18 @@ def _contar_jsonl(nome: str) -> int:
     return sum(1 for _ in _ler_jsonl(nome))
 
 
+def _contar_jsonl_nao_orfao(nome: str, id_map: dict[str, int]) -> int:
+    """Mesma contagem que _load_historico/_load_notificacoes realmente carregam
+    — exclui linhas cujo chamado_id não existe em id_map (chamado_id órfão,
+    já descartado deliberadamente no --load, não é divergência de dado)."""
+    count = 0
+    for data in _ler_jsonl(nome):
+        chamado_id_antigo = str(data.get("chamado_id") or "")
+        if chamado_id_antigo in id_map:
+            count += 1
+    return count
+
+
 def verificar_contagens() -> list[str]:
     """COUNT(*) Postgres == contagem de linhas no dump, por coleção."""
     from sqlalchemy import func, select
@@ -636,11 +648,17 @@ def verificar_contagens() -> list[str]:
         ("historico", HistoricoRow),
         ("notificacoes", NotificacaoRow),
     ]
+    id_map = _carregar_chamado_id_map()
     erros = []
     with db_module.SessionLocal() as session:
         for nome, row_cls in tabelas:
             pg_count = session.execute(select(func.count()).select_from(row_cls)).scalar_one()
-            fs_count = _contar_jsonl(nome)
+            if nome in ("historico", "notificacoes"):
+                # chamado_id órfão (chamado já não existe no Firestore) é
+                # descartado deliberadamente no --load — não é divergência.
+                fs_count = _contar_jsonl_nao_orfao(nome, id_map)
+            else:
+                fs_count = _contar_jsonl(nome)
             status = "OK" if pg_count == fs_count else "DIVERGENTE"
             logger.info(
                 "contagem %-22s postgres=%-6d firestore=%-6d %s", nome, pg_count, fs_count, status
