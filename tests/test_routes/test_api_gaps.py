@@ -86,25 +86,18 @@ def test_atualizar_status_sem_novo_status_retorna_400(client_logado_supervisor):
     assert "novo_status" in data.get("erro", "").lower()
 
 
-def test_atualizar_status_cancelado_sem_motivo_retorna_400(client_logado_supervisor):
+def test_atualizar_status_cancelado_sem_motivo_retorna_400(client_logado_supervisor, db_session):
     """POST /api/atualizar-status com status=Cancelado sem motivo retorna 400."""
-    doc = MagicMock()
-    doc.exists = True
-    doc.to_dict.return_value = {"area": "Manutencao", "status": "Aberto", "solicitante_id": "s1"}
-    chamado_mock = MagicMock()
-    chamado_mock.area = "Manutencao"
-    with (
-        patch("app.routes.api_chamados.db") as mock_db,
-        patch("app.routes.api_chamados.Chamado") as mock_chamado,
-        patch(
-            "app.routes.api_chamados.verificar_permissao_mudanca_status", return_value=(True, None)
-        ),
+    from tests.factories import make_chamado
+
+    chamado = make_chamado(area="Manutencao", status="Aberto", solicitante_id="s1")
+
+    with patch(
+        "app.routes.api_chamados.verificar_permissao_mudanca_status", return_value=(True, None)
     ):
-        mock_db.collection.return_value.document.return_value.get.return_value = doc
-        mock_chamado.from_dict.return_value = chamado_mock
         r = client_logado_supervisor.post(
             "/api/atualizar-status",
-            json={"chamado_id": "ch_1", "novo_status": "Cancelado"},
+            json={"chamado_id": str(chamado.id), "novo_status": "Cancelado"},
             content_type="application/json",
         )
     assert r.status_code == 400
@@ -113,13 +106,19 @@ def test_atualizar_status_cancelado_sem_motivo_retorna_400(client_logado_supervi
     assert "reason" in data.get("erro", "").lower()
 
 
-def test_atualizar_status_excecao_retorna_500(client_logado_supervisor):
+def test_atualizar_status_excecao_retorna_500(client_logado_supervisor, db_session):
     """POST /api/atualizar-status com exceção interna retorna 500 genérico."""
-    with patch("app.routes.api_chamados.db") as mock_db:
-        mock_db.collection.side_effect = Exception("db explodiu")
+    from tests.factories import make_chamado
+
+    chamado = make_chamado(area="Manutencao", status="Aberto")
+
+    with patch(
+        "app.routes.api_chamados.verificar_permissao_mudanca_status",
+        side_effect=Exception("db explodiu"),
+    ):
         r = client_logado_supervisor.post(
             "/api/atualizar-status",
-            json={"chamado_id": "ch_1", "novo_status": "Aberto"},
+            json={"chamado_id": str(chamado.id), "novo_status": "Em Atendimento"},
             content_type="application/json",
         )
     assert r.status_code == 500
@@ -185,16 +184,11 @@ def test_bulk_status_ids_lista_vazia_apos_filtro_retorna_400(client_logado_super
 
 def test_bulk_status_chamado_nao_encontrado_vai_para_erros(client_logado_supervisor):
     """POST /api/bulk-status: chamado inexistente vai para lista de erros, não aborta."""
-    doc_nao_existe = MagicMock()
-    doc_nao_existe.exists = False
-
-    with patch("app.routes.api_chamados.db") as mock_db:
-        mock_db.collection.return_value.document.return_value.get.return_value = doc_nao_existe
-        r = client_logado_supervisor.post(
-            "/api/bulk-status",
-            json={"chamado_ids": ["ch_nao_existe"], "novo_status": "Aberto"},
-            content_type="application/json",
-        )
+    r = client_logado_supervisor.post(
+        "/api/bulk-status",
+        json={"chamado_ids": ["999999999"], "novo_status": "Aberto"},
+        content_type="application/json",
+    )
     assert r.status_code == 200
     data = r.get_json()
     assert data is not None and data.get("sucesso") is True
@@ -203,23 +197,15 @@ def test_bulk_status_chamado_nao_encontrado_vai_para_erros(client_logado_supervi
     assert data["erros"][0]["erro"] == "Not found"
 
 
-def test_bulk_status_concluido_seta_data_conclusao(client_logado_supervisor):
+def test_bulk_status_concluido_seta_data_conclusao(client_logado_supervisor, db_session):
     """POST /api/bulk-status com status=Concluído delega a atualizar_status_chamado."""
-    doc = MagicMock()
-    doc.exists = True
-    doc.to_dict.return_value = {
-        "status": "Em Atendimento",
-        "area": "Manutencao",
-        "responsavel_id": "sup_1",
-        "solicitante_id": "sol_1",
-        "participantes": [],
-    }
+    from tests.factories import make_chamado
 
-    with (
-        patch("app.routes.api_chamados.db") as mock_db,
-        patch("app.routes.api_chamados.atualizar_status_chamado") as mock_atualizar,
-    ):
-        mock_db.collection.return_value.document.return_value.get.return_value = doc
+    chamado = make_chamado(
+        status="Em Atendimento", area="Manutencao", responsavel_id="sup_1", solicitante_id="sol_1"
+    )
+
+    with patch("app.routes.api_chamados.atualizar_status_chamado") as mock_atualizar:
         mock_atualizar.return_value = {
             "sucesso": True,
             "mensagem": "Status atualizado",
@@ -227,7 +213,7 @@ def test_bulk_status_concluido_seta_data_conclusao(client_logado_supervisor):
         }
         r = client_logado_supervisor.post(
             "/api/bulk-status",
-            json={"chamado_ids": ["ch_conc"], "novo_status": "Concluído"},
+            json={"chamado_ids": [str(chamado.id)], "novo_status": "Concluído"},
             content_type="application/json",
         )
 
@@ -238,29 +224,23 @@ def test_bulk_status_concluido_seta_data_conclusao(client_logado_supervisor):
     mock_atualizar.assert_called_once()
     _, kw = mock_atualizar.call_args
     assert kw.get("novo_status") == "Concluído"
-    assert kw.get("chamado_id") == "ch_conc"
+    assert kw.get("chamado_id") == str(chamado.id)
 
 
-def test_bulk_status_inner_exception_vai_para_erros(client_logado_supervisor):
+def test_bulk_status_inner_exception_vai_para_erros(client_logado_supervisor, db_session):
     """POST /api/bulk-status: exceção em atualizar_status_chamado vai para erros sem abortar."""
-    doc = MagicMock()
-    doc.exists = True
-    doc.to_dict.return_value = {
-        "status": "Aberto",
-        "area": "Manutencao",
-        "responsavel_id": "sup_1",
-        "solicitante_id": "sol_1",
-        "participantes": [],
-    }
+    from tests.factories import make_chamado
 
-    with (
-        patch("app.routes.api_chamados.db") as mock_db,
-        patch("app.routes.api_chamados.atualizar_status_chamado", side_effect=Exception("timeout")),
+    chamado = make_chamado(
+        status="Aberto", area="Manutencao", responsavel_id="sup_1", solicitante_id="sol_1"
+    )
+
+    with patch(
+        "app.routes.api_chamados.atualizar_status_chamado", side_effect=Exception("timeout")
     ):
-        mock_db.collection.return_value.document.return_value.get.return_value = doc
         r = client_logado_supervisor.post(
             "/api/bulk-status",
-            json={"chamado_ids": ["ch_err"], "novo_status": "Aberto"},
+            json={"chamado_ids": [str(chamado.id)], "novo_status": "Em Atendimento"},
             content_type="application/json",
         )
 
@@ -271,20 +251,23 @@ def test_bulk_status_inner_exception_vai_para_erros(client_logado_supervisor):
     assert len(data.get("erros", [])) == 1
 
 
-def test_bulk_status_outer_exception_retorna_500(client_logado_supervisor):
+def test_bulk_status_outer_exception_retorna_500(client_logado_supervisor, db_session):
     """POST /api/bulk-status: exceção em cascata (logger.warning raises) retorna 500."""
+    from tests.factories import make_chamado
+
+    chamado = make_chamado(status="Aberto", area="Manutencao", responsavel_id="sup_1")
+
     with (
-        patch("app.routes.api_chamados.db") as mock_db,
+        patch(
+            "app.routes.api_chamados.usuario_pode_operar_chamado",
+            side_effect=RuntimeError("db explodiu"),
+        ),
         patch("app.routes.api_chamados.logger") as mock_logger,
     ):
-        doc = MagicMock()
-        doc.exists = True
-        doc.to_dict.side_effect = RuntimeError("db explodiu")
-        mock_db.collection.return_value.document.return_value.get.return_value = doc
         mock_logger.warning.side_effect = RuntimeError("cascade fail")
         r = client_logado_supervisor.post(
             "/api/bulk-status",
-            json={"chamado_ids": ["ch_1"], "novo_status": "Concluído"},
+            json={"chamado_ids": [str(chamado.id)], "novo_status": "Concluído"},
             content_type="application/json",
         )
     assert r.status_code == 500
@@ -295,25 +278,22 @@ def test_bulk_status_outer_exception_retorna_500(client_logado_supervisor):
 # Lacuna 1 — novos testes TDD (devem falhar antes da correção em api.py)
 
 
-def test_bulk_status_supervisor_nao_altera_ticket_de_colega_mesma_area(client_logado_supervisor):
+def test_bulk_status_supervisor_nao_altera_ticket_de_colega_mesma_area(
+    client_logado_supervisor, db_session
+):
     """Lacuna 1: supervisor não pode alterar chamado com owner diferente, mesmo sendo da sua área."""
-    doc = MagicMock()
-    doc.exists = True
-    doc.to_dict.return_value = {
-        "status": "Aberto",
-        "area": "Manutencao",
-        "responsavel_id": "outro_supervisor",
-        "solicitante_id": "sol_1",
-        "participantes": [],
-    }
-    with (
-        patch("app.routes.api_chamados.db") as mock_db,
-        patch("app.routes.api_chamados.atualizar_status_chamado") as mock_atualizar,
-    ):
-        mock_db.collection.return_value.document.return_value.get.return_value = doc
+    from tests.factories import make_chamado
+
+    chamado = make_chamado(
+        status="Aberto",
+        area="Manutencao",
+        responsavel_id="outro_supervisor",
+        solicitante_id="sol_1",
+    )
+    with patch("app.routes.api_chamados.atualizar_status_chamado") as mock_atualizar:
         r = client_logado_supervisor.post(
             "/api/bulk-status",
-            json={"chamado_ids": ["ch_colega"], "novo_status": "Concluído"},
+            json={"chamado_ids": [str(chamado.id)], "novo_status": "Concluído"},
             content_type="application/json",
         )
     assert r.status_code == 200
@@ -321,26 +301,20 @@ def test_bulk_status_supervisor_nao_altera_ticket_de_colega_mesma_area(client_lo
     assert data.get("sucesso") is True
     assert data.get("atualizados") == 0
     erros_ids = [e.get("id") for e in data.get("erros", [])]
-    assert "ch_colega" in erros_ids
+    assert str(chamado.id) in erros_ids
     mock_atualizar.assert_not_called()
 
 
-def test_bulk_status_em_atendimento_fila_delega_atualizar_status_chamado(client_logado_supervisor):
+def test_bulk_status_em_atendimento_fila_delega_atualizar_status_chamado(
+    client_logado_supervisor, db_session
+):
     """Lacuna 1: chamado na fila (sem owner) → Em Atendimento delega a atualizar_status_chamado (claim)."""
-    doc = MagicMock()
-    doc.exists = True
-    doc.to_dict.return_value = {
-        "status": "Aberto",
-        "area": "Manutencao",
-        "responsavel_id": None,
-        "solicitante_id": "sol_1",
-        "participantes": [],
-    }
-    with (
-        patch("app.routes.api_chamados.db") as mock_db,
-        patch("app.routes.api_chamados.atualizar_status_chamado") as mock_atualizar,
-    ):
-        mock_db.collection.return_value.document.return_value.get.return_value = doc
+    from tests.factories import make_chamado
+
+    chamado = make_chamado(
+        status="Aberto", area="Manutencao", responsavel_id=None, solicitante_id="sol_1"
+    )
+    with patch("app.routes.api_chamados.atualizar_status_chamado") as mock_atualizar:
         mock_atualizar.return_value = {
             "sucesso": True,
             "mensagem": "ok",
@@ -348,7 +322,7 @@ def test_bulk_status_em_atendimento_fila_delega_atualizar_status_chamado(client_
         }
         r = client_logado_supervisor.post(
             "/api/bulk-status",
-            json={"chamado_ids": ["ch_fila"], "novo_status": "Em Atendimento"},
+            json={"chamado_ids": [str(chamado.id)], "novo_status": "Em Atendimento"},
             content_type="application/json",
         )
     assert r.status_code == 200
@@ -357,7 +331,7 @@ def test_bulk_status_em_atendimento_fila_delega_atualizar_status_chamado(client_
     assert data.get("atualizados") == 1
     mock_atualizar.assert_called_once()
     _, kw = mock_atualizar.call_args
-    assert kw.get("chamado_id") == "ch_fila"
+    assert kw.get("chamado_id") == str(chamado.id)
     assert kw.get("novo_status") == "Em Atendimento"
 
 
@@ -454,40 +428,36 @@ def test_api_push_subscribe_excecao_retorna_500(client_logado_solicitante):
 
 def test_api_chamado_por_id_nao_encontrado_retorna_404(client_logado_supervisor):
     """GET /api/chamado/<id> com chamado inexistente retorna 404."""
-    doc = MagicMock()
-    doc.exists = False
-    with patch("app.routes.api_chamados.db") as mock_db:
-        mock_db.collection.return_value.document.return_value.get.return_value = doc
-        r = client_logado_supervisor.get("/api/chamado/nao_existe")
+    r = client_logado_supervisor.get("/api/chamado/999999999")
     assert r.status_code == 404
     data = r.get_json()
     assert data is not None and data.get("sucesso") is False
 
 
-def test_api_chamado_por_id_supervisor_sem_permissao_retorna_403(client_logado_supervisor):
+def test_api_chamado_por_id_supervisor_sem_permissao_retorna_403(
+    client_logado_supervisor, db_session
+):
     """GET /api/chamado/<id> por supervisor sem acesso ao chamado retorna 403."""
-    doc = MagicMock()
-    doc.exists = True
-    doc.to_dict.return_value = {"area": "TI", "status": "Aberto", "solicitante_id": "s1"}
-    chamado_mock = MagicMock()
-    chamado_mock.area = "TI"
-    with (
-        patch("app.routes.api_chamados.db") as mock_db,
-        patch("app.routes.api_chamados.Chamado.from_dict", return_value=chamado_mock),
-        patch("app.routes.api_chamados.usuario_pode_ver_chamado", return_value=False),
-    ):
-        mock_db.collection.return_value.document.return_value.get.return_value = doc
-        r = client_logado_supervisor.get("/api/chamado/ch_ti_1")
+    from tests.factories import make_chamado
+
+    chamado = make_chamado(area="TI", status="Aberto", solicitante_id="s1")
+    with patch("app.routes.api_chamados.usuario_pode_ver_chamado", return_value=False):
+        r = client_logado_supervisor.get(f"/api/chamado/{chamado.id}")
     assert r.status_code == 403
     data = r.get_json()
     assert data is not None and data.get("sucesso") is False
 
 
-def test_api_chamado_por_id_excecao_retorna_500(client_logado_supervisor):
+def test_api_chamado_por_id_excecao_retorna_500(client_logado_supervisor, db_session):
     """GET /api/chamado/<id> com exceção inesperada retorna 500 genérico."""
-    with patch("app.routes.api_chamados.db") as mock_db:
-        mock_db.collection.side_effect = Exception("timeout")
-        r = client_logado_supervisor.get("/api/chamado/ch_err")
+    from tests.factories import make_chamado
+
+    chamado = make_chamado(area="Manutencao", status="Aberto")
+    with (
+        patch("app.routes.api_chamados.usuario_pode_ver_chamado", return_value=True),
+        patch("app.routes.api_chamados.obter_sla_para_exibicao", side_effect=Exception("timeout")),
+    ):
+        r = client_logado_supervisor.get(f"/api/chamado/{chamado.id}")
     assert r.status_code == 500
     data = r.get_json()
     assert data is not None and data.get("sucesso") is False
@@ -499,31 +469,28 @@ def test_api_chamado_por_id_excecao_retorna_500(client_logado_supervisor):
 
 
 def test_aplicar_filtro_perfil_admin_retorna_ref_sem_where(app):
-    """_aplicar_filtro_perfil para admin retorna a ref original sem filtro."""
+    """_aplicar_filtro_perfil para admin retorna lista de condições vazia (sem restrição)."""
     from app.routes.api_chamados import _aplicar_filtro_perfil
 
-    ref = MagicMock()
     user = MagicMock()
     user.perfil = "admin"
 
-    result = _aplicar_filtro_perfil(ref, user)
+    result = _aplicar_filtro_perfil(user)
 
-    assert result is ref
-    ref.where.assert_not_called()
+    assert result == []
 
 
 def test_aplicar_filtro_perfil_solicitante_filtra_por_id(app):
-    """_aplicar_filtro_perfil para solicitante adiciona filtro por solicitante_id."""
+    """_aplicar_filtro_perfil para solicitante adiciona condição por solicitante_id."""
     from app.routes.api_chamados import _aplicar_filtro_perfil
 
-    ref = MagicMock()
     user = MagicMock()
     user.perfil = "solicitante"
     user.id = "sol_1"
 
-    _aplicar_filtro_perfil(ref, user)
+    result = _aplicar_filtro_perfil(user)
 
-    ref.where.assert_called_once()
+    assert len(result) == 1
 
 
 # ---------------------------------------------------------------------------
@@ -533,19 +500,8 @@ def test_aplicar_filtro_perfil_solicitante_filtra_por_id(app):
 
 def test_api_chamados_paginar_retorna_estrutura_esperada(client_logado_admin):
     """GET /api/chamados/paginar retorna sucesso com chamados e paginação."""
-    doc = MagicMock()
-    doc.id = "ch_pag_1"
-    doc.to_dict.return_value = {
-        "status": "Aberto",
-        "categoria": "Manutenção",
-        "tipo_solicitacao": "Corretiva",
-        "responsavel": "Fulano",
-        "prioridade": "Alta",
-        "descricao": "Descrição teste",
-        "numero_chamado": "CH-001",
-        "rl_codigo": None,
-    }
     chamado_mock = MagicMock()
+    chamado_mock.id = "ch_pag_1"
     chamado_mock.numero_chamado = "CH-001"
     chamado_mock.categoria = "Manutenção"
     chamado_mock.rl_codigo = None
@@ -557,12 +513,9 @@ def test_api_chamados_paginar_retorna_estrutura_esperada(client_logado_admin):
     chamado_mock.data_abertura_formatada.return_value = "01/01/2025"
     chamado_mock.data_conclusao_formatada.return_value = "-"
 
-    with (
-        patch("app.routes.api_chamados.aplicar_filtros_dashboard_com_paginacao") as mock_filtros,
-        patch("app.routes.api_chamados.Chamado.from_dict", return_value=chamado_mock),
-    ):
+    with patch("app.routes.api_chamados.aplicar_filtros_dashboard_com_paginacao") as mock_filtros:
         mock_filtros.return_value = {
-            "docs": [doc],
+            "docs": [chamado_mock],
             "proximo_cursor": None,
             "tem_proxima": False,
         }
@@ -595,22 +548,17 @@ def test_api_chamados_paginar_excecao_retorna_500(client_logado_admin):
 
 def test_carregar_mais_com_docs_retorna_chamados(client_logado_supervisor):
     """POST /api/carregar-mais com docs retorna lista de chamados."""
-    doc = MagicMock()
-    doc.id = "ch_scroll_1"
-    doc.to_dict.return_value = {"status": "Aberto"}
     chamado_mock = MagicMock()
+    chamado_mock.id = "ch_scroll_1"
     chamado_mock.numero_chamado = "CH-002"
     chamado_mock.categoria = "Elétrica"
     chamado_mock.status = "Aberto"
     chamado_mock.responsavel = "Maria"
     chamado_mock.data_abertura_formatada.return_value = "02/01/2025"
 
-    with (
-        patch("app.routes.api_chamados.aplicar_filtros_dashboard_com_paginacao") as mock_filtros,
-        patch("app.routes.api_chamados.Chamado.from_dict", return_value=chamado_mock),
-    ):
+    with patch("app.routes.api_chamados.aplicar_filtros_dashboard_com_paginacao") as mock_filtros:
         mock_filtros.return_value = {
-            "docs": [doc],
+            "docs": [chamado_mock],
             "proximo_cursor": "cursor_abc",
             "tem_proxima": True,
         }
@@ -686,36 +634,26 @@ def test_onboarding_pular_excecao_retorna_500(client_logado_solicitante):
 
 def test_confirmar_resolucao_chamado_nao_encontrado_retorna_404(client_logado_solicitante):
     """POST confirmar-resolucao com chamado inexistente retorna 404."""
-    doc = MagicMock()
-    doc.exists = False
-    with patch("app.routes.api_chamados.db") as mock_db:
-        mock_db.collection.return_value.document.return_value.get.return_value = doc
-        r = client_logado_solicitante.post(
-            "/api/chamado/ch_nao_existe/confirmar-resolucao",
-            json={"acao": "confirmar"},
-            content_type="application/json",
-        )
+    r = client_logado_solicitante.post(
+        "/api/chamado/999999999/confirmar-resolucao",
+        json={"acao": "confirmar"},
+        content_type="application/json",
+    )
     assert r.status_code == 404
     data = r.get_json()
     assert data is not None and data.get("sucesso") is False
 
 
-def test_confirmar_resolucao_excecao_retorna_500(client_logado_solicitante):
+def test_confirmar_resolucao_excecao_retorna_500(client_logado_solicitante, db_session):
     """POST confirmar-resolucao com exceção inesperada retorna 500 genérico."""
-    doc = MagicMock()
-    doc.exists = True
-    doc.to_dict.return_value = {
-        "status": "Concluído",
-        "confirmacao_solicitante": "pendente",
-        "solicitante_id": "sol_1",
-    }
-    with (
-        patch("app.routes.api_chamados.db") as mock_db,
-    ):
-        mock_db.collection.return_value.document.return_value.get.return_value = doc
-        mock_db.collection.return_value.document.return_value.update.side_effect = Exception("db")
+    from tests.factories import make_chamado
+
+    chamado = make_chamado(
+        status="Concluído", confirmacao_solicitante="pendente", solicitante_id="sol_1"
+    )
+    with patch("app.routes.api_chamados.Chamado.atualizar_campos", side_effect=Exception("db")):
         r = client_logado_solicitante.post(
-            "/api/chamado/ch_exc/confirmar-resolucao",
+            f"/api/chamado/{chamado.id}/confirmar-resolucao",
             json={"acao": "confirmar"},
             content_type="application/json",
         )
@@ -748,37 +686,30 @@ def test_api_lista_supervisores_excecao_retorna_200_vazio(client_logado_solicita
 
 
 def test_aplicar_filtro_perfil_supervisor_usa_array_contains(app):
-    """Supervisor → filtro por supervisor_ids_com_acesso array_contains (não area in)."""
+    """Supervisor → condição por supervisor_ids_com_acesso.contains (não area in)."""
 
     from app.routes.api_chamados import _aplicar_filtro_perfil
 
-    ref = MagicMock()
     user = MagicMock()
     user.perfil = "supervisor"
     user.id = "id_julia"
     user.areas = ["Engenharia"]
 
-    _aplicar_filtro_perfil(ref, user)
+    result = _aplicar_filtro_perfil(user)
 
-    ref.where.assert_called_once()
-    call_kwargs = ref.where.call_args
-    ff = call_kwargs[1].get("filter") or (call_kwargs[0][0] if call_kwargs[0] else None)
-    assert ff is not None
-    assert ff.field_path == "supervisor_ids_com_acesso"
-    assert ff.op_string in ("ARRAY_CONTAINS", "array_contains", "array-contains")
-    assert ff.value == "id_julia"
+    assert len(result) == 1
+    assert "supervisor_ids_com_acesso" in str(result[0])
 
 
 def test_aplicar_filtro_perfil_supervisor_sem_areas_retorna_none(app):
     """Supervisor sem áreas → retorna None (sem acesso)."""
     from app.routes.api_chamados import _aplicar_filtro_perfil
 
-    ref = MagicMock()
     user = MagicMock()
     user.perfil = "supervisor"
     user.areas = []
 
-    result = _aplicar_filtro_perfil(ref, user)
+    result = _aplicar_filtro_perfil(user)
 
     assert result is None
 
@@ -799,26 +730,18 @@ def test_gestor_bulk_status_retorna_403(client_logado_gestor):
     assert data["sucesso"] is False
 
 
-def test_supervisor_bulk_status_nao_regrediu(client_logado_supervisor):
+def test_supervisor_bulk_status_nao_regrediu(client_logado_supervisor, db_session):
     """Regressão: supervisor comum continua funcionando após bloqueio de gestor."""
-    doc = MagicMock()
-    doc.exists = True
-    doc.to_dict.return_value = {
-        "status": "Aberto",
-        "area": "Manutencao",
-        "responsavel_id": None,
-        "solicitante_id": "sol_1",
-        "participantes": [],
-    }
-    with (
-        patch("app.routes.api_chamados.db") as mock_db,
-        patch("app.routes.api_chamados.atualizar_status_chamado") as mock_atualizar,
-    ):
-        mock_db.collection.return_value.document.return_value.get.return_value = doc
+    from tests.factories import make_chamado
+
+    chamado = make_chamado(
+        status="Aberto", area="Manutencao", responsavel_id=None, solicitante_id="sol_1"
+    )
+    with patch("app.routes.api_chamados.atualizar_status_chamado") as mock_atualizar:
         mock_atualizar.return_value = {"sucesso": True, "mensagem": "ok"}
         resp = client_logado_supervisor.post(
             "/api/bulk-status",
-            json={"chamado_ids": ["ch_001"], "novo_status": "Em Atendimento"},
+            json={"chamado_ids": [str(chamado.id)], "novo_status": "Em Atendimento"},
         )
     assert resp.status_code == 200
     assert resp.get_json()["atualizados"] == 1

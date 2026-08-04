@@ -8,6 +8,7 @@ from sqlalchemy import engine_from_config, pool
 # cada marco introduz uma tabela.
 import app.db.models  # noqa: E402, F401
 from alembic import context
+from app.db import normalizar_url_driver  # noqa: E402
 from app.db.base import Base  # noqa: E402
 
 # this is the Alembic Config object, which provides
@@ -20,7 +21,7 @@ config = context.config
 # rodar migration de teste contra produção por engano.
 _db_url = os.getenv("TEST_DATABASE_URL") or os.getenv("DATABASE_URL")
 if _db_url:
-    config.set_main_option("sqlalchemy.url", _db_url)
+    config.set_main_option("sqlalchemy.url", normalizar_url_driver(_db_url))
 
 # Interpret the config file for Python logging.
 # disable_existing_loggers=False: o padrão (True) desliga TODOS os loggers já

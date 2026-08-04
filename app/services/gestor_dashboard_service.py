@@ -15,7 +15,10 @@ import logging
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from app.database import db
+from sqlalchemy import select
+
+from app import db as db_module
+from app.db.models.chamado import ChamadoRow
 from app.models import Chamado
 from app.services.business_time import minutos_uteis_entre
 from config import Config
@@ -142,15 +145,12 @@ def _calcular_insights(
 
 
 def _carregar_todos_chamados() -> list[Chamado]:
-    """Carrega chamados ativos do Firestore sem filtro de área."""
+    """Carrega chamados ativos do Postgres sem filtro de área."""
     try:
-        docs = (
-            db.collection("chamados")
-            .order_by("data_abertura", direction="DESCENDING")
-            .limit(500)
-            .stream()
-        )
-        return [Chamado.from_dict(doc.to_dict(), doc.id) for doc in docs]
+        with db_module.SessionLocal() as session:
+            stmt = select(ChamadoRow).order_by(ChamadoRow.data_abertura.desc()).limit(500)
+            rows = session.execute(stmt).scalars().all()
+            return [Chamado._from_row(row) for row in rows]
     except Exception:
         logger.exception("Erro ao carregar chamados para dashboard gestor")
         return []

@@ -55,35 +55,29 @@ def test_to_dict_contem_senha_hash_uso_interno():
 # ── CWI 2.3 — API /api/chamado/<id> sem campos internos ──────────────────────
 
 
-def test_api_chamado_por_id_resposta_sem_campos_internos(client_logado_supervisor):
+def test_api_chamado_por_id_resposta_sem_campos_internos(client_logado_supervisor, db_session):
     """/api/chamado/<id> não expõe senha_hash, Traceback ou outros campos internos."""
-    mock_doc = MagicMock()
-    mock_doc.exists = True
-    mock_doc.to_dict.return_value = {
-        "numero_chamado": "CH-001",
-        "rl_codigo": "RL-001",
-        "categoria": "Manutenção",
-        "tipo_solicitacao": "Corretiva",
-        "gate": "Gate 1",
-        "responsavel": "Supervisor",
-        "responsavel_id": "sup_1",
-        "descricao": "Problema na bomba",
-        "data_abertura": None,
-        "status": "Aberto",
-        "area": "Manutencao",
-        "solicitante_id": "sol_1",
-        "senha_hash": "HASH_VAZADO",
-        "encryption_key": "KEY_VAZADA",
-        "prioridade": "Normal",
-    }
+    from tests.factories import make_chamado
+
+    chamado = make_chamado(
+        numero_chamado="CH-001",
+        rl_codigo="RL-001",
+        categoria="Manutenção",
+        tipo_solicitacao="Corretiva",
+        gate="Gate 1",
+        responsavel="Supervisor",
+        responsavel_id="sup_1",
+        descricao="Problema na bomba",
+        status="Aberto",
+        area="Manutencao",
+        solicitante_id="sol_1",
+    )
 
     with (
-        patch("app.routes.api_chamados.db") as mock_db,
         patch("app.routes.api_chamados.usuario_pode_ver_chamado", return_value=True),
         patch("app.routes.api_chamados.obter_sla_para_exibicao", return_value={}),
     ):
-        mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
-        r = client_logado_supervisor.get("/api/chamado/ch_001")
+        r = client_logado_supervisor.get(f"/api/chamado/{chamado.id}")
 
     assert r.status_code == 200
     body = r.data.decode("utf-8", errors="replace")
@@ -92,56 +86,59 @@ def test_api_chamado_por_id_resposta_sem_campos_internos(client_logado_superviso
         assert campo not in body, f"Campo interno '{campo}' encontrado na resposta"
 
     data = r.get_json()
-    chamado = data.get("chamado", {})
-    assert "senha_hash" not in chamado
-    assert "encryption_key" not in chamado
-    assert chamado.get("status") == "Aberto"
+    chamado_resp = data.get("chamado", {})
+    assert "senha_hash" not in chamado_resp
+    assert "encryption_key" not in chamado_resp
+    assert chamado_resp.get("status") == "Aberto"
 
 
-def test_api_chamado_por_id_campos_esperados_presentes(client_logado_supervisor):
+def test_api_chamado_por_id_campos_esperados_presentes(client_logado_supervisor, db_session):
     """/api/chamado/<id> retorna os campos esperados (whitelist explícita)."""
-    mock_doc = MagicMock()
-    mock_doc.exists = True
-    mock_doc.to_dict.return_value = {
-        "numero_chamado": "CH-042",
-        "rl_codigo": "RL-X",
-        "categoria": "Projetos",
-        "tipo_solicitacao": "Nova funcionalidade",
-        "gate": "Gate 2",
-        "responsavel": "Ana",
-        "responsavel_id": "sup_2",
-        "descricao": "Desc do chamado",
-        "data_abertura": None,
-        "status": "Em Atendimento",
-        "area": "Manutencao",
-        "solicitante_id": "sol_1",
-        "prioridade": "Alta",
-    }
+    from tests.factories import make_chamado
+
+    chamado = make_chamado(
+        numero_chamado="CH-042",
+        rl_codigo="RL-X",
+        categoria="Projetos",
+        tipo_solicitacao="Nova funcionalidade",
+        gate="Gate 2",
+        responsavel="Ana",
+        responsavel_id="sup_2",
+        descricao="Desc do chamado",
+        status="Em Atendimento",
+        area="Manutencao",
+        solicitante_id="sol_1",
+    )
 
     with (
-        patch("app.routes.api_chamados.db") as mock_db,
         patch("app.routes.api_chamados.usuario_pode_ver_chamado", return_value=True),
         patch("app.routes.api_chamados.obter_sla_para_exibicao", return_value={"status": "ok"}),
     ):
-        mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
-        r = client_logado_supervisor.get("/api/chamado/ch_042")
+        r = client_logado_supervisor.get(f"/api/chamado/{chamado.id}")
 
     assert r.status_code == 200
-    chamado = r.get_json().get("chamado", {})
+    chamado_resp = r.get_json().get("chamado", {})
     for campo in ("id", "status", "categoria", "descricao", "responsavel"):
-        assert campo in chamado, f"Campo esperado '{campo}' ausente da resposta"
+        assert campo in chamado_resp, f"Campo esperado '{campo}' ausente da resposta"
 
 
 # ── CWI 3.2 — Erros genéricos em handlers 500 ────────────────────────────────
 
 
-def test_api_chamado_por_id_500_usa_mensagem_generica(client_logado_supervisor):
-    """Quando db lança exceção em /api/chamado/<id>, resposta 500 usa ERRO_INTERNO_MSG."""
-    with patch("app.routes.api_chamados.db") as mock_db:
-        mock_db.collection.return_value.document.return_value.get.side_effect = RuntimeError(
-            "Firestore connection timeout — credenciais inválidas"
-        )
-        r = client_logado_supervisor.get("/api/chamado/ch_erro")
+def test_api_chamado_por_id_500_usa_mensagem_generica(client_logado_supervisor, db_session):
+    """Quando uma dependência interna lança exceção em /api/chamado/<id>, resposta 500 usa ERRO_INTERNO_MSG."""
+    from tests.factories import make_chamado
+
+    chamado = make_chamado(area="Manutencao", responsavel_id="sup_1")
+
+    with (
+        patch("app.routes.api_chamados.usuario_pode_ver_chamado", return_value=True),
+        patch(
+            "app.routes.api_chamados.obter_sla_para_exibicao",
+            side_effect=RuntimeError("Firestore connection timeout — credenciais inválidas"),
+        ),
+    ):
+        r = client_logado_supervisor.get(f"/api/chamado/{chamado.id}")
 
     assert r.status_code == 500
     data = r.get_json()
@@ -156,17 +153,10 @@ def test_api_chamado_por_id_500_usa_mensagem_generica(client_logado_supervisor):
 
 def test_api_chamados_paginar_500_usa_mensagem_generica(client_logado_supervisor):
     """Quando aplicar_filtros_dashboard lança exceção em /api/chamados/paginar, resposta usa ERRO_INTERNO_MSG."""
-    mock_ref = MagicMock()
-    mock_ref.where.return_value = mock_ref
-
-    with (
-        patch("app.routes.api_chamados.db") as mock_db,
-        patch(
-            "app.routes.api_chamados.aplicar_filtros_dashboard_com_paginacao",
-            side_effect=RuntimeError("Google Cloud quota exceeded"),
-        ),
+    with patch(
+        "app.routes.api_chamados.aplicar_filtros_dashboard_com_paginacao",
+        side_effect=RuntimeError("Google Cloud quota exceeded"),
     ):
-        mock_db.collection.return_value = mock_ref
         r = client_logado_supervisor.get("/api/chamados/paginar")
 
     assert r.status_code == 500
@@ -178,40 +168,29 @@ def test_api_chamados_paginar_500_usa_mensagem_generica(client_logado_supervisor
     assert "quota" not in body
 
 
-def test_bulk_status_erro_por_item_usa_mensagem_generica(client_logado_supervisor):
+def test_bulk_status_erro_por_item_usa_mensagem_generica(client_logado_supervisor, db_session):
     """bulk_atualizar_status: falha em item individual retorna mensagem genérica, não str(exception)."""
-    mock_doc_ok = MagicMock()
-    mock_doc_ok.exists = True
-    mock_doc_ok.to_dict.return_value = {
-        "status": "Aberto",
-        "area": "Manutencao",
-        "responsavel_id": "sup_1",
-    }
+    from tests.factories import make_chamado
 
-    call_count = {"n": 0}
-
-    def get_side_effect():
-        call_count["n"] += 1
-        if call_count["n"] == 1:
-            return mock_doc_ok
-        raise RuntimeError("Firestore: UNAVAILABLE — could not connect to database")
-
-    mock_col = MagicMock()
-    mock_col.document.return_value.get.side_effect = get_side_effect
+    chamado_ok = make_chamado(status="Aberto", area="Manutencao", responsavel_id="sup_1")
+    chamado_erro = make_chamado(status="Aberto", area="Manutencao", responsavel_id="sup_1")
 
     with (
-        patch("app.routes.api_chamados.db") as mock_db,
-        patch("app.routes.api_chamados.atualizar_status_chamado") as mock_atualizar,
+        patch("app.routes.api_chamados.usuario_pode_operar_chamado", return_value=True),
+        patch(
+            "app.routes.api_chamados.atualizar_status_chamado",
+            side_effect=[
+                {"sucesso": True, "mensagem": "ok", "novo_status": "Em Atendimento"},
+                RuntimeError("Firestore: UNAVAILABLE — could not connect to database"),
+            ],
+        ),
     ):
-        mock_db.collection.return_value = mock_col
-        mock_atualizar.return_value = {
-            "sucesso": True,
-            "mensagem": "ok",
-            "novo_status": "Em Atendimento",
-        }
         r = client_logado_supervisor.post(
             "/api/bulk-status",
-            json={"chamado_ids": ["ch_001", "ch_002"], "novo_status": "Em Atendimento"},
+            json={
+                "chamado_ids": [str(chamado_ok.id), str(chamado_erro.id)],
+                "novo_status": "Em Atendimento",
+            },
             content_type="application/json",
         )
 
@@ -275,24 +254,25 @@ def test_push_subscribe_500_usa_erro_interno(client_logado_supervisor):
     assert "redis" not in r.data.decode()
 
 
-def test_atualizar_status_exception_em_service_nao_vaza_internals(client_logado_supervisor):
+def test_atualizar_status_exception_em_service_nao_vaza_internals(
+    client_logado_supervisor, db_session
+):
     """CWI 3.2 — status_service lança exceção: atualizar_status_ajax não expõe str(e) ao cliente.
 
     Gap corrigido em Onda 3b: status_service.py retornava {"erro": str(e)}.
     A rota repassa resultado.get("erro") diretamente — fix aplicado no service.
     """
-    mock_doc = MagicMock()
-    mock_doc.exists = True
-    mock_doc.to_dict.return_value = {
-        "status": "Aberto",
-        "area": "Manutencao",
-        "responsavel_id": "sup_1",
-        "solicitante_id": "sol_1",
-        "numero_chamado": "CH-001",
-    }
+    from tests.factories import make_chamado
+
+    chamado = make_chamado(
+        status="Aberto",
+        area="Manutencao",
+        responsavel_id="sup_1",
+        solicitante_id="sol_1",
+        numero_chamado="CH-001",
+    )
 
     with (
-        patch("app.routes.api_chamados.db") as mock_db,
         patch(
             "app.routes.api_chamados.verificar_permissao_mudanca_status", return_value=(True, None)
         ),
@@ -305,10 +285,9 @@ def test_atualizar_status_exception_em_service_nao_vaza_internals(client_logado_
             },
         ),
     ):
-        mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
         r = client_logado_supervisor.post(
             "/api/atualizar-status",
-            json={"chamado_id": "ch_001", "novo_status": "Em Atendimento"},
+            json={"chamado_id": str(chamado.id), "novo_status": "Em Atendimento"},
             content_type="application/json",
         )
 

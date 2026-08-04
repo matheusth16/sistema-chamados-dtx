@@ -54,23 +54,18 @@ def test_obter_contexto_admin_retorna_dict_com_chaves_esperadas():
 
     with patch("app.services.dashboard_service.get_static_cached") as mock_cache:
         mock_cache.return_value = []
-        with patch("app.services.dashboard_service.db") as mock_db:
-            mock_ref = MagicMock()
-            mock_db.collection.return_value = mock_ref
-            with patch(
-                "app.services.dashboard_service.aplicar_filtros_dashboard_com_paginacao"
-            ) as mock_filtros:
-                mock_filtros.return_value = {
-                    "docs": [],
-                    "proximo_cursor": None,
-                    "tem_proxima": False,
-                    "cursor_anterior": None,
-                    "tem_anterior": False,
-                }
-                with patch(
-                    "app.services.dashboard_service.obter_sla_para_exibicao", return_value=None
-                ):
-                    ctx = obter_contexto_admin(user, {}, itens_por_pagina=25)
+        with patch(
+            "app.services.dashboard_service.aplicar_filtros_dashboard_com_paginacao"
+        ) as mock_filtros:
+            mock_filtros.return_value = {
+                "docs": [],
+                "proximo_cursor": None,
+                "tem_proxima": False,
+                "cursor_anterior": None,
+                "tem_anterior": False,
+            }
+            with patch("app.services.dashboard_service.obter_sla_para_exibicao", return_value=None):
+                ctx = obter_contexto_admin(user, {}, itens_por_pagina=25)
 
     assert "chamados" in ctx
     assert "lista_responsaveis" in ctx
@@ -244,9 +239,10 @@ def test_preparar_metricas_paginadas_clampeia_pagina_fora_do_intervalo():
     assert result["pagina"] == 1
 
 
-def test_obter_contexto_admin_projetos_no_topo_e_grupo_key_definido():
+def test_obter_contexto_admin_projetos_no_topo_e_grupo_key_definido(db_session):
     """Chamados Projetos ficam no topo e recebem grupo_key iniciando com '0|'."""
     from app.services.dashboard_service import obter_contexto_admin
+    from tests.factories import make_chamado
 
     user = MagicMock()
     user.perfil = "admin"
@@ -254,33 +250,21 @@ def test_obter_contexto_admin_projetos_no_topo_e_grupo_key_definido():
     user.id = "admin1"
     user.is_admin_or_above = True
 
-    def _doc(num, cat, rl=""):
-        d = MagicMock()
-        d.id = f"doc_{num}"
-        d.to_dict.return_value = {
-            "categoria": cat,
-            "tipo_solicitacao": "Corretiva",
-            "descricao": f"D{num}",
-            "responsavel": "",
-            "numero_chamado": str(num).zfill(5),
-            "area": "Manutencao",
-            "rl_codigo": rl,
-            "status": "Aberto",
-        }
-        return d
-
-    docs = [_doc(3, "Manutencao"), _doc(1, "Projetos", rl="RL-001")]
+    docs = [
+        make_chamado(categoria="Manutencao", numero_chamado="00003", status="Aberto"),
+        make_chamado(
+            categoria="Projetos", numero_chamado="00001", rl_codigo="RL-001", status="Aberto"
+        ),
+    ]
 
     with (
         patch("app.services.dashboard_service.get_static_cached", return_value=[]),
         patch("app.services.dashboard_service.filtrar_supervisores_por_area", return_value=[]),
-        patch("app.services.dashboard_service.db") as mock_db,
         patch(
             "app.services.dashboard_service.aplicar_filtros_dashboard_com_paginacao"
         ) as mock_filtros,
         patch("app.services.dashboard_service.obter_sla_para_exibicao", return_value=None),
     ):
-        mock_db.collection.return_value = MagicMock()
         mock_filtros.return_value = {
             "docs": docs,
             "proximo_cursor": None,
@@ -299,9 +283,10 @@ def test_obter_contexto_admin_projetos_no_topo_e_grupo_key_definido():
     assert projetos_c.grupo_key.startswith("0|")
 
 
-def test_obter_contexto_admin_aog_acima_de_projetos():
+def test_obter_contexto_admin_aog_acima_de_projetos(db_session):
     """AOG fica acima de Projetos, que fica acima do resto; grupo_key de AOG começa com '-1|'."""
     from app.services.dashboard_service import obter_contexto_admin
+    from tests.factories import make_chamado
 
     user = MagicMock()
     user.perfil = "admin"
@@ -309,37 +294,22 @@ def test_obter_contexto_admin_aog_acima_de_projetos():
     user.id = "admin1"
     user.is_admin_or_above = True
 
-    def _doc(num, cat, rl=""):
-        d = MagicMock()
-        d.id = f"doc_{num}"
-        d.to_dict.return_value = {
-            "categoria": cat,
-            "tipo_solicitacao": "Corretiva",
-            "descricao": f"D{num}",
-            "responsavel": "",
-            "numero_chamado": str(num).zfill(5),
-            "area": "Manutencao",
-            "rl_codigo": rl,
-            "status": "Aberto",
-        }
-        return d
-
     docs = [
-        _doc(3, "Manutencao"),
-        _doc(1, "Projetos", rl="RL-001"),
-        _doc(2, "AOG", rl="AOG-001"),
+        make_chamado(categoria="Manutencao", numero_chamado="00003", status="Aberto"),
+        make_chamado(
+            categoria="Projetos", numero_chamado="00001", rl_codigo="RL-001", status="Aberto"
+        ),
+        make_chamado(categoria="AOG", numero_chamado="00002", rl_codigo="AOG-001", status="Aberto"),
     ]
 
     with (
         patch("app.services.dashboard_service.get_static_cached", return_value=[]),
         patch("app.services.dashboard_service.filtrar_supervisores_por_area", return_value=[]),
-        patch("app.services.dashboard_service.db") as mock_db,
         patch(
             "app.services.dashboard_service.aplicar_filtros_dashboard_com_paginacao"
         ) as mock_filtros,
         patch("app.services.dashboard_service.obter_sla_para_exibicao", return_value=None),
     ):
-        mock_db.collection.return_value = MagicMock()
         mock_filtros.return_value = {
             "docs": docs,
             "proximo_cursor": None,
@@ -357,7 +327,8 @@ def test_obter_contexto_admin_aog_acima_de_projetos():
 
 
 def test_obter_contexto_admin_supervisor_aplica_filtro_por_areas():
-    """obter_contexto_admin com perfil supervisor adiciona .where() na ref de chamados."""
+    """obter_contexto_admin com perfil supervisor passa condição de escopo por área
+    (supervisor_ids_com_acesso) em condicoes_base pra aplicar_filtros_dashboard_com_paginacao."""
     from app.services.dashboard_service import obter_contexto_admin
 
     user = MagicMock()
@@ -366,19 +337,14 @@ def test_obter_contexto_admin_supervisor_aplica_filtro_por_areas():
     user.id = "sup1"
     user.is_admin_or_above = False
 
-    mock_ref = MagicMock()
-    mock_ref.where.return_value = mock_ref
-
     with (
         patch("app.services.dashboard_service.get_static_cached", return_value=[]),
         patch("app.services.dashboard_service.filtrar_supervisores_por_area", return_value=[]),
-        patch("app.services.dashboard_service.db") as mock_db,
         patch(
             "app.services.dashboard_service.aplicar_filtros_dashboard_com_paginacao"
         ) as mock_filtros,
         patch("app.services.dashboard_service.obter_sla_para_exibicao", return_value=None),
     ):
-        mock_db.collection.return_value = mock_ref
         mock_filtros.return_value = {
             "docs": [],
             "proximo_cursor": None,
@@ -388,7 +354,10 @@ def test_obter_contexto_admin_supervisor_aplica_filtro_por_areas():
         }
         obter_contexto_admin(user, {}, itens_por_pagina=25)
 
-    mock_ref.where.assert_called()
+    condicoes_base_passada = mock_filtros.call_args[0][0]
+    assert len(condicoes_base_passada) == 1, (
+        "supervisor com áreas deve passar 1 condição de escopo em condicoes_base"
+    )
 
 
 def test_filtrar_chamados_usa_batch_fetch_nao_n_mais_1():

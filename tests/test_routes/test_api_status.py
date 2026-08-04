@@ -1,6 +1,6 @@
 """Testes da API de atualização de status (AJAX). Ref: CT-STAT-*."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -50,25 +50,15 @@ def test_atualizar_status_status_invalido_retorna_400(client_logado_supervisor):
     assert "inválido" in data.get("erro", "").lower() or "status" in data.get("erro", "").lower()
 
 
-def test_atualizar_status_com_sucesso_retorna_200(client_logado_supervisor):
+def test_atualizar_status_com_sucesso_retorna_200(client_logado_supervisor, db_session):
     """CT-STAT-01: POST /api/atualizar-status com payload válido retorna 200."""
-    from unittest.mock import MagicMock
+    from tests.factories import make_chamado
 
-    doc = MagicMock()
-    doc.exists = True
-    doc.to_dict.return_value = {"area": "Manutencao", "status": "Aberto", "solicitante_id": "s1"}
-    chamado_mock = MagicMock()
-    chamado_mock.area = "Manutencao"
-    chamado_mock.responsavel_id = None  # sem dono → supervisor da área pode ver
-    chamado_mock.solicitante_id = "s1"
-    chamado_mock.participantes = []
-    with (
-        patch("app.routes.api_chamados.db") as mock_db,
-        patch("app.routes.api_chamados.Chamado") as mock_chamado_cls,
-        patch("app.routes.api_chamados.atualizar_status_chamado") as mock_atualizar,
-    ):
-        mock_db.collection.return_value.document.return_value.get.return_value = doc
-        mock_chamado_cls.from_dict.return_value = chamado_mock
+    chamado = make_chamado(
+        area="Manutencao", status="Aberto", responsavel_id=None, solicitante_id="s1"
+    )
+
+    with patch("app.routes.api_chamados.atualizar_status_chamado") as mock_atualizar:
         mock_atualizar.return_value = {
             "sucesso": True,
             "mensagem": "Status alterado para Em Atendimento",
@@ -76,7 +66,7 @@ def test_atualizar_status_com_sucesso_retorna_200(client_logado_supervisor):
         }
         r = client_logado_supervisor.post(
             "/api/atualizar-status",
-            json={"chamado_id": "ch_valido_123", "novo_status": "Em Atendimento"},
+            json={"chamado_id": str(chamado.id), "novo_status": "Em Atendimento"},
             content_type="application/json",
         )
     assert r.status_code == 200
@@ -85,17 +75,13 @@ def test_atualizar_status_com_sucesso_retorna_200(client_logado_supervisor):
     assert data.get("novo_status") == "Em Atendimento"
 
 
-def test_atualizar_status_chamado_inexistente_retorna_404(client_logado_supervisor):
+def test_atualizar_status_chamado_inexistente_retorna_404(client_logado_supervisor, db_engine):
     """CT-STAT-04: Chamado não encontrado retorna 404."""
-    mock_doc = MagicMock()
-    mock_doc.exists = False
-    with patch("app.routes.api_chamados.db") as mock_db:
-        mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
-        r = client_logado_supervisor.post(
-            "/api/atualizar-status",
-            json={"chamado_id": "ch_inexistente", "novo_status": "Em Atendimento"},
-            content_type="application/json",
-        )
+    r = client_logado_supervisor.post(
+        "/api/atualizar-status",
+        json={"chamado_id": "999999999", "novo_status": "Em Atendimento"},
+        content_type="application/json",
+    )
     assert r.status_code == 404
     data = r.get_json()
     assert data.get("sucesso") is False
@@ -150,32 +136,21 @@ def test_bulk_status_novo_status_invalido_retorna_400(client_logado_supervisor):
 
 
 @pytest.mark.regression
-def test_atualizar_status_supervisor_outra_area_retorna_403(client_logado_supervisor):
+def test_atualizar_status_supervisor_outra_area_retorna_403(client_logado_supervisor, db_session):
     """CT-STAT-08 (IDOR): supervisor da área 'Manutencao' não pode alterar chamado da área 'TI'.
 
     Verifica que verificar_permissao_mudanca_status bloqueia no endpoint,
     não apenas no serviço de permissões.
     """
-    doc = MagicMock()
-    doc.exists = True
-    doc.to_dict.return_value = {"area": "TI", "status": "Aberto", "solicitante_id": "outro_usuario"}
+    from tests.factories import make_chamado
 
-    chamado_mock = MagicMock()
-    chamado_mock.area = "TI"
-    chamado_mock.solicitante_id = "outro_usuario"
+    chamado = make_chamado(area="TI", status="Aberto", solicitante_id="outro_usuario")
 
-    with (
-        patch("app.routes.api_chamados.db") as mock_db,
-        patch("app.routes.api_chamados.Chamado") as mock_chamado_cls,
-    ):
-        mock_db.collection.return_value.document.return_value.get.return_value = doc
-        mock_chamado_cls.from_dict.return_value = chamado_mock
-
-        r = client_logado_supervisor.post(
-            "/api/atualizar-status",
-            json={"chamado_id": "ch_de_ti", "novo_status": "Em Atendimento"},
-            content_type="application/json",
-        )
+    r = client_logado_supervisor.post(
+        "/api/atualizar-status",
+        json={"chamado_id": str(chamado.id), "novo_status": "Em Atendimento"},
+        content_type="application/json",
+    )
 
     assert r.status_code == 403, (
         f"Supervisor de 'Manutencao' não deveria alterar chamado de 'TI'. "
@@ -188,27 +163,15 @@ def test_atualizar_status_supervisor_outra_area_retorna_403(client_logado_superv
 # ── F-63: Transição inválida via API retorna 400 ──────────────────────────────
 
 
-def test_atualizar_status_transicao_invalida_retorna_400(client_logado_supervisor):
+def test_atualizar_status_transicao_invalida_retorna_400(client_logado_supervisor, db_session):
     """CT-STAT-09 (F-63): Transição inválida (Concluído → Aberto) retorna 400."""
-    doc = MagicMock()
-    doc.exists = True
-    doc.to_dict.return_value = {
-        "area": "Manutencao",
-        "status": "Concluído",
-        "solicitante_id": "s1",
-    }
-    chamado_mock = MagicMock()
-    chamado_mock.area = "Manutencao"
-    chamado_mock.responsavel_id = None  # sem dono → supervisor da área pode ver
-    chamado_mock.solicitante_id = "s1"
-    chamado_mock.participantes = []
-    with (
-        patch("app.routes.api_chamados.db") as mock_db,
-        patch("app.routes.api_chamados.Chamado") as mock_chamado_cls,
-        patch("app.routes.api_chamados.atualizar_status_chamado") as mock_atualizar,
-    ):
-        mock_db.collection.return_value.document.return_value.get.return_value = doc
-        mock_chamado_cls.from_dict.return_value = chamado_mock
+    from tests.factories import make_chamado
+
+    chamado = make_chamado(
+        area="Manutencao", status="Concluído", responsavel_id=None, solicitante_id="s1"
+    )
+
+    with patch("app.routes.api_chamados.atualizar_status_chamado") as mock_atualizar:
         mock_atualizar.return_value = {
             "sucesso": False,
             "erro": "Transição inválida: Concluído → Aberto",
@@ -216,7 +179,7 @@ def test_atualizar_status_transicao_invalida_retorna_400(client_logado_superviso
         }
         r = client_logado_supervisor.post(
             "/api/atualizar-status",
-            json={"chamado_id": "ch_conc", "novo_status": "Aberto"},
+            json={"chamado_id": str(chamado.id), "novo_status": "Aberto"},
             content_type="application/json",
         )
     assert r.status_code == 400
@@ -227,95 +190,66 @@ def test_atualizar_status_transicao_invalida_retorna_400(client_logado_superviso
 # ── Lacuna 4: motivo_reabertura obrigatório ao reabrir de Concluído ───────────
 
 
-def test_atualizar_status_reabrir_concluido_sem_motivo_retorna_400(client_logado_admin):
+def test_atualizar_status_reabrir_concluido_sem_motivo_retorna_400(client_logado_admin, db_session):
     """Lacuna 4: Concluído → Aberto sem motivo_reabertura retorna 400."""
-    doc = MagicMock()
-    doc.exists = True
-    doc.to_dict.return_value = {
-        "area": "Geral",
-        "status": "Concluído",
-        "confirmacao_solicitante": "pendente",
-        "solicitante_id": "s1",
-    }
-    chamado_mock = MagicMock()
-    chamado_mock.status = "Concluído"
-    chamado_mock.area = "Geral"
-    chamado_mock.responsavel_id = None
-    chamado_mock.solicitante_id = "s1"
-    chamado_mock.participantes = []
-    chamado_mock.confirmacao_solicitante = "pendente"
-    with (
-        patch("app.routes.api_chamados.db") as mock_db,
-        patch("app.routes.api_chamados.Chamado") as mock_chamado_cls,
-    ):
-        mock_db.collection.return_value.document.return_value.get.return_value = doc
-        mock_chamado_cls.from_dict.return_value = chamado_mock
-        r = client_logado_admin.post(
-            "/api/atualizar-status",
-            json={"chamado_id": "ch_conc", "novo_status": "Aberto"},
-            content_type="application/json",
-        )
+    from tests.factories import make_chamado
+
+    chamado = make_chamado(
+        area="Geral",
+        status="Concluído",
+        responsavel_id=None,
+        solicitante_id="s1",
+        confirmacao_solicitante="pendente",
+    )
+
+    r = client_logado_admin.post(
+        "/api/atualizar-status",
+        json={"chamado_id": str(chamado.id), "novo_status": "Aberto"},
+        content_type="application/json",
+    )
     assert r.status_code == 400
     data = r.get_json()
     assert data is not None and data.get("sucesso") is False
     assert "reason" in data.get("erro", "").lower() or "reopen" in data.get("erro", "").lower()
 
 
-def test_atualizar_status_reabrir_concluido_motivo_curto_retorna_400(client_logado_admin):
+def test_atualizar_status_reabrir_concluido_motivo_curto_retorna_400(
+    client_logado_admin, db_session
+):
     """Lacuna 4: motivo_reabertura com menos de 3 chars retorna 400."""
-    doc = MagicMock()
-    doc.exists = True
-    doc.to_dict.return_value = {
-        "area": "Geral",
-        "status": "Concluído",
-        "confirmacao_solicitante": "confirmado",
-        "solicitante_id": "s1",
-    }
-    chamado_mock = MagicMock()
-    chamado_mock.status = "Concluído"
-    chamado_mock.area = "Geral"
-    chamado_mock.responsavel_id = None
-    chamado_mock.solicitante_id = "s1"
-    chamado_mock.participantes = []
-    chamado_mock.confirmacao_solicitante = "confirmado"
-    with (
-        patch("app.routes.api_chamados.db") as mock_db,
-        patch("app.routes.api_chamados.Chamado") as mock_chamado_cls,
-    ):
-        mock_db.collection.return_value.document.return_value.get.return_value = doc
-        mock_chamado_cls.from_dict.return_value = chamado_mock
-        r = client_logado_admin.post(
-            "/api/atualizar-status",
-            json={"chamado_id": "ch_conc", "novo_status": "Aberto", "motivo_reabertura": "ok"},
-            content_type="application/json",
-        )
+    from tests.factories import make_chamado
+
+    chamado = make_chamado(
+        area="Geral",
+        status="Concluído",
+        responsavel_id=None,
+        solicitante_id="s1",
+        confirmacao_solicitante="confirmado",
+    )
+
+    r = client_logado_admin.post(
+        "/api/atualizar-status",
+        json={"chamado_id": str(chamado.id), "novo_status": "Aberto", "motivo_reabertura": "ok"},
+        content_type="application/json",
+    )
     assert r.status_code == 400
 
 
-def test_atualizar_status_reabrir_concluido_com_motivo_valido_passa(client_logado_admin):
+def test_atualizar_status_reabrir_concluido_com_motivo_valido_passa(
+    client_logado_admin, db_session
+):
     """Lacuna 4: Concluído → Aberto com motivo_reabertura válido passa a validação de motivo."""
-    doc = MagicMock()
-    doc.exists = True
-    doc.to_dict.return_value = {
-        "area": "Geral",
-        "status": "Concluído",
-        "confirmacao_solicitante": "confirmado",
-        "solicitante_id": "s1",
-    }
-    chamado_mock = MagicMock()
-    chamado_mock.status = "Concluído"
-    chamado_mock.area = "Geral"
-    chamado_mock.responsavel_id = None
-    chamado_mock.solicitante_id = "s1"
-    chamado_mock.participantes = []
-    chamado_mock.confirmacao_solicitante = "confirmado"
-    with (
-        patch("app.routes.api_chamados.db") as mock_db,
-        patch("app.routes.api_chamados.Chamado") as mock_chamado_cls,
-        patch("app.routes.api_chamados.atualizar_status_chamado") as mock_atualizar,
-    ):
-        mock_db.collection.return_value.document.return_value.get.return_value = doc
-        mock_chamado_cls.from_dict.return_value = chamado_mock
+    from tests.factories import make_chamado
+
+    chamado = make_chamado(
+        area="Geral",
+        status="Concluído",
+        responsavel_id=None,
+        solicitante_id="s1",
+        confirmacao_solicitante="confirmado",
+    )
+
+    with patch("app.routes.api_chamados.atualizar_status_chamado") as mock_atualizar:
         mock_atualizar.return_value = {
             "sucesso": True,
             "mensagem": "Status alterado para Aberto",
@@ -324,7 +258,7 @@ def test_atualizar_status_reabrir_concluido_com_motivo_valido_passa(client_logad
         r = client_logado_admin.post(
             "/api/atualizar-status",
             json={
-                "chamado_id": "ch_conc",
+                "chamado_id": str(chamado.id),
                 "novo_status": "Aberto",
                 "motivo_reabertura": "Problema recorrente identificado",
             },

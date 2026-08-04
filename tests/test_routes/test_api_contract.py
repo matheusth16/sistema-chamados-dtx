@@ -67,23 +67,14 @@ def test_api_atualizar_status_novo_status_invalido_400(client_logado_supervisor)
 
 
 @pytest.mark.api
-def test_api_atualizar_status_sucesso_200_estrutura(client_logado_supervisor):
+def test_api_atualizar_status_sucesso_200_estrutura(client_logado_supervisor, db_session):
     """POST /api/atualizar-status sucesso retorna 200 com sucesso, mensagem, novo_status."""
-    doc = MagicMock()
-    doc.exists = True
-    doc.to_dict.return_value = {"area": "Manutencao", "status": "Aberto", "solicitante_id": "s1"}
-    chamado_mock = MagicMock()
-    chamado_mock.area = "Manutencao"
-    chamado_mock.responsavel_id = None  # sem dono → supervisor da área pode ver
-    chamado_mock.solicitante_id = "s1"
-    chamado_mock.participantes = []
-    with (
-        patch("app.routes.api_chamados.db") as mock_db,
-        patch("app.routes.api_chamados.Chamado") as mock_chamado_cls,
-        patch("app.routes.api_chamados.atualizar_status_chamado") as m,
-    ):
-        mock_db.collection.return_value.document.return_value.get.return_value = doc
-        mock_chamado_cls.from_dict.return_value = chamado_mock
+    from tests.factories import make_chamado
+
+    chamado = make_chamado(
+        area="Manutencao", status="Aberto", responsavel_id=None, solicitante_id="s1"
+    )
+    with patch("app.routes.api_chamados.atualizar_status_chamado") as m:
         m.return_value = {
             "sucesso": True,
             "mensagem": "Status alterado",
@@ -91,7 +82,7 @@ def test_api_atualizar_status_sucesso_200_estrutura(client_logado_supervisor):
         }
         r = client_logado_supervisor.post(
             "/api/atualizar-status",
-            json={"chamado_id": "ch1", "novo_status": "Em Atendimento"},
+            json={"chamado_id": str(chamado.id), "novo_status": "Em Atendimento"},
             content_type="application/json",
         )
     assert r.status_code == 200
@@ -137,24 +128,22 @@ def test_api_bulk_status_chamado_ids_nao_lista_400(client_logado_supervisor):
 
 
 @pytest.mark.api
-def test_api_bulk_status_sucesso_200_estrutura(client_logado_supervisor):
+def test_api_bulk_status_sucesso_200_estrutura(client_logado_supervisor, db_session):
     """POST /api/bulk-status sucesso retorna 200 com sucesso, atualizados, total_solicitados, erros."""
-    with patch("app.routes.api_chamados.db") as mock_db:
-        doc = MagicMock()
-        doc.exists = True
-        doc.to_dict.return_value = {"area": "Manutencao", "status": "Aberto"}
-        mock_db.collection.return_value.document.return_value.get.return_value = doc
-        with patch("app.routes.api_chamados.atualizar_status_chamado") as mock_atualizar:
-            mock_atualizar.return_value = {
-                "sucesso": True,
-                "mensagem": "ok",
-                "novo_status": "Concluído",
-            }
-            r = client_logado_supervisor.post(
-                "/api/bulk-status",
-                json={"chamado_ids": ["ch1"], "novo_status": "Concluído"},
-                content_type="application/json",
-            )
+    from tests.factories import make_chamado
+
+    chamado = make_chamado(area="Manutencao", status="Aberto", responsavel_id=None)
+    with patch("app.routes.api_chamados.atualizar_status_chamado") as mock_atualizar:
+        mock_atualizar.return_value = {
+            "sucesso": True,
+            "mensagem": "ok",
+            "novo_status": "Concluído",
+        }
+        r = client_logado_supervisor.post(
+            "/api/bulk-status",
+            json={"chamado_ids": [str(chamado.id)], "novo_status": "Concluído"},
+            content_type="application/json",
+        )
     assert r.status_code == 200
     data = r.get_json()
     assert data.get("sucesso") is True
@@ -271,28 +260,25 @@ def test_api_chamado_por_id_sem_login_401(client):
 
 
 @pytest.mark.api
-def test_api_chamado_por_id_sucesso_200_estrutura(client_logado_supervisor):
+def test_api_chamado_por_id_sucesso_200_estrutura(client_logado_supervisor, db_session):
     """GET /api/chamado/<id> retorna 200 com objeto chamado."""
-    mock_doc = MagicMock()
-    mock_doc.exists = True
-    mock_doc.id = "ch1"
-    mock_doc.to_dict.return_value = {
-        "numero_chamado": "CHM-0001",
-        "categoria": "Chamado",
-        "status": "Aberto",
-        "descricao": "X",
-        "area": "Manutencao",
-        "solicitante_id": "s1",
-        "responsavel": "Sup",
-        "tipo_solicitacao": "Manutencao",
-    }
+    from tests.factories import make_chamado
+
+    chamado = make_chamado(
+        numero_chamado="CHM-0001",
+        categoria="Chamado",
+        status="Aberto",
+        descricao="X",
+        area="Manutencao",
+        solicitante_id="s1",
+        responsavel="Sup",
+        tipo_solicitacao="Manutencao",
+    )
     with (
-        patch("app.routes.api_chamados.db") as mock_db,
         patch("app.routes.api_chamados.usuario_pode_ver_chamado", return_value=True),
         patch("app.routes.api_chamados.obter_sla_para_exibicao", return_value=None),
     ):
-        mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
-        r = client_logado_supervisor.get("/api/chamado/ch1")
+        r = client_logado_supervisor.get(f"/api/chamado/{chamado.id}")
     assert r.status_code == 200
     data = r.get_json()
     assert data.get("sucesso") is True and "chamado" in data

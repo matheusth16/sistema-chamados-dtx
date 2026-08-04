@@ -18,10 +18,9 @@ from flask import (
 )
 from flask_login import current_user, login_required
 from google.api_core.exceptions import FailedPrecondition
-from google.cloud.firestore_v1.base_query import FieldFilter
 
 from app.cache import get_static_cached
-from app.database import db
+from app.db.models.chamado import ChamadoRow
 from app.decoradores import requer_gestor_ou_admin, requer_perfil, requer_supervisor_area
 from app.i18n import flash_t, get_translation
 from app.limiter import limiter
@@ -85,18 +84,16 @@ def _redirect_dashboard(**kwargs) -> Response:
 
 
 def _query_chamados_escopada_por_area(user):
-    """Query base de chamados, escopada por área quando o usuário é supervisor.
+    """Condições de escopo de chamados por área, quando o usuário é supervisor.
 
     Mesmo filtro que obter_contexto_admin já aplica pro /painel — sem isso,
-    rotas que consultam db.collection("chamados") direto (ex.: exportações)
-    trazem chamados/métricas de áreas que não são do supervisor.
+    rotas que consultam chamados direto (ex.: exportações) trazem
+    chamados/métricas de áreas que não são do supervisor.
     """
-    chamados_ref = db.collection("chamados")
+    condicoes = []
     if user.perfil == "supervisor" and getattr(user, "areas", None):
-        chamados_ref = chamados_ref.where(
-            filter=FieldFilter("supervisor_ids_com_acesso", "array_contains", user.id)
-        )
-    return chamados_ref
+        condicoes.append(ChamadoRow.supervisor_ids_com_acesso.contains([user.id]))
+    return condicoes
 
 
 def _render_dashboard() -> Response:
@@ -110,12 +107,11 @@ def _render_dashboard() -> Response:
         novo_status = request.form.get("novo_status")
         logger.debug("Alterar status: chamado_id=%s, novo_status=%s", chamado_id, novo_status)
         try:
-            doc_anterior = db.collection("chamados").document(chamado_id).get()
-            if not doc_anterior.exists:
+            chamado_obj = Chamado.get_by_id(chamado_id)
+            if chamado_obj is None:
                 flash_t("ticket_not_found", "danger")
                 return _redirect_dashboard(**request.args)
-            data_anterior = doc_anterior.to_dict()
-            chamado_obj = Chamado.from_dict(data_anterior, chamado_id)
+            data_anterior = chamado_obj.to_dict()
 
             if current_user.perfil == "supervisor" and not usuario_pode_operar_chamado(
                 current_user, chamado_obj
@@ -207,15 +203,14 @@ def painel() -> Response:
 def visualizar_detalhe_chamado(chamado_id: str) -> Response:
     """Exibe detalhes do chamado. Solicitante vê só os próprios; supervisor/admin conforme permissão."""
     try:
-        doc_chamado = db.collection("chamados").document(chamado_id).get()
-        if not doc_chamado.exists:
+        chamado = Chamado.get_by_id(chamado_id)
+        if chamado is None:
             flash_t("ticket_not_found", "danger")
             return redirect(
                 url_for(_dashboard_endpoint())
                 if current_user.perfil in ("supervisor", "admin")
                 else url_for("main.meus_chamados")
             )
-        chamado = Chamado.from_dict(doc_chamado.to_dict(), chamado_id)
         if not usuario_pode_ver_chamado(current_user, chamado):
             if current_user.perfil == "solicitante":
                 flash_t("ticket_not_found", "danger")
@@ -321,12 +316,11 @@ def editar_chamado_pagina() -> Response:
         flash_t("ticket_not_found", "danger")
         return _redirect_dashboard()
 
-    doc_chamado = db.collection("chamados").document(chamado_id).get()
-    if not doc_chamado.exists:
+    chamado = Chamado.get_by_id(chamado_id)
+    if chamado is None:
         flash_t("ticket_not_found", "danger")
         return _redirect_dashboard()
 
-    chamado = Chamado.from_dict(doc_chamado.to_dict(), chamado_id)
     if not usuario_pode_ver_chamado(current_user, chamado):
         flash_t("only_view_history_your_area", "danger")
         return _redirect_dashboard()
@@ -377,11 +371,10 @@ def visualizar_historico(chamado_id: str) -> Response:
         return redirect(url_for("main.index"))
 
     try:
-        doc_chamado = db.collection("chamados").document(chamado_id).get()
-        if not doc_chamado.exists:
+        chamado = Chamado.get_by_id(chamado_id)
+        if chamado is None:
             flash_t("ticket_not_found", "danger")
             return _redirect_dashboard()
-        chamado = Chamado.from_dict(doc_chamado.to_dict(), chamado_id)
         if not usuario_pode_ver_chamado(current_user, chamado):
             flash_t("only_view_history_your_area", "danger")
             return _redirect_dashboard()
@@ -407,9 +400,9 @@ def exportar() -> Response:
             flash_t("error_exporting_data", "danger")
             return _redirect_dashboard()
     try:
-        chamados_ref = _query_chamados_escopada_por_area(current_user)
+        condicoes_base = _query_chamados_escopada_por_area(current_user)
         resultado = aplicar_filtros_dashboard_com_paginacao(
-            chamados_ref, request.args, limite=MAX_EXPORT_CHAMADOS, cursor=None
+            condicoes_base, request.args, limite=MAX_EXPORT_CHAMADOS, cursor=None
         )
         docs = resultado["docs"]
         chamados = _filtrar_chamados_por_permissao(docs, current_user)
@@ -474,10 +467,10 @@ def exportar_avancado() -> Response:
     try:
         from app.services.excel_export_service import exportador_excel
 
-        # Busca chamados com filtros e permissão (limitado para não estourar cota Firestore)
-        chamados_ref = _query_chamados_escopada_por_area(current_user)
+        # Busca chamados com filtros e permissão (limitado por MAX_EXPORT_CHAMADOS)
+        condicoes_base = _query_chamados_escopada_por_area(current_user)
         resultado = aplicar_filtros_dashboard_com_paginacao(
-            chamados_ref, request.args, limite=MAX_EXPORT_CHAMADOS, cursor=None
+            condicoes_base, request.args, limite=MAX_EXPORT_CHAMADOS, cursor=None
         )
         docs = resultado["docs"]
         chamados = _filtrar_chamados_por_permissao(docs, current_user)

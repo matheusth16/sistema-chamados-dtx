@@ -1,7 +1,13 @@
-"""Testes dos endpoints Health Check e Service Worker (CT-HEALTH-01, CT-SW-01)."""
+"""Testes dos endpoints Health Check e Service Worker (CT-HEALTH-01, CT-SW-01).
+
+Fase 2 — deep health check verifica Postgres (SELECT 1), não mais Firestore.
+Testes que exigem Postgres real usam a fixture `db_engine` (pula se
+TEST_DATABASE_URL não estiver configurada); os demais mockam
+`app.routes.api_chamados.db_module.SessionLocal` diretamente.
+"""
 
 import os
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 
 def test_health_isento_de_rate_limit(app):
@@ -40,46 +46,38 @@ def test_health_nao_exige_autenticacao_sem_secret(client):
 # ---------------------------------------------------------------------------
 
 
-def test_health_deep_firestore_ok(client):
-    """CT-HEALTH-02: ?deep=1 com Firestore saudável retorna status 'ok' e campo checks."""
-    mock_query = MagicMock()
-    mock_query.limit.return_value.get.return_value = []
-
-    with patch("app.routes.api_chamados.db") as mock_db:
-        mock_db.collection.return_value = mock_query
-        r = client.get("/health?deep=1")
+def test_health_deep_postgres_ok(client, db_engine):
+    """CT-HEALTH-02: ?deep=1 com Postgres saudável retorna status 'ok' e campo checks."""
+    r = client.get("/health?deep=1")
 
     assert r.status_code == 200
     data = r.get_json()
     assert data is not None
     assert data.get("status") == "ok"
     assert "checks" in data
-    assert data["checks"].get("firestore") == "ok"
+    assert data["checks"].get("postgres") == "ok"
     assert "duration_ms" in data
 
 
-def test_health_deep_firestore_falha(client):
-    """CT-HEALTH-03: ?deep=1 com Firestore falhando retorna status 'degraded'."""
-    with patch("app.routes.api_chamados.db") as mock_db:
-        mock_db.collection.side_effect = Exception("Firestore unreachable")
+def test_health_deep_postgres_falha(client):
+    """CT-HEALTH-03: ?deep=1 com Postgres falhando retorna status 'degraded'."""
+    with patch(
+        "app.routes.api_chamados.db_module.SessionLocal",
+        side_effect=RuntimeError("postgres unreachable"),
+    ):
         r = client.get("/health?deep=1")
 
     assert r.status_code in (200, 503)
     data = r.get_json()
     assert data is not None
     assert data.get("status") in ("degraded", "error")
-    assert "firestore" in data.get("checks", {})
-    assert data["checks"]["firestore"].startswith("error:")
+    assert "postgres" in data.get("checks", {})
+    assert data["checks"]["postgres"].startswith("error:")
 
 
-def test_health_deep_nao_expoe_versao(client):
+def test_health_deep_nao_expoe_versao(client, db_engine):
     """CT-HEALTH-04: ?deep=1 não expõe commit SHA — campo version removido por segurança."""
-    mock_query = MagicMock()
-    mock_query.limit.return_value.get.return_value = []
-
-    with patch("app.routes.api_chamados.db") as mock_db:
-        mock_db.collection.return_value = mock_query
-        r = client.get("/health?deep=1")
+    r = client.get("/health?deep=1")
 
     data = r.get_json()
     assert "version" not in data
@@ -88,13 +86,13 @@ def test_health_deep_nao_expoe_versao(client):
     assert "duration_ms" in data
 
 
-def test_health_shallow_nao_chama_firestore(client):
-    """CT-HEALTH-05: GET /health (sem ?deep) não faz chamada ao Firestore."""
-    with patch("app.routes.api_chamados.db") as mock_db:
+def test_health_shallow_nao_chama_postgres(client):
+    """CT-HEALTH-05: GET /health (sem ?deep) não faz chamada ao Postgres."""
+    with patch("app.routes.api_chamados.db_module.SessionLocal") as mock_session_local:
         r = client.get("/health")
 
     assert r.status_code == 200
-    mock_db.collection.assert_not_called()
+    mock_session_local.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
@@ -116,15 +114,9 @@ def test_health_deep_com_token_errado_retorna_401(client):
     assert r.status_code == 401
 
 
-def test_health_deep_com_token_correto_retorna_200(client):
+def test_health_deep_com_token_correto_retorna_200(client, db_engine):
     """CT-HEALTH-08: ?deep=1 com token correto retorna 200."""
-    mock_query = MagicMock()
-    mock_query.limit.return_value.get.return_value = []
-    with (
-        patch.dict(os.environ, {"HEALTH_SECRET": "supersecret"}),
-        patch("app.routes.api_chamados.db") as mock_db,
-    ):
-        mock_db.collection.return_value = mock_query
+    with patch.dict(os.environ, {"HEALTH_SECRET": "supersecret"}):
         r = client.get("/health?deep=1&token=supersecret")
     assert r.status_code == 200
 
@@ -162,21 +154,14 @@ def test_service_worker_retorna_200_e_javascript(client):
 # ---------------------------------------------------------------------------
 
 
-def test_health_deep_cache_branch_ok_com_cache_set(client):
+def test_health_deep_cache_branch_ok_com_cache_set(client, db_engine):
     """CT-HEALTH-CACHE-01 (RED→GREEN): cache branch deve retornar 'ok' quando cache_set funciona.
 
     Antes do fix: `from app.cache import cache` lançava ImportError,
     marcando cache como 'degraded:ImportError'.
     Após fix com cache_set: cache fica 'ok' quando não há exceção.
     """
-    mock_query = MagicMock()
-    mock_query.limit.return_value.get.return_value = []
-
-    with (
-        patch("app.routes.api_chamados.db") as mock_db,
-        patch("app.routes.api_chamados.cache_set") as mock_cache_set,
-    ):
-        mock_db.collection.return_value = mock_query
+    with patch("app.routes.api_chamados.cache_set") as mock_cache_set:
         r = client.get("/health?deep=1")
 
     data = r.get_json()
@@ -189,16 +174,9 @@ def test_health_deep_cache_branch_ok_com_cache_set(client):
     mock_cache_set.assert_called_once_with("__health__", "1", ttl_seconds=10)
 
 
-def test_health_deep_cache_branch_degraded_quando_excecao(client):
+def test_health_deep_cache_branch_degraded_quando_excecao(client, db_engine):
     """CT-HEALTH-CACHE-02: quando cache_set lança exceção, cache fica 'degraded'."""
-    mock_query = MagicMock()
-    mock_query.limit.return_value.get.return_value = []
-
-    with (
-        patch("app.routes.api_chamados.db") as mock_db,
-        patch("app.routes.api_chamados.cache_set", side_effect=RuntimeError("redis down")),
-    ):
-        mock_db.collection.return_value = mock_query
+    with patch("app.routes.api_chamados.cache_set", side_effect=RuntimeError("redis down")):
         r = client.get("/health?deep=1")
 
     data = r.get_json()
@@ -214,15 +192,9 @@ def test_health_deep_cache_branch_degraded_quando_excecao(client):
 # ---------------------------------------------------------------------------
 
 
-def test_health_deep_com_header_x_health_token_correto_retorna_200(client):
+def test_health_deep_com_header_x_health_token_correto_retorna_200(client, db_engine):
     """CT-HEALTH-10: ?deep=1 com header X-Health-Token correto → 200 (canal primário)."""
-    mock_query = MagicMock()
-    mock_query.limit.return_value.get.return_value = []
-    with (
-        patch.dict(os.environ, {"HEALTH_SECRET": "supersecret"}),
-        patch("app.routes.api_chamados.db") as mock_db,
-    ):
-        mock_db.collection.return_value = mock_query
+    with patch.dict(os.environ, {"HEALTH_SECRET": "supersecret"}):
         r = client.get("/health?deep=1", headers={"X-Health-Token": "supersecret"})
     assert r.status_code == 200
 
@@ -234,15 +206,9 @@ def test_health_deep_com_header_x_health_token_errado_retorna_401(client):
     assert r.status_code == 401
 
 
-def test_health_deep_header_sem_query_token_retorna_200(client):
+def test_health_deep_header_sem_query_token_retorna_200(client, db_engine):
     """CT-HEALTH-12: header X-Health-Token correto, sem ?token= na URL → 200 (sem secret na URL)."""
-    mock_query = MagicMock()
-    mock_query.limit.return_value.get.return_value = []
-    with (
-        patch.dict(os.environ, {"HEALTH_SECRET": "minhachavefort32x"}),
-        patch("app.routes.api_chamados.db") as mock_db,
-    ):
-        mock_db.collection.return_value = mock_query
+    with patch.dict(os.environ, {"HEALTH_SECRET": "minhachavefort32x"}):
         # sem ?token= na URL — token apenas no header
         r = client.get("/health?deep=1", headers={"X-Health-Token": "minhachavefort32x"})
     assert r.status_code == 200
@@ -251,14 +217,8 @@ def test_health_deep_header_sem_query_token_retorna_200(client):
     assert data.get("status") == "ok"
 
 
-def test_health_deep_query_token_deprecado_ainda_funciona(client):
+def test_health_deep_query_token_deprecado_ainda_funciona(client, db_engine):
     """CT-HEALTH-13: ?token= query string ainda funciona (compat UptimeRobot legado)."""
-    mock_query = MagicMock()
-    mock_query.limit.return_value.get.return_value = []
-    with (
-        patch.dict(os.environ, {"HEALTH_SECRET": "supersecret"}),
-        patch("app.routes.api_chamados.db") as mock_db,
-    ):
-        mock_db.collection.return_value = mock_query
+    with patch.dict(os.environ, {"HEALTH_SECRET": "supersecret"}):
         r = client.get("/health?deep=1&token=supersecret")
     assert r.status_code == 200

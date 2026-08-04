@@ -2,7 +2,7 @@
 CWI 4.2 — Swagger/docs não exposto: /swagger, /docs, /openapi.json → 404.
 """
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -37,25 +37,12 @@ def _mock_paginacao_vazia():
     return {"docs": [], "proximo_cursor": None, "tem_proxima": False}
 
 
-def _mock_db_com_ref():
-    mock_db = MagicMock()
-    mock_ref = MagicMock()
-    mock_db.collection.return_value = mock_ref
-    mock_ref.where.return_value = mock_ref
-    mock_ref.order_by.return_value = mock_ref
-    mock_ref.limit.return_value = mock_ref
-    return mock_db
-
-
 @pytest.mark.parametrize("payload", PAYLOADS_ALL)
 def test_search_payload_nao_causa_500(client_logado_supervisor, payload):
     """search=<injection_payload> retorna 200, 400 ou 403 — nunca 500."""
-    with (
-        patch("app.routes.api_chamados.db", _mock_db_com_ref()),
-        patch(
-            "app.routes.api_chamados.aplicar_filtros_dashboard_com_paginacao",
-            return_value=_mock_paginacao_vazia(),
-        ),
+    with patch(
+        "app.routes.api_chamados.aplicar_filtros_dashboard_com_paginacao",
+        return_value=_mock_paginacao_vazia(),
     ):
         r = client_logado_supervisor.get(f"/api/chamados/paginar?search={payload}")
     assert r.status_code in (200, 400, 403), f"payload={payload!r} devolveu {r.status_code}"
@@ -64,12 +51,9 @@ def test_search_payload_nao_causa_500(client_logado_supervisor, payload):
 @pytest.mark.parametrize("payload", PAYLOADS_ALL)
 def test_search_payload_nao_vaza_internals(client_logado_supervisor, payload):
     """search=<injection_payload> não vaza nomes internos de tecnologia/campo."""
-    with (
-        patch("app.routes.api_chamados.db", _mock_db_com_ref()),
-        patch(
-            "app.routes.api_chamados.aplicar_filtros_dashboard_com_paginacao",
-            return_value=_mock_paginacao_vazia(),
-        ),
+    with patch(
+        "app.routes.api_chamados.aplicar_filtros_dashboard_com_paginacao",
+        return_value=_mock_paginacao_vazia(),
     ):
         r = client_logado_supervisor.get(f"/api/chamados/paginar?search={payload}")
 
@@ -83,12 +67,9 @@ def test_search_payload_nao_vaza_internals(client_logado_supervisor, payload):
 @pytest.mark.parametrize("payload", PAYLOADS_ALL)
 def test_search_payload_nao_retorna_dados_extras(client_logado_supervisor, payload):
     """search=<injection_payload> retorna lista vazia (mock controlado), não dados de outros."""
-    with (
-        patch("app.routes.api_chamados.db", _mock_db_com_ref()),
-        patch(
-            "app.routes.api_chamados.aplicar_filtros_dashboard_com_paginacao",
-            return_value=_mock_paginacao_vazia(),
-        ),
+    with patch(
+        "app.routes.api_chamados.aplicar_filtros_dashboard_com_paginacao",
+        return_value=_mock_paginacao_vazia(),
     ):
         r = client_logado_supervisor.get(f"/api/chamados/paginar?search={payload}")
 
@@ -110,12 +91,9 @@ def test_payload_tratado_como_string_literal(client_logado_supervisor, payload):
         captured_args["search"] = args.get("search", "")
         return _mock_paginacao_vazia()
 
-    with (
-        patch("app.routes.api_chamados.db", _mock_db_com_ref()),
-        patch(
-            "app.routes.api_chamados.aplicar_filtros_dashboard_com_paginacao",
-            side_effect=capturar_filtros,
-        ),
+    with patch(
+        "app.routes.api_chamados.aplicar_filtros_dashboard_com_paginacao",
+        side_effect=capturar_filtros,
     ):
         client_logado_supervisor.get(f"/api/chamados/paginar?search={payload}")
 

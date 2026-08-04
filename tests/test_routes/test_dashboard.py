@@ -238,28 +238,16 @@ def test_historico_sem_login_redireciona(client):
     assert "login" in (r.location or "").lower()
 
 
-def test_historico_com_supervisor_permissao_retorna_200(client_logado_supervisor):
-    """GET /chamado/<id>/historico com supervisor que pode ver o chamado retorna 200 (mock)."""
-    with patch("app.routes.dashboard.db") as mock_db:
-        mock_doc = MagicMock()
-        mock_doc.exists = True
-        mock_doc.to_dict.return_value = {
-            "numero_chamado": "001",
-            "categoria": "Manutencao",
-            "tipo_solicitacao": "Corretiva",
-            "descricao": "Teste",
-            "responsavel": "",
-            "area": "Manutencao",
-            "solicitante_id": "sol1",
-            "responsavel_id": None,
-        }
-        mock_doc.id = "ch1"
-        mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
-        with (
-            patch("app.routes.dashboard.usuario_pode_ver_chamado", return_value=True),
-            patch("app.routes.dashboard.Historico.get_by_chamado_id", return_value=[]),
-        ):
-            r = client_logado_supervisor.get("/chamado/ch1/historico", follow_redirects=False)
+def test_historico_com_supervisor_permissao_retorna_200(client_logado_supervisor, db_session):
+    """GET /chamado/<id>/historico com supervisor que pode ver o chamado retorna 200."""
+    from tests.factories import make_chamado
+
+    chamado = make_chamado(area="Manutencao", solicitante_id="sol1")
+    with (
+        patch("app.routes.dashboard.usuario_pode_ver_chamado", return_value=True),
+        patch("app.routes.dashboard.Historico.get_by_chamado_id", return_value=[]),
+    ):
+        r = client_logado_supervisor.get(f"/chamado/{chamado.id}/historico", follow_redirects=False)
     assert r.status_code == 200
 
 
@@ -290,31 +278,16 @@ def test_indices_firestore_com_solicitante_redireciona(client_logado_solicitante
 # ── POST /admin (alteração de status) ─────────────────────────────────────────
 
 
-def test_admin_post_status_change_admin_sucesso(client_logado_admin):
+def test_admin_post_status_change_admin_sucesso(client_logado_admin, db_session):
     """POST /admin com admin altera status com sucesso e redireciona."""
-    mock_doc = MagicMock()
-    mock_doc.exists = True
-    mock_doc.to_dict.return_value = {
-        "status": "Em Atendimento",
-        "confirmacao_solicitante": None,
-        "area": "Geral",
-        "solicitante_id": "s1",
-        "participantes": [],
-    }
-    with (
-        patch("app.routes.dashboard.db") as mock_db,
-        patch("app.routes.dashboard.Chamado") as mock_chamado_cls,
-        patch("app.routes.dashboard.atualizar_status_chamado") as mock_atualizar,
-    ):
-        mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
-        mock_chamado = MagicMock()
-        mock_chamado.status = "Em Atendimento"
-        mock_chamado.confirmacao_solicitante = None
-        mock_chamado_cls.from_dict.return_value = mock_chamado
+    from tests.factories import make_chamado
+
+    chamado = make_chamado(status="Em Atendimento", area="Geral")
+    with patch("app.routes.dashboard.atualizar_status_chamado") as mock_atualizar:
         mock_atualizar.return_value = {"sucesso": True, "mensagem": "Status atualizado"}
         r = client_logado_admin.post(
             "/admin",
-            data={"chamado_id": "ch1", "novo_status": "Concluído"},
+            data={"chamado_id": str(chamado.id), "novo_status": "Concluído"},
             follow_redirects=False,
         )
     assert r.status_code == 302
@@ -322,94 +295,54 @@ def test_admin_post_status_change_admin_sucesso(client_logado_admin):
     mock_atualizar.assert_called_once()
 
 
-def test_admin_post_status_change_falha_exibe_erro(client_logado_admin):
+def test_admin_post_status_change_falha_exibe_erro(client_logado_admin, db_session):
     """POST /admin quando atualizar_status_chamado retorna sucesso=False redireciona."""
-    mock_doc = MagicMock()
-    mock_doc.exists = True
-    mock_doc.to_dict.return_value = {
-        "status": "Em Atendimento",
-        "confirmacao_solicitante": None,
-        "area": "Geral",
-        "solicitante_id": "s1",
-        "participantes": [],
-    }
-    with (
-        patch("app.routes.dashboard.db") as mock_db,
-        patch("app.routes.dashboard.Chamado") as mock_chamado_cls,
-        patch("app.routes.dashboard.atualizar_status_chamado") as mock_atualizar,
-    ):
-        mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
-        mock_chamado = MagicMock()
-        mock_chamado.status = "Em Atendimento"
-        mock_chamado.confirmacao_solicitante = None
-        mock_chamado_cls.from_dict.return_value = mock_chamado
+    from tests.factories import make_chamado
+
+    chamado = make_chamado(status="Em Atendimento", area="Geral")
+    with patch("app.routes.dashboard.atualizar_status_chamado") as mock_atualizar:
         mock_atualizar.return_value = {"sucesso": False, "erro": "Status inválido"}
         r = client_logado_admin.post(
             "/admin",
-            data={"chamado_id": "ch1", "novo_status": "Invalido"},
+            data={"chamado_id": str(chamado.id), "novo_status": "Invalido"},
             follow_redirects=False,
         )
     assert r.status_code == 302
 
 
 def test_admin_post_status_change_supervisor_chamado_nao_encontrado(client_logado_supervisor):
-    """POST /admin com supervisor quando chamado não existe redireciona."""
-    with patch("app.routes.dashboard.db") as mock_db:
-        mock_doc = MagicMock()
-        mock_doc.exists = False
-        mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
-        r = client_logado_supervisor.post(
-            "/admin",
-            data={"chamado_id": "ch_nao_existe", "novo_status": "Concluído"},
-            follow_redirects=False,
-        )
+    """POST /admin com supervisor quando chamado não existe redireciona.
+
+    /admin redireciona supervisor pra /painel imediatamente (GET ou POST), antes
+    de tocar o chamado — então isso já é 302 independente do chamado existir.
+    """
+    r = client_logado_supervisor.post(
+        "/admin",
+        data={"chamado_id": "ch_nao_existe", "novo_status": "Concluído"},
+        follow_redirects=False,
+    )
     assert r.status_code == 302
 
 
 def test_admin_post_status_change_supervisor_sem_permissao_redireciona(client_logado_supervisor):
-    """POST /admin com supervisor sem permissão na área redireciona."""
-    with patch("app.routes.dashboard.db") as mock_db:
-        mock_doc = MagicMock()
-        mock_doc.exists = True
-        mock_doc.to_dict.return_value = {
-            "area": "TI",
-            "responsavel_id": None,
-            "solicitante_id": "sol_x",
-            "participantes": [],
-        }
-        mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
-        r = client_logado_supervisor.post(
-            "/admin",
-            data={"chamado_id": "ch1", "novo_status": "Concluído"},
-            follow_redirects=False,
-        )
+    """POST /admin com supervisor redireciona pra /painel antes de processar o chamado."""
+    r = client_logado_supervisor.post(
+        "/admin",
+        data={"chamado_id": "ch1", "novo_status": "Concluído"},
+        follow_redirects=False,
+    )
     assert r.status_code == 302
 
 
-def test_admin_post_exception_redireciona(client_logado_admin):
+def test_admin_post_exception_redireciona(client_logado_admin, db_session):
     """POST /admin quando atualizar_status_chamado lança exceção redireciona."""
-    mock_doc = MagicMock()
-    mock_doc.exists = True
-    mock_doc.to_dict.return_value = {
-        "status": "Em Atendimento",
-        "confirmacao_solicitante": None,
-        "area": "Geral",
-        "solicitante_id": "s1",
-        "participantes": [],
-    }
-    with (
-        patch("app.routes.dashboard.db") as mock_db,
-        patch("app.routes.dashboard.Chamado") as mock_chamado_cls,
-        patch("app.routes.dashboard.atualizar_status_chamado", side_effect=Exception("timeout")),
-    ):
-        mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
-        mock_chamado = MagicMock()
-        mock_chamado.status = "Em Atendimento"
-        mock_chamado.confirmacao_solicitante = None
-        mock_chamado_cls.from_dict.return_value = mock_chamado
+    from tests.factories import make_chamado
+
+    chamado = make_chamado(status="Em Atendimento", area="Geral")
+    with patch("app.routes.dashboard.atualizar_status_chamado", side_effect=Exception("timeout")):
         r = client_logado_admin.post(
             "/admin",
-            data={"chamado_id": "ch1", "novo_status": "Concluído"},
+            data={"chamado_id": str(chamado.id), "novo_status": "Concluído"},
             follow_redirects=False,
         )
     assert r.status_code == 302
@@ -441,33 +374,29 @@ def _chamado_dict_fake(solicitante_id="sol_x", area="Manutencao", status="Aberto
 
 def test_visualizar_chamado_nao_encontrado_redireciona_admin(client_logado_admin):
     """GET /chamado/<id> quando chamado não existe redireciona para /admin."""
-    with patch("app.routes.dashboard.db") as mock_db:
-        mock_doc = MagicMock()
-        mock_doc.exists = False
-        mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
-        r = client_logado_admin.get("/chamado/naoexiste", follow_redirects=False)
+    r = client_logado_admin.get("/chamado/999999999", follow_redirects=False)
     assert r.status_code == 302
     assert "/admin" in (r.location or "")
 
 
-def test_visualizar_chamado_admin_com_permissao_retorna_200(client_logado_admin):
+def test_visualizar_chamado_admin_com_permissao_retorna_200(client_logado_admin, db_session):
     """GET /chamado/<id> com admin que pode ver retorna 200."""
-    with patch("app.routes.dashboard.db") as mock_db:
-        mock_doc = MagicMock()
-        mock_doc.exists = True
-        mock_doc.to_dict.return_value = _chamado_dict_fake()
-        mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
-        with (
-            patch("app.routes.dashboard.usuario_pode_ver_chamado", return_value=True),
-            patch("app.routes.dashboard.Usuario.get_all", return_value=[]),
-            patch("app.routes.dashboard.filtrar_supervisores_por_area", return_value=[]),
-            patch("app.routes.dashboard.CategoriaSetor.get_all", return_value=[]),
-        ):
-            r = client_logado_admin.get("/chamado/ch1", follow_redirects=False)
+    from tests.factories import make_chamado
+
+    chamado = make_chamado()
+    with (
+        patch("app.routes.dashboard.usuario_pode_ver_chamado", return_value=True),
+        patch("app.routes.dashboard.get_static_cached", return_value=[]),
+        patch("app.routes.dashboard.filtrar_supervisores_por_area", return_value=[]),
+        patch("app.routes.dashboard.CategoriaSetor.get_all", return_value=[]),
+    ):
+        r = client_logado_admin.get(f"/chamado/{chamado.id}", follow_redirects=False)
     assert r.status_code == 200
 
 
-def test_visualizar_chamado_com_participantes_sem_usuario_atual_retorna_200(client_logado_admin):
+def test_visualizar_chamado_com_participantes_sem_usuario_atual_retorna_200(
+    client_logado_admin, db_session
+):
     """GET /chamado/<id> com participantes cadastrados, nenhum deles o usuário logado.
 
     Regressão: o template calcula `participante_atual` filtrando
@@ -478,24 +407,22 @@ def test_visualizar_chamado_com_participantes_sem_usuario_atual_retorna_200(clie
     jinja2.exceptions.UndefinedError — capturado pelo except genérico da rota
     e mascarado como um redirect com flash de erro, sem 500 visível.
     """
-    dados = _chamado_dict_fake()
-    dados["participantes"] = [{"supervisor_id": "outra_pessoa", "area": "TI", "status": "pendente"}]
-    with patch("app.routes.dashboard.db") as mock_db:
-        mock_doc = MagicMock()
-        mock_doc.exists = True
-        mock_doc.to_dict.return_value = dados
-        mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
-        with (
-            patch("app.routes.dashboard.usuario_pode_ver_chamado", return_value=True),
-            patch("app.routes.dashboard.Usuario.get_all", return_value=[]),
-            patch("app.routes.dashboard.filtrar_supervisores_por_area", return_value=[]),
-            patch("app.routes.dashboard.CategoriaSetor.get_all", return_value=[]),
-        ):
-            r = client_logado_admin.get("/chamado/ch1", follow_redirects=False)
+    from tests.factories import make_chamado
+
+    chamado = make_chamado(
+        participantes=[{"supervisor_id": "outra_pessoa", "area": "TI", "status": "pendente"}]
+    )
+    with (
+        patch("app.routes.dashboard.usuario_pode_ver_chamado", return_value=True),
+        patch("app.routes.dashboard.get_static_cached", return_value=[]),
+        patch("app.routes.dashboard.filtrar_supervisores_por_area", return_value=[]),
+        patch("app.routes.dashboard.CategoriaSetor.get_all", return_value=[]),
+    ):
+        r = client_logado_admin.get(f"/chamado/{chamado.id}", follow_redirects=False)
     assert r.status_code == 200
 
 
-def test_visualizar_chamado_traduz_status_para_ingles(client_logado_admin):
+def test_visualizar_chamado_traduz_status_para_ingles(client_logado_admin, db_session):
     """GET /chamado/<id> com idioma=en não deve mostrar status cru em PT-BR.
 
     Regressão: components/_status_badge.html importado sem 'with context' em
@@ -503,20 +430,18 @@ def test_visualizar_chamado_traduz_status_para_ingles(client_logado_admin):
     do context_processor, cai no fallback hardcoded em português
     independente do idioma escolhido pelo usuário.
     """
-    with patch("app.routes.dashboard.db") as mock_db:
-        mock_doc = MagicMock()
-        mock_doc.exists = True
-        mock_doc.to_dict.return_value = _chamado_dict_fake(status="Em Atendimento")
-        mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
-        with (
-            patch("app.routes.dashboard.usuario_pode_ver_chamado", return_value=True),
-            patch("app.routes.dashboard.Usuario.get_all", return_value=[]),
-            patch("app.routes.dashboard.filtrar_supervisores_por_area", return_value=[]),
-            patch("app.routes.dashboard.CategoriaSetor.get_all", return_value=[]),
-        ):
-            with client_logado_admin.session_transaction() as sess:
-                sess["language"] = "en"
-            r = client_logado_admin.get("/chamado/ch1")
+    from tests.factories import make_chamado
+
+    chamado = make_chamado(status="Em Atendimento")
+    with (
+        patch("app.routes.dashboard.usuario_pode_ver_chamado", return_value=True),
+        patch("app.routes.dashboard.get_static_cached", return_value=[]),
+        patch("app.routes.dashboard.filtrar_supervisores_por_area", return_value=[]),
+        patch("app.routes.dashboard.CategoriaSetor.get_all", return_value=[]),
+    ):
+        with client_logado_admin.session_transaction() as sess:
+            sess["language"] = "en"
+        r = client_logado_admin.get(f"/chamado/{chamado.id}")
     body = r.data.decode("utf-8")
     assert "In Progress" in body
     # value="Em Atendimento" no <option> é o valor canônico do form (correto,
@@ -524,47 +449,45 @@ def test_visualizar_chamado_traduz_status_para_ingles(client_logado_admin):
     assert ">Em Atendimento<" not in body
 
 
-def test_visualizar_chamado_supervisor_sem_permissao_redireciona(client_logado_supervisor):
+def test_visualizar_chamado_supervisor_sem_permissao_redireciona(
+    client_logado_supervisor, db_session
+):
     """GET /chamado/<id> com supervisor sem permissão na área redireciona."""
-    with patch("app.routes.dashboard.db") as mock_db:
-        mock_doc = MagicMock()
-        mock_doc.exists = True
-        mock_doc.to_dict.return_value = _chamado_dict_fake(area="TI")
-        mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
-        with patch("app.routes.dashboard.usuario_pode_ver_chamado", return_value=False):
-            r = client_logado_supervisor.get("/chamado/ch1", follow_redirects=False)
+    from tests.factories import make_chamado
+
+    chamado = make_chamado(area="TI")
+    with patch("app.routes.dashboard.usuario_pode_ver_chamado", return_value=False):
+        r = client_logado_supervisor.get(f"/chamado/{chamado.id}", follow_redirects=False)
     assert r.status_code == 302
     assert "/painel" in (r.location or "")
 
 
-def test_visualizar_chamado_solicitante_proprio_retorna_200(client_logado_solicitante):
+def test_visualizar_chamado_solicitante_proprio_retorna_200(client_logado_solicitante, db_session):
     """GET /chamado/<id> com solicitante visualizando o próprio chamado retorna 200."""
-    with patch("app.routes.dashboard.db") as mock_db:
-        mock_doc = MagicMock()
-        mock_doc.exists = True
-        mock_doc.to_dict.return_value = _chamado_dict_fake(solicitante_id="sol_1")
-        mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
-        with patch("app.routes.dashboard.CategoriaSetor.get_all", return_value=[]):
-            r = client_logado_solicitante.get("/chamado/ch1", follow_redirects=False)
+    from tests.factories import make_chamado
+
+    chamado = make_chamado(solicitante_id="sol_1")
+    with patch("app.routes.dashboard.CategoriaSetor.get_all", return_value=[]):
+        r = client_logado_solicitante.get(f"/chamado/{chamado.id}", follow_redirects=False)
     assert r.status_code == 200
 
 
-def test_visualizar_chamado_solicitante_outro_redireciona(client_logado_solicitante):
+def test_visualizar_chamado_solicitante_outro_redireciona(client_logado_solicitante, db_session):
     """GET /chamado/<id> com solicitante tentando ver chamado alheio redireciona."""
-    with patch("app.routes.dashboard.db") as mock_db:
-        mock_doc = MagicMock()
-        mock_doc.exists = True
-        mock_doc.to_dict.return_value = _chamado_dict_fake(solicitante_id="outro_id")
-        mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
-        r = client_logado_solicitante.get("/chamado/ch1", follow_redirects=False)
+    from tests.factories import make_chamado
+
+    chamado = make_chamado(solicitante_id="outro_id")
+    r = client_logado_solicitante.get(f"/chamado/{chamado.id}", follow_redirects=False)
     assert r.status_code == 302
 
 
-def test_visualizar_chamado_exception_redireciona(client_logado_admin):
-    """GET /chamado/<id> quando db lança exceção redireciona."""
-    with patch("app.routes.dashboard.db") as mock_db:
-        mock_db.collection.return_value.document.return_value.get.side_effect = Exception("db err")
-        r = client_logado_admin.get("/chamado/ch_erro", follow_redirects=False)
+def test_visualizar_chamado_exception_redireciona(client_logado_admin, db_session):
+    """GET /chamado/<id> quando ocorre exceção após localizar o chamado redireciona."""
+    from tests.factories import make_chamado
+
+    chamado = make_chamado()
+    with patch("app.routes.dashboard.usuario_pode_ver_chamado", side_effect=Exception("db err")):
+        r = client_logado_admin.get(f"/chamado/{chamado.id}", follow_redirects=False)
     assert r.status_code == 302
 
 
@@ -594,86 +517,66 @@ def test_editar_chamado_sem_id_redireciona(client_logado_admin):
 
 def test_editar_chamado_nao_encontrado_redireciona(client_logado_admin):
     """POST /chamado/editar quando chamado não existe redireciona para /admin."""
-    with patch("app.routes.dashboard.db") as mock_db:
-        mock_doc = MagicMock()
-        mock_doc.exists = False
-        mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
+    r = client_logado_admin.post(
+        "/chamado/editar",
+        data={"chamado_id": "999999999", "novo_status": "Concluído"},
+        follow_redirects=False,
+    )
+    assert r.status_code == 302
+    assert "/admin" in (r.location or "")
+
+
+def test_editar_chamado_sem_permissao_redireciona(client_logado_admin, db_session):
+    """POST /chamado/editar quando usuario_pode_ver_chamado=False redireciona."""
+    from tests.factories import make_chamado
+
+    chamado = make_chamado()
+    with patch("app.routes.dashboard.usuario_pode_ver_chamado", return_value=False):
         r = client_logado_admin.post(
             "/chamado/editar",
-            data={"chamado_id": "naoexiste", "novo_status": "Concluído"},
+            data={"chamado_id": str(chamado.id), "novo_status": "Concluído"},
             follow_redirects=False,
         )
     assert r.status_code == 302
     assert "/admin" in (r.location or "")
 
 
-def test_editar_chamado_sem_permissao_redireciona(client_logado_admin):
-    """POST /chamado/editar quando usuario_pode_ver_chamado=False redireciona."""
-    with patch("app.routes.dashboard.db") as mock_db:
-        mock_doc = MagicMock()
-        mock_doc.exists = True
-        mock_doc.to_dict.return_value = _chamado_dict_fake()
-        mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
-        with patch("app.routes.dashboard.usuario_pode_ver_chamado", return_value=False):
-            r = client_logado_admin.post(
-                "/chamado/editar",
-                data={"chamado_id": "ch1", "novo_status": "Concluído"},
-                follow_redirects=False,
-            )
-    assert r.status_code == 302
-    assert "/admin" in (r.location or "")
-
-
-def test_editar_chamado_sucesso_redireciona_para_detalhe(client_logado_admin):
+def test_editar_chamado_sucesso_redireciona_para_detalhe(client_logado_admin, db_session):
     """POST /chamado/editar com dados válidos chama serviço e redireciona para o chamado."""
-    with patch("app.routes.dashboard.db") as mock_db:
-        mock_doc = MagicMock()
-        mock_doc.exists = True
-        mock_doc.to_dict.return_value = _chamado_dict_fake()
-        mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
-        with (
-            patch("app.routes.dashboard.usuario_pode_ver_chamado", return_value=True),
-            patch(
-                "app.services.edicao_chamado_service.processar_edicao_chamado",
-                return_value={"sucesso": True, "mensagem": "Salvo"},
-            ),
-        ):
-            r = client_logado_admin.post(
-                "/chamado/editar",
-                data={"chamado_id": "ch1", "novo_status": "Concluído"},
-                follow_redirects=False,
-            )
+    from tests.factories import make_chamado
+
+    chamado = make_chamado()
+    with (
+        patch("app.routes.dashboard.usuario_pode_ver_chamado", return_value=True),
+        patch(
+            "app.services.edicao_chamado_service.processar_edicao_chamado",
+            return_value={"sucesso": True, "mensagem": "Salvo"},
+        ),
+    ):
+        r = client_logado_admin.post(
+            "/chamado/editar",
+            data={"chamado_id": str(chamado.id), "novo_status": "Concluído"},
+            follow_redirects=False,
+        )
     assert r.status_code == 302
-    assert "ch1" in (r.location or "")
+    assert str(chamado.id) in (r.location or "")
 
 
 # ── S4-03: Cache Usuario.get_all() via get_static_cached ─────────────────────
 
 
-def test_visualizar_chamado_usa_cache_para_usuarios(client_logado_supervisor):
+def test_visualizar_chamado_usa_cache_para_usuarios(client_logado_supervisor, db_session):
     """visualizar_detalhe_chamado deve usar get_static_cached, não Usuario.get_all() direto."""
-    mock_doc = MagicMock()
-    mock_doc.exists = True
-    mock_doc.to_dict.return_value = {
-        "numero_chamado": "CHM-0001",
-        "categoria": "Chamado",
-        "status": "Aberto",
-        "descricao": "Teste",
-        "area": "Manutencao",
-        "solicitante_id": "s1",
-        "responsavel": "Sup",
-        "tipo_solicitacao": "Manutencao",
-        "setores_adicionais": [],
-    }
+    from tests.factories import make_chamado
+
+    chamado = make_chamado(area="Manutencao")
     with (
-        patch("app.routes.dashboard.db") as mock_db,
         patch("app.routes.dashboard.usuario_pode_ver_chamado", return_value=True),
         patch("app.routes.dashboard.get_static_cached", return_value=[]) as mock_cache,
         patch("app.routes.dashboard.CategoriaSetor.get_all", return_value=[]),
         patch("app.routes.dashboard.Usuario.get_all") as mock_get_all,
     ):
-        mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
-        client_logado_supervisor.get("/chamado/ch1", follow_redirects=False)
+        client_logado_supervisor.get(f"/chamado/{chamado.id}", follow_redirects=False)
 
     mock_cache.assert_called()
     mock_get_all.assert_not_called()
@@ -715,7 +618,6 @@ def test_exportar_neutraliza_formula_injection_em_xlsx(client_logado_supervisor)
     with (
         patch("app.routes.dashboard.aplicar_filtros_dashboard_com_paginacao") as mock_filtros,
         patch("app.routes.dashboard._filtrar_chamados_por_permissao") as mock_perm,
-        patch("app.routes.dashboard.db"),
         patch("app.routes.dashboard.verificar_e_incrementar_export", return_value=(True, None)),
     ):
         mock_filtros.return_value = {
@@ -760,35 +662,37 @@ def test_exportar_neutraliza_formula_injection_em_xlsx(client_logado_supervisor)
 # métricas agregadas por supervisor).
 
 
+def _compilar_condicao_postgres(condicao) -> str:
+    """Compila uma condição SQLAlchemy pro SQL literal (dialeto Postgres), pra
+    inspecionar em teste sem precisar de conexão real."""
+    from sqlalchemy.dialects import postgresql
+
+    return str(
+        condicao.compile(dialect=postgresql.dialect(), compile_kwargs={"literal_binds": True})
+    )
+
+
 def test_exportar_escopa_query_por_supervisor_ids_com_acesso(client_logado_supervisor):
     """/exportar deve escopar a query por área do supervisor ANTES da paginação,
-    mesmo padrão usado em obter_contexto_admin para o /painel."""
+    mesmo padrão usado em obter_contexto_admin para o /painel (Postgres:
+    ChamadoRow.supervisor_ids_com_acesso.contains([user.id]) em condicoes_base)."""
     with (
         patch("app.routes.dashboard.aplicar_filtros_dashboard_com_paginacao") as mock_filtros,
         patch("app.routes.dashboard._filtrar_chamados_por_permissao", return_value=[]),
-        patch("app.routes.dashboard.db") as mock_db,
         patch("app.routes.dashboard.verificar_e_incrementar_export", return_value=(True, None)),
     ):
         mock_filtros.return_value = {"docs": []}
 
         client_logado_supervisor.get("/exportar", follow_redirects=False)
 
-        colecao = mock_db.collection.return_value
-        assert colecao.where.call_count >= 1, (
+        condicoes_base = mock_filtros.call_args[0][0]
+        assert len(condicoes_base) == 1, (
             "A query de /exportar não foi escopada por área — supervisor pode "
             "exportar chamados de áreas que não são dele."
         )
-        filtro = colecao.where.call_args.kwargs.get("filter")
-        assert filtro is not None
-        assert filtro.field_path == "supervisor_ids_com_acesso"
-        assert filtro.op_string == "array_contains"
-        assert filtro.value == "sup_1"
-
-        query_passada = mock_filtros.call_args[0][0]
-        assert query_passada is colecao.where.return_value, (
-            "aplicar_filtros_dashboard_com_paginacao recebeu a coleção crua, não "
-            "a query já escopada por .where(supervisor_ids_com_acesso)."
-        )
+        sql = _compilar_condicao_postgres(condicoes_base[0])
+        assert "supervisor_ids_com_acesso" in sql
+        assert "sup_1" in sql
 
 
 def test_exportar_avancado_escopa_query_por_supervisor_ids_com_acesso(
@@ -800,7 +704,6 @@ def test_exportar_avancado_escopa_query_por_supervisor_ids_com_acesso(
         patch("app.routes.dashboard._filtrar_chamados_por_permissao", return_value=[]),
         patch("app.routes.dashboard.analisador") as mock_anal,
         patch("app.services.excel_export_service.exportador_excel") as mock_exp,
-        patch("app.routes.dashboard.db") as mock_db,
         patch("app.routes.dashboard.verificar_e_incrementar_export", return_value=(True, None)),
     ):
         import io
@@ -812,14 +715,11 @@ def test_exportar_avancado_escopa_query_por_supervisor_ids_com_acesso(
 
         client_logado_supervisor.get("/exportar-avancado", follow_redirects=False)
 
-        colecao = mock_db.collection.return_value
-        assert colecao.where.call_count >= 1, (
-            "A query de /exportar-avancado não foi escopada por área."
-        )
-        filtro = colecao.where.call_args.kwargs.get("filter")
-        assert filtro is not None
-        assert filtro.field_path == "supervisor_ids_com_acesso"
-        assert filtro.value == "sup_1"
+        condicoes_base = mock_filtros.call_args[0][0]
+        assert len(condicoes_base) == 1, "A query de /exportar-avancado não foi escopada por área."
+        sql = _compilar_condicao_postgres(condicoes_base[0])
+        assert "supervisor_ids_com_acesso" in sql
+        assert "sup_1" in sql
 
 
 def test_exportar_avancado_metricas_supervisores_filtradas_por_area(
@@ -832,7 +732,6 @@ def test_exportar_avancado_metricas_supervisores_filtradas_por_area(
         patch("app.routes.dashboard._filtrar_chamados_por_permissao", return_value=[]),
         patch("app.routes.dashboard.analisador") as mock_anal,
         patch("app.services.excel_export_service.exportador_excel") as mock_exp,
-        patch("app.routes.dashboard.db"),
         patch("app.routes.dashboard.verificar_e_incrementar_export", return_value=(True, None)),
     ):
         import io
@@ -859,69 +758,48 @@ def test_exportar_avancado_metricas_supervisores_filtradas_por_area(
 # ── Onda 3: POST /painel como supervisor ──────────────────────────────────────
 
 
-def test_painel_post_supervisor_altera_status_sucesso(client_logado_supervisor):
+def test_painel_post_supervisor_altera_status_sucesso(client_logado_supervisor, db_session):
     """POST /painel com supervisor altera status com sucesso e redireciona."""
-    with (
-        patch("app.routes.dashboard.atualizar_status_chamado") as mock_atualizar,
-        patch("app.routes.dashboard.db") as mock_db,
-    ):
-        mock_doc = MagicMock()
-        mock_doc.exists = True
-        mock_doc.to_dict.return_value = {
-            "area": "Manutencao",
-            "responsavel_id": None,
-            "solicitante_id": "sol_x",
-            "participantes": [],
-        }
-        mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
+    from tests.factories import make_chamado
+
+    chamado = make_chamado(area="Manutencao", responsavel_id=None, solicitante_id="sol_x")
+    with patch("app.routes.dashboard.atualizar_status_chamado") as mock_atualizar:
         mock_atualizar.return_value = {"sucesso": True, "mensagem": "Status atualizado"}
         r = client_logado_supervisor.post(
             "/painel",
-            data={"chamado_id": "ch1", "novo_status": "Concluído"},
+            data={"chamado_id": str(chamado.id), "novo_status": "Concluído"},
             follow_redirects=False,
         )
     assert r.status_code == 302
     mock_atualizar.assert_called_once()
 
 
-def test_painel_post_supervisor_sem_permissao_na_area(client_logado_supervisor):
+def test_painel_post_supervisor_sem_permissao_na_area(client_logado_supervisor, db_session):
     """POST /painel com supervisor sem permissão na área redireciona."""
-    with patch("app.routes.dashboard.db") as mock_db:
-        mock_doc = MagicMock()
-        mock_doc.exists = True
-        mock_doc.to_dict.return_value = {
-            "area": "OutraArea",
-            "responsavel_id": None,
-            "solicitante_id": "sol_x",
-            "participantes": [],
-        }
-        mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
-        r = client_logado_supervisor.post(
-            "/painel",
-            data={"chamado_id": "ch1", "novo_status": "Concluído"},
-            follow_redirects=False,
-        )
+    from tests.factories import make_chamado
+
+    chamado = make_chamado(area="OutraArea", responsavel_id=None, solicitante_id="sol_x")
+    r = client_logado_supervisor.post(
+        "/painel",
+        data={"chamado_id": str(chamado.id), "novo_status": "Concluído"},
+        follow_redirects=False,
+    )
     assert r.status_code == 302
 
 
-def test_dashboard_alterar_status_supervisor_colega_owner_negado(client_logado_supervisor):
+def test_dashboard_alterar_status_supervisor_colega_owner_negado(
+    client_logado_supervisor, db_session
+):
     """Lacuna 2: supervisor não pode alterar chamado da mesma área se outro supervisor é o owner."""
-    with (
-        patch("app.routes.dashboard.db") as mock_db,
-        patch("app.routes.dashboard.atualizar_status_chamado") as mock_atualizar,
-    ):
-        mock_doc = MagicMock()
-        mock_doc.exists = True
-        mock_doc.to_dict.return_value = {
-            "area": "Manutencao",
-            "responsavel_id": "outro_supervisor",
-            "solicitante_id": "sol_outro",
-            "participantes": [],
-        }
-        mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
+    from tests.factories import make_chamado
+
+    chamado = make_chamado(
+        area="Manutencao", responsavel_id="outro_supervisor", solicitante_id="sol_outro"
+    )
+    with patch("app.routes.dashboard.atualizar_status_chamado") as mock_atualizar:
         r = client_logado_supervisor.post(
             "/painel",
-            data={"chamado_id": "ch1", "novo_status": "Concluído"},
+            data={"chamado_id": str(chamado.id), "novo_status": "Concluído"},
             follow_redirects=False,
         )
     assert r.status_code == 302
@@ -930,43 +808,24 @@ def test_dashboard_alterar_status_supervisor_colega_owner_negado(client_logado_s
 
 def test_painel_post_chamado_inexistente(client_logado_supervisor):
     """POST /painel com chamado que não existe redireciona."""
-    with patch("app.routes.dashboard.db") as mock_db:
-        mock_doc = MagicMock()
-        mock_doc.exists = False
-        mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
-        r = client_logado_supervisor.post(
-            "/painel",
-            data={"chamado_id": "nao_existe", "novo_status": "Concluído"},
-            follow_redirects=False,
-        )
+    r = client_logado_supervisor.post(
+        "/painel",
+        data={"chamado_id": "999999999", "novo_status": "Concluído"},
+        follow_redirects=False,
+    )
     assert r.status_code == 302
 
 
-def test_painel_post_falha_sem_chave_erro(client_logado_admin):
+def test_painel_post_falha_sem_chave_erro(client_logado_admin, db_session):
     """POST /admin quando sucesso=False sem 'erro' no resultado exibe flash genérico."""
-    mock_doc = MagicMock()
-    mock_doc.exists = True
-    mock_doc.to_dict.return_value = {
-        "status": "Em Atendimento",
-        "confirmacao_solicitante": None,
-        "area": "Geral",
-        "solicitante_id": "s1",
-        "participantes": [],
-    }
-    with (
-        patch("app.routes.dashboard.db") as mock_db,
-        patch("app.routes.dashboard.Chamado") as mock_chamado_cls,
-        patch("app.routes.dashboard.atualizar_status_chamado") as mock_atualizar,
-    ):
-        mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
-        mock_chamado = MagicMock()
-        mock_chamado.status = "Em Atendimento"
-        mock_chamado.confirmacao_solicitante = None
-        mock_chamado_cls.from_dict.return_value = mock_chamado
+    from tests.factories import make_chamado
+
+    chamado = make_chamado(status="Em Atendimento", area="Geral")
+    with patch("app.routes.dashboard.atualizar_status_chamado") as mock_atualizar:
         mock_atualizar.return_value = {"sucesso": False}  # sem chave 'erro'
         r = client_logado_admin.post(
             "/admin",
-            data={"chamado_id": "ch1", "novo_status": "Invalido"},
+            data={"chamado_id": str(chamado.id), "novo_status": "Invalido"},
             follow_redirects=False,
         )
     assert r.status_code == 302
@@ -1030,48 +889,44 @@ def test_painel_com_admin_redireciona_para_admin(client_logado_admin):
 # ── Onda 3: editar_chamado_pagina falhas ──────────────────────────────────────
 
 
-def test_editar_chamado_falha_com_erro_exibe_flash(client_logado_admin):
+def test_editar_chamado_falha_com_erro_exibe_flash(client_logado_admin, db_session):
     """POST /chamado/editar com sucesso=False e 'erro' presente redireciona para chamado."""
-    with patch("app.routes.dashboard.db") as mock_db:
-        mock_doc = MagicMock()
-        mock_doc.exists = True
-        mock_doc.to_dict.return_value = _chamado_dict_fake()
-        mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
-        with (
-            patch("app.routes.dashboard.usuario_pode_ver_chamado", return_value=True),
-            patch(
-                "app.services.edicao_chamado_service.processar_edicao_chamado",
-                return_value={"sucesso": False, "erro": "Erro de validação"},
-            ),
-        ):
-            r = client_logado_admin.post(
-                "/chamado/editar",
-                data={"chamado_id": "ch1", "novo_status": "Concluído"},
-                follow_redirects=False,
-            )
+    from tests.factories import make_chamado
+
+    chamado = make_chamado()
+    with (
+        patch("app.routes.dashboard.usuario_pode_ver_chamado", return_value=True),
+        patch(
+            "app.services.edicao_chamado_service.processar_edicao_chamado",
+            return_value={"sucesso": False, "erro": "Erro de validação"},
+        ),
+    ):
+        r = client_logado_admin.post(
+            "/chamado/editar",
+            data={"chamado_id": str(chamado.id), "novo_status": "Concluído"},
+            follow_redirects=False,
+        )
     assert r.status_code == 302
-    assert "ch1" in (r.location or "")
+    assert str(chamado.id) in (r.location or "")
 
 
-def test_editar_chamado_falha_sem_erro_exibe_flash_generico(client_logado_admin):
+def test_editar_chamado_falha_sem_erro_exibe_flash_generico(client_logado_admin, db_session):
     """POST /chamado/editar com sucesso=False sem 'erro' usa flash_t genérico."""
-    with patch("app.routes.dashboard.db") as mock_db:
-        mock_doc = MagicMock()
-        mock_doc.exists = True
-        mock_doc.to_dict.return_value = _chamado_dict_fake()
-        mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
-        with (
-            patch("app.routes.dashboard.usuario_pode_ver_chamado", return_value=True),
-            patch(
-                "app.services.edicao_chamado_service.processar_edicao_chamado",
-                return_value={"sucesso": False},  # sem chave 'erro'
-            ),
-        ):
-            r = client_logado_admin.post(
-                "/chamado/editar",
-                data={"chamado_id": "ch1", "novo_status": "Concluído"},
-                follow_redirects=False,
-            )
+    from tests.factories import make_chamado
+
+    chamado = make_chamado()
+    with (
+        patch("app.routes.dashboard.usuario_pode_ver_chamado", return_value=True),
+        patch(
+            "app.services.edicao_chamado_service.processar_edicao_chamado",
+            return_value={"sucesso": False},  # sem chave 'erro'
+        ),
+    ):
+        r = client_logado_admin.post(
+            "/chamado/editar",
+            data={"chamado_id": str(chamado.id), "novo_status": "Concluído"},
+            follow_redirects=False,
+        )
     assert r.status_code == 302
 
 
@@ -1080,35 +935,34 @@ def test_editar_chamado_falha_sem_erro_exibe_flash_generico(client_logado_admin)
 
 def test_historico_chamado_nao_encontrado_redireciona(client_logado_supervisor):
     """GET /chamado/<id>/historico quando chamado não existe redireciona."""
-    with patch("app.routes.dashboard.db") as mock_db:
-        mock_doc = MagicMock()
-        mock_doc.exists = False
-        mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
-        r = client_logado_supervisor.get("/chamado/nao_existe/historico", follow_redirects=False)
+    r = client_logado_supervisor.get("/chamado/999999999/historico", follow_redirects=False)
     assert r.status_code == 302
 
 
-def test_historico_supervisor_sem_permissao_redireciona(client_logado_supervisor):
+def test_historico_supervisor_sem_permissao_redireciona(client_logado_supervisor, db_session):
     """GET /chamado/<id>/historico com supervisor sem permissão redireciona."""
-    with patch("app.routes.dashboard.db") as mock_db:
-        mock_doc = MagicMock()
-        mock_doc.exists = True
-        mock_doc.to_dict.return_value = _chamado_dict_fake(area="OutraArea")
-        mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
-        with patch("app.routes.dashboard.usuario_pode_ver_chamado", return_value=False):
-            r = client_logado_supervisor.get("/chamado/ch1/historico", follow_redirects=False)
+    from tests.factories import make_chamado
+
+    chamado = make_chamado(area="OutraArea")
+    with patch("app.routes.dashboard.usuario_pode_ver_chamado", return_value=False):
+        r = client_logado_supervisor.get(f"/chamado/{chamado.id}/historico", follow_redirects=False)
     assert r.status_code == 302
 
 
-def test_historico_exception_redireciona(client_logado_supervisor):
-    """GET /chamado/<id>/historico quando db lança exceção redireciona."""
-    with patch("app.routes.dashboard.db") as mock_db:
-        mock_db.collection.return_value.document.return_value.get.side_effect = Exception("db err")
-        r = client_logado_supervisor.get("/chamado/ch_erro/historico", follow_redirects=False)
+def test_historico_exception_redireciona(client_logado_supervisor, db_session):
+    """GET /chamado/<id>/historico quando ocorre exceção após localizar o chamado redireciona."""
+    from tests.factories import make_chamado
+
+    chamado = make_chamado(area="Manutencao")
+    with (
+        patch("app.routes.dashboard.usuario_pode_ver_chamado", return_value=True),
+        patch("app.routes.dashboard.Historico.get_by_chamado_id", side_effect=Exception("db err")),
+    ):
+        r = client_logado_supervisor.get(f"/chamado/{chamado.id}/historico", follow_redirects=False)
     assert r.status_code == 302
 
 
-def test_historico_traduz_status_para_ingles(client_logado_admin):
+def test_historico_traduz_status_para_ingles(client_logado_admin, db_session):
     """GET /chamado/<id>/historico com idioma=en não deve mostrar status cru em PT-BR.
 
     Dois bugs no mesmo template (historico.html):
@@ -1122,10 +976,12 @@ def test_historico_traduz_status_para_ingles(client_logado_admin):
     from datetime import datetime
 
     from app.models_historico import Historico
+    from tests.factories import make_chamado
 
+    chamado = make_chamado(status="Em Atendimento")
     evento = Historico(
         id="h1",
-        chamado_id="ch1",
+        chamado_id=str(chamado.id),
         usuario_id="u1",
         usuario_nome="Fulano",
         acao="alteracao_status",
@@ -1134,18 +990,13 @@ def test_historico_traduz_status_para_ingles(client_logado_admin):
         valor_novo="Em Atendimento",
         data_acao=datetime.now(),
     )
-    with patch("app.routes.dashboard.db") as mock_db:
-        mock_doc = MagicMock()
-        mock_doc.exists = True
-        mock_doc.to_dict.return_value = _chamado_dict_fake(status="Em Atendimento")
-        mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
-        with (
-            patch("app.routes.dashboard.usuario_pode_ver_chamado", return_value=True),
-            patch("app.routes.dashboard.Historico.get_by_chamado_id", return_value=[evento]),
-        ):
-            with client_logado_admin.session_transaction() as sess:
-                sess["language"] = "en"
-            r = client_logado_admin.get("/chamado/ch1/historico")
+    with (
+        patch("app.routes.dashboard.usuario_pode_ver_chamado", return_value=True),
+        patch("app.routes.dashboard.Historico.get_by_chamado_id", return_value=[evento]),
+    ):
+        with client_logado_admin.session_transaction() as sess:
+            sess["language"] = "en"
+        r = client_logado_admin.get(f"/chamado/{chamado.id}/historico")
     body = r.data.decode("utf-8")
     assert "In Progress" in body
     assert "Em Atendimento" not in body
@@ -1213,7 +1064,6 @@ def test_exportar_avancado_retorna_xlsx(client_logado_supervisor):
         patch("app.routes.dashboard._filtrar_chamados_por_permissao") as mock_perm,
         patch("app.routes.dashboard.analisador") as mock_anal,
         patch("app.services.excel_export_service.exportador_excel") as mock_exp,
-        patch("app.routes.dashboard.db"),
         patch("app.routes.dashboard.verificar_e_incrementar_export", return_value=(True, None)),
     ):
         import io
@@ -1255,7 +1105,6 @@ def test_exportar_avancado_exception_redireciona(client_logado_supervisor):
         patch("app.routes.dashboard.aplicar_filtros_dashboard_com_paginacao") as mock_filtros,
         patch("app.routes.dashboard._filtrar_chamados_por_permissao", return_value=[]),
         patch("app.routes.dashboard.analisador") as mock_anal,
-        patch("app.routes.dashboard.db"),
         patch("app.routes.dashboard.verificar_e_incrementar_export", return_value=(True, None)),
     ):
         mock_filtros.return_value = {"docs": []}
@@ -1276,7 +1125,6 @@ def test_exportar_avancado_com_filtros_no_url(client_logado_supervisor):
         patch("app.routes.dashboard._filtrar_chamados_por_permissao") as mock_perm,
         patch("app.routes.dashboard.analisador") as mock_anal,
         patch("app.services.excel_export_service.exportador_excel") as mock_exp,
-        patch("app.routes.dashboard.db"),
         patch("app.routes.dashboard.verificar_e_incrementar_export", return_value=(True, None)),
     ):
         import io
@@ -1483,61 +1331,57 @@ def test_indices_firestore_exception_redireciona(client_logado_admin):
 # ── Onda 3: visualizar_detalhe_chamado com referrer same-origin ───────────────
 
 
-def test_visualizar_chamado_com_referrer_same_origin(client_logado_admin):
+def test_visualizar_chamado_com_referrer_same_origin(client_logado_admin, db_session):
     """GET /chamado/<id> com Referer same-origin usa o referrer como voltar_url."""
-    with patch("app.routes.dashboard.db") as mock_db:
-        mock_doc = MagicMock()
-        mock_doc.exists = True
-        mock_doc.to_dict.return_value = _chamado_dict_fake()
-        mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
-        with (
-            patch("app.routes.dashboard.usuario_pode_ver_chamado", return_value=True),
-            patch("app.routes.dashboard.get_static_cached", return_value=[]),
-            patch("app.routes.dashboard.CategoriaSetor.get_all", return_value=[]),
-            patch("app.routes.dashboard.filtrar_supervisores_por_area", return_value=[]),
-        ):
-            r = client_logado_admin.get(
-                "/chamado/ch1",
-                headers={"Referer": "http://localhost/admin"},
-                follow_redirects=False,
-            )
+    from tests.factories import make_chamado
+
+    chamado = make_chamado()
+    with (
+        patch("app.routes.dashboard.usuario_pode_ver_chamado", return_value=True),
+        patch("app.routes.dashboard.get_static_cached", return_value=[]),
+        patch("app.routes.dashboard.CategoriaSetor.get_all", return_value=[]),
+        patch("app.routes.dashboard.filtrar_supervisores_por_area", return_value=[]),
+    ):
+        r = client_logado_admin.get(
+            f"/chamado/{chamado.id}",
+            headers={"Referer": "http://localhost/admin"},
+            follow_redirects=False,
+        )
     assert r.status_code == 200
 
 
 # ── Supervisor não edita descrição do solicitante ──────────────────────────────
 
 
-def test_visualizar_chamado_supervisor_nao_mostra_descricao_editavel(client_logado_supervisor):
+def test_visualizar_chamado_supervisor_nao_mostra_descricao_editavel(
+    client_logado_supervisor, db_session
+):
     """Supervisor da área vê a descrição só como texto, sem textarea editável."""
-    with patch("app.routes.dashboard.db") as mock_db:
-        mock_doc = MagicMock()
-        mock_doc.exists = True
-        mock_doc.to_dict.return_value = _chamado_dict_fake(area="Manutencao")
-        mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
-        with (
-            patch("app.routes.dashboard.usuario_pode_ver_chamado", return_value=True),
-            patch("app.routes.dashboard.get_static_cached", return_value=[]),
-            patch("app.routes.dashboard.CategoriaSetor.get_all", return_value=[]),
-            patch("app.routes.dashboard.filtrar_supervisores_por_area", return_value=[]),
-        ):
-            r = client_logado_supervisor.get("/chamado/ch1", follow_redirects=False)
+    from tests.factories import make_chamado
+
+    chamado = make_chamado(area="Manutencao")
+    with (
+        patch("app.routes.dashboard.usuario_pode_ver_chamado", return_value=True),
+        patch("app.routes.dashboard.get_static_cached", return_value=[]),
+        patch("app.routes.dashboard.CategoriaSetor.get_all", return_value=[]),
+        patch("app.routes.dashboard.filtrar_supervisores_por_area", return_value=[]),
+    ):
+        r = client_logado_supervisor.get(f"/chamado/{chamado.id}", follow_redirects=False)
     assert r.status_code == 200
     assert b'id="modal-descricao"' not in r.data
 
 
-def test_visualizar_chamado_admin_mostra_descricao_editavel(client_logado_admin):
+def test_visualizar_chamado_admin_mostra_descricao_editavel(client_logado_admin, db_session):
     """Admin continua vendo a descrição como textarea editável (válvula de escape)."""
-    with patch("app.routes.dashboard.db") as mock_db:
-        mock_doc = MagicMock()
-        mock_doc.exists = True
-        mock_doc.to_dict.return_value = _chamado_dict_fake()
-        mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
-        with (
-            patch("app.routes.dashboard.usuario_pode_ver_chamado", return_value=True),
-            patch("app.routes.dashboard.get_static_cached", return_value=[]),
-            patch("app.routes.dashboard.CategoriaSetor.get_all", return_value=[]),
-            patch("app.routes.dashboard.filtrar_supervisores_por_area", return_value=[]),
-        ):
-            r = client_logado_admin.get("/chamado/ch1", follow_redirects=False)
+    from tests.factories import make_chamado
+
+    chamado = make_chamado()
+    with (
+        patch("app.routes.dashboard.usuario_pode_ver_chamado", return_value=True),
+        patch("app.routes.dashboard.get_static_cached", return_value=[]),
+        patch("app.routes.dashboard.CategoriaSetor.get_all", return_value=[]),
+        patch("app.routes.dashboard.filtrar_supervisores_por_area", return_value=[]),
+    ):
+        r = client_logado_admin.get(f"/chamado/{chamado.id}", follow_redirects=False)
     assert r.status_code == 200
     assert b'id="modal-descricao"' in r.data

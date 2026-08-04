@@ -210,78 +210,63 @@ def test_gestor_dashboard_filtro_atrasados(client_logado_gestor):
     mock_svc.assert_called_once_with(filtro="atrasados", usuario=ANY)
 
 
-def test_gestor_nao_pode_mudar_status_via_api(client_logado_gestor):
+def test_gestor_nao_pode_mudar_status_via_api(client_logado_gestor, db_session):
     """POST /api/atualizar-status retorna 403 para gestor read-only."""
-    with (
-        patch("app.routes.api_chamados.db"),
-        patch(
-            "app.routes.api_chamados.verificar_permissao_mudanca_status",
-            return_value=(False, "Acesso negado: gestores têm visão read-only"),
-        ),
+    from tests.factories import make_chamado
+
+    chamado = make_chamado(status="Aberto")
+
+    with patch(
+        "app.routes.api_chamados.verificar_permissao_mudanca_status",
+        return_value=(False, "Acesso negado: gestores têm visão read-only"),
     ):
         resp = client_logado_gestor.post(
             "/api/atualizar-status",
-            json={"chamado_id": "ch_001", "novo_status": "Em Atendimento"},
+            json={"chamado_id": str(chamado.id), "novo_status": "Em Atendimento"},
         )
     assert resp.status_code == 403
 
 
 def test_gestor_setor_dual_role_nao_muda_status_de_chamado_do_colega(
-    client_logado_gestor_setor_dual_role,
+    client_logado_gestor_setor_dual_role, db_session
 ):
     """QA (Nível 3): supervisor + gestor_setor enxerga chamado do colega na própria
     área (leitura ampliada), mas POST /api/atualizar-status continua bloqueado —
     enxergar não é igual a poder editar."""
-    chamado_data = {
-        "area": "Geral",
-        "status": "Em Atendimento",
-        "solicitante_id": "outro_solicitante",
-        "responsavel_id": "colega_supervisor",
-        "participantes": [],
-        "numero_chamado": "CHM-9999",
-        "categoria": "Geral",
-        "tipo_solicitacao": "Outros",
-        "descricao": "chamado do colega",
-        "responsavel": "Colega",
-    }
-    mock_doc = MagicMock()
-    mock_doc.exists = True
-    mock_doc.to_dict.return_value = chamado_data
+    from tests.factories import make_chamado
 
-    with patch("app.routes.api_chamados.db") as mock_db:
-        mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
-        resp = client_logado_gestor_setor_dual_role.post(
-            "/api/atualizar-status",
-            json={"chamado_id": "ch_colega", "novo_status": "Concluído"},
-        )
+    chamado = make_chamado(
+        area="Geral",
+        status="Em Atendimento",
+        solicitante_id="outro_solicitante",
+        responsavel_id="colega_supervisor",
+        numero_chamado="CHM-9999",
+        categoria="Geral",
+        tipo_solicitacao="Outros",
+        descricao="chamado do colega",
+        responsavel="Colega",
+    )
+
+    resp = client_logado_gestor_setor_dual_role.post(
+        "/api/atualizar-status",
+        json={"chamado_id": str(chamado.id), "novo_status": "Concluído"},
+    )
 
     assert resp.status_code == 403
 
 
-def test_gestor_visualizar_chamado_pode_editar_false(client_logado_gestor):
+def test_gestor_visualizar_chamado_pode_editar_false(client_logado_gestor, db_session):
     """Gestor visualiza chamado com pode_editar=False no contexto do template."""
-    from app.models import Chamado as ChamadoModel
+    from tests.factories import make_chamado
 
-    chamado_mock = MagicMock(spec=ChamadoModel)
-    chamado_mock.id = "ch_001"
-    chamado_mock.area = "Geral"
-    chamado_mock.responsavel_id = None
-    chamado_mock.solicitante_id = "outro"
-    chamado_mock.participantes = []
+    chamado = make_chamado(area="Geral", responsavel_id=None, solicitante_id="outro")
 
     with (
-        patch("app.routes.dashboard.db") as mock_db,
         patch("app.routes.dashboard.usuario_pode_ver_chamado", return_value=True),
-        patch("app.routes.dashboard.Chamado.from_dict", return_value=chamado_mock),
         patch("app.routes.dashboard.get_static_cached", return_value=[]),
         patch("app.routes.dashboard.CategoriaSetor.get_all", return_value=[]),
     ):
-        mock_doc = MagicMock()
-        mock_doc.exists = True
-        mock_doc.to_dict.return_value = {}
-        mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
-
-        resp = client_logado_gestor.get("/chamado/ch_001")
+        resp = client_logado_gestor.get(f"/chamado/{chamado.id}")
 
     # Gestor pode ver o chamado (200) mas pode_editar=False no template
     assert resp.status_code == 200

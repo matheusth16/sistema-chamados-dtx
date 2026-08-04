@@ -8,10 +8,8 @@ paginação por cursor, listas de responsáveis e gates.
 import logging
 from typing import Any
 
-from google.cloud.firestore_v1.base_query import FieldFilter
-
 from app.cache import get_static_cached
-from app.database import db
+from app.db.models.chamado import ChamadoRow
 from app.models import Chamado
 from app.models_categorias import CategoriaGate
 from app.models_usuario import Usuario
@@ -151,18 +149,16 @@ def obter_contexto_admin(
         [{"id": u.id, "nome": u.nome, "area": u.area} for u in supervisores],
         key=lambda x: x["nome"].upper(),
     )
-    chamados_ref = db.collection("chamados")
+    condicoes_base = []
     if user.perfil == "supervisor" and getattr(user, "areas", None):
-        chamados_ref = chamados_ref.where(
-            filter=FieldFilter("supervisor_ids_com_acesso", "array_contains", user.id)
-        )
+        condicoes_base.append(ChamadoRow.supervisor_ids_com_acesso.contains([user.id]))
     cursor = (args.get("cursor") or "").strip() or None
     cursor_prev = (args.get("cursor_prev") or "").strip() or None
     pagina_atual = int(args.get("pagina") or 1)
     if pagina_atual < 1:
         pagina_atual = 1
     resultado = aplicar_filtros_dashboard_com_paginacao(
-        chamados_ref, args, limite=itens_por_pagina, cursor=cursor, cursor_anterior=cursor_prev
+        condicoes_base, args, limite=itens_por_pagina, cursor=cursor, cursor_anterior=cursor_prev
     )
     docs = resultado["docs"]
     chamados = _filtrar_chamados_por_permissao(docs, user)

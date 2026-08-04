@@ -16,16 +16,12 @@ os.environ.setdefault("FLASK_ENV", "testing")
 _MODULOS_COM_DB_FIRESTORE = [
     "app.database",
     "app.routes.api_solicitante",
-    "app.routes.api_chamados",
     "app.routes.api_colaboracao",
-    "app.routes.dashboard",
     "app.routes.admin_global",
     "app.models_historico",
     "app.services.lgpd_self_service",
     "app.services.edicao_chamado_service",
-    "app.services.gestor_dashboard_service",
     "app.services.solicitante_edicao_service",
-    "app.services.dashboard_service",
     "app.services.onboarding_service",
     "app.services.notifications_inapp",
     "app.utils",
@@ -332,13 +328,14 @@ def db_engine():
     from sqlalchemy import create_engine
 
     from alembic import command
+    from app.db import normalizar_url_driver
 
     test_url = os.environ.get("TEST_DATABASE_URL")
     if not test_url:
         pytest.skip("TEST_DATABASE_URL não configurada — testes de Postgres pulados.")
 
     command.upgrade(_alembic_config(), "head")
-    engine = create_engine(test_url)
+    engine = create_engine(normalizar_url_driver(test_url))
     yield engine
     engine.dispose()
 

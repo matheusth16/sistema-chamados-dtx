@@ -124,11 +124,11 @@ def test_staging_auth_deep_health_ainda_usa_health_secret(client_staging):
     _test_secret = "segredo-teste-health-valido-32ch"
     with (
         patch.dict(os.environ, {"HEALTH_SECRET": _test_secret}, clear=False),
-        patch("app.routes.api_chamados.db") as mock_db,
+        patch(
+            "app.routes.api_chamados.db_module.SessionLocal",
+            side_effect=Exception("Postgres indisponível no teste"),
+        ),
     ):
-        mock_db.collection.return_value.limit.return_value.get.side_effect = Exception(
-            "Firestore indisponível no teste"
-        )
         # Sem health token → não bloqueado por Basic Auth (pode ser 401 pelo guard de HEALTH_SECRET)
         resp_no_token = client_staging.get("/health?deep=1")
         www_auth = resp_no_token.headers.get("WWW-Authenticate", "")
@@ -143,8 +143,8 @@ def test_staging_auth_deep_health_ainda_usa_health_secret(client_staging):
             headers={"X-Health-Token": _test_secret},
         )
         assert "Basic" not in resp_with_token.headers.get("WWW-Authenticate", "")
-        # 200 (Firestore ok) ou 503 (Firestore indisponível no teste) — mas nunca 401/403 com token correto
-        assert resp_with_token.status_code in (200, 503)
+        # Postgres mockado como indisponível → 503, mas nunca 401/403 com token correto
+        assert resp_with_token.status_code == 503
 
 
 # ── Testes: casos extremos ─────────────────────────────────────────────────────

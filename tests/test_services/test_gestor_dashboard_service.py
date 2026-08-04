@@ -315,26 +315,18 @@ def test_is_atrasado_com_sla_e_data_abertura_dentro_do_prazo():
 # ---------------------------------------------------------------------------
 
 
-def test_carregar_todos_chamados_retorna_lista_de_chamados():
-    """_carregar_todos_chamados executa query no Firestore e retorna lista (linhas 81-88)."""
+def test_carregar_todos_chamados_retorna_lista_de_chamados(db_session):
+    """_carregar_todos_chamados executa query no Postgres e retorna lista de Chamado."""
     from app.services.gestor_dashboard_service import _carregar_todos_chamados
+    from tests.factories import make_chamado
 
-    doc = MagicMock()
-    doc.to_dict.return_value = {"status": "Aberto"}
-    doc.id = "ch_1"
+    make_chamado(status="Aberto")
 
-    with (
-        patch("app.services.gestor_dashboard_service.db") as mock_db,
-        patch("app.services.gestor_dashboard_service.Chamado") as mock_chamado_cls,
-    ):
-        mock_db.collection.return_value.order_by.return_value.limit.return_value.stream.return_value = [
-            doc
-        ]
-        mock_chamado_cls.from_dict.return_value = MagicMock()
-        result = _carregar_todos_chamados()
+    result = _carregar_todos_chamados()
 
     assert isinstance(result, list)
     assert len(result) == 1
+    assert result[0].status == "Aberto"
 
 
 # ---------------------------------------------------------------------------
@@ -589,10 +581,10 @@ def test_carregar_todos_chamados_retorna_vazio_em_excecao():
     """_carregar_todos_chamados retorna [] em exceção do Firestore (linhas 89-91)."""
     from app.services.gestor_dashboard_service import _carregar_todos_chamados
 
-    with patch("app.services.gestor_dashboard_service.db") as mock_db:
-        mock_db.collection.return_value.order_by.return_value.limit.return_value.stream.side_effect = Exception(
-            "db error"
-        )
+    with patch(
+        "app.services.gestor_dashboard_service.db_module.SessionLocal",
+        side_effect=Exception("db error"),
+    ):
         result = _carregar_todos_chamados()
 
     assert result == []

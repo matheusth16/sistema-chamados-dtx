@@ -1,9 +1,9 @@
 """
 Serviço de Filtros para Dashboard de Chamados
 
-Aplicar múltiplos filtros a queries do Firestore para buscar chamados específicos.
-Usa order_by(data_abertura DESC) para paginação por cursor consistente.
-Usa indexação Firestore para performance, com fallback para filtros em memória.
+Aplica múltiplos filtros a uma consulta Postgres (SQLAlchemy) para buscar
+chamados específicos. Usa keyset pagination (data_abertura DESC, id DESC)
+para paginação por cursor consistente e eficiente (sem OFFSET).
 
 **Filtros Disponíveis:**
 
@@ -12,37 +12,25 @@ Usa indexação Firestore para performance, com fallback para filtros em memóri
 | `status` | 'Aberto', 'Em Atendimento', 'Concluído' | Filtra por status exato |
 | `categoria` | 'Projetos', 'Manutenção' | Filtra por categoria |
 | `gate` | 'Gate 1', 'Gate 2' | Filtra por gate (produção) |
-| `responsavel` | User ID | Chamados atribuídos a supervisor |
+| `responsavel` | Nome do responsável | Chamados atribuídos a supervisor |
+| `rl_codigo` | Código RL | Chamados de uma RL específica |
 | `search` | Qualquer texto | Busca em descrição, código RL, etc (case-insensitive) |
 | Valor 'Todos'/'Todas' | Qualquer filtro | Ignora o filtro (retorna tudo) |
 
-**Estratégia de Performance:**
+**Estratégia:**
 
-1. **Índices Firestore:** Status, gate, responsavel usam índices compostos (rápido)
-2. **Filtros em Memória:** Categoria, search aplicados após buscar do Firestore (mais flexível)
-3. **Cursor-Based Pagination:** Uso de snapshots para paginação eficiente (sem offset)
+1. **Condições SQL:** status, gate, responsavel, rl_codigo, categoria viram WHERE
+   (índices compostos cobrem essas combinações — ver `app/db/models/chamado.py`).
+2. **Filtro em Memória:** search (substring match) é aplicado após buscar do
+   Postgres — sem suporte nativo a substring indexado nas colunas de texto.
+3. **Cursor-Based Pagination:** keyset (data_abertura, id) em vez de OFFSET.
 
 **Exemplos de Uso:**
 
 ```python
-# Chamados abertos da última semana
-filtros = {'status': 'Aberto', 'data_inicio': datetime.now() - timedelta(days=7)}
-docs = aplicar_filtros_dashboard_com_paginacao(
-    chamados_query,
-    filtros=filtros,
-    pagina=1
-)
-
-# Chamados de um supervisor específico com busca
-filtros = {'responsavel': 'userId123', 'search': 'falha'}
-docs = aplicar_filtros_dashboard(chamados_query, filtros)
-
-# Paginação com cursor
+condicoes_base = [ChamadoRow.supervisor_ids_com_acesso.contains([user.id])]
 resultado = aplicar_filtros_dashboard_com_paginacao(
-    query_ref=chamados_query,
-    args={'status': 'Concluído'},
-    limite=50,
-    cursor='ultimo_doc_id_da_pagina_anterior'
+    condicoes_base, args={'status': 'Aberto'}, limite=50, cursor=None
 )
 if resultado['tem_proxima']:
     # Buscar próxima página usando resultado['proximo_cursor']
@@ -50,204 +38,204 @@ if resultado['tem_proxima']:
 
 **Notas Importantes:**
 - Filtros são case-sensitive para status/categoria
-- Search é substring match (parcial)
-- Valor vazio em status/gate ignora o filtro
+- Search é substring match (parcial), case-insensitive
+- Valor vazio em status/gate/categoria ignora o filtro
 - Cursor vazio ou inválido reinicia do início
 """
 
 import logging
 from typing import Any
 
-from firebase_admin import firestore
-from google.cloud.firestore_v1.base_query import FieldFilter
+from sqlalchemy import and_, or_, select
+
+from app import db as db_module
+from app.db.models.chamado import ChamadoRow
 
 logger = logging.getLogger(__name__)
 
 
-def _construir_query_base(
-    query_ref: Any,
+def _construir_condicoes_filtro(
     args: dict[str, Any],
-) -> tuple[Any, bool, str | None, str | None, str | None]:
-    """
-    Aplica filtros baseados em índices Firestore (status, gate, responsavel).
-    Categoria e search são aplicados depois em memória (ver _aplicar_filtros_em_memoria).
-
-    Args:
-        query_ref: Referência da coleção ou query Firestore.
-        args: Dict com chaves status, gate, categoria, responsavel (query params).
+) -> tuple[list[Any], str | None, str | None, str | None]:
+    """Monta as condições SQL (status, gate, responsavel, rl_codigo, categoria).
 
     Returns:
-        Tuple (query_filtrada, categoria_filtrada, categoria, status, gate).
+        Tuple (condicoes, status, gate, categoria).
     """
     status = args.get("status")
     gate = args.get("gate")
     categoria = args.get("categoria")
-    responsavel = args.get("responsavel", "").strip()
+    responsavel = (args.get("responsavel") or "").strip()
     rl_codigo = (args.get("rl_codigo") or "").strip()
 
-    query_filtrada = query_ref
+    condicoes: list[Any] = []
 
-    if status and status not in ["", "Todos"]:
-        query_filtrada = query_filtrada.where(filter=FieldFilter("status", "==", status))
+    if status and status not in ("", "Todos"):
+        condicoes.append(ChamadoRow.status == status)
 
-    if gate and gate not in ["", "Todos"]:
-        query_filtrada = query_filtrada.where(filter=FieldFilter("gate", "==", gate))
+    if gate and gate not in ("", "Todos"):
+        condicoes.append(ChamadoRow.gate == gate)
 
     if responsavel:
-        query_filtrada = query_filtrada.where(filter=FieldFilter("responsavel", "==", responsavel))
+        condicoes.append(ChamadoRow.responsavel == responsavel)
 
-    # Filtro direto por código RL (Projetos): permite ver todos os chamados de uma RL específica
     if rl_codigo:
-        query_filtrada = query_filtrada.where(filter=FieldFilter("rl_codigo", "==", rl_codigo))
+        condicoes.append(ChamadoRow.rl_codigo == rl_codigo)
 
-    # categoria movida para query Firestore — evita filtro pós-.limit() que descarta docs válidos
-    categoria_filtrada = categoria and categoria not in ["", "Todas"]
-    if categoria_filtrada:
-        query_filtrada = query_filtrada.where(filter=FieldFilter("categoria", "==", categoria))
+    if categoria and categoria not in ("", "Todas"):
+        condicoes.append(ChamadoRow.categoria == categoria)
 
-    return query_filtrada, categoria_filtrada, categoria, status, gate
+    return condicoes, status, gate, categoria
 
 
-def construir_query_para_contagem(query_ref: Any, args: dict[str, Any]) -> Any:
+def construir_condicoes_para_contagem(args: dict[str, Any]) -> list[Any]:
+    """Retorna as mesmas condições de filtro usadas no dashboard, pra uso em COUNT(*).
+
+    Quando há filtro em memória (search), a contagem retornada pode ser maior
+    que o número real de resultados exibidos.
     """
-    Retorna a query com os mesmos filtros por índice usados no dashboard.
+    condicoes, _, _, _ = _construir_condicoes_filtro(args)
+    return condicoes
 
-    Use com obter_total_por_contagem() para obter o total de documentos sem
-    carregar todos em memória (agregação no Firestore). Quando há filtros
-    em memória (categoria, search), o total retornado pode ser maior que o
-    número real de resultados exibidos.
+
+def _aplicar_busca_em_memoria(chamados: list[Any], search: str | None) -> list[Any]:
+    """Busca por texto (case-insensitive) — único filtro genuinamente em memória.
+
+    Substring match não tem suporte nativo indexado no schema atual; aplicado
+    sobre a página já carregada (não sobre a coleção inteira).
     """
-    query_filtrada, _, _, _, _ = _construir_query_base(query_ref, args)
-    return query_filtrada
+    if not search:
+        return chamados
+    termo = search.lower()
+    return [
+        c
+        for c in chamados
+        if termo in (c.descricao or "").lower()
+        or termo in (c.rl_codigo or "").lower()
+        or termo in (c.responsavel or "").lower()
+        or termo in (c.numero_chamado or "").lower()
+    ]
 
 
-def _aplicar_filtros_em_memoria(
-    docs: list[Any],
-    status: str | None,
-    gate: str | None,
-    categoria: str | None,
-    search: str | None,
-) -> list[Any]:
-    """
-    Filtros aplicados em memória pós-query.
-
-    - categoria, status, gate: já aplicados na query Firestore por _construir_query_base;
-      passados aqui apenas por compatibilidade de assinatura, sem reprocessamento.
-    - search: substring match não tem suporte nativo em Firestore; aplicado em memória.
-    """
-    resultado = docs
-
-    # Busca por texto (case-insensitive) — único filtro genuinamente em memória
-    if search:
-        termo = search.lower()
-        filtered = []
-        for doc in resultado:
-            d = doc.to_dict()
-            if (
-                termo in str(d.get("descricao", "")).lower()
-                or termo in str(d.get("rl_codigo", "")).lower()
-                or termo in str(d.get("responsavel", "")).lower()
-                or termo in str(d.get("numero_chamado", "")).lower()
-                or termo in doc.id.lower()
-            ):
-                filtered.append(doc)
-        resultado = filtered
-
-    return resultado
+def _obter_ancora(session, cursor_id: str | None) -> ChamadoRow | None:
+    """Busca a linha-âncora do cursor (para montar a condição de keyset)."""
+    if not cursor_id:
+        return None
+    try:
+        cid = int(cursor_id)
+    except (TypeError, ValueError):
+        return None
+    return session.get(ChamadoRow, cid)
 
 
 def aplicar_filtros_dashboard_com_paginacao(
-    query_ref: Any,
+    condicoes_base: list[Any],
     args: dict[str, Any],
     limite: int = 50,
     cursor: str | None = None,
     cursor_anterior: str | None = None,
 ) -> dict[str, Any]:
     """
-    OTIMIZAÇÃO 3: Paginação por cursor (cursor-based pagination)
+    Paginação por cursor (keyset pagination) sobre chamados no Postgres.
 
-    Ao invés de usar offset, que é ineficiente no Firestore,
-    usamos documentos "cursor" para saber por onde começar.
-    Ordem fixa: data_abertura DESC (exige índice composto).
+    Ordem fixa: data_abertura DESC, id DESC (desempate) — índices compostos em
+    `app/db/models/chamado.py` cobrem as combinações de filtro mais comuns.
 
     Args:
-        query_ref: Referência da coleção Firestore
-        args: Argumentos da URL (filtros)
-        limite: Documentos por página (padrão: 50)
-        cursor: ID do último documento da página anterior (para próxima página)
-        cursor_anterior: ID do primeiro documento da página atual (para página anterior)
+        condicoes_base: condições SQL de escopo (ex.: permissão por perfil/área),
+            aplicadas em conjunto com os filtros de `args`.
+        args: Argumentos da URL (filtros: status, gate, categoria, responsavel,
+            rl_codigo, search).
+        limite: Chamados por página (padrão: 50).
+        cursor: ID do último chamado da página anterior (para próxima página).
+        cursor_anterior: ID do primeiro chamado da página atual (para página anterior).
 
     Returns:
         {
-            'docs': [DocumentSnapshot, ...],
-            'proximo_cursor': ID do último documento da página,
+            'docs': [Chamado, ...],
+            'proximo_cursor': ID do último chamado da página,
             'tem_proxima': bool,
-            'cursor_anterior': ID do primeiro documento da página (para link "voltar"),
+            'cursor_anterior': ID do primeiro chamado da página (para link "voltar"),
             'tem_anterior': bool
         }
     """
-    query_filtrada, categoria_filtrada, categoria, status, gate = _construir_query_base(
-        query_ref, args
-    )
+    from app.models import Chamado
+
+    condicoes_extra, _, _, _ = _construir_condicoes_filtro(args)
     search = args.get("search")
-    # Ordem fixa para cursor-based pagination (exige índice com data_abertura DESC)
-    query_filtrada = query_filtrada.order_by("data_abertura", direction=firestore.Query.DESCENDING)
-    col_ref = getattr(query_ref, "parent", query_ref)
-    q = query_filtrada
-    if cursor_anterior:
-        try:
-            cursor_ant_doc = col_ref.document(cursor_anterior).get()
-            if cursor_ant_doc.exists:
-                q = q.end_before(cursor_ant_doc)
-        except Exception as e:
-            logger.debug("Cursor anterior inválido (%s): %s", cursor_anterior, e)
-    elif cursor:
-        try:
-            cursor_doc = col_ref.document(cursor).get()
-            if cursor_doc.exists:
-                q = q.start_after(cursor_doc)
-        except Exception as e:
-            logger.debug("Cursor inválido (%s): %s", cursor, e)
-    if cursor_anterior:
-        docs_stream = list(q.limit(limite + 1).stream())
-        docs_stream.reverse()
-        tem_anterior = len(docs_stream) > limite
-        if tem_anterior:
-            docs_stream = docs_stream[:limite]
-        docs_filtrados = _aplicar_filtros_em_memoria(docs_stream, status, gate, categoria, search)
-        primeiro_id = docs_filtrados[0].id if docs_filtrados else None
-        ultimo_id = docs_filtrados[-1].id if docs_filtrados else None
+    todas_condicoes = [*condicoes_base, *condicoes_extra]
+
+    with db_module.SessionLocal() as session:
+        if cursor_anterior:
+            stmt = select(ChamadoRow).where(*todas_condicoes)
+            ancora = _obter_ancora(session, cursor_anterior)
+            if ancora is not None:
+                stmt = stmt.where(
+                    or_(
+                        ChamadoRow.data_abertura > ancora.data_abertura,
+                        and_(
+                            ChamadoRow.data_abertura == ancora.data_abertura,
+                            ChamadoRow.id > ancora.id,
+                        ),
+                    )
+                )
+            stmt = stmt.order_by(ChamadoRow.data_abertura.asc(), ChamadoRow.id.asc()).limit(
+                limite + 1
+            )
+            rows = list(session.execute(stmt).scalars().all())
+            tem_anterior = len(rows) > limite
+            if tem_anterior:
+                rows = rows[:limite]
+            rows.reverse()
+            chamados = _aplicar_busca_em_memoria([Chamado._from_row(r) for r in rows], search)
+            primeiro_id = str(chamados[0].id) if chamados else None
+            ultimo_id = str(chamados[-1].id) if chamados else None
+            return {
+                "docs": chamados,
+                "proximo_cursor": ultimo_id,
+                "tem_proxima": True,
+                "cursor_anterior": primeiro_id,
+                "tem_anterior": tem_anterior,
+            }
+
+        stmt = select(ChamadoRow).where(*todas_condicoes)
+        ancora = _obter_ancora(session, cursor)
+        if ancora is not None:
+            stmt = stmt.where(
+                or_(
+                    ChamadoRow.data_abertura < ancora.data_abertura,
+                    and_(
+                        ChamadoRow.data_abertura == ancora.data_abertura,
+                        ChamadoRow.id < ancora.id,
+                    ),
+                )
+            )
+        stmt = stmt.order_by(ChamadoRow.data_abertura.desc(), ChamadoRow.id.desc()).limit(
+            limite + 1
+        )
+        rows = list(session.execute(stmt).scalars().all())
+        tem_proxima = len(rows) > limite
+        if tem_proxima:
+            rows = rows[:limite]
+        chamados = _aplicar_busca_em_memoria([Chamado._from_row(r) for r in rows], search)
+        proximo_cursor = str(chamados[-1].id) if chamados else None
+        primeiro_id = str(chamados[0].id) if chamados else None
         return {
-            "docs": docs_filtrados,
-            "proximo_cursor": ultimo_id,
-            "tem_proxima": True,
+            "docs": chamados,
+            "proximo_cursor": proximo_cursor,
+            "tem_proxima": tem_proxima and len(chamados) == limite,
             "cursor_anterior": primeiro_id,
-            "tem_anterior": tem_anterior,
+            "tem_anterior": bool(cursor),
         }
-    docs_stream = list(q.limit(limite + 1).stream())
-    tem_proxima = len(docs_stream) > limite
-    if tem_proxima:
-        docs_stream = docs_stream[:limite]
-    docs_filtrados = _aplicar_filtros_em_memoria(docs_stream, status, gate, categoria, search)
-    proximo_cursor = docs_filtrados[-1].id if docs_filtrados else None
-    primeiro_id = docs_filtrados[0].id if docs_filtrados else None
-    return {
-        "docs": docs_filtrados,
-        "proximo_cursor": proximo_cursor,
-        "tem_proxima": tem_proxima and len(docs_filtrados) == limite,
-        "cursor_anterior": primeiro_id,
-        "tem_anterior": bool(cursor),
-    }
 
 
-def aplicar_filtros_dashboard(query_ref: Any, args: dict[str, Any]) -> list[Any]:
+def aplicar_filtros_dashboard(condicoes_base: list[Any], args: dict[str, Any]) -> list[Any]:
     """
-    OTIMIZAÇÃO 4: Função legada mantida para compatibilidade
-
-    Usa paginação com limite padrão de 50 documentos
-    Não usa cursor (começa do início sempre)
+    Função legada mantida para compatibilidade — sem cursor (começa do início).
 
     IMPORTANTE: Para usar cursor-based pagination, use aplicar_filtros_dashboard_com_paginacao()
     """
-    resultado = aplicar_filtros_dashboard_com_paginacao(query_ref, args, limite=50, cursor=None)
+    resultado = aplicar_filtros_dashboard_com_paginacao(
+        condicoes_base, args, limite=50, cursor=None
+    )
     return resultado["docs"]

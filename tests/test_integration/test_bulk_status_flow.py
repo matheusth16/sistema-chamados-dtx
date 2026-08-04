@@ -1,6 +1,6 @@
 """Testes de integração: fluxo de atualização de status em lote (bulk)."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -37,43 +37,25 @@ def test_bulk_status_com_login_json_invalido_retorna_400(client_logado_superviso
         )
 
 
-def test_bulk_status_lote_100_por_cento_sucesso(client_logado_supervisor):
+def test_bulk_status_lote_100_por_cento_sucesso(client_logado_supervisor, db_session):
     """Lote com todos os itens da área do supervisor: atualizados == total_solicitados, erros vazio."""
-    doc_a = MagicMock()
-    doc_a.exists = True
-    doc_a.to_dict.return_value = {
-        "area": "Manutencao",
-        "status": "Aberto",
-        "responsavel_id": None,
-        "solicitante_id": "sol_x",
-        "participantes": [],
-    }
-    doc_b = MagicMock()
-    doc_b.exists = True
-    doc_b.to_dict.return_value = {
-        "area": "Manutencao",
-        "status": "Aberto",
-        "responsavel_id": None,
-        "solicitante_id": "sol_y",
-        "participantes": [],
-    }
-    with (
-        patch("app.routes.api_chamados.db") as mock_db,
-        patch("app.routes.api_chamados.atualizar_status_chamado") as mock_atualizar,
-    ):
-        col = mock_db.collection.return_value
+    from tests.factories import make_chamado
 
-        def doc_side_effect(doc_id):
-            m = MagicMock()
-            m.get.return_value = doc_a if doc_id == "ch_a" else doc_b
-            return m
-
-        col.document.side_effect = doc_side_effect
+    chamado_a = make_chamado(
+        area="Manutencao", status="Aberto", responsavel_id=None, solicitante_id="sol_x"
+    )
+    chamado_b = make_chamado(
+        area="Manutencao", status="Aberto", responsavel_id=None, solicitante_id="sol_y"
+    )
+    with patch("app.routes.api_chamados.atualizar_status_chamado") as mock_atualizar:
         mock_atualizar.return_value = {"sucesso": True, "novo_status": "Em Atendimento"}
 
         r = client_logado_supervisor.post(
             "/api/bulk-status",
-            json={"chamado_ids": ["ch_a", "ch_b"], "novo_status": "Em Atendimento"},
+            json={
+                "chamado_ids": [str(chamado_a.id), str(chamado_b.id)],
+                "novo_status": "Em Atendimento",
+            },
             content_type="application/json",
             headers={"Origin": "http://localhost:5000"},
         )
@@ -88,7 +70,7 @@ def test_bulk_status_lote_100_por_cento_sucesso(client_logado_supervisor):
 
 
 def test_bulk_status_lote_falha_total_ainda_retorna_sucesso_true_no_topo(
-    client_logado_supervisor,
+    client_logado_supervisor, db_session
 ):
     """Regressão/documentação de contrato: quando NENHUM item do lote é atualizado
     (ex.: todos de outra área), o campo top-level "sucesso" continua True — só
@@ -98,24 +80,24 @@ def test_bulk_status_lote_falha_total_ainda_retorna_sucesso_true_no_topo(
     olha `data.sucesso` (como o JS de app/templates/dashboard.html fazia antes desta
     correção) não percebe que 0 de N chamados foram de fato atualizados.
     """
-    doc_outra_area = MagicMock()
-    doc_outra_area.exists = True
-    doc_outra_area.to_dict.return_value = {
-        "area": "TI",
-        "status": "Aberto",
-        "responsavel_id": None,
-        "solicitante_id": "sol_x",
-        "participantes": [],
-    }
-    with patch("app.routes.api_chamados.db") as mock_db:
-        mock_db.collection.return_value.document.return_value.get.return_value = doc_outra_area
+    from tests.factories import make_chamado
 
-        r = client_logado_supervisor.post(
-            "/api/bulk-status",
-            json={"chamado_ids": ["ch_ti_1", "ch_ti_2"], "novo_status": "Em Atendimento"},
-            content_type="application/json",
-            headers={"Origin": "http://localhost:5000"},
-        )
+    chamado_1 = make_chamado(
+        area="TI", status="Aberto", responsavel_id=None, solicitante_id="sol_x"
+    )
+    chamado_2 = make_chamado(
+        area="TI", status="Aberto", responsavel_id=None, solicitante_id="sol_x"
+    )
+
+    r = client_logado_supervisor.post(
+        "/api/bulk-status",
+        json={
+            "chamado_ids": [str(chamado_1.id), str(chamado_2.id)],
+            "novo_status": "Em Atendimento",
+        },
+        content_type="application/json",
+        headers={"Origin": "http://localhost:5000"},
+    )
     assert r.status_code == 200
     data = r.get_json()
     assert data.get("sucesso") is True
@@ -165,30 +147,25 @@ def client_logado_gestor_setor_dual_role(client, app):
 
 
 def test_bulk_status_gestor_setor_nao_altera_chamado_do_colega_na_mesma_area(
-    client_logado_gestor_setor_dual_role,
+    client_logado_gestor_setor_dual_role, db_session
 ):
     """QA (Nível 3): a leitura ampliada de gestor_setor sobre chamado do colega na
     própria área não pode virar permissão de escrita em lote — só enxergar, não
     poder editar (mesma regra já aplicada em /api/atualizar-status)."""
-    doc_colega = MagicMock()
-    doc_colega.exists = True
-    doc_colega.to_dict.return_value = {
-        "area": "Manutencao",
-        "status": "Aberto",
-        "responsavel_id": "colega_supervisor",
-        "solicitante_id": "sol_x",
-        "participantes": [],
-    }
-    with (
-        patch("app.routes.api_chamados.db") as mock_db,
-        patch("app.routes.api_chamados.atualizar_status_chamado") as mock_atualizar,
-    ):
-        mock_db.collection.return_value.document.return_value.get.return_value = doc_colega
+    from tests.factories import make_chamado
+
+    chamado_colega = make_chamado(
+        area="Manutencao",
+        status="Aberto",
+        responsavel_id="colega_supervisor",
+        solicitante_id="sol_x",
+    )
+    with patch("app.routes.api_chamados.atualizar_status_chamado") as mock_atualizar:
         mock_atualizar.return_value = {"sucesso": True, "novo_status": "Concluído"}
 
         r = client_logado_gestor_setor_dual_role.post(
             "/api/bulk-status",
-            json={"chamado_ids": ["ch_colega"], "novo_status": "Concluído"},
+            json={"chamado_ids": [str(chamado_colega.id)], "novo_status": "Concluído"},
             content_type="application/json",
             headers={"Origin": "http://localhost:5000"},
         )

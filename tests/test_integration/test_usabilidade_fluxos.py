@@ -179,29 +179,20 @@ def test_usabilidade_carregar_mais_estrutura_consistente(client_logado_superviso
 # --- U-STAT / U-EDIT: Ações e feedback ---
 
 
-def test_usabilidade_atualizar_status_resposta_sucesso_ou_erro_explicito(client_logado_supervisor):
+def test_usabilidade_atualizar_status_resposta_sucesso_ou_erro_explicito(
+    client_logado_supervisor, db_session
+):
     """U-STAT-01: Atualização de status com chamado existente retorna 200 com sucesso."""
-    from unittest.mock import MagicMock
+    from tests.factories import make_chamado
 
-    doc = MagicMock()
-    doc.exists = True
-    doc.to_dict.return_value = {"area": "Manutencao", "status": "Aberto", "solicitante_id": "s1"}
-    chamado_mock = MagicMock()
-    chamado_mock.area = "Manutencao"
-    chamado_mock.responsavel_id = None  # sem dono → supervisor da área pode ver
-    chamado_mock.solicitante_id = "s1"
-    chamado_mock.participantes = []
-    with (
-        patch("app.routes.api_chamados.db") as mock_db,
-        patch("app.routes.api_chamados.Chamado") as mock_chamado_cls,
-        patch("app.routes.api_chamados.atualizar_status_chamado") as mock_st,
-    ):
-        mock_db.collection.return_value.document.return_value.get.return_value = doc
-        mock_chamado_cls.from_dict.return_value = chamado_mock
+    chamado = make_chamado(
+        area="Manutencao", status="Aberto", responsavel_id=None, solicitante_id="s1"
+    )
+    with patch("app.routes.api_chamados.atualizar_status_chamado") as mock_st:
         mock_st.return_value = {"sucesso": True, "mensagem": "Ok", "novo_status": "Em Atendimento"}
         r = client_logado_supervisor.post(
             "/api/atualizar-status",
-            json={"chamado_id": "ch1", "novo_status": "Em Atendimento"},
+            json={"chamado_id": str(chamado.id), "novo_status": "Em Atendimento"},
             content_type="application/json",
         )
     assert r.status_code == 200
@@ -210,25 +201,25 @@ def test_usabilidade_atualizar_status_resposta_sucesso_ou_erro_explicito(client_
     assert "mensagem" in data or "novo_status" in data
 
 
-def test_usabilidade_bulk_status_retorna_resumo_atualizados_e_erros(client_logado_supervisor):
+def test_usabilidade_bulk_status_retorna_resumo_atualizados_e_erros(
+    client_logado_supervisor, db_session
+):
     """U-STAT-02: Bulk status retorna resumo (ou 403 por Origin)."""
-    with patch("app.routes.api_chamados.db") as mock_db:
-        doc = MagicMock()
-        doc.exists = True
-        doc.to_dict.return_value = {"area": "Manutencao", "status": "Aberto"}
-        mock_db.collection.return_value.document.return_value.get.return_value = doc
-        with patch("app.routes.api_chamados.atualizar_status_chamado") as mock_atualizar:
-            mock_atualizar.return_value = {
-                "sucesso": True,
-                "mensagem": "ok",
-                "novo_status": "Concluído",
-            }
-            r = client_logado_supervisor.post(
-                "/api/bulk-status",
-                json={"chamado_ids": ["ch1"], "novo_status": "Concluído"},
-                content_type="application/json",
-                headers={"Origin": "http://localhost:5000"},
-            )
+    from tests.factories import make_chamado
+
+    chamado = make_chamado(area="Manutencao", status="Aberto")
+    with patch("app.routes.api_chamados.atualizar_status_chamado") as mock_atualizar:
+        mock_atualizar.return_value = {
+            "sucesso": True,
+            "mensagem": "ok",
+            "novo_status": "Concluído",
+        }
+        r = client_logado_supervisor.post(
+            "/api/bulk-status",
+            json={"chamado_ids": [str(chamado.id)], "novo_status": "Concluído"},
+            content_type="application/json",
+            headers={"Origin": "http://localhost:5000"},
+        )
     assert r.status_code in (200, 403)
     if r.status_code == 200:
         data = r.get_json()

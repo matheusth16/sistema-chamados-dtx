@@ -211,38 +211,20 @@ def test_api_supervisores_disponibilidade_sem_login_retorna_401_json(client):
         assert "requer_login" in data or "erro" in data
 
 
-def test_bulk_status_supervisor_outra_area_retorna_erro_por_chamado(client_logado_supervisor):
+def test_bulk_status_supervisor_outra_area_retorna_erro_por_chamado(
+    client_logado_supervisor, db_session
+):
     """Edge case: no bulk-status, chamados de outra área do supervisor retornam em erros (sem permissão)."""
-    doc_manutencao = MagicMock()
-    doc_manutencao.exists = True
-    doc_manutencao.to_dict.return_value = {
-        "area": "Manutencao",
-        "status": "Aberto",
-        "responsavel_id": None,
-        "solicitante_id": "sol_outro",
-        "participantes": [],
-    }
-    doc_ti = MagicMock()
-    doc_ti.exists = True
-    doc_ti.to_dict.return_value = {
-        "area": "TI",
-        "status": "Aberto",
-        "responsavel_id": None,
-        "solicitante_id": "sol_outro",
-        "participantes": [],
-    }
-    with (
-        patch("app.routes.api_chamados.db") as mock_db,
-        patch("app.routes.api_chamados.atualizar_status_chamado") as mock_atualizar,
-    ):
-        col = mock_db.collection.return_value
+    from tests.factories import make_chamado
 
-        def doc_side_effect(doc_id):
-            m = MagicMock()
-            m.get.return_value = doc_manutencao if doc_id == "ch_manutencao" else doc_ti
-            return m
+    chamado_manutencao = make_chamado(
+        area="Manutencao", status="Aberto", responsavel_id=None, solicitante_id="sol_outro"
+    )
+    chamado_ti = make_chamado(
+        area="TI", status="Aberto", responsavel_id=None, solicitante_id="sol_outro"
+    )
 
-        col.document.side_effect = doc_side_effect
+    with patch("app.routes.api_chamados.atualizar_status_chamado") as mock_atualizar:
         mock_atualizar.return_value = {
             "sucesso": True,
             "mensagem": "ok",
@@ -250,7 +232,10 @@ def test_bulk_status_supervisor_outra_area_retorna_erro_por_chamado(client_logad
         }
         r = client_logado_supervisor.post(
             "/api/bulk-status",
-            json={"chamado_ids": ["ch_manutencao", "ch_ti"], "novo_status": "Em Atendimento"},
+            json={
+                "chamado_ids": [str(chamado_manutencao.id), str(chamado_ti.id)],
+                "novo_status": "Em Atendimento",
+            },
             content_type="application/json",
             headers={"Origin": "http://localhost:5000"},
         )
@@ -261,7 +246,7 @@ def test_bulk_status_supervisor_outra_area_retorna_erro_por_chamado(client_logad
     assert data.get("sucesso") is True
     assert "erros" in data
     erros_ids = [e.get("id") for e in data["erros"]]
-    assert "ch_ti" in erros_ids
+    assert str(chamado_ti.id) in erros_ids
     assert data.get("atualizados", 0) >= 0
 
 
@@ -274,25 +259,24 @@ def test_api_chamados_paginar_sem_login_retorna_401(client):
         assert data is not None and data.get("requer_login") is True
 
 
-def test_api_chamado_por_id_solicitante_chamado_de_outro_retorna_403(client_logado_solicitante):
+def test_api_chamado_por_id_solicitante_chamado_de_outro_retorna_403(
+    client_logado_solicitante, db_session
+):
     """CT-ID-01: Solicitante acessando chamado de outro usuário retorna 403 (acesso negado ou sem permissão)."""
-    mock_doc = MagicMock()
-    mock_doc.exists = True
-    mock_doc.id = "ch_123"
+    from tests.factories import make_chamado
+
     # solicitante_id diferente do current_user (sol_1) para simular chamado de outro
-    mock_doc.to_dict.return_value = {
-        "numero_chamado": "CHM-0001",
-        "categoria": "Chamado",
-        "status": "Aberto",
-        "descricao": "Desc",
-        "area": "Planejamento",
-        "solicitante_id": "outro_usuario_id",
-        "responsavel": "Alguém",
-        "tipo_solicitacao": "Manutencao",
-    }
-    with patch("app.routes.api_chamados.db") as mock_db:
-        mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
-        r = client_logado_solicitante.get("/api/chamado/ch_123")
+    chamado = make_chamado(
+        numero_chamado="CHM-0001",
+        categoria="Chamado",
+        status="Aberto",
+        descricao="Desc",
+        area="Planejamento",
+        solicitante_id="outro_usuario_id",
+        responsavel="Alguém",
+        tipo_solicitacao="Manutencao",
+    )
+    r = client_logado_solicitante.get(f"/api/chamado/{chamado.id}")
     assert r.status_code == 403
     data = r.get_json()
     assert data is not None and data.get("sucesso") is False
@@ -300,25 +284,23 @@ def test_api_chamado_por_id_solicitante_chamado_de_outro_retorna_403(client_loga
     assert "access denied" in erro or "denied" in erro or "permission" in erro
 
 
-def test_api_chamado_por_id_supervisor_sua_area_retorna_200(client_logado_supervisor):
+def test_api_chamado_por_id_supervisor_sua_area_retorna_200(client_logado_supervisor, db_session):
     """CT-ID-02: Supervisor vê chamado da sua área (Manutencao) e retorna 200."""
-    mock_doc = MagicMock()
-    mock_doc.exists = True
-    mock_doc.id = "ch_manutencao_1"
-    mock_doc.to_dict.return_value = {
-        "numero_chamado": "CHM-0002",
-        "categoria": "Chamado",
-        "status": "Aberto",
-        "descricao": "Descrição",
-        "area": "Manutencao",
-        "solicitante_id": "sol_1",
-        "responsavel": "Supervisor Teste",
-        "tipo_solicitacao": "Manutencao",
-    }
-    with patch("app.routes.api_chamados.db") as mock_db:
-        mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
-        with patch("app.routes.api_chamados.obter_sla_para_exibicao", return_value=None):
-            r = client_logado_supervisor.get("/api/chamado/ch_manutencao_1")
+    from tests.factories import make_chamado
+
+    chamado = make_chamado(
+        numero_chamado="CHM-0002",
+        categoria="Chamado",
+        status="Aberto",
+        descricao="Descrição",
+        area="Manutencao",
+        solicitante_id="sol_1",
+        responsavel="Supervisor Teste",
+        responsavel_id=None,
+        tipo_solicitacao="Manutencao",
+    )
+    with patch("app.routes.api_chamados.obter_sla_para_exibicao", return_value=None):
+        r = client_logado_supervisor.get(f"/api/chamado/{chamado.id}")
     assert r.status_code == 200
     data = r.get_json()
     assert data.get("sucesso") is True
@@ -330,36 +312,34 @@ def test_api_chamado_por_id_supervisor_sua_area_retorna_200(client_logado_superv
 # ── IDOR: POST body com chamado_id alheio ─────────────────────────────────────
 
 
-def test_post_editar_chamado_chamado_id_alheio_retorna_403(client_logado_solicitante):
+def test_post_editar_chamado_chamado_id_alheio_retorna_403(client_logado_solicitante, db_session):
     """CT-IDOR-POST-01: Solicitante com chamado_id de outro usuário no JSON → 403.
 
     Garante que o IDOR guard em /api/atualizar-status rejeita chamados cujo
     solicitante_id não corresponde ao current_user.id, mesmo com JSON válido.
     """
-    mock_doc = MagicMock()
-    mock_doc.exists = True
-    mock_doc.to_dict.return_value = {
-        "numero_chamado": "CHM-9999",
-        "categoria": "Chamado",
-        "status": "Aberto",
-        "descricao": "Desc alheio",
-        "area": "TI",
-        "solicitante_id": "outro_usuario",  # ≠ "sol_1" do fixture
-        "responsavel": "Resp",
-        "tipo_solicitacao": "Suporte",
-        "prioridade": 2,
-    }
-    with patch("app.routes.api_chamados.db") as mock_db:
-        mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
-        r = client_logado_solicitante.post(
-            "/api/atualizar-status",
-            json={
-                "chamado_id": "ch_alheio_99",
-                "novo_status": "Cancelado",
-                "motivo_cancelamento": "teste IDOR",
-            },
-            content_type="application/json",
-        )
+    from tests.factories import make_chamado
+
+    chamado = make_chamado(
+        numero_chamado="CHM-9999",
+        categoria="Chamado",
+        status="Aberto",
+        descricao="Desc alheio",
+        area="TI",
+        solicitante_id="outro_usuario",  # ≠ "sol_1" do fixture
+        responsavel="Resp",
+        tipo_solicitacao="Suporte",
+        prioridade=2,
+    )
+    r = client_logado_solicitante.post(
+        "/api/atualizar-status",
+        json={
+            "chamado_id": str(chamado.id),
+            "novo_status": "Cancelado",
+            "motivo_cancelamento": "teste IDOR",
+        },
+        content_type="application/json",
+    )
     assert r.status_code == 403
     data = r.get_json()
     assert data is not None and data.get("sucesso") is False
@@ -476,12 +456,11 @@ def test_filtro_perfil_supervisor_sem_areas_retorna_none():
 
     from app.routes.api_chamados import _aplicar_filtro_perfil
 
-    ref = MagicMock()
     user = MagicMock()
     user.perfil = "supervisor"
     user.areas = []
 
-    result = _aplicar_filtro_perfil(ref, user)
+    result = _aplicar_filtro_perfil(user)
     assert result is None, (
         "Supervisor sem áreas não deve receber ref sem filtro (exporia todos os chamados)"
     )

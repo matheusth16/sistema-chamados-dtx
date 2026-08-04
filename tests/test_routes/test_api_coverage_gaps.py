@@ -7,8 +7,10 @@ api_push_subscribe, api_chamados_paginar, carregar_mais, api_buscar_usuarios,
 api_editar_solicitante/cancelar_solicitante/anexo_solicitante (gestor read-only),
 api_transferir_area, api_escalonar_colega, api_incluir_participantes, api_concluir_minha_parte.
 
-Segue padrão do projeto: patch('app.routes.api_chamados.db'), patch do serviço no módulo de origem,
-fixtures client_logado_{solicitante,supervisor,admin,gestor}.
+Segue padrão do projeto (Fase 2 — Postgres real): tests/factories.py::make_chamado + fixture
+db_session pros testes que dependem de Chamado.get_by_id; api_colaboracao.py ainda não migrou,
+então patch('app.routes.api_colaboracao.db') continua válido só ali. Patch do serviço no módulo
+de origem, fixtures client_logado_{solicitante,supervisor,admin,gestor}.
 """
 
 from unittest.mock import MagicMock, patch
@@ -64,60 +66,44 @@ def _mock_chamado_obj(
 # ── _dados_chamado_reaberto_valido / _dados_chamado_confirmado_valido (unit) ──
 
 
-def test_dados_chamado_reaberto_valido_retorna_none_quando_nao_existe():
+def test_dados_chamado_reaberto_valido_retorna_none_quando_nao_existe(db_engine):
     from app.routes.api_chamados import _dados_chamado_reaberto_valido
 
-    doc = MagicMock()
-    doc.exists = False
-    with patch("app.routes.api_chamados.db") as mock_db:
-        mock_db.collection.return_value.document.return_value.get.return_value = doc
-        assert _dados_chamado_reaberto_valido("ch1") is None
+    assert _dados_chamado_reaberto_valido("999999999") is None
 
 
-def test_dados_chamado_reaberto_valido_retorna_none_quando_status_diferente():
+def test_dados_chamado_reaberto_valido_retorna_none_quando_status_diferente(db_session):
     from app.routes.api_chamados import _dados_chamado_reaberto_valido
+    from tests.factories import make_chamado
 
-    doc = MagicMock()
-    doc.exists = True
-    doc.to_dict.return_value = {"status": "Concluído", "confirmacao_solicitante": "reaberto"}
-    with patch("app.routes.api_chamados.db") as mock_db:
-        mock_db.collection.return_value.document.return_value.get.return_value = doc
-        assert _dados_chamado_reaberto_valido("ch1") is None
+    chamado = make_chamado(status="Concluído", confirmacao_solicitante="reaberto")
+    assert _dados_chamado_reaberto_valido(str(chamado.id)) is None
 
 
-def test_dados_chamado_reaberto_valido_retorna_dados_quando_valido():
+def test_dados_chamado_reaberto_valido_retorna_dados_quando_valido(db_session):
     from app.routes.api_chamados import _dados_chamado_reaberto_valido
+    from tests.factories import make_chamado
 
-    doc = MagicMock()
-    doc.exists = True
-    doc.to_dict.return_value = {"status": "Aberto", "confirmacao_solicitante": "reaberto"}
-    with patch("app.routes.api_chamados.db") as mock_db:
-        mock_db.collection.return_value.document.return_value.get.return_value = doc
-        result = _dados_chamado_reaberto_valido("ch1")
+    chamado = make_chamado(status="Aberto", confirmacao_solicitante="reaberto")
+    result = _dados_chamado_reaberto_valido(str(chamado.id))
     assert result is not None
     assert result["status"] == "Aberto"
 
 
-def test_dados_chamado_confirmado_valido_retorna_none_quando_nao_confirmado():
+def test_dados_chamado_confirmado_valido_retorna_none_quando_nao_confirmado(db_session):
     from app.routes.api_chamados import _dados_chamado_confirmado_valido
+    from tests.factories import make_chamado
 
-    doc = MagicMock()
-    doc.exists = True
-    doc.to_dict.return_value = {"confirmacao_solicitante": "pendente"}
-    with patch("app.routes.api_chamados.db") as mock_db:
-        mock_db.collection.return_value.document.return_value.get.return_value = doc
-        assert _dados_chamado_confirmado_valido("ch1") is None
+    chamado = make_chamado(confirmacao_solicitante="pendente")
+    assert _dados_chamado_confirmado_valido(str(chamado.id)) is None
 
 
-def test_dados_chamado_confirmado_valido_retorna_dados_quando_confirmado():
+def test_dados_chamado_confirmado_valido_retorna_dados_quando_confirmado(db_session):
     from app.routes.api_chamados import _dados_chamado_confirmado_valido
+    from tests.factories import make_chamado
 
-    doc = MagicMock()
-    doc.exists = True
-    doc.to_dict.return_value = {"confirmacao_solicitante": "confirmado"}
-    with patch("app.routes.api_chamados.db") as mock_db:
-        mock_db.collection.return_value.document.return_value.get.return_value = doc
-        result = _dados_chamado_confirmado_valido("ch1")
+    chamado = make_chamado(confirmacao_solicitante="confirmado")
+    result = _dados_chamado_confirmado_valido(str(chamado.id))
     assert result is not None
 
 
@@ -135,153 +121,125 @@ class _SyncThread:
             self._target()
 
 
-def test_enviar_notificacao_reabrir_executa_e_notifica(app):
+def test_enviar_notificacao_reabrir_executa_e_notifica(app, db_session):
     from app.routes.api_chamados import _enviar_notificacao_reabrir
+    from tests.factories import make_chamado
 
-    doc = MagicMock()
-    doc.exists = True
-    doc.to_dict.return_value = {
-        "status": "Aberto",
-        "confirmacao_solicitante": "reaberto",
-        "responsavel_id": "sup_1",
-        "numero_chamado": "CHM-001",
-        "categoria": "Manutencao",
-    }
+    chamado = make_chamado(
+        status="Aberto",
+        confirmacao_solicitante="reaberto",
+        responsavel_id="sup_1",
+        numero_chamado="CHM-001",
+        categoria="Manutencao",
+    )
 
     with (
-        patch("app.routes.api_chamados.db") as mock_db,
         patch("app.routes.api_chamados.threading.Thread", _SyncThread),
         patch("app.routes.api_chamados.Usuario.get_by_id", return_value=MagicMock(nome="Sup")),
         patch("app.services.notifications.notificar_supervisor_chamado_reaberto") as mock_notif,
     ):
-        mock_db.collection.return_value.document.return_value.get.return_value = doc
-        _enviar_notificacao_reabrir(app, "ch1", {}, "motivo reabertura", "Fulano")
+        _enviar_notificacao_reabrir(app, str(chamado.id), {}, "motivo reabertura", "Fulano")
 
     mock_notif.assert_called_once()
 
 
-def test_enviar_notificacao_reabrir_excecao_e_logada_sem_propagar(app):
+def test_enviar_notificacao_reabrir_excecao_e_logada_sem_propagar(app, db_session):
     from app.routes.api_chamados import _enviar_notificacao_reabrir
+    from tests.factories import make_chamado
 
-    doc = MagicMock()
-    doc.exists = True
-    doc.to_dict.return_value = {
-        "status": "Aberto",
-        "confirmacao_solicitante": "reaberto",
-        "responsavel_id": "sup_1",
-    }
+    chamado = make_chamado(
+        status="Aberto", confirmacao_solicitante="reaberto", responsavel_id="sup_1"
+    )
 
     with (
-        patch("app.routes.api_chamados.db") as mock_db,
         patch("app.routes.api_chamados.threading.Thread", _SyncThread),
         patch(
             "app.routes.api_chamados.Usuario.get_by_id", side_effect=RuntimeError("falha usuario")
         ),
     ):
-        mock_db.collection.return_value.document.return_value.get.return_value = doc
         # Não deve levantar exceção — apenas logar e seguir
-        _enviar_notificacao_reabrir(app, "ch1", {}, "motivo", "Fulano")
+        _enviar_notificacao_reabrir(app, str(chamado.id), {}, "motivo", "Fulano")
 
 
-def test_enviar_notificacao_reabrir_chamado_invalido_nao_notifica(app):
+def test_enviar_notificacao_reabrir_chamado_invalido_nao_notifica(app, db_engine):
     from app.routes.api_chamados import _enviar_notificacao_reabrir
 
-    doc = MagicMock()
-    doc.exists = False
-
     with (
-        patch("app.routes.api_chamados.db") as mock_db,
         patch("app.routes.api_chamados.threading.Thread", _SyncThread),
         patch("app.services.notifications.notificar_supervisor_chamado_reaberto") as mock_notif,
     ):
-        mock_db.collection.return_value.document.return_value.get.return_value = doc
-        _enviar_notificacao_reabrir(app, "ch1", {}, "motivo", "Fulano")
+        _enviar_notificacao_reabrir(app, "999999999", {}, "motivo", "Fulano")
 
     mock_notif.assert_not_called()
 
 
-def test_enviar_notificacao_confirmar_executa_e_notifica(app):
+def test_enviar_notificacao_confirmar_executa_e_notifica(app, db_session):
     from app.routes.api_chamados import _enviar_notificacao_confirmar
+    from tests.factories import make_chamado
 
-    doc = MagicMock()
-    doc.exists = True
-    doc.to_dict.return_value = {
-        "confirmacao_solicitante": "confirmado",
-        "responsavel_id": "sup_1",
-        "numero_chamado": "CHM-001",
-        "categoria": "Manutencao",
-    }
+    chamado = make_chamado(
+        confirmacao_solicitante="confirmado",
+        responsavel_id="sup_1",
+        numero_chamado="CHM-001",
+        categoria="Manutencao",
+    )
 
     with (
-        patch("app.routes.api_chamados.db") as mock_db,
         patch("app.routes.api_chamados.threading.Thread", _SyncThread),
         patch("app.routes.api_chamados.Usuario.get_by_id", return_value=MagicMock(nome="Sup")),
         patch("app.services.notifications.notificar_responsavel_chamado_confirmado") as mock_notif,
     ):
-        mock_db.collection.return_value.document.return_value.get.return_value = doc
-        _enviar_notificacao_confirmar(app, "ch1", {}, "Fulano")
+        _enviar_notificacao_confirmar(app, str(chamado.id), {}, "Fulano")
 
     mock_notif.assert_called_once()
 
 
-def test_enviar_notificacao_confirmar_sem_responsavel_nao_notifica(app):
+def test_enviar_notificacao_confirmar_sem_responsavel_nao_notifica(app, db_session):
     from app.routes.api_chamados import _enviar_notificacao_confirmar
+    from tests.factories import make_chamado
 
-    doc = MagicMock()
-    doc.exists = True
-    doc.to_dict.return_value = {
-        "confirmacao_solicitante": "confirmado",
-        "responsavel_id": None,
-        "numero_chamado": "CHM-001",
-        "categoria": "Manutencao",
-    }
+    chamado = make_chamado(
+        confirmacao_solicitante="confirmado",
+        responsavel_id=None,
+        numero_chamado="CHM-001",
+        categoria="Manutencao",
+    )
 
     with (
-        patch("app.routes.api_chamados.db") as mock_db,
         patch("app.routes.api_chamados.threading.Thread", _SyncThread),
         patch("app.services.notifications.notificar_responsavel_chamado_confirmado") as mock_notif,
     ):
-        mock_db.collection.return_value.document.return_value.get.return_value = doc
-        _enviar_notificacao_confirmar(app, "ch1", {"responsavel_id": None}, "Fulano")
+        _enviar_notificacao_confirmar(app, str(chamado.id), {"responsavel_id": None}, "Fulano")
 
     mock_notif.assert_not_called()
 
 
-def test_enviar_notificacao_confirmar_excecao_e_logada_sem_propagar(app):
+def test_enviar_notificacao_confirmar_excecao_e_logada_sem_propagar(app, db_session):
     from app.routes.api_chamados import _enviar_notificacao_confirmar
+    from tests.factories import make_chamado
 
-    doc = MagicMock()
-    doc.exists = True
-    doc.to_dict.return_value = {
-        "confirmacao_solicitante": "confirmado",
-        "responsavel_id": "sup_1",
-    }
+    chamado = make_chamado(confirmacao_solicitante="confirmado", responsavel_id="sup_1")
 
     with (
-        patch("app.routes.api_chamados.db") as mock_db,
         patch("app.routes.api_chamados.threading.Thread", _SyncThread),
         patch(
             "app.routes.api_chamados.Usuario.get_by_id", side_effect=RuntimeError("falha usuario")
         ),
     ):
-        mock_db.collection.return_value.document.return_value.get.return_value = doc
-        _enviar_notificacao_confirmar(app, "ch1", {}, "Fulano")
+        _enviar_notificacao_confirmar(app, str(chamado.id), {}, "Fulano")
 
 
-def test_enviar_notificacao_confirmar_chamado_invalido_nao_notifica(app):
+def test_enviar_notificacao_confirmar_chamado_invalido_nao_notifica(app, db_session):
     from app.routes.api_chamados import _enviar_notificacao_confirmar
+    from tests.factories import make_chamado
 
-    doc = MagicMock()
-    doc.exists = True
-    doc.to_dict.return_value = {"confirmacao_solicitante": "pendente"}
+    chamado = make_chamado(confirmacao_solicitante="pendente")
 
     with (
-        patch("app.routes.api_chamados.db") as mock_db,
         patch("app.routes.api_chamados.threading.Thread", _SyncThread),
         patch("app.services.notifications.notificar_responsavel_chamado_confirmado") as mock_notif,
     ):
-        mock_db.collection.return_value.document.return_value.get.return_value = doc
-        _enviar_notificacao_confirmar(app, "ch1", {}, "Fulano")
+        _enviar_notificacao_confirmar(app, str(chamado.id), {}, "Fulano")
 
     mock_notif.assert_not_called()
 
@@ -289,13 +247,16 @@ def test_enviar_notificacao_confirmar_chamado_invalido_nao_notifica(app):
 # ── POST /api/atualizar-status: transição bloqueada (linha 303) ──────────────
 
 
-def test_atualizar_status_ajax_transicao_bloqueada_retorna_403(client_logado_supervisor):
-    doc = _chamado_doc_mock(status="Concluído", confirmacao_solicitante="confirmado")
-    chamado_mock = _mock_chamado_obj(status="Concluído")
+def test_atualizar_status_ajax_transicao_bloqueada_retorna_403(
+    client_logado_supervisor, db_session
+):
+    from tests.factories import make_chamado
+
+    chamado = make_chamado(
+        status="Concluído", area="Manutencao", confirmacao_solicitante="confirmado"
+    )
 
     with (
-        patch("app.routes.api_chamados.db") as mock_db,
-        patch("app.routes.api_chamados.Chamado") as mock_chamado_cls,
         patch(
             "app.routes.api_chamados.verificar_permissao_mudanca_status", return_value=(True, None)
         ),
@@ -304,12 +265,9 @@ def test_atualizar_status_ajax_transicao_bloqueada_retorna_403(client_logado_sup
             return_value=(False, "bloqueado"),
         ),
     ):
-        mock_db.collection.return_value.document.return_value.get.return_value = doc
-        mock_chamado_cls.from_dict.return_value = chamado_mock
-
         resp = client_logado_supervisor.post(
             "/api/atualizar-status",
-            json={"chamado_id": "ch1", "novo_status": "Em Atendimento"},
+            json={"chamado_id": str(chamado.id), "novo_status": "Em Atendimento"},
             content_type="application/json",
         )
 
@@ -360,24 +318,25 @@ def test_bulk_atualizar_status_json_vazio_retorna_400(client_logado_supervisor):
 # ── POST /api/bulk-atualizar-status: pode_trans False + resultado falho (449-452, 463) ──
 
 
-def test_bulk_atualizar_status_transicao_bloqueada_adiciona_erro(client_logado_supervisor):
-    doc = _chamado_doc_mock(status="Concluído", confirmacao_solicitante="confirmado")
+def test_bulk_atualizar_status_transicao_bloqueada_adiciona_erro(
+    client_logado_supervisor, db_session
+):
+    from tests.factories import make_chamado
+
+    chamado = make_chamado(
+        status="Concluído", area="Manutencao", confirmacao_solicitante="confirmado"
+    )
 
     with (
-        patch("app.routes.api_chamados.db") as mock_db,
-        patch("app.routes.api_chamados.Chamado") as mock_chamado_cls,
-        patch("app.routes.api_chamados.usuario_pode_ver_chamado", return_value=True),
+        patch("app.routes.api_chamados.usuario_pode_operar_chamado", return_value=True),
         patch(
             "app.services.permission_validation.chamado_aceita_transicao_status",
             return_value=(False, "bloqueado"),
         ),
     ):
-        mock_db.collection.return_value.document.return_value.get.return_value = doc
-        mock_chamado_cls.from_dict.return_value = _mock_chamado_obj(status="Concluído")
-
         resp = client_logado_supervisor.post(
             "/api/bulk-status",
-            json={"chamado_ids": ["ch1"], "novo_status": "Em Atendimento"},
+            json={"chamado_ids": [str(chamado.id)], "novo_status": "Em Atendimento"},
             content_type="application/json",
         )
 
@@ -387,13 +346,15 @@ def test_bulk_atualizar_status_transicao_bloqueada_adiciona_erro(client_logado_s
     assert len(data["erros"]) == 1
 
 
-def test_bulk_atualizar_status_servico_retorna_erro_e_registra(client_logado_supervisor):
-    doc = _chamado_doc_mock(status="Em Atendimento")
+def test_bulk_atualizar_status_servico_retorna_erro_e_registra(
+    client_logado_supervisor, db_session
+):
+    from tests.factories import make_chamado
+
+    chamado = make_chamado(status="Em Atendimento", area="Manutencao", responsavel_id="sup_1")
 
     with (
-        patch("app.routes.api_chamados.db") as mock_db,
-        patch("app.routes.api_chamados.Chamado") as mock_chamado_cls,
-        patch("app.routes.api_chamados.usuario_pode_ver_chamado", return_value=True),
+        patch("app.routes.api_chamados.usuario_pode_operar_chamado", return_value=True),
         patch(
             "app.services.permission_validation.chamado_aceita_transicao_status",
             return_value=(True, None),
@@ -403,12 +364,9 @@ def test_bulk_atualizar_status_servico_retorna_erro_e_registra(client_logado_sup
             return_value={"sucesso": False, "erro": "Falha ao salvar"},
         ),
     ):
-        mock_db.collection.return_value.document.return_value.get.return_value = doc
-        mock_chamado_cls.from_dict.return_value = _mock_chamado_obj(status="Em Atendimento")
-
         resp = client_logado_supervisor.post(
             "/api/bulk-status",
-            json={"chamado_ids": ["ch1"], "novo_status": "Concluído"},
+            json={"chamado_ids": [str(chamado.id)], "novo_status": "Concluído"},
             content_type="application/json",
         )
 
@@ -436,12 +394,9 @@ def test_api_push_subscribe_sucesso_retorna_200(client_logado_supervisor):
 
 
 def test_api_chamados_paginar_limite_invalido_usa_padrao(client_logado_admin):
-    with (
-        patch("app.routes.api_chamados.db"),
-        patch(
-            "app.routes.api_chamados.aplicar_filtros_dashboard_com_paginacao",
-            return_value={"docs": [], "proximo_cursor": None, "tem_proxima": False},
-        ),
+    with patch(
+        "app.routes.api_chamados.aplicar_filtros_dashboard_com_paginacao",
+        return_value={"docs": [], "proximo_cursor": None, "tem_proxima": False},
     ):
         resp = client_logado_admin.get("/api/chamados/paginar?limite=9999")
 

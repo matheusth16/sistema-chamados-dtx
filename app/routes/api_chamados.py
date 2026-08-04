@@ -8,10 +8,11 @@ import threading
 
 from flask import abort, current_app, jsonify, request, session
 from flask_login import current_user, login_required
-from google.cloud.firestore_v1.base_query import FieldFilter
+from sqlalchemy import text
 
+from app import db as db_module
 from app.cache import cache_set
-from app.database import db
+from app.db.models.chamado import ChamadoRow
 from app.i18n import get_translation
 from app.limiter import limiter
 from app.models import Chamado
@@ -38,10 +39,10 @@ def _t(key, **kwargs):
 
 def _dados_chamado_reaberto_valido(chamado_id: str) -> dict | None:
     """Retorna dados do chamado se ainda existir e estiver reaberto; senão None."""
-    doc = db.collection("chamados").document(chamado_id).get()
-    if not doc.exists:
+    chamado = Chamado.get_by_id(chamado_id)
+    if chamado is None:
         return None
-    atual = doc.to_dict() or {}
+    atual = chamado.to_dict()
     if atual.get("status") != "Aberto" or atual.get("confirmacao_solicitante") != "reaberto":
         return None
     return atual
@@ -84,10 +85,10 @@ def _enviar_notificacao_reabrir(
 
 def _dados_chamado_confirmado_valido(chamado_id: str) -> dict | None:
     """Retorna dados do chamado se confirmacao_solicitante == 'confirmado'; senão None."""
-    doc = db.collection("chamados").document(chamado_id).get()
-    if not doc.exists:
+    chamado = Chamado.get_by_id(chamado_id)
+    if chamado is None:
         return None
-    atual = doc.to_dict() or {}
+    atual = chamado.to_dict()
     if atual.get("confirmacao_solicitante") != "confirmado":
         return None
     return atual
@@ -148,7 +149,7 @@ def health():
     """Health check para monitoramento externo.
 
     Modo raso (padrão): apenas confirma que a app está no ar — rápido, sem I/O.
-    Modo deep (?deep=1): verifica conectividade com Firestore — para UptimeRobot/BetterUptime.
+    Modo deep (?deep=1): verifica conectividade com Postgres — para UptimeRobot/BetterUptime.
 
     Autenticação (quando HEALTH_SECRET estiver configurado):
       Exigida em AMBOS os modos (raso e deep) — impede mapeamento de liveness por atacantes.
@@ -186,13 +187,14 @@ def health():
     optional_checks: dict[str, str] = {}
     start = time.perf_counter()
 
-    # Firestore: dependência crítica — sem ela a app não funciona
+    # Postgres: dependência crítica — sem ele a app não funciona
     try:
-        db.collection("__health__").limit(1).get()
-        critical_checks["firestore"] = "ok"
+        with db_module.SessionLocal() as session:
+            session.execute(text("SELECT 1"))
+        critical_checks["postgres"] = "ok"
     except Exception as exc:
-        critical_checks["firestore"] = f"error:{type(exc).__name__}"
-        logger.error("health_check firestore falhou: %s", exc)
+        critical_checks["postgres"] = f"error:{type(exc).__name__}"
+        logger.error("health_check postgres falhou: %s", exc)
 
     # Redis / cache em memória — opcional, degrada performance mas não bloqueia
     try:
@@ -305,11 +307,9 @@ def atualizar_status_ajax():
                 {"sucesso": False, "erro": _t("cancellation_reason_required_field")}
             ), 400
 
-        doc_chamado = db.collection("chamados").document(chamado_id).get()
-        if not doc_chamado.exists:
+        chamado_obj = Chamado.get_by_id(chamado_id)
+        if chamado_obj is None:
             return jsonify({"sucesso": False, "erro": _t("ticket_not_found")}), 404
-
-        chamado_obj = Chamado.from_dict(doc_chamado.to_dict(), chamado_id)
 
         permitido, erro_perm = verificar_permissao_mudanca_status(
             current_user, chamado_obj, novo_status
@@ -350,7 +350,7 @@ def atualizar_status_ajax():
             usuario_nome=current_user.nome,
             motivo_cancelamento=motivo_cancelamento if novo_status == "Cancelado" else None,
             motivo_reabertura=motivo_reabertura if novo_status == "Aberto" else None,
-            data_chamado=doc_chamado.to_dict(),
+            data_chamado=chamado_obj.to_dict(),
         )
         if resultado["sucesso"]:
             return jsonify(
@@ -453,12 +453,11 @@ def bulk_atualizar_status():
         erros = []
         for chamado_id in ids:
             try:
-                doc = db.collection("chamados").document(chamado_id).get()
-                if not doc.exists:
+                chamado_obj = Chamado.get_by_id(chamado_id)
+                if chamado_obj is None:
                     erros.append({"id": chamado_id, "erro": _t("not_found_short")})
                     continue
-                doc_data = doc.to_dict()
-                chamado_obj = Chamado.from_dict(doc_data, chamado_id)
+                doc_data = chamado_obj.to_dict()
                 if not usuario_pode_operar_chamado(current_user, chamado_obj):
                     erros.append({"id": chamado_id, "erro": _t("no_permission_for_ticket")})
                     continue
@@ -509,10 +508,9 @@ def bulk_atualizar_status():
 def api_chamado_por_id(chamado_id: str):
     """Retorna um chamado por ID (JSON). Usado pelo dashboard para atualizar a linha após fechar o modal/aba de detalhes."""
     try:
-        doc_chamado = db.collection("chamados").document(chamado_id).get()
-        if not doc_chamado.exists:
+        chamado = Chamado.get_by_id(chamado_id)
+        if chamado is None:
             return jsonify({"sucesso": False, "erro": _t("ticket_not_found")}), 404
-        chamado = Chamado.from_dict(doc_chamado.to_dict(), chamado_id)
         if not usuario_pode_ver_chamado(current_user, chamado):
             return jsonify({"sucesso": False, "erro": _t("no_permission_generic")}), 403
         sla_info = obter_sla_para_exibicao(chamado)
@@ -535,21 +533,21 @@ def api_chamado_por_id(chamado_id: str):
         return jsonify({"sucesso": False, "erro": _t("internal_error_retry")}), 500
 
 
-def _aplicar_filtro_perfil(ref, user):
-    """Restringe a query de chamados ao escopo do perfil — evita IDOR por omissão de filtro.
+def _aplicar_filtro_perfil(user):
+    """Condições de escopo de chamados por perfil — evita IDOR por omissão de filtro.
 
-    Supervisor: usa campo desnormalizado supervisor_ids_com_acesso (array_contains).
+    Supervisor: usa campo desnormalizado supervisor_ids_com_acesso (array contains).
     Retorna None quando o supervisor não tem áreas configuradas:
     callers devem tratar None como lista vazia (não chamar aplicar_filtros).
     """
     if user.perfil == "solicitante":
-        return ref.where(filter=FieldFilter("solicitante_id", "==", user.id))
+        return [ChamadoRow.solicitante_id == user.id]
     if user.perfil == "supervisor":
         areas = list(getattr(user, "areas", None) or [])
         if not areas:
             return None  # Supervisor sem áreas não deve ver nenhum chamado
-        return ref.where(filter=FieldFilter("supervisor_ids_com_acesso", "array_contains", user.id))
-    return ref  # admin/admin_global: sem restrição
+        return [ChamadoRow.supervisor_ids_com_acesso.contains([user.id])]
+    return []  # admin/admin_global: sem restrição
 
 
 @main.route("/api/chamados/paginar", methods=["GET"])
@@ -561,8 +559,8 @@ def api_chamados_paginar():
         cursor = request.args.get("cursor")
         if limite < 1 or limite > 100:
             limite = 50
-        chamados_ref = _aplicar_filtro_perfil(db.collection("chamados"), current_user)
-        if chamados_ref is None:
+        condicoes = _aplicar_filtro_perfil(current_user)
+        if condicoes is None:
             return jsonify(
                 {
                     "sucesso": True,
@@ -576,15 +574,13 @@ def api_chamados_paginar():
                 }
             ), 200
         resultado = aplicar_filtros_dashboard_com_paginacao(
-            chamados_ref, request.args, limite=limite, cursor=cursor
+            condicoes, request.args, limite=limite, cursor=cursor
         )
         chamados_dict = []
-        for doc in resultado["docs"]:
-            data = doc.to_dict()
-            c = Chamado.from_dict(data, doc.id)
+        for c in resultado["docs"]:
             chamados_dict.append(
                 {
-                    "id": doc.id,
+                    "id": c.id,
                     "numero": c.numero_chamado,
                     "categoria": c.categoria,
                     "rl_codigo": c.rl_codigo or "-",
@@ -624,8 +620,8 @@ def carregar_mais():
         dados = request.get_json() or {}
         cursor = dados.get("cursor")
         limite = min(dados.get("limite", 20), 50)
-        chamados_ref = _aplicar_filtro_perfil(db.collection("chamados"), current_user)
-        if chamados_ref is None:
+        condicoes = _aplicar_filtro_perfil(current_user)
+        if condicoes is None:
             return jsonify(
                 {
                     "sucesso": True,
@@ -635,15 +631,13 @@ def carregar_mais():
                 }
             ), 200
         resultado = aplicar_filtros_dashboard_com_paginacao(
-            chamados_ref, request.args, limite=limite, cursor=cursor
+            condicoes, request.args, limite=limite, cursor=cursor
         )
         chamados_dict = []
-        for doc in resultado["docs"]:
-            data = doc.to_dict()
-            c = Chamado.from_dict(data, doc.id)
+        for c in resultado["docs"]:
             chamados_dict.append(
                 {
-                    "id": doc.id,
+                    "id": c.id,
                     "numero": c.numero_chamado,
                     "categoria": c.categoria,
                     "status": c.status,
@@ -726,11 +720,11 @@ def api_confirmar_resolucao(chamado_id: str):
         return jsonify({"sucesso": False, "erro": _t("ticket_reopen_reason_required")}), 400
 
     try:
-        doc = db.collection("chamados").document(chamado_id).get()
-        if not doc.exists:
+        chamado = Chamado.get_by_id(chamado_id)
+        if chamado is None:
             return jsonify({"sucesso": False, "erro": _t("ticket_not_found")}), 404
 
-        data = doc.to_dict()
+        data = chamado.to_dict()
 
         if data.get("solicitante_id") != current_user.id:
             return jsonify({"sucesso": False, "erro": _t("access_denied_generic")}), 403
@@ -739,9 +733,7 @@ def api_confirmar_resolucao(chamado_id: str):
             return jsonify({"sucesso": False, "erro": _t("ticket_not_awaiting_confirmation")}), 400
 
         if acao == "confirmar":
-            db.collection("chamados").document(chamado_id).update(
-                {"confirmacao_solicitante": "confirmado"}
-            )
+            chamado.atualizar_campos(confirmacao_solicitante="confirmado")
             with contextlib.suppress(RuntimeError):
                 _enviar_notificacao_confirmar(
                     current_app._get_current_object(),
@@ -759,22 +751,20 @@ def api_confirmar_resolucao(chamado_id: str):
                     }
                 ), 403
 
-            db.collection("chamados").document(chamado_id).update(
-                {
-                    "status": "Aberto",
-                    "confirmacao_solicitante": "reaberto",
-                    "data_conclusao": None,
-                    "escalacao_resposta_nivel": 0,  # ADR-004: Escada A reinicia na reabertura
-                    # Fase 7 — Escada B: reinicia junto com Escada A na reabertura
-                    "escalacao_resolucao_nivel": 0,
-                    "alerta_supervisor_50_enviado": False,
-                    "alerta_supervisor_80_enviado": False,
-                    # Lembretes resetados para que o próximo ciclo de conclusão funcione
-                    "lembrete_confirmacao_1_enviado": False,
-                    "lembrete_confirmacao_2_enviado": False,
-                    # Limite de auto-reabertura (Nível 1): supervisor/admin reabrem sem esse teto
-                    "reaberturas_solicitante_count": reaberturas_atual + 1,
-                }
+            chamado.atualizar_campos(
+                status="Aberto",
+                confirmacao_solicitante="reaberto",
+                data_conclusao=None,
+                escalacao_resposta_nivel=0,  # ADR-004: Escada A reinicia na reabertura
+                # Fase 7 — Escada B: reinicia junto com Escada A na reabertura
+                escalacao_resolucao_nivel=0,
+                alerta_supervisor_50_enviado=False,
+                alerta_supervisor_80_enviado=False,
+                # Lembretes resetados para que o próximo ciclo de conclusão funcione
+                lembrete_confirmacao_1_enviado=False,
+                lembrete_confirmacao_2_enviado=False,
+                # Limite de auto-reabertura (Nível 1): supervisor/admin reabrem sem esse teto
+                reaberturas_solicitante_count=reaberturas_atual + 1,
             )
             Historico(
                 chamado_id=chamado_id,
