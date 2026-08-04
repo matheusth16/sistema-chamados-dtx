@@ -178,6 +178,31 @@ def fase_dump() -> None:
 # ─────────────────────────────────────────────────────────────────────────
 
 
+def _init_db_module() -> None:
+    """Inicializa app.db.engine/SessionLocal sem precisar de create_app() —
+    este script nunca sobe a app Flask inteira, só a camada de dado. Usa
+    DATABASE_URL diretamente (não TEST_DATABASE_URL/DATABASE_URL como o
+    alembic/env.py faz — aqui é sempre explícito, sem ambiguidade)."""
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import scoped_session, sessionmaker
+
+    from app import db as db_module
+    from app.db import normalizar_url_driver
+
+    if db_module.SessionLocal is not None:
+        return  # já inicializado (chamada repetida dentro do mesmo processo)
+
+    database_url = os.environ.get("DATABASE_URL")
+    if not database_url:
+        raise RuntimeError("DATABASE_URL não configurada — obrigatória para --load/--verify")
+
+    db_module.engine = create_engine(normalizar_url_driver(database_url), pool_pre_ping=True)
+    db_module.SessionLocal = scoped_session(
+        sessionmaker(bind=db_module.engine, autoflush=False, expire_on_commit=False)
+    )
+    logger.info("Postgres inicializado: %s", database_url.split("@")[-1])
+
+
 def _ler_jsonl(nome: str):
     caminho = DUMP_DIR / f"{nome}.jsonl"
     if not caminho.exists():
@@ -547,6 +572,7 @@ def _alinhar_sequence() -> None:
 
 
 def fase_load() -> None:
+    _init_db_module()
     logger.info("=== LOAD: schema deve estar vazio (alembic upgrade head recém-aplicado) ===")
     _load_categorias()
     _load_grupos_rl()
@@ -708,6 +734,7 @@ def verificar_sequence() -> list[str]:
 
 
 def fase_verify() -> None:
+    _init_db_module()
     logger.info("=== VERIFY ===")
     erros: list[str] = []
     erros += verificar_contagens()
