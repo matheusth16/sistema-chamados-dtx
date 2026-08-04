@@ -1,12 +1,11 @@
 """
 Testes do serviço de edição de chamados (processar_edicao_chamado).
 
-Fase 2 (Marco 7): a leitura/escrita do CHAMADO usa Chamado.get_by_id()/
-atualizar_campos() (Postgres) — db.collection("chamados") não existe mais
-aqui. Historico continua em Firestore (Marco 8), então `db` ainda é
-mockado só para o batch de histórico. Chamado é mockado como classe (não
-precisa de Postgres real neste arquivo — só o contrato get_by_id/
-atualizar_campos importa aqui).
+Fase 2 (Marco 7 + 8): leitura/escrita do CHAMADO usa Chamado.get_by_id()/
+atualizar_campos() (Postgres) e o histórico usa Historico.salvar_lote()
+(Postgres, Marco 8) — nenhum dos dois toca Firestore mais. Chamado e
+Historico são mockados como classe (não precisa de Postgres real neste
+arquivo — só o contrato get_by_id/atualizar_campos/salvar_lote importa aqui).
 """
 
 from unittest.mock import MagicMock, patch
@@ -64,10 +63,6 @@ def _make_chamado_mock(data=None, **attrs):
     return m
 
 
-def _patch_batch(mock_db):
-    mock_db.batch.return_value = MagicMock()
-
-
 # ── Guardas de entrada ─────────────────────────────────────────────────────────
 
 
@@ -100,7 +95,6 @@ def test_processar_edicao_chamado_nao_encontrado_retorna_404(app):
 
     with (
         app.app_context(),
-        patch("app.services.edicao_chamado_service.db"),
         patch("app.services.edicao_chamado_service.Chamado") as mock_chamado_cls,
     ):
         mock_chamado_cls.get_by_id.return_value = None
@@ -127,7 +121,6 @@ def test_processar_edicao_supervisor_sem_permissao_retorna_403(app):
 
     with (
         app.app_context(),
-        patch("app.services.edicao_chamado_service.db"),
         patch("app.services.edicao_chamado_service.Chamado") as mock_chamado_cls,
         patch("app.services.permissions.usuario_pode_ver_chamado", return_value=False),
     ):
@@ -164,7 +157,6 @@ def test_processar_edicao_supervisor_observador_fora_da_area_retorna_403(app):
 
     with (
         app.app_context(),
-        patch("app.services.edicao_chamado_service.db"),
         patch("app.services.edicao_chamado_service.Chamado") as mock_chamado_cls,
         patch("app.services.edicao_chamado_service.atualizar_status_chamado") as mock_status,
         # Simula o que usuario_pode_ver_chamado retorna de verdade pra um observador:
@@ -202,7 +194,6 @@ def test_processar_edicao_concluido_pendente_retorna_403(app):
 
     with (
         app.app_context(),
-        patch("app.services.edicao_chamado_service.db"),
         patch("app.services.edicao_chamado_service.Chamado") as mock_chamado_cls,
     ):
         mock_chamado_cls.get_by_id.return_value = _make_chamado_mock(
@@ -234,7 +225,6 @@ def test_processar_edicao_concluido_confirmado_retorna_403(app):
 
     with (
         app.app_context(),
-        patch("app.services.edicao_chamado_service.db"),
         patch("app.services.edicao_chamado_service.Chamado") as mock_chamado_cls,
         patch("app.services.permissions.usuario_pode_ver_chamado", return_value=True),
     ):
@@ -268,7 +258,6 @@ def test_processar_edicao_sem_alteracoes_retorna_sucesso(app):
 
     with (
         app.app_context(),
-        patch("app.services.edicao_chamado_service.db"),
         patch("app.services.edicao_chamado_service.Chamado") as mock_chamado_cls,
     ):
         mock_chamado_cls.get_by_id.return_value = _make_chamado_mock()
@@ -297,11 +286,9 @@ def test_processar_edicao_muda_status_com_sucesso(app):
 
     with (
         app.app_context(),
-        patch("app.services.edicao_chamado_service.db") as mock_db,
         patch("app.services.edicao_chamado_service.Chamado") as mock_chamado_cls,
         patch("app.services.edicao_chamado_service.atualizar_status_chamado") as mock_status,
     ):
-        _patch_batch(mock_db)
         mock_chamado_cls.get_by_id.return_value = _make_chamado_mock()
         mock_status.return_value = {"sucesso": True, "mensagem": "Status atualizado"}
         result = processar_edicao_chamado(
@@ -327,7 +314,6 @@ def test_processar_edicao_cancelamento_sem_motivo_retorna_erro(app):
 
     with (
         app.app_context(),
-        patch("app.services.edicao_chamado_service.db"),
         patch("app.services.edicao_chamado_service.Chamado") as mock_chamado_cls,
     ):
         mock_chamado_cls.get_by_id.return_value = _make_chamado_mock()
@@ -354,11 +340,9 @@ def test_processar_edicao_cancelamento_com_motivo_chama_status(app):
 
     with (
         app.app_context(),
-        patch("app.services.edicao_chamado_service.db") as mock_db,
         patch("app.services.edicao_chamado_service.Chamado") as mock_chamado_cls,
         patch("app.services.edicao_chamado_service.atualizar_status_chamado") as mock_status,
     ):
-        _patch_batch(mock_db)
         mock_chamado_cls.get_by_id.return_value = _make_chamado_mock()
         mock_status.return_value = {"sucesso": True, "mensagem": "Cancelado"}
         result = processar_edicao_chamado(
@@ -388,7 +372,6 @@ def test_processar_edicao_sla_invalido_retorna_erro(app):
 
     with (
         app.app_context(),
-        patch("app.services.edicao_chamado_service.db"),
         patch("app.services.edicao_chamado_service.Chamado") as mock_chamado_cls,
     ):
         mock_chamado_cls.get_by_id.return_value = _make_chamado_mock()
@@ -415,10 +398,8 @@ def test_processar_edicao_sla_zero_reseta_para_padrao(app):
 
     with (
         app.app_context(),
-        patch("app.services.edicao_chamado_service.db") as mock_db,
         patch("app.services.edicao_chamado_service.Chamado") as mock_chamado_cls,
     ):
-        _patch_batch(mock_db)
         mock_chamado = _make_chamado_mock(data={**_default_data(), "sla_dias": 7})
         mock_chamado_cls.get_by_id.return_value = mock_chamado
         result = processar_edicao_chamado(
@@ -448,10 +429,8 @@ def test_processar_edicao_nova_descricao_diferente_salva(app):
 
     with (
         app.app_context(),
-        patch("app.services.edicao_chamado_service.db") as mock_db,
         patch("app.services.edicao_chamado_service.Chamado") as mock_chamado_cls,
     ):
-        _patch_batch(mock_db)
         mock_chamado = _make_chamado_mock()
         mock_chamado_cls.get_by_id.return_value = mock_chamado
         result = processar_edicao_chamado(
@@ -487,11 +466,9 @@ def test_processar_edicao_novo_responsavel_atualiza_dados(app):
 
     with (
         app.app_context(),
-        patch("app.services.edicao_chamado_service.db") as mock_db,
         patch("app.services.edicao_chamado_service.Chamado") as mock_chamado_cls,
         patch("app.services.edicao_chamado_service.Usuario") as mock_usuario_cls,
     ):
-        _patch_batch(mock_db)
         mock_chamado = _make_chamado_mock()
         mock_chamado_cls.get_by_id.return_value = mock_chamado
         mock_usuario_cls.get_by_id.return_value = novo_resp
@@ -524,7 +501,6 @@ def test_edicao_troca_responsavel_atualiza_supervisor_ids_com_acesso(app):
 
     with (
         app.app_context(),
-        patch("app.services.edicao_chamado_service.db") as mock_db,
         patch("app.services.edicao_chamado_service.Chamado") as mock_chamado_cls,
         patch("app.services.edicao_chamado_service.Usuario") as mock_usuario_cls,
         patch(
@@ -532,7 +508,6 @@ def test_edicao_troca_responsavel_atualiza_supervisor_ids_com_acesso(app):
             return_value=["resp2"],
         ) as mock_calc,
     ):
-        _patch_batch(mock_db)
         mock_chamado = _make_chamado_mock()
         mock_chamado_cls.get_by_id.return_value = mock_chamado
         mock_usuario_cls.get_by_id.return_value = novo_resp
@@ -567,11 +542,9 @@ def test_processar_edicao_setores_adicionais_dispara_notificacao(app):
 
     with (
         app.app_context(),
-        patch("app.services.edicao_chamado_service.db") as mock_db,
         patch("app.services.edicao_chamado_service.Chamado") as mock_chamado_cls,
         patch("app.services.edicao_chamado_service.threading") as mock_threading,
     ):
-        _patch_batch(mock_db)
         mock_chamado_cls.get_by_id.return_value = _make_chamado_mock()  # setores_adicionais = []
         result = processar_edicao_chamado(
             usuario_atual=u,
@@ -597,10 +570,9 @@ def _arq(nome: str):
     return f
 
 
-def _base_patches(mock_db, mock_chamado_cls, data=None):
-    """Configura mocks de DB/Chamado comuns nos testes de anexo. Retorna o mock
+def _base_patches(mock_chamado_cls, data=None):
+    """Configura o mock de Chamado comum nos testes de anexo. Retorna o mock
     do Chamado (para inspecionar atualizar_campos.call_args depois)."""
-    _patch_batch(mock_db)
     mock_chamado = _make_chamado_mock(data=data)
     mock_chamado_cls.get_by_id.return_value = mock_chamado
     return mock_chamado
@@ -618,14 +590,13 @@ def test_edicao_aceita_arquivos_novos_como_lista(app):
 
     with (
         app.app_context(),
-        patch("app.services.edicao_chamado_service.db") as mock_db,
         patch("app.services.edicao_chamado_service.Chamado") as mock_chamado_cls,
         patch(
             "app.services.edicao_chamado_service.salvar_anexo",
             side_effect=["r2:relatorio.pdf", "r2:foto.png"],
         ) as mock_salvar,
     ):
-        mock_chamado = _base_patches(mock_db, mock_chamado_cls)
+        mock_chamado = _base_patches(mock_chamado_cls)
         result = processar_edicao_chamado(
             usuario_atual=u,
             chamado_id="ch1",
@@ -655,11 +626,10 @@ def test_edicao_lista_vazia_nao_altera_anexos(app):
 
     with (
         app.app_context(),
-        patch("app.services.edicao_chamado_service.db") as mock_db,
         patch("app.services.edicao_chamado_service.Chamado") as mock_chamado_cls,
         patch("app.services.edicao_chamado_service.salvar_anexo") as mock_salvar,
     ):
-        _base_patches(mock_db, mock_chamado_cls)
+        _base_patches(mock_chamado_cls)
         result = processar_edicao_chamado(
             usuario_atual=u,
             chamado_id="ch1",
@@ -688,14 +658,13 @@ def test_edicao_falha_em_um_arquivo_retorna_erro_sem_persistir(app):
 
     with (
         app.app_context(),
-        patch("app.services.edicao_chamado_service.db") as mock_db,
         patch("app.services.edicao_chamado_service.Chamado") as mock_chamado_cls,
         patch(
             "app.services.edicao_chamado_service.salvar_anexo",
             side_effect=["r2:bom.pdf", ValueError("Extensão não permitida")],
         ),
     ):
-        mock_chamado = _base_patches(mock_db, mock_chamado_cls)
+        mock_chamado = _base_patches(mock_chamado_cls)
         result = processar_edicao_chamado(
             usuario_atual=u,
             chamado_id="ch1",
@@ -719,7 +688,8 @@ def test_edicao_falha_em_um_arquivo_retorna_erro_sem_persistir(app):
 def test_edicao_historico_criado_por_arquivo_adicionado(app):
     """
     Para cada arquivo salvo com sucesso, deve haver um registro no histórico
-    com campo_alterado='novo anexo'.
+    com campo_alterado='novo anexo' — verificado via Historico.salvar_lote(),
+    chamado uma única vez com a lista completa (N writes → 1 round-trip).
     """
     from app.services.edicao_chamado_service import processar_edicao_chamado
 
@@ -730,23 +700,18 @@ def test_edicao_historico_criado_por_arquivo_adicionado(app):
         def __init__(self, **kwargs):
             self._kwargs = kwargs
 
-        def to_dict(self):
-            return self._kwargs
-
-    batch_mock = MagicMock()
-
     with (
         app.app_context(),
-        patch("app.services.edicao_chamado_service.db") as mock_db,
         patch("app.services.edicao_chamado_service.Chamado") as mock_chamado_cls,
         patch(
             "app.services.edicao_chamado_service.salvar_anexo",
             side_effect=["r2:doc1.pdf", "r2:doc2.xlsx"],
         ),
-        patch("app.services.edicao_chamado_service.Historico", side_effect=_FakeHistorico),
+        patch(
+            "app.services.edicao_chamado_service.Historico", side_effect=_FakeHistorico
+        ) as mock_historico_cls,
     ):
-        _base_patches(mock_db, mock_chamado_cls)
-        mock_db.batch.return_value = batch_mock
+        _base_patches(mock_chamado_cls)
 
         result = processar_edicao_chamado(
             usuario_atual=u,
@@ -761,14 +726,10 @@ def test_edicao_historico_criado_por_arquivo_adicionado(app):
         )
 
     assert result["sucesso"] is True
-    # batch.set deve ser chamado pelo menos 2x (um por arquivo)
-    historico_calls = list(batch_mock.set.call_args_list)
+    mock_historico_cls.salvar_lote.assert_called_once()
+    historico_pendente = mock_historico_cls.salvar_lote.call_args.args[0]
     anexo_entries = [
-        c
-        for c in historico_calls
-        if c.args
-        and isinstance(c.args[1], dict)
-        and c.args[1].get("campo_alterado") == "novo anexo"
+        h for h in historico_pendente if h._kwargs.get("campo_alterado") == "novo anexo"
     ]
     assert len(anexo_entries) == 2
 
@@ -803,10 +764,9 @@ def test_processar_edicao_descricao_acima_de_3000_chars_e_truncada(app):
 
     with (
         app.app_context(),
-        patch("app.services.edicao_chamado_service.db") as mock_db,
         patch("app.services.edicao_chamado_service.Chamado") as mock_chamado_cls,
     ):
-        mock_chamado = _base_patches(mock_db, mock_chamado_cls, data=_data_f25())
+        mock_chamado = _base_patches(mock_chamado_cls, data=_data_f25())
         result = processar_edicao_chamado(
             usuario_atual=u,
             chamado_id="ch_f25",
@@ -838,10 +798,8 @@ def test_supervisor_nao_pode_editar_descricao_do_solicitante(app):
 
     with (
         app.app_context(),
-        patch("app.services.edicao_chamado_service.db") as mock_db,
         patch("app.services.edicao_chamado_service.Chamado") as mock_chamado_cls,
     ):
-        _patch_batch(mock_db)
         mock_chamado = _make_chamado_mock(
             status="Aberto", confirmacao_solicitante=None, area="Manutencao"
         )
@@ -872,10 +830,9 @@ def test_admin_ainda_pode_editar_descricao_do_solicitante(app):
 
     with (
         app.app_context(),
-        patch("app.services.edicao_chamado_service.db") as mock_db,
         patch("app.services.edicao_chamado_service.Chamado") as mock_chamado_cls,
     ):
-        mock_chamado = _base_patches(mock_db, mock_chamado_cls)
+        mock_chamado = _base_patches(mock_chamado_cls)
 
         result = processar_edicao_chamado(
             usuario_atual=admin,
@@ -902,11 +859,9 @@ def test_supervisor_pode_editar_outros_campos_sem_tocar_descricao(app):
 
     with (
         app.app_context(),
-        patch("app.services.edicao_chamado_service.db") as mock_db,
         patch("app.services.edicao_chamado_service.Chamado") as mock_chamado_cls,
         patch("app.services.edicao_chamado_service.atualizar_status_chamado") as mock_status,
     ):
-        _patch_batch(mock_db)
         mock_chamado = _make_chamado_mock(
             status="Aberto", confirmacao_solicitante=None, area="Manutencao"
         )
@@ -938,10 +893,9 @@ def test_processar_edicao_descricao_menor_que_3000_nao_e_alterada(app):
 
     with (
         app.app_context(),
-        patch("app.services.edicao_chamado_service.db") as mock_db,
         patch("app.services.edicao_chamado_service.Chamado") as mock_chamado_cls,
     ):
-        mock_chamado = _base_patches(mock_db, mock_chamado_cls, data=_data_f25())
+        mock_chamado = _base_patches(mock_chamado_cls, data=_data_f25())
         result = processar_edicao_chamado(
             usuario_atual=u,
             chamado_id="ch_f25b",
@@ -974,10 +928,9 @@ def test_edicao_descricao_nao_altera_data_em_atendimento(app):
 
     with (
         app.app_context(),
-        patch("app.services.edicao_chamado_service.db") as mock_db,
         patch("app.services.edicao_chamado_service.Chamado") as mock_chamado_cls,
     ):
-        mock_chamado = _base_patches(mock_db, mock_chamado_cls, data=_data_f25())
+        mock_chamado = _base_patches(mock_chamado_cls, data=_data_f25())
         result = processar_edicao_chamado(
             usuario_atual=u,
             chamado_id="ch_reg_1",

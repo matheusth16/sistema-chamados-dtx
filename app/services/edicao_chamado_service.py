@@ -5,7 +5,6 @@ import threading
 
 from flask import current_app, session
 
-from app.database import db
 from app.i18n import get_translation
 from app.models import Chamado
 from app.models_historico import Historico
@@ -297,14 +296,9 @@ def processar_edicao_chamado(
                 )
             )
 
-        # Persiste histórico em batch único (N writes → 1 round-trip)
+        # Persiste histórico em lote único (N writes → 1 round-trip)
         if historico_pendente:
-            batch = db.batch()
-            col = db.collection("historico")
-            for h in historico_pendente:
-                doc_ref = col.document()
-                batch.set(doc_ref, h.to_dict())
-            batch.commit()
+            Historico.salvar_lote(historico_pendente)
 
         # Efetivar as alterações de Dados
         if update_data:

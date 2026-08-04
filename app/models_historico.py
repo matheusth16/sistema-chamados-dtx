@@ -1,10 +1,13 @@
+import logging
 from datetime import datetime
 
 import pytz
-from firebase_admin import firestore
-from google.cloud.firestore_v1.base_query import FieldFilter
+from sqlalchemy import select
 
-from app.database import db
+from app import db as db_module
+from app.db.models.historico import HistoricoRow
+
+logger = logging.getLogger(__name__)
 
 
 class Historico:
@@ -12,7 +15,7 @@ class Historico:
 
     def __init__(
         self,
-        chamado_id: str,
+        chamado_id: int,
         usuario_id: str,
         usuario_nome: str,
         acao: str,  # 'criacao', 'alteracao_status', 'alteracao_dados'
@@ -21,7 +24,7 @@ class Historico:
         valor_novo=None,
         data_acao=None,
         detalhe: str = None,
-        id: str = None,
+        id: int = None,
     ):
         self.id = id
         self.chamado_id = chamado_id
@@ -31,131 +34,108 @@ class Historico:
         self.campo_alterado = campo_alterado
         self.valor_anterior = valor_anterior
         self.valor_novo = valor_novo
-        self.data_acao = data_acao or firestore.SERVER_TIMESTAMP
+        self.data_acao = data_acao
         self.detalhe = detalhe  # ex: nome do arquivo anexado para exibição
 
-    def to_dict(self):
-        """Converte para dicionário para salvar no Firestore"""
-        d = {
-            "chamado_id": self.chamado_id,
+    def to_row_kwargs(self) -> dict:
+        """Campos pra insert em HistoricoRow (registro é sempre criado, nunca
+        atualizado — histórico é um log de auditoria imutável). chamado_id
+        aceita str (rotas Flask/form ainda repassam string em vários call
+        sites) — coage pra int aqui, ponto único de conversão."""
+        return {
+            "chamado_id": int(self.chamado_id),
             "usuario_id": self.usuario_id,
             "usuario_nome": self.usuario_nome,
             "acao": self.acao,
             "campo_alterado": self.campo_alterado,
             "valor_anterior": self.valor_anterior,
             "valor_novo": self.valor_novo,
-            "data_acao": self.data_acao,
+            "detalhe": self.detalhe,
         }
-        if self.detalhe is not None:
-            d["detalhe"] = self.detalhe
-        return d
 
     @classmethod
-    def from_dict(cls, data: dict, id: str = None):
-        """Cria um objeto Historico a partir de um dicionário do Firestore"""
+    def _from_row(cls, row: HistoricoRow) -> "Historico":
         return cls(
-            id=id,
-            chamado_id=data.get("chamado_id"),
-            usuario_id=data.get("usuario_id"),
-            usuario_nome=data.get("usuario_nome"),
-            acao=data.get("acao"),
-            campo_alterado=data.get("campo_alterado"),
-            valor_anterior=data.get("valor_anterior"),
-            valor_novo=data.get("valor_novo"),
-            data_acao=data.get("data_acao"),
-            detalhe=data.get("detalhe"),
+            id=row.id,
+            chamado_id=row.chamado_id,
+            usuario_id=row.usuario_id,
+            usuario_nome=row.usuario_nome,
+            acao=row.acao,
+            campo_alterado=row.campo_alterado,
+            valor_anterior=row.valor_anterior,
+            valor_novo=row.valor_novo,
+            data_acao=row.data_acao,
+            detalhe=row.detalhe,
         )
 
-    def save(self):
-        """Salva o histórico no Firestore"""
+    def save(self) -> bool:
+        """Insere o registro de histórico no Postgres. Retorna True/False."""
         try:
-            import logging
-
-            logger = logging.getLogger(__name__)
-            hist_dict = self.to_dict()
-            logger.info("Salvando histórico: %s", hist_dict)
-            doc_ref = db.collection("historico").add(hist_dict)
-            logger.info("Histórico salvo com ID: %s", doc_ref[1].id)
+            with db_module.SessionLocal() as session, session.begin():
+                row = HistoricoRow(**self.to_row_kwargs())
+                session.add(row)
+                session.flush()
+                self.id = row.id
+                if row.data_acao:
+                    self.data_acao = row.data_acao
+            logger.debug("Histórico salvo: chamado=%s, acao=%s", self.chamado_id, self.acao)
             return True
         except Exception as e:
-            import logging
-
-            logger = logging.getLogger(__name__)
-            logger.error("Erro ao salvar histórico: %s", e, exc_info=True)
+            logger.exception("Erro ao salvar histórico: %s", e)
             return False
 
     @classmethod
-    def get_by_chamado_id(cls, chamado_id: str):
-        """Busca histórico de um chamado específico"""
+    def salvar_lote(cls, historicos: list["Historico"]) -> bool:
+        """Insere vários registros de histórico numa única transação
+        (N writes → 1 round-trip, equivalente ao antigo batch do Firestore).
+        Retorna True/False; em falha, nenhum registro é persistido."""
+        if not historicos:
+            return True
         try:
-            import logging
-
-            logger = logging.getLogger(__name__)
-            logger.info("Buscando histórico para chamado_id: %s", chamado_id)
-
-            # Tenta buscar com ordenação (requer índice)
-            try:
-                docs = (
-                    db.collection("historico")
-                    .where(filter=FieldFilter("chamado_id", "==", chamado_id))
-                    .order_by("data_acao", direction=firestore.Query.DESCENDING)
-                    .stream()
-                )
-                historico = []
-                for doc in docs:
-                    data = doc.to_dict()
-                    logger.debug("Histórico encontrado: %s - %s", doc.id, data)
-                    historico.append(cls.from_dict(data, doc.id))
-                logger.info("✅ Total de %s registros encontrados (com ordenação)", len(historico))
-                return historico
-            except Exception as index_error:
-                # Se falhar (índice em construção), busca sem ordenação e ordena manualmente
-                if "index" in str(index_error).lower() or "building" in str(index_error).lower():
-                    logger.warning(
-                        "⚠️ Índice ainda em construção, buscando sem ordenação: %s", index_error
-                    )
-                    docs = (
-                        db.collection("historico")
-                        .where(filter=FieldFilter("chamado_id", "==", chamado_id))
-                        .stream()
-                    )
-                    historico = []
-                    for doc in docs:
-                        data = doc.to_dict()
-                        logger.debug("Histórico encontrado (sem ordem): %s - %s", doc.id, data)
-                        historico.append(cls.from_dict(data, doc.id))
-
-                    # Ordena manualmente por data_acao (mais recente primeiro)
-                    historico.sort(key=lambda h: h.data_acao if h.data_acao else "", reverse=True)
-                    logger.info(
-                        "✅ Total de %s registros encontrados (ordenação manual)", len(historico)
-                    )
-                    return historico
-                else:
-                    raise index_error
-
+            with db_module.SessionLocal() as session, session.begin():
+                rows = [HistoricoRow(**h.to_row_kwargs()) for h in historicos]
+                session.add_all(rows)
+                session.flush()
+                for h, row in zip(historicos, rows, strict=True):
+                    h.id = row.id
+                    if row.data_acao:
+                        h.data_acao = row.data_acao
+            return True
         except Exception as e:
-            import logging
+            logger.exception("Erro ao salvar lote de histórico: %s", e)
+            return False
 
-            logger = logging.getLogger(__name__)
-            logger.error("❌ Erro ao buscar histórico: %s", e, exc_info=True)
+    @classmethod
+    def get_by_chamado_id(cls, chamado_id) -> list["Historico"]:
+        """Busca histórico de um chamado específico, mais recente primeiro."""
+        try:
+            cid = int(chamado_id)
+        except (TypeError, ValueError):
+            return []
+        try:
+            with db_module.SessionLocal() as session:
+                rows = (
+                    session.execute(
+                        select(HistoricoRow)
+                        .where(HistoricoRow.chamado_id == cid)
+                        .order_by(HistoricoRow.data_acao.desc(), HistoricoRow.id.desc())
+                    )
+                    .scalars()
+                    .all()
+                )
+                return [cls._from_row(row) for row in rows]
+        except Exception as e:
+            logger.exception("Erro ao buscar histórico do chamado %s: %s", chamado_id, e)
             return []
 
     def _converter_timestamp(self, ts):
-        """Converte timestamp do Firestore para datetime em horário de Brasília"""
-        if ts is None or ts == firestore.SERVER_TIMESTAMP:
+        """Converte timestamp para datetime em horário de Brasília"""
+        if ts is None:
             return None
         if isinstance(ts, datetime):
-            # Se não tiver timezone, assume UTC e converte para Brasília
             if ts.tzinfo is None:
                 ts = pytz.utc.localize(ts)
             return ts.astimezone(pytz.timezone("America/Sao_Paulo"))
-        if hasattr(ts, "to_pydatetime"):
-            dt = ts.to_pydatetime()
-            # Firestore timestamps são UTC, então convertemos para Brasília
-            if dt.tzinfo is None:
-                dt = pytz.utc.localize(dt)
-            return dt.astimezone(pytz.timezone("America/Sao_Paulo"))
         return ts
 
     def data_acao_formatada(self):

@@ -28,15 +28,11 @@ def test_api_editar_chamado_sem_chamado_id_retorna_400(client_logado_supervisor)
 
 def test_api_editar_chamado_chamado_inexistente_retorna_404(client_logado_supervisor):
     """POST /api/editar-chamado com ID inexistente retorna 404."""
-    mock_doc = MagicMock()
-    mock_doc.exists = False
-    with patch("app.services.edicao_chamado_service.db") as mock_db:
-        mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
-        r = client_logado_supervisor.post(
-            "/api/editar-chamado",
-            data={"chamado_id": "id_inexistente"},
-            content_type="multipart/form-data",
-        )
+    r = client_logado_supervisor.post(
+        "/api/editar-chamado",
+        data={"chamado_id": "id_inexistente"},
+        content_type="multipart/form-data",
+    )
     assert r.status_code == 404
     assert "not found" in r.get_json().get("erro", "").lower()
 

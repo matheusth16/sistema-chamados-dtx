@@ -33,8 +33,7 @@ def test_criar_notificacao_retorna_none_sem_usuario_id():
     """criar_notificacao retorna None quando usuario_id é vazio."""
     from app.services.notifications_inapp import criar_notificacao
 
-    with patch("app.services.notifications_inapp.db"):
-        r = criar_notificacao("", "ch1", "CHM-0001", "Título", "Msg")
+    r = criar_notificacao("", "ch1", "CHM-0001", "Título", "Msg")
     assert r is None
 
 

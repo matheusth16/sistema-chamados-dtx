@@ -1,28 +1,58 @@
 """
-Testes unitários do serviço de notificações in-app (notifications_inapp.py).
-Cobre: criar_notificacao, listar_para_usuario, contar_nao_lidas,
-marcar_como_lida, marcar_todas_como_lidas, localizar_notificacao.
+Testes do serviço de notificações in-app (notifications_inapp.py), Fase 2 —
+Marco 8: persistência roda contra Postgres real (db_session), não mock de
+Firestore. Cobre: criar_notificacao, listar_para_usuario, contar_nao_lidas,
+marcar_como_lida, marcar_todas_como_lidas, localizar_notificacao e os
+helpers de texto (funções puras, sem I/O).
 """
 
-from datetime import datetime
-from unittest.mock import MagicMock, patch
+from datetime import UTC, datetime, timedelta
+from unittest.mock import patch
+
+import pytest
+
+from app.db.models.notificacao import NotificacaoRow
+from tests.factories import make_chamado
+
+pytestmark = pytest.mark.usefixtures("db_session")
+
+
+def _criar_notificacao_row(db_session, *, chamado=None, data_criacao=None, **overrides):
+    """Insere uma NotificacaoRow diretamente (sem passar pelo serviço), pra
+    controlar timestamp/estado inicial nos testes de ordenação e filtro."""
+    if chamado is None:
+        chamado = make_chamado()
+    defaults = {
+        "usuario_id": "u1",
+        "chamado_id": chamado.id,
+        "numero_chamado": chamado.numero_chamado,
+        "titulo": "Título",
+        "mensagem": "Mensagem",
+        "tipo": "novo_chamado",
+        "lida": False,
+    }
+    defaults.update(overrides)
+    row = NotificacaoRow(**defaults)
+    if data_criacao is not None:
+        row.data_criacao = data_criacao
+    db_session.add(row)
+    db_session.commit()
+    return row
+
 
 # ── criar_notificacao ──────────────────────────────────────────────────────────
 
 
-def test_criar_notificacao_retorna_id_quando_firestore_ok():
-    """criar_notificacao retorna o ID do documento criado quando Firestore responde OK."""
+def test_criar_notificacao_persiste_e_retorna_id():
+    """criar_notificacao insere a linha e retorna o id gerado."""
     from app.services.notifications_inapp import criar_notificacao
 
-    mock_ref = MagicMock()
-    mock_ref.id = "notif_abc123"
-    with patch("app.services.notifications_inapp.db") as mock_db:
-        mock_db.collection.return_value.add.return_value = (None, mock_ref)
-        result = criar_notificacao(
-            "user1", "ch1", "CHM-001", "Novo chamado", "Descrição", "novo_chamado"
-        )
+    chamado = make_chamado()
+    result = criar_notificacao(
+        "user1", chamado.id, chamado.numero_chamado, "Novo chamado", "Descrição", "novo_chamado"
+    )
 
-    assert result == "notif_abc123"
+    assert isinstance(result, int)
 
 
 def test_criar_notificacao_retorna_none_sem_chamado_id():
@@ -33,421 +63,324 @@ def test_criar_notificacao_retorna_none_sem_chamado_id():
     assert result is None
 
 
-def test_criar_notificacao_retorna_none_quando_firestore_falha():
-    """criar_notificacao captura exceção do Firestore e retorna None."""
+def test_criar_notificacao_retorna_none_com_chamado_id_nao_numerico():
+    """criar_notificacao retorna None quando chamado_id não é conversível a int."""
     from app.services.notifications_inapp import criar_notificacao
 
-    with patch("app.services.notifications_inapp.db") as mock_db:
-        mock_db.collection.return_value.add.side_effect = Exception("Firestore down")
-        result = criar_notificacao("user1", "ch1", "CHM-001", "Título", "Msg")
-
+    result = criar_notificacao("user1", "nao-numerico", "CHM-001", "Título", "Msg")
     assert result is None
+
+
+def test_criar_notificacao_retorna_none_quando_chamado_nao_existe():
+    """criar_notificacao retorna None quando chamado_id referencia um chamado inexistente (FK)."""
+    from app.services.notifications_inapp import criar_notificacao
+
+    result = criar_notificacao("user1", 999999999, "CHM-001", "Título", "Msg")
+    assert result is None
+
+
+def test_criar_notificacao_retorna_none_quando_banco_falha(monkeypatch):
+    """criar_notificacao captura exceção do banco e retorna None."""
+    from app.services import notifications_inapp
+
+    def _explode():
+        raise RuntimeError("banco indisponível")
+
+    monkeypatch.setattr(notifications_inapp.db_module, "SessionLocal", _explode)
+
+    chamado_id_qualquer = 1
+    result = notifications_inapp.criar_notificacao(
+        "user1", chamado_id_qualquer, "CHM-001", "Título", "Msg"
+    )
+    assert result is None
+
+
+def test_criar_notificacao_inclui_categoria_e_solicitante_nome():
+    """categoria/solicitante_nome informados são persistidos no registro."""
+    from app.services.notifications_inapp import criar_notificacao, db_module
+
+    chamado = make_chamado()
+    notificacao_id = criar_notificacao(
+        usuario_id="u1",
+        chamado_id=chamado.id,
+        numero_chamado="CHM-0300",
+        titulo="Título",
+        mensagem="Mensagem",
+        categoria="TI",
+        solicitante_nome="Fulano",
+    )
+
+    row = db_module.SessionLocal().get(NotificacaoRow, notificacao_id)
+    assert row.categoria == "TI"
+    assert row.solicitante_nome == "Fulano"
+
+
+def test_criar_notificacao_sem_categoria_grava_none():
+    """categoria/solicitante_nome não informados gravam NULL, não string vazia."""
+    from app.services.notifications_inapp import criar_notificacao, db_module
+
+    chamado = make_chamado()
+    notificacao_id = criar_notificacao(
+        usuario_id="u1",
+        chamado_id=chamado.id,
+        numero_chamado="CHM-0301",
+        titulo="Título",
+        mensagem="Mensagem",
+    )
+
+    row = db_module.SessionLocal().get(NotificacaoRow, notificacao_id)
+    assert row.categoria is None
+    assert row.solicitante_nome is None
 
 
 # ── listar_para_usuario ────────────────────────────────────────────────────────
 
 
-def test_listar_para_usuario_retorna_docs_ordenados_por_data():
-    """listar_para_usuario retorna lista de dicts com data_criacao serializado, mais recente primeiro."""
+def test_listar_para_usuario_retorna_mais_recente_primeiro(db_session):
+    """listar_para_usuario ordena por data_criacao decrescente."""
     from app.services.notifications_inapp import listar_para_usuario
 
-    # doc2 mais recente — Firestore retorna em DESC por data_criacao
-    doc2 = MagicMock()
-    doc2.id = "n2"
-    doc2.to_dict.return_value = {
-        "usuario_id": "u1",
-        "chamado_id": "ch2",
-        "numero_chamado": "CHM-002",
-        "titulo": "Notif 2",
-        "mensagem": "Mensagem 2",
-        "tipo": "novo_chamado",
-        "lida": False,
-        "data_criacao": datetime(2026, 3, 21, 10, 0, 0),
-    }
+    chamado = make_chamado()
+    agora = datetime.now(UTC)
+    mais_antiga = _criar_notificacao_row(
+        db_session, chamado=chamado, titulo="Notif 1", data_criacao=agora - timedelta(minutes=5)
+    )
+    mais_recente = _criar_notificacao_row(
+        db_session, chamado=chamado, titulo="Notif 2", data_criacao=agora
+    )
 
-    doc1 = MagicMock()
-    doc1.id = "n1"
-    doc1.to_dict.return_value = {
-        "usuario_id": "u1",
-        "chamado_id": "ch1",
-        "numero_chamado": "CHM-001",
-        "titulo": "Notif 1",
-        "mensagem": "Mensagem 1",
-        "tipo": "novo_chamado",
-        "lida": False,
-        "data_criacao": datetime(2026, 3, 20, 10, 0, 0),
-    }
+    result = listar_para_usuario("u1")
 
-    with patch("app.services.notifications_inapp.db") as mock_db:
-        mock_query = MagicMock()
-        mock_db.collection.return_value.where.return_value = mock_query
-        # Suporta encadeamento: .where(...).order_by(...).limit(...).stream()
-        mock_query.order_by.return_value = mock_query
-        mock_query.limit.return_value.stream.return_value = [doc2, doc1]
-        result = listar_para_usuario("u1")
+    assert [n["id"] for n in result] == [mais_recente.id, mais_antiga.id]
+
+
+def test_listar_para_usuario_apenas_nao_lidas(db_session):
+    """apenas_nao_lidas=True filtra as já lidas."""
+    from app.services.notifications_inapp import listar_para_usuario
+
+    chamado = make_chamado()
+    _criar_notificacao_row(db_session, chamado=chamado, lida=True)
+    nao_lida = _criar_notificacao_row(db_session, chamado=chamado, lida=False)
+
+    result = listar_para_usuario("u1", apenas_nao_lidas=True)
+
+    assert len(result) == 1
+    assert result[0]["id"] == nao_lida.id
+
+
+def test_listar_para_usuario_respeita_limite(db_session):
+    """limite corta a quantidade de resultados."""
+    from app.services.notifications_inapp import listar_para_usuario
+
+    chamado = make_chamado()
+    for _ in range(3):
+        _criar_notificacao_row(db_session, chamado=chamado)
+
+    result = listar_para_usuario("u1", limite=2)
 
     assert len(result) == 2
-    # Mais recente primeiro (Firestore retorna na ordem correta via order_by DESC)
-    assert result[0]["id"] == "n2"
-    assert result[1]["id"] == "n1"
 
 
-def test_listar_para_usuario_apenas_nao_lidas():
-    """listar_para_usuario com apenas_nao_lidas=True adiciona filtro na query."""
+def test_listar_para_usuario_nao_mistura_outros_usuarios(db_session):
+    """listar_para_usuario só retorna notificações do usuario_id pedido."""
     from app.services.notifications_inapp import listar_para_usuario
 
-    with patch("app.services.notifications_inapp.db") as mock_db:
-        mock_query = MagicMock()
-        mock_db.collection.return_value.where.return_value = mock_query
-        mock_query.where.return_value = mock_query
-        mock_query.order_by.return_value = mock_query
-        mock_query.limit.return_value.stream.return_value = []
-        listar_para_usuario("u1", apenas_nao_lidas=True)
+    chamado = make_chamado()
+    _criar_notificacao_row(db_session, chamado=chamado, usuario_id="outro_usuario")
+    minha = _criar_notificacao_row(db_session, chamado=chamado, usuario_id="u1")
 
-    # Verifica que .where foi chamado duas vezes (usuario_id + lida==False)
-    assert mock_db.collection.return_value.where.call_count >= 1
-    assert mock_query.where.call_count >= 1
+    result = listar_para_usuario("u1")
+
+    assert len(result) == 1
+    assert result[0]["id"] == minha.id
 
 
-def test_listar_para_usuario_usa_order_by_data_criacao_desc():
-    """listar_para_usuario deve usar order_by(data_criacao DESC) na query Firestore, não sort em memória."""
-    from app.services.notifications_inapp import listar_para_usuario
-
-    with patch("app.services.notifications_inapp.db") as mock_db:
-        mock_query = MagicMock()
-        mock_db.collection.return_value.where.return_value = mock_query
-        mock_query.order_by.return_value = mock_query
-        mock_query.limit.return_value.stream.return_value = []
-        listar_para_usuario("u1")
-
-    assert mock_query.order_by.called, "listar_para_usuario deve chamar order_by"
-    order_by_args = mock_query.order_by.call_args_list[0].args
-    assert order_by_args[0] == "data_criacao", "order_by deve ser por data_criacao"
-
-
-def test_listar_para_usuario_retorna_vazio_quando_firestore_falha():
-    """listar_para_usuario retorna [] quando Firestore lança exceção."""
-    from app.services.notifications_inapp import listar_para_usuario
-
-    with patch("app.services.notifications_inapp.db") as mock_db:
-        mock_db.collection.return_value.where.side_effect = Exception("timeout")
-        result = listar_para_usuario("u1")
-
-    assert result == []
-
-
-def test_listar_para_usuario_serializa_data_isoformat():
+def test_listar_para_usuario_serializa_data_isoformat(db_session):
     """listar_para_usuario serializa data_criacao datetime para string ISO."""
     from app.services.notifications_inapp import listar_para_usuario
 
-    doc = MagicMock()
-    doc.id = "n1"
-    doc.to_dict.return_value = {
-        "usuario_id": "u1",
-        "chamado_id": "ch1",
-        "numero_chamado": "CHM-001",
-        "titulo": "T",
-        "mensagem": "M",
-        "tipo": "novo",
-        "lida": False,
-        "data_criacao": datetime(2026, 1, 1, 12, 0, 0),
-    }
+    _criar_notificacao_row(db_session)
 
-    with patch("app.services.notifications_inapp.db") as mock_db:
-        mock_query = MagicMock()
-        mock_db.collection.return_value.where.return_value = mock_query
-        mock_query.order_by.return_value = mock_query
-        mock_query.limit.return_value.stream.return_value = [doc]
-        result = listar_para_usuario("u1")
+    result = listar_para_usuario("u1")
 
     assert isinstance(result[0]["data_criacao"], str)
-    assert "2026" in result[0]["data_criacao"]
+    assert "T" in result[0]["data_criacao"]
+
+
+def test_listar_para_usuario_retorna_vazio_quando_banco_falha(monkeypatch):
+    """listar_para_usuario captura exceção do banco e retorna []."""
+    from app.services import notifications_inapp
+
+    def _explode():
+        raise RuntimeError("timeout")
+
+    monkeypatch.setattr(notifications_inapp.db_module, "SessionLocal", _explode)
+
+    assert notifications_inapp.listar_para_usuario("u1") == []
+
+
+def test_listar_para_usuario_sem_usuario_id_retorna_vazio():
+    from app.services.notifications_inapp import listar_para_usuario
+
+    assert listar_para_usuario("") == []
+
+
+def test_listar_para_usuario_com_language_localiza_resultado(db_session):
+    """language informado aplica localizar_notificacao em cada item retornado."""
+    from app.services.notifications_inapp import listar_para_usuario
+
+    chamado = make_chamado()
+    _criar_notificacao_row(
+        db_session,
+        chamado=chamado,
+        tipo="status_em_atendimento",
+        numero_chamado="CHM-0400",
+        categoria="TI",
+        titulo="título original",
+        mensagem="mensagem original",
+    )
+
+    result = listar_para_usuario("u1", language="en")
+
+    assert len(result) == 1
+    assert result[0]["titulo"] != "título original"
 
 
 # ── contar_nao_lidas ───────────────────────────────────────────────────────────
 
 
-def test_contar_nao_lidas_retorna_valor_do_firestore():
-    """contar_nao_lidas retorna o count retornado pelo Firestore."""
+def test_contar_nao_lidas_conta_apenas_do_usuario(db_session):
+    """contar_nao_lidas soma só as não lidas do usuário pedido."""
     from app.services.notifications_inapp import contar_nao_lidas
 
-    mock_count_val = MagicMock()
-    mock_count_val.value = 5
-    with patch("app.services.notifications_inapp.db") as mock_db:
-        mock_query = MagicMock()
-        mock_db.collection.return_value.where.return_value = mock_query
-        mock_query.where.return_value = mock_query
-        mock_query.count.return_value.get.return_value = [[mock_count_val]]
-        result = contar_nao_lidas("u1")
+    chamado = make_chamado()
+    _criar_notificacao_row(db_session, chamado=chamado, lida=False)
+    _criar_notificacao_row(db_session, chamado=chamado, lida=False)
+    _criar_notificacao_row(db_session, chamado=chamado, lida=True)
+    _criar_notificacao_row(db_session, chamado=chamado, usuario_id="outro", lida=False)
 
-    assert result == 5
+    assert contar_nao_lidas("u1") == 2
 
 
-def test_contar_nao_lidas_retorna_zero_quando_firestore_falha():
-    """contar_nao_lidas retorna 0 quando Firestore lança exceção."""
+def test_contar_nao_lidas_retorna_zero_quando_banco_falha(monkeypatch):
+    """contar_nao_lidas captura exceção do banco e retorna 0."""
+    from app.services import notifications_inapp
+
+    def _explode():
+        raise RuntimeError("err")
+
+    monkeypatch.setattr(notifications_inapp.db_module, "SessionLocal", _explode)
+
+    assert notifications_inapp.contar_nao_lidas("u1") == 0
+
+
+def test_contar_nao_lidas_sem_usuario_id_retorna_zero():
     from app.services.notifications_inapp import contar_nao_lidas
 
-    with patch("app.services.notifications_inapp.db") as mock_db:
-        mock_db.collection.return_value.where.side_effect = Exception("err")
-        result = contar_nao_lidas("u1")
-
-    assert result == 0
+    assert contar_nao_lidas("") == 0
 
 
 # ── marcar_como_lida ───────────────────────────────────────────────────────────
 
 
-def test_marcar_como_lida_retorna_true_quando_pertence_ao_usuario():
-    """marcar_como_lida retorna True quando doc existe e pertence ao usuário."""
+def test_marcar_como_lida_retorna_true_quando_pertence_ao_usuario(db_session):
+    """marcar_como_lida marca lida=True e retorna True quando a notificação é do usuário."""
     from app.services.notifications_inapp import marcar_como_lida
 
-    mock_doc = MagicMock()
-    mock_doc.exists = True
-    mock_doc.to_dict.return_value = {"usuario_id": "u1"}
+    notif = _criar_notificacao_row(db_session, usuario_id="u1", lida=False)
 
-    with patch("app.services.notifications_inapp.db") as mock_db:
-        mock_ref = MagicMock()
-        mock_db.collection.return_value.document.return_value = mock_ref
-        mock_ref.get.return_value = mock_doc
-        result = marcar_como_lida("notif1", "u1")
+    result = marcar_como_lida(notif.id, "u1")
 
     assert result is True
-    mock_ref.update.assert_called_once_with({"lida": True})
+    assert db_session.get(NotificacaoRow, notif.id).lida is True
 
 
 def test_marcar_como_lida_retorna_false_quando_nao_existe():
-    """marcar_como_lida retorna False quando o documento não existe."""
+    """marcar_como_lida retorna False quando o id não existe."""
     from app.services.notifications_inapp import marcar_como_lida
 
-    mock_doc = MagicMock()
-    mock_doc.exists = False
-
-    with patch("app.services.notifications_inapp.db") as mock_db:
-        mock_ref = MagicMock()
-        mock_db.collection.return_value.document.return_value = mock_ref
-        mock_ref.get.return_value = mock_doc
-        result = marcar_como_lida("notif1", "u1")
-
-    assert result is False
+    assert marcar_como_lida(999999999, "u1") is False
 
 
-def test_marcar_como_lida_retorna_false_quando_pertence_a_outro_usuario():
-    """marcar_como_lida retorna False quando o doc pertence a outro usuário."""
+def test_marcar_como_lida_retorna_false_quando_pertence_a_outro_usuario(db_session):
+    """marcar_como_lida retorna False (e não altera) quando a notificação é de outro usuário."""
     from app.services.notifications_inapp import marcar_como_lida
 
-    mock_doc = MagicMock()
-    mock_doc.exists = True
-    mock_doc.to_dict.return_value = {"usuario_id": "outro_usuario"}
+    notif = _criar_notificacao_row(db_session, usuario_id="outro_usuario", lida=False)
 
-    with patch("app.services.notifications_inapp.db") as mock_db:
-        mock_ref = MagicMock()
-        mock_db.collection.return_value.document.return_value = mock_ref
-        mock_ref.get.return_value = mock_doc
-        result = marcar_como_lida("notif1", "u1")
+    result = marcar_como_lida(notif.id, "u1")
 
     assert result is False
+    assert db_session.get(NotificacaoRow, notif.id).lida is False
 
 
-def test_marcar_como_lida_retorna_false_quando_firestore_falha():
-    """marcar_como_lida retorna False quando Firestore lança exceção."""
+def test_marcar_como_lida_retorna_false_com_id_nao_numerico():
+    """marcar_como_lida retorna False quando notificacao_id não é conversível a int."""
     from app.services.notifications_inapp import marcar_como_lida
 
-    with patch("app.services.notifications_inapp.db") as mock_db:
-        mock_db.collection.return_value.document.return_value.get.side_effect = Exception("err")
-        result = marcar_como_lida("notif1", "u1")
-
-    assert result is False
+    assert marcar_como_lida("nao-numerico", "u1") is False
 
 
-# ── marcar_todas_como_lidas ────────────────────────────────────────────────────
+def test_marcar_como_lida_retorna_false_quando_banco_falha(monkeypatch):
+    """marcar_como_lida captura exceção do banco e retorna False."""
+    from app.services import notifications_inapp
 
+    def _explode():
+        raise RuntimeError("err")
 
-def test_marcar_todas_como_lidas_retorna_contagem():
-    """marcar_todas_como_lidas retorna a quantidade de notificações marcadas."""
-    from app.services.notifications_inapp import marcar_todas_como_lidas
+    monkeypatch.setattr(notifications_inapp.db_module, "SessionLocal", _explode)
 
-    doc1 = MagicMock()
-    doc2 = MagicMock()
-
-    with patch("app.services.notifications_inapp.db") as mock_db:
-        mock_query = MagicMock()
-        mock_db.collection.return_value.where.return_value = mock_query
-        mock_query.where.return_value = mock_query
-        mock_query.stream.return_value = [doc1, doc2]
-        mock_batch = MagicMock()
-        mock_db.batch.return_value = mock_batch
-        result = marcar_todas_como_lidas("u1")
-
-    assert result == 2
-    mock_batch.commit.assert_called()
-
-
-def test_marcar_todas_como_lidas_retorna_zero_sem_notificacoes():
-    """marcar_todas_como_lidas retorna 0 quando não há notificações não lidas."""
-    from app.services.notifications_inapp import marcar_todas_como_lidas
-
-    with patch("app.services.notifications_inapp.db") as mock_db:
-        mock_query = MagicMock()
-        mock_db.collection.return_value.where.return_value = mock_query
-        mock_query.where.return_value = mock_query
-        mock_query.stream.return_value = []
-        result = marcar_todas_como_lidas("u1")
-
-    assert result == 0
-
-
-def test_marcar_todas_como_lidas_retorna_zero_quando_firestore_falha():
-    """marcar_todas_como_lidas retorna 0 quando Firestore lança exceção."""
-    from app.services.notifications_inapp import marcar_todas_como_lidas
-
-    with patch("app.services.notifications_inapp.db") as mock_db:
-        mock_db.collection.return_value.where.side_effect = Exception("err")
-        result = marcar_todas_como_lidas("u1")
-
-    assert result == 0
-
-
-def test_listar_serializa_timestamp_com_to_pydatetime():
-    """listar_para_usuario serializa timestamp com .to_pydatetime() via branch ISO (linha 75)."""
-    from app.services.notifications_inapp import listar_para_usuario
-
-    ts = MagicMock()
-    ts.to_pydatetime.return_value = datetime(2026, 6, 1, 10, 0, 0)
-
-    doc = MagicMock()
-    doc.id = "n_ts"
-    doc.to_dict.return_value = {
-        "usuario_id": "u1",
-        "chamado_id": "ch1",
-        "numero_chamado": "CHM-001",
-        "titulo": "T",
-        "mensagem": "M",
-        "tipo": "novo",
-        "lida": False,
-        "data_criacao": ts,
-    }
-
-    with patch("app.services.notifications_inapp.db") as mock_db:
-        mock_query = MagicMock()
-        mock_db.collection.return_value.where.return_value = mock_query
-        mock_query.order_by.return_value = mock_query
-        mock_query.limit.return_value.stream.return_value = [doc]
-        result = listar_para_usuario("u1")
-
-    assert "2026" in result[0]["data_criacao"]
-
-
-def test_listar_serializa_timestamp_fallback_str():
-    """listar_para_usuario usa str(ts) como fallback quando ts não é datetime nem tem to_pydatetime."""
-    from app.services.notifications_inapp import listar_para_usuario
-
-    class OpaqueTsObj:
-        def __repr__(self):
-            return "ts-opaque"
-
-    doc = MagicMock()
-    doc.id = "n_fallback"
-    doc.to_dict.return_value = {
-        "usuario_id": "u1",
-        "chamado_id": "ch1",
-        "numero_chamado": "CHM-001",
-        "titulo": "T",
-        "mensagem": "M",
-        "tipo": "novo",
-        "lida": False,
-        "data_criacao": OpaqueTsObj(),
-    }
-
-    with patch("app.services.notifications_inapp.db") as mock_db:
-        mock_query = MagicMock()
-        mock_db.collection.return_value.where.return_value = mock_query
-        mock_query.order_by.return_value = mock_query
-        mock_query.limit.return_value.stream.return_value = [doc]
-        result = listar_para_usuario("u1")
-
-    assert result[0]["data_criacao"] is not None
+    assert notifications_inapp.marcar_como_lida(1, "u1") is False
 
 
 def test_marcar_como_lida_sem_ids_retorna_false():
-    """marcar_como_lida retorna False quando notificacao_id ou usuario_id é vazio."""
     from app.services.notifications_inapp import marcar_como_lida
 
     assert marcar_como_lida("", "u1") is False
     assert marcar_como_lida("n1", "") is False
 
 
+# ── marcar_todas_como_lidas ────────────────────────────────────────────────────
+
+
+def test_marcar_todas_como_lidas_retorna_contagem_e_atualiza(db_session):
+    """marcar_todas_como_lidas marca todas as não lidas do usuário e retorna a contagem."""
+    from app.services.notifications_inapp import marcar_todas_como_lidas
+
+    chamado = make_chamado()
+    n1 = _criar_notificacao_row(db_session, chamado=chamado, lida=False)
+    n2 = _criar_notificacao_row(db_session, chamado=chamado, lida=False)
+    _criar_notificacao_row(db_session, chamado=chamado, usuario_id="outro", lida=False)
+
+    result = marcar_todas_como_lidas("u1")
+
+    assert result == 2
+    assert db_session.get(NotificacaoRow, n1.id).lida is True
+    assert db_session.get(NotificacaoRow, n2.id).lida is True
+
+
+def test_marcar_todas_como_lidas_retorna_zero_sem_notificacoes():
+    from app.services.notifications_inapp import marcar_todas_como_lidas
+
+    assert marcar_todas_como_lidas("u1") == 0
+
+
+def test_marcar_todas_como_lidas_retorna_zero_quando_banco_falha(monkeypatch):
+    """marcar_todas_como_lidas captura exceção do banco e retorna 0."""
+    from app.services import notifications_inapp
+
+    def _explode():
+        raise RuntimeError("err")
+
+    monkeypatch.setattr(notifications_inapp.db_module, "SessionLocal", _explode)
+
+    assert notifications_inapp.marcar_todas_como_lidas("u1") == 0
+
+
 def test_marcar_todas_sem_usuario_id_retorna_zero():
-    """marcar_todas_como_lidas retorna 0 quando usuario_id é vazio."""
     from app.services.notifications_inapp import marcar_todas_como_lidas
 
     assert marcar_todas_como_lidas("") == 0
-
-
-# ── fallback quando índice Firestore ausente ───────────────────────────────────
-
-
-def test_listar_para_usuario_fallback_sem_order_by_quando_indice_falha():
-    """Se order_by falhar (ex.: índice não deployado), usa fallback sem order_by e sort em memória."""
-    from app.services.notifications_inapp import listar_para_usuario
-
-    doc1 = MagicMock()
-    doc1.id = "n1"
-    doc1.to_dict.return_value = {
-        "usuario_id": "u1",
-        "chamado_id": "ch1",
-        "numero_chamado": "CHM-001",
-        "titulo": "T1",
-        "mensagem": "M1",
-        "tipo": "novo_chamado",
-        "lida": False,
-        "data_criacao": datetime(2026, 1, 1, 8, 0, 0),
-    }
-    doc2 = MagicMock()
-    doc2.id = "n2"
-    doc2.to_dict.return_value = {
-        "usuario_id": "u1",
-        "chamado_id": "ch2",
-        "numero_chamado": "CHM-002",
-        "titulo": "T2",
-        "mensagem": "M2",
-        "tipo": "novo_chamado",
-        "lida": False,
-        "data_criacao": datetime(2026, 1, 2, 10, 0, 0),  # mais recente
-    }
-
-    with patch("app.services.notifications_inapp.db") as mock_db:
-        mock_query = MagicMock()
-        mock_db.collection.return_value.where.return_value = mock_query
-        # order_by chain levanta exceção (índice não deployado)
-        mock_query.order_by.return_value.limit.return_value.stream.side_effect = Exception(
-            "9 FAILED_PRECONDITION: The query requires an index"
-        )
-        # Fallback: query sem order_by retorna os 2 docs (ordem aleatória)
-        mock_query.limit.return_value.stream.return_value = [doc1, doc2]
-
-        result = listar_para_usuario("u1")
-
-    assert len(result) == 2
-    # doc2 (mais recente: 2026-01-02) deve vir primeiro após sort em memória
-    assert result[0]["id"] == "n2"
-    assert result[1]["id"] == "n1"
-
-
-def test_listar_para_usuario_fallback_retorna_vazio_se_ambas_queries_falham():
-    """Se tanto order_by quanto fallback falharem, retorna [] sem propagar exceção."""
-    from app.services.notifications_inapp import listar_para_usuario
-
-    with patch("app.services.notifications_inapp.db") as mock_db:
-        mock_query = MagicMock()
-        mock_db.collection.return_value.where.return_value = mock_query
-        mock_query.order_by.return_value.limit.return_value.stream.side_effect = Exception(
-            "index error"
-        )
-        mock_query.limit.return_value.stream.side_effect = Exception("network error")
-
-        result = listar_para_usuario("u1")
-
-    assert result == []
 
 
 # ── localizar_notificacao ──────────────────────────────────────────────────────
@@ -670,12 +603,10 @@ def test_texto_status_solicitante_lembrete_en():
 
 def test_criar_notificacao_solicitante_chama_criar_notificacao():
     """criar_notificacao_solicitante delega para criar_notificacao com dados corretos."""
-    from unittest.mock import patch
-
     from app.services.notifications_inapp import criar_notificacao_solicitante
 
     with patch("app.services.notifications_inapp.criar_notificacao") as mock_criar:
-        mock_criar.return_value = "notif_xyz"
+        mock_criar.return_value = 42
         result = criar_notificacao_solicitante(
             solicitante_id="sol1",
             chamado_id="ch1",
@@ -685,7 +616,7 @@ def test_criar_notificacao_solicitante_chama_criar_notificacao():
             language="en",
         )
 
-    assert result == "notif_xyz"
+    assert result == 42
     mock_criar.assert_called_once()
     call_kwargs = mock_criar.call_args
     assert call_kwargs.kwargs["tipo"] == "status_em_atendimento"
@@ -694,12 +625,10 @@ def test_criar_notificacao_solicitante_chama_criar_notificacao():
 
 def test_criar_notificacao_solicitante_lembrete_1_usa_tipo_correto():
     """criar_notificacao_solicitante usa tipo 'lembrete_confirmacao_1'."""
-    from unittest.mock import patch
-
     from app.services.notifications_inapp import criar_notificacao_solicitante
 
     with patch("app.services.notifications_inapp.criar_notificacao") as mock_criar:
-        mock_criar.return_value = "notif_l1"
+        mock_criar.return_value = 43
         criar_notificacao_solicitante(
             solicitante_id="sol1",
             chamado_id="ch1",
@@ -822,53 +751,6 @@ def test_localizar_todos_participantes_concluidos_traduz():
     assert out["mensagem"] != "mensagem original"
 
 
-# ── criar_notificacao — payload opcional solicitante_nome ───────────────────
-
-
-def test_criar_notificacao_inclui_solicitante_nome_no_payload():
-    """Quando solicitante_nome é informado, deve entrar no payload salvo no Firestore."""
-    from app.services.notifications_inapp import criar_notificacao
-
-    with patch("app.services.notifications_inapp.db") as mock_db:
-        mock_ref = MagicMock()
-        mock_ref.id = "notif1"
-        mock_db.collection.return_value.add.return_value = (None, mock_ref)
-
-        criar_notificacao(
-            usuario_id="u1",
-            chamado_id="ch1",
-            numero_chamado="CHM-0300",
-            titulo="Título",
-            mensagem="Mensagem",
-            solicitante_nome="Fulano",
-        )
-
-    payload = mock_db.collection.return_value.add.call_args[0][0]
-    assert payload["solicitante_nome"] == "Fulano"
-
-
-def test_criar_notificacao_inclui_categoria_no_payload():
-    """Quando categoria é informada, deve entrar no payload salvo no Firestore."""
-    from app.services.notifications_inapp import criar_notificacao
-
-    with patch("app.services.notifications_inapp.db") as mock_db:
-        mock_ref = MagicMock()
-        mock_ref.id = "notif2"
-        mock_db.collection.return_value.add.return_value = (None, mock_ref)
-
-        criar_notificacao(
-            usuario_id="u1",
-            chamado_id="ch1",
-            numero_chamado="CHM-0301",
-            titulo="Título",
-            mensagem="Mensagem",
-            categoria="TI",
-        )
-
-    payload = mock_db.collection.return_value.add.call_args[0][0]
-    assert payload["categoria"] == "TI"
-
-
 # ── texto_notificacao_novo_chamado ───────────────────────────────────────────
 
 
@@ -880,59 +762,3 @@ def test_texto_notificacao_novo_chamado_en():
     )
     assert "CHM-0500" in titulo
     assert "Fulano" in mensagem
-
-
-# ── listar_para_usuario com language aplica localizar_notificacao ───────────
-
-
-def test_listar_para_usuario_com_language_localiza_resultado():
-    from app.services.notifications_inapp import listar_para_usuario
-
-    doc = MagicMock()
-    doc.id = "n1"
-    doc.to_dict.return_value = {
-        "tipo": "status_em_atendimento",
-        "numero_chamado": "CHM-0400",
-        "categoria": "TI",
-        "usuario_id": "u1",
-        "titulo": "título original",
-        "mensagem": "mensagem original",
-        "data_criacao": None,
-    }
-
-    with patch("app.services.notifications_inapp.db") as mock_db:
-        query = mock_db.collection.return_value.where.return_value
-        query.order_by.return_value.limit.return_value.stream.return_value = [doc]
-        result = listar_para_usuario("u1", language="en")
-
-    assert len(result) == 1
-    assert result[0]["titulo"] != "título original"
-
-
-# ── _ts_sort_key — exceção no timestamp cai no fallback 0.0 ──────────────────
-
-
-def test_ts_sort_key_excecao_retorna_zero():
-    from app.services.notifications_inapp import _ts_sort_key
-
-    doc = MagicMock()
-    ts = MagicMock()
-    ts.timestamp.side_effect = Exception("boom")
-    doc.to_dict.return_value = {"data_criacao": ts}
-
-    assert _ts_sort_key(doc) == 0.0
-
-
-# ── Guardas de usuario_id vazio ──────────────────────────────────────────────
-
-
-def test_listar_para_usuario_sem_usuario_id_retorna_vazio():
-    from app.services.notifications_inapp import listar_para_usuario
-
-    assert listar_para_usuario("") == []
-
-
-def test_contar_nao_lidas_sem_usuario_id_retorna_zero():
-    from app.services.notifications_inapp import contar_nao_lidas
-
-    assert contar_nao_lidas("") == 0

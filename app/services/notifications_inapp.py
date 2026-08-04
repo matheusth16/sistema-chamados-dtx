@@ -1,16 +1,16 @@
 """
 Notificações in-app (sino): criar, listar e marcar como lida.
-Armazenamento no Firestore, collection 'notificacoes'.
+Armazenamento no Postgres, tabela 'notificacoes' (Fase 2, Marco 8).
 """
 
 import logging
 from datetime import datetime
 from typing import Any
 
-from firebase_admin import firestore
-from google.cloud.firestore_v1.base_query import FieldFilter
+from sqlalchemy import func, select, update
 
-from app.database import db
+from app import db as db_module
+from app.db.models.notificacao import NotificacaoRow
 from app.i18n import get_translated_category, get_translation
 
 logger = logging.getLogger(__name__)
@@ -232,7 +232,7 @@ def criar_notificacao_solicitante(
     tipo: str,
     numero_lembrete: int | None = None,
     language: str = "en",
-) -> str | None:
+) -> int | None:
     """
     Cria notificação in-app para o solicitante em eventos de status/lembrete.
 
@@ -292,61 +292,61 @@ def criar_notificacao(
     tipo: str = "novo_chamado",
     categoria: str = "",
     solicitante_nome: str = "",
-) -> str | None:
+) -> int | None:
     """
     Cria uma notificação in-app para o usuário (ex.: aprovador quando recebe novo chamado).
-    Retorna o id do documento criado ou None em caso de erro.
+    Retorna o id do registro criado ou None em caso de erro.
     Os campos opcionais categoria/solicitante_nome são metadados estruturados que permitem
     traduzir a notificação na leitura para qualquer idioma.
     """
     if not usuario_id or not chamado_id:
         return None
     try:
-        payload: dict[str, Any] = {
-            "usuario_id": usuario_id,
-            "chamado_id": chamado_id,
-            "numero_chamado": numero_chamado,
-            "titulo": titulo,
-            "mensagem": mensagem,
-            "tipo": tipo,
-            "lida": False,
-            "data_criacao": firestore.SERVER_TIMESTAMP,
-        }
-        if categoria:
-            payload["categoria"] = categoria
-        if solicitante_nome:
-            payload["solicitante_nome"] = solicitante_nome
-        ref = db.collection("notificacoes").add(payload)
+        cid = int(chamado_id)
+    except (TypeError, ValueError):
+        logger.exception("chamado_id inválido ao criar notificação: %s", chamado_id)
+        return None
+    try:
+        with db_module.SessionLocal() as session, session.begin():
+            row = NotificacaoRow(
+                usuario_id=usuario_id,
+                chamado_id=cid,
+                numero_chamado=numero_chamado,
+                titulo=titulo,
+                mensagem=mensagem,
+                tipo=tipo,
+                categoria=categoria or None,
+                solicitante_nome=solicitante_nome or None,
+                lida=False,
+            )
+            session.add(row)
+            session.flush()
+            notificacao_id = row.id
         logger.debug(
             "Notificação in-app criada: usuario=%s, chamado=%s", usuario_id, numero_chamado
         )
-        return ref[1].id
+        return notificacao_id
     except Exception as e:
         logger.exception("Erro ao criar notificação in-app: %s", e)
         return None
 
 
-def _serializar_doc(doc: Any) -> dict[str, Any]:
-    """Serializa um documento Firestore de notificação para dict JSON-safe."""
-    d = doc.to_dict()
-    d["id"] = doc.id
-    ts = d.get("data_criacao")
-    if hasattr(ts, "to_pydatetime"):
-        d["data_criacao"] = ts.to_pydatetime().isoformat()
-    elif isinstance(ts, datetime):
-        d["data_criacao"] = ts.isoformat()
-    else:
-        d["data_criacao"] = str(ts) if ts else None
-    return d
-
-
-def _ts_sort_key(doc: Any) -> float:
-    """Chave de ordenação por data_criacao para sort em memória (fallback)."""
-    ts = doc.to_dict().get("data_criacao")
-    try:
-        return ts.timestamp() if ts and hasattr(ts, "timestamp") else 0.0
-    except Exception:
-        return 0.0
+def _serializar_row(row: NotificacaoRow) -> dict[str, Any]:
+    """Serializa uma NotificacaoRow para dict JSON-safe."""
+    ts = row.data_criacao
+    return {
+        "id": row.id,
+        "usuario_id": row.usuario_id,
+        "chamado_id": row.chamado_id,
+        "numero_chamado": row.numero_chamado,
+        "titulo": row.titulo,
+        "mensagem": row.mensagem,
+        "tipo": row.tipo,
+        "categoria": row.categoria,
+        "solicitante_nome": row.solicitante_nome,
+        "lida": row.lida,
+        "data_criacao": ts.isoformat() if isinstance(ts, datetime) else None,
+    }
 
 
 def listar_para_usuario(
@@ -357,38 +357,22 @@ def listar_para_usuario(
 ) -> list[dict[str, Any]]:
     """
     Lista notificações do usuário, mais recentes primeiro.
-    Se o índice Firestore não estiver deployado, usa fallback com sort em memória.
     Retorna lista de dicts com id, chamado_id, numero_chamado, titulo, mensagem, lida, data_criacao.
     Quando language é fornecido, aplica localização dinâmica ao titulo/mensagem de cada notificação.
     """
     if not usuario_id:
         return []
     try:
-        q = db.collection("notificacoes").where(filter=FieldFilter("usuario_id", "==", usuario_id))
-        if apenas_nao_lidas:
-            q = q.where(filter=FieldFilter("lida", "==", False))
+        with db_module.SessionLocal() as session:
+            query = select(NotificacaoRow).where(NotificacaoRow.usuario_id == usuario_id)
+            if apenas_nao_lidas:
+                query = query.where(NotificacaoRow.lida.is_(False))
+            query = query.order_by(
+                NotificacaoRow.data_criacao.desc(), NotificacaoRow.id.desc()
+            ).limit(limite)
+            rows = session.execute(query).scalars().all()
 
-        try:
-            raw_docs = list(
-                q.order_by("data_criacao", direction=firestore.Query.DESCENDING)
-                .limit(limite)
-                .stream()
-            )
-        except Exception as e_order:
-            # Índice composto não deployado ou indisponível: usa fallback sem order_by.
-            # Solução definitiva: firebase deploy --only firestore:indexes
-            logger.warning(
-                "listar_para_usuario: order_by falhou (%s: %s). "
-                "Usando fallback sem índice (sort em memória). "
-                "Execute: firebase deploy --only firestore:indexes",
-                type(e_order).__name__,
-                str(e_order)[:120],
-            )
-            raw_docs = list(q.limit(limite + 20).stream())
-            raw_docs.sort(key=_ts_sort_key, reverse=True)
-            raw_docs = raw_docs[:limite]
-
-        result = [_serializar_doc(doc) for doc in raw_docs]
+        result = [_serializar_row(row) for row in rows]
         if language:
             result = [localizar_notificacao(d, language) for d in result]
         return result
@@ -402,29 +386,32 @@ def contar_nao_lidas(usuario_id: str) -> int:
     if not usuario_id:
         return 0
     try:
-        result = (
-            db.collection("notificacoes")
-            .where(filter=FieldFilter("usuario_id", "==", usuario_id))
-            .where(filter=FieldFilter("lida", "==", False))
-            .count()
-            .get()
-        )
-        return result[0][0].value
+        with db_module.SessionLocal() as session:
+            total = session.execute(
+                select(func.count())
+                .select_from(NotificacaoRow)
+                .where(NotificacaoRow.usuario_id == usuario_id, NotificacaoRow.lida.is_(False))
+            ).scalar()
+        return total or 0
     except Exception as e:
         logger.exception("Erro ao contar notificações: %s", e)
         return 0
 
 
-def marcar_como_lida(notificacao_id: str, usuario_id: str) -> bool:
+def marcar_como_lida(notificacao_id, usuario_id: str) -> bool:
     """Marca a notificação como lida. Retorna True se encontrou e pertence ao usuário."""
     if not notificacao_id or not usuario_id:
         return False
     try:
-        ref = db.collection("notificacoes").document(notificacao_id)
-        doc = ref.get()
-        if not doc.exists or doc.to_dict().get("usuario_id") != usuario_id:
-            return False
-        ref.update({"lida": True})
+        nid = int(notificacao_id)
+    except (TypeError, ValueError):
+        return False
+    try:
+        with db_module.SessionLocal() as session, session.begin():
+            row = session.get(NotificacaoRow, nid)
+            if row is None or row.usuario_id != usuario_id:
+                return False
+            row.lida = True
         return True
     except Exception as e:
         logger.exception("Erro ao marcar notificação como lida: %s", e)
@@ -436,22 +423,17 @@ def marcar_todas_como_lidas(usuario_id: str) -> int:
     if not usuario_id:
         return 0
     try:
-        docs = list(
-            db.collection("notificacoes")
-            .where(filter=FieldFilter("usuario_id", "==", usuario_id))
-            .where(filter=FieldFilter("lida", "==", False))
-            .stream()
-        )
-        count = len(docs)
-        if not count:
-            return 0
-        # Firestore batch limit: 500 ops
-        for i in range(0, count, 500):
-            batch = db.batch()
-            for doc in docs[i : i + 500]:
-                batch.update(doc.reference, {"lida": True})
-            batch.commit()
-        logger.debug("Notificações marcadas como lidas: usuario=%s, count=%s", usuario_id, count)
+        with db_module.SessionLocal() as session, session.begin():
+            result = session.execute(
+                update(NotificacaoRow)
+                .where(NotificacaoRow.usuario_id == usuario_id, NotificacaoRow.lida.is_(False))
+                .values(lida=True)
+            )
+            count = result.rowcount or 0
+        if count:
+            logger.debug(
+                "Notificações marcadas como lidas: usuario=%s, count=%s", usuario_id, count
+            )
         return count
     except Exception as e:
         logger.exception("Erro ao marcar todas notificações como lidas: %s", e)

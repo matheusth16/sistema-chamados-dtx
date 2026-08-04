@@ -1,170 +1,163 @@
 """
-Testes unitários do modelo Historico.
-Cobre: from_dict, to_dict, save, get_by_chamado_id, data_acao_formatada.
+Testes unitários do modelo Historico (Fase 2, Marco 8 — Postgres real).
+Cobre: save, get_by_chamado_id, data_acao_formatada, __repr__.
 """
 
 from datetime import datetime
-from unittest.mock import MagicMock, patch
 
-# ── Construção ─────────────────────────────────────────────────────────────────
+import pytest
+import pytz
 
+from app.models_historico import Historico
+from tests.factories import make_chamado
 
-def test_from_dict_cria_historico_com_campos_corretos():
-    """from_dict cria Historico com todos os campos esperados."""
-    from app.models_historico import Historico
-
-    data = {
-        "chamado_id": "ch1",
-        "usuario_id": "u1",
-        "usuario_nome": "Admin",
-        "acao": "criacao",
-        "campo_alterado": None,
-        "valor_anterior": None,
-        "valor_novo": None,
-        "data_acao": None,
-        "detalhe": "info extra",
-    }
-    with patch("app.models_historico.db"):
-        h = Historico.from_dict(data, "hist_001")
-
-    assert h.id == "hist_001"
-    assert h.chamado_id == "ch1"
-    assert h.acao == "criacao"
-    assert h.detalhe == "info extra"
-
-
-def test_to_dict_sem_detalhe_nao_inclui_campo():
-    """to_dict sem detalhe não inclui a chave 'detalhe'."""
-    from app.models_historico import Historico
-
-    with patch("app.models_historico.db"):
-        h = Historico(
-            chamado_id="ch1",
-            usuario_id="u1",
-            usuario_nome="Admin",
-            acao="criacao",
-        )
-        d = h.to_dict()
-
-    assert "detalhe" not in d
-    assert d["chamado_id"] == "ch1"
-
-
-def test_to_dict_com_detalhe_inclui_campo():
-    """to_dict com detalhe inclui a chave 'detalhe' no dicionário."""
-    from app.models_historico import Historico
-
-    with patch("app.models_historico.db"):
-        h = Historico(
-            chamado_id="ch1",
-            usuario_id="u1",
-            usuario_nome="Admin",
-            acao="alteracao_dados",
-            detalhe="arquivo.pdf",
-        )
-        d = h.to_dict()
-
-    assert d["detalhe"] == "arquivo.pdf"
+pytestmark = pytest.mark.usefixtures("db_session")
 
 
 # ── save ───────────────────────────────────────────────────────────────────────
 
 
-def test_save_chama_firestore_add_e_retorna_true():
-    """save chama db.collection('historico').add() e retorna True."""
-    from app.models_historico import Historico
+def test_save_persiste_e_retorna_true():
+    """save persiste o registro e popula id/data_acao."""
+    chamado = make_chamado()
+    h = Historico(chamado_id=chamado.id, usuario_id="u1", usuario_nome="Admin", acao="criacao")
 
-    mock_ref = MagicMock()
-    mock_ref.id = "hist_999"
-    with patch("app.models_historico.db") as mock_db:
-        mock_db.collection.return_value.add.return_value = (None, mock_ref)
-        h = Historico(chamado_id="ch1", usuario_id="u1", usuario_nome="A", acao="criacao")
-        result = h.save()
+    result = h.save()
 
     assert result is True
-    mock_db.collection.return_value.add.assert_called_once()
+    assert h.id is not None
+    assert h.data_acao is not None
 
 
-def test_save_retorna_false_quando_firestore_falha():
-    """save retorna False quando Firestore lança exceção."""
-    from app.models_historico import Historico
+def test_save_retorna_false_quando_banco_falha(monkeypatch):
+    """save captura exceção do banco e retorna False (ex.: conexão indisponível)."""
+    from app import models_historico
 
-    with patch("app.models_historico.db") as mock_db:
-        mock_db.collection.return_value.add.side_effect = Exception("timeout")
-        h = Historico(chamado_id="ch1", usuario_id="u1", usuario_nome="A", acao="criacao")
-        result = h.save()
+    def _explode():
+        raise RuntimeError("banco indisponível")
+
+    monkeypatch.setattr(models_historico.db_module, "SessionLocal", _explode)
+
+    h = Historico(chamado_id=1, usuario_id="u1", usuario_nome="A", acao="criacao")
+    result = h.save()
 
     assert result is False
+
+
+def test_save_sem_detalhe_grava_none():
+    """save sem detalhe grava NULL na coluna, sem levantar erro."""
+    chamado = make_chamado()
+    Historico(chamado_id=chamado.id, usuario_id="u1", usuario_nome="Admin", acao="criacao").save()
+
+    historico = Historico.get_by_chamado_id(chamado.id)
+
+    assert historico[0].detalhe is None
+
+
+def test_save_com_detalhe_persiste_valor():
+    """save com detalhe grava o valor informado."""
+    chamado = make_chamado()
+    Historico(
+        chamado_id=chamado.id,
+        usuario_id="u1",
+        usuario_nome="Admin",
+        acao="alteracao_dados",
+        detalhe="arquivo.pdf",
+    ).save()
+
+    historico = Historico.get_by_chamado_id(chamado.id)
+
+    assert historico[0].detalhe == "arquivo.pdf"
 
 
 # ── get_by_chamado_id ──────────────────────────────────────────────────────────
 
 
-def test_get_by_chamado_id_retorna_lista_ordenada():
-    """get_by_chamado_id retorna lista de Historico para o chamado."""
-    from app.models_historico import Historico
+def test_get_by_chamado_id_retorna_mais_recente_primeiro():
+    """get_by_chamado_id ordena por data_acao decrescente."""
+    chamado = make_chamado()
+    Historico(chamado_id=chamado.id, usuario_id="u1", usuario_nome="A", acao="criacao").save()
+    Historico(
+        chamado_id=chamado.id, usuario_id="u1", usuario_nome="A", acao="alteracao_status"
+    ).save()
 
-    doc = MagicMock()
-    doc.id = "h1"
-    doc.to_dict.return_value = {
-        "chamado_id": "ch1",
-        "usuario_id": "u1",
-        "usuario_nome": "Admin",
-        "acao": "criacao",
-        "campo_alterado": None,
-        "valor_anterior": None,
-        "valor_novo": None,
-        "data_acao": None,
-    }
+    result = Historico.get_by_chamado_id(chamado.id)
 
-    with patch("app.models_historico.db") as mock_db:
-        mock_query = MagicMock()
-        mock_db.collection.return_value.where.return_value = mock_query
-        mock_query.order_by.return_value.stream.return_value = [doc]
-        result = Historico.get_by_chamado_id("ch1")
-
-    assert len(result) == 1
-    assert result[0].chamado_id == "ch1"
+    assert [h.acao for h in result] == ["alteracao_status", "criacao"]
 
 
-def test_get_by_chamado_id_fallback_sem_indice():
-    """get_by_chamado_id usa fallback sem order_by quando índice não existe."""
-    from app.models_historico import Historico
+def test_get_by_chamado_id_aceita_string_numerica():
+    """get_by_chamado_id aceita chamado_id como string (ex.: vindo de rota Flask)."""
+    chamado = make_chamado()
+    Historico(chamado_id=chamado.id, usuario_id="u1", usuario_nome="A", acao="criacao").save()
 
-    doc = MagicMock()
-    doc.id = "h1"
-    doc.to_dict.return_value = {
-        "chamado_id": "ch1",
-        "usuario_id": "u1",
-        "usuario_nome": "Admin",
-        "acao": "criacao",
-        "campo_alterado": None,
-        "valor_anterior": None,
-        "valor_novo": None,
-        "data_acao": None,
-    }
-
-    with patch("app.models_historico.db") as mock_db:
-        mock_query = MagicMock()
-        mock_db.collection.return_value.where.return_value = mock_query
-        # order_by falha com erro de índice
-        mock_query.order_by.return_value.stream.side_effect = Exception("index building")
-        # fallback sem order_by
-        mock_query.stream.return_value = [doc]
-        result = Historico.get_by_chamado_id("ch1")
+    result = Historico.get_by_chamado_id(str(chamado.id))
 
     assert len(result) == 1
 
 
-def test_get_by_chamado_id_retorna_vazio_quando_firestore_falha():
-    """get_by_chamado_id retorna [] quando Firestore lança exceção não relacionada a índice."""
-    from app.models_historico import Historico
+def test_get_by_chamado_id_retorna_vazio_para_id_invalido():
+    """get_by_chamado_id retorna [] pra chamado_id não conversível a int, sem levantar erro."""
+    assert Historico.get_by_chamado_id("nao-numerico") == []
+    assert Historico.get_by_chamado_id(None) == []
 
-    with patch("app.models_historico.db") as mock_db:
-        mock_db.collection.return_value.where.side_effect = Exception("conexão perdida")
-        result = Historico.get_by_chamado_id("ch1")
 
-    assert result == []
+def test_get_by_chamado_id_nao_mistura_chamados_diferentes():
+    """get_by_chamado_id filtra estritamente pelo chamado pedido."""
+    chamado1 = make_chamado()
+    chamado2 = make_chamado()
+    Historico(chamado_id=chamado1.id, usuario_id="u1", usuario_nome="A", acao="criacao").save()
+    Historico(chamado_id=chamado2.id, usuario_id="u1", usuario_nome="A", acao="criacao").save()
+
+    result = Historico.get_by_chamado_id(chamado1.id)
+
+    assert len(result) == 1
+    assert result[0].chamado_id == chamado1.id
+
+
+def test_get_by_chamado_id_retorna_vazio_quando_banco_falha(monkeypatch):
+    """get_by_chamado_id captura exceção do banco e retorna []."""
+    from app import models_historico
+
+    def _explode():
+        raise RuntimeError("conexão perdida")
+
+    monkeypatch.setattr(models_historico.db_module, "SessionLocal", _explode)
+
+    assert Historico.get_by_chamado_id(1) == []
+
+
+# ── valor_anterior/valor_novo (JSONB) ───────────────────────────────────────────
+
+
+def test_valores_string_sao_preservados_no_round_trip():
+    """valor_anterior/valor_novo (JSONB) preservam string após save + reload."""
+    chamado = make_chamado()
+    Historico(
+        chamado_id=chamado.id,
+        usuario_id="u1",
+        usuario_nome="A",
+        acao="alteracao_status",
+        campo_alterado="status",
+        valor_anterior="Aberto",
+        valor_novo="Em Atendimento",
+    ).save()
+
+    result = Historico.get_by_chamado_id(chamado.id)[0]
+
+    assert result.valor_anterior == "Aberto"
+    assert result.valor_novo == "Em Atendimento"
+
+
+def test_valores_none_sao_preservados():
+    """valor_anterior/valor_novo ausentes continuam None após save + reload."""
+    chamado = make_chamado()
+    Historico(chamado_id=chamado.id, usuario_id="u1", usuario_nome="A", acao="criacao").save()
+
+    result = Historico.get_by_chamado_id(chamado.id)[0]
+
+    assert result.valor_anterior is None
+    assert result.valor_novo is None
 
 
 # ── data_acao_formatada ────────────────────────────────────────────────────────
@@ -172,16 +165,10 @@ def test_get_by_chamado_id_retorna_vazio_quando_firestore_falha():
 
 def test_data_acao_formatada_com_datetime():
     """data_acao_formatada retorna string formatada quando data_acao é datetime."""
-    import pytz
-
-    from app.models_historico import Historico
-
     dt = pytz.utc.localize(datetime(2026, 3, 20, 10, 30, 0))
-    with patch("app.models_historico.db"):
-        h = Historico(
-            chamado_id="ch1", usuario_id="u1", usuario_nome="A", acao="criacao", data_acao=dt
-        )
-        result = h.data_acao_formatada()
+    h = Historico(chamado_id=1, usuario_id="u1", usuario_nome="A", acao="criacao", data_acao=dt)
+
+    result = h.data_acao_formatada()
 
     assert "2026" in result
     assert "/" in result
@@ -189,16 +176,9 @@ def test_data_acao_formatada_com_datetime():
 
 def test_data_acao_formatada_sem_data_retorna_traco():
     """data_acao_formatada retorna '-' quando data_acao é None."""
+    h = Historico(chamado_id=1, usuario_id="u1", usuario_nome="A", acao="criacao")
 
-    from app.models_historico import Historico
-
-    with patch("app.models_historico.db"):
-        h = Historico(chamado_id="ch1", usuario_id="u1", usuario_nome="A", acao="criacao")
-        # Forçar data_acao como None para o _converter_timestamp retornar None
-        h.data_acao = None
-        result = h.data_acao_formatada()
-
-    assert result == "-"
+    assert h.data_acao_formatada() == "-"
 
 
 # ── __repr__ ───────────────────────────────────────────────────────────────────
@@ -206,11 +186,9 @@ def test_data_acao_formatada_sem_data_retorna_traco():
 
 def test_repr_contem_chamado_id_e_acao():
     """__repr__ de Historico contém chamado_id e acao."""
-    from app.models_historico import Historico
+    h = Historico(chamado_id=99, usuario_id="u1", usuario_nome="A", acao="criacao")
 
-    with patch("app.models_historico.db"):
-        h = Historico(chamado_id="ch99", usuario_id="u1", usuario_nome="A", acao="criacao")
-        r = repr(h)
+    r = repr(h)
 
-    assert "ch99" in r
+    assert "99" in r
     assert "criacao" in r

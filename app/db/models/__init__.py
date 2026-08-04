@@ -17,4 +17,6 @@ from app.db.models.chamado import (  # noqa: F401
     ChamadoRow,
 )
 from app.db.models.grupo_rl import GrupoRLRow  # noqa: F401
+from app.db.models.historico import HistoricoRow  # noqa: F401
+from app.db.models.notificacao import NotificacaoRow  # noqa: F401
 from app.db.models.usuario import UsuarioRow  # noqa: F401

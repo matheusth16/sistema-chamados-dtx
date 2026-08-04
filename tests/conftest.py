@@ -18,12 +18,9 @@ _MODULOS_COM_DB_FIRESTORE = [
     "app.routes.api_solicitante",
     "app.routes.api_colaboracao",
     "app.routes.admin_global",
-    "app.models_historico",
     "app.services.lgpd_self_service",
-    "app.services.edicao_chamado_service",
     "app.services.solicitante_edicao_service",
     "app.services.onboarding_service",
-    "app.services.notifications_inapp",
     "app.utils",
     "app.services.gamification_service",
 ]
