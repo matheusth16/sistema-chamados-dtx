@@ -87,6 +87,7 @@ USUARIOS_DEMO = [
         "nome": "Solicitante Demo",
         "perfil": "solicitante",
         "areas": [],
+        "totp_env": "TEST_SOLICITANTE_TOTP_SECRET",
     },
     {
         "id": "demo_supervisor",
@@ -94,6 +95,7 @@ USUARIOS_DEMO = [
         "nome": "Supervisor Demo",
         "perfil": "supervisor",
         "areas": [AREA_DEMO],
+        "totp_env": "TEST_SUPERVISOR_TOTP_SECRET",
     },
     {
         "id": "demo_admin",
@@ -101,6 +103,7 @@ USUARIOS_DEMO = [
         "nome": "Admin Demo",
         "perfil": "admin",
         "areas": [AREA_DEMO],
+        "totp_env": "TEST_ADMIN_TOTP_SECRET",
     },
     {
         "id": "demo_admin_global",
@@ -108,6 +111,7 @@ USUARIOS_DEMO = [
         "nome": "Admin Global Demo",
         "perfil": "admin_global",
         "areas": [AREA_DEMO],
+        "totp_env": "TEST_ADMIN_GLOBAL_TOTP_SECRET",
     },
 ]
 
@@ -153,6 +157,12 @@ CHAMADOS_DEMO = [
 
 
 def _upsert_usuario(dados: dict) -> None:
+    """MFA é obrigatório em todo login (ver app/routes/auth.py) — sem
+    mfa_enabled/mfa_secret configurados aqui, o login cairia na tela de setup
+    forçado em vez de aceitar o código TOTP que TEST_*_TOTP_SECRET (.env.test)
+    já documenta pra essas mesmas contas."""
+    totp_secret = os.environ.get(dados["totp_env"], "").strip()
+
     existente = Usuario.get_by_email(dados["email"])
     usuario = existente or Usuario(
         id=dados["id"],
@@ -168,8 +178,17 @@ def _upsert_usuario(dados: dict) -> None:
     usuario.onboarding_perfis_vistos = [dados["perfil"]]
     usuario.onboarding_passo = 0
     usuario.set_password(SENHA_DEMO)
+    if totp_secret:
+        usuario.mfa_enabled = True
+        usuario.mfa_secret = totp_secret
     usuario.save()
-    print(f"  Usuário demo pronto: {dados['email']} (perfil={dados['perfil']}, senha={SENHA_DEMO})")
+    mfa_info = (
+        "MFA configurado" if totp_secret else "MFA NÃO configurado (sem TOTP_SECRET no ambiente)"
+    )
+    print(
+        f"  Usuário demo pronto: {dados['email']} (perfil={dados['perfil']}, "
+        f"senha={SENHA_DEMO}, {mfa_info})"
+    )
 
 
 def _criar_chamados_demo() -> None:
