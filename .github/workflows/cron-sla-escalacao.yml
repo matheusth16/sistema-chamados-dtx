@@ -1,15 +1,17 @@
 name: Cron - SLA Escalonamento
 
-# Acorda o Container App (min-replicas=0, free tier) a cada 10 min só pelo
-# tempo de rodar o job de escalonamento SLA. O APScheduler in-process
-# (app/__init__.py:_iniciar_scheduler) não é confiável em scale-to-zero —
-# ver auditoria de CI/CD de 2026-07-21. Chama /internal/cron/sla-escalacao,
-# autenticado por CRON_SECRET (header X-Cron-Token), que reaproveita o lock
-# Redis existente (executar_job_com_lock) contra dupla execução.
+# DESATIVADO (2026-08-04, Marco 12): existia pra acordar o Container App
+# (min-replicas=0, free tier) a cada 10 min, já que o APScheduler in-process
+# (app/__init__.py:_iniciar_scheduler) não era confiável em scale-to-zero —
+# ver auditoria de CI/CD de 2026-07-21. Produção migrou pro servidor físico
+# on-premise (sempre ligado, gunicorn --workers 1) em 2026-07-31; o
+# APScheduler interno já cobre sla_escalacao a cada 10 min sozinho (confirmado
+# rodando em produção). Além de redundante, o runner hospedado do GitHub
+# Actions não alcança o servidor mesmo com PRODUCTION_URL corrigido — ele é
+# LAN-only, sem domínio/VPN público. Mantido como workflow_dispatch manual
+# (dry-run) caso o cenário de rede mude no futuro (self-hosted runner, VPN).
 
 on:
-  schedule:
-    - cron: "*/10 * * * *"
   workflow_dispatch:
 
 jobs:
