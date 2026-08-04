@@ -6,10 +6,10 @@ import logging
 from datetime import datetime
 from typing import Any
 
-from firebase_admin import firestore
 from flask import current_app, request
+from sqlalchemy import func, select
 
-from app.database import db
+from app import db as db_module
 
 logger = logging.getLogger(__name__)
 
@@ -60,29 +60,15 @@ def extrair_numero_chamado(numero_str: str | None) -> float:
 def gerar_numero_chamado() -> str:
     """
     Gera o próximo número de chamado sequencial no formato CHM-XXXX.
-    Usa transação atômica com documento contador.
+    Usa SEQUENCE nativa do Postgres (chamados_numero_seq) — atômica por
+    construção do banco, sem precisar de transação explícita.
     """
     try:
-        contador_ref = db.collection("_sistema").document("contador_chamados")
-
-        @firestore.transactional
-        def atualizar_contador(transaction):
-            # transaction.get() aceita um DocumentReference, não uma lista
-            result = transaction.get(contador_ref)
-            # Em versões mais recentes da API, pode retornar um generator
-            doc = next(result) if hasattr(result, "__next__") else result
-            if doc.exists:
-                proximo_numero = doc.get("proximo_numero") + 1
-            else:
-                proximo_numero = 1
-            transaction.set(contador_ref, {"proximo_numero": proximo_numero})
-            return proximo_numero
-
-        transaction = db.transaction()
-        novo_numero = atualizar_contador(transaction)
+        with db_module.SessionLocal() as session:
+            novo_numero = session.execute(select(func.nextval("chamados_numero_seq"))).scalar()
         return f"CHM-{novo_numero:04d}"
     except Exception:
-        current_app.logger.exception("Erro ao gerar número de chamado via transação")
+        current_app.logger.exception("Erro ao gerar número de chamado via sequence")
         timestamp_num = int(datetime.now().timestamp()) % 10000
         return f"CHM-{timestamp_num:04d}"
 

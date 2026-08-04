@@ -16,6 +16,7 @@ from app.db.models.chamado import (  # noqa: F401
     ChamadoParticipanteRow,
     ChamadoRow,
 )
+from app.db.models.config_setor_area import ConfigSetorAreaRow  # noqa: F401
 from app.db.models.grupo_rl import GrupoRLRow  # noqa: F401
 from app.db.models.historico import HistoricoRow  # noqa: F401
 from app.db.models.notificacao import NotificacaoRow  # noqa: F401

@@ -21,7 +21,6 @@ _MODULOS_COM_DB_FIRESTORE = [
     "app.services.lgpd_self_service",
     "app.services.solicitante_edicao_service",
     "app.services.onboarding_service",
-    "app.utils",
     "app.services.gamification_service",
 ]
 
@@ -98,27 +97,15 @@ def pytest_configure(config):
 
 
 @pytest.fixture(autouse=True)
-def _patch_utils_areas_db_default():
-    """Evita chamadas ao Firestore via utils_areas em todos os testes.
-
-    Substitui app.utils_areas.db por um mock cujo doc.exists=False, fazendo
-    _carregar_mapa_firestore retornar o fallback estático SETOR_PARA_AREA sem
-    bloquear na rede. Limpa o cache antes e depois do teste para evitar
-    interferência entre testes.
-
-    Testes que precisam de comportamento específico do Firestore (ex.:
-    test_carregar_mapa_firestore_*) devem usar patch("app.utils_areas.db") ou
-    patch("app.utils_areas._carregar_mapa_firestore") internamente — o patch
-    interno tem precedência sobre este autouse.
-    """
+def _limpa_cache_setor_area():
+    """Evita que o cache TTL de setor_para_area (app/utils_areas.py) vaze
+    entre testes. Desde a Fase 2 (Marco 9), a leitura é Postgres real
+    (config_setor_area) — sem linha na tabela de teste, cai no fallback
+    estático SETOR_PARA_AREA sem precisar de mock."""
     from app.cache import static_cache_delete
 
     static_cache_delete("setor_para_area_map")
-    _doc = MagicMock()
-    _doc.exists = False
-    with patch("app.utils_areas.db") as _mock_db:
-        _mock_db.collection.return_value.document.return_value.get.return_value = _doc
-        yield
+    yield
     static_cache_delete("setor_para_area_map")
 
 

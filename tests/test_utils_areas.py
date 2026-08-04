@@ -1,8 +1,13 @@
-"""Testes para utils_areas.py — mapeamento setor → área."""
+"""Testes para utils_areas.py — mapeamento setor → área (Fase 2, Marco 9:
+leitura contra Postgres real, tabela config_setor_area)."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
-# ── helpers ──────────────────────────────────────────────────────────────────
+import pytest
+
+from app.db.models.config_setor_area import ConfigSetorAreaRow
+
+pytestmark = pytest.mark.usefixtures("db_session")
 
 
 def _limpar_cache():
@@ -12,7 +17,7 @@ def _limpar_cache():
     static_cache_delete("setor_para_area_map")
 
 
-# ── testes existentes (fallback estático) ─────────────────────────────────────
+# ── fallback estático (tabela config_setor_area vazia) ────────────────────────
 
 
 def test_setor_material_indireto_mapeia_para_material():
@@ -59,37 +64,41 @@ def test_setor_nao_string_retorna_valor_original():
     assert setor_para_area(123) == 123
 
 
-# ── F-30: leitura do Firestore ────────────────────────────────────────────────
+# ── leitura real do Postgres ───────────────────────────────────────────────────
 
 
-def test_setor_para_area_le_mapa_do_firestore():
-    """setor_para_area usa mapa do Firestore quando disponível."""
+def test_setor_para_area_le_mapa_do_postgres(db_session):
+    """setor_para_area usa o mapa persistido em config_setor_area quando existe."""
     _limpar_cache()
-    mapa_remoto = {"TI": "TecnologiaInformacao", "Logística": "Logistica"}
-    with patch("app.utils_areas._carregar_mapa_firestore", return_value=mapa_remoto):
-        from app.utils_areas import setor_para_area
+    db_session.add(
+        ConfigSetorAreaRow(id=True, mapa={"TI": "TecnologiaInformacao", "Logística": "Logistica"})
+    )
+    db_session.commit()
 
-        assert setor_para_area("TI") == "TecnologiaInformacao"
-        assert setor_para_area("Logística") == "Logistica"
+    from app.utils_areas import setor_para_area
+
+    assert setor_para_area("TI") == "TecnologiaInformacao"
+    assert setor_para_area("Logística") == "Logistica"
     _limpar_cache()
 
 
-def test_setor_para_area_setor_desconhecido_do_firestore_retorna_proprio_nome():
-    """Setor não presente no mapa do Firestore → retorna o próprio nome (fallback)."""
+def test_setor_para_area_setor_desconhecido_do_postgres_retorna_proprio_nome(db_session):
+    """Setor não presente no mapa persistido → retorna o próprio nome (fallback pontual)."""
     _limpar_cache()
-    mapa_remoto = {"TI": "TecnologiaInformacao"}
-    with patch("app.utils_areas._carregar_mapa_firestore", return_value=mapa_remoto):
-        from app.utils_areas import setor_para_area
+    db_session.add(ConfigSetorAreaRow(id=True, mapa={"TI": "TecnologiaInformacao"}))
+    db_session.commit()
 
-        assert setor_para_area("RH") == "RH"
+    from app.utils_areas import setor_para_area
+
+    assert setor_para_area("RH") == "RH"
     _limpar_cache()
 
 
 def test_setor_para_area_cache_evita_re_query():
-    """Segunda chamada não re-executa _carregar_mapa_firestore (cache hit)."""
+    """Segunda chamada não re-executa _carregar_mapa_postgres (cache hit)."""
     _limpar_cache()
     mapa = {"TI": "TI_area"}
-    with patch("app.utils_areas._carregar_mapa_firestore", return_value=mapa) as mock_carregar:
+    with patch("app.utils_areas._carregar_mapa_postgres", return_value=mapa) as mock_carregar:
         from app.utils_areas import setor_para_area
 
         setor_para_area("TI")
@@ -99,10 +108,10 @@ def test_setor_para_area_cache_evita_re_query():
 
 
 def test_invalidar_cache_setor_area_forca_re_query():
-    """Após invalidar, próxima chamada re-executa _carregar_mapa_firestore."""
+    """Após invalidar, próxima chamada re-executa _carregar_mapa_postgres."""
     _limpar_cache()
     mapa = {"TI": "TI_area"}
-    with patch("app.utils_areas._carregar_mapa_firestore", return_value=mapa) as mock_carregar:
+    with patch("app.utils_areas._carregar_mapa_postgres", return_value=mapa) as mock_carregar:
         from app.utils_areas import invalidar_cache_setor_area, setor_para_area
 
         setor_para_area("TI")  # warm up cache
@@ -112,72 +121,43 @@ def test_invalidar_cache_setor_area_forca_re_query():
     _limpar_cache()
 
 
-def test_carregar_mapa_firestore_retorna_dict_do_doc():
-    """_carregar_mapa_firestore lê campo 'mapa' do doc config/setor_para_area."""
-    _limpar_cache()
+def test_carregar_mapa_postgres_retorna_dict_da_linha(db_session):
+    """_carregar_mapa_postgres lê a coluna 'mapa' da linha única de config_setor_area."""
     mapa_esperado = {"Comercial": "ComercialArea"}
-    mock_doc = MagicMock()
-    mock_doc.exists = True
-    mock_doc.to_dict.return_value = {"mapa": mapa_esperado}
-    mock_db = MagicMock()
-    mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
+    db_session.add(ConfigSetorAreaRow(id=True, mapa=mapa_esperado))
+    db_session.commit()
 
-    with patch("app.utils_areas.db", mock_db):
-        from app.utils_areas import _carregar_mapa_firestore
+    from app.utils_areas import _carregar_mapa_postgres
 
-        resultado = _carregar_mapa_firestore()
-
-    assert resultado == mapa_esperado
-    mock_db.collection.assert_called_once_with("config")
-    mock_db.collection.return_value.document.assert_called_once_with("setor_para_area")
-    _limpar_cache()
+    assert _carregar_mapa_postgres() == mapa_esperado
 
 
-def test_carregar_mapa_firestore_doc_inexistente_retorna_fallback():
-    """Doc inexistente no Firestore → retorna SETOR_PARA_AREA estático."""
-    _limpar_cache()
-    mock_doc = MagicMock()
-    mock_doc.exists = False
-    mock_db = MagicMock()
-    mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
+def test_carregar_mapa_postgres_linha_inexistente_retorna_fallback():
+    """Tabela sem a linha singleton → retorna SETOR_PARA_AREA estático."""
+    from app.utils_areas import SETOR_PARA_AREA, _carregar_mapa_postgres
 
-    with patch("app.utils_areas.db", mock_db):
-        from app.utils_areas import SETOR_PARA_AREA, _carregar_mapa_firestore
-
-        resultado = _carregar_mapa_firestore()
-
-    assert resultado == dict(SETOR_PARA_AREA)
-    _limpar_cache()
+    assert _carregar_mapa_postgres() == dict(SETOR_PARA_AREA)
 
 
-def test_carregar_mapa_firestore_mapa_vazio_retorna_fallback():
-    """Mapa vazio no Firestore → fallback para SETOR_PARA_AREA."""
-    _limpar_cache()
-    mock_doc = MagicMock()
-    mock_doc.exists = True
-    mock_doc.to_dict.return_value = {"mapa": {}}
-    mock_db = MagicMock()
-    mock_db.collection.return_value.document.return_value.get.return_value = mock_doc
+def test_carregar_mapa_postgres_mapa_vazio_retorna_fallback(db_session):
+    """Linha existe mas mapa é {} → fallback para SETOR_PARA_AREA."""
+    db_session.add(ConfigSetorAreaRow(id=True, mapa={}))
+    db_session.commit()
 
-    with patch("app.utils_areas.db", mock_db):
-        from app.utils_areas import SETOR_PARA_AREA, _carregar_mapa_firestore
+    from app.utils_areas import SETOR_PARA_AREA, _carregar_mapa_postgres
 
-        resultado = _carregar_mapa_firestore()
-
-    assert resultado == dict(SETOR_PARA_AREA)
-    _limpar_cache()
+    assert _carregar_mapa_postgres() == dict(SETOR_PARA_AREA)
 
 
-def test_carregar_mapa_firestore_excecao_usa_fallback():
-    """Exceção de Firestore → _carregar_mapa_firestore captura e retorna fallback estático."""
-    _limpar_cache()
-    mock_db = MagicMock()
-    mock_db.collection.side_effect = RuntimeError("connection refused")
+def test_carregar_mapa_postgres_excecao_usa_fallback(monkeypatch):
+    """Exceção de banco → _carregar_mapa_postgres captura e retorna fallback estático."""
+    from app import utils_areas
 
-    with patch("app.utils_areas.db", mock_db):
-        from app.utils_areas import SETOR_PARA_AREA, _carregar_mapa_firestore
+    def _explode():
+        raise RuntimeError("banco indisponível")
 
-        resultado = _carregar_mapa_firestore()
+    monkeypatch.setattr(utils_areas.db_module, "SessionLocal", _explode)
 
-    assert resultado == dict(SETOR_PARA_AREA)
-    _limpar_cache()
+    from app.utils_areas import SETOR_PARA_AREA, _carregar_mapa_postgres
+
+    assert _carregar_mapa_postgres() == dict(SETOR_PARA_AREA)

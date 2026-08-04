@@ -1,7 +1,7 @@
 """Testes das funções utilitárias (utils)."""
 
 from datetime import datetime
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -42,55 +42,50 @@ def test_extrair_numero_chamado(numero, esperado):
     assert extrair_numero_chamado(numero) == esperado
 
 
-def test_gerar_numero_chamado_formato(app):
-    """gerar_numero_chamado retorna string no formato CHM-XXXX (transação mockada)."""
-
-    class DocContador:
-        exists = True
-
-        def get(self, k):
-            return 1 if k == "proximo_numero" else None
-
-    with patch("app.utils.db") as mock_db:
-        mock_transaction = MagicMock()
-        mock_transaction.get.return_value = DocContador()
-        mock_db.transaction.return_value = mock_transaction
-        mock_db.collection.return_value.document.return_value = MagicMock()
-
-        with app.app_context():
-            result = gerar_numero_chamado()
+def test_gerar_numero_chamado_formato(app, db_session):
+    """gerar_numero_chamado retorna string no formato CHM-XXXX usando a
+    sequence real (chamados_numero_seq, Fase 2 — Marco 9)."""
+    with app.app_context():
+        result = gerar_numero_chamado()
 
     assert result.startswith("CHM-")
     assert len(result) == 8
     assert result[4:].isdigit()
-    assert result == "CHM-0002"
 
 
-def test_gerar_numero_chamado_doc_nao_existe_inicia_em_1(app):
-    """Quando o documento contador não existe, começa do número 1."""
+def test_gerar_numero_chamado_incrementa_a_cada_chamada(app, db_session):
+    """Chamadas sucessivas retornam números estritamente crescentes — a
+    sequence nunca repete (nem sob rollback: SEQUENCE não é transacional)."""
+    with app.app_context():
+        primeiro = gerar_numero_chamado()
+        segundo = gerar_numero_chamado()
 
-    class DocNovo:
-        exists = False
-
-    with patch("app.utils.db") as mock_db:
-        mock_transaction = MagicMock()
-        mock_transaction.get.return_value = DocNovo()
-        mock_db.transaction.return_value = mock_transaction
-        mock_db.collection.return_value.document.return_value = MagicMock()
-
-        with app.app_context():
-            result = gerar_numero_chamado()
-
-    assert result == "CHM-0001"
+    assert extrair_numero_chamado(segundo) > extrair_numero_chamado(primeiro)
 
 
-def test_gerar_numero_chamado_fallback_em_excecao(app):
-    """Exceção na transação cai para fallback CHM-XXXX com timestamp."""
-    with patch("app.utils.db") as mock_db:
-        mock_db.transaction.side_effect = Exception("Firestore error")
-        with app.app_context():
-            result = gerar_numero_chamado()
+def test_gerar_numero_chamado_fallback_em_excecao(app, monkeypatch):
+    """Exceção ao acessar o banco cai para fallback CHM-XXXX com timestamp."""
+    from app import utils
+
+    class _SessionLocalQuebrada:
+        """Levanta ao ser chamada; .remove() vira no-op — sem isso, o
+        teardown_appcontext (app/db/__init__.py::_remove_session) quebra ao
+        tentar chamar .remove() no valor monkeypatchado quando o `with
+        app.app_context()` sai, antes do monkeypatch reverter no fim do teste."""
+
+        def __call__(self):
+            raise RuntimeError("banco indisponível")
+
+        def remove(self):
+            pass
+
+    monkeypatch.setattr(utils.db_module, "SessionLocal", _SessionLocalQuebrada())
+
+    with app.app_context():
+        result = gerar_numero_chamado()
+
     assert result.startswith("CHM-")
+    assert len(result) == 8
 
 
 # ── formatar_data_para_excel (ramos adicionais) ───────────────────────────────
@@ -230,100 +225,12 @@ def test_mask_email_filter_email_invalido_retorna_inalterado(app):
     assert f(None) == ""
 
 
-# ── F-58: Confirma uso de transação atômica em gerar_numero_chamado ──────────
-
-
-def test_gerar_numero_chamado_usa_transaction_set_quando_doc_nao_existe(app):
-    """F-58: gerar_numero_chamado chama transaction.set() quando o doc contador não existe.
-    Confirma que o caminho @firestore.transactional é executado para garantir atomicidade."""
-
-    class DocNovo:
-        exists = False
-
-    with patch("app.utils.db") as mock_db:
-        mock_transaction = MagicMock()
-        mock_transaction.get.return_value = DocNovo()
-        mock_db.transaction.return_value = mock_transaction
-        mock_db.collection.return_value.document.return_value = MagicMock()
-
-        with app.app_context():
-            result = gerar_numero_chamado()
-
-    mock_db.transaction.assert_called_once()
-    mock_transaction.set.assert_called_once()
-    call_args = mock_transaction.set.call_args[0]
-    assert call_args[1]["proximo_numero"] == 1
-    assert result == "CHM-0001"
-
-
-def test_gerar_numero_chamado_usa_transaction_get_para_ler_contador(app):
-    """F-58: gerar_numero_chamado lê o contador via transaction.get() antes de incrementar."""
-
-    class DocExistente:
-        exists = True
-
-        def get(self, k):
-            return 5 if k == "proximo_numero" else None
-
-    with patch("app.utils.db") as mock_db:
-        mock_transaction = MagicMock()
-        mock_transaction.get.return_value = DocExistente()
-        mock_db.transaction.return_value = mock_transaction
-        mock_db.collection.return_value.document.return_value = MagicMock()
-
-        with app.app_context():
-            result = gerar_numero_chamado()
-
-    mock_transaction.get.assert_called()
-    assert result == "CHM-0006"
-
-
-def test_gerar_numero_chamado_concorrencia_gera_numeros_unicos(app):
-    """F-58: Múltiplas threads chamando gerar_numero_chamado() com mock serializado devem gerar números únicos."""
-    import threading
-
-    counter = {"n": 0}
-    state_lock = threading.Lock()
-
-    class RealDoc:
-        """Doc sem __next__ para cair no caminho else (não-generator) em utils.py."""
-
-        def __init__(self, n):
-            self.exists = True
-            self._n = n
-
-        def get(self, k, **kwargs):
-            return self._n if k == "proximo_numero" else None
-
-    def make_transaction():
-        mock_tx = MagicMock()
-
-        def atomic_get(doc_ref, **kwargs):
-            with state_lock:
-                counter["n"] += 1
-                return RealDoc(counter["n"])
-
-        mock_tx.get.side_effect = atomic_get
-        return mock_tx
-
-    results = []
-    results_lock = threading.Lock()
-
-    with patch("app.utils.db") as mock_db:
-        mock_db.transaction.side_effect = make_transaction
-        mock_db.collection.return_value.document.return_value = MagicMock()
-
-        def worker():
-            with app.app_context():
-                num = gerar_numero_chamado()
-            with results_lock:
-                results.append(num)
-
-        threads = [threading.Thread(target=worker) for _ in range(5)]
-        for t in threads:
-            t.start()
-        for t in threads:
-            t.join()
-
-    assert len(results) == 5, f"Esperado 5 resultados, obtido {len(results)}"
-    assert len(set(results)) == 5, f"Race condition detectada — números duplicados: {results}"
+# ── F-58: atomicidade de gerar_numero_chamado (Fase 2 — sequence nativa) ─────
+#
+# A garantia de unicidade agora vem da própria SEQUENCE do Postgres (atômica
+# por construção do banco, inclusive sob concorrência real) — não precisa de
+# teste de concorrência aqui como precisou pra GrupoRL/contadores_uso, onde
+# a migração corrigia uma race condition de fato (check-then-act). Aqui a
+# implementação antiga (transação Firestore) já era atômica; a mudança é só
+# de mecanismo. Um teste com threads reais contra a mesma SQLAlchemy Session
+# de teste (não thread-safe) só introduziria flakiness sem provar nada novo.
