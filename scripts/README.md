@@ -14,6 +14,8 @@ A maioria dos scripts que tocam o banco requer `credentials.json` na raiz.
 
 | Script | Quando usar |
 |--------|-------------|
+| **backup_postgres.sh** | Backup diário do Postgres via `pg_dump` (formato `-Fc`, `docker exec`) pra LV de backup do host; cron do root em produção |
+| **backup_anexos.sh** | Backup diário dos anexos (rsync + snapshots com hardlink) pra LV de backup do host; cron do root em produção |
 | **executar_qa_manual_cwi.py** | Playbook QA manual CWI (11 sub-itens): validação local via test client; gera JSON em `docs/evidencias/` |
 | **executar_qa_escalonamento.py** | Playbook QA Onda 6 — Escalonamento + SLA Gerencial (10 cenários ESC-01..ESC-10): isolamento, claim, transferência, multi-setor, gestor, tempo útil, deadline imutável; `--json` gera JSON em `docs/evidencias/` |
 | **migrate_firestore_to_postgres.py** | Fase 2, Marco 11 — dump/load/verify da migração completa Firestore → Postgres; **nunca contra produção ao vivo**, só staging restaurado de backup |
@@ -87,6 +89,47 @@ Todos os jobs usam `executar_job_com_lock` (`scheduler_lock.py`) para evitar exe
 > `chamados` — `status ASC, escalacao_resposta_nivel ASC`.
 > Sem ele, `processar_escada_a()` falha com `FAILED_PRECONDITION` no Firestore.
 > Ver `docs/INDICES_FIRESTORE.md`.
+
+---
+
+## Bash (cron do host, produção)
+
+Backups rodam no **host físico**, fora do Docker, agendados no crontab do
+**root** (não do container) — assim continuam funcionando mesmo se o
+container do Postgres estiver reiniciando, e têm acesso direto às LVs do
+host sem depender de bind mount. Repartição de disco em 2026-08-05 (ver
+[[project_migracao_servidor_local]]): SSD só SO, `vg_data` (HD 1TB) guarda
+dados vivos, `vg_backup` (HD 500GB) guarda os backups.
+
+### backup_postgres.sh
+
+Dump diário do Postgres via `pg_dump -Fc` (formato custom, comprimido) executado
+dentro do próprio container (`docker exec`) — não precisa de client Postgres
+nem de credencial duplicada no host, reaproveita as env vars que já existem
+no container. Retenção padrão 14 dias.
+
+```bash
+scripts/backup_postgres.sh                        # execução manual/teste
+# produção (crontab do root):
+# 30 1 * * * /caminho/para/sistema_chamados/scripts/backup_postgres.sh
+```
+
+Restore:
+```bash
+docker exec -i sistema_chamados-postgres-1 pg_restore -U sistema_chamados \
+  -d sistema_chamados --clean --if-exists < dump.pgcustom
+```
+
+### backup_anexos.sh
+
+Sync diário dos anexos (`rsync -a --delete`) + snapshot com hardlinks (barato
+em espaço) e retenção configurável (padrão 7 dias).
+
+```bash
+scripts/backup_anexos.sh                          # execução manual/teste
+# produção (crontab do root):
+# 0 2 * * * /caminho/para/sistema_chamados/scripts/backup_anexos.sh
+```
 
 ---
 
