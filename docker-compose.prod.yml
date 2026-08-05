@@ -12,10 +12,13 @@
 # credentials.json montado.
 
 services:
-  # Fase 2 (Marco 12) — Postgres roda no SSD do sistema (/), reservado pra
-  # isso desde a migração pro servidor físico (ver
-  # [[project_migracao_servidor_local]]). "web" depende deste serviço estar
-  # saudável (depends_on abaixo) e se conecta via DATABASE_URL no .env, pela
+  # Fase 2 (Marco 12) — Postgres roda em LVM dedicado no HD de 1TB
+  # (vg_data/lv_sistema_chamados_postgres, /mnt/data/sistema_chamados/postgres).
+  # Repartição via LVM em 2026-08-05: SSD só com o SO, HDs em vg_data (dados)
+  # e vg_backup (backup), reservando espaço pra outros projetos no mesmo
+  # servidor (ver [[project_migracao_servidor_local]]). "web" depende deste
+  # serviço estar saudável (depends_on abaixo) e se conecta via DATABASE_URL
+  # no .env, pela
   # rede interna do compose (nome do serviço "postgres") — nunca precisa de
   # porta publicada na LAN.
   postgres:
@@ -25,7 +28,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: sistema_chamados
     volumes:
-      - /opt/sistema_chamados_postgres_data:/var/lib/postgresql/data
+      - /mnt/data/sistema_chamados/postgres:/var/lib/postgresql/data
     ports:
       - "127.0.0.1:5432:5432"
     healthcheck:
@@ -46,12 +49,12 @@ services:
     env_file:
       - .env
     volumes:
-      # Anexos novos (Fase 1 on-premise) — bind-mount pro HD dedicado do host
-      # físico (~932GB, ver [[project_migracao_servidor_local]]). O caminho
-      # dentro do container deve bater com ANEXO_LOCAL_DIR no .env do servidor.
-      # Pré-requisito no host: sudo mkdir -p /var/anexos_chamados &&
-      # sudo chown -R 1001:1001 /var/anexos_chamados (appuser não-root do Dockerfile).
-      - /var/anexos_chamados:/var/anexos_chamados
+      # Anexos novos (Fase 1 on-premise) — bind-mount pra LV dedicada em
+      # vg_data (HD de 1TB), montada em /mnt/data/sistema_chamados/anexos.
+      # Repartição via LVM em 2026-08-05 (ver [[project_migracao_servidor_local]]).
+      # O caminho dentro do container deve bater com ANEXO_LOCAL_DIR no .env
+      # do servidor. Dono já é 1001:1001 (appuser não-root do Dockerfile).
+      - /mnt/data/sistema_chamados/anexos:/var/anexos_chamados
     healthcheck:
       # Envia X-Health-Token lendo HEALTH_SECRET do próprio ambiente do container
       # (env_file acima) — a rota /health exige o token quando HEALTH_SECRET está
