@@ -27,6 +27,10 @@
   var URL_CONCLUIR = root.dataset.urlConcluir;
   var URL_PULAR    = root.dataset.urlPular;
   var pasoAtual    = MODO === 'replay' ? 0 : (parseInt(root.dataset.passo, 10) || 0);
+  // Guarda contra cliques repetidos em "Próximo"/"Anterior" durante a transição
+  // (fade + possível scroll até o elemento em destaque) — sem isso, um clique
+  // duplo pula um passo inteiro sem o usuário nunca ver o conteúdo dele.
+  var emTransicao  = false;
 
   // ─── Textos da UI por idioma ───────────────────────────────────────────────
 
@@ -829,6 +833,7 @@
 
     var step = steps[index];
     pasoAtual = index;
+    emTransicao = false;
 
     clearHighlight();
     card.innerHTML = buildCardHTML(step, index);
@@ -1084,8 +1089,16 @@
 
   // ─── Navegação ─────────────────────────────────────────────────────────────
 
-  function nextStep() { animateCardOut(function () { renderStep(pasoAtual + 1); }); }
-  function prevStep() { if (pasoAtual > 0) animateCardOut(function () { renderStep(pasoAtual - 1); }); }
+  function nextStep() {
+    if (emTransicao) return;
+    emTransicao = true;
+    animateCardOut(function () { renderStep(pasoAtual + 1); });
+  }
+  function prevStep() {
+    if (emTransicao || pasoAtual <= 0) return;
+    emTransicao = true;
+    animateCardOut(function () { renderStep(pasoAtual - 1); });
+  }
 
   function animateCardOut(cb) {
     if (typeof gsap !== 'undefined') {
