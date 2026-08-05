@@ -48,18 +48,22 @@ DEFAULT_TIMEOUT = 10_000  # ms — tempo padrão de espera para assertions E2E
 
 
 # ---------------------------------------------------------------------------
-# Stub server para CI (sem Firebase real, sem servidor externo)
+# Stub server para CI (Flask em thread local + Postgres real de teste)
 # ---------------------------------------------------------------------------
 
 
-def _fake_usuarios_por_id() -> dict[str, dict]:
-    """Monta os documentos falsos de usuário (id -> dict estilo Firestore) a partir das
-    variáveis TEST_<PERFIL>_EMAIL/PASSWORD/TOTP_SECRET já definidas no workflow do E2E.
+def _seed_usuarios_teste() -> None:
+    """Semeia no Postgres real de teste os usuários E2E (solicitante/supervisor/admin) a
+    partir de TEST_<PERFIL>_EMAIL/PASSWORD/TOTP_SECRET já definidas no workflow do E2E —
+    mesmo padrão de scripts/seed/seed_dados_demo_onboarding.py.
 
-    Um perfil só aparece aqui se TEST_<PERFIL>_EMAIL estiver definido — sem isso, o
-    fixture `creds_<perfil>` já faz pytest.skip normalmente, então nenhum dado é preciso.
+    Um perfil só é semeado se TEST_<PERFIL>_EMAIL estiver definido — sem isso, o fixture
+    `creds_<perfil>` já faz pytest.skip normalmente, então nenhum dado é preciso.
+
+    Idempotente: reaproveita o usuário existente por email (get_by_email) em vez de
+    duplicar, então rodar a suíte várias vezes contra o mesmo Postgres é seguro.
     """
-    from werkzeug.security import generate_password_hash
+    from app.models_usuario import Usuario
 
     especificacoes = [
         ("e2e-solicitante", "SOLICITANTE", "solicitante", "E2E Solicitante", ["Planejamento"]),
@@ -67,76 +71,27 @@ def _fake_usuarios_por_id() -> dict[str, dict]:
         ("e2e-admin", "ADMIN", "admin", "E2E Admin", []),
     ]
 
-    usuarios: dict[str, dict] = {}
     for uid, env_prefix, perfil, nome, areas in especificacoes:
         email = os.environ.get(f"TEST_{env_prefix}_EMAIL", "")
         senha = os.environ.get(f"TEST_{env_prefix}_PASSWORD", "")
         totp_secret = os.environ.get(f"TEST_{env_prefix}_TOTP_SECRET", "")
         if not email or not senha:
             continue
-        usuarios[uid] = {
-            "email": email,
-            "nome": nome,
-            "perfil": perfil,
-            "areas": areas,
-            "senha_hash": generate_password_hash(senha),
-            "ativo": True,
-            "must_change_password": False,
-            # MFA é obrigatório pra todos os perfis (ver auth.py) — sem secret configurado
-            # o login para em /verificar-mfa e _do_login pula o teste, não falha.
-            "mfa_enabled": bool(totp_secret),
-            "mfa_secret": totp_secret or None,
-            "mfa_backup_codes": [],
-            "onboarding_perfis_vistos": [perfil],
-        }
-    return usuarios
 
-
-def _build_usuarios_collection_mock(usuarios_por_id: dict[str, dict]):
-    """Mock de db.collection('usuarios') com lookup real por email e por id,
-    usando os usuários falsos gerados por _fake_usuarios_por_id().
-    """
-    from unittest.mock import MagicMock
-
-    def _fake_doc(uid: str, data: dict):
-        doc = MagicMock()
-        doc.exists = True
-        doc.id = uid
-        doc.to_dict.return_value = dict(data)
-        return doc
-
-    docs_por_email = {data["email"]: (uid, data) for uid, data in usuarios_por_id.items()}
-
-    def _where(*_args, **kwargs):
-        filtro = kwargs.get("filter")
-        resultado = MagicMock()
-        campo = getattr(filtro, "field_path", None)
-        valor = getattr(filtro, "value", None)
-        if campo == "email" and valor in docs_por_email:
-            uid, data = docs_por_email[valor]
-            resultado.stream.return_value = iter([_fake_doc(uid, data)])
-        else:
-            resultado.stream.return_value = iter([])
-        resultado.limit.return_value.stream.return_value = resultado.stream.return_value
-        return resultado
-
-    def _document(uid: str):
-        doc_ref = MagicMock()
-        if uid in usuarios_por_id:
-            doc_ref.get.return_value = _fake_doc(uid, usuarios_por_id[uid])
-        else:
-            doc_ref.get.return_value = MagicMock(exists=False)
-        # .update(**kwargs) só precisa não travar — não persiste de verdade no stub.
-        doc_ref.update = MagicMock()
-        return doc_ref
-
-    mock_usuarios = MagicMock()
-    mock_usuarios.where.side_effect = _where
-    mock_usuarios.document.side_effect = _document
-    mock_usuarios.stream.return_value = iter(
-        _fake_doc(uid, data) for uid, data in usuarios_por_id.items()
-    )
-    return mock_usuarios
+        usuario = Usuario.get_by_email(email) or Usuario(
+            id=uid, email=email, nome=nome, perfil=perfil, areas=areas
+        )
+        usuario.nome = nome
+        usuario.perfil = perfil
+        usuario.areas = areas
+        usuario.must_change_password = False
+        usuario.onboarding_perfis_vistos = [perfil]
+        usuario.set_password(senha)
+        # MFA é obrigatório pra todos os perfis (ver auth.py) — sem secret configurado
+        # o login para em /verificar-mfa e _do_login pula o teste, não falha.
+        usuario.mfa_enabled = bool(totp_secret)
+        usuario.mfa_secret = totp_secret or None
+        usuario.save()
 
 
 @pytest.fixture(scope="session")
@@ -146,21 +101,11 @@ def _stub_server() -> Generator[str | None]:
     Ativado quando FLASK_E2E_STUB=1 ou CI=true e FLASK_TEST_URL não está definido.
     Retorna a URL base do servidor stub, ou None se o modo stub não estiver ativo.
 
-    Smoke tests que não precisam de login (SMOKE-01, 02, 03) funcionam com o stub
-    pois o Flask trata /login e o redirect de rotas protegidas sem acessar Firestore.
-    Para os demais smokes (login por perfil, permissões, dashboard etc.), a coleção
-    "usuarios" é populada com usuários falsos derivados de TEST_<PERFIL>_EMAIL/PASSWORD/
-    TOTP_SECRET (ver _fake_usuarios_por_id) — as outras coleções continuam retornando
-    vazio, capturado silenciosamente pelos try/except já existentes nos services.
-
-    A credencial usada em CI (GOOGLE_CREDENTIALS_JSON fake) é sintaticamente válida mas
-    não corresponde a nenhum projeto GCP real: qualquer chamada a uma coleção não
-    populada aqui falha, só que não instantaneamente — o SDK do Google tenta novamente
-    por até ~60s antes de levantar a exceção, estourando o timeout de 30s do pytest
-    (pytest.ini) e derrubando o teste. Como o stub roda no mesmo processo (thread, não
-    subprocess), mockar os métodos do objeto `db` aqui afeta todos os módulos que já
-    importaram essa mesma instância — sem precisar tocar em cada rota/serviço
-    individualmente.
+    O workflow do E2E (.github/workflows/e2e.yml) sobe um serviço postgres:16-alpine e
+    aplica `alembic upgrade head` antes deste fixture rodar — create_app() conecta nesse
+    Postgres real via TEST_DATABASE_URL (config.py troca automaticamente pra essa var
+    quando FLASK_ENV=testing). Os usuários de teste (solicitante/supervisor/admin) são
+    gravados de verdade via _seed_usuarios_teste() logo após a app subir.
     """
     ci_mode = (
         os.environ.get("CI") == "true" or os.environ.get("FLASK_E2E_STUB") == "1"
@@ -170,51 +115,31 @@ def _stub_server() -> Generator[str | None]:
         yield None
         return
 
-    from unittest.mock import MagicMock, patch
-
     from werkzeug.serving import make_server
 
-    import app.database
     from app import create_app
 
-    # `db` é um singleton do Firestore importado por referência em vários módulos
-    # (models_usuario.py, models.py, etc.) — mockar os métodos do objeto existente,
-    # em vez de reatribuir app.database.db, garante que todos esses módulos também
-    # vejam o mock, sem precisar descobrir e patchar cada um individualmente.
-    mock_collection_vazia = MagicMock()
-    mock_collection_vazia.where.return_value.stream.return_value = iter([])
-    mock_collection_vazia.where.return_value.limit.return_value.stream.return_value = iter([])
-    mock_collection_vazia.document.return_value.get.return_value = MagicMock(exists=False)
-    mock_collection_vazia.limit.return_value.stream.return_value = iter([])
-    mock_collection_vazia.stream.return_value = iter([])
+    stub = create_app()
+    stub.config["TESTING"] = True
+    stub.config["WTF_CSRF_ENABLED"] = False
+    stub.config["SECRET_KEY"] = "test-stub-e2e-secret"
+    stub.config["APP_BASE_URL"] = ""
+    # Desativa rate limiting no stub para que SMOKE-02 (login inválido) não bloqueie
+    stub.config["RATELIMIT_ENABLED"] = False
 
-    mock_collection_usuarios = _build_usuarios_collection_mock(_fake_usuarios_por_id())
+    _seed_usuarios_teste()
 
-    def _collection(nome: str):
-        if nome == "usuarios":
-            return mock_collection_usuarios
-        return mock_collection_vazia
+    # Porta 0 = OS escolhe uma porta livre (sem race condition)
+    server = make_server("127.0.0.1", 0, stub)
+    port = server.socket.getsockname()[1]
+    url = f"http://127.0.0.1:{port}"
 
-    with patch.object(app.database.db, "collection", side_effect=_collection):
-        stub = create_app()
-        stub.config["TESTING"] = True
-        stub.config["WTF_CSRF_ENABLED"] = False
-        stub.config["SECRET_KEY"] = "test-stub-e2e-secret"
-        stub.config["APP_BASE_URL"] = ""
-        # Desativa rate limiting no stub para que SMOKE-02 (login inválido) não bloqueie
-        stub.config["RATELIMIT_ENABLED"] = False
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
 
-        # Porta 0 = OS escolhe uma porta livre (sem race condition)
-        server = make_server("127.0.0.1", 0, stub)
-        port = server.socket.getsockname()[1]
-        url = f"http://127.0.0.1:{port}"
+    yield url
 
-        thread = threading.Thread(target=server.serve_forever, daemon=True)
-        thread.start()
-
-        yield url
-
-        server.shutdown()
+    server.shutdown()
 
 
 # ---------------------------------------------------------------------------

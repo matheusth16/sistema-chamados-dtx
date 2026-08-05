@@ -19,10 +19,29 @@ jobs:
     runs-on: ubuntu-latest
     # Smoke-01/02/03 bloqueiam o merge; testes que exigem credenciais fazem pytest.skip automaticamente.
 
+    services:
+      # Postgres real de teste — mesmo motivo do ci.yml: desde o Marco 12,
+      # models_usuario.py fala com Postgres de verdade (SessionLocal), não Firestore
+      # mockado, então o stub E2E precisa de um banco real pra semear os usuários de teste.
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+
     env:
       FLASK_ENV: testing
       SECRET_KEY: e2e-test-secret
       WTF_CSRF_ENABLED: "false"
+      TEST_DATABASE_URL: postgresql://postgres:test@localhost:5432/test
       # FLASK_E2E_STUB=1 ativa o servidor Flask local em thread (sem Firestore real).
       # SMOKE-01/02/03 passam com o stub; SMOKE-04+ fazem pytest.skip por falta de credenciais.
       FLASK_E2E_STUB: "1"
@@ -66,6 +85,9 @@ jobs:
 
       - name: Instalar browsers Playwright
         run: playwright install chromium --with-deps
+
+      - name: Alembic — aplica migrations no Postgres de teste
+        run: alembic upgrade head
 
       - name: Rodar suíte smoke E2E
         run: |
