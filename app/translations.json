@@ -3629,6 +3629,11 @@
     "en": "Locked multi-sector",
     "es": "Multisector bloqueado"
   },
+  "gestor_lane_em_dia": {
+    "pt_BR": "Em dia",
+    "en": "On track",
+    "es": "Al día"
+  },
   "index_building_title": {
     "pt_BR": "Índice do banco em construção",
     "en": "Database index under construction",

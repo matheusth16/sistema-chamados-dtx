@@ -180,6 +180,17 @@ def _make_chamado_multi_travado():
     return c
 
 
+def _make_chamado_saudavel():
+    """Chamado sem nenhum risco: não atrasado, não aberto-sem-resposta, não multi-travado."""
+    c = MagicMock()
+    c.status = "Em Atendimento"
+    c.is_atrasado = False
+    c.sla_dias = None
+    c.data_abertura = datetime(2024, 6, 3, 10, 30)
+    c.participantes = []
+    return c
+
+
 def test_obter_contexto_lista_vazia():
     with patch("app.services.gestor_dashboard_service._carregar_todos_chamados", return_value=[]):
         ctx = obter_contexto_gestor_dashboard(agora=_AGORA_FIXED)
@@ -468,7 +479,7 @@ def test_chamado_pode_acumular_multiplos_riscos():
 # ---------------------------------------------------------------------------
 
 
-def test_grupos_contem_as_tres_raias_com_totais_corretos():
+def test_grupos_contem_as_quatro_raias_com_totais_corretos():
     atrasado = _make_chamado_atrasado()
     aberto_antigo = _make_chamado_aberto_antigo()
     multi = _make_chamado_multi_travado()
@@ -479,11 +490,12 @@ def test_grupos_contem_as_tres_raias_com_totais_corretos():
         ctx = obter_contexto_gestor_dashboard(agora=_AGORA_FIXED)
 
     chaves = {g["chave"] for g in ctx["grupos"]}
-    assert chaves == {"atrasados", "aberto_sem_resposta", "multi_setor"}
+    assert chaves == {"atrasados", "aberto_sem_resposta", "multi_setor", "em_dia"}
     por_chave = {g["chave"]: g for g in ctx["grupos"]}
     assert por_chave["atrasados"]["total"] == 1
     assert por_chave["aberto_sem_resposta"]["total"] == 1
     assert por_chave["multi_setor"]["total"] == 1
+    assert por_chave["em_dia"]["total"] == 0
 
 
 def test_grupos_limita_chamados_por_raia():
@@ -497,6 +509,50 @@ def test_grupos_limita_chamados_por_raia():
     grupo_atrasados = next(g for g in ctx["grupos"] if g["chave"] == "atrasados")
     assert grupo_atrasados["total"] == 10
     assert len(grupo_atrasados["chamados"]) == 6
+
+
+def test_grupos_contem_raia_em_dia_com_chamado_sem_risco():
+    """Regressão: chamado saudável era contado no Total mas não aparecia em nenhuma raia."""
+    saudavel = _make_chamado_saudavel()
+    atrasado = _make_chamado_atrasado()
+    with patch(
+        "app.services.gestor_dashboard_service._carregar_todos_chamados",
+        return_value=[atrasado, saudavel],
+    ):
+        ctx = obter_contexto_gestor_dashboard(agora=_AGORA_FIXED)
+
+    chaves = {g["chave"] for g in ctx["grupos"]}
+    assert chaves == {"atrasados", "aberto_sem_resposta", "multi_setor", "em_dia"}
+    por_chave = {g["chave"]: g for g in ctx["grupos"]}
+    assert por_chave["em_dia"]["total"] == 1
+    assert por_chave["em_dia"]["chamados"] == [saudavel]
+
+
+def test_grupos_em_dia_filtra_chamados_com_risco():
+    """Um chamado atrasado nunca deve aparecer na raia em_dia."""
+    atrasado = _make_chamado_atrasado()
+    with patch(
+        "app.services.gestor_dashboard_service._carregar_todos_chamados",
+        return_value=[atrasado],
+    ):
+        ctx = obter_contexto_gestor_dashboard(agora=_AGORA_FIXED)
+
+    por_chave = {g["chave"]: g for g in ctx["grupos"]}
+    assert por_chave["em_dia"]["total"] == 0
+
+
+def test_obter_contexto_filtro_em_dia_retorna_apenas_saudaveis():
+    saudavel = _make_chamado_saudavel()
+    atrasado = _make_chamado_atrasado()
+    with patch(
+        "app.services.gestor_dashboard_service._carregar_todos_chamados",
+        return_value=[atrasado, saudavel],
+    ):
+        ctx = obter_contexto_gestor_dashboard(filtro="em_dia", agora=_AGORA_FIXED)
+
+    assert ctx["filtro_ativo"] == "em_dia"
+    assert len(ctx["chamados"]) == 1
+    assert ctx["chamados"][0] is saudavel
 
 
 # ---------------------------------------------------------------------------

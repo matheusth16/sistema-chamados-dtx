@@ -186,6 +186,8 @@ def obter_contexto_gestor_dashboard(
     ids_atrasados = {id(c) for c in atrasados}
     ids_sem_resp = {id(c) for c in abertos_sem_resp}
     ids_multi = {id(c) for c in multi_travados}
+    ids_com_risco = ids_atrasados | ids_sem_resp | ids_multi
+    em_dia = [c for c in todos if id(c) not in ids_com_risco]
     for c in todos:
         _marcar_riscos(c, ids_atrasados, ids_sem_resp, ids_multi)
 
@@ -194,6 +196,7 @@ def obter_contexto_gestor_dashboard(
         "atrasados": len(atrasados),
         "aberto_sem_resposta": len(abertos_sem_resp),
         "multi_setor_travado": len(multi_travados),
+        "em_dia": len(em_dia),
     }
 
     filtro_norm = (filtro or "").strip().lower()
@@ -203,6 +206,8 @@ def obter_contexto_gestor_dashboard(
         lista = abertos_sem_resp
     elif filtro_norm in ("multi_setor", "multi_setor_travado"):
         lista = multi_travados
+    elif filtro_norm == "em_dia":
+        lista = em_dia
     else:
         lista = todos
 
@@ -229,6 +234,13 @@ def obter_contexto_gestor_dashboard(
             "cor": "purple",
             "total": len(multi_travados),
             "chamados": multi_travados[:_LIMITE_POR_RAIA],
+        },
+        {
+            "chave": "em_dia",
+            "titulo": "gestor_lane_em_dia",
+            "cor": "ok",
+            "total": len(em_dia),
+            "chamados": em_dia[:_LIMITE_POR_RAIA],
         },
     ]
 
