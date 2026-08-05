@@ -183,6 +183,32 @@ def test_obter_metricas_areas_usa_dados_pre_carregados_sem_query_chamados():
     assert resultado[0]["atribuidos_automaticamente"] == 1
 
 
+def test_obter_metricas_areas_inclui_area_sem_supervisor_cadastrado():
+    """Regressão: chamado numa área sem nenhum supervisor era contado no total geral
+    mas ficava invisível em 'Performance por Área' — areas_uniques só incluía áreas
+    com supervisor cadastrado, então a área nunca aparecia na tabela de métricas."""
+    from app.services.analytics import AnalisadorChamados
+
+    chamados = [
+        {
+            "area": "TI",
+            "status": "Aberto",
+            "data_abertura": None,
+            "data_conclusao": None,
+            "motivo_atribuicao": "",
+        }
+    ]
+
+    with patch("app.models_usuario.Usuario.get_all", return_value=[]):
+        a = AnalisadorChamados()
+        resultado = a.obter_metricas_areas(chamados_pre_carregados=chamados)
+
+    assert len(resultado) == 1
+    assert resultado[0]["area"] == "TI"
+    assert resultado[0]["total_chamados"] == 1
+    assert resultado[0]["supervisores_alocados"] == 0
+
+
 def test_obter_metricas_gerais_usa_chamados_pre_carregados_sem_query():
     """Com chamados_pre_carregados, obter_metricas_gerais não deve consultar o banco."""
     from datetime import UTC, datetime, timedelta

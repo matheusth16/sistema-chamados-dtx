@@ -440,6 +440,10 @@ class AnalisadorChamados:
                 if area := c.get("area"):
                     chamados_por_area[area].append(c)
 
+            # Áreas sem nenhum supervisor cadastrado também entram — senão, chamados
+            # nela ficam contados no total geral mas invisíveis nesta métrica por área.
+            areas_uniques.update(chamados_por_area.keys())
+
             metricas = []
             for area in sorted(areas_uniques):
                 chamados = chamados_por_area.get(area, [])
