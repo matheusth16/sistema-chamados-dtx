@@ -103,11 +103,12 @@
 .bento-btn-secondary:hover{ background:var(--color-dtx-600); }
 
 .bento-resp-box{ background:transparent; border:1px solid rgba(20,30,60,.08); border-radius:16px; padding:16px 20px; }
-.bento-resp-badge{ display:inline-flex; align-items:center; gap:8px; background:var(--color-surface-canvas); border:none; border-radius:99px; padding:8px 16px 8px 34px; color:var(--color-text-muted); font-size:14px; font-weight:700; position:relative; width:100%; cursor:not-allowed; }
-/* .hidden (Tailwind) e .bento-resp-badge têm a mesma especificidade — bento.css carrega
-   depois de tailwind.min.css em base.html, então display:inline-flex sempre vencia mesmo com
-   .hidden aplicada. Seletor composto abaixo tem especificidade maior e resolve o empate. */
-.bento-resp-badge.hidden{ display:none; }
+/* display fica isolado num seletor :not(.hidden) — mesmo padrão de .bento-bulk-bar/.bento-batch-bar
+   abaixo. .hidden (Tailwind) e uma regra .bento-resp-badge{ display:... } incondicional têm a
+   mesma especificidade; como bento.css carrega depois de tailwind.min.css em base.html, a regra
+   incondicional sempre venceria o empate mesmo com .hidden aplicada. */
+.bento-resp-badge:not(.hidden){ display:inline-flex; }
+.bento-resp-badge{ align-items:center; gap:8px; background:var(--color-surface-canvas); border:none; border-radius:99px; padding:8px 16px 8px 34px; color:var(--color-text-muted); font-size:14px; font-weight:700; position:relative; width:100%; cursor:not-allowed; }
 .bento-resp-badge.is-resolved{ background:var(--color-dtx-100); color:var(--color-dtx-500); }
 .bento-resp-badge.is-warning{ background:var(--color-status-open-bg); color:var(--color-status-open-text); }
 .bento-resp-badge.is-error{ background:var(--color-status-cancelled-bg); color:var(--color-status-cancelled-text); }
@@ -598,7 +599,13 @@ dialog.bento-modal textarea:focus{ outline:none; border-color:var(--color-dtx-50
 .bento-escalation-btn.violet{ background:#f5f3ff; color:var(--color-bento-violet); border-color:#ddd6fe; } .bento-escalation-btn.violet:hover{ background:#ddd6fe; }
 .bento-escalation-btn.teal{ background:#f0fdfa; color:var(--color-bento-teal); border-color:#99f6e4; } .bento-escalation-btn.teal:hover{ background:#99f6e4; }
 
-.bento-inline-notice{ font-size:12px; font-weight:600; border-radius:12px; padding:8px 12px; display:flex; align-items:center; gap:6px; }
+/* display isolado em :not(.hidden) — mesmo motivo de .bento-resp-badge acima: uma regra
+   .bento-inline-notice{ display:... } incondicional tinha a mesma especificidade de .hidden
+   (Tailwind) e sempre vencia o empate, deixando visíveis (como barra vazia) TODOS os avisos
+   inline da tela de chamado que começam escondidos no HTML (erro de edição de descrição, anexo,
+   transferir área, escalonar, incluir supervisores, previsão de atendimento, cancelar). */
+.bento-inline-notice:not(.hidden){ display:flex; }
+.bento-inline-notice{ font-size:12px; font-weight:600; border-radius:12px; padding:8px 12px; align-items:center; gap:6px; }
 .bento-inline-notice.error{ background:#fff1f2; color:var(--color-bento-danger); border:1px solid var(--color-bento-danger-bg); }
 .bento-inline-notice.ok{ background:var(--color-status-done-bg); color:var(--color-bento-success); border:1px solid #a7f3d0; }
 .bento-inline-notice.warn{ background:var(--color-status-open-bg); color:var(--color-bento-warning); border:1px solid var(--color-bento-warning-bg); }
