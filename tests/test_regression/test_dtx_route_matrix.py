@@ -335,3 +335,27 @@ def test_supervisor_tem_hamburger(client_logado_supervisor):
         r = client_logado_supervisor.get("/painel", follow_redirects=False)
     html = r.data.decode("utf-8", errors="replace")
     assert 'id="btn-hamburger"' in html
+
+
+def test_supervisor_hamburger_visivel_no_desktop(client_logado_supervisor):
+    """Regressão: o wrapper do hamburger do supervisor não deve ter md:hidden.
+
+    Antes do fix, supervisores com nivel_gestao (ex.: supervisor + gestor de
+    setor) acumulavam 5 itens sempre visíveis na barra (Gestão, Relatórios,
+    Novo Chamado, Meus Chamados, Painel Gerencial) e o hamburger só aparecia
+    em mobile — causando overflow/corte de texto na barra em telas normais."""
+    with _mock_dashboard():
+        r = client_logado_supervisor.get("/painel", follow_redirects=False)
+    html = r.data.decode("utf-8", errors="replace")
+    assert 'id="nav-hamburger-wrap"' in html
+    assert 'class="relative md:hidden" id="nav-hamburger-wrap"' not in html
+
+
+def test_supervisor_novo_chamado_esta_no_dropdown(client_logado_supervisor):
+    """Regressão: Novo Chamado/Meus Chamados saíram da barra fixa do supervisor
+    e passaram a ficar só no dropdown do hamburger (mesmo padrão do admin)."""
+    with _mock_dashboard():
+        r = client_logado_supervisor.get("/painel?lang=pt_BR", follow_redirects=False)
+    html = r.data.decode("utf-8", errors="replace")
+    assert "Novo Chamado" in html
+    assert 'href="/meus-chamados"' in html
