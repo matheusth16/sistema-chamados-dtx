@@ -2,9 +2,9 @@
 Serviço de upload de anexos.
 
 Prioridade em produção:
-  1. Cloudflare R2 (quando R2_ACCOUNT_ID et al. estão configurados)
-  2. Firebase Storage (fallback)
-  3. Disco local (apenas em desenvolvimento)
+  1. Disco local (quando ANEXO_STORAGE_BACKEND=local, Fase 1 on-premise)
+  2. Cloudflare R2 (quando R2_ACCOUNT_ID et al. estão configurados)
+  3. Disco local (apenas em desenvolvimento, sem R2 configurado)
 """
 
 import logging
@@ -132,46 +132,6 @@ def gerar_url_presignada(chave_r2: str, expiracao_segundos: int = 3600) -> str |
         return None
 
 
-def _upload_firebase_storage(arquivo: Any, nome_final: str) -> str | None:
-    """
-    Envia o arquivo para Firebase Storage em chamados/nome_final.
-    Retorna a URL pública ou None em caso de falha.
-    """
-    try:
-        from firebase_admin import storage
-
-        bucket = storage.bucket()
-    except Exception as e:
-        logger.warning(
-            "Firebase Storage indisponível (anexo usará disco local): %s - %s",
-            type(e).__name__,
-            e,
-            exc_info=False,
-        )
-        return None
-
-    try:
-        blob = bucket.blob(f"chamados/{nome_final}")
-        if hasattr(arquivo.stream, "seek"):
-            arquivo.stream.seek(0)
-        ext = arquivo.filename.rsplit(".", 1)[-1].lower() if "." in arquivo.filename else ""
-        safe_content_type = _EXT_TO_MIME.get(ext, "application/octet-stream")
-        blob.upload_from_file(arquivo.stream, content_type=safe_content_type)
-        blob.make_public()
-        url = blob.public_url
-        logger.info("Anexo enviado ao Firebase Storage: %s", nome_final)
-        return url
-    except Exception as e:
-        logger.warning(
-            "Falha ao enviar anexo ao Firebase Storage (%s): %s - %s",
-            nome_final,
-            type(e).__name__,
-            e,
-            exc_info=True,
-        )
-        return None
-
-
 def _upload_local(arquivo: Any, nome_final: str) -> str | None:
     """
     Salva o arquivo em disco local persistente (ANEXO_LOCAL_DIR).
@@ -211,7 +171,7 @@ def salvar_anexo(arquivo: Any) -> str | None:
         arquivo: FileStorage do request.files
 
     Returns:
-        str: URL pública ou nome do arquivo, ou None se não houver arquivo
+        str: chave/identificador do arquivo salvo, ou None se não houver arquivo
     """
     if not arquivo or not arquivo.filename or arquivo.filename.strip() == "":
         return None
@@ -238,7 +198,7 @@ def salvar_anexo(arquivo: Any) -> str | None:
         if chave_local:
             return chave_local
         logger.warning(
-            "ANEXO_STORAGE_BACKEND=local falhou ao salvar %s; tentando fallback R2/Firebase.",
+            "ANEXO_STORAGE_BACKEND=local falhou ao salvar %s; tentando fallback R2.",
             nome_final,
         )
 
@@ -249,23 +209,16 @@ def salvar_anexo(arquivo: Any) -> str | None:
     if url:
         return url
 
-    # 2) Fallback: Firebase Storage
-    if hasattr(arquivo.stream, "seek"):
-        arquivo.stream.seek(0)
-    url = _upload_firebase_storage(arquivo, nome_final)
-    if url:
-        return url
-
-    # 3) Em produção sem nenhum storage configurado: não salvar em disco (efêmero)
+    # 2) Em produção sem nenhum storage configurado: não salvar em disco (efêmero)
     if current_app.config.get("ENV") == "production":
         logger.error(
-            "R2 e Firebase Storage falharam em produção. Anexo NÃO foi salvo. "
-            "Configure R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, "
-            "R2_BUCKET_NAME e R2_PUBLIC_URL nas variáveis de ambiente."
+            "R2 falhou em produção. Anexo NÃO foi salvo. Configure R2_ACCOUNT_ID, "
+            "R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET_NAME e R2_PUBLIC_URL "
+            "nas variáveis de ambiente."
         )
         return None
 
-    # 4) Fallback: armazenamento local apenas em desenvolvimento
+    # 3) Fallback: armazenamento local apenas em desenvolvimento
     pasta_upload = current_app.config["UPLOAD_FOLDER"]
     if not os.path.exists(pasta_upload):
         os.makedirs(pasta_upload)

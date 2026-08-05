@@ -18,7 +18,7 @@ def test_salvar_anexo_sem_arquivo_retorna_none():
 
 
 def test_salvar_anexo_r2_tem_prioridade(app):
-    """Quando R2 está disponível, usa R2 e não chama Firebase Storage."""
+    """Quando R2 está disponível, usa R2."""
     fake_file = MagicMock()
     fake_file.filename = "doc.pdf"
     fake_file.stream = BytesIO(b"%PDF-1.4 minimal")
@@ -27,37 +27,16 @@ def test_salvar_anexo_r2_tem_prioridade(app):
 
     with (
         patch("app.services.upload._upload_r2") as mock_r2,
-        patch("app.services.upload._upload_firebase_storage") as mock_firebase,
         patch("app.services.upload.current_app", app),
     ):
         mock_r2.return_value = "r2:chamados/20260101_doc.pdf"
         result = salvar_anexo(fake_file)
 
     assert result == "r2:chamados/20260101_doc.pdf"
-    mock_firebase.assert_not_called()
 
 
-def test_salvar_anexo_r2_falha_usa_firebase(app):
-    """Quando R2 falha, cai no Firebase Storage como fallback."""
-    fake_file = MagicMock()
-    fake_file.filename = "doc.pdf"
-    fake_file.stream = BytesIO(b"%PDF-1.4 minimal")
-    fake_file.content_type = "application/pdf"
-    fake_file.stream.seek = MagicMock()
-
-    with (
-        patch("app.services.upload._upload_r2", return_value=None),
-        patch("app.services.upload._upload_firebase_storage") as mock_firebase,
-        patch("app.services.upload.current_app", app),
-    ):
-        mock_firebase.return_value = "https://storage.googleapis.com/chamados/doc.pdf"
-        result = salvar_anexo(fake_file)
-
-    assert result == "https://storage.googleapis.com/chamados/doc.pdf"
-
-
-def test_salvar_anexo_ambos_falham_producao_retorna_none(app):
-    """Em produção, quando R2 e Firebase falham, retorna None sem salvar em disco."""
+def test_salvar_anexo_r2_falha_producao_retorna_none(app):
+    """Em produção, quando R2 falha, retorna None sem salvar em disco."""
     app.config["ENV"] = "production"
     fake_file = MagicMock()
     fake_file.filename = "doc.pdf"
@@ -67,7 +46,6 @@ def test_salvar_anexo_ambos_falham_producao_retorna_none(app):
 
     with (
         patch("app.services.upload._upload_r2", return_value=None),
-        patch("app.services.upload._upload_firebase_storage", return_value=None),
         patch("app.services.upload.current_app", app),
     ):
         result = salvar_anexo(fake_file)
@@ -98,8 +76,8 @@ def test_gerar_url_presignada_rejeita_chave_sem_prefixo():
     assert gerar_url_presignada("https://storage.googleapis.com/x") is None
 
 
-def test_salvar_anexo_ambos_falham_dev_salva_local(app):
-    """Em desenvolvimento, quando R2 e Firebase falham, salva em disco local."""
+def test_salvar_anexo_r2_falha_dev_salva_local(app):
+    """Em desenvolvimento, quando R2 falha, salva em disco local."""
     app.config["ENV"] = "development"
     app.config["UPLOAD_FOLDER"] = "/tmp/test_uploads_sistema_chamados"
     fake_file = MagicMock()
@@ -111,7 +89,6 @@ def test_salvar_anexo_ambos_falham_dev_salva_local(app):
 
     with (
         patch("app.services.upload._upload_r2", return_value=None),
-        patch("app.services.upload._upload_firebase_storage", return_value=None),
         patch("app.services.upload.current_app", app),
         patch("app.services.upload.os.path.exists", return_value=False),
         patch("app.services.upload.os.makedirs"),
@@ -240,59 +217,6 @@ def test_gerar_url_presignada_excecao_retorna_none():
     assert result is None
 
 
-# ── _upload_firebase_storage ─────────────────────────────────────────────────
-
-
-def test_upload_firebase_storage_nao_inicializado_retorna_none():
-    """_upload_firebase_storage quando Firebase lança exceção ao obter bucket retorna None."""
-
-    from app.services.upload import _upload_firebase_storage
-
-    mock_arquivo = MagicMock()
-    mock_arquivo.filename = "doc.pdf"
-    mock_arquivo.stream = BytesIO(b"%PDF-1.4")
-
-    with patch("firebase_admin.storage.bucket", side_effect=Exception("Firebase not initialized")):
-        result = _upload_firebase_storage(mock_arquivo, "20260101_doc.pdf")
-    assert result is None
-
-
-def test_upload_firebase_storage_falha_upload_retorna_none():
-    """_upload_firebase_storage quando upload_from_file falha retorna None."""
-
-    from app.services.upload import _upload_firebase_storage
-
-    mock_blob = MagicMock()
-    mock_blob.upload_from_file.side_effect = Exception("upload failed")
-    mock_bucket_inst = MagicMock()
-    mock_bucket_inst.blob.return_value = mock_blob
-    mock_arquivo = MagicMock()
-    mock_arquivo.filename = "doc.pdf"
-    mock_arquivo.stream = BytesIO(b"%PDF-1.4")
-
-    with patch("firebase_admin.storage.bucket", return_value=mock_bucket_inst):
-        result = _upload_firebase_storage(mock_arquivo, "20260101_doc.pdf")
-    assert result is None
-
-
-def test_upload_firebase_storage_sucesso_retorna_url():
-    """_upload_firebase_storage com Firebase disponível retorna URL pública."""
-
-    from app.services.upload import _upload_firebase_storage
-
-    mock_blob = MagicMock()
-    mock_blob.public_url = "https://storage.googleapis.com/bucket/chamados/doc.pdf"
-    mock_bucket_inst = MagicMock()
-    mock_bucket_inst.blob.return_value = mock_blob
-    mock_arquivo = MagicMock()
-    mock_arquivo.filename = "doc.pdf"
-    mock_arquivo.stream = BytesIO(b"%PDF-1.4")
-
-    with patch("firebase_admin.storage.bucket", return_value=mock_bucket_inst):
-        result = _upload_firebase_storage(mock_arquivo, "20260101_doc.pdf")
-    assert result == "https://storage.googleapis.com/bucket/chamados/doc.pdf"
-
-
 # ── salvar_anexo — validações de extensão e conteúdo ─────────────────────────
 
 
@@ -378,7 +302,7 @@ def test_upload_local_oserror_retorna_none(app):
 
 
 def test_salvar_anexo_backend_local_tem_prioridade(app):
-    """ANEXO_STORAGE_BACKEND=local usa disco local e não chama R2/Firebase."""
+    """ANEXO_STORAGE_BACKEND=local usa disco local e não chama R2."""
     app.config["ANEXO_STORAGE_BACKEND"] = "local"
     fake_file = MagicMock()
     fake_file.filename = "doc.pdf"
@@ -391,14 +315,12 @@ def test_salvar_anexo_backend_local_tem_prioridade(app):
             "app.services.upload._upload_local", return_value="local:20260101_doc.pdf"
         ) as mock_local,
         patch("app.services.upload._upload_r2") as mock_r2,
-        patch("app.services.upload._upload_firebase_storage") as mock_fb,
     ):
         result = salvar_anexo(fake_file)
 
     assert result == "local:20260101_doc.pdf"
     mock_local.assert_called_once()
     mock_r2.assert_not_called()
-    mock_fb.assert_not_called()
 
 
 def test_salvar_anexo_backend_local_falha_cai_para_r2(app):
@@ -413,12 +335,10 @@ def test_salvar_anexo_backend_local_falha_cai_para_r2(app):
         patch("app.services.upload.current_app", app),
         patch("app.services.upload._upload_local", return_value=None),
         patch("app.services.upload._upload_r2", return_value="r2:chamados/x.pdf"),
-        patch("app.services.upload._upload_firebase_storage") as mock_fb,
     ):
         result = salvar_anexo(fake_file)
 
     assert result == "r2:chamados/x.pdf"
-    mock_fb.assert_not_called()
 
 
 def test_salvar_anexo_backend_default_ignora_local(app):
