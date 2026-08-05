@@ -1195,3 +1195,566 @@ def test_criar_chamado_normal_nao_grava_nivel_4_nem_notifica_aog(app):
 
     assert Chamado.get_by_id(chamado_id).escalacao_resposta_nivel == 0
     mock_notif_aog.assert_not_called()
+
+
+# ── Gate de cobertura: ramos ainda não exercitados ────────────────────────────
+
+
+def test_criar_chamado_setores_adicionais_string_unica_sem_getlist(app):
+    """form sem .getlist (dict simples) com setores_adicionais como string única
+    (não-lista, truthy) vira lista de 1 item."""
+    form = {
+        "categoria": "Manutencao",
+        "tipo": "Manutencao",
+        "descricao": "Descrição válida para teste de setor único.",
+        "rl_codigo": "",
+        "impacto": "",
+        "gate": "",
+        "setores_adicionais": "Engenharia",
+    }
+    files = MagicMock()
+    files.get.return_value = None
+    files.getlist.return_value = []
+
+    with (
+        patch("app.services.chamados_criacao_service.salvar_anexo", return_value=None),
+        patch(
+            "app.services.chamados_criacao_service.gerar_numero_chamado", return_value="2026-400"
+        ),
+        patch("app.services.chamados_criacao_service.atribuidor") as mock_atr,
+        patch("app.services.chamados_criacao_service.Historico"),
+        patch("app.services.chamados_criacao_service.threading.Thread"),
+    ):
+        mock_atr.atribuir.return_value = {
+            "sucesso": True,
+            "supervisor": {"id": "sup1", "nome": "Supervisor"},
+            "motivo": "",
+        }
+
+        with app.app_context():
+            chamado_id, _, erro, _ = criar_chamado(
+                form=form,
+                files=files,
+                solicitante_id="sol1",
+                solicitante_nome="Solicitante",
+                area_solicitante="Manutencao",
+            )
+
+    assert erro is None
+    assert Chamado.get_by_id(chamado_id).setores_adicionais == ["Engenharia"]
+
+
+def test_criar_chamado_setores_adicionais_none_sem_getlist_fica_vazio(app):
+    """form sem .getlist com setores_adicionais=None (não-lista, falsy) vira []."""
+    form = {
+        "categoria": "Manutencao",
+        "tipo": "Manutencao",
+        "descricao": "Descrição válida sem setores adicionais.",
+        "rl_codigo": "",
+        "impacto": "",
+        "gate": "",
+        "setores_adicionais": None,
+    }
+    files = MagicMock()
+    files.get.return_value = None
+    files.getlist.return_value = []
+
+    with (
+        patch("app.services.chamados_criacao_service.salvar_anexo", return_value=None),
+        patch(
+            "app.services.chamados_criacao_service.gerar_numero_chamado", return_value="2026-401"
+        ),
+        patch("app.services.chamados_criacao_service.atribuidor") as mock_atr,
+        patch("app.services.chamados_criacao_service.Historico"),
+        patch("app.services.chamados_criacao_service.threading.Thread"),
+    ):
+        mock_atr.atribuir.return_value = {
+            "sucesso": True,
+            "supervisor": {"id": "sup1", "nome": "Supervisor"},
+            "motivo": "",
+        }
+
+        with app.app_context():
+            chamado_id, _, erro, _ = criar_chamado(
+                form=form,
+                files=files,
+                solicitante_id="sol1",
+                solicitante_nome="Solicitante",
+                area_solicitante="Manutencao",
+            )
+
+    assert erro is None
+    assert Chamado.get_by_id(chamado_id).setores_adicionais == []
+
+
+def test_criar_chamado_anexo_sem_filename_e_ignorado(app):
+    """Item de files.getlist("anexo") sem filename é pulado (continue), não chama salvar_anexo."""
+    form = {
+        "categoria": "Manutencao",
+        "tipo": "Manutencao",
+        "descricao": "Chamado com um anexo vazio no meio da lista.",
+        "rl_codigo": "",
+        "impacto": "",
+        "gate": "",
+    }
+    arq_vazio = MagicMock()
+    arq_vazio.filename = ""
+    arq_valido = _arq_mock("valido.pdf")
+    files = MagicMock()
+    files.getlist.return_value = [arq_vazio, arq_valido]
+
+    with (
+        patch(
+            "app.services.chamados_criacao_service.salvar_anexo",
+            return_value="caminho/valido.pdf",
+        ) as mock_salvar,
+        patch(
+            "app.services.chamados_criacao_service.gerar_numero_chamado", return_value="2026-402"
+        ),
+        patch("app.services.chamados_criacao_service.atribuidor") as mock_atr,
+        patch("app.services.chamados_criacao_service.Historico"),
+        patch("app.services.chamados_criacao_service.threading.Thread"),
+    ):
+        mock_atr.atribuir.return_value = {
+            "sucesso": True,
+            "supervisor": {"id": "sup1", "nome": "Supervisor"},
+            "motivo": "",
+        }
+
+        with app.app_context():
+            chamado_id, _, erro, _ = criar_chamado(
+                form=form,
+                files=files,
+                solicitante_id="sol1",
+                solicitante_nome="Solicitante",
+                area_solicitante="Manutencao",
+            )
+
+    assert erro is None
+    mock_salvar.assert_called_once_with(arq_valido)
+    assert Chamado.get_by_id(chamado_id).anexos == ["caminho/valido.pdf"]
+
+
+def test_criar_chamado_observadores_json_nao_lista_vira_lista_vazia(app):
+    """observadores_json válido mas não é uma lista (ex.: objeto) → observadores_list = []."""
+    form = {
+        "categoria": "Manutencao",
+        "tipo": "Manutencao",
+        "descricao": "Descrição válida com observadores_json malformado.",
+        "rl_codigo": "",
+        "impacto": "",
+        "gate": "",
+        "observadores_json": '{"nao": "e uma lista"}',
+    }
+    files = MagicMock()
+    files.get.return_value = None
+    files.getlist.return_value = []
+
+    with (
+        patch("app.services.chamados_criacao_service.salvar_anexo", return_value=None),
+        patch(
+            "app.services.chamados_criacao_service.gerar_numero_chamado", return_value="2026-403"
+        ),
+        patch("app.services.chamados_criacao_service.atribuidor") as mock_atr,
+        patch("app.services.chamados_criacao_service.Historico"),
+        patch("app.services.chamados_criacao_service.threading.Thread"),
+    ):
+        mock_atr.atribuir.return_value = {
+            "sucesso": True,
+            "supervisor": {"id": "sup1", "nome": "Supervisor"},
+            "motivo": "",
+        }
+
+        with app.app_context():
+            chamado_id, _, erro, _ = criar_chamado(
+                form=form,
+                files=files,
+                solicitante_id="sol1",
+                solicitante_nome="Solicitante",
+                area_solicitante="Manutencao",
+            )
+
+    assert erro is None
+    assert Chamado.get_by_id(chamado_id).observadores == []
+
+
+def test_criar_chamado_observadores_invalidos_retorna_erro(app):
+    """validar_observadores retornando erros bloqueia a criação (erros_obs[0])."""
+    form = {
+        "categoria": "Manutencao",
+        "tipo": "Manutencao",
+        "descricao": "Descrição válida com observador inválido.",
+        "rl_codigo": "",
+        "impacto": "",
+        "gate": "",
+        "observadores_json": '[{"usuario_id": "obs1", "nome": "Observador", "email": "o@b.com"}]',
+    }
+    files = MagicMock()
+    files.get.return_value = None
+    files.getlist.return_value = []
+
+    with patch(
+        "app.services.validators.validar_observadores",
+        return_value=["Admin não pode ser observador"],
+    ):
+        chamado_id, numero, erro, aviso = criar_chamado(
+            form=form,
+            files=files,
+            solicitante_id="sol1",
+            solicitante_nome="Solicitante",
+            area_solicitante="Manutencao",
+        )
+
+    assert chamado_id is None
+    assert numero is None
+    assert erro == "Admin não pode ser observador"
+    assert aviso is None
+
+
+def test_criar_chamado_grupo_rl_falha_nao_impede_criacao(app):
+    """GrupoRL.get_or_create lançando exceção é logado, mas o chamado é criado
+    normalmente com grupo_rl_id=None."""
+    form = {
+        "categoria": "Projetos",
+        "tipo": "Manutencao",
+        "descricao": "Chamado com RL cujo grupo falha ao criar.",
+        "rl_codigo": "RL-999",
+        "impacto": "",
+        "gate": "",
+    }
+    files = MagicMock()
+    files.get.return_value = None
+    files.getlist.return_value = []
+
+    with (
+        patch("app.services.chamados_criacao_service.salvar_anexo", return_value=None),
+        patch(
+            "app.services.chamados_criacao_service.gerar_numero_chamado", return_value="2026-404"
+        ),
+        patch("app.services.chamados_criacao_service.atribuidor") as mock_atr,
+        patch("app.services.chamados_criacao_service.Historico"),
+        patch(
+            "app.services.chamados_criacao_service.GrupoRL.get_or_create",
+            side_effect=RuntimeError("banco indisponível"),
+        ),
+        patch("app.services.chamados_criacao_service.threading.Thread"),
+    ):
+        mock_atr.atribuir.return_value = {
+            "sucesso": True,
+            "supervisor": {"id": "sup1", "nome": "Supervisor"},
+            "motivo": "",
+        }
+
+        with app.app_context():
+            chamado_id, numero, erro, _ = criar_chamado(
+                form=form,
+                files=files,
+                solicitante_id="sol1",
+                solicitante_nome="Solicitante",
+                area_solicitante="Manutencao",
+            )
+
+    assert erro is None
+    assert chamado_id is not None
+    assert Chamado.get_by_id(chamado_id).grupo_rl_id is None
+
+
+def test_criar_chamado_aog_notificacao_falha_nao_impede_thread(app):
+    """notificar_abertura_aog_todos_gestores lançando exceção é capturado e logado
+    (warning) sem interromper o resto das notificações da thread."""
+    form = {
+        "categoria": "AOG",
+        "tipo": "Manutencao",
+        "descricao": "AOG cujo broadcast pros gestores falha.",
+        "rl_codigo": "",
+        "impacto": "",
+        "gate": "",
+    }
+    files = MagicMock()
+    files.get.return_value = None
+    files.getlist.return_value = []
+
+    with (
+        patch("app.services.chamados_criacao_service.salvar_anexo", return_value=None),
+        patch(
+            "app.services.chamados_criacao_service.gerar_numero_chamado", return_value="2026-405"
+        ),
+        patch("app.services.chamados_criacao_service.atribuidor") as mock_atr,
+        patch("app.services.chamados_criacao_service.Historico"),
+        patch("app.services.chamados_criacao_service.Usuario.get_by_id", return_value=None),
+        patch("app.services.chamados_criacao_service.notificar_aprovador_novo_chamado"),
+        patch(
+            "app.services.chamados_criacao_service.notificar_abertura_aog_todos_gestores",
+            side_effect=RuntimeError("broadcast falhou"),
+        ),
+        patch("app.services.chamados_criacao_service.criar_notificacao"),
+        patch("app.services.chamados_criacao_service.enviar_webpush_usuario"),
+        patch("app.services.chamados_criacao_service.threading.Thread", side_effect=_FakeThread),
+    ):
+        mock_atr.atribuir.return_value = {
+            "sucesso": True,
+            "supervisor": {"id": "sup1", "nome": "Supervisor Teste"},
+            "motivo": "",
+        }
+
+        with app.app_context():
+            chamado_id, _, erro, _ = criar_chamado(
+                form=form,
+                files=files,
+                solicitante_id="sol1",
+                solicitante_nome="Solicitante Teste",
+                area_solicitante="Manutencao",
+                solicitante_email="sol@test.com",
+            )
+
+    assert erro is None
+    assert chamado_id is not None
+
+
+def test_criar_chamado_notificacao_inapp_falha_nao_impede_thread(app):
+    """criar_notificacao lançando exceção dentro da thread de notificação é
+    capturado e logado (debug), não propaga pro caller."""
+    form = {
+        "categoria": "Manutencao",
+        "tipo": "Manutencao",
+        "descricao": "Chamado cuja notificação in-app falha.",
+        "rl_codigo": "",
+        "impacto": "",
+        "gate": "",
+    }
+    files = MagicMock()
+    files.get.return_value = None
+    files.getlist.return_value = []
+    responsavel_usuario = MagicMock()
+    responsavel_usuario.email = "resp@dtx.aero"
+
+    with (
+        patch("app.services.chamados_criacao_service.salvar_anexo", return_value=None),
+        patch(
+            "app.services.chamados_criacao_service.gerar_numero_chamado", return_value="2026-406"
+        ),
+        patch("app.services.chamados_criacao_service.atribuidor") as mock_atr,
+        patch("app.services.chamados_criacao_service.Historico"),
+        patch(
+            "app.services.chamados_criacao_service.Usuario.get_by_id",
+            return_value=responsavel_usuario,
+        ),
+        patch("app.services.chamados_criacao_service.notificar_aprovador_novo_chamado"),
+        patch(
+            "app.services.chamados_criacao_service.criar_notificacao",
+            side_effect=RuntimeError("notificação in-app indisponível"),
+        ),
+        patch("app.services.chamados_criacao_service.enviar_webpush_usuario") as mock_webpush,
+        patch("app.services.chamados_criacao_service.threading.Thread", side_effect=_FakeThread),
+    ):
+        mock_atr.atribuir.return_value = {
+            "sucesso": True,
+            "supervisor": {"id": "sup_falha", "nome": "Supervisor Falha"},
+            "motivo": "",
+        }
+
+        with app.app_context():
+            chamado_id, _, erro, _ = criar_chamado(
+                form=form,
+                files=files,
+                solicitante_id="sol1",
+                solicitante_nome="Solicitante Teste",
+                area_solicitante="Manutencao",
+                solicitante_email="sol@test.com",
+            )
+
+    assert erro is None
+    assert chamado_id is not None
+    # criar_notificacao lançou antes do webpush (mesmo bloco try) — webpush não é chamado
+    mock_webpush.assert_not_called()
+
+
+def test_criar_chamado_erro_generico_na_thread_notificacao_e_logado(app):
+    """Exceção fora dos try/except internos (ex.: executar_com_retry) é capturada
+    pelo except externo da thread de notificação, sem propagar pro caller."""
+    form = {
+        "categoria": "Manutencao",
+        "tipo": "Manutencao",
+        "descricao": "Chamado cuja thread de notificação quebra de forma genérica.",
+        "rl_codigo": "",
+        "impacto": "",
+        "gate": "",
+    }
+    files = MagicMock()
+    files.get.return_value = None
+    files.getlist.return_value = []
+
+    with (
+        patch("app.services.chamados_criacao_service.salvar_anexo", return_value=None),
+        patch(
+            "app.services.chamados_criacao_service.gerar_numero_chamado", return_value="2026-407"
+        ),
+        patch("app.services.chamados_criacao_service.atribuidor") as mock_atr,
+        patch("app.services.chamados_criacao_service.Historico"),
+        patch("app.services.chamados_criacao_service.Usuario.get_by_id", return_value=None),
+        patch(
+            "app.services.chamados_criacao_service.executar_com_retry",
+            side_effect=RuntimeError("falha genérica na thread"),
+        ),
+        patch("app.services.chamados_criacao_service.threading.Thread", side_effect=_FakeThread),
+    ):
+        mock_atr.atribuir.return_value = {
+            "sucesso": True,
+            "supervisor": {"id": "sup1", "nome": "Supervisor Teste"},
+            "motivo": "",
+        }
+
+        with app.app_context():
+            chamado_id, _, erro, _ = criar_chamado(
+                form=form,
+                files=files,
+                solicitante_id="sol1",
+                solicitante_nome="Solicitante Teste",
+                area_solicitante="Manutencao",
+                solicitante_email="sol@test.com",
+            )
+
+    # criar_chamado já retornou (id salvo) antes da thread rodar — erro da thread
+    # fica só logado, não afeta o retorno da função.
+    assert erro is None
+    assert chamado_id is not None
+
+
+def test_criar_chamado_observadores_dispara_e_falha_notificacao_e_logado(app):
+    """observadores_list não-vazio dispara _notificar_observadores_inclusao numa
+    thread própria; notificar_observadores_criacao lançando é capturado (warning)."""
+    form = {
+        "categoria": "Manutencao",
+        "tipo": "Manutencao",
+        "descricao": "Chamado com observador cuja notificação falha.",
+        "rl_codigo": "",
+        "impacto": "",
+        "gate": "",
+        "observadores_json": '[{"usuario_id": "obs1", "nome": "Observador Um", "email": "o1@b.com"}]',
+    }
+    files = MagicMock()
+    files.get.return_value = None
+    files.getlist.return_value = []
+
+    with (
+        patch("app.services.chamados_criacao_service.salvar_anexo", return_value=None),
+        patch(
+            "app.services.chamados_criacao_service.gerar_numero_chamado", return_value="2026-408"
+        ),
+        patch("app.services.chamados_criacao_service.atribuidor") as mock_atr,
+        patch("app.services.chamados_criacao_service.Historico"),
+        patch("app.services.chamados_criacao_service.Usuario.get_by_id", return_value=None),
+        patch("app.services.chamados_criacao_service.notificar_aprovador_novo_chamado"),
+        patch(
+            "app.services.chamado_notificacao_service.notificar_observadores_criacao",
+            side_effect=RuntimeError("falha ao notificar observador"),
+        ),
+        patch("app.services.chamados_criacao_service.threading.Thread", side_effect=_FakeThread),
+    ):
+        mock_atr.atribuir.return_value = {
+            "sucesso": True,
+            "supervisor": {"id": "sup1", "nome": "Supervisor Teste"},
+            "motivo": "",
+        }
+
+        with app.app_context():
+            chamado_id, _, erro, _ = criar_chamado(
+                form=form,
+                files=files,
+                solicitante_id="sol1",
+                solicitante_nome="Solicitante Teste",
+                area_solicitante="Manutencao",
+                solicitante_email="sol@test.com",
+            )
+
+    assert erro is None
+    assert chamado_id is not None
+    assert Chamado.get_by_id(chamado_id).observadores == [
+        {"usuario_id": "obs1", "nome": "Observador Um", "email": "o1@b.com"}
+    ]
+
+
+def test_criar_chamado_observadores_json_malformado_ignora_e_segue(app):
+    """observadores_json com JSON sintaticamente inválido é ignorado (não quebra a criação)."""
+    form = {
+        "categoria": "Manutencao",
+        "tipo": "Manutencao",
+        "descricao": "Descrição válida com JSON quebrado nos observadores.",
+        "rl_codigo": "",
+        "impacto": "",
+        "gate": "",
+        "observadores_json": "{isso nao e json valido",
+    }
+    files = MagicMock()
+    files.get.return_value = None
+    files.getlist.return_value = []
+
+    with (
+        patch("app.services.chamados_criacao_service.salvar_anexo", return_value=None),
+        patch(
+            "app.services.chamados_criacao_service.gerar_numero_chamado", return_value="2026-409"
+        ),
+        patch("app.services.chamados_criacao_service.atribuidor") as mock_atr,
+        patch("app.services.chamados_criacao_service.Historico"),
+        patch("app.services.chamados_criacao_service.threading.Thread"),
+    ):
+        mock_atr.atribuir.return_value = {
+            "sucesso": True,
+            "supervisor": {"id": "sup1", "nome": "Supervisor"},
+            "motivo": "",
+        }
+
+        with app.app_context():
+            chamado_id, _, erro, _ = criar_chamado(
+                form=form,
+                files=files,
+                solicitante_id="sol1",
+                solicitante_nome="Solicitante",
+                area_solicitante="Manutencao",
+            )
+
+    assert erro is None
+    assert Chamado.get_by_id(chamado_id).observadores == []
+
+
+def test_criar_chamado_excecao_inesperada_ao_persistir_retorna_erro_generico(app):
+    """Exceção não prevista dentro do bloco de persistência (ex.: Chamado.salvar()
+    lançando em vez de retornar None) é capturada pelo except externo."""
+    form = {
+        "categoria": "Manutencao",
+        "tipo": "Manutencao",
+        "descricao": "Descrição válida cuja persistência quebra de forma inesperada.",
+        "rl_codigo": "",
+        "impacto": "",
+        "gate": "",
+    }
+    files = MagicMock()
+    files.get.return_value = None
+    files.getlist.return_value = []
+
+    with (
+        patch("app.services.chamados_criacao_service.salvar_anexo", return_value=None),
+        patch(
+            "app.services.chamados_criacao_service.gerar_numero_chamado",
+            side_effect=RuntimeError("falha inesperada ao gerar número"),
+        ),
+        patch("app.services.chamados_criacao_service.atribuidor") as mock_atr,
+    ):
+        mock_atr.atribuir.return_value = {
+            "sucesso": True,
+            "supervisor": {"id": "sup1", "nome": "Supervisor"},
+            "motivo": "",
+        }
+
+        chamado_id, numero, erro, aviso = criar_chamado(
+            form=form,
+            files=files,
+            solicitante_id="sol1",
+            solicitante_nome="Solicitante",
+            area_solicitante="Manutencao",
+        )
+
+    assert chamado_id is None
+    assert numero is None
+    assert erro is not None
+    assert aviso is None

@@ -188,6 +188,80 @@ def test_setor_delete_sem_id_nao_lanca(app):
     assert s.delete() is True
 
 
+def test_setor_save_com_id_inexistente_lanca_value_error(app):
+    """save() com id setado que não existe mais no banco lança ValueError."""
+    from app.models_categorias import CategoriaSetor
+
+    with patch("app.models_categorias.traduzir_categoria", return_value={"en": "X", "es": "X"}):
+        s = CategoriaSetor(nome_pt="Fantasma", nome_en="X", nome_es="X", id=999999)
+
+        with pytest.raises(ValueError, match="não encontrado"):
+            s.save()
+
+
+def test_setor_save_excecao_no_banco_relanca(app, monkeypatch):
+    """save() propaga a exceção depois de logar (fail loud, ao contrário de delete/get)."""
+    from app import models_categorias
+
+    def _explode():
+        raise RuntimeError("banco indisponível")
+
+    monkeypatch.setattr(models_categorias.db_module, "SessionLocal", _explode)
+
+    with patch("app.models_categorias.traduzir_categoria", return_value={"en": "X", "es": "X"}):
+        s = models_categorias.CategoriaSetor(nome_pt="Qualquer", nome_en="X", nome_es="X")
+
+        with pytest.raises(RuntimeError, match="banco indisponível"):
+            s.save()
+
+
+def test_setor_delete_excecao_no_banco_retorna_false(app, monkeypatch):
+    from app import models_categorias
+
+    def _explode():
+        raise RuntimeError("banco indisponível")
+
+    with patch("app.models_categorias.traduzir_categoria", return_value={"en": "X", "es": "X"}):
+        s = models_categorias.CategoriaSetor(nome_pt="Qualquer", nome_en="X", nome_es="X", id=1)
+
+    monkeypatch.setattr(models_categorias.db_module, "SessionLocal", _explode)
+
+    assert s.delete() is False
+
+
+def test_setor_get_all_excecao_no_banco_retorna_lista_vazia(app, monkeypatch):
+    from app import models_categorias
+
+    def _explode():
+        raise RuntimeError("banco indisponível")
+
+    monkeypatch.setattr(models_categorias.db_module, "SessionLocal", _explode)
+
+    assert models_categorias.CategoriaSetor.get_all() == []
+
+
+def test_setor_get_all_incluindo_inativos_excecao_no_banco_retorna_lista_vazia(app, monkeypatch):
+    from app import models_categorias
+
+    def _explode():
+        raise RuntimeError("banco indisponível")
+
+    monkeypatch.setattr(models_categorias.db_module, "SessionLocal", _explode)
+
+    assert models_categorias.CategoriaSetor.get_all_incluindo_inativos() == []
+
+
+def test_setor_nome_existe_excecao_no_banco_retorna_false(app, monkeypatch):
+    from app import models_categorias
+
+    def _explode():
+        raise RuntimeError("banco indisponível")
+
+    monkeypatch.setattr(models_categorias.db_module, "SessionLocal", _explode)
+
+    assert models_categorias.CategoriaSetor.nome_existe("Qualquer Nome") is False
+
+
 # ── CategoriaGate ─────────────────────────────────────────────────────────────
 
 
@@ -287,6 +361,101 @@ def test_gate_delete_remove_linha(app):
     assert CategoriaGate.get_by_id(gate_id) is None
 
 
+def test_gate_save_com_id_inexistente_lanca_value_error(app):
+    """save() com id setado que não existe mais no banco lança ValueError."""
+    from app.models_categorias import CategoriaGate
+
+    with patch("app.models_categorias.traduzir_categoria", return_value={"en": "G", "es": "G"}):
+        g = CategoriaGate(nome_pt="Fantasma", gate_pai="G", etapa="F", id=999999)
+
+        with pytest.raises(ValueError, match="não encontrado"):
+            g.save()
+
+
+def test_gate_save_excecao_no_banco_relanca(app, monkeypatch):
+    from app import models_categorias
+
+    def _explode():
+        raise RuntimeError("banco indisponível")
+
+    monkeypatch.setattr(models_categorias.db_module, "SessionLocal", _explode)
+
+    with patch("app.models_categorias.traduzir_categoria", return_value={"en": "G", "es": "G"}):
+        g = models_categorias.CategoriaGate(nome_pt="Qualquer", gate_pai="G", etapa="Q")
+
+        with pytest.raises(RuntimeError, match="banco indisponível"):
+            g.save()
+
+
+def test_gate_delete_excecao_no_banco_retorna_false(app, monkeypatch):
+    from app import models_categorias
+
+    def _explode():
+        raise RuntimeError("banco indisponível")
+
+    with patch("app.models_categorias.traduzir_categoria", return_value={"en": "G", "es": "G"}):
+        g = models_categorias.CategoriaGate(nome_pt="Qualquer", gate_pai="G", etapa="Q", id=1)
+
+    monkeypatch.setattr(models_categorias.db_module, "SessionLocal", _explode)
+
+    assert g.delete() is False
+
+
+def test_gate_get_all_excecao_no_banco_retorna_lista_vazia(app, monkeypatch):
+    from app import models_categorias
+
+    def _explode():
+        raise RuntimeError("banco indisponível")
+
+    monkeypatch.setattr(models_categorias.db_module, "SessionLocal", _explode)
+
+    assert models_categorias.CategoriaGate.get_all() == []
+
+
+def test_gate_get_all_ativos_excecao_no_banco_retorna_lista_vazia(app, monkeypatch):
+    from app import models_categorias
+
+    def _explode():
+        raise RuntimeError("banco indisponível")
+
+    monkeypatch.setattr(models_categorias.db_module, "SessionLocal", _explode)
+
+    assert models_categorias.CategoriaGate.get_all_ativos() == []
+
+
+def test_gate_get_by_id_id_invalido_retorna_none(app):
+    """get_by_id retorna None (não lança) para id malformado."""
+    from app.models_categorias import CategoriaGate
+
+    assert CategoriaGate.get_by_id("nao-e-um-numero") is None
+
+
+def test_gate_nome_existe_vazio_retorna_false(app):
+    from app.models_categorias import CategoriaGate
+
+    assert CategoriaGate.nome_existe("   ") is False
+
+
+def test_gate_nome_existe_ignora_id_atual(app):
+    from app.models_categorias import CategoriaGate
+
+    with patch("app.models_categorias.traduzir_categoria", return_value={"en": "G", "es": "G"}):
+        gate_id = CategoriaGate(nome_pt="Gate 3 - Unico", gate_pai="Gate 3", etapa="Unico").save()
+
+    assert CategoriaGate.nome_existe("Gate 3 - Unico", id_atual=gate_id) is False
+
+
+def test_gate_nome_existe_excecao_no_banco_retorna_false(app, monkeypatch):
+    from app import models_categorias
+
+    def _explode():
+        raise RuntimeError("banco indisponível")
+
+    monkeypatch.setattr(models_categorias.db_module, "SessionLocal", _explode)
+
+    assert models_categorias.CategoriaGate.nome_existe("Qualquer Nome") is False
+
+
 # ── CategoriaImpacto ──────────────────────────────────────────────────────────
 
 
@@ -370,3 +539,111 @@ def test_impacto_delete_remove_linha(app):
 
     assert imp.delete() is True
     assert CategoriaImpacto.get_by_id(impacto_id) is None
+
+
+def test_impacto_to_dict_contem_campos_esperados():
+    """CategoriaImpacto.to_dict retorna dict com nivel/cor além dos campos comuns."""
+    from app.models_categorias import CategoriaImpacto
+
+    with patch("app.models_categorias.traduzir_categoria", return_value={"en": "H", "es": "H"}):
+        imp = CategoriaImpacto(nome_pt="Alto", nivel=3, cor="red")
+        d = imp.to_dict()
+
+    assert d["nome_pt"] == "Alto"
+    assert d["nivel"] == 3
+    assert d["cor"] == "red"
+    assert "ativo" in d
+    assert "data_criacao" in d
+
+
+def test_impacto_save_com_id_inexistente_lanca_value_error(app):
+    """save() com id setado que não existe mais no banco lança ValueError."""
+    from app.models_categorias import CategoriaImpacto
+
+    with patch("app.models_categorias.traduzir_categoria", return_value={"en": "H", "es": "H"}):
+        imp = CategoriaImpacto(nome_pt="Fantasma", id=999999)
+
+        with pytest.raises(ValueError, match="não encontrado"):
+            imp.save()
+
+
+def test_impacto_save_excecao_no_banco_relanca(app, monkeypatch):
+    from app import models_categorias
+
+    def _explode():
+        raise RuntimeError("banco indisponível")
+
+    monkeypatch.setattr(models_categorias.db_module, "SessionLocal", _explode)
+
+    with patch("app.models_categorias.traduzir_categoria", return_value={"en": "H", "es": "H"}):
+        imp = models_categorias.CategoriaImpacto(nome_pt="Qualquer")
+
+        with pytest.raises(RuntimeError, match="banco indisponível"):
+            imp.save()
+
+
+def test_impacto_delete_excecao_no_banco_retorna_false(app, monkeypatch):
+    from app import models_categorias
+
+    def _explode():
+        raise RuntimeError("banco indisponível")
+
+    with patch("app.models_categorias.traduzir_categoria", return_value={"en": "H", "es": "H"}):
+        imp = models_categorias.CategoriaImpacto(nome_pt="Qualquer", id=1)
+
+    monkeypatch.setattr(models_categorias.db_module, "SessionLocal", _explode)
+
+    assert imp.delete() is False
+
+
+def test_impacto_get_all_excecao_no_banco_retorna_lista_vazia(app, monkeypatch):
+    from app import models_categorias
+
+    def _explode():
+        raise RuntimeError("banco indisponível")
+
+    monkeypatch.setattr(models_categorias.db_module, "SessionLocal", _explode)
+
+    assert models_categorias.CategoriaImpacto.get_all() == []
+
+
+def test_impacto_get_all_incluindo_inativos_excecao_no_banco_retorna_lista_vazia(app, monkeypatch):
+    from app import models_categorias
+
+    def _explode():
+        raise RuntimeError("banco indisponível")
+
+    monkeypatch.setattr(models_categorias.db_module, "SessionLocal", _explode)
+
+    assert models_categorias.CategoriaImpacto.get_all_incluindo_inativos() == []
+
+
+def test_impacto_get_by_id_excecao_no_banco_retorna_none(app, monkeypatch):
+    from app import models_categorias
+
+    def _explode():
+        raise RuntimeError("banco indisponível")
+
+    monkeypatch.setattr(models_categorias.db_module, "SessionLocal", _explode)
+
+    assert models_categorias.CategoriaImpacto.get_by_id(1) is None
+
+
+def test_impacto_nome_existe_ignora_id_atual(app):
+    from app.models_categorias import CategoriaImpacto
+
+    with patch("app.models_categorias.traduzir_categoria", return_value={"en": "H", "es": "H"}):
+        impacto_id = CategoriaImpacto(nome_pt="Severo Unico").save()
+
+    assert CategoriaImpacto.nome_existe("Severo Unico", id_atual=impacto_id) is False
+
+
+def test_impacto_nome_existe_excecao_no_banco_retorna_false(app, monkeypatch):
+    from app import models_categorias
+
+    def _explode():
+        raise RuntimeError("banco indisponível")
+
+    monkeypatch.setattr(models_categorias.db_module, "SessionLocal", _explode)
+
+    assert models_categorias.CategoriaImpacto.nome_existe("Qualquer Nome") is False

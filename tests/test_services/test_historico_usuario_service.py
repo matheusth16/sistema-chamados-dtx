@@ -68,3 +68,33 @@ def test_obter_historico_usuario_sem_registros_retorna_lista_vazia(app):
     from app.services.historico_usuario_service import obter_historico_usuario
 
     assert obter_historico_usuario("user_sem_historico") == []
+
+
+def test_registrar_historico_usuario_excecao_no_banco_retorna_false(app, monkeypatch):
+    from app.services import historico_usuario_service
+
+    def _explode():
+        raise RuntimeError("banco indisponível")
+
+    monkeypatch.setattr(historico_usuario_service.db_module, "SessionLocal", _explode)
+
+    resultado = historico_usuario_service.registrar_historico_usuario(
+        usuario_alvo_id="user_4",
+        usuario_alvo_nome="Fulano",
+        admin_id="admin_1",
+        admin_nome="Admin Root",
+        acao="criacao",
+    )
+
+    assert resultado is False
+
+
+def test_obter_historico_usuario_excecao_no_banco_retorna_lista_vazia(app, monkeypatch):
+    from app.services import historico_usuario_service
+
+    def _explode():
+        raise RuntimeError("banco indisponível")
+
+    monkeypatch.setattr(historico_usuario_service.db_module, "SessionLocal", _explode)
+
+    assert historico_usuario_service.obter_historico_usuario("user_4") == []
