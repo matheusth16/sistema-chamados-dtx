@@ -27,7 +27,7 @@ formatação profissional, estilos, e análises.
 ```python
 from app.services.excel_export_service import gerar_relatorio_excel
 
-# Obter lista de chamados (usar MAX_EXPORT_CHAMADOS para não estourar cota Firestore)
+# Obter lista de chamados (usar MAX_EXPORT_CHAMADOS para limitar o tamanho do relatório)
 chamados = db.collection('chamados').limit(MAX_EXPORT_CHAMADOS).stream()
 
 # Gerar Excel
@@ -56,16 +56,13 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
-from firebase_admin import firestore
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
 logger = logging.getLogger(__name__)
 
-# Limite de chamados na exportação. Aumentar esse valor aumenta as leituras no
-# Firestore e pode aproximar do limite do plano Spark (50k leituras/dia).
-# Manter controle para não estourar cota sem necessidade.
+# Limite de chamados na exportação — mantém o relatório em tamanho razoável.
 MAX_EXPORT_CHAMADOS = 100
 
 # Chars que iniciam fórmulas em Excel/LibreOffice — prefixar com ' para neutralizar
@@ -127,14 +124,7 @@ class ExportadorExcelAvancado:
     """Exportador profissional de relatórios em Excel"""
 
     def __init__(self):
-        self.db = None
         self.config = ConfiguradorExcel()
-
-    def get_db(self):
-        """Lazy initialization do Firestore"""
-        if self.db is None:
-            self.db = firestore.client()
-        return self.db
 
     def exportar_relatorio_completo(
         self,

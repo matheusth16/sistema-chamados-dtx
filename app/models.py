@@ -2,7 +2,6 @@ import logging
 from datetime import datetime
 
 import pytz
-from firebase_admin import firestore
 from sqlalchemy import delete, select
 
 from app import db as db_module
@@ -100,7 +99,9 @@ class Chamado:
         self.solicitante_nome = solicitante_nome  # Nome do solicitante para rastreamento
         self.area = area  # Área/setor para filtragem de supervisores
         self.status = status
-        self.data_abertura = data_abertura or firestore.SERVER_TIMESTAMP
+        # Sem valor: server_default=func.now() na coluna Postgres cobre o timestamp
+        # de criação — não precisa de um sentinel aqui como na era Firestore.
+        self.data_abertura = data_abertura
         self.data_conclusao = data_conclusao
         # Fase 2 — Escalonamento SLA
         self.supervisor_ids_com_acesso = supervisor_ids_com_acesso or []
@@ -133,7 +134,7 @@ class Chamado:
         """Converte timestamp do Firestore para datetime em horário de Brasília.
         Tolera tipos inesperados (string, etc.) e retorna None em caso de falha.
         """
-        if ts is None or ts == firestore.SERVER_TIMESTAMP:
+        if ts is None:
             return None
         try:
             # Se já for datetime, retorna

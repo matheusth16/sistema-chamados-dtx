@@ -111,7 +111,7 @@ def medir_duracao(nome_operacao: str) -> Callable:
     """Decorador que registra duração em ms de uma função no logger de métricas.
 
     Uso:
-        @medir_duracao("firestore_query_chamados")
+        @medir_duracao("db_query_chamados")
         def buscar_chamados(...): ...
     """
 

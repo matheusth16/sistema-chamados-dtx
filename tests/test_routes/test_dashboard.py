@@ -245,30 +245,6 @@ def test_historico_com_supervisor_permissao_retorna_200(client_logado_supervisor
     assert r.status_code == 200
 
 
-def test_indices_firestore_sem_login_redireciona(client):
-    """GET /admin/indices-firestore sem login redireciona para login."""
-    r = client.get("/admin/indices-firestore", follow_redirects=False)
-    assert r.status_code == 302
-    assert "login" in (r.location or "").lower()
-
-
-def test_indices_firestore_com_admin_retorna_200(client_logado_admin):
-    """GET /admin/indices-firestore com admin retorna 200."""
-    r = client_logado_admin.get("/admin/indices-firestore", follow_redirects=False)
-    assert r.status_code == 200
-    assert (
-        b"indice" in r.data.lower() or b"firestore" in r.data.lower() or b"index" in r.data.lower()
-    )
-
-
-def test_indices_firestore_com_solicitante_redireciona(client_logado_solicitante):
-    """GET /admin/indices-firestore com solicitante redireciona (rota requer perfil admin)."""
-    r = client_logado_solicitante.get("/admin/indices-firestore", follow_redirects=False)
-    assert r.status_code == 302
-    # Solicitante é redirecionado para main.index (/), não para a página de índices
-    assert r.location and "/admin/indices-firestore" not in (r.location or "")
-
-
 # ── POST /admin (alteração de status) ─────────────────────────────────────────
 
 
@@ -825,9 +801,6 @@ def test_painel_post_falha_sem_chave_erro(client_logado_admin, db_session):
     assert r.status_code == 302
 
 
-# ── Onda 3: _render_dashboard FailedPrecondition ──────────────────────────────
-
-
 def test_render_dashboard_usa_cache_para_setores(client_logado_admin):
     """_render_dashboard (GET /admin) deve buscar setores via get_static_cached
     ('categorias_setor', ...), não CategoriaSetor.get_all() direto — evita reler a
@@ -842,32 +815,6 @@ def test_render_dashboard_usa_cache_para_setores(client_logado_admin):
     assert "categorias_setor" in chaves_chamadas, (
         "GET /admin não busca setores via get_static_cached('categorias_setor', ...)"
     )
-
-
-def test_admin_get_failed_precondition_retorna_503(client_logado_admin):
-    """GET /admin quando Firestore retorna FailedPrecondition ('currently building') retorna 503."""
-    from google.api_core.exceptions import FailedPrecondition
-
-    with patch("app.routes.dashboard.obter_contexto_admin") as mock_ctx:
-        mock_ctx.side_effect = FailedPrecondition("index currently building")
-        r = client_logado_admin.get("/admin", follow_redirects=False)
-    assert r.status_code == 503
-
-
-def test_admin_get_failed_precondition_indice_ausente_degrada_sem_crash(client_logado_admin):
-    """GET /admin com combinação de filtros sem índice composto (não 'building') não deve
-    derrubar a página com 500 — deve redirecionar de volta ao dashboard sem os filtros."""
-    from google.api_core.exceptions import FailedPrecondition
-
-    with patch("app.routes.dashboard.obter_contexto_admin") as mock_ctx:
-        mock_ctx.side_effect = FailedPrecondition(
-            "The query requires an index. You can create it here: https://console.firebase.google.com/..."
-        )
-        r = client_logado_admin.get(
-            "/admin?status=Aberto&responsavel=Fulano", follow_redirects=False
-        )
-    assert r.status_code == 302
-    assert "admin" in r.location
 
 
 # ── Onda 3: /painel redireciona admin ─────────────────────────────────────────
@@ -1308,17 +1255,6 @@ def test_relatorios_outer_exception_renderiza_pagina_erro(client_logado_admin):
             "insights": [],
         }
         r = client_logado_admin.get("/admin/relatorios", follow_redirects=False)
-    assert r.status_code in (200, 302)
-
-
-# ── Onda 3: indices_firestore exception ───────────────────────────────────────
-
-
-def test_indices_firestore_exception_redireciona(client_logado_admin):
-    """GET /admin/indices-firestore quando OptimizadorQuery lança exceção redireciona."""
-    with patch("app.routes.dashboard.OptimizadorQuery") as mock_opt:
-        mock_opt.INDICES_RECOMENDADOS = MagicMock(side_effect=Exception("indices error"))
-        r = client_logado_admin.get("/admin/indices-firestore", follow_redirects=False)
     assert r.status_code in (200, 302)
 
 

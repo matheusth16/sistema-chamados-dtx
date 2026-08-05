@@ -1,4 +1,4 @@
-"""Rotas do painel administrativo: dashboard, exportar, histórico, relatórios, índices."""
+"""Rotas do painel administrativo: dashboard, exportar, histórico, relatórios."""
 
 import io
 import logging
@@ -17,11 +17,10 @@ from flask import (
     url_for,
 )
 from flask_login import current_user, login_required
-from google.api_core.exceptions import FailedPrecondition
 
 from app.cache import get_static_cached
 from app.db.models.chamado import ChamadoRow
-from app.decoradores import requer_gestor_ou_admin, requer_perfil, requer_supervisor_area
+from app.decoradores import requer_gestor_ou_admin, requer_supervisor_area
 from app.i18n import flash_t, get_translation
 from app.limiter import limiter
 from app.models import Chamado
@@ -44,7 +43,6 @@ from app.services.dashboard_service import (
 from app.services.excel_export_service import MAX_EXPORT_CHAMADOS, _safe_cell
 from app.services.filters import aplicar_filtros_dashboard_com_paginacao
 from app.services.gestor_dashboard_service import obter_contexto_gestor_dashboard
-from app.services.pagination import OptimizadorQuery
 from app.services.permission_validation import (
     chamado_aceita_transicao_status,
     filtrar_supervisores_por_area,
@@ -145,26 +143,13 @@ def _render_dashboard() -> Response:
             return _redirect_dashboard(**request.args)
 
     itens_por_pagina = Config.ITENS_POR_PAGINA_DASHBOARD
-    try:
-        contexto = obter_contexto_admin(
-            current_user, request.args, itens_por_pagina=itens_por_pagina
-        )
-        setores = [
-            s
-            for s in get_static_cached("categorias_setor", CategoriaSetor.get_all, ttl_seconds=1800)
-            if getattr(s, "ativo", True)
-        ]
-        return render_template("dashboard.html", **contexto, setores=setores)
-    except FailedPrecondition as e:
-        msg = str(e).lower()
-        if "currently building" in msg or "cannot be used yet" in msg:
-            logger.warning("Índice Firestore em construção: %s", e)
-            return render_template("dashboard_indice_construindo.html"), 503
-        # Combinação de filtros sem índice composto criado — degrada em vez de
-        # derrubar a página com 500. Redireciona sem os filtros da query string.
-        logger.warning("Combinação de filtros sem índice Firestore disponível: %s", e)
-        flash_t("dashboard_filtros_sem_indice", "warning")
-        return redirect(url_for(request.endpoint))
+    contexto = obter_contexto_admin(current_user, request.args, itens_por_pagina=itens_por_pagina)
+    setores = [
+        s
+        for s in get_static_cached("categorias_setor", CategoriaSetor.get_all, ttl_seconds=1800)
+        if getattr(s, "ativo", True)
+    ]
+    return render_template("dashboard.html", **contexto, setores=setores)
 
 
 @main.route("/gestor/dashboard", methods=["GET"])
@@ -721,18 +706,3 @@ def relatorios() -> Response:
             logger.exception("Erro ao renderizar página de relatórios (fallback): %s", e2)
             flash_t("error_generating_reports", "danger")
             return _redirect_dashboard()
-
-
-@main.route("/admin/indices-firestore")
-@login_required
-@requer_perfil("admin")
-def indices_firestore() -> Response:
-    """Página de documentação dos índices Firestore."""
-    try:
-        indices = OptimizadorQuery.INDICES_RECOMENDADOS
-        script = OptimizadorQuery.gerar_script_indices()
-        return render_template("indices_firestore.html", indices=indices, script=script)
-    except Exception as e:
-        logger.exception("Erro ao exibir índices: %s", e)
-        flash_t("error_loading_index_info", "danger")
-        return _redirect_dashboard()
