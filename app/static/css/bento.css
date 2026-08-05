@@ -104,6 +104,10 @@
 
 .bento-resp-box{ background:transparent; border:1px solid rgba(20,30,60,.08); border-radius:16px; padding:16px 20px; }
 .bento-resp-badge{ display:inline-flex; align-items:center; gap:8px; background:var(--color-surface-canvas); border:none; border-radius:99px; padding:8px 16px 8px 34px; color:var(--color-text-muted); font-size:14px; font-weight:700; position:relative; width:100%; cursor:not-allowed; }
+/* .hidden (Tailwind) e .bento-resp-badge têm a mesma especificidade — bento.css carrega
+   depois de tailwind.min.css em base.html, então display:inline-flex sempre vencia mesmo com
+   .hidden aplicada. Seletor composto abaixo tem especificidade maior e resolve o empate. */
+.bento-resp-badge.hidden{ display:none; }
 .bento-resp-badge.is-resolved{ background:var(--color-dtx-100); color:var(--color-dtx-500); }
 .bento-resp-badge.is-warning{ background:var(--color-status-open-bg); color:var(--color-status-open-text); }
 .bento-resp-badge.is-error{ background:var(--color-status-cancelled-bg); color:var(--color-status-cancelled-text); }
