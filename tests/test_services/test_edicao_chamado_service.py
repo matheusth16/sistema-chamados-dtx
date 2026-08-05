@@ -361,6 +361,36 @@ def test_processar_edicao_cancelamento_com_motivo_chama_status(app):
     assert kwargs.get("motivo_cancelamento") == "Duplicado"
 
 
+def test_processar_edicao_cancelamento_motivo_com_caractere_especial_nao_fica_escapado(app):
+    """Regressão: bleach.clean() já retorna texto HTML-escapado ("->"" vira "-&gt;"") — sem
+    desfazer esse escaping antes de salvar, o template (autoescape do Jinja) escapa de novo e
+    o usuário vê "&gt;" literal na tela em vez de ">"."""
+    from app.services.edicao_chamado_service import processar_edicao_chamado
+
+    u = _make_usuario()
+
+    with (
+        app.app_context(),
+        patch("app.services.edicao_chamado_service.Chamado") as mock_chamado_cls,
+        patch("app.services.edicao_chamado_service.atualizar_status_chamado") as mock_status,
+    ):
+        mock_chamado_cls.get_by_id.return_value = _make_chamado_mock()
+        mock_status.return_value = {"sucesso": True, "mensagem": "Cancelado"}
+        processar_edicao_chamado(
+            usuario_atual=u,
+            chamado_id="ch1",
+            novo_status="Cancelado",
+            motivo_cancelamento="Duplicado do chamado a->b",
+            nova_descricao="",
+            novo_responsavel_id="",
+            novo_sla_str="",
+            arquivos_novos=[],
+            setores_adicionais_lista=[],
+        )
+    kwargs = mock_status.call_args.kwargs
+    assert kwargs.get("motivo_cancelamento") == "Duplicado do chamado a->b"
+
+
 # ── SLA ───────────────────────────────────────────────────────────────────────
 
 
@@ -448,6 +478,35 @@ def test_processar_edicao_nova_descricao_diferente_salva(app):
     mock_chamado.atualizar_campos.assert_called_once()
     update_data = mock_chamado.atualizar_campos.call_args.kwargs
     assert "descricao" in update_data
+
+
+def test_processar_edicao_nova_descricao_com_caractere_especial_nao_fica_escapada(app):
+    """Regressão: bleach.clean() já retorna texto HTML-escapado ("->"" vira "-&gt;"") — sem
+    desfazer esse escaping antes de salvar, o template (autoescape do Jinja) escapa de novo e
+    o usuário vê "&gt;" literal na tela em vez de ">"."""
+    from app.services.edicao_chamado_service import processar_edicao_chamado
+
+    u = _make_usuario()
+
+    with (
+        app.app_context(),
+        patch("app.services.edicao_chamado_service.Chamado") as mock_chamado_cls,
+    ):
+        mock_chamado = _make_chamado_mock()
+        mock_chamado_cls.get_by_id.return_value = mock_chamado
+        processar_edicao_chamado(
+            usuario_atual=u,
+            chamado_id="ch1",
+            novo_status="",
+            motivo_cancelamento="",
+            nova_descricao="Fluxo a->b corrigido",
+            novo_responsavel_id="",
+            novo_sla_str="",
+            arquivos_novos=[],
+            setores_adicionais_lista=[],
+        )
+    update_data = mock_chamado.atualizar_campos.call_args.kwargs
+    assert update_data.get("descricao") == "Fluxo a->b corrigido"
 
 
 # ── Responsável ───────────────────────────────────────────────────────────────

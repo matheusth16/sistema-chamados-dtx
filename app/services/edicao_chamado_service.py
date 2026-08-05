@@ -85,6 +85,8 @@ def processar_edicao_chamado(
         }
 
     try:
+        import html
+
         import bleach
 
         # 1. Status
@@ -94,7 +96,12 @@ def processar_edicao_chamado(
             and novo_status != data_chamado.get("status")
         ):
             if motivo_cancelamento:
-                motivo_cancelamento = bleach.clean(motivo_cancelamento, tags=[], strip=True)
+                # bleach.clean() já devolve texto HTML-escapado (ex.: ">" vira "&gt;") — sem
+                # desfazer aqui, o autoescape do Jinja na renderização escapa de novo e o
+                # usuário vê "&gt;" literal na tela em vez de ">".
+                motivo_cancelamento = html.unescape(
+                    bleach.clean(motivo_cancelamento, tags=[], strip=True)
+                )
             if novo_status == "Cancelado" and not motivo_cancelamento:
                 return {
                     "sucesso": False,
@@ -155,7 +162,9 @@ def processar_edicao_chamado(
                     "erro": _t("cannot_edit_solicitante_description"),
                     "codigo": 403,
                 }
-            nova_descricao = bleach.clean(nova_descricao.strip(), tags=[], strip=True)[:3000]
+            nova_descricao = html.unescape(
+                bleach.clean(nova_descricao.strip(), tags=[], strip=True)
+            )[:3000]
             descricao_anterior = (data_chamado.get("descricao") or "").strip()
             update_data["descricao"] = nova_descricao
             max_len = 3000

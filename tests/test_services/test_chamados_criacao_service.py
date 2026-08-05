@@ -91,6 +91,51 @@ def test_criar_chamado_com_dados_validos_retorna_id_e_numero(app):
     assert mock_thread.return_value.start.call_count >= 1
 
 
+def test_criar_chamado_descricao_com_caractere_especial_nao_fica_escapada(app):
+    """Regressão: bleach.clean() já retorna texto HTML-escapado ("->"" vira "-&gt;"") — sem
+    desfazer esse escaping antes de salvar, o template (autoescape do Jinja) escapa de novo e
+    o usuário vê "&gt;" literal na tela em vez de ">"."""
+    form = {
+        "categoria": "Manutencao",
+        "tipo": "Manutencao",
+        "descricao": "Fluxo criar->editar->status corrigido.",
+        "rl_codigo": "",
+        "impacto": "",
+        "gate": "",
+    }
+    files = MagicMock()
+    files.get.return_value = None
+    files.getlist.return_value = []
+
+    with (
+        patch("app.services.chamados_criacao_service.salvar_anexo", return_value=None),
+        patch(
+            "app.services.chamados_criacao_service.gerar_numero_chamado", return_value="2026-100"
+        ),
+        patch("app.services.chamados_criacao_service.atribuidor") as mock_atr,
+        patch("app.services.chamados_criacao_service.Historico"),
+        patch("app.services.chamados_criacao_service.threading.Thread"),
+    ):
+        mock_atr.atribuir.return_value = {
+            "sucesso": True,
+            "supervisor": {"id": "sup1", "nome": "Supervisor Teste"},
+            "motivo": "",
+        }
+        with app.app_context():
+            chamado_id, _numero, erro, _aviso = criar_chamado(
+                form=form,
+                files=files,
+                solicitante_id="sol1",
+                solicitante_nome="Solicitante Teste",
+                area_solicitante="Manutencao",
+                solicitante_email="sol@test.com",
+            )
+
+    assert erro is None
+    chamado = Chamado.get_by_id(chamado_id)
+    assert chamado.descricao == "Fluxo criar->editar->status corrigido."
+
+
 def test_criar_chamado_anexo_invalido_retorna_erro():
     """criar_chamado quando salvar_anexo levanta ValueError retorna (None, None, mensagem, None)."""
     form = {

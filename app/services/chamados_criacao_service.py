@@ -137,12 +137,17 @@ def criar_chamado(
         (chamado_id, numero_chamado, erro, aviso_atribuicao)
         Em sucesso: (id, numero, None, aviso ou None). Em falha: (None, None, mensagem_erro, None).
     """
+    import html
+
     import bleach
 
     categoria = form.get("categoria")
     rl_codigo = form.get("rl_codigo")
     tipo = form.get("tipo")
-    descricao = bleach.clean(form.get("descricao") or "", tags=[], strip=True)
+    # bleach.clean() já devolve texto HTML-escapado (ex.: ">" vira "&gt;") — sem
+    # desfazer aqui, o autoescape do Jinja na renderização escapa de novo e o
+    # usuário vê "&gt;" literal na tela em vez de ">".
+    descricao = html.unescape(bleach.clean(form.get("descricao") or "", tags=[], strip=True))
     impacto = form.get("impacto")
     gate = form.get("gate")
     if hasattr(form, "getlist"):
