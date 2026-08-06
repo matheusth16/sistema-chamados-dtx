@@ -11,6 +11,7 @@ from app.i18n import get_translation
 from app.models import Chamado
 from app.models_usuario import Usuario
 from app.routes import main
+from app.services.api_response import erro_json, sucesso_json
 from app.services.cancelamento_solicitante_service import cancelar_chamado_solicitante
 from app.services.permissions import usuario_pode_ver_chamado
 from app.services.solicitante_edicao_service import (
@@ -106,7 +107,7 @@ def api_buscar_usuarios():
     """
     q = request.args.get("q", "").strip()
     if len(q) < 2:
-        return jsonify({"sucesso": True, "dados": []}), 200
+        return sucesso_json(dados=[])
     try:
         todos = Usuario.buscar_ativos(q)
         dados = [
@@ -114,10 +115,10 @@ def api_buscar_usuarios():
             for u in todos
             if u.id != current_user.id and u.perfil not in ("admin", "admin_global")
         ][:10]
-        return jsonify({"sucesso": True, "dados": dados}), 200
+        return sucesso_json(dados=dados)
     except Exception as exc:
         logger.exception("Erro em buscar_usuarios: %s", exc)
-        return jsonify({"sucesso": False, "erro": _t("internal_error_retry")}), 500
+        return erro_json(_t("internal_error_retry"), 500)
 
 
 @main.route("/api/chamado/<chamado_id>/editar-solicitante", methods=["POST"])
@@ -128,32 +129,16 @@ def api_editar_solicitante(chamado_id: str):
     Qualquer perfil não-gestor pode usar; o service valida ownership (solicitante_id).
     """
     if getattr(current_user, "is_gestor_only", False):
-        return jsonify({"sucesso": False, "erro": _t("unauthorized_access")}), 403
+        return erro_json(_t("unauthorized_access"), 403)
 
     from config import Config
 
     payload = request.get_json(silent=True) or {}
     descricao = (payload.get("descricao") or "").strip()
     if len(descricao) < Config.MIN_DESCRICAO_CHARS:
-        return (
-            jsonify(
-                {
-                    "sucesso": False,
-                    "erro": _t("description_min_chars", min_chars=Config.MIN_DESCRICAO_CHARS),
-                }
-            ),
-            400,
-        )
+        return erro_json(_t("description_min_chars", min_chars=Config.MIN_DESCRICAO_CHARS), 400)
     if len(descricao) > Config.MAX_DESCRICAO_CHARS:
-        return (
-            jsonify(
-                {
-                    "sucesso": False,
-                    "erro": _t("description_max_chars", max_chars=Config.MAX_DESCRICAO_CHARS),
-                }
-            ),
-            400,
-        )
+        return erro_json(_t("description_max_chars", max_chars=Config.MAX_DESCRICAO_CHARS), 400)
 
     resultado = editar_descricao_solicitante(
         chamado_id=chamado_id,
@@ -173,12 +158,12 @@ def api_cancelar_solicitante(chamado_id: str):
     Qualquer perfil não-gestor pode usar; o service valida ownership (solicitante_id).
     """
     if getattr(current_user, "is_gestor_only", False):
-        return jsonify({"sucesso": False, "erro": _t("unauthorized_access")}), 403
+        return erro_json(_t("unauthorized_access"), 403)
 
     payload = request.get_json(silent=True) or {}
     motivo = (payload.get("motivo") or "").strip()
     if len(motivo) < 10:
-        return jsonify({"sucesso": False, "erro": _t("reason_required_min_10_parens")}), 400
+        return erro_json(_t("reason_required_min_10_parens"), 400)
 
     resultado = cancelar_chamado_solicitante(
         chamado_id=chamado_id,
@@ -195,22 +180,19 @@ def api_cancelar_solicitante(chamado_id: str):
 def api_anexo_solicitante(chamado_id: str):
     """Anexo tardio enviado pelo dono do chamado (FormData). Qualquer perfil não-gestor."""
     if getattr(current_user, "is_gestor_only", False):
-        return jsonify({"sucesso": False, "erro": _t("unauthorized_access")}), 403
+        return erro_json(_t("unauthorized_access"), 403)
 
     motivo = (request.form.get("motivo") or "").strip()
     if len(motivo) < 10:
-        return (
-            jsonify({"sucesso": False, "erro": _t("reason_required_min_10_parens")}),
-            400,
-        )
+        return erro_json(_t("reason_required_min_10_parens"), 400)
 
     arquivo = request.files.get("anexo")
     if not arquivo or not arquivo.filename:
-        return jsonify({"sucesso": False, "erro": _t("file_not_sent")}), 400
+        return erro_json(_t("file_not_sent"), 400)
 
     caminho = salvar_anexo(arquivo)
     if not caminho:
-        return jsonify({"sucesso": False, "erro": _t("file_type_not_allowed")}), 400
+        return erro_json(_t("file_type_not_allowed"), 400)
 
     resultado = adicionar_anexo_tardio(
         chamado_id=chamado_id,
@@ -232,12 +214,12 @@ def api_responder_solicitante(chamado_id: str):
     que exigiam anexar um arquivo só para poder responder por texto.
     """
     if getattr(current_user, "is_gestor_only", False):
-        return jsonify({"sucesso": False, "erro": _t("unauthorized_access")}), 403
+        return erro_json(_t("unauthorized_access"), 403)
 
     payload = request.get_json(silent=True) or {}
     mensagem = (payload.get("mensagem") or "").strip()
     if not mensagem:
-        return jsonify({"sucesso": False, "erro": _t("reply_message_required", min_chars=2)}), 400
+        return erro_json(_t("reply_message_required", min_chars=2), 400)
 
     resultado = responder_chamado_solicitante(
         chamado_id=chamado_id,

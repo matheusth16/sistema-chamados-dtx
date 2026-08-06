@@ -233,7 +233,7 @@ def test_atualizar_status_ajax_transicao_bloqueada_retorna_403(
             "app.routes.api_chamados.verificar_permissao_mudanca_status", return_value=(True, None)
         ),
         patch(
-            "app.services.permission_validation.chamado_aceita_transicao_status",
+            "app.services.permissoes_edicao_chamado.chamado_aceita_transicao_status",
             return_value=(False, "bloqueado"),
         ),
     ):
@@ -302,7 +302,7 @@ def test_bulk_atualizar_status_transicao_bloqueada_adiciona_erro(
     with (
         patch("app.routes.api_chamados.usuario_pode_operar_chamado", return_value=True),
         patch(
-            "app.services.permission_validation.chamado_aceita_transicao_status",
+            "app.services.permissoes_edicao_chamado.chamado_aceita_transicao_status",
             return_value=(False, "bloqueado"),
         ),
     ):
@@ -328,7 +328,7 @@ def test_bulk_atualizar_status_servico_retorna_erro_e_registra(
     with (
         patch("app.routes.api_chamados.usuario_pode_operar_chamado", return_value=True),
         patch(
-            "app.services.permission_validation.chamado_aceita_transicao_status",
+            "app.services.permissoes_edicao_chamado.chamado_aceita_transicao_status",
             return_value=(True, None),
         ),
         patch(

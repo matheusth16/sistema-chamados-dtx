@@ -40,11 +40,11 @@ def _invalidar_cache_gates():
 
 
 def _seed_gates_padroes_se_vazio() -> None:
-    """Semeia os 16 gates padrão (gates_config.py) no Firestore na primeira criação.
+    """Semeia os 16 gates padrão (gates_config.py) no banco na primeira criação.
 
     build_gate_subetapas() só usa o fallback estático de gates_config.py quando a
-    coleção categorias_gates está vazia — assim que existe QUALQUER gate real no
-    Firestore, os 16 valores padrão desaparecem do formulário de chamado por
+    tabela categorias_gates está vazia — assim que existe QUALQUER gate real no
+    banco, os 16 valores padrão desaparecem do formulário de chamado por
     completo (o fallback não complementa, substitui). Sem isso, o primeiro admin a
     cadastrar um gate customizado apagaria os outros 15 do dropdown sem perceber.
     """
@@ -54,7 +54,7 @@ def _seed_gates_padroes_se_vazio() -> None:
         for ordem, nome_pt in enumerate(valores, start=1):
             etapa = nome_pt.split(" - ", 1)[1]
             CategoriaGate(nome_pt=nome_pt, gate_pai=gate_pai, etapa=etapa, ordem=ordem).save()
-    logger.info("Gates padrão semeados no Firestore na primeira configuração da tela")
+    logger.info("Gates padrão semeados no banco na primeira configuração da tela")
 
 
 def _invalidar_cache_impactos():

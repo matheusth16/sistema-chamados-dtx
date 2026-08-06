@@ -125,7 +125,7 @@ def test_staging_auth_deep_health_ainda_usa_health_secret(client_staging):
     with (
         patch.dict(os.environ, {"HEALTH_SECRET": _test_secret}, clear=False),
         patch(
-            "app.routes.api_chamados.db_module.SessionLocal",
+            "app.routes.api_infra.db_module.SessionLocal",
             side_effect=Exception("Postgres indisponível no teste"),
         ),
     ):

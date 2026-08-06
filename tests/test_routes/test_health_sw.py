@@ -3,7 +3,7 @@
 Fase 2 — deep health check verifica Postgres (SELECT 1), não mais Firestore.
 Testes que exigem Postgres real usam a fixture `db_engine` (pula se
 TEST_DATABASE_URL não estiver configurada); os demais mockam
-`app.routes.api_chamados.db_module.SessionLocal` diretamente.
+`app.routes.api_infra.db_module.SessionLocal` diretamente.
 """
 
 import os
@@ -62,7 +62,7 @@ def test_health_deep_postgres_ok(client, db_engine):
 def test_health_deep_postgres_falha(client):
     """CT-HEALTH-03: ?deep=1 com Postgres falhando retorna status 'degraded'."""
     with patch(
-        "app.routes.api_chamados.db_module.SessionLocal",
+        "app.routes.api_infra.db_module.SessionLocal",
         side_effect=RuntimeError("postgres unreachable"),
     ):
         r = client.get("/health?deep=1")
@@ -88,7 +88,7 @@ def test_health_deep_nao_expoe_versao(client, db_engine):
 
 def test_health_shallow_nao_chama_postgres(client):
     """CT-HEALTH-05: GET /health (sem ?deep) não faz chamada ao Postgres."""
-    with patch("app.routes.api_chamados.db_module.SessionLocal") as mock_session_local:
+    with patch("app.routes.api_infra.db_module.SessionLocal") as mock_session_local:
         r = client.get("/health")
 
     assert r.status_code == 200
@@ -161,7 +161,7 @@ def test_health_deep_cache_branch_ok_com_cache_set(client, db_engine):
     marcando cache como 'degraded:ImportError'.
     Após fix com cache_set: cache fica 'ok' quando não há exceção.
     """
-    with patch("app.routes.api_chamados.cache_set") as mock_cache_set:
+    with patch("app.routes.api_infra.cache_set") as mock_cache_set:
         r = client.get("/health?deep=1")
 
     data = r.get_json()
@@ -176,7 +176,7 @@ def test_health_deep_cache_branch_ok_com_cache_set(client, db_engine):
 
 def test_health_deep_cache_branch_degraded_quando_excecao(client, db_engine):
     """CT-HEALTH-CACHE-02: quando cache_set lança exceção, cache fica 'degraded'."""
-    with patch("app.routes.api_chamados.cache_set", side_effect=RuntimeError("redis down")):
+    with patch("app.routes.api_infra.cache_set", side_effect=RuntimeError("redis down")):
         r = client.get("/health?deep=1")
 
     data = r.get_json()
@@ -221,4 +221,41 @@ def test_health_deep_query_token_deprecado_ainda_funciona(client, db_engine):
     """CT-HEALTH-13: ?token= query string ainda funciona (compat UptimeRobot legado)."""
     with patch.dict(os.environ, {"HEALTH_SECRET": "supersecret"}):
         r = client.get("/health?deep=1&token=supersecret")
+    assert r.status_code == 200
+
+
+# ---------------------------------------------------------------------------
+# CT-HEALTH-14/15: fail-closed em produção sem HEALTH_SECRET configurado
+# (achado em auditoria, 2026-08-05 — sem isso, qualquer host na LAN via
+# /health?deep=1 descobre saúde/latência do Postgres de graça)
+# ---------------------------------------------------------------------------
+
+
+def test_health_deep_producao_sem_secret_retorna_401(app, client, monkeypatch):
+    """CT-HEALTH-14: em produção sem HEALTH_SECRET, ?deep=1 falha fechado (401)
+    em vez de rodar sem autenticação nenhuma."""
+    monkeypatch.delenv("HEALTH_SECRET", raising=False)
+    app.config["ENV"] = "production"
+    app.config["REQUIRE_HTTPS"] = False
+    r = client.get("/health?deep=1")
+    assert r.status_code == 401
+
+
+def test_health_shallow_producao_sem_secret_continua_liberado(app, client, monkeypatch):
+    """CT-HEALTH-15: modo raso em produção sem secret continua sem exigir token
+    — não vaza nada além de {"status":"ok"}, então não precisa do fail-closed
+    que o modo deep exige."""
+    monkeypatch.delenv("HEALTH_SECRET", raising=False)
+    app.config["ENV"] = "production"
+    app.config["REQUIRE_HTTPS"] = False
+    r = client.get("/health")
+    assert r.status_code == 200
+    assert r.get_json().get("status") == "ok"
+
+
+def test_health_deep_fora_de_producao_sem_secret_continua_liberado(client, monkeypatch, db_engine):
+    """CT-HEALTH-16: fora de produção (dev/CI), ?deep=1 sem secret continua sem
+    exigir token — não regride a conveniência de monitorar localmente."""
+    monkeypatch.delenv("HEALTH_SECRET", raising=False)
+    r = client.get("/health?deep=1")
     assert r.status_code == 200

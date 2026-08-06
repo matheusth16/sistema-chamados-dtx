@@ -11,8 +11,9 @@ from app.i18n import get_translation
 from app.models import Chamado
 from app.models_usuario import Usuario
 from app.routes import main
-from app.services.permission_validation import usuario_pode_mutar_chamado
+from app.services.api_response import erro_json
 from app.services.permissions import usuario_pode_ver_chamado
+from app.services.permissoes_edicao_chamado import usuario_pode_mutar_chamado
 
 logger = logging.getLogger(__name__)
 
@@ -81,40 +82,40 @@ def api_transferir_area(chamado_id: str):
     try:
         dados = request.get_json(silent=True)
         if not dados:
-            return jsonify({"sucesso": False, "erro": _t("invalid_or_empty_json")}), 400
+            return erro_json(_t("invalid_or_empty_json"), 400)
 
         area = (dados.get("area") or "").strip()
         supervisor_id = (dados.get("supervisor_id") or "").strip()
         motivo = (dados.get("motivo") or "").strip()
 
         if not area:
-            return jsonify({"sucesso": False, "erro": _t("field_target_area_required")}), 400
+            return erro_json(_t("field_target_area_required"), 400)
         if not supervisor_id:
-            return jsonify({"sucesso": False, "erro": _t("field_supervisor_id_required")}), 400
+            return erro_json(_t("field_supervisor_id_required"), 400)
         if not motivo:
-            return jsonify({"sucesso": False, "erro": _t("error_reason_required")}), 400
+            return erro_json(_t("error_reason_required"), 400)
 
         chamado = Chamado.get_by_id(chamado_id)
         if not chamado:
-            return jsonify({"sucesso": False, "erro": _t("ticket_not_found")}), 404
+            return erro_json(_t("ticket_not_found"), 404)
 
         dados_chamado = chamado.to_dict()
 
         if not usuario_pode_ver_chamado(current_user, chamado):
-            return jsonify({"sucesso": False, "erro": _t("access_denied_generic")}), 403
+            return erro_json(_t("access_denied_generic"), 403)
 
         pode_mutar, _ = usuario_pode_mutar_chamado(current_user)
         if not pode_mutar:
-            return jsonify({"sucesso": False, "erro": _t("access_denied_generic")}), 403
+            return erro_json(_t("access_denied_generic"), 403)
 
-        from app.services.permission_validation import chamado_aceita_edicao_operacional
+        from app.services.permissoes_edicao_chamado import chamado_aceita_edicao_operacional
 
         _pode_op, _ = chamado_aceita_edicao_operacional(current_user, chamado)
         if not _pode_op:
-            return jsonify({"sucesso": False, "erro": _t("ticket_completed_no_operation")}), 403
+            return erro_json(_t("ticket_completed_no_operation"), 403)
 
         if not (chamado.responsavel_id == current_user.id or current_user.is_admin_or_above):
-            return jsonify({"sucesso": False, "erro": _t("only_owner_or_admin_transfer")}), 403
+            return erro_json(_t("only_owner_or_admin_transfer"), 403)
 
         from app.services.escalonamento_service import transferir_area
 
@@ -136,10 +137,10 @@ def api_transferir_area(chamado_id: str):
 
     except ValueError as exc:
         logger.debug("Validação transferir_area chamado=%s: %s", chamado_id, exc)
-        return jsonify({"sucesso": False, "erro": _t("invalid_request_data")}), 400
+        return erro_json(_t("invalid_request_data"), 400)
     except Exception as exc:
         logger.exception("Erro em api_transferir_area chamado=%s: %s", chamado_id, exc)
-        return jsonify({"sucesso": False, "erro": _t("internal_error_retry")}), 500
+        return erro_json(_t("internal_error_retry"), 500)
 
 
 @main.route("/api/chamado/<chamado_id>/previsao-atendimento", methods=["POST"])
@@ -156,48 +157,44 @@ def api_definir_previsao_atendimento(chamado_id: str):
 
         dados = request.get_json(silent=True)
         if not dados:
-            return jsonify({"sucesso": False, "erro": _t("invalid_or_empty_json")}), 400
+            return erro_json(_t("invalid_or_empty_json"), 400)
 
         previsao_raw = (dados.get("previsao") or "").strip()
         motivo = (dados.get("motivo") or "").strip()
 
         if not previsao_raw:
-            return jsonify(
-                {"sucesso": False, "erro": _t("field_attendance_forecast_required")}
-            ), 400
+            return erro_json(_t("field_attendance_forecast_required"), 400)
         if not motivo:
-            return jsonify({"sucesso": False, "erro": _t("error_reason_required")}), 400
+            return erro_json(_t("error_reason_required"), 400)
 
         try:
             previsao = datetime.fromisoformat(previsao_raw)
         except ValueError:
-            return jsonify({"sucesso": False, "erro": _t("invalid_request_data")}), 400
+            return erro_json(_t("invalid_request_data"), 400)
 
         chamado = Chamado.get_by_id(chamado_id)
         if not chamado:
-            return jsonify({"sucesso": False, "erro": _t("ticket_not_found")}), 404
+            return erro_json(_t("ticket_not_found"), 404)
 
         if not usuario_pode_ver_chamado(current_user, chamado):
-            return jsonify({"sucesso": False, "erro": _t("access_denied_generic")}), 403
+            return erro_json(_t("access_denied_generic"), 403)
 
         pode_mutar, _ = usuario_pode_mutar_chamado(current_user)
         if not pode_mutar:
-            return jsonify({"sucesso": False, "erro": _t("access_denied_generic")}), 403
+            return erro_json(_t("access_denied_generic"), 403)
 
-        from app.services.permission_validation import chamado_aceita_edicao_operacional
+        from app.services.permissoes_edicao_chamado import chamado_aceita_edicao_operacional
 
         _pode_op, _ = chamado_aceita_edicao_operacional(current_user, chamado)
         if not _pode_op:
-            return jsonify({"sucesso": False, "erro": _t("ticket_completed_no_operation")}), 403
+            return erro_json(_t("ticket_completed_no_operation"), 403)
 
         eh_supervisor_ou_acima = current_user.perfil in ("supervisor", "admin", "admin_global")
         eh_owner_ou_admin = (
             chamado.responsavel_id == current_user.id or current_user.is_admin_or_above
         )
         if not (eh_supervisor_ou_acima and eh_owner_ou_admin):
-            return jsonify(
-                {"sucesso": False, "erro": _t("no_permission_set_attendance_forecast")}
-            ), 403
+            return erro_json(_t("no_permission_set_attendance_forecast"), 403)
 
         from app.services.escalonamento_service import definir_previsao_atendimento
 
@@ -209,10 +206,10 @@ def api_definir_previsao_atendimento(chamado_id: str):
 
     except ValueError as exc:
         logger.debug("Validação previsao_atendimento chamado=%s: %s", chamado_id, exc)
-        return jsonify({"sucesso": False, "erro": _t("invalid_request_data")}), 400
+        return erro_json(_t("invalid_request_data"), 400)
     except Exception as exc:
         logger.exception("Erro em api_definir_previsao_atendimento chamado=%s: %s", chamado_id, exc)
-        return jsonify({"sucesso": False, "erro": _t("internal_error_retry")}), 500
+        return erro_json(_t("internal_error_retry"), 500)
 
 
 @main.route("/api/chamado/<chamado_id>/escalonar-colega", methods=["POST"])
@@ -227,37 +224,37 @@ def api_escalonar_colega(chamado_id: str):
     try:
         dados = request.get_json(silent=True)
         if not dados:
-            return jsonify({"sucesso": False, "erro": _t("invalid_or_empty_json")}), 400
+            return erro_json(_t("invalid_or_empty_json"), 400)
 
         supervisor_id = (dados.get("supervisor_id") or "").strip()
         motivo = (dados.get("motivo") or "").strip()
 
         if not supervisor_id:
-            return jsonify({"sucesso": False, "erro": _t("field_supervisor_id_required")}), 400
+            return erro_json(_t("field_supervisor_id_required"), 400)
         if not motivo:
-            return jsonify({"sucesso": False, "erro": _t("error_reason_required")}), 400
+            return erro_json(_t("error_reason_required"), 400)
 
         chamado = Chamado.get_by_id(chamado_id)
         if not chamado:
-            return jsonify({"sucesso": False, "erro": _t("ticket_not_found")}), 404
+            return erro_json(_t("ticket_not_found"), 404)
 
         dados_chamado = chamado.to_dict()
 
         if not usuario_pode_ver_chamado(current_user, chamado):
-            return jsonify({"sucesso": False, "erro": _t("access_denied_generic")}), 403
+            return erro_json(_t("access_denied_generic"), 403)
 
         pode_mutar, _ = usuario_pode_mutar_chamado(current_user)
         if not pode_mutar:
-            return jsonify({"sucesso": False, "erro": _t("access_denied_generic")}), 403
+            return erro_json(_t("access_denied_generic"), 403)
 
-        from app.services.permission_validation import chamado_aceita_edicao_operacional
+        from app.services.permissoes_edicao_chamado import chamado_aceita_edicao_operacional
 
         _pode_op, _ = chamado_aceita_edicao_operacional(current_user, chamado)
         if not _pode_op:
-            return jsonify({"sucesso": False, "erro": _t("ticket_completed_no_operation")}), 403
+            return erro_json(_t("ticket_completed_no_operation"), 403)
 
         if not (chamado.responsavel_id == current_user.id or current_user.is_admin_or_above):
-            return jsonify({"sucesso": False, "erro": _t("only_owner_or_admin_escalate")}), 403
+            return erro_json(_t("only_owner_or_admin_escalate"), 403)
 
         from app.services.escalonamento_service import escalonar_colega
 
@@ -279,10 +276,10 @@ def api_escalonar_colega(chamado_id: str):
 
     except ValueError as exc:
         logger.debug("Validação escalonar_colega chamado=%s: %s", chamado_id, exc)
-        return jsonify({"sucesso": False, "erro": _t("invalid_request_data")}), 400
+        return erro_json(_t("invalid_request_data"), 400)
     except Exception as exc:
         logger.exception("Erro em api_escalonar_colega chamado=%s: %s", chamado_id, exc)
-        return jsonify({"sucesso": False, "erro": _t("internal_error_retry")}), 500
+        return erro_json(_t("internal_error_retry"), 500)
 
 
 # ---------------------------------------------------------------------------
@@ -420,40 +417,33 @@ def api_incluir_participantes(chamado_id: str):
     try:
         dados = request.get_json(silent=True)
         if not dados:
-            return jsonify({"sucesso": False, "erro": _t("invalid_or_empty_json")}), 400
+            return erro_json(_t("invalid_or_empty_json"), 400)
 
         participantes_novos = dados.get("participantes")
         if not isinstance(participantes_novos, list) or not participantes_novos:
-            return jsonify(
-                {"sucesso": False, "erro": _t("participants_must_be_nonempty_list")}
-            ), 400
+            return erro_json(_t("participants_must_be_nonempty_list"), 400)
 
         chamado = Chamado.get_by_id(chamado_id)
         if not chamado:
-            return jsonify({"sucesso": False, "erro": _t("ticket_not_found")}), 404
+            return erro_json(_t("ticket_not_found"), 404)
 
         dados_chamado = chamado.to_dict()
 
         if not usuario_pode_ver_chamado(current_user, chamado):
-            return jsonify({"sucesso": False, "erro": _t("access_denied_generic")}), 403
+            return erro_json(_t("access_denied_generic"), 403)
 
         pode_mutar, _ = usuario_pode_mutar_chamado(current_user)
         if not pode_mutar:
-            return jsonify({"sucesso": False, "erro": _t("access_denied_generic")}), 403
+            return erro_json(_t("access_denied_generic"), 403)
 
-        from app.services.permission_validation import chamado_aceita_edicao_operacional
+        from app.services.permissoes_edicao_chamado import chamado_aceita_edicao_operacional
 
         _pode_op, _ = chamado_aceita_edicao_operacional(current_user, chamado)
         if not _pode_op:
-            return jsonify({"sucesso": False, "erro": _t("access_denied_generic")}), 403
+            return erro_json(_t("access_denied_generic"), 403)
 
         if not (chamado.responsavel_id == current_user.id or current_user.is_admin_or_above):
-            return jsonify(
-                {
-                    "sucesso": False,
-                    "erro": _t("only_owner_or_admin_participants"),
-                }
-            ), 403
+            return erro_json(_t("only_owner_or_admin_participants"), 403)
 
         from app.services.escalonamento_service import incluir_participantes
 
@@ -474,10 +464,10 @@ def api_incluir_participantes(chamado_id: str):
 
     except ValueError as exc:
         logger.debug("Validação incluir_participantes chamado=%s: %s", chamado_id, exc)
-        return jsonify({"sucesso": False, "erro": _t("invalid_request_data")}), 400
+        return erro_json(_t("invalid_request_data"), 400)
     except Exception as exc:
         logger.exception("Erro em api_incluir_participantes chamado=%s: %s", chamado_id, exc)
-        return jsonify({"sucesso": False, "erro": _t("internal_error_retry")}), 500
+        return erro_json(_t("internal_error_retry"), 500)
 
 
 @main.route("/api/chamado/<chamado_id>/concluir-minha-parte", methods=["POST"])
@@ -491,21 +481,21 @@ def api_concluir_minha_parte(chamado_id: str):
     # Gestor read-only: bloqueado mesmo que seja participante (edge case fail-closed)
     pode_mutar, _ = usuario_pode_mutar_chamado(current_user)
     if not pode_mutar:
-        return jsonify({"sucesso": False, "erro": _t("access_denied_generic")}), 403
+        return erro_json(_t("access_denied_generic"), 403)
     try:
         chamado = Chamado.get_by_id(chamado_id)
         if not chamado:
-            return jsonify({"sucesso": False, "erro": _t("ticket_not_found")}), 404
+            return erro_json(_t("ticket_not_found"), 404)
 
         dados_chamado = chamado.to_dict()
 
         if chamado.status == "Concluído":
-            return jsonify({"sucesso": False, "erro": _t("ticket_already_completed")}), 400
+            return erro_json(_t("ticket_already_completed"), 400)
 
         participantes = chamado.participantes or []
         ids_participantes = {p.get("supervisor_id") for p in participantes}
         if current_user.id not in ids_participantes:
-            return jsonify({"sucesso": False, "erro": _t("user_not_participant")}), 403
+            return erro_json(_t("user_not_participant"), 403)
 
         from app.services.escalonamento_service import concluir_minha_parte
 
@@ -527,4 +517,4 @@ def api_concluir_minha_parte(chamado_id: str):
 
     except Exception as exc:
         logger.exception("Erro em api_concluir_minha_parte chamado=%s: %s", chamado_id, exc)
-        return jsonify({"sucesso": False, "erro": _t("internal_error_retry")}), 500
+        return erro_json(_t("internal_error_retry"), 500)

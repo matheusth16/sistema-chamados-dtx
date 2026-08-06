@@ -1,17 +1,12 @@
-"""Rotas núcleo de chamados: status, edição, bulk, paginação, confirmação, onboarding, health check, CSP report."""
+"""Rotas núcleo de chamados: status, edição, bulk, paginação, confirmação, onboarding."""
 
 import contextlib
-import hmac
 import logging
-import os
 import threading
 
-from flask import abort, current_app, jsonify, request, session
+from flask import current_app, jsonify, request, session
 from flask_login import current_user, login_required
-from sqlalchemy import text
 
-from app import db as db_module
-from app.cache import cache_set
 from app.db.models.chamado import ChamadoRow
 from app.i18n import get_translation
 from app.limiter import limiter
@@ -20,12 +15,13 @@ from app.models_historico import Historico
 from app.models_usuario import Usuario
 from app.routes import main
 from app.services.analytics import obter_sla_para_exibicao
+from app.services.api_response import erro_json, sucesso_json
 from app.services.assignment import atribuidor  # noqa: F401  # usado em testes via patch
 from app.services.filters import aplicar_filtros_dashboard_com_paginacao
-from app.services.permission_validation import (
+from app.services.permissions import usuario_pode_operar_chamado, usuario_pode_ver_chamado
+from app.services.permissoes_edicao_chamado import (
     verificar_permissao_mudanca_status,
 )
-from app.services.permissions import usuario_pode_operar_chamado, usuario_pode_ver_chamado
 from app.services.status_service import atualizar_status_chamado
 from app.utils_areas import setor_para_area
 
@@ -131,157 +127,6 @@ def _enviar_notificacao_confirmar(app, chamado_id: str, data: dict, solicitante_
     threading.Thread(target=_run, daemon=True).start()
 
 
-def _obter_health_token_request() -> str:
-    """Lê token de autenticação do health check.
-
-    Canal primário: header X-Health-Token (não aparece em access logs).
-    Canal deprecado: query string ?token= (compat UptimeRobot legado — migrar para header).
-    """
-    header = request.headers.get("X-Health-Token", "").strip()
-    if header:
-        return header
-    return request.args.get("token", "").strip()
-
-
-@main.route("/health", methods=["GET"])
-@limiter.exempt
-def health():
-    """Health check para monitoramento externo.
-
-    Modo raso (padrão): apenas confirma que a app está no ar — rápido, sem I/O.
-    Modo deep (?deep=1): verifica conectividade com Postgres — para UptimeRobot/BetterUptime.
-
-    Autenticação (quando HEALTH_SECRET estiver configurado):
-      Exigida em AMBOS os modos (raso e deep) — impede mapeamento de liveness por atacantes.
-      Canal primário  : header X-Health-Token: <secret>  ← não aparece em access logs
-      Canal deprecado : query string ?token=<secret>     ← migrar para header
-
-    Sem HEALTH_SECRET (dev/CI): sem autenticação em nenhum modo.
-
-    Configuração de monitoramento:
-      curl -H "X-Health-Token: $HEALTH_SECRET" "https://host/health"
-      curl -H "X-Health-Token: $HEALTH_SECRET" "https://host/health?deep=1"
-
-    Returns:
-        200 {"status": "ok"}        — tudo saudável
-        401                         — token ausente ou inválido (quando HEALTH_SECRET configurado)
-        503 {"status": "degraded"}  — alguma dependência falhou (apenas no modo deep)
-    """
-    import time
-
-    # Quando HEALTH_SECRET estiver configurado, exige token em AMBOS os modos.
-    # Sem HEALTH_SECRET (dev/CI): sem autenticação.
-    secret = os.getenv("HEALTH_SECRET", "").strip()
-    if secret:
-        provided = _obter_health_token_request()
-        if not provided or not hmac.compare_digest(provided, secret):
-            abort(401)
-
-    shallow = request.args.get("deep") not in ("1", "true")
-
-    if shallow:
-        return jsonify({"status": "ok"}), 200
-
-    # checks críticos: impactam overall; checks opcionais: apenas informativos
-    critical_checks: dict[str, str] = {}
-    optional_checks: dict[str, str] = {}
-    start = time.perf_counter()
-
-    # Postgres: dependência crítica — sem ele a app não funciona
-    try:
-        with db_module.SessionLocal() as session:
-            session.execute(text("SELECT 1"))
-        critical_checks["postgres"] = "ok"
-    except Exception as exc:
-        critical_checks["postgres"] = f"error:{type(exc).__name__}"
-        logger.error("health_check postgres falhou: %s", exc)
-
-    # Redis / cache em memória — opcional, degrada performance mas não bloqueia
-    try:
-        cache_set("__health__", "1", ttl_seconds=10)
-        optional_checks["cache"] = "ok"
-    except Exception as exc:
-        optional_checks["cache"] = f"degraded:{type(exc).__name__}"
-
-    duration_ms = round((time.perf_counter() - start) * 1000, 1)
-    all_critical_ok = all(v == "ok" for v in critical_checks.values())
-    overall = "ok" if all_critical_ok else "degraded"
-    status_code = 200 if all_critical_ok else 503
-    checks = {**critical_checks, **optional_checks}
-
-    payload = {
-        "status": overall,
-        "checks": checks,
-        "duration_ms": duration_ms,
-    }
-    logger.info("health_check status=%s duration_ms=%.1f checks=%s", overall, duration_ms, checks)
-    return jsonify(payload), status_code
-
-
-def _obter_cron_token_request() -> str:
-    """Lê token de autenticação do endpoint de cron interno (header X-Cron-Token)."""
-    return request.headers.get("X-Cron-Token", "").strip()
-
-
-@main.route("/internal/cron/sla-escalacao", methods=["POST"])
-def cron_sla_escalacao():
-    """Executa sob demanda o job de escalonamento SLA (Escada A + avisos + Escada B).
-
-    Existe porque o Container App roda com min-replicas=0 (scale-to-zero, free
-    tier): o APScheduler in-process (`app/__init__.py:_iniciar_scheduler`) só
-    dispara enquanto o container está de pé, o que na prática quase nunca
-    acontece por 10 minutos seguidos sem tráfego. Um workflow do GitHub
-    Actions chama esta rota a cada 10 min pra acordar o container só pelo
-    tempo de rodar o job, reaproveitando o lock Redis já existente
-    (`executar_job_com_lock`) pra não duplicar execução com o scheduler
-    in-process quando o container já está acordado por outro motivo.
-
-    Autenticação: header X-Cron-Token: <CRON_SECRET>.
-    Sem CRON_SECRET configurado, a rota nunca fica aberta por engano.
-
-    Returns:
-        200 {"sucesso": true, "dados": {...}}  — job executado
-        401                                     — token ausente ou inválido
-        503                                     — CRON_SECRET não configurado
-    """
-    secret = os.getenv("CRON_SECRET", "").strip()
-    if not secret:
-        logger.error("cron_sla_escalacao chamado sem CRON_SECRET configurado no ambiente")
-        return jsonify({"sucesso": False, "erro": "cron não configurado"}), 503
-
-    provided = _obter_cron_token_request()
-    if not provided or not hmac.compare_digest(provided, secret):
-        abort(401)
-
-    from app.services.scheduler_lock import executar_job_com_lock
-    from app.services.sla_escalacao_service import (
-        processar_avisos_resolucao,
-        processar_escada_a,
-        processar_escada_b,
-    )
-
-    resultado: dict = {}
-    erro: Exception | None = None
-
-    def _job():
-        nonlocal erro
-        try:
-            resultado["escada_a"] = processar_escada_a()
-            resultado["avisos_resolucao"] = processar_avisos_resolucao()
-            resultado["escada_b"] = processar_escada_b()
-        except Exception as exc:  # noqa: BLE001 — convertido em 500 genérico abaixo
-            erro = exc
-
-    executar_job_com_lock(current_app._get_current_object(), "sla_escalacao", _job)
-
-    if erro is not None:
-        logger.exception("Erro no job SLA Escalonamento via cron HTTP: %s", erro)
-        return jsonify({"sucesso": False, "erro": "erro ao processar escalonamento"}), 500
-
-    logger.info("cron_sla_escalacao executado via HTTP: %s", resultado)
-    return jsonify({"sucesso": True, "dados": resultado}), 200
-
-
 @main.route("/api/atualizar-status", methods=["POST"])
 @login_required
 @limiter.limit("30 per minute", methods=["POST"])
@@ -290,43 +135,34 @@ def atualizar_status_ajax():
     try:
         dados = request.get_json()
         if not dados:
-            return jsonify({"sucesso": False, "erro": _t("invalid_or_empty_json")}), 400
+            return erro_json(_t("invalid_or_empty_json"), 400)
         chamado_id = (dados.get("chamado_id") or "").strip()
         novo_status = (dados.get("novo_status") or "").strip()
         if not chamado_id:
-            return jsonify({"sucesso": False, "erro": _t("field_chamado_id_required")}), 400
+            return erro_json(_t("field_chamado_id_required"), 400)
         if not novo_status:
-            return jsonify({"sucesso": False, "erro": _t("field_novo_status_required")}), 400
+            return erro_json(_t("field_novo_status_required"), 400)
         if novo_status not in ["Aberto", "Em Atendimento", "Concluído", "Cancelado"]:
-            return jsonify(
-                {"sucesso": False, "erro": _t("invalid_status_value", status=novo_status)}
-            ), 400
+            return erro_json(_t("invalid_status_value", status=novo_status), 400)
         motivo_cancelamento = (dados.get("motivo_cancelamento") or "").strip()
         if novo_status == "Cancelado" and not motivo_cancelamento:
-            return jsonify(
-                {"sucesso": False, "erro": _t("cancellation_reason_required_field")}
-            ), 400
+            return erro_json(_t("cancellation_reason_required_field"), 400)
 
         chamado_obj = Chamado.get_by_id(chamado_id)
         if chamado_obj is None:
-            return jsonify({"sucesso": False, "erro": _t("ticket_not_found")}), 404
+            return erro_json(_t("ticket_not_found"), 404)
 
         permitido, erro_perm = verificar_permissao_mudanca_status(
             current_user, chamado_obj, novo_status
         )
         if not permitido:
-            return jsonify({"sucesso": False, "erro": erro_perm}), 403
+            return erro_json(erro_perm, 403)
 
-        from app.services.permission_validation import chamado_aceita_transicao_status
+        from app.services.permissoes_edicao_chamado import chamado_aceita_transicao_status
 
         pode_trans, _ = chamado_aceita_transicao_status(current_user, chamado_obj, novo_status)
         if not pode_trans:
-            return jsonify(
-                {
-                    "sucesso": False,
-                    "erro": _t("ticket_completed_no_status_transition"),
-                }
-            ), 403
+            return erro_json(_t("ticket_completed_no_status_transition"), 403)
 
         motivo_reabertura = (dados.get("motivo_reabertura") or "").strip()
 
@@ -336,12 +172,7 @@ def atualizar_status_ajax():
             and chamado_obj.status == "Concluído"
             and len(motivo_reabertura) < 3
         ):
-            return jsonify(
-                {
-                    "sucesso": False,
-                    "erro": _t("reopen_reason_min_3"),
-                }
-            ), 400
+            return erro_json(_t("reopen_reason_min_3"), 400)
 
         resultado = atualizar_status_chamado(
             chamado_id=chamado_id,
@@ -353,16 +184,14 @@ def atualizar_status_ajax():
             data_chamado=chamado_obj.to_dict(),
         )
         if resultado["sucesso"]:
-            return jsonify(
-                {"sucesso": True, "mensagem": resultado["mensagem"], "novo_status": novo_status}
-            ), 200
+            return sucesso_json(mensagem=resultado["mensagem"], novo_status=novo_status)
         else:
-            return jsonify(
-                {"sucesso": False, "erro": resultado.get("erro") or _t("error_unknown")}
-            ), resultado.get("codigo", 500)
+            return erro_json(
+                resultado.get("erro") or _t("error_unknown"), resultado.get("codigo", 500)
+            )
     except Exception as e:
         logger.exception("Erro em atualizar_status_ajax: %s", e)
-        return jsonify({"sucesso": False, "erro": _t("internal_error_retry")}), 500
+        return erro_json(_t("internal_error_retry"), 500)
 
 
 @main.route("/api/editar-chamado", methods=["POST"])
@@ -370,9 +199,9 @@ def atualizar_status_ajax():
 def api_editar_chamado():
     """Edita chamado de forma completa via FormData (incluindo arquivo, status, responsavel, descricao). Apenas supervisor/admin."""
     if not current_user.is_supervisor_or_above:
-        return jsonify({"sucesso": False, "erro": _t("access_denied_generic")}), 403
+        return erro_json(_t("access_denied_generic"), 403)
     if getattr(current_user, "is_gestor_only", None) is True:
-        return jsonify({"sucesso": False, "erro": _t("access_denied_generic")}), 403
+        return erro_json(_t("access_denied_generic"), 403)
 
     try:
         chamado_id = request.form.get("chamado_id")
@@ -386,7 +215,7 @@ def api_editar_chamado():
         arquivos_novos = request.files.getlist("anexos_novos")
 
         if not chamado_id:
-            return jsonify({"sucesso": False, "erro": _t("field_ticket_id_required")}), 400
+            return erro_json(_t("field_ticket_id_required"), 400)
 
         from app.services.edicao_chamado_service import processar_edicao_chamado
 
@@ -409,20 +238,16 @@ def api_editar_chamado():
         )
 
         if resultado.get("sucesso"):
-            return jsonify(
-                {
-                    "sucesso": True,
-                    "mensagem": resultado.get("mensagem"),
-                    "dados": resultado.get("dados", {}),
-                }
-            ), 200
+            return sucesso_json(
+                mensagem=resultado.get("mensagem"), dados=resultado.get("dados", {})
+            )
         else:
             http_code = resultado.get("codigo", 400)
-            return jsonify({"sucesso": False, "erro": resultado.get("erro")}), http_code
+            return erro_json(resultado.get("erro"), http_code)
 
     except Exception as e:
         logger.exception("Erro em api_editar_chamado: %s", e)
-        return jsonify({"sucesso": False, "erro": _t("internal_error_retry")}), 500
+        return erro_json(_t("internal_error_retry"), 500)
 
 
 @main.route("/api/bulk-status", methods=["POST"])
@@ -431,23 +256,23 @@ def api_editar_chamado():
 def bulk_atualizar_status():
     """Atualiza status de múltiplos chamados em lote. Apenas supervisor/admin."""
     if not current_user.is_supervisor_or_above:
-        return jsonify({"sucesso": False, "erro": _t("access_denied_generic")}), 403
+        return erro_json(_t("access_denied_generic"), 403)
     # Gestor read-only: bloqueio total antes do loop
     if getattr(current_user, "is_gestor_only", None) is True:
-        return jsonify({"sucesso": False, "erro": _t("access_denied_generic")}), 403
+        return erro_json(_t("access_denied_generic"), 403)
     try:
         dados = request.get_json()
         if not dados:
-            return jsonify({"sucesso": False, "erro": _t("invalid_or_empty_json")}), 400
+            return erro_json(_t("invalid_or_empty_json"), 400)
         ids = dados.get("chamado_ids")
         if not isinstance(ids, list):
-            return jsonify({"sucesso": False, "erro": _t("field_chamado_ids_list")}), 400
+            return erro_json(_t("field_chamado_ids_list"), 400)
         novo_status = (dados.get("novo_status") or "").strip()
         if novo_status not in ("Aberto", "Em Atendimento", "Concluído"):
-            return jsonify({"sucesso": False, "erro": _t("invalid_new_status_generic")}), 400
+            return erro_json(_t("invalid_new_status_generic"), 400)
         ids = [str(i).strip() for i in ids if i][:50]
         if not ids:
-            return jsonify({"sucesso": False, "erro": _t("no_ticket_provided")}), 400
+            return erro_json(_t("no_ticket_provided"), 400)
 
         atualizados = 0
         erros = []
@@ -461,7 +286,7 @@ def bulk_atualizar_status():
                 if not usuario_pode_operar_chamado(current_user, chamado_obj):
                     erros.append({"id": chamado_id, "erro": _t("no_permission_for_ticket")})
                     continue
-                from app.services.permission_validation import chamado_aceita_transicao_status
+                from app.services.permissoes_edicao_chamado import chamado_aceita_transicao_status
 
                 pode_trans, _ = chamado_aceita_transicao_status(
                     current_user, chamado_obj, novo_status
@@ -490,17 +315,10 @@ def bulk_atualizar_status():
             except Exception as e:
                 logger.warning("Bulk status: falha em %s: %s", chamado_id, e)
                 erros.append({"id": chamado_id, "erro": _t("error_processing_ticket")})
-        return jsonify(
-            {
-                "sucesso": True,
-                "atualizados": atualizados,
-                "total_solicitados": len(ids),
-                "erros": erros,
-            }
-        ), 200
+        return sucesso_json(atualizados=atualizados, total_solicitados=len(ids), erros=erros)
     except Exception as e:
         logger.exception("Erro em bulk_atualizar_status: %s", e)
-        return jsonify({"sucesso": False, "erro": _t("internal_error_retry")}), 500
+        return erro_json(_t("internal_error_retry"), 500)
 
 
 @main.route("/api/chamado/<chamado_id>", methods=["GET"])
@@ -510,9 +328,9 @@ def api_chamado_por_id(chamado_id: str):
     try:
         chamado = Chamado.get_by_id(chamado_id)
         if chamado is None:
-            return jsonify({"sucesso": False, "erro": _t("ticket_not_found")}), 404
+            return erro_json(_t("ticket_not_found"), 404)
         if not usuario_pode_ver_chamado(current_user, chamado):
-            return jsonify({"sucesso": False, "erro": _t("no_permission_generic")}), 403
+            return erro_json(_t("no_permission_generic"), 403)
         sla_info = obter_sla_para_exibicao(chamado)
         chamado_dict = {
             "id": chamado_id,
@@ -527,10 +345,10 @@ def api_chamado_por_id(chamado_id: str):
             "status": chamado.status,
             "sla_info": sla_info,
         }
-        return jsonify({"sucesso": True, "chamado": chamado_dict}), 200
+        return sucesso_json(chamado=chamado_dict)
     except Exception as e:
         logger.exception("Erro ao buscar chamado %s: %s", chamado_id, e)
-        return jsonify({"sucesso": False, "erro": _t("internal_error_retry")}), 500
+        return erro_json(_t("internal_error_retry"), 500)
 
 
 def _aplicar_filtro_perfil(user):
@@ -561,18 +379,15 @@ def api_chamados_paginar():
             limite = 50
         condicoes = _aplicar_filtro_perfil(current_user)
         if condicoes is None:
-            return jsonify(
-                {
-                    "sucesso": True,
-                    "chamados": [],
-                    "paginacao": {
-                        "cursor_proximo": None,
-                        "tem_proxima": False,
-                        "total_pagina": 0,
-                        "limite": limite,
-                    },
-                }
-            ), 200
+            return sucesso_json(
+                chamados=[],
+                paginacao={
+                    "cursor_proximo": None,
+                    "tem_proxima": False,
+                    "total_pagina": 0,
+                    "limite": limite,
+                },
+            )
         resultado = aplicar_filtros_dashboard_com_paginacao(
             condicoes, request.args, limite=limite, cursor=cursor
         )
@@ -595,21 +410,18 @@ def api_chamados_paginar():
                     "data_conclusao": c.data_conclusao_formatada(),
                 }
             )
-        return jsonify(
-            {
-                "sucesso": True,
-                "chamados": chamados_dict,
-                "paginacao": {
-                    "cursor_proximo": resultado["proximo_cursor"],
-                    "tem_proxima": resultado["tem_proxima"],
-                    "total_pagina": len(chamados_dict),
-                    "limite": limite,
-                },
-            }
-        ), 200
+        return sucesso_json(
+            chamados=chamados_dict,
+            paginacao={
+                "cursor_proximo": resultado["proximo_cursor"],
+                "tem_proxima": resultado["tem_proxima"],
+                "total_pagina": len(chamados_dict),
+                "limite": limite,
+            },
+        )
     except Exception as e:
         logger.exception("Erro em api_chamados_paginar: %s", e)
-        return jsonify({"sucesso": False, "erro": _t("internal_error_retry")}), 500
+        return erro_json(_t("internal_error_retry"), 500)
 
 
 @main.route("/api/carregar-mais", methods=["POST"])
@@ -622,14 +434,7 @@ def carregar_mais():
         limite = min(dados.get("limite", 20), 50)
         condicoes = _aplicar_filtro_perfil(current_user)
         if condicoes is None:
-            return jsonify(
-                {
-                    "sucesso": True,
-                    "chamados": [],
-                    "cursor_proximo": None,
-                    "tem_proxima": False,
-                }
-            ), 200
+            return sucesso_json(chamados=[], cursor_proximo=None, tem_proxima=False)
         resultado = aplicar_filtros_dashboard_com_paginacao(
             condicoes, request.args, limite=limite, cursor=cursor
         )
@@ -645,17 +450,14 @@ def carregar_mais():
                     "data_abertura": c.data_abertura_formatada(),
                 }
             )
-        return jsonify(
-            {
-                "sucesso": True,
-                "chamados": chamados_dict,
-                "cursor_proximo": resultado["proximo_cursor"],
-                "tem_proxima": resultado["tem_proxima"],
-            }
-        ), 200
+        return sucesso_json(
+            chamados=chamados_dict,
+            cursor_proximo=resultado["proximo_cursor"],
+            tem_proxima=resultado["tem_proxima"],
+        )
     except Exception as e:
         logger.exception("Erro em carregar_mais: %s", e)
-        return jsonify({"sucesso": False, "erro": _t("internal_error_retry")}), 500
+        return erro_json(_t("internal_error_retry"), 500)
 
 
 @main.route("/api/onboarding/avancar", methods=["POST"])
@@ -666,14 +468,14 @@ def api_onboarding_avancar():
         dados = request.get_json() or {}
         passo = dados.get("passo")
         if passo is None or not isinstance(passo, int) or passo < 0:
-            return jsonify({"sucesso": False, "erro": _t("invalid_step")}), 400
+            return erro_json(_t("invalid_step"), 400)
         from app.services.onboarding_service import avancar_passo
 
         ok = avancar_passo(current_user.id, passo)
         return jsonify({"sucesso": ok}), 200
     except Exception as e:
         logger.exception("Erro em api_onboarding_avancar: %s", e)
-        return jsonify({"sucesso": False, "erro": _t("internal_error_retry")}), 500
+        return erro_json(_t("internal_error_retry"), 500)
 
 
 @main.route("/api/onboarding/concluir", methods=["POST"])
@@ -687,7 +489,7 @@ def api_onboarding_concluir():
         return jsonify({"sucesso": ok}), 200
     except Exception as e:
         logger.exception("Erro em api_onboarding_concluir: %s", e)
-        return jsonify({"sucesso": False, "erro": _t("internal_error_retry")}), 500
+        return erro_json(_t("internal_error_retry"), 500)
 
 
 @main.route("/api/onboarding/pular", methods=["POST"])
@@ -701,7 +503,7 @@ def api_onboarding_pular():
         return jsonify({"sucesso": ok}), 200
     except Exception as e:
         logger.exception("Erro em api_onboarding_pular: %s", e)
-        return jsonify({"sucesso": False, "erro": _t("internal_error_retry")}), 500
+        return erro_json(_t("internal_error_retry"), 500)
 
 
 @main.route("/api/chamado/<chamado_id>/confirmar-resolucao", methods=["POST"])
@@ -714,23 +516,23 @@ def api_confirmar_resolucao(chamado_id: str):
     motivo = (dados.get("motivo") or "").strip()
 
     if acao not in ("confirmar", "reabrir"):
-        return jsonify({"sucesso": False, "erro": "Ação inválida"}), 400
+        return erro_json("Ação inválida", 400)
 
     if acao == "reabrir" and not motivo:
-        return jsonify({"sucesso": False, "erro": _t("ticket_reopen_reason_required")}), 400
+        return erro_json(_t("ticket_reopen_reason_required"), 400)
 
     try:
         chamado = Chamado.get_by_id(chamado_id)
         if chamado is None:
-            return jsonify({"sucesso": False, "erro": _t("ticket_not_found")}), 404
+            return erro_json(_t("ticket_not_found"), 404)
 
         data = chamado.to_dict()
 
         if data.get("solicitante_id") != current_user.id:
-            return jsonify({"sucesso": False, "erro": _t("access_denied_generic")}), 403
+            return erro_json(_t("access_denied_generic"), 403)
 
         if data.get("status") != "Concluído" or data.get("confirmacao_solicitante") != "pendente":
-            return jsonify({"sucesso": False, "erro": _t("ticket_not_awaiting_confirmation")}), 400
+            return erro_json(_t("ticket_not_awaiting_confirmation"), 400)
 
         if acao == "confirmar":
             chamado.atualizar_campos(confirmacao_solicitante="confirmado")
@@ -744,12 +546,9 @@ def api_confirmar_resolucao(chamado_id: str):
         else:
             reaberturas_atual = data.get("reaberturas_solicitante_count", 0)
             if reaberturas_atual >= LIMITE_REABERTURAS_SOLICITANTE:
-                return jsonify(
-                    {
-                        "sucesso": False,
-                        "erro": _t("reopen_limit_reached", limite=LIMITE_REABERTURAS_SOLICITANTE),
-                    }
-                ), 403
+                return erro_json(
+                    _t("reopen_limit_reached", limite=LIMITE_REABERTURAS_SOLICITANTE), 403
+                )
 
             chamado.atualizar_campos(
                 status="Aberto",
@@ -785,11 +584,11 @@ def api_confirmar_resolucao(chamado_id: str):
                     current_user.nome,
                 )
 
-        return jsonify({"sucesso": True}), 200
+        return sucesso_json()
 
     except Exception as e:
         logger.exception("Erro ao confirmar resolução do chamado %s: %s", chamado_id, e)
-        return jsonify({"sucesso": False, "erro": _t("internal_error_retry")}), 500
+        return erro_json(_t("internal_error_retry"), 500)
 
 
 @main.route("/api/supervisores/lista", methods=["GET"])
@@ -808,13 +607,7 @@ def api_lista_supervisores():
             for u in supervisores
             if u.id != current_user.id
         ]
-        return jsonify(
-            {
-                "sucesso": True,
-                "area": area_resolvida,
-                "supervisores": dados,
-            }
-        ), 200
+        return sucesso_json(area=area_resolvida, supervisores=dados)
     except Exception as e:
         logger.exception("Erro ao listar supervisores: %s", e)
         return jsonify(
@@ -828,21 +621,3 @@ def api_lista_supervisores():
 
 
 LIMITE_REABERTURAS_SOLICITANTE = 3
-
-
-_csp_logger = logging.getLogger("app.csp")
-
-
-@main.route("/api/csp-report", methods=["POST"])
-@limiter.limit("20 per minute", methods=["POST"])
-def csp_report():
-    """Recebe relatórios de violação CSP enviados pelo browser (sem autenticação, sem CSRF)."""
-    body = request.get_json(silent=True, force=True) or {}
-    report = body.get("csp-report", body)
-    _csp_logger.warning(
-        "CSP violation: blocked-uri=%s violated-directive=%s document-uri=%s",
-        report.get("blocked-uri", ""),
-        report.get("violated-directive", ""),
-        report.get("document-uri", ""),
-    )
-    return "", 204
