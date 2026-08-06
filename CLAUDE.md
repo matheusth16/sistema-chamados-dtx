@@ -1,14 +1,15 @@
 # CLAUDE.md — Convenções do Projeto sistema_chamados
 
 ## Stack
-- **Backend:** Flask 3.1 + Firestore (firebase-admin), Flask-Login, Flask-WTF (CSRF), Flask-Limiter (rate limiting em auth/API/dashboard, ver `app/limiter.py`), gunicorn (WSGI em produção)
+- **Backend:** Flask 3.1 + PostgreSQL (SQLAlchemy 2.0 + Alembic, ver `app/db/`), Flask-Login, Flask-WTF (CSRF), Flask-Limiter (rate limiting em auth/API/dashboard, ver `app/limiter.py`), gunicorn (WSGI em produção — 1 worker/8 threads, sem Nginx na frente)
 - **Frontend:** Tailwind CSS (compilado via CLI, `npm run build:css` — não é CDN), GSAP 3 (ScrollTrigger, ScrollToPlugin)
 - **Python:** 3.14, pytest + unittest.mock
 - **Blueprint:** único `main` — todos os módulos de rota registram nele
-- **Autenticação/Segurança:** MFA via TOTP + QR code (`pyotp`, `segno`, ver `app/routes/mfa.py`), SSO Microsoft/Entra ID (`msal`, ver `app/services/sso_microsoft_service.py`), criptografia de PII em repouso — LGPD (`cryptography`, ver `app/services/pii_encryption.py`)
-- **Serviços externos:** Firebase/Firestore (banco), Cloudflare R2 via boto3 (anexos — bucket privado, URLs pré-assinadas), Microsoft Graph API (e-mail), Web Push (`pywebpush`, ver `app/services/webpush_service.py`)
-- **Infra:** Redis (cache/backend do rate limiter, ver `app/cache.py`), APScheduler (jobs agendados, ver `app/__init__.py`)
+- **Autenticação/Segurança:** MFA obrigatório via TOTP + QR code (`pyotp`, `segno`, ver `app/routes/mfa.py`), SSO Microsoft/Entra ID (`msal`, ver `app/services/sso_microsoft_service.py` — **hoje inerte**: servidor roda HTTP puro, OAuth exige redirect HTTPS), criptografia de PII em repouso — LGPD (`cryptography`, ver `app/services/pii_encryption.py`)
+- **Serviços externos:** PostgreSQL (banco, self-hosted no servidor físico), Cloudflare R2 via boto3 (anexos legados — bucket privado, URLs pré-assinadas; anexos novos vão pra disco local, Fase 1), Microsoft Graph API (e-mail), Web Push (`pywebpush`, ver `app/services/webpush_service.py`)
+- **Infra:** Redis (cache/backend do rate limiter, ver `app/cache.py` — opcional com 1 worker), APScheduler (jobs agendados incl. escalonamento gerencial de SLA, ver `app/__init__.py`)
 - **Exportação:** Excel via `openpyxl` (ver `app/services/excel_export_service.py`)
+- **Legado (não tocar sem motivo)**: `app/database.py` (inicializador Firestore, zero import ativo em `app/`, rede de segurança de rollback do Marco 12 até ~2026-09-03), `firebase_admin` em `requirements.txt`
 
 ## Perfis de usuário
 - `solicitante` — cria e acompanha os próprios chamados
@@ -26,10 +27,11 @@
 - Exceções customizadas em `app/exceptions.py`
 
 ### Testes
-- Mock de Firestore: `patch('app.database.db')` ou `patch('app.services.X.db')`
+- **PostgreSQL real nos testes** — `TEST_DATABASE_URL`, fixture `db_session` (rollback por teste, schema fica de pé). Não é mock/SQLite. Sem `TEST_DATABASE_URL`, testes de banco são pulados (`pytest.skip`), não falham.
+- Mock só pra serviços genuinamente externos (Graph API, R2, Web Push) — `patch('app.services.X.servico_externo')`
 - Imports inline nas rotas — patch **no módulo do serviço**, não em `api`
 - CSRF desabilitado em testes: `app.config['WTF_CSRF_ENABLED'] = False`
-- Fixtures em `tests/conftest.py`: `client_logado_{solicitante,supervisor,admin}`
+- Fixtures em `tests/conftest.py`: `client_logado_{solicitante,supervisor,admin,admin_global,gestor}`
 - **Regra TDD:** nenhum código de produção sem teste falhando primeiro
 
 ### Nomenclatura
@@ -95,7 +97,7 @@ app/
 ├── models_usuario.py        # Classe Usuario (UserMixin), to_dict/from_dict
 ├── models_categorias.py     # Modelo de categorias
 ├── models_historico.py      # Histórico de alterações dos chamados
-├── database.py              # Instância Firestore
+├── database.py              # LEGADO: instância Firestore, zero import ativo (rede de segurança até ~2026-09-03)
 ├── decoradores.py           # @requer_* decoradores
 ├── i18n.py                  # Internacionalização (PT-BR, EN, ES)
 ├── routes/
@@ -141,10 +143,10 @@ tests/
 ## Skills padrão deste projeto
 Base gerada por `/aas` (bootstrap) em 2026-07-21, revisada em 2026-07-22 — ponto de partida pra qualquer `/aas <tema>` futuro.
 
-- **Segurança** (obrigatória): `backend-security-coder`, `auth-implementation-patterns`, `secrets-management`, `privacy-by-design`, `sast-configuration` — auth combina Flask-Login + MFA (pyotp) + SSO Microsoft (msal); PII criptografado em repouso (LGPD); múltiplos segredos (Firebase, R2, MSAL, chave Fernet)
-- **Dados/storage**: `nosql-expert` — Firestore é NoSQL, não relacional
+- **Segurança** (obrigatória): `backend-security-coder`, `auth-implementation-patterns`, `secrets-management`, `privacy-by-design`, `sast-configuration` — auth combina Flask-Login + MFA (pyotp) + SSO Microsoft (msal, hoje inerte); PII criptografado em repouso (LGPD); múltiplos segredos (Postgres, R2, MSAL, chave Fernet, `firebase_admin` legado)
+- **Dados/storage**: ⚠️ **`nosql-expert` desatualizado** — banco migrou de Firestore (NoSQL) pra PostgreSQL (relacional) no Marco 12 (2026-08-04). Revisitar pra `sql-pro`/`postgres-best-practices`/`database-architect` na próxima rodada de `/aas`.
 - **Testes/qualidade**: `pytest-skill`, `test-driven-development`, `playwright-skill`, `k6-load-testing` — TDD é regra explícita deste arquivo; `pytest-playwright` real em `requirements-dev.txt` com suíte em `tests/e2e/` (CI `e2e.yml` bloqueia merge); `scripts/qa/k6/{smoke,load,stress}.js` + workflow semanal `k6-smoke.yml` contra produção
 - **UX/Acessibilidade**: `tailwind-patterns`, `ui-a11y` — design system real é Tailwind; acessibilidade já auditada (WCAG 2.1 AA, 2026-07-21)
 - **Internacionalização**: `i18n-localization` — app já suporta PT-BR/EN/ES de verdade (`app/i18n.py`, `translations.json`); convenção do projeto exige traduzir todo texto novo nos 3 idiomas ao implementar qualquer feature
-- **Deploy/operações**: `docker-expert`, `github-actions-templates` — produção roda em Azure Container Apps, mas o deploy real é via GitHub Actions (`cd-build-image.yml`: build→push GHCR→`az containerapp update` com digest), não a CLI `azd`; `azd-deployment` removido por não corresponder ao fluxo real
+- **Deploy/operações**: `docker-expert`, `github-actions-templates` — produção roda no **servidor físico on-premise** (Azure Container Apps desligado 2026-07-31); GitHub Actions (`cd-build-image.yml`) builda e publica no GHCR, mas a aplicação da imagem nova é **manual** via `scripts/watchtower_trigger.sh` rodado no servidor (Watchtower, sem polling) — não há `az containerapp update` nem CLI `azd` envolvidos hoje
 - **Manutenção**: `git-pushing`, `lint-and-validate` — já é o fluxo real (`smart_commit.sh` no ciclo de qualidade acima)

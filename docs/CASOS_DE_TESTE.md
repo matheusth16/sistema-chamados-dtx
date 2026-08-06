@@ -252,7 +252,7 @@
 | **ID** | CT-STAT-01 |
 | **Tipo** | I |
 | **Objetivo** | POST `/api/atualizar-status` com payload válido e chamado existente retorna 200. |
-| **Pré-condição** | Usuário logado; chamado existe no Firestore (mock). |
+| **Pré-condição** | Usuário logado; chamado existe no banco de teste. |
 | **Passos** | 1. POST `/api/atualizar-status`, JSON `{ chamado_id: '<id_valido>', novo_status: 'Em Atendimento' }`, header CSRF se necessário |
 | **Resultado esperado** | 200; corpo `{ sucesso: true, mensagem: '...', novo_status: 'Em Atendimento' }`. |
 | **Prioridade** | Alta |
@@ -376,7 +376,7 @@
 | **ID** | CT-EDIT-03 |
 | **Tipo** | I |
 | **Objetivo** | Chamado não encontrado retorna 404. |
-| **Pré-condição** | Supervisor logado; mock Firestore retorna documento inexistente. |
+| **Pré-condição** | Supervisor logado; chamado inexistente no banco de teste. |
 | **Passos** | 1. POST `/api/editar-chamado` com chamado_id inexistente |
 | **Resultado esperado** | 404; `{ sucesso: false, erro: 'Chamado não encontrado' }`. |
 | **Prioridade** | Alta |
@@ -875,7 +875,7 @@
 | **Objetivo** | Editar descrição de chamado em atendimento não altera `data_em_atendimento`. |
 | **Pré-condição** | Chamado `Em Atendimento` com `data_em_atendimento` gravado. |
 | **Passos** | 1. `processar_edicao_chamado(..., nova_descricao="X", ...)` |
-| **Resultado esperado** | Payload de update enviado ao Firestore não contém `data_em_atendimento`. |
+| **Resultado esperado** | UPDATE enviado ao PostgreSQL não contém `data_em_atendimento`. |
 | **Prioridade** | Alta |
 
 ---
@@ -979,7 +979,7 @@
 |-------|-----------|
 | **ID** | CT-REQ-06 |
 | **Tipo** | U/I |
-| **Objetivo** | `adicionar_anexo_tardio` salva anexo no Firestore e dispara `_notificar_anexo_tardio`. |
+| **Objetivo** | `adicionar_anexo_tardio` salva anexo no PostgreSQL e dispara `_notificar_anexo_tardio`. |
 | **Pré-condição** | Chamado `Em Atendimento` com o solicitante como dono. |
 | **Passos** | 1. `adicionar_anexo_tardio(chamado_id, "path/f.pdf", "Motivo suficiente", usuario)` com `_notificar_anexo_tardio` mockado |
 | **Resultado esperado** | `{"sucesso": true}`; `_notificar_anexo_tardio.assert_called_once()`. |
@@ -1024,7 +1024,7 @@
 |-------|-----------|
 | **ID** | CT-REQ-09 |
 | **Tipo** | U |
-| **Objetivo** | `cancelar_chamado_solicitante` inclui `data_cancelamento: SERVER_TIMESTAMP` no payload Firestore. |
+| **Objetivo** | `cancelar_chamado_solicitante` grava `data_cancelamento` (server-side default `now()`) no PostgreSQL. |
 | **Pré-condição** | Chamado `Aberto`, dono como solicitante. |
 | **Passos** | 1. `cancelar_chamado_solicitante(chamado_id, "Motivo suficiente", usuario)` |
 | **Resultado esperado** | `db.collection.update` chamado com `"data_cancelamento"` no payload. |

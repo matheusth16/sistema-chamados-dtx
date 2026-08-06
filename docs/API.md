@@ -96,7 +96,7 @@ Requisições não autenticadas recebem **302 → `/login`** (não JSON).
 Verifica disponibilidade da aplicação. Não exige autenticação.
 
 **Modo raso (padrão):** resposta imediata sem I/O — usado pelo healthcheck da plataforma de deploy.
-**Modo deep (`?deep=1`):** verifica Firestore e cache — usado por UptimeRobot/BetterUptime.
+**Modo deep (`?deep=1`):** verifica PostgreSQL e cache — usado por UptimeRobot/BetterUptime.
 
 **Query params:**
 
@@ -114,7 +114,7 @@ Verifica disponibilidade da aplicação. Não exige autenticação.
 {
   "status": "ok",
   "checks": {
-    "firestore": "ok",
+    "postgres": "ok",
     "cache": "ok"
   },
   "duration_ms": 42.3,
@@ -122,12 +122,12 @@ Verifica disponibilidade da aplicação. Não exige autenticação.
 }
 ```
 
-**Resposta 503 — modo deep (Firestore indisponível):**
+**Resposta 503 — modo deep (PostgreSQL indisponível):**
 ```json
 {
   "status": "degraded",
   "checks": {
-    "firestore": "error:ConnectionError",
+    "postgres": "error:ConnectionError",
     "cache": "ok"
   },
   "duration_ms": 2041.0,
@@ -151,7 +151,7 @@ Gera URL pré-assinada (1 hora) para download de anexo privado no Cloudflare R2.
 
 | Parâmetro | Obrigatório | Descrição |
 |-----------|-------------|-----------|
-| `chamado_id` | Sim | ID do chamado no Firestore |
+| `chamado_id` | Sim | ID do chamado no PostgreSQL |
 | `chave` | Sim | Chave R2 do anexo (formato `r2:<caminho>`) |
 
 **Resposta:**
@@ -192,7 +192,7 @@ X-Requested-With: XMLHttpRequest
 
 | Campo | Tipo | Obrigatório | Valores |
 |-------|------|-------------|---------|
-| `chamado_id` | string | Sim | ID Firestore |
+| `chamado_id` | string | Sim | ID do chamado |
 | `novo_status` | string | Sim | `Aberto`, `Em Atendimento`, `Concluído`, `Cancelado` |
 | `motivo_cancelamento` | string | Sim se `Cancelado` | Texto livre |
 | `motivo_reabertura` | string | Sim se `Aberto` e chamado estava `Concluído` | Mínimo 3 caracteres, máx. 500 |
@@ -265,7 +265,7 @@ Apenas **supervisor** ou **admin**. Supervisor só pode editar chamados da próp
 
 | Campo | Obrigatório | Descrição |
 |-------|-------------|-----------|
-| `chamado_id` | Sim | ID Firestore do chamado |
+| `chamado_id` | Sim | ID do chamado |
 | `novo_status` | Não | `Aberto`, `Em Atendimento`, `Concluído`, `Cancelado` |
 | `motivo_cancelamento` | Não | Obrigatório quando `novo_status=Cancelado` |
 | `nova_descricao` | Não | Substitui a descrição atual |
@@ -345,7 +345,7 @@ Controle de acesso: solicitante vê apenas o próprio chamado; supervisor vê da
 
 **Auth:** Sim
 
-**URL params:** `chamado_id` — ID Firestore do chamado.
+**URL params:** `chamado_id` — ID do chamado.
 
 **Resposta 200:**
 ```json
@@ -648,7 +648,7 @@ await fetch('/api/push-subscribe', {
 ## Onboarding
 
 As três rotas abaixo controlam o tour de boas-vindas exibido a novos usuários.
-O estado é persistido por usuário no Firestore (`onboarding_passo`, `onboarding_perfis_vistos`).
+O estado é persistido por usuário no PostgreSQL (`onboarding_passo`, `onboarding_perfis_vistos`).
 
 ### `POST /api/onboarding/avancar`
 
@@ -718,7 +718,7 @@ Lista supervisores disponíveis para uma área. Usado no formulário de abertura
 |-----------|--------|-----------|
 | `area` | `Geral` | Nome do setor (ex.: `Planejamento`, `TI`) |
 
-> O parâmetro `area` passa por resolução interna (`setor_para_area`) antes da busca. O mapa de setores → áreas é lido do Firestore (`config/setor_para_area`) com cache TTL 5 min e fallback estático (F-30 resolvido).
+> O parâmetro `area` passa por resolução interna (`setor_para_area`) antes da busca. O mapa de setores → áreas é lido do PostgreSQL (`ConfigSetorAreaRow`) com cache TTL 5 min e fallback estático (F-30 resolvido).
 
 **Resposta 200:**
 ```json
@@ -965,11 +965,7 @@ Chamados elegíveis fora dessa janela são contabilizados em `pulados_fora_janel
 
 **Reabertura:** `POST /api/chamado/<id>/confirmar-resolucao` com `acao="reabrir"` reseta `escalacao_resposta_nivel = 0`, reiniciando a Escada A do zero (ADR-004).
 
-**Índice Firestore obrigatório** (deploy em produção):
-```json
-{ "status": "ASC", "escalacao_resposta_nivel": "ASC" }
-```
-Ver `docs/INDICES_FIRESTORE.md`.
+**Índice PostgreSQL obrigatório** (colunas `status` + `escalacao_resposta_nivel`, definido via migração Alembic — ver `alembic/versions/`, sem passo de deploy separado):
 
 **Estatísticas retornadas** (logadas via `app.logger.info`):
 ```json
@@ -1034,10 +1030,7 @@ Threshold atingido fora da janela → `pulados_fora_janela++`, reprocessado na p
 
 **Janela útil:** seg–sex 07:00–11:30 e 13:00–16:30 BRT. Fora da janela → `pulados_fora_janela++`.
 
-**Índice Firestore obrigatório:**
-```json
-{ "status": "ASC", "escalacao_resolucao_nivel": "ASC" }
-```
+**Índice PostgreSQL obrigatório** (colunas `status` + `escalacao_resolucao_nivel`, definido via migração Alembic):
 
 **Estatísticas retornadas:**
 ```json

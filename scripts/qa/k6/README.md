@@ -82,6 +82,10 @@ gcloud run services logs read sistema-chamados \
 ```
 
 Sinais de alerta nos logs:
-- `WORKER TIMEOUT` → Firestore query lenta (N+1 no dashboard)
-- `Memory limit exceeded` → Aumentar para 1Gi
-- `Too many connections` → Reduzir `--max-instances`
+- `WORKER TIMEOUT` → query Postgres lenta (N+1 no dashboard, checar índice faltando)
+- `Memory limit exceeded` → aumentar limite de memória do container
+- `Too many connections` → checar pool de conexões do Postgres/SQLAlchemy
+
+> Nota: os comandos `gcloud logging` acima (`--region=southamerica-east1`, filtros Cloud Run) são
+> de uma infra anterior (Cloud Run/GCP) que não é mais usada — produção hoje é servidor físico
+> on-premise. Pra ver logs reais, usar `docker logs sistema_chamados-web-1` (ver `docs/INCIDENT_RUNBOOK.md`).

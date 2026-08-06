@@ -1,13 +1,21 @@
 # Plano de Deployment — Sistema de Chamados DTX
 
-> **Dois caminhos documentados:** (A) container Docker em servidor próprio/on-premise
-> (seção "Passo 1" em diante) ou (B) **Azure Container Apps** — hospedagem gerenciada
-> gratuita (seção abaixo), sem precisar de servidor nem Docker instalado localmente.
-> Banco: Firestore. Anexos: Cloudflare R2 (fallback Firebase Storage). E-mail: Microsoft Graph API.
+> **Atualizado 2026-08-06.** Produção roda hoje em **servidor físico on-premise da DTX**
+> (10.20.0.199:8080, LAN-only), não mais Azure Container Apps (desligado 2026-07-31) — e o banco é
+> **PostgreSQL**, não mais Firestore (migrado no Marco 12, 2026-08-04). O fluxo real de deploy é:
+> GitHub Actions builda e publica a imagem no GHCR a cada push em `main`; a aplicação da imagem
+> nova no servidor é **manual**, via `scripts/watchtower_trigger.sh` rodado no próprio servidor
+> (não há deploy automático). Anexos: disco local (Fase 1) com Cloudflare R2 como storage legado.
+> E-mail: Microsoft Graph API. A seção "Azure Container Apps" abaixo é histórico preservado — não
+> siga esses passos, o recurso está parado.
 
 ---
 
-## Deploy no Azure Container Apps (free tier)
+## SUPERADO — Deploy no Azure Container Apps (free tier, histórico)
+
+> **Este caminho não é mais usado.** Preservado como registro do que já foi montado — o Container
+> App em si continua existindo no Azure, mas **parado** desde 2026-07-31, não recebe mais deploy.
+> Pule pra seção "Deploy real (servidor físico)" abaixo.
 
 Caminho recomendado quando não há servidor próprio disponível. Usa a mesma imagem
 Docker já existente no repo (`Dockerfile`), sem precisar de Docker instalado na
@@ -96,6 +104,42 @@ independentes de onde o container roda.
 
 ---
 
+## Deploy real (servidor físico) — o que roda hoje
+
+Produção é `docker-compose.prod.yml` no servidor físico (10.20.0.199), com 3 serviços:
+`postgres` (16-alpine, volume LVM dedicado), `web` (imagem do GHCR) e `watchtower`
+(fork `nicholas-fedor/watchtower`, API HTTP só em `127.0.0.1:8081`, sem polling).
+
+**Fluxo normal (já configurado, não precisa repetir):**
+1. `git push` em `main` → `.github/workflows/cd-build-image.yml` builda, escaneia com Trivy
+   (não-bloqueante) e publica em `ghcr.io/matheusth16/sistema-chamados-dtx:latest`.
+2. A imagem nova **não é aplicada sozinha**. Alguém precisa rodar no servidor:
+   ```bash
+   ./scripts/watchtower_trigger.sh
+   ```
+   Isso chama a API local do Watchtower, que puxa a imagem nova do GHCR e recria só o
+   container `web` (Postgres e Watchtower não são afetados).
+3. Validar:
+   ```bash
+   docker compose -f docker-compose.prod.yml ps          # web deve estar "healthy"
+   curl http://10.20.0.199:8080/health                    # {"status": "ok"}
+   docker logs -f sistema_chamados-web-1                   # conferir ausência de erros
+   ```
+
+**Primeiro setup do zero num servidor novo** (raro — só se for provisionar outro servidor):
+```bash
+git clone <repo> sistema_chamados && cd sistema_chamados
+# Preencher .env na raiz (copiar de .env.example, ver docs/ENV.md) — DATABASE_URL,
+# SECRET_KEY, HEALTH_SECRET são obrigatórias; credentials.json NÃO é (opcional/legado)
+docker compose -f docker-compose.prod.yml up -d
+# Depois de subir: alembic upgrade head (dentro do container web ou via exec)
+```
+
+Gunicorn: **1 worker, 8 threads (gthread)**, sem Nginx/proxy na frente — a porta do
+container é publicada direto (`8080:8080`).
+
+---
+
 ## Checklist pré-deploy (obrigatório)
 
 Executar antes de cada `docker compose up`:
@@ -140,46 +184,46 @@ Execute apenas se fazendo upgrade de uma versão que não tinha estas variáveis
 ## Pré-requisitos no servidor
 
 - Docker Engine + plugin `docker compose` instalados
-- Arquivo `credentials.json` (conta de serviço Firebase) na raiz do projeto
-- Arquivo `.env` preenchido (copie de `.env.example` — ver `docs/ENV.md`)
-- Porta de publicação livre no host (por padrão `5000`)
+- Arquivo `.env` preenchido (copie de `.env.example` — ver `docs/ENV.md`); `credentials.json`
+  é **opcional** (só alimenta a rede de segurança de rollback em `app/database.py`, não é
+  necessário pra rodar)
+- Porta de publicação livre no host (produção usa `8080`)
 
 ---
 
-## Passo 1 — Obter o código no servidor
+## Passo 1 — Obter o código no servidor (só no primeiro setup)
 
 ```bash
 git clone <repo> sistema_chamados
 cd sistema_chamados
-git checkout main   # ou a tag/release desejada
+git checkout main
 ```
 
-Coloque `credentials.json` e `.env` na raiz (não são versionados).
+No dia a dia isso não é repetido — a imagem já vem pronta do GHCR (ver "Deploy real" acima).
 
 ---
 
-## Passo 2 — Build e subida do container
+## Passo 2 — Subida do container
 
 ```bash
-docker compose up -d --build
+docker compose -f docker-compose.prod.yml up -d
 ```
 
-O `Dockerfile` é multi-stage:
-1. **css-builder** (Node 20) — gera o Tailwind purgado (`tailwind.min.css`)
-2. **builder** (Python 3.14) — instala dependências
-3. **runtime** (Python 3.14-slim) — imagem final, usuário não-root, gunicorn
+A imagem já vem **pré-buildada** do GHCR (`ghcr.io/matheusth16/sistema-chamados-dtx:latest`) —
+não builda localmente em produção. O `Dockerfile` multi-stage (`css-builder` Node 20 →
+`builder` Python 3.14 → `runtime` Python 3.14-slim, usuário não-root) só roda no GitHub Actions.
 
 O `start.sh` sobe o gunicorn: **1 worker / 8 threads** (`gthread`), bind `0.0.0.0:8080`,
-timeout 120s. O compose mapeia `5000:8080` por padrão.
+timeout 120s, sem Nginx/proxy na frente. `docker-compose.prod.yml` publica `8080:8080`.
 
 ---
 
 ## Passo 3 — Validar a subida
 
 ```bash
-docker compose ps                       # container deve estar "healthy"
-curl http://localhost:5000/health       # deve retornar 200
-docker compose logs --tail=50 web       # conferir ausência de erros
+docker compose -f docker-compose.prod.yml ps    # container deve estar "healthy"
+curl http://10.20.0.199:8080/health              # deve retornar 200
+docker logs --tail=50 sistema_chamados-web-1     # conferir ausência de erros
 ```
 
 Checklist funcional:
@@ -231,6 +275,10 @@ Ver: `docs/adr/002-protecao-ambientes-staging.md`, `docs/ENV.md § Proteção de
 
 ### Segurança pós-deploy (CWI 2.1)
 
+> Os 3 itens abaixo (redirect HTTPS, cookie Secure, HSTS) **não se aplicam ao servidor físico
+> atual** — roda LAN-only, HTTP puro, `REQUIRE_HTTPS=false` por decisão documentada. Não é achado
+> novo, é o ambiente real. Só valem de verdade se/quando o servidor ganhar HTTPS.
+
 - [ ] **HTTP redireciona para HTTPS:** `curl -I http://<host>/login` → `HTTP/1.1 301 MOVED PERMANENTLY` + `Location: https://...`
 - [ ] **`/health` shallow responde 200 sem expor estado interno:** `curl http://<host>/health` → `{"status": "ok"}` (sem token não expõe deep)
 - [ ] **`/health?deep=1` autenticado via header (não query):** `curl -H "X-Health-Token: $HEALTH_SECRET" "https://<host>/health?deep=1"` → `{"status": "ok"}`
@@ -241,18 +289,24 @@ Ver: `docs/adr/002-protecao-ambientes-staging.md`, `docs/ENV.md § Proteção de
 ### Playbook QA pós-deploy — Matriz CWI (11 sub-itens)
 
 > Referência completa em `docs/CHECKLIST_SEGURANCA.md §20`. Use este checklist copy-paste após cada deploy em produção ou HML.
-> **Manual ops** = requer acesso de rede externo / inspeção de Firestore. **HML** = validável no ambiente HML antes de prod.
+> **Manual ops** = requer acesso de rede externo / inspeção do banco. **HML** = validável no ambiente HML antes de prod.
+
+> **⚠️ CWI 2.1 não se aplica à produção atual como escrito.** O servidor físico roda LAN-only,
+> **sem HTTPS** (`REQUIRE_HTTPS=false` no `.env` de produção — decisão documentada, ver
+> [[project_migracao_servidor_local]]). Rodar o comando abaixo contra a produção real hoje
+> **não** vai retornar `301 https://` — isso é esperado, não é achado de segurança novo. O check
+> só se aplica de verdade se/quando o servidor ganhar HTTPS.
 
 | Item | Tipo | Comando / procedimento | Esperado |
 |---|---|---|---|
 | **CWI 1.1** — Acesso anônimo | Automático | `curl -I https://<host>/meus-chamados` | `302 /login` |
 | **CWI 1.2** — Permissão por perfil | Automático | Login como solicitante → `/admin-categorias` | `302` ou `403` |
 | **CWI 1.3** — IDOR | Automático | `GET /api/chamado/<id_alheio>` autenticado | `403` |
-| **CWI 2.1** — HTTPS | Manual ops | `curl -I http://<prod-host>/login` | `301 https://` |
-| **CWI 2.2** — Senha hash | Manual ops | Firestore → `usuarios` → `senha_hash` | Prefixo `scrypt:` ou `pbkdf2:` |
+| **CWI 2.1** — HTTPS | Manual ops | `curl -I http://<prod-host>/login` | `301 https://` (N/A no servidor físico atual — LAN-only sem HTTPS) |
+| **CWI 2.2** — Senha hash | Manual ops | Postgres → `SELECT senha_hash FROM usuarios LIMIT 1` | Prefixo `scrypt:` ou `pbkdf2:` |
 | **CWI 2.3** — PII | Automático + parcial | `GET /api/chamado/<id>` → sem `senha_hash` na resposta | Sem campos internos |
 | **CWI 3.1** — Injection | Automático | `?search=%27+OR+1%3D1--` | Chamados da área; sem 500 |
-| **CWI 3.2** — Erros genéricos | Automático | Payload inválido → JSON de erro | Sem traceback / "Firestore" |
+| **CWI 3.2** — Erros genéricos | Automático | Payload inválido → JSON de erro | Sem traceback / detalhe interno |
 | **CWI 4.1** — Staging não público | HML + manual ops | (ver seção abaixo) | Bloqueado fora VPN |
 | **CWI 4.2** — Swagger | Automático | `curl -I https://<host>/swagger` | `404` |
 
@@ -284,40 +338,36 @@ curl -I http://<hml-host>/health
 
 ## Passo 4 — Anexos (Cloudflare R2 / Firebase Storage)
 
-O sistema grava anexos no **Cloudflare R2** (bucket privado, URLs pré-assinadas) e,
-em caso de indisponibilidade, cai no **Firebase Storage**. Configure no `.env`:
+O sistema grava anexos novos em **disco local** (Fase 1, volume dedicado no servidor) quando
+`ANEXO_STORAGE_BACKEND=local`; sem esse backend explícito, cai em **Cloudflare R2**
+(bucket privado, URLs pré-assinadas). O fallback intermediário via Firebase Storage foi
+removido do código (confirmado por auditoria de logs: nunca disparava). Configure no `.env`:
 
-- `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_PUBLIC_URL`
-- `FIREBASE_STORAGE_BUCKET` (fallback)
+- `ANEXO_STORAGE_BACKEND=local` + `ANEXO_LOCAL_DIR` (destino principal em produção)
+- `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_PUBLIC_URL` (storage legado, só leitura de anexos antigos)
 
-Limite de tamanho controlado por `MAX_CONTENT_LENGTH` (~10 MB). Sem credenciais
-válidas, uploads em produção falham — valide com um anexo de teste após o deploy.
+Limite de tamanho controlado por `MAX_CONTENT_LENGTH` (~10 MB). Anexos locais precisam de
+backup próprio (rsync/cron pro disco secundário) — diferente do R2, que tinha durabilidade
+delegada ao provedor.
 
 ---
 
-## Passo 5 — Índices Firestore
+## Passo 5 — Índices PostgreSQL
 
-Se alterar `firestore.indexes.json`, aplique os índices compostos e single-field:
-
-```bash
-firebase deploy --only firestore:indexes
-```
-
-(Requer Firebase CLI autenticado no projeto Firebase usado como banco.)
-
-### Regras de segurança (Firestore + Storage)
-
-`firestore.rules` e `storage.rules` só valem no projeto Firebase real depois de
-deployadas — editar o arquivo local não muda nada em produção até rodar:
+Índices são definidos via migração Alembic, não deploy separado:
 
 ```bash
-firebase deploy --only firestore:rules,storage
+alembic revision --autogenerate -m "add index X"   # gera a migração
+alembic upgrade head                                 # aplica
 ```
 
-Ambas as regras são deny-all por padrão (`allow read, write: if false`) — o
-acesso real é sempre via Firebase Admin SDK no backend, que ignora essas
-regras. Elas existem só como defesa em profundidade contra acesso direto
-indevido (cliente/browser) caso algo seja mal configurado no futuro.
+### Acesso direto ao banco
+
+Não existe mais cliente JS/mobile com acesso direto ao Postgres — todo acesso passa pelo
+backend Flask/SQLAlchemy por construção (sem exposição de porta externa do Postgres:
+`docker-compose.prod.yml` publica `127.0.0.1:5432`, só acessível de dentro do próprio
+servidor). Não há regra de segurança "deny-all" separada pra manter (era `firestore.rules`,
+já removido do repositório — histórico em `docs/ARQUITETURA.md` ADR-07).
 
 ---
 
@@ -334,13 +384,13 @@ indevido (cliente/browser) caso algo seja mal configurado no futuro.
   python scripts/gerar_chave_criptografia.py
   # Saída: ENCRYPTION_KEY=<string base64url 44 chars>
   ```
-- [ ] **2. Backup dos dados** — exportar coleção `usuarios` no Firebase Console antes de qualquer migração.
-- [ ] **3. Criar índice Firestore** — obrigatório antes do `--apply`:
+- [ ] **2. Backup dos dados** — `pg_dump` da tabela `usuarios` antes de qualquer migração:
   ```bash
-  firebase deploy --only firestore:indexes
-  # Cria o fieldOverride: usuarios / email_lookup_hash (ASC)
-  # Ou manualmente: Firebase Console > Firestore > Indexes > Single field
+  docker exec sistema_chamados-postgres-1 pg_dump -U <user> -d <db> -t usuarios > backup_usuarios.sql
   ```
+- [ ] **3. Índice em `email_lookup_hash`** — já faz parte do schema desde a migração
+  `alembic/versions/552599f9b52c_usuarios.py` (índice único na coluna). Não precisa criar nada
+  separado — só confirmar que `alembic upgrade head` já rodou nesse ambiente.
 - [ ] **4. Adicionar ao `.env` do servidor** (com `ENCRYPT_PII_AT_REST=false` ainda):
   ```
   ENCRYPTION_KEY=<chave_gerada>
@@ -355,16 +405,16 @@ indevido (cliente/browser) caso algo seja mal configurado no futuro.
   ENCRYPT_PII_AT_REST=true ENCRYPTION_KEY=<chave> python scripts/migrations/migrar_pii_criptografia.py --apply
   ```
 - [ ] **7. Smoke test** — tentar login com um usuário migrado. Se falhar, verificar se `ENCRYPTION_KEY` do `--apply` é igual à configurada no servidor.
-- [ ] **8. Ativar flag e reiniciar** — somente após 100% dos docs migrados:
+- [ ] **8. Ativar flag e reiniciar** — somente após 100% das linhas migradas:
   ```bash
   # No .env do servidor:
   ENCRYPT_PII_AT_REST=true
-  # Reiniciar: docker compose up -d --build
+  # Aplicar: ./scripts/watchtower_trigger.sh (recria só o container web)
   ```
 
 ### Rollback
 
-Se algo der errado após `--apply` mas antes de ativar `ENCRYPT_PII_AT_REST=true`: a app continua funcionando (dual-read — docs criptografados são ignorados no login enquanto encryption OFF). Para reverter a migração: restaurar backup da coleção `usuarios`.
+Se algo der errado após `--apply` mas antes de ativar `ENCRYPT_PII_AT_REST=true`: a app continua funcionando (dual-read — linhas criptografadas são ignoradas no login enquanto encryption OFF). Para reverter a migração: restaurar o backup da tabela `usuarios` (`psql < backup_usuarios.sql`).
 
 Se o flag já estava `true` e a app não sobe (ENCRYPTION_KEY inválida/ausente): corrigir `ENCRYPTION_KEY` no `.env` e reiniciar.
 
@@ -372,75 +422,71 @@ Se o flag já estava `true` e a app não sobe (ENCRYPTION_KEY inválida/ausente)
 
 ## Passo 6 — Mapeamento setor → área (F-30)
 
-Necessário apenas no **primeiro deploy após a Onda C wave 3**. Semeia o documento
-`config/setor_para_area` no Firestore para que `utils_areas.setor_para_area()` use o
-Firestore como fonte de verdade. Sem o documento, a app usa o fallback estático (comportamento legado) — sem risco de indisponibilidade.
+Já feito de uma vez só durante o corte pra Postgres (Marco 12) — não é mais um passo de deploy
+recorrente. `utils_areas.setor_para_area()` lê da tabela `config_setor_area` (coluna `mapa`) como
+fonte de verdade; sem a linha, a app usa o fallback estático (comportamento legado, sem risco de
+indisponibilidade).
 
-```bash
-# Dry-run (seguro — só exibe o payload, não grava nada)
-python scripts/migrations/migrar_setor_area.py
+> **⚠️ Achado 2026-08-06 — `scripts/migrations/migrar_setor_area.py` está obsoleto/quebrado.**
+> Esse script ainda grava em `config/setor_para_area` no **Firestore** (`from app.database import
+> db`), mas `app/utils_areas.py` já lê exclusivamente de Postgres (`ConfigSetorAreaRow`) desde o
+> Marco 12 — rodar esse script hoje não tem efeito nenhum na app real. **Não precisa rodar este
+> passo** em deploys novos: a linha `config_setor_area` já foi semeada de uma vez só durante o
+> corte pra Postgres (`scripts/migrate_firestore_to_postgres.py::_load_config_setor_area`). Se
+> precisar editar o mapa setor→área hoje, é direto na tabela Postgres — não existe script
+> dedicado ainda (candidato a criar um `scripts/migrations/atualizar_setor_area_postgres.py`,
+> mas não existe até este achado ser tratado). Script antigo marcado como candidato à remoção.
 
-# Gravar config/setor_para_area no Firestore (executar uma vez após o deploy)
-python scripts/migrations/migrar_setor_area.py --apply
-```
+**Após editar o mapa diretamente no Postgres**: aguardar TTL 5 min ou chamar
+`invalidar_cache_setor_area()` por processo para flush imediato.
 
-**Ordem recomendada:** pode rodar antes ou depois do `docker compose up`; o fallback estático cobre os primeiros requests se o documento ainda não existir.
-
-**Após editar o mapa diretamente no Firestore** (via console ou script): aguardar TTL 5 min ou chamar `invalidar_cache_setor_area()` por processo para flush imediato.
-
-> Referências: `docs/plans/adr-f30-setor-para-area.md`, `scripts/README.md → migrar_setor_area.py`
+> Referências: `docs/plans/adr-f30-setor-para-area.md`
 
 ---
 
-> **Nota — Job F-31 (contadores_uso):** na primeira execução do job de domingo 02h00 BRT, a
-> query `where("data", "<", corte_str)` pode exigir um índice composto Firestore no campo `data`.
-> Se aparecer erro `FAILED_PRECONDITION` nos logs, crie o índice via console Firebase ou adicione
-> em `firestore.indexes.json` e execute `firebase deploy --only firestore:indexes`.
+> **Nota — Job F-31 (contadores_uso):** a query de limpeza (`data < corte`) roda sobre a tabela
+> `contadores_uso` no PostgreSQL. Um índice na coluna `data` é definido via migração Alembic — se
+> a query ficar lenta em volume alto, adicionar `op.create_index(...)` numa migração nova (ver
+> Passo 5 acima), não há mais índice "composto Firestore" a se preocupar.
 
 ---
 
 ## Atualização / Redeploy
 
 ```bash
-git pull
-docker compose up -d --build
+# No servidor:
+./scripts/watchtower_trigger.sh
 ```
 
-O `restart: unless-stopped` garante que o container volte após reinício do host.
+Isso puxa a imagem `:latest` mais recente do GHCR e recria só o container `web`
+(`restart: unless-stopped` garante que ele volte sozinho após reinício do host). Não faz
+`git pull`/build no servidor — a imagem já vem pronta do GitHub Actions.
 
 ---
 
 ## Rollback
 
-```bash
-docker compose down
-git checkout <tag-ou-commit-estável>
-docker compose up -d --build
-```
+**Aplicação (voltar pra imagem anterior):** retag manual da imagem anterior no GHCR como
+`:latest` (ou `git revert` + push, que gera uma imagem nova revertida) + rodar
+`./scripts/watchtower_trigger.sh` de novo.
+
+**Banco (schema):** `alembic downgrade -1` (ou pra uma revisão específica). **Cuidado**: já se
+observou em rehearsal que `alembic downgrade base` pode reportar sucesso no log sem de fato
+limpar todos os dados — validar com `TRUNCATE` direto ou inspeção manual da tabela, não confiar
+só no exit code do Alembic.
 
 ---
 
 ## Monitoramento
 
 ```bash
-docker compose logs -f web      # logs em tempo real (stdout/stderr do gunicorn)
-docker stats --no-stream        # uso de CPU/memória
-curl http://localhost:5000/health
+docker logs -f sistema_chamados-web-1        # logs em tempo real (stdout/stderr do gunicorn)
+docker stats --no-stream                      # uso de CPU/memória
+curl http://10.20.0.199:8080/health
 ```
 
----
-
-## Acompanhamento de cota Firebase
-
-Para não estourar a cota do Firebase, o sistema já usa:
-
-- **Rate limits** em produção (200/hora, 2000/dia por cliente; exportações 3/hora).
-- **Cache** do relatório completo (5 min).
-- **Paginação por cursor** + **contagem por agregação (count)** para totais.
-- **Limite** nas queries de analytics (`MAX_CHAMADOS_ANALYTICS`).
-
-Acompanhe o uso em **Firebase Console → Firestore/Storage → Usage**. Mantenha rate
-limits e cache ativos em produção.
+Painéis adicionais no servidor: **Portainer** (`:9443`, gestão de containers) e **Netdata**
+(`:19999`, métricas de sistema) — ambos restritos à LAN.
 
 ---
 
@@ -448,7 +494,7 @@ limits e cache ativos em produção.
 
 | Sintoma | Ação |
 |---|---|
-| Falha no stage `css-builder` | Conferir `package.json`/`npm run build:css` localmente |
-| Falha no `pip install` | Conferir `requirements.txt` e conectividade do host |
-| Container sobe e morre | `docker compose logs web` — geralmente `.env`/`credentials.json` ausentes |
-| Health check falha | Verificar se a porta 8080 interna responde `/health` |
+| Falha no stage `css-builder` (no GitHub Actions) | Conferir `package.json`/`npm run build:css` localmente |
+| Falha no `pip install` (no GitHub Actions) | Conferir `requirements.txt` |
+| Container sobe e morre no servidor | `docker logs sistema_chamados-web-1` — geralmente `.env` incompleto (`DATABASE_URL`/`SECRET_KEY`/`HEALTH_SECRET` ausentes) |
+| Health check falha | Verificar se a porta 8080 interna responde `/health`; conferir se `sistema_chamados-postgres-1` está `healthy` |

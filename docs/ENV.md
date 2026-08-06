@@ -14,7 +14,7 @@ Copie `.env.example` para `.env` e preencha conforme o ambiente (desenvolvimento
 | `FLASK_ENV` | Ambiente da aplicação. | `production` ativa validações abaixo. | `production` |
 | `SECRET_KEY` | Chave secreta do Flask (sessões, CSRF, cookies). | Obrigatória, não pode ser o valor padrão de dev. | `openssl rand -hex 32` |
 | `APP_BASE_URL` | URL pública da aplicação. Usada em e-mails, push e validação Origin/Referer. | Obrigatória; **deve** começar com `https://`. | `https://chamados.dtx.aero` |
-| `HEALTH_SECRET` | Token para proteger `/health?deep=1` (expõe status Firestore/Redis). Canal primário: header `X-Health-Token` (não exposto em logs). Canal deprecado: `?token=` (compat legado). | Obrigatório; mínimo **16 caracteres**. | `python -c "import secrets; print(secrets.token_urlsafe(32))"` |
+| `HEALTH_SECRET` | Token para proteger `/health?deep=1` (expõe status Postgres/Redis). Canal primário: header `X-Health-Token` (não exposto em logs). Canal deprecado: `?token=` (compat legado). | Obrigatório; mínimo **16 caracteres**. | `python -c "import secrets; print(secrets.token_urlsafe(32))"` |
 
 **Gerar valores:**
 ```bash
@@ -130,7 +130,7 @@ Se ambas estiverem vazias, a inscrição/Web Push fica desabilitada.
 
 ## Criptografia de PII em repouso (LGPD — Onda 4 / CWI 2.3)
 
-> **Implementado.** Criptografia Fernet dos campos `nome` e `email` no Firestore. Default `ENCRYPT_PII_AT_REST=false` — zero breaking change até ops ativar.
+> **Implementado.** Criptografia Fernet dos campos `nome` e `email` no PostgreSQL. Default `ENCRYPT_PII_AT_REST=false` — zero breaking change até ops ativar.
 > ADR: [`docs/adr/001-criptografia-pii-fernet.md`](adr/001-criptografia-pii-fernet.md)
 
 | Variável               | Descrição | Padrão | Exemplo |
@@ -142,16 +142,16 @@ Se ambas estiverem vazias, a inscrição/Web Push fica desabilitada.
 
 > **Ordem crítica:** migração 100% ANTES de definir `ENCRYPT_PII_AT_REST=true`.
 > Usuários sem `email_lookup_hash` não conseguem logar com flag ativo.
-> O índice `email_lookup_hash` já está em `firestore.indexes.json` (`fieldOverrides`).
+> O índice único em `email_lookup_hash` já faz parte do schema Postgres desde a migração
+> `alembic/versions/552599f9b52c_usuarios.py` — não precisa criar nada separado.
 
 ```bash
 # 1. Gerar chave
 python scripts/gerar_chave_criptografia.py
 # Copiar ENCRYPTION_KEY para o .env (manter ENCRYPT_PII_AT_REST=false por ora)
 
-# 2. Criar índice Firestore (OBRIGATÓRIO antes de --apply)
-firebase deploy --only firestore:indexes
-#    OU Firebase Console > Firestore > Indexes > Single-field: usuarios / email_lookup_hash (ASC)
+# 2. Confirmar que a migração Alembic já rodou (índice email_lookup_hash já existe)
+alembic current
 
 # 3. Dry-run (sem alterar dados)
 ENCRYPTION_KEY=<chave> python scripts/migrations/migrar_pii_criptografia.py
@@ -161,8 +161,8 @@ ENCRYPT_PII_AT_REST=true ENCRYPTION_KEY=<chave> python scripts/migrations/migrar
 
 # 5. Smoke test: login com usuário migrado
 
-# 6. Somente após 100% migrado: ativar flag e reiniciar
-#    ENCRYPT_PII_AT_REST=true no .env → docker compose up -d --build
+# 6. Somente após 100% migrado: ativar flag e aplicar
+#    ENCRYPT_PII_AT_REST=true no .env → ./scripts/watchtower_trigger.sh
 ```
 
 Ver checklist completo em `docs/DEPLOYMENT_PLAN.md §Criptografia PII`.
@@ -173,7 +173,7 @@ Com `FLASK_ENV=production` + `ENCRYPT_PII_AT_REST=true`: a aplicação **não so
 
 ---
 
-## Armazenamento de Anexos — Cloudflare R2 (alternativo ao Firebase Storage)
+## Armazenamento de Anexos — Cloudflare R2 (storage legado, sem escrita nova)
 
 | Variável | Descrição | Padrão |
 |----------|-----------|--------|
@@ -183,7 +183,10 @@ Com `FLASK_ENV=production` + `ENCRYPT_PII_AT_REST=true`: a aplicação **não so
 | `R2_BUCKET_NAME` | Nome do bucket R2. | (vazio) |
 | `R2_PUBLIC_URL` | URL pública do bucket (se acesso público habilitado). | (vazio) |
 
-Quando o R2 não está configurado ou indisponível, o sistema cai no **Firebase Storage** (ver abaixo).
+O fallback intermediário via Firebase Storage foi **removido do código** (auditoria 2026-08-05,
+confirmado por logs que nunca disparava). Cascata real hoje: disco local (Fase 1, se
+`ANEXO_STORAGE_BACKEND=local`) → R2 → disco local (só em dev, fallback final). `FIREBASE_STORAGE_BUCKET`
+não é mais lido por nada em `app/`.
 
 ---
 
@@ -191,7 +194,7 @@ Quando o R2 não está configurado ou indisponível, o sistema cai no **Firebase
 
 | Variável | Descrição | Padrão |
 |----------|-----------|--------|
-| `ANEXO_STORAGE_BACKEND` | `local` faz uploads **novos** irem para disco local primeiro (R2/Firebase viram fallback só se o disco falhar). Qualquer outro valor mantém a cascata legada (R2 → Firebase). | `r2` |
+| `ANEXO_STORAGE_BACKEND` | `local` faz uploads **novos** irem para disco local primeiro (R2 vira fallback só se o disco falhar). Qualquer outro valor pula direto pro R2 (sem Firebase Storage — removido do código). | `r2` |
 | `ANEXO_LOCAL_DIR` | Diretório de disco onde anexos novos são salvos quando o backend `local` está ativo. Em produção deve ser um bind-mount fora do container (ver `docker-compose.prod.yml`, HD dedicado `/var/anexos_chamados`). | mesmo caminho de `UPLOAD_FOLDER` |
 
 Anexos já existentes no R2/Firebase **não são migrados** — continuam lidos normalmente pelos seus
@@ -291,30 +294,29 @@ Recomenda-se integrar `pip audit` no pipeline de CI e corrigir vulnerabilidades 
 
 ---
 
-## Firebase
+## Firebase (LEGADO — rede de segurança de rollback, não o banco ativo)
 
-O Firebase é inicializado em `app/database.py`:
+**Superado desde o Marco 12 (2026-08-04).** O Firestore foi desligado em produção — PostgreSQL é
+o banco ativo (ver seção abaixo). `app/database.py` (inicializador Firebase) continua no
+repositório só como rede de segurança de rollback, **sem nenhum import ativo em `app/`** hoje.
+Prazo pra remover de vez: ~2026-09-03 (30 dias do corte).
 
-- **Produção (Azure Container Apps):** variável de ambiente `GOOGLE_CREDENTIALS_JSON` (conteúdo do JSON da conta de serviço), lida primeiro por `app/database.py`.
-- **Desenvolvimento local (docker-compose):** arquivo `credentials.json` na raiz do projeto, montado no container via volume — usado como segunda opção se `GOOGLE_CREDENTIALS_JSON` não estiver definida.
-- **Application Default Credentials (ADC):** suportado como último fallback se nem a env var nem `credentials.json` estiverem presentes e o ambiente fornecer credenciais padrão.
-
-| Variável | Descrição | Obrigatório em produção |
-|----------|-----------|-------------------------|
-| `FIREBASE_STORAGE_BUCKET` | Nome **exato** do bucket do Firebase Storage (Firebase Console > Storage: use o valor do bucket, ex. `projeto.firebasestorage.app` ou `projeto.appspot.com`). Usado para anexos quando o R2 não está configurado. Sem isso, em produção os uploads via Firebase falham. | **Recomendado** (fallback de anexos) |
+- `GOOGLE_CREDENTIALS_JSON`/`credentials.json`: opcionais, só alimentam esse inicializador legado.
+- `FIREBASE_STORAGE_BUCKET`: **não é mais lido por nada em `app/`** — o fallback de upload via
+  Firebase Storage foi removido do código (auditoria 2026-08-05). Pode ser omitido.
+- Azure Container Apps (mencionado em versões antigas deste doc como "produção"): desativado
+  desde 2026-07-31 — produção é o servidor físico on-premise hoje.
 
 ---
 
-## PostgreSQL (Fase 2 — migração gradual do Firestore)
+## PostgreSQL — banco ativo
 
-Banco de dados sendo migrado do Firestore pra PostgreSQL (branch `feature/fase2-postgres`), marco
-a marco (ver plano de migração). Camada de acesso em `app/db/` (SQLAlchemy 2.0 + Alembic),
-inicializada em `create_app()` via `app.db.init_engine(app)` — **no-op** enquanto `DATABASE_URL`
-não estiver configurada (Firestore continua sendo o banco ativo até o corte final do Marco 12).
+Migração do Firestore concluída no Marco 12 (2026-08-04, corte único). Camada de acesso em
+`app/db/` (SQLAlchemy 2.0 + Alembic), inicializada em `create_app()` via `app.db.init_engine(app)`.
 
 | Variável | Descrição | Padrão |
 |----------|-----------|--------|
-| `DATABASE_URL` | String de conexão Postgres em produção (`postgresql://user:senha@host:5432/db`). | (vazio — Postgres inativo) |
+| `DATABASE_URL` | String de conexão Postgres (`postgresql://user:senha@host:5432/db`). **Obrigatória** — a app não sobe sem isso (`init_engine()` fica no-op e todo acesso a dado falha). | (obrigatória, sem default) |
 | `TEST_DATABASE_URL` | String de conexão do Postgres **de teste** (real, não mock) — usada pela suíte pytest e por `alembic upgrade head`/`downgrade base`. No CI, setada automaticamente pelo serviço `postgres:16-alpine` (`.github/workflows/ci.yml`). Em dev local, aponte pra um banco dedicado do projeto — não reutilize um banco de outro projeto na mesma instância. | (vazio) |
 
 Comandos úteis (rodar na raiz do projeto, com `TEST_DATABASE_URL` no ambiente):
@@ -342,15 +344,20 @@ SECRET_KEY=dev-secret-key-change-in-production
 ```env
 FLASK_ENV=production
 SECRET_KEY=<valor de openssl rand -hex 32>
-APP_BASE_URL=https://seu-dominio.com
+DATABASE_URL=postgresql://user:senha@postgres:5432/sistema_chamados
+HEALTH_SECRET=<valor de python -c "import secrets; print(secrets.token_urlsafe(32))">
+APP_BASE_URL=http://10.20.0.199:8080
+# ^ HTTP, não HTTPS — servidor físico LAN-only sem certificado. Se algum dia ganhar
+# domínio/HTTPS, trocar pra https:// e não esquecer REQUIRE_HTTPS (default True).
 
-# Anexos: Cloudflare R2 (preferencial) com fallback Firebase Storage
+# Anexos: disco local (Fase 1, destino principal) com R2 como storage legado
+ANEXO_STORAGE_BACKEND=local
+# ANEXO_LOCAL_DIR=/var/anexos_chamados
 # R2_ACCOUNT_ID=...
 # R2_ACCESS_KEY_ID=...
 # R2_SECRET_ACCESS_KEY=...
 # R2_BUCKET_NAME=...
 # R2_PUBLIC_URL=...
-# FIREBASE_STORAGE_BUCKET=seu-projeto.firebasestorage.app
 
 # Recomendado se escalar para múltiplos workers/containers
 # REDIS_URL=redis://:senha@redis-host:6379/0

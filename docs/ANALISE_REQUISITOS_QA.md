@@ -2,7 +2,7 @@
 
 **Documento:** Análise de Requisitos para QA
 **Projeto:** Sistema de Chamados DTX
-**Stack:** Python/Flask, Firestore, Firebase Auth
+**Stack:** Python/Flask, PostgreSQL, Flask-Login (MFA obrigatório + SSO Microsoft opcional)
 
 ---
 
@@ -10,7 +10,7 @@
 
 O sistema é uma aplicação web de **gerenciamento de chamados** com:
 
-- Autenticação (Firebase/Flask-Login) e perfis: **solicitante**, **supervisor**, **admin**
+- Autenticação (Flask-Login + MFA obrigatório + SSO Microsoft opcional) e perfis: **solicitante**, **supervisor**, **admin**, **admin_global**
 - Criação e listagem de chamados com paginação (cursor-based)
 - Atualização de status (individual e em lote)
 - Edição de chamados (supervisor/admin), anexos, notificações e i18n (PT/EN)
@@ -23,10 +23,10 @@ O sistema é uma aplicação web de **gerenciamento de chamados** com:
 
 | Item | Especificação |
 |------|----------------|
-| Runtime | Python 3.8+ |
-| Framework | Flask |
-| Banco | Firestore (acesso apenas via backend; regras negam acesso direto do cliente) |
-| Autenticação | Flask-Login + usuários em Firestore (`usuarios`), senha com werkzeug hash |
+| Runtime | Python 3.14 |
+| Framework | Flask 3.1 |
+| Banco | PostgreSQL (acesso apenas via backend/SQLAlchemy; sem cliente externo direto) |
+| Autenticação | Flask-Login + usuários no PostgreSQL (tabela `usuarios`), senha com werkzeug hash, MFA obrigatório |
 | CSRF | WTF_CSRF_ENABLED = True (em produção); testes usam WTF_CSRF_ENABLED = False |
 | Upload | Máx. 10 MB por arquivo (`MAX_ANEXO_BYTES`); extensões: png, jpg, jpeg, pdf, Excel (xls/xlsx/...), Word (doc/docx/...), csv |
 | Paginação | Cursor-based; dashboard 50/página, listas 10/página, API até 100 |
@@ -34,7 +34,7 @@ O sistema é uma aplicação web de **gerenciamento de chamados** com:
 
 ### 2.2 Estrutura de Dados
 
-**Chamado (Firestore `chamados`):**
+**Chamado (PostgreSQL, tabela `chamados`):**
 
 - `numero_chamado`, `categoria`, `rl_codigo`, `prioridade`, `tipo_solicitacao`, `gate`, `impacto`
 - `descricao`, `anexo`, `anexos[]`
@@ -43,7 +43,7 @@ O sistema é uma aplicação web de **gerenciamento de chamados** com:
 - `status`: `Aberto` \| `Em Atendimento` \| `Concluído`
 - `data_abertura`, `data_conclusao` (timestamp; Concluído preenche `data_conclusao`)
 
-**Usuário (Firestore `usuarios`):**
+**Usuário (PostgreSQL, tabela `usuarios`):**
 
 - `email`, `nome`, `perfil` (`solicitante` \| `supervisor` \| `admin`), `areas` (lista)
 - `senha_hash` (werkzeug)
@@ -128,7 +128,7 @@ O sistema é uma aplicação web de **gerenciamento de chamados** com:
 ### 3.10 Segurança e Configuração
 
 - Produção exige `SECRET_KEY` forte (diferente do default de dev).
-- Firestore: acesso somente pelo backend; regras `allow read, write: if false` para acesso direto do cliente.
+- PostgreSQL: acesso somente pelo backend/SQLAlchemy; sem cliente externo direto por construção.
 - Headers de segurança: X-Content-Type-Options, X-Frame-Options, HSTS em HTTPS.
 - Validação de Origin/Referer em POST sensíveis quando `APP_BASE_URL` definido.
 
@@ -136,7 +136,7 @@ O sistema é uma aplicação web de **gerenciamento de chamados** com:
 
 ## 4. Requisitos Não Funcionais (Para Testes)
 
-- **Performance:** paginação cursor-based; índices Firestore para filtros (categoria+status+data_abertura, etc.).
+- **Performance:** paginação cursor-based; índices PostgreSQL (via Alembic) para filtros (categoria+status+data_abertura, etc.).
 - **Disponibilidade:** health check em `/health`.
 - **Logs:** ações importantes (login, alteração de status, criação de chamado) registradas.
 - **i18n:** textos em PT/EN; painel de traduções (admin).

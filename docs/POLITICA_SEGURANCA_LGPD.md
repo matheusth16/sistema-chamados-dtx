@@ -14,13 +14,17 @@ Este documento descreve as medidas de segurança e o alinhamento do **Sistema de
 
 ## 2. Dados tratados
 
+> **Atualizado 2026-08-06** — banco migrou do Firestore pro PostgreSQL no Marco 12 (2026-08-04).
+> Todas as referências a "Firestore" abaixo eram válidas até essa data; os dados hoje estão em
+> tabelas PostgreSQL self-hosted no servidor físico da DTX, não mais em serviço de nuvem terceiro.
+
 | Categoria              | Exemplos                    | Onde são armazenados | Finalidade                    |
 |------------------------|----------------------------|----------------------|------------------------------|
-| Dados cadastrais       | Nome, e-mail, perfil, áreas| Firestore (usuarios) | Autenticação e gestão        |
-| Dados de chamados      | Descrição, responsável, anexos | Firestore (chamados) | Atendimento e rastreamento   |
-| Histórico de ações     | Quem alterou, quando, valor anterior/novo | Firestore (historico) | Auditoria e conformidade     |
-| Credenciais            | Hash de senha (nunca senha em texto) | Firestore (usuarios) | Autenticação                 |
-| Inscrições Web Push    | Endpoint e chaves (p256dh, auth) | Firestore (push_subscriptions) | Notificações no navegador   |
+| Dados cadastrais       | Nome, e-mail, perfil, áreas| PostgreSQL (tabela `usuarios`) | Autenticação e gestão        |
+| Dados de chamados      | Descrição, responsável, anexos | PostgreSQL (tabela `chamados`) | Atendimento e rastreamento   |
+| Histórico de ações     | Quem alterou, quando, valor anterior/novo | PostgreSQL (tabela `historico`) | Auditoria e conformidade     |
+| Credenciais            | Hash de senha (nunca senha em texto) | PostgreSQL (tabela `usuarios`) | Autenticação                 |
+| Inscrições Web Push    | Endpoint e chaves (p256dh, auth) | PostgreSQL (tabela `push_subscriptions`) | Notificações no navegador   |
 
 ---
 
@@ -29,10 +33,10 @@ Este documento descreve as medidas de segurança e o alinhamento do **Sistema de
 ### 3.1 Criptografia em repouso
 
 - **Senhas**: Armazenadas apenas como hash (Werkzeug/bcrypt), nunca em texto claro.
-- **Campos de dados pessoais (PII)**: `nome` e `email` dos usuários são armazenados **criptografados com Fernet (AES-128-CBC + HMAC-SHA256)** no Firestore quando `ENCRYPT_PII_AT_REST=true`. Um hash determinístico (`email_lookup_hash = sha256(email)`) permite busca/login sem descriptografar o índice. Formato: `fernet:v1:<token>`.
+- **Campos de dados pessoais (PII)**: `nome` e `email` dos usuários são armazenados **criptografados com Fernet (AES-128-CBC + HMAC-SHA256)** no PostgreSQL quando `ENCRYPT_PII_AT_REST=true`. Um hash determinístico (`email_lookup_hash = sha256(email)`) permite busca/login sem descriptografar o índice. Formato: `fernet:v1:<token>`.
   - Default `ENCRYPT_PII_AT_REST=false`: plaintext (retrocompatível) — ativar via procedimento em `docs/ENV.md`.
   - Implementado na **Onda 4** (2026-06-23). Ver ADR: `docs/adr/001-criptografia-pii-fernet.md`.
-- **Firestore**: Acesso apenas pelo backend (Firebase Admin SDK). Regras do Firestore negam leitura/escrita direta do cliente.
+- **PostgreSQL**: Acesso apenas pelo backend (SQLAlchemy, sem cliente externo direto). Banco self-hosted no servidor físico da DTX, porta interna não exposta à internet.
 
 ### 3.2 Criptografia em trânsito
 
@@ -71,14 +75,14 @@ A organização que opera o sistema deve garantir os direitos previstos na LGPD,
 1. **Desativação** (`POST /admin/usuarios/<id>/desativar`) — reversível. Marca `ativo=False`, bloqueia login e invalida sessão ativa. Os dados pessoais (nome, e-mail) permanecem intactos, permitindo reverter via `/admin/usuarios/<id>/ativar`.
 2. **Anonimização** (`POST /admin/usuarios/<id>/anonimizar`) — **irreversível**, ação separada e deliberada do admin. Só é permitida para contas já desativadas. Sobrescreve `nome` para "Usuário Removido" e `email` para um valor sintético (`removido-<id>@anonimizado.invalid`), preservando o registro do chamado/histórico associado (sem dado pessoal identificável). Toda ação (criação, edição, desativação, ativação, exclusão, anonimização) fica registrada em `historico_usuarios` (`app/services/historico_usuario_service.py`) com admin responsável e timestamp, para auditoria.
 
-Não existe exclusão física imediata de linha no Firestore ao desativar — isso é intencional: a anonimização é o mecanismo de "esquecimento" real, e é acionada manualmente pelo admin quando desejado, não automaticamente ao desativar.
+Não existe exclusão física imediata de linha no PostgreSQL ao desativar — isso é intencional: a anonimização é o mecanismo de "esquecimento" real, e é acionada manualmente pelo admin quando desejado, não automaticamente ao desativar.
 
 ---
 
 ## 5. Retenção e armazenamento
 
 - **Retenção**: Definir política de retenção (ex.: chamados e histórico por X anos; logs por Y meses), documentada internamente.
-- **Armazenamento**: Dados em ambiente cloud (Firebase/Firestore e Storage) sob controle de acesso restrito e configurações de segurança do provedor.
+- **Armazenamento**: Dados em PostgreSQL self-hosted no servidor físico da DTX (rede local, sem exposição à internet); anexos em disco local (mesmo servidor) com Cloudflare R2 como storage legado de anexos antigos — sob controle de acesso restrito.
 - **Backup**: Procedimentos de backup devem seguir a mesma política de segurança e retenção.
 
 ---
@@ -104,7 +108,7 @@ A organização deve indicar um **Encarregado de Dados (DPO)** e divulgar canal 
 
 | Medida                    | Onde está no código / config                              |
 |---------------------------|------------------------------------------------------------|
-| Criptografia Fernet (PII) | **Implementado — Onda 4 (2026-06-23).** `nome` e `email` criptografados em repouso no Firestore quando `ENCRYPT_PII_AT_REST=true`. Ver `app/services/pii_encryption.py`, `app/models_usuario.py`, `scripts/migrations/migrar_pii_criptografia.py` e [`docs/adr/001-criptografia-pii-fernet.md`](adr/001-criptografia-pii-fernet.md). Default `false` (ativação via ops, ver `docs/ENV.md`). |
+| Criptografia Fernet (PII) | **Implementado — Onda 4 (2026-06-23), migrado pro PostgreSQL no Marco 12.** `nome` e `email` criptografados em repouso no PostgreSQL quando `ENCRYPT_PII_AT_REST=true`. Ver `app/services/pii_encryption.py`, `app/models_usuario.py`, `scripts/migrations/migrar_pii_criptografia.py` e [`docs/adr/001-criptografia-pii-fernet.md`](adr/001-criptografia-pii-fernet.md). Default `false` (ativação via ops, ver `docs/ENV.md`). |
 | Hash de senha             | `app/models_usuario.py` (Werkzeug)                         |
 | Cookies e HSTS            | `config.py` (session), `app/__init__.py` (headers)          |
 | CSP e Permissions-Policy  | `app/__init__.py` (headers em produção)                     |
@@ -112,6 +116,6 @@ A organização deve indicar um **Encarregado de Dados (DPO)** e divulgar canal 
 | Rate limit e timeout      | `app/limiter.py`, `app/__init__.py` (timeout sessão)        |
 | Upload (extensão + magic bytes) | `app/services/validators.py`, `app/services/upload.py`; tamanho máx. 10 MB em `config.py` |
 | Mascaramento de PII em logs | `app/utils.py` (mask_email_for_log), `app/routes/auth.py` |
-| Firestore (somente backend) | `firestore.rules`, `app/database.py`                     |
+| PostgreSQL (somente backend) | `app/db/`, sem cliente externo direto ao banco             |
 
-A criptografia Fernet de PII em repouso foi **implementada na Onda 4** (2026-06-23) via `app/services/pii_encryption.py`. O default `ENCRYPT_PII_AT_REST=false` garante zero breaking change; a ativação exige migração prévia dos dados existentes com `scripts/migrations/migrar_pii_criptografia.py` e criação do índice Firestore em `email_lookup_hash`. Ver procedimento completo em `docs/ENV.md` e `docs/DEPLOYMENT_PLAN.md`.
+A criptografia Fernet de PII em repouso foi **implementada na Onda 4** (2026-06-23) via `app/services/pii_encryption.py`. O default `ENCRYPT_PII_AT_REST=false` garante zero breaking change; a ativação exige migração prévia dos dados existentes com `scripts/migrations/migrar_pii_criptografia.py`. O índice único em `email_lookup_hash` já faz parte do schema Postgres (migração `552599f9b52c_usuarios.py`), não precisa criar nada separado. Ver procedimento completo em `docs/ENV.md` e `docs/DEPLOYMENT_PLAN.md`.

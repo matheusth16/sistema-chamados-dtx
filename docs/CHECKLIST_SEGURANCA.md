@@ -853,7 +853,7 @@ curl -I http://hml-host/health
 
 > Esta seção foi adicionada na 3ª rodada de auditoria (2026-06-16) após identificação de achados F-64 a F-70.
 
-> **Nota positiva:** `firestore.rules` está corretamente configurado com `allow read, write: if false` — acesso direto ao banco bloqueado por padrão (deny-all). Manter esse estado.
+> **Nota positiva (atualizada pós-Marco 12):** `firestore.rules` foi removido junto com o banco Firestore (2026-08-04) — não existe mais cliente JS/mobile com acesso direto ao banco por construção; todo acesso ao PostgreSQL passa pelo backend Flask/SQLAlchemy. O deny-all que essa regra garantia hoje é estrutural, não configuração a manter.
 
 ### 15.1 Tokens de design
 

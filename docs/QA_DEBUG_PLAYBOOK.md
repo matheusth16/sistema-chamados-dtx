@@ -13,7 +13,7 @@ Ao ver uma falha, responda a estas perguntas:
 | O teste falha só em CI, passa localmente? | **Timing / Ambiente** |
 | O erro é `PermissionError`, `403`, `401`, `redirect to login`? | **Permissão** |
 | O erro é `KeyError`, `AttributeError` em mock, `assert False`? | **Dados** |
-| O erro é `ConnectionError`, `Timeout`, `firebase_admin` exception? | **Dependência externa** |
+| O erro é `ConnectionError`, `Timeout`, `sqlalchemy.exc.OperationalError`? | **Dependência externa** |
 | O erro é `AssertionError` em resposta de API (status code / JSON)? | **Contrato de API** |
 | O erro é `ImportError` ou `ModuleNotFoundError`? | **Ambiente / Dependências** |
 
@@ -27,7 +27,12 @@ Ao ver uma falha, responda a estas perguntas:
 - `dict.to_dict()` retorna campos diferentes do esperado pelo template
 
 ### Causa raiz mais comum
-O mock não replica a estrutura real do documento Firestore. Um campo foi adicionado ao modelo mas o mock não foi atualizado.
+Os testes de acesso a dado usam PostgreSQL real (`db_session`, fixture com rollback por teste),
+não mock — se um campo foi adicionado ao modelo/tabela e a migração Alembic não rodou no banco de
+teste, ou o fixture de setup não populou o campo novo, o teste falha por dado ausente, não por
+mock desatualizado. Para testes que ainda usam `MagicMock` (rotas, serviços externos como Graph
+API), a causa clássica abaixo continua válida: o mock não replica a estrutura real do
+objeto/`to_dict()`.
 
 ### Checklist de triagem
 
@@ -178,14 +183,17 @@ Para cada nova rota, adicionar **dois** testes: acesso autorizado + acesso negad
 ## 5. Tipo: DEPENDÊNCIA EXTERNA
 
 ### Sintomas
-- `google.api_core.exceptions.GoogleAPIError` / `firebase_admin._auth_utils.UserNotFoundError`
-- `ConnectionRefusedError` no CI para Firestore / SMTP / push notifications
-- Teste passa com credenciais reais mas falha em CI sem Firebase configurado
+- `sqlalchemy.exc.OperationalError` / `psycopg.OperationalError`
+- `ConnectionRefusedError` no CI para Postgres / SMTP / push notifications
+- Teste passa localmente mas falha em CI sem `TEST_DATABASE_URL` configurada
 
 ### Causa raiz mais comum
-- Mock de Firestore no caminho errado (patch no módulo que importa, não no módulo de origem)
-- Código de produção chama `db` diretamente numa rota sem passar pelo service
+- Mock no caminho errado pra serviços externos que ainda usam mock — Graph API, R2 (patch no
+  módulo que importa, não no módulo de origem)
+- Código de produção chama `app.db`/`db_module` diretamente numa rota sem passar pelo service
 - Teste de integração sem `@pytest.mark.e2e` tentando conectar a serviço real
+- `TEST_DATABASE_URL` ausente — testes de Postgres real são pulados (`pytest.skip`), não devem
+  ser tratados como "passando" numa análise de cobertura
 
 ### Checklist de triagem
 

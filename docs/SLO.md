@@ -7,8 +7,9 @@
 
 ## Contexto
 
-Sistema interno da DTX Aerospace utilizado por 3 perfis (solicitante, supervisor, admin).
-Deploy: Docker (instância única, Firestore como banco, Microsoft Graph API para e-mail, R2 para anexos).
+Sistema interno da DTX Aerospace utilizado por perfis solicitante/supervisor/admin/admin_global.
+Deploy: Docker no servidor físico on-premise (instância única), PostgreSQL como banco,
+Microsoft Graph API para e-mail, disco local (Fase 1) + R2 legado para anexos.
 Público-alvo: equipes internas — tolerância a downtime em horário fora-de-expediente é maior.
 
 ---
@@ -54,14 +55,14 @@ Público-alvo: equipes internas — tolerância a downtime em horário fora-de-e
 
 ---
 
-## SLO-04 — Conectividade com Firestore
+## SLO-04 — Conectividade com PostgreSQL
 
 | Métrica | Meta |
 |---------|------|
-| Latência Firestore p95 | < 300 ms |
+| Latência Postgres p95 | < 300 ms |
 | Falhas de conexão | 0 em janela de 1h |
 
-**Medição:** `GET /health?deep=1` — campo `checks.firestore` e `duration_ms`.
+**Medição:** `GET /health?deep=1` — campo `checks.postgres` e `duration_ms`.
 - Configurar monitor separado em UptimeRobot para `/health?deep=1`.
 - Resposta `"status": "degraded"` = alerta imediato.
 
@@ -114,23 +115,23 @@ Exportar stdout/stderr do container para um agregador:
 
 ### App não responde (SLO-01 violado)
 
-1. Verificar logs do container (`docker logs <container>` ou painel do provedor)
+1. Verificar logs: `docker logs sistema_chamados-web-1` (ver `docs/INCIDENT_RUNBOOK.md`)
 2. Verificar se `GET /health` retorna 200 (curl ou browser)
 3. Se 502/503: container pode estar reiniciando — aguardar 2 min
-4. Se persiste: redeploy via CI/CD ou `docker compose up -d --force-recreate`
+4. Se persiste: `./scripts/watchtower_trigger.sh` (imagem nova) ou `docker compose -f docker-compose.prod.yml up -d --force-recreate`
 
-### Firestore degraded (SLO-04 violado)
+### PostgreSQL degraded (SLO-04 violado)
 
-1. `GET /health?deep=1` → ver `checks.firestore`
-2. Verificar Firebase Console → Firestore → Usage → quotas
-3. Verificar `GOOGLE_CREDENTIALS_JSON` nas variáveis de ambiente do servidor
-4. Ver logs: filtrar por `health_check firestore falhou`
+1. `GET /health?deep=1` → ver `checks.postgres`
+2. Verificar `docker ps` — `sistema_chamados-postgres-1` deve estar `healthy`
+3. Verificar `DATABASE_URL` no `.env` do servidor
+4. Ver logs: filtrar por `health_check postgres falhou`
 
 ### Latência alta (SLO-02 violado)
 
 1. Filtrar logs: `duration_ms > 2000`
 2. Identificar rotas lentas (N+1 no dashboard é suspeito habitual)
-3. Ver `app/services/dashboard_service.py` — busca em Firestore sem índice
+3. Ver `app/services/dashboard_service.py` — checar índice faltando no Postgres (via `EXPLAIN ANALYZE`)
 4. Verificar se Redis está disponível (`checks.cache` no `/health?deep=1`)
 
 ---

@@ -2,15 +2,15 @@
 
 > Ref rápida para quando algo quebra. Diagnose → Ação → Postmortem leve.
 >
-> **Ambiente de execução:** container Docker (gunicorn, 1 worker / 8 threads,
-> porta interna 8080) rodando no **Azure Container Apps** (`sistema-chamados` /
-> `rg-sistema-chamados`; imagem publicada no GHCR via CI/CD — ver
-> `docs/DEPLOYMENT_PLAN.md`). Banco: Firestore. Anexos: Cloudflare R2 (com
-> fallback Firebase Storage). E-mail: Microsoft Graph API.
+> **Atualizado 2026-08-06.** Ambiente de execução: container Docker (gunicorn, 1 worker / 8
+> threads, porta 8080) rodando no **servidor físico on-premise da DTX** (10.20.0.199, LAN-only),
+> não mais Azure Container Apps (desligado 2026-07-31). Banco: **PostgreSQL** (não mais
+> Firestore, migrado no Marco 12, 2026-08-04). Anexos: disco local (Fase 1, destino principal)
+> com Cloudflare R2 como storage legado. E-mail: Microsoft Graph API.
 >
-> Os comandos abaixo assumem Azure CLI autenticado (`az login`). Alternativa
-> sem CLI: Portal → Container Apps → `sistema-chamados` (Log stream, Console,
-> Revisions and replicas).
+> Os comandos abaixo assumem acesso SSH ao servidor (`ssh <usuário>@10.20.0.199`) com permissão
+> pra rodar `docker`. Não há mais Azure CLI/Portal envolvido — o servidor roda
+> `docker-compose.prod.yml` com 3 serviços: `postgres`, `web` e `watchtower`.
 
 ---
 
@@ -18,14 +18,12 @@
 
 ```
 1. Confirmar o sintoma — o que usuário vê? (503? tela branca? login falha?)
-2. Verificar status/revisões: az containerapp revision list -n sistema-chamados -g rg-sistema-chamados -o table
-3. Verificar logs:              az containerapp logs show -n sistema-chamados -g rg-sistema-chamados --tail 100
-4. Verificar health:            curl https://<fqdn>/health
+2. Verificar status:  ssh <usuário>@10.20.0.199 "docker ps --format 'table {{.Names}}\t{{.Status}}'"
+3. Verificar logs:    ssh <usuário>@10.20.0.199 "docker logs --tail 100 sistema_chamados-web-1"
+4. Verificar health:  curl http://10.20.0.199:8080/health
 5. Se crítico → rollback imediato (ver seção abaixo)
 6. Após estável → postmortem leve (ver template)
 ```
-
-> Substitua `<fqdn>` pelo FQDN real do Container App (Portal → Overview, ou `az containerapp show -n sistema-chamados -g rg-sistema-chamados --query properties.configuration.ingress.fqdn`).
 
 ---
 
@@ -35,53 +33,49 @@
 
 **Diagnose**
 ```bash
-az containerapp revision list -n sistema-chamados -g rg-sistema-chamados -o table
-az containerapp logs show -n sistema-chamados -g rg-sistema-chamados --tail 200
+ssh <usuário>@10.20.0.199 "docker ps --format 'table {{.Names}}\t{{.Status}}'"
+ssh <usuário>@10.20.0.199 "docker logs --tail 200 sistema_chamados-web-1"
 ```
 
 **Causas mais prováveis**
 | Sintoma nos logs | Causa | Ação |
 |---|---|---|
-| `WORKER TIMEOUT` | Requisição lenta (Firestore/e-mail) | Aumentar `--timeout` em `start.sh` ou otimizar query |
-| `GOOGLE_CREDENTIALS_JSON` ausente/erro de parse | Secret não configurado ou JSON inválido | Conferir Container App → Secrets/Environment variables |
-| `MemoryError` / réplica reiniciando (OOM) | App consumindo mais que o limite de recursos | Aumentar vCPU/memória do Container App (Scale) |
-| Revisão travada em "Provisioning" ou "Failed" | Erro de inicialização na imagem nova | Ver logs da revisão; fazer rollback (abaixo) |
+| `WORKER TIMEOUT` | Requisição lenta (query Postgres/e-mail) | Aumentar `--timeout` em `start.sh` ou otimizar query |
+| `DATABASE_URL` ausente/erro de conexão | `.env` incompleto ou Postgres fora do ar | Conferir `docker ps` mostra `sistema_chamados-postgres-1` healthy; conferir `.env` no servidor |
+| Container reiniciando em loop (OOM) | App consumindo mais memória que o limite | `docker stats --no-stream` pra confirmar; considerar ajustar limites no compose |
+| Container não sobe após `watchtower_trigger.sh` | Erro de inicialização na imagem nova | Ver `docker logs sistema_chamados-web-1`; fazer rollback (abaixo) |
 
-**Rollback rápido** — Container Apps mantém revisões anteriores; não é preciso rebuildar:
+**Rollback rápido**:
 ```bash
-# Listar revisões e achar a última estável antes do problema
-az containerapp revision list -n sistema-chamados -g rg-sistema-chamados -o table
-
-# Redirecionar 100% do tráfego para a revisão anterior estável
-az containerapp ingress traffic set -n sistema-chamados -g rg-sistema-chamados \
-  --revision-weight <nome-revisao-anterior>=100
-
-# Alternativa via Portal: Container App → Revisions and replicas → ative a
-# revisão anterior e ajuste o tráfego para 100% nela.
+# No servidor — retag a imagem anterior conhecida-boa como :latest no GHCR
+# (fora do servidor, via gh/docker CLI com push access), depois:
+ssh <usuário>@10.20.0.199 "./scripts/watchtower_trigger.sh"
 ```
-Se o problema exigir reverter o código-fonte (não só a revisão), fazer o commit
-de correção e deixar o `cd-build-image.yml` publicar uma imagem nova — não há
-"voltar servidor" local para isso.
+Alternativa mais direta se souber a tag/digest anterior: editar `docker-compose.prod.yml` no
+servidor pra apontar pra uma tag/digest específica (não `:latest`) e rodar
+`docker compose -f docker-compose.prod.yml up -d` manualmente.
 
 ---
 
-### 2. Erro de autenticação Firebase / Firestore
+### 2. Erro de conexão com PostgreSQL
 
-**Sintoma**: `google.auth.exceptions.TransportError` ou `DefaultCredentialsError` nos logs
+**Sintoma**: `sqlalchemy.exc.OperationalError`, `psycopg.OperationalError`, ou app não sobe
+citando `DATABASE_URL` nos logs.
 
 **Diagnose**
 ```bash
-# Confirmar que o secret GOOGLE_CREDENTIALS_JSON está definido (mostra só o nome, não o valor)
-az containerapp secret list -n sistema-chamados -g rg-sistema-chamados -o table
+ssh <usuário>@10.20.0.199 "docker ps --filter name=postgres --format '{{.Names}} {{.Status}}'"
+ssh <usuário>@10.20.0.199 "docker logs --tail 100 sistema_chamados-postgres-1"
 ```
 
 **Ações**
-1. Confirmar que o secret `GOOGLE_CREDENTIALS_JSON` está definido no Container App (Portal → Secrets) e referenciado na variável de ambiente correspondente
-2. Confirmar que a conta de serviço tem as permissões corretas no Firebase/Firestore
-3. Rolar a credencial se comprometida:
-   - Firebase Console → Configurações → Contas de serviço → Gerar nova chave privada
-   - Atualizar o secret `GOOGLE_CREDENTIALS_JSON` no Container App (Portal → Secrets, ou `az containerapp secret set`) com o novo JSON
-   - Salvar cria uma nova revisão automaticamente (não precisa de "reiniciar" manual)
+1. Confirmar que `sistema_chamados-postgres-1` está `healthy` (`docker ps`).
+2. Confirmar `DATABASE_URL` no `.env` do servidor bate com usuário/senha/db do serviço `postgres`.
+3. Se o container Postgres não sobe: checar espaço em disco do volume LVM dedicado
+   (`/mnt/data/sistema_chamados/postgres`) — `df -h`.
+4. `app/database.py` (Firestore, legado) não é mais usado — se aparecer erro citando
+   `firebase_admin`, é porque o import morto acidentalmente voltou a ser referenciado em algum
+   lugar; verificar `grep -rn "app.database" app/` (deveria dar zero hits).
 
 ---
 
@@ -92,7 +86,7 @@ az containerapp secret list -n sistema-chamados -g rg-sistema-chamados -o table
 **Diagnose**: Lentidão pode ser causada por volume alto de chamados na query inicial do dashboard. Verificar `app/services/dashboard_service.py` — usa paginação por cursor; reduzir janela se necessário.
 
 **Ação imediata**
-- Reduzir `ITENS_POR_PAGINA_DASHBOARD` para 50 (Container App → Environment variables) — salvar cria revisão nova automaticamente
+- Reduzir `ITENS_POR_PAGINA_DASHBOARD` para 50 no `.env` do servidor, depois `./scripts/watchtower_trigger.sh` (ou `docker compose -f docker-compose.prod.yml up -d` se editou localmente)
 
 **Contexto**: N+1 em relatório semanal (`report_service.py`) foi resolvido via batch `Usuario.get_by_ids` (F-24, Onda B 2026-06-18). Lentidão residual no dashboard é de volume, não de padrão N+1.
 
@@ -105,10 +99,8 @@ do Microsoft Graph (`401`/`403`) ou throttling (`429`).
 
 **Diagnose**
 ```bash
-# Conferir se as variáveis Graph estão definidas (Portal → Environment variables
-# lista os nomes; secrets como GRAPH_CLIENT_SECRET não mostram o valor)
-az containerapp show -n sistema-chamados -g rg-sistema-chamados \
-  --query "properties.template.containers[0].env[?starts_with(name, 'GRAPH_')]"
+# Conferir se as variáveis Graph estão no .env do servidor (não mostrar o secret em log/tela compartilhada)
+ssh <usuário>@10.20.0.199 "grep '^GRAPH_' .env | cut -d= -f1"
 
 # Gerar/inspecionar snapshots visuais dos e-mails (roda localmente, não envia para produção)
 python scripts/qa/gerar_email_visual_snapshots.py
@@ -117,7 +109,7 @@ python scripts/qa/gerar_email_visual_snapshots.py
 **Ações**
 | Erro | Causa | Ação |
 |---|---|---|
-| `401 Unauthorized` | Client secret expirado | Gerar novo secret no Azure AD e atualizar `GRAPH_CLIENT_SECRET` |
+| `401 Unauthorized` | Client secret expirado | Gerar novo secret no Azure AD (App Registration) e atualizar `GRAPH_CLIENT_SECRET` no `.env` do servidor + `watchtower_trigger.sh` |
 | `403 Forbidden` | App sem permissão `Mail.Send` | Conceder/consentir `Mail.Send` (Application) no Azure AD |
 | `429 Too Many Requests` | Throttling do Graph | Retentativa com backoff (ver `app/services/notify_retry.py`) |
 | Timeout | Rede/Graph lento | Verificar conectividade de saída do servidor |
@@ -133,32 +125,31 @@ As notificações in-app e Web Push continuam ativas.
 
 **Diagnose**
 ```bash
-az containerapp logs show -n sistema-chamados -g rg-sistema-chamados --tail 200 \
-  | grep -iE "R2|Storage|upload"
+ssh <usuário>@10.20.0.199 "docker logs --tail 200 sistema_chamados-web-1" | grep -iE "R2|disco|local|upload"
 ```
 
 **Ações**
 | Cenário | Ação |
 |---|---|
-| `R2 indisponível` | Verificar `R2_*` nas variáveis do Container App; sistema cai no fallback Firebase Storage |
+| `ANEXO_STORAGE_BACKEND=local` falhando | Verificar espaço/permissão em `ANEXO_LOCAL_DIR` (`/var/anexos_chamados` no servidor) |
+| `R2 indisponível` | Verificar `R2_*` no `.env` do servidor — sem R2 configurado em produção, upload falha (não há mais fallback Firebase Storage, removido do código) |
 | `403 Forbidden` (R2) | Conferir credenciais/permissões do bucket R2 |
-| `Firebase Storage indisponível` | Verificar `FIREBASE_STORAGE_BUCKET` nas variáveis do Container App |
 | `File too large` | Limite atingido (config `MAX_CONTENT_LENGTH`, ~10MB) |
 
 ---
 
-### 6. Cold start / réplica demorando pra subir
+### 6. Container reiniciando ou demorando pra subir
 
-**Contexto**: o Container App roda com `min-replicas=0` (economia de cota gratuita —
-ver `docs/DEPLOYMENT_PLAN.md`). Após período ocioso, a primeira requisição sofre
-cold start (alguns segundos até a réplica subir). Isso é esperado, não é incidente —
-mas se demorar muito mais que o normal ou nunca estabilizar, investigar:
+> **Superado**: cold start por `min-replicas=0` era específico do Azure Container Apps
+> (desativado). O servidor físico é **sempre-ligado** — não há scale-to-zero nem cold start
+> esperado. Se o container está demorando ou reiniciando, é sintoma real, não comportamento
+> normal — tratar como o cenário 1 (503/não responde).
 
 **Ação**
-1. Conferir o status da réplica: `az containerapp replica list -n sistema-chamados -g rg-sistema-chamados -o table`
-2. Ver logs da revisão ativa: `az containerapp logs show -n sistema-chamados -g rg-sistema-chamados --tail 100`
-3. Validar health: `curl https://<fqdn>/health`
-4. Se a revisão estiver presa em "Failed"/"Provisioning" indefinidamente, ativar a revisão anterior estável (ver rollback no cenário 1)
+1. Conferir o status: `ssh <usuário>@10.20.0.199 "docker ps --format 'table {{.Names}}\t{{.Status}}'"`
+2. Ver logs: `ssh <usuário>@10.20.0.199 "docker logs --tail 100 sistema_chamados-web-1"`
+3. Validar health: `curl http://10.20.0.199:8080/health`
+4. Se preso reiniciando, seguir o rollback do cenário 1.
 
 ---
 
@@ -196,15 +187,14 @@ mas se demorar muito mais que o normal ou nunca estabilizar, investigar:
 
 | Recurso | Comando / Link |
 |---|---|
-| Status/revisões | `az containerapp revision list -n sistema-chamados -g rg-sistema-chamados -o table` |
-| Logs em tempo real | `az containerapp logs show -n sistema-chamados -g rg-sistema-chamados --follow` |
-| Ativar revisão (rollback) | `az containerapp ingress traffic set -n sistema-chamados -g rg-sistema-chamados --revision-weight <revisao>=100` |
-| Forçar nova imagem | `az containerapp update -n sistema-chamados -g rg-sistema-chamados --image ghcr.io/matheusth16/sistema-chamados-dtx:latest` |
-| Shell no container | `az containerapp exec -n sistema-chamados -g rg-sistema-chamados --command sh` |
-| Health check | `curl https://<fqdn>/health` |
-| Portal (visão geral, secrets, revisões) | https://portal.azure.com → Container Apps → sistema-chamados |
-| Firestore console | https://console.firebase.google.com |
-| Firebase Storage | https://console.firebase.google.com |
-| Cloudflare R2 | https://dash.cloudflare.com |
-| Azure AD (Graph / e-mail) | https://portal.azure.com |
+| Status dos containers | `ssh <usuário>@10.20.0.199 "docker ps --format 'table {{.Names}}\t{{.Status}}'"` |
+| Logs em tempo real | `ssh <usuário>@10.20.0.199 "docker logs -f sistema_chamados-web-1"` |
+| Aplicar imagem nova / rollback | `ssh <usuário>@10.20.0.199 "./scripts/watchtower_trigger.sh"` |
+| Shell no container | `ssh <usuário>@10.20.0.199 "docker exec -it sistema_chamados-web-1 sh"` |
+| Health check | `curl http://10.20.0.199:8080/health` |
+| Portainer (gestão visual de containers) | https://10.20.0.199:9443 (LAN only) |
+| Netdata (métricas de sistema) | http://10.20.0.199:19999 (LAN only) |
+| Cloudflare R2 (anexos legados) | https://dash.cloudflare.com |
+| Azure AD (Graph API / e-mail) | https://portal.azure.com |
+| GHCR (imagens publicadas) | https://github.com/matheusth16/sistema-chamados-dtx/pkgs/container/sistema-chamados-dtx |
 | Desenvolvimento local (não produção) | `docker compose up -d --build` (ver `docs/DEPLOYMENT_PLAN.md`) |

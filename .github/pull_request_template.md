@@ -49,7 +49,7 @@
 ### Cenários negativos
 - [ ] Fluxo de erro testado (ex.: dado inválido, usuário sem permissão)
 - [ ] Respostas de erro retornam `{"sucesso": false, "erro": "..."}` sem expor stack trace
-- [ ] Erros do Firestore tratados (timeout, documento inexistente)
+- [ ] Erros do PostgreSQL tratados (timeout, registro inexistente)
 
 ### Autorização e permissões
 - [ ] Rota protegida pelos decoradores corretos (`@requer_solicitante`, `@requer_supervisor_area`, `@requer_admin`)
@@ -68,10 +68,10 @@
 - [ ] Sem secrets ou credenciais no diff
 - [ ] Lógica de negócio em `app/services/`, não nas rotas
 
-### Firestore
-- [ ] Novas queries com índices criados (se necessário)
-- [ ] Sem `db.collection().get()` sem paginação em coleções grandes
-- [ ] Regras de segurança do Firestore atualizadas (se aplicável)
+### PostgreSQL
+- [ ] Novas queries com índices criados via migração Alembic (se necessário)
+- [ ] Sem query sem paginação/limite em tabelas grandes
+- [ ] Migração Alembic gerada e testada (`alembic upgrade head` / `downgrade -1`) se houve mudança de schema
 
 ### Templates / Frontend
 - [ ] Novos elementos interativos têm `data-testid` para E2E

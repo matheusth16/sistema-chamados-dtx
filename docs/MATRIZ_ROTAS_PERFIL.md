@@ -162,7 +162,7 @@ Após a Fase 2, a função `usuario_pode_ver_chamado` em `app/services/permissio
 ### Campos de modelo novos a gravar (documentar, não implementar aqui)
 
 ```python
-# Firestore — documento chamados
+# PostgreSQL — tabela chamados (já implementado, campos reais hoje)
 data_em_atendimento           # datetime — set ao 1º Em Atendimento; nada reseta
 escalacao_resposta_nivel      # int 0–4 — Escada A (congelado ao virar Em Atendimento)
 escalacao_resolucao_nivel     # int 0–4 — Escada B pós-estouro deadline
@@ -171,7 +171,7 @@ alerta_supervisor_80_enviado  # bool | datetime — idempotência aviso 80%
 participantes                 # list[{supervisor_id, area, status, concluido_em}]
 motivo_ultima_escalacao       # str — motivo da última ação formal
 
-# Firestore — documento usuarios
+# PostgreSQL — tabela usuarios (já implementado)
 nivel_gestao                  # str | None — gestor_setor | gerente_producao | assistente_gm | gm
 ```
 

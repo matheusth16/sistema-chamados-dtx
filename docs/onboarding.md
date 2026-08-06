@@ -77,7 +77,7 @@ O modelo `Usuario` (`app/models_usuario.py`) expõe e persiste o estado de onboa
 - No construtor (`__init__`):
   - Recebe `onboarding_perfis_vistos: list | None = None` e `onboarding_passo: int = 0`; a lista é filtrada contra `PERFIS_VALIDOS`.
 - Em `to_dict()`:
-  - Serializa `onboarding_perfis_vistos` e `onboarding_passo` para o documento armazenado no Firestore.
+  - Serializa `onboarding_perfis_vistos` e `onboarding_passo` para a linha armazenada no PostgreSQL.
 - Em `from_dict()`:
   - Lê `onboarding_perfis_vistos` do documento; se ausente, faz retrocompat a partir de `onboarding_completo` (bool antigo) — ver bloco acima.
 - No método de atualização (linha ~341):
@@ -98,7 +98,7 @@ Há duas abordagens recomendadas:
 Criar um script na pasta `scripts/` (ex.: `scripts/reset_onboarding_usuario.py`) que:
 
 1. Recebe um identificador de usuário (`id` ou email).
-2. Faz lookup do documento correspondente no Firestore.
+2. Faz lookup do usuário correspondente no PostgreSQL.
 3. Atualiza os campos:
    - `onboarding_perfis_vistos = []` (reset total) ou remove só o perfil específico da lista (reset parcial)
    - `onboarding_passo = 0`

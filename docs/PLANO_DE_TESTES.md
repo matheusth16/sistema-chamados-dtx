@@ -41,8 +41,7 @@
 
 ### 2.2 Fora do Escopo (Nesta Fase)
 
-- Testes de carga e performance (Firestore/Redis).
-- Testes de integração com Firebase real (credenciais); preferir mocks.
+- Testes de carga e performance (PostgreSQL/Redis) — ver `scripts/qa/k6/` (fora deste plano).
 - Validação visual de UI (layout, i18n).
 
 ---
@@ -51,13 +50,15 @@
 
 ### 3.1 Testes Unitários
 
-- **Serviços:** `validators`, `permissions`, `status_service`, `pagination`, `filters`, `assignment`, `date_validators`, `analytics`, `notifications_inapp`.
-- **Modelos:** `Chamado.from_dict` / `to_dict`, `Usuario` (onde não dependa de Firestore real).
+- **Serviços:** `validators`, `permissions`, `status_service`, `filters`, `assignment`, `analytics`, `notifications_inapp`, `sla_escalacao_service`, `gestor_escalonamento_service`.
+- **Modelos:** `Chamado._from_row` / `to_row_kwargs`, `Usuario` (contra PostgreSQL real via fixture `db_session`, quando a lógica envolve persistência).
 - **Utilitários:** `gerar_numero_chamado`, `utils` diversos.
 - **Exceções:** tipos e mensagens.
 
 **Ferramenta:** pytest.
-**Dependências:** Mock de Firestore e de funções externas (email, push, etc.).
+**Dependências:** PostgreSQL real (`TEST_DATABASE_URL`, fixture `db_session` com rollback por
+teste) pra tudo que toca o banco; mock só pra serviços externos genuinamente externos (Graph API,
+R2, Web Push).
 
 ### 3.2 Testes de Integração (Rotas)
 
@@ -65,7 +66,7 @@
 - **Cenários:** usuário não logado (302 ou 401), solicitante, supervisor, admin.
 - **APIs:** POST/GET com JSON ou FormData; assert em status code e corpo JSON.
 
-**Ferramenta:** pytest + fixtures do `conftest.py` (`client`, `client_logado_solicitante`, `client_logado_supervisor`, `client_logado_admin`, `mock_firestore`).
+**Ferramenta:** pytest + fixtures do `conftest.py` (`client`, `client_logado_{solicitante,supervisor,admin,admin_global,gestor}`, `db_session` — PostgreSQL real).
 
 ### 3.3 Testes de Fluxo (Integração)
 
@@ -73,7 +74,7 @@
 - Fluxo de criação de chamado (formulário válido/inválido).
 - Fluxo de bulk-status (supervisor com/sem permissão por área).
 
-**Ferramenta:** pytest; mocks para Firestore e serviços externos.
+**Ferramenta:** pytest; PostgreSQL real (`db_session`) + mocks só para serviços externos.
 
 ### 3.4 Testes de Contrato (API)
 
@@ -111,11 +112,11 @@
 
 ## 5. Ambiente e Dados de Teste
 
-- **Python:** 3.12+ (ver `.python-version` e `ruff.toml` `target-version = "py312"`).
-- **Frameworks:** `pytest` + `unittest.mock` (unidade/integração) e `playwright` (E2E).
+- **Python:** 3.14 (local); 3.12+ como piso mínimo aceito.
+- **Frameworks:** `pytest` + `unittest.mock` (mock só de serviços externos) e `playwright` (E2E).
 - **Config:** `FLASK_ENV=testing` (já definido em `conftest.py`); `WTF_CSRF_ENABLED=False` nos testes.
-- **Fixtures:** usuários mockados com `_usuario_mock(uid, email, nome, perfil, area, areas)`, incluindo `client_logado_admin_global`.
-- **Firestore:** não usar banco real nos testes automatizados; usar `patch('app.database.db', MagicMock())` ou equivalente.
+- **Fixtures:** usuários reais persistidos via `db_session`, ou `_usuario_mock(...)` pra testes que não tocam o banco; `client_logado_{solicitante,supervisor,admin,admin_global,gestor}`.
+- **PostgreSQL:** **usar banco real** nos testes automatizados — `TEST_DATABASE_URL`, fixture `db_session` (rollback por teste, schema fica de pé). Sem `TEST_DATABASE_URL` configurada, testes de banco são pulados (`pytest.skip`), não mockados.
 - **Cobertura:** executar com `pytest --cov=app` para acompanhar cobertura; focar em rotas e serviços de negócio.
 
 ---
@@ -133,7 +134,7 @@
 
 | Risco | Mitigação |
 |-------|------------|
-| Testes flaky por dependência de rede/ Firestore | Usar mocks para `app.database.db` e serviços externos |
+| Testes flaky por dependência de rede/Postgres indisponível | Confirmar `TEST_DATABASE_URL` de pé; mocks só pra serviços externos (Graph API, R2, push) |
 | Cobertura baixa em rotas não documentadas | Incluir rotas críticas no plano (dashboard, usuários, categorias) conforme prioridade |
 | Mudança de contrato da API | Manter casos de teste alinhados a [API.md](API.md) e atualizar ambos |
 

@@ -57,11 +57,26 @@ pip install -r requirements-dev.txt
 
 ---
 
-## 3. Credenciais do Firebase
+## 3. Banco de dados (PostgreSQL)
 
-1. Firebase Console → Configurações do projeto → Contas de serviço → **Gerar nova chave privada**
-2. Renomeie o arquivo baixado para `credentials.json`
-3. Coloque na raiz do projeto (nunca versionar — já está no `.gitignore`)
+O banco é **obrigatório** — a app não sobe sem `DATABASE_URL` configurada. Sem um Postgres já
+disponível, suba um local rápido:
+
+```powershell
+docker run -d --name postgres-dev -p 5432:5432 `
+  -e POSTGRES_USER=user -e POSTGRES_PASSWORD=senha -e POSTGRES_DB=sistema_chamados_dev `
+  postgres:16-alpine
+```
+
+Depois de configurar `DATABASE_URL` no passo 4, aplique as migrações:
+
+```powershell
+alembic upgrade head
+```
+
+> **Credenciais do Firebase (`credentials.json`) são opcionais** — só alimentam `app/database.py`,
+> mantido como rede de segurança de rollback (não é importado por `app/` em runtime normal). Pule
+> esse passo a menos que precise especificamente testar esse caminho legado.
 
 ---
 
@@ -76,6 +91,7 @@ Edite `.env`. Mínimo para rodar localmente:
 ```env
 FLASK_ENV=development
 SECRET_KEY=qualquer-string-aleatoria-para-dev
+DATABASE_URL=postgresql://user:senha@localhost:5432/sistema_chamados_dev
 ```
 
 Para referência completa de todas as variáveis: **[docs/ENV.md](ENV.md)**
@@ -132,7 +148,7 @@ Para ver o relatório de cobertura:
 pytest --cov=app --cov-report=term-missing -q
 ```
 
-Os testes usam mocks do Firestore — nenhuma conexão com Firebase é necessária.
+Os testes usam PostgreSQL real (`TEST_DATABASE_URL`, fixture `db_session` com rollback por teste) — não mock/SQLite. Nenhuma conexão com Firebase é necessária.
 
 **Gate de cobertura por módulo (≥ 85%):** o CI exige que cada arquivo `app/**/*.py` atinja individualmente 85%. Para verificar localmente após rodar o pytest com `--cov-report=json`:
 
@@ -173,7 +189,8 @@ sistema_chamados/
 ├── tests/                # Suíte de testes (pytest)
 ├── scripts/              # Utilitários (diagnóstico, migrações) — ver scripts/README.md
 ├── docs/                 # Documentação
-├── credentials.json      # Credencial Firebase (NÃO versionar)
+├── alembic/               # Migrações de schema PostgreSQL
+├── credentials.json      # Credencial Firebase — OPCIONAL, legado (NÃO versionar)
 ├── .env                  # Variáveis de ambiente (NÃO versionar)
 ├── run.py                # Entrypoint Flask
 ├── Dockerfile            # Imagem multi-stage (build + runtime)
@@ -184,11 +201,12 @@ sistema_chamados/
 
 ## Troubleshooting
 
-**`ModuleNotFoundError: No module named 'firebase_admin'`**
+**`ModuleNotFoundError` (qualquer pacote)**
 O venv não está ativo. Execute `.venv\Scripts\Activate.ps1` e tente novamente.
 
-**`FileNotFoundError: credentials.json`**
-Coloque o arquivo na raiz do projeto (passo 3).
+**`sqlalchemy.exc.OperationalError` / app não sobe citando `DATABASE_URL`**
+Postgres não está rodando ou `DATABASE_URL` está errada/ausente no `.env` (passo 3). Confirme
+com `docker ps` que o container `postgres-dev` está de pé, e rode `alembic upgrade head`.
 
 **`ValueError: SECRET_KEY must be set`**
 `.env` não foi criado ou `SECRET_KEY` está em branco (passo 4).
