@@ -1950,9 +1950,9 @@
     "es": "¡Usuario {nome} creado con éxito!"
   },
   "error_creating_user": {
-    "pt_BR": "Erro ao criar usuário: {error}",
-    "en": "Error creating user: {error}",
-    "es": "Error al crear usuario: {error}"
+    "pt_BR": "Erro ao criar usuário. Tente novamente ou contate o suporte.",
+    "en": "Error creating user. Please try again or contact support.",
+    "es": "Error al crear usuario. Intente de nuevo o contacte al soporte."
   },
   "error_loading_users": {
     "pt_BR": "Erro ao carregar usuários",
@@ -1970,9 +1970,9 @@
     "es": "¡Usuario {nome} actualizado con éxito!"
   },
   "error_editing_user": {
-    "pt_BR": "Erro ao editar usuário: {error}",
-    "en": "Error editing user: {error}",
-    "es": "Error al editar usuario: {error}"
+    "pt_BR": "Erro ao editar usuário. Tente novamente ou contate o suporte.",
+    "en": "Error editing user. Please try again or contact support.",
+    "es": "Error al editar usuario. Intente de nuevo o contacte al soporte."
   },
   "cannot_delete_own_account": {
     "pt_BR": "Você não pode deletar sua própria conta!",
@@ -2020,9 +2020,9 @@
     "es": "El usuario {nome} fue eliminado del sistema"
   },
   "error_deleting_user": {
-    "pt_BR": "Erro ao deletar usuário: {error}",
-    "en": "Error deleting user: {error}",
-    "es": "Error al eliminar usuario: {error}"
+    "pt_BR": "Erro ao deletar usuário. Tente novamente ou contate o suporte.",
+    "en": "Error deleting user. Please try again or contact support.",
+    "es": "Error al eliminar usuario. Intente de nuevo o contacte al soporte."
   },
   "user_password_reset_success": {
     "pt_BR": "Senha de {nome} foi resetada e enviada por e-mail. Ele precisará criar uma nova senha no próximo login.",
@@ -2030,9 +2030,9 @@
     "es": "La contraseña de {nome} se ha restablecido y enviado por correo electrónico. Necesitará crear una nueva contraseña en el próximo inicio de sesión."
   },
   "error_resetting_password": {
-    "pt_BR": "Erro ao resetar senha do usuário: {error}",
-    "en": "Error resetting user password: {error}",
-    "es": "Error al restablecer la contraseña del usuario: {error}"
+    "pt_BR": "Erro ao resetar senha do usuário. Tente novamente ou contate o suporte.",
+    "en": "Error resetting user password. Please try again or contact support.",
+    "es": "Error al restablecer la contraseña del usuario. Intente de nuevo o contacte al soporte."
   },
   "cannot_reset_own_password": {
     "pt_BR": "Você não pode resetar sua própria senha! Use a função de alterar senha.",
@@ -4998,6 +4998,31 @@
     "pt_BR": "Erro interno ao salvar resposta. Tente novamente.",
     "en": "Internal error saving reply. Please try again.",
     "es": "Error interno al guardar la respuesta. Intente de nuevo."
+  },
+  "text_reply_title": {
+    "pt_BR": "Responder por texto",
+    "en": "Reply with text",
+    "es": "Responder por texto"
+  },
+  "text_reply_hint": {
+    "pt_BR": "Sem precisar anexar arquivo — use isso pra responder um pedido de informação.",
+    "en": "No file needed — use this to answer a request for information.",
+    "es": "Sin necesidad de adjuntar archivo — úselo para responder una solicitud de información."
+  },
+  "text_reply_placeholder": {
+    "pt_BR": "Escreva sua resposta...",
+    "en": "Write your reply...",
+    "es": "Escriba su respuesta..."
+  },
+  "text_reply_send_btn": {
+    "pt_BR": "Enviar resposta",
+    "en": "Send reply",
+    "es": "Enviar respuesta"
+  },
+  "text_reply_sent_success": {
+    "pt_BR": "Resposta enviada com sucesso.",
+    "en": "Reply sent successfully.",
+    "es": "Respuesta enviada con éxito."
   },
   "push_subject_reply": {
     "pt_BR": "[Resposta] Chamado {numero} — solicitante respondeu",

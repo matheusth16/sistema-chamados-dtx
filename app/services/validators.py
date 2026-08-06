@@ -247,7 +247,7 @@ def validar_novo_chamado(
     links_externos: list | None = None,
 ) -> list[str]:
     """
-    Valida dados do formulário de novo chamado. Blindagem antes de persistir no Firestore.
+    Valida dados do formulário de novo chamado. Blindagem antes de persistir no banco.
 
     Args:
         form: Dict-like com campos do formulário (descricao, tipo, categoria, rl_codigo, etc.)

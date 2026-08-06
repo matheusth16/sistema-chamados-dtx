@@ -73,6 +73,9 @@
                 case 'enviar-anexo-tardio':
                     if (typeof enviarAnexoTardio === 'function') enviarAnexoTardio(el.dataset.chamadoId);
                     break;
+                case 'enviar-resposta-solicitante':
+                    if (typeof enviarRespostaSolicitante === 'function') enviarRespostaSolicitante(el.dataset.chamadoId);
+                    break;
                 case 'salvar-descricao-solicitante':
                     if (typeof salvarDescricaoSolicitante === 'function') salvarDescricaoSolicitante();
                     break;
@@ -610,6 +613,22 @@
                                     <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                                     {{ t('cancel_ticket_sol_title') if t else 'Cancelar chamado' }}
                                 </button>
+                                {% endif %}
+
+                                {% if pode_anexo_tardio_solicitante %}
+                                <div id="bloco-resposta-texto" class="bento-action-box blue" style="margin-bottom:12px;">
+                                    <p class="title">{{ t('text_reply_title') if t else 'Responder por texto' }}</p>
+                                    <p>{{ t('text_reply_hint') if t else 'Sem precisar anexar arquivo — use isso pra responder um pedido de informação.' }}</p>
+                                    <textarea id="sol-resposta-texto" rows="3"
+                                        style="width:100%; background:#fff; border:1.5px solid transparent; border-radius:14px; padding:11px 14px; font-family:inherit; font-size:13px; resize:none; margin-bottom:8px;"
+                                        placeholder="{{ t('text_reply_placeholder') if t else 'Escreva sua resposta...' }}"></textarea>
+                                    <div id="sol-resposta-erro" class="hidden bento-inline-notice error" style="margin-top:4px;"></div>
+                                    <div id="sol-resposta-ok" class="hidden bento-inline-notice ok" style="margin-top:4px;"></div>
+                                    <button type="button" data-action="enviar-resposta-solicitante" data-chamado-id="{{ chamado.id }}" class="bento-btn-block solid-blue" style="margin-top:8px;">
+                                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
+                                        {{ t('text_reply_send_btn') if t else 'Enviar resposta' }}
+                                    </button>
+                                </div>
                                 {% endif %}
 
                                 {% if pode_anexo_tardio_solicitante %}
@@ -1461,6 +1480,41 @@ function cancelarChamadoAdmin() {
             else { erroEl.textContent = data.erro || {{ t('generic_cancel_error') | tojson }}; erroEl.classList.remove('hidden'); }
         })
         .catch(function() { erroEl.textContent = {{ t('error_connection') | tojson }}; erroEl.classList.remove('hidden'); });
+    };
+    {% endif %}
+
+    {% if pode_anexo_tardio_solicitante %}
+    window.enviarRespostaSolicitante = function(chamadoId) {
+        var erroEl = document.getElementById('sol-resposta-erro');
+        var okEl = document.getElementById('sol-resposta-ok');
+        erroEl.classList.add('hidden');
+        okEl.classList.add('hidden');
+        var mensagem = (document.getElementById('sol-resposta-texto').value || '').trim();
+        if (mensagem.length < 2) {
+            erroEl.textContent = {{ t('reply_message_required', min_chars=2) | tojson }};
+            erroEl.classList.remove('hidden');
+            return;
+        }
+        fetch('/api/chamado/' + chamadoId + '/responder-solicitante', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': _CSRF_SOL },
+            body: JSON.stringify({ mensagem: mensagem })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.sucesso) {
+                okEl.textContent = {{ t('text_reply_sent_success') | tojson }};
+                okEl.classList.remove('hidden');
+                document.getElementById('sol-resposta-texto').value = '';
+            } else {
+                erroEl.textContent = data.erro || {{ t('error_processing_request') | tojson }};
+                erroEl.classList.remove('hidden');
+            }
+        })
+        .catch(function() {
+            erroEl.textContent = {{ t('error_connection') | tojson }};
+            erroEl.classList.remove('hidden');
+        });
     };
     {% endif %}
 

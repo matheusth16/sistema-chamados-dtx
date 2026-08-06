@@ -3,6 +3,8 @@ Funções utilitárias compartilhadas entre rotas.
 """
 
 import logging
+import secrets
+import time
 from datetime import datetime
 from typing import Any
 
@@ -62,15 +64,31 @@ def gerar_numero_chamado() -> str:
     Gera o próximo número de chamado sequencial no formato CHM-XXXX.
     Usa SEQUENCE nativa do Postgres (chamados_numero_seq) — atômica por
     construção do banco, sem precisar de transação explícita.
+
+    Tenta 3 vezes antes de cair no fallback: a falha mais comum aqui é blip
+    transiente de conexão, não indisponibilidade sustentada. Se as 3
+    tentativas falharem, o fallback usa timestamp em milissegundos + sufixo
+    aleatório — o fallback antigo (timestamp em segundos % 10000) colidia
+    entre duas criações no mesmo segundo sob falha de banco, violando o
+    unique constraint de numero_chamado e derrubando a segunda criação com
+    IntegrityError engolida silenciosamente (achado em auditoria, 2026-08-05).
     """
-    try:
-        with db_module.SessionLocal() as session:
-            novo_numero = session.execute(select(func.nextval("chamados_numero_seq"))).scalar()
-        return f"CHM-{novo_numero:04d}"
-    except Exception:
-        current_app.logger.exception("Erro ao gerar número de chamado via sequence")
-        timestamp_num = int(datetime.now().timestamp()) % 10000
-        return f"CHM-{timestamp_num:04d}"
+    for tentativa in range(3):
+        try:
+            with db_module.SessionLocal() as session:
+                novo_numero = session.execute(select(func.nextval("chamados_numero_seq"))).scalar()
+            return f"CHM-{novo_numero:04d}"
+        except Exception:
+            if tentativa < 2:
+                time.sleep(0.05)
+                continue
+            current_app.logger.exception(
+                "Erro ao gerar número de chamado via sequence (3 tentativas esgotadas)"
+            )
+
+    timestamp_ms = int(datetime.now().timestamp() * 1000)
+    sufixo = secrets.token_hex(3)
+    return f"CHM-F{timestamp_ms}{sufixo}"
 
 
 def get_client_ip() -> str:

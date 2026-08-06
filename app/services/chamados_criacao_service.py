@@ -123,7 +123,7 @@ def criar_chamado(
     solicitante_email: str | None = None,
 ) -> tuple[str | None, str | None, str | None, str | None]:
     """
-    Cria um novo chamado no Firestore e dispara notificações.
+    Cria um novo chamado no banco e dispara notificações.
 
     Args:
         form: request.form (categoria, rl_codigo, tipo, descricao, impacto, gate, etc.)

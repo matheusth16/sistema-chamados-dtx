@@ -118,7 +118,7 @@ def atualizar_status_chamado(
                         "Validação de congelamento ignorada (usuário não carregável): %s", exc
                     )
             if _u is not None:
-                from app.services.permission_validation import chamado_aceita_transicao_status
+                from app.services.permissoes_edicao_chamado import chamado_aceita_transicao_status
 
                 _pode, _ = chamado_aceita_transicao_status(_u, data_chamado, novo_status)
                 if not _pode:

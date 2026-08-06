@@ -64,7 +64,7 @@ def test_gerar_numero_chamado_incrementa_a_cada_chamada(app, db_session):
 
 
 def test_gerar_numero_chamado_fallback_em_excecao(app, monkeypatch):
-    """Exceção ao acessar o banco cai para fallback CHM-XXXX com timestamp."""
+    """Exceção ao acessar o banco cai para fallback CHM-F<timestamp_ms><sufixo>."""
     from app import utils
 
     class _SessionLocalQuebrada:
@@ -80,12 +80,40 @@ def test_gerar_numero_chamado_fallback_em_excecao(app, monkeypatch):
             pass
 
     monkeypatch.setattr(utils.db_module, "SessionLocal", _SessionLocalQuebrada())
+    monkeypatch.setattr(utils.time, "sleep", lambda *_a, **_kw: None)
 
     with app.app_context():
         result = gerar_numero_chamado()
 
-    assert result.startswith("CHM-")
-    assert len(result) == 8
+    assert result.startswith("CHM-F")
+
+
+def test_gerar_numero_chamado_fallback_nao_colide_na_mesma_janela(app, monkeypatch):
+    """Regressão (auditoria 2026-08-05): o fallback antigo usava
+    timestamp%10000 (resolução de 1s) — duas criações de chamado sob falha de
+    banco no mesmo segundo geravam o MESMO número, violando o unique
+    constraint e derrubando a segunda criação com IntegrityError engolida
+    silenciosamente (erro genérico pro usuário, sem indicar a causa real).
+    O fallback atual usa timestamp em milissegundos + sufixo aleatório —
+    duas chamadas de fallback de volta, mesmo na mesma janela de tempo,
+    não devem colidir."""
+    from app import utils
+
+    class _SessionLocalQuebrada:
+        def __call__(self):
+            raise RuntimeError("banco indisponível")
+
+        def remove(self):
+            pass
+
+    monkeypatch.setattr(utils.db_module, "SessionLocal", _SessionLocalQuebrada())
+    monkeypatch.setattr(utils.time, "sleep", lambda *_a, **_kw: None)
+
+    with app.app_context():
+        primeiro = gerar_numero_chamado()
+        segundo = gerar_numero_chamado()
+
+    assert primeiro != segundo
 
 
 # ── formatar_data_para_excel (ramos adicionais) ───────────────────────────────

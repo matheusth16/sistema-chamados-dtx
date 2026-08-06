@@ -146,7 +146,7 @@ def test_processar_edicao_supervisor_observador_fora_da_area_retorna_403(app):
 
     A checagem de escrita usava usuario_pode_ver_chamado (leitura) em vez de
     supervisor_pode_alterar_chamado (escrita, só área — já existia em
-    permission_validation.py mas nunca era chamada daqui). Isso deixava qualquer
+    permissoes_edicao_chamado.py mas nunca era chamada daqui). Isso deixava qualquer
     supervisor adicionado como observador/cc num chamado de OUTRA área com acesso
     total de edição (mudar status, reatribuir responsável, setores, SLA) — não só
     visibilidade passiva como o recurso "Em cópia" promete.

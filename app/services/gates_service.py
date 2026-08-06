@@ -1,7 +1,8 @@
 """Service de gates: constrói o dict de sub-etapas e valida valores.
 
-Firestore é a fonte de verdade. Fallback para GATE_SUBETAPAS estático se o
-banco estiver vazio ou inacessível (ex.: ambiente de testes sem credenciais).
+Postgres (CategoriaGate) é a fonte de verdade. Fallback para GATE_SUBETAPAS
+estático se o banco estiver vazio ou inacessível (ex.: ambiente de testes
+sem banco configurado).
 """
 
 import logging
@@ -17,9 +18,9 @@ _GATES_VALIDOS_TTL = 300  # 5 minutos
 
 
 def build_gate_subetapas() -> dict[str, list[str]]:
-    """Retorna dict {gate_pai: [nome_pt, ...]} a partir do Firestore.
+    """Retorna dict {gate_pai: [nome_pt, ...]} a partir do Postgres (CategoriaGate).
 
-    Fallback: GATE_SUBETAPAS estático se Firestore vazio ou com erro.
+    Fallback: GATE_SUBETAPAS estático se a tabela estiver vazia ou com erro.
     """
     try:
         gates = CategoriaGate.get_all_ativos()
@@ -31,15 +32,15 @@ def build_gate_subetapas() -> dict[str, list[str]]:
                 result.setdefault(gate.gate_pai, []).append(gate.nome_pt)
         return result if result else dict(GATE_SUBETAPAS)
     except Exception as e:
-        logger.warning("Erro ao buscar gates do Firestore, usando fallback estático: %s", e)
+        logger.warning("Erro ao buscar gates do banco, usando fallback estático: %s", e)
         return dict(GATE_SUBETAPAS)
 
 
 def is_gate_valido(valor: str) -> bool:
     """Retorna True se valor == 'N/A' ou existe gate ativo com nome_pt == valor.
 
-    Fallback: allowlist estática de GATE_SUBETAPAS se Firestore vazio ou com erro.
-    Resultado é cacheado 5 min para evitar leitura no Firestore a cada validação.
+    Fallback: allowlist estática de GATE_SUBETAPAS se a tabela estiver vazia ou com erro.
+    Resultado é cacheado 5 min para evitar leitura no banco a cada validação.
     """
     if valor == "N/A":
         return True
@@ -50,7 +51,7 @@ def is_gate_valido(valor: str) -> bool:
             if gates:
                 return frozenset(g.nome_pt for g in gates)
         except Exception as e:
-            logger.warning("Erro ao validar gate no Firestore, usando fallback estático: %s", e)
+            logger.warning("Erro ao validar gate no banco, usando fallback estático: %s", e)
         return frozenset()
 
     gate_names = get_static_cached(_GATES_VALIDOS_CACHE_KEY, _fetch, ttl_seconds=_GATES_VALIDOS_TTL)

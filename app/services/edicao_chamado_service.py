@@ -43,7 +43,7 @@ def processar_edicao_chamado(
     if not chamado_id:
         return {"sucesso": False, "erro": _t("field_ticket_id_required")}
 
-    from app.services.permission_validation import usuario_pode_mutar_chamado
+    from app.services.permissoes_edicao_chamado import usuario_pode_mutar_chamado
 
     pode_mutar, msg_erro = usuario_pode_mutar_chamado(usuario_atual)
     if not pode_mutar:
@@ -59,7 +59,7 @@ def processar_edicao_chamado(
     # exibir o chamado. Leitura (usuario_pode_ver_chamado) libera dono/responsável/
     # fila-da-área/participante/observador; um supervisor que só enxerga o chamado
     # como observador (cc) não deve poder editá-lo, só acompanhar.
-    from app.services.permission_validation import supervisor_pode_alterar_chamado
+    from app.services.permissoes_edicao_chamado import supervisor_pode_alterar_chamado
 
     if not supervisor_pode_alterar_chamado(usuario_atual, chamado_obj.area, chamado_obj):
         return {
@@ -74,7 +74,7 @@ def processar_edicao_chamado(
 
     # Congelamento: Chamado Concluído é read-only para edição operacional.
     # Reabertura deve ser feita via /api/atualizar-status com chamado_aceita_transicao_status.
-    from app.services.permission_validation import chamado_aceita_edicao_operacional
+    from app.services.permissoes_edicao_chamado import chamado_aceita_edicao_operacional
 
     _pode_op, _msg_key = chamado_aceita_edicao_operacional(usuario_atual, chamado_obj)
     if not _pode_op:
