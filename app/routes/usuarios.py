@@ -138,7 +138,7 @@ def gerenciar_usuarios() -> Response:
             return redirect(url_for("main.gerenciar_usuarios"))
         except Exception as e:
             logger.exception("Erro ao criar usuário: %s", e)
-            flash_t("error_creating_user", "danger", error=str(e))
+            flash_t("error_creating_user", "danger")
             return redirect(url_for("main.gerenciar_usuarios"))
     try:
         from app.services.lgpd_self_service import listar_usuarios_com_solicitacao_pendente
@@ -267,7 +267,7 @@ def editar_usuario(usuario_id: str) -> Response:
         return redirect(url_for("main.gerenciar_usuarios"))
     except Exception as e:
         logger.exception("Erro ao editar usuário: %s", e)
-        flash_t("error_editing_user", "danger", error=str(e))
+        flash_t("error_editing_user", "danger")
         return redirect(url_for("main.gerenciar_usuarios"))
 
 
@@ -312,7 +312,7 @@ def deletar_usuario(usuario_id: str) -> Response:
         return redirect(url_for("main.gerenciar_usuarios"))
     except Exception as e:
         logger.exception("Erro ao deletar usuário: %s", e)
-        flash_t("error_deleting_user", "danger", error=str(e))
+        flash_t("error_deleting_user", "danger")
         return redirect(url_for("main.gerenciar_usuarios"))
 
 
@@ -424,7 +424,7 @@ def resetar_senha_usuario(usuario_id: str) -> Response:
 
     except Exception as e:
         logger.exception("Erro ao resetar senha do usuário: %s", e)
-        flash_t("error_resetting_password", "danger", error=str(e))
+        flash_t("error_resetting_password", "danger")
         return redirect(url_for("main.gerenciar_usuarios"))
 
 
@@ -464,7 +464,7 @@ def desativar_usuario(usuario_id: str) -> Response:
         return redirect(url_for("main.gerenciar_usuarios"))
     except Exception as e:
         logger.exception("Erro ao desativar usuário: %s", e)
-        flash_t("error_editing_user", "danger", error=str(e))
+        flash_t("error_editing_user", "danger")
         return redirect(url_for("main.gerenciar_usuarios"))
 
 
@@ -496,7 +496,7 @@ def ativar_usuario(usuario_id: str) -> Response:
         return redirect(url_for("main.gerenciar_usuarios"))
     except Exception as e:
         logger.exception("Erro ao reativar usuário: %s", e)
-        flash_t("error_editing_user", "danger", error=str(e))
+        flash_t("error_editing_user", "danger")
         return redirect(url_for("main.gerenciar_usuarios"))
 
 
@@ -551,7 +551,7 @@ def anonimizar_usuario(usuario_id: str) -> Response:
         return redirect(url_for("main.gerenciar_usuarios"))
     except Exception as e:
         logger.exception("Erro ao anonimizar usuário: %s", e)
-        flash_t("error_editing_user", "danger", error=str(e))
+        flash_t("error_editing_user", "danger")
         return redirect(url_for("main.gerenciar_usuarios"))
 
 
@@ -576,7 +576,7 @@ def desativar_mfa_usuario(usuario_id: str) -> Response:
         return redirect(url_for("main.gerenciar_usuarios"))
     except Exception as e:
         logger.exception("Erro ao desativar MFA do usuário: %s", e)
-        flash_t("error_editing_user", "danger", error=str(e))
+        flash_t("error_editing_user", "danger")
         return redirect(url_for("main.gerenciar_usuarios"))
 
 
@@ -607,5 +607,5 @@ def resetar_exp_usuario(usuario_id: str) -> Response:
 
     except Exception as e:
         logger.exception("Erro ao resetar EXP do usuário: %s", e)
-        flash_t("error_resetting_exp", "danger", error=str(e))
+        flash_t("error_resetting_exp", "danger")
         return redirect(url_for("main.gerenciar_usuarios"))

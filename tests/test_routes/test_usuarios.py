@@ -1187,6 +1187,33 @@ def test_editar_usuario_post_excecao_redireciona(client_logado_admin):
     assert r.status_code == 302
 
 
+def test_editar_usuario_post_excecao_nao_vaza_detalhe_interno(client_logado_admin):
+    """Achado BAIXO da auditoria 2026-08-06: flash de erro não deve expor
+    str(e) (detalhe interno de exceção) — só uma mensagem genérica traduzida.
+    O detalhe real continua indo pro logger.exception (já testado à parte)."""
+    fake = _usuario_fake(
+        uid="u_exc2", email="u_exc2@dtx.aero", nome="Exc User2", perfil="solicitante"
+    )
+    fake.areas = []
+    fake.update = MagicMock(side_effect=Exception("db broke: senha=hunter2 caminho=/srv/segredo"))
+    with (
+        patch(
+            "app.models_usuario.Usuario.get_by_id",
+            side_effect=_get_by_id_side_effect("u_exc2", fake),
+        ),
+        patch("app.routes.usuarios.Usuario.email_existe", return_value=False),
+    ):
+        r = client_logado_admin.post(
+            "/admin/usuarios/u_exc2/editar",
+            data={"email": "u_exc2@dtx.aero", "nome": "Exc User2 Novo", "perfil": "solicitante"},
+            follow_redirects=True,
+        )
+    assert r.status_code == 200
+    assert b"db broke" not in r.data
+    assert b"hunter2" not in r.data
+    assert b"/srv/segredo" not in r.data
+
+
 # ── Onda 2: desativar / ativar usuário ────────────────────────────────────────
 
 
