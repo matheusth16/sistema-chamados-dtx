@@ -22,6 +22,7 @@ from app.i18n import get_translated_status
 from app.models import Chamado
 from app.models_usuario import Usuario
 from app.services.analytics import _to_datetime, obter_sla_para_exibicao
+from app.services.gestor_escalonamento_service import construir_mapa_gestor_setor
 from app.services.notifications import (
     _base_url,
     _link_dashboard,
@@ -241,15 +242,13 @@ def _corpo_supervisor(
 
 def enviar_relatorio_semanal() -> dict[str, Any]:
     """
-    Busca chamados abertos/atrasados e envia para o relay um e-mail por supervisor:
+    Busca chamados abertos/atrasados e envia um e-mail por supervisor direto via
+    Microsoft Graph API (`enviar_email()` — sem relay/parsing de subject; resíduo
+    de design anterior removido na auditoria 2026-08-06).
 
-      Subject: REPORT_SEMANAL|{data}|{email_supervisor}
-
-    O Power Automate lê o subject, extrai o e-mail (3º segmento) e encaminha
-    o corpo HTML ao supervisor — mesmo mecanismo do CHAMADO_NOVO.
-
-    Admins recebem um resumo consolidado com subject:
-      REPORT_SEMANAL_ADMIN|{data}|{email_admin}
+    Admins recebem um resumo consolidado (todas as áreas). Gestores de setor
+    (`nivel_gestao == "gestor_setor"`) recebem um resumo consolidado só da
+    própria área, via `_enviar_resumo_gestores_area`.
 
     Retorna dict: enviados, ignorados, erros, total_chamados, total_atrasados.
     """
@@ -293,7 +292,12 @@ def enviar_relatorio_semanal() -> dict[str, Any]:
 
         supervisor = supervisores_map.get(responsavel_id)
         if not supervisor or not getattr(supervisor, "email", None):
-            logger.debug("Supervisor %s sem e-mail; ignorado.", responsavel_id)
+            # Todo responsável DEVE ter e-mail cadastrado (é o identificador de
+            # login) — se isso dispara de verdade, é dado inconsistente, não
+            # caso normal (achado da auditoria 2026-08-06: era logger.debug).
+            logger.warning(
+                "Supervisor %s sem e-mail cadastrado; relatório ignorado.", responsavel_id
+            )
             ignorados += len(lista)
             continue
 
@@ -315,6 +319,7 @@ def enviar_relatorio_semanal() -> dict[str, Any]:
             logger.warning("Falha ao enviar relatório para supervisor %s: %s", email_sup, err)
 
     _enviar_resumo_admins(chamados, grupos, supervisores_map, data_ref, link_dash, link_base)
+    _enviar_resumo_gestores_area(chamados, data_ref, link_dash, link_base)
 
     return {
         "enviados": enviados,
@@ -405,6 +410,65 @@ def _enviar_resumo_admins(
             logger.info("Resumo semanal enviado para admin %s", email_admin)
         else:
             logger.warning("Falha ao enviar resumo para admin %s: %s", email_admin, err)
+
+
+def _enviar_resumo_gestores_area(
+    chamados: list[dict[str, Any]],
+    data_ref: str,
+    link_dash: str,
+    link_base: str,
+) -> None:
+    """Envia resumo consolidado (só da própria área) para cada gestor_setor.
+
+    Achado da auditoria 2026-08-06: o relatório semanal só chegava ao
+    responsável do chamado e aos admins — o gestor da área (nivel_gestao ==
+    "gestor_setor") não recebia nada. Reusa a mesma fonte de verdade de
+    e-mails de gestor (`gestor_escalonamento_service.construir_mapa_gestor_setor`)
+    já usada pela escalação de SLA, em vez de duplicar essa lógica.
+    """
+    mapa_gestor_setor = construir_mapa_gestor_setor()
+    if not mapa_gestor_setor:
+        return
+
+    por_area: dict[str, list] = defaultdict(list)
+    for c in chamados:
+        por_area[c.get("area") or ""].append(c)
+
+    for area, lista in por_area.items():
+        email_gestor = mapa_gestor_setor.get(area)
+        if not email_gestor:
+            continue
+
+        atrasados = [c for c in lista if c["atrasado"]]
+        html = (
+            '<div style="font-family:Arial,sans-serif;max-width:760px;">'
+            f'<h2 style="color:#111827;">Weekly Area Report — {escape(area)} — {data_ref}</h2>'
+            f"<p><strong>Total open:</strong> {len(lista)} &nbsp;|&nbsp; "
+            f'<span style="color:#dc2626;"><strong>Overdue:</strong> {len(atrasados)}</span></p>'
+            + _tabela_html(lista, link_base)
+            + (
+                f'<a href="{link_dash}" style="background:#2563eb;color:white;padding:10px 20px;'
+                f'text-decoration:none;border-radius:6px;display:inline-block;margin-top:20px;">'
+                f"Open dashboard</a>"
+                if link_dash
+                else ""
+            )
+            + '<p style="margin-top:24px;color:#9ca3af;font-size:11px;"><em>Andon</em></p>'
+            "</div>"
+        )
+        assunto = f"Weekly area report — {area} — {data_ref}"
+        ok, err = enviar_email(email_gestor, assunto, html, importance="low")
+        if ok:
+            logger.info(
+                "Relatório semanal (área) enviado para gestor_setor %s (%s, %d chamados)",
+                email_gestor,
+                area,
+                len(lista),
+            )
+        else:
+            logger.warning(
+                "Falha ao enviar relatório de área para gestor_setor %s: %s", email_gestor, err
+            )
 
 
 def enviar_alertas_prazo_24h() -> dict[str, Any]:

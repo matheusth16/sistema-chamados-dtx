@@ -316,3 +316,139 @@ def test_relatorio_semanal_usa_get_by_ids_e_nao_get_by_id(app):
     ids_passados = set(mock_batch.call_args[0][0])
     assert ids_passados == {"sup-a", "sup-b", "sup-c"}
     mock_single.assert_not_called()
+
+
+def test_enviar_relatorio_semanal_envia_para_gestor_da_area(app):
+    """Achado da auditoria 2026-08-06: gestor_setor da área não recebia o
+    relatório semanal (só o responsável do chamado e os admins recebiam).
+    Com um chamado na área 'Manutenção' e um gestor_setor cadastrado pra essa
+    área, o gestor deve receber e-mail também."""
+    from app.services.report_service import enviar_relatorio_semanal
+
+    chamados = [
+        {
+            "id": "c1",
+            "numero": "CH-001",
+            "categoria": "Projetos",
+            "tipo": "Manutenção",
+            "area": "Manutenção",
+            "responsavel": "Supervisor",
+            "responsavel_id": "sup1",
+            "solicitante": "Solicitante",
+            "status": "Aberto",
+            "data_abertura_fmt": "01/01/2026",
+            "dias_aberto": 5,
+            "sla_label": "Ok",
+            "atrasado": False,
+            "sla_dias": 3,
+            "alerta_prazo_24h_enviado_em": None,
+        }
+    ]
+    supervisor = _make_usuario("sup@test.com", "Supervisor", "supervisor")
+
+    with (
+        app.app_context(),
+        patch("app.services.report_service.buscar_chamados_abertos", return_value=chamados),
+        patch("app.services.report_service.Usuario.get_by_ids", return_value={"sup1": supervisor}),
+        patch("app.services.report_service.Usuario.get_all", return_value=[]),
+        patch(
+            "app.services.report_service.construir_mapa_gestor_setor",
+            return_value={"Manutenção": "gestor.manutencao@dtx.aero"},
+        ),
+        patch("app.services.report_service.enviar_email", return_value=(True, None)) as mock_send,
+    ):
+        resultado = enviar_relatorio_semanal()
+
+    assert resultado["enviados"] == 1  # só conta supervisores, gestor de área é à parte
+    destinos = [call[0][0] for call in mock_send.call_args_list]
+    assert "gestor.manutencao@dtx.aero" in destinos
+
+
+def test_enviar_relatorio_semanal_nao_envia_gestor_area_sem_mapeamento(app):
+    """Área sem gestor_setor cadastrado não deve gerar tentativa de envio nem erro."""
+    from app.services.report_service import enviar_relatorio_semanal
+
+    chamados = [
+        {
+            "id": "c1",
+            "numero": "CH-001",
+            "categoria": "Projetos",
+            "tipo": "Manutenção",
+            "area": "Área Sem Gestor",
+            "responsavel": "Supervisor",
+            "responsavel_id": "sup1",
+            "solicitante": "Solicitante",
+            "status": "Aberto",
+            "data_abertura_fmt": "01/01/2026",
+            "dias_aberto": 5,
+            "sla_label": "Ok",
+            "atrasado": False,
+            "sla_dias": 3,
+            "alerta_prazo_24h_enviado_em": None,
+        }
+    ]
+    supervisor = _make_usuario("sup@test.com", "Supervisor", "supervisor")
+
+    with (
+        app.app_context(),
+        patch("app.services.report_service.buscar_chamados_abertos", return_value=chamados),
+        patch("app.services.report_service.Usuario.get_by_ids", return_value={"sup1": supervisor}),
+        patch("app.services.report_service.Usuario.get_all", return_value=[]),
+        patch("app.services.report_service.construir_mapa_gestor_setor", return_value={}),
+        patch("app.services.report_service.enviar_email", return_value=(True, None)) as mock_send,
+    ):
+        enviar_relatorio_semanal()
+
+    destinos = [call[0][0] for call in mock_send.call_args_list]
+    assert destinos == ["sup@test.com"]
+
+
+def test_enviar_relatorio_semanal_loga_warning_quando_responsavel_sem_email(app, caplog):
+    """Achado da auditoria 2026-08-06: responsável sem e-mail cadastrado era
+    tratado como caso normal (logger.debug). Todo responsável DEVE ter e-mail
+    (é o identificador de login) — se esse branch dispara de verdade, é sinal
+    de dado inconsistente e merece warning, não silêncio."""
+    import logging
+
+    from app.services.report_service import enviar_relatorio_semanal
+
+    chamados = [
+        {
+            "id": "c1",
+            "numero": "CH-001",
+            "categoria": "Projetos",
+            "tipo": "Manutenção",
+            "area": "Manutenção",
+            "responsavel": "Supervisor Sem Email",
+            "responsavel_id": "sup_sem_email",
+            "solicitante": "Solicitante",
+            "status": "Aberto",
+            "data_abertura_fmt": "01/01/2026",
+            "dias_aberto": 5,
+            "sla_label": "Ok",
+            "atrasado": False,
+            "sla_dias": 3,
+            "alerta_prazo_24h_enviado_em": None,
+        }
+    ]
+    supervisor_sem_email = _make_usuario(email=None, nome="Supervisor Sem Email")
+
+    with (
+        app.app_context(),
+        caplog.at_level(logging.WARNING, logger="app.services.report_service"),
+        patch("app.services.report_service.buscar_chamados_abertos", return_value=chamados),
+        patch(
+            "app.services.report_service.Usuario.get_by_ids",
+            return_value={"sup_sem_email": supervisor_sem_email},
+        ),
+        patch("app.services.report_service.Usuario.get_all", return_value=[]),
+        patch("app.services.report_service.construir_mapa_gestor_setor", return_value={}),
+        patch("app.services.report_service.enviar_email", return_value=(True, None)),
+    ):
+        resultado = enviar_relatorio_semanal()
+
+    assert resultado["ignorados"] == 1
+    assert any(
+        record.levelno == logging.WARNING and "sup_sem_email" in record.getMessage()
+        for record in caplog.records
+    )

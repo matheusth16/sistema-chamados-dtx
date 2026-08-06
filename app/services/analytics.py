@@ -17,6 +17,7 @@ from typing import Any
 
 from sqlalchemy import select
 
+import config as config_module
 from app import db as db_module
 from app.db.models.chamado import ChamadoRow
 from app.services.business_time import percentual_prazo_resolucao
@@ -31,28 +32,40 @@ _RELATORIO_CACHE_TTL_SEC = 300  # 5 minutos
 # razoavelmente frescos, longo o suficiente para não re-escanear 2000 docs por minuto.
 _ANALYTICS_QUERY_TTL_SEC = 60  # 1 minuto
 
-# Limite máximo de documentos em queries de analytics (evita estourar cota Firestore no plano Spark)
+# Limite máximo de registros em queries de analytics (protege performance/memória)
 MAX_CHAMADOS_ANALYTICS = 2000
-
-# SLA por categoria (dias para conclusão): Projetos 2 dias, demais 3 dias
-SLA_DIAS_PROJETOS = 2
-SLA_DIAS_PADRAO = 3
 
 
 def _sla_dias_por_categoria(categoria: str, sla_dias_custom: int | None = None) -> int:
-    """Retorna o prazo em dias do SLA. Se sla_dias_custom for fornecido (>0), usa-o."""
+    """Retorna o prazo em dias do SLA. Se sla_dias_custom for fornecido (>0), usa-o.
+
+    Lê de config.Config (SLA_DIAS_RESOLUCAO_PROJETOS/SLA_DIAS_RESOLUCAO_PADRAO)
+    em vez de manter constantes hardcoded próprias — achado da auditoria
+    2026-08-06: valores duplicados aqui podiam divergir silenciosamente do que
+    sla_escalacao_service.py de fato usa pra escalar (fonte de verdade real).
+
+    Resolve `config_module.Config` em tempo de chamada (não `from config import
+    Config` no topo do arquivo): alguns testes fazem `importlib.reload(config)`,
+    o que troca o objeto da classe Config — um bind feito na importação ficaria
+    apontando pra classe antiga e nunca veria o valor atualizado.
+    """
     if sla_dias_custom is not None and isinstance(sla_dias_custom, int) and sla_dias_custom > 0:
         return sla_dias_custom
-    return SLA_DIAS_PROJETOS if (categoria or "").strip() == "Projetos" else SLA_DIAS_PADRAO
+    return (
+        config_module.Config.SLA_DIAS_RESOLUCAO_PROJETOS
+        if (categoria or "").strip() == "Projetos"
+        else config_module.Config.SLA_DIAS_RESOLUCAO_PADRAO
+    )
 
 
-# Firestore sempre devolve datetimes tz-aware (UTC); usar um mínimo naive aqui
-# quebraria a comparação com data_limite/agora (também tz-aware) com TypeError.
+# Colunas DateTime(timezone=True) do Postgres sempre devolvem datetimes
+# tz-aware (UTC); usar um mínimo naive aqui quebraria a comparação com
+# data_limite/agora (também tz-aware) com TypeError.
 _DATETIME_MIN_UTC = datetime.min.replace(tzinfo=UTC)
 
 
 def _to_datetime(ts: Any) -> datetime | None:
-    """Converte valor do Firestore (Timestamp/datetime) para datetime. Evita queries extras."""
+    """Converte valor (datetime ou objeto tipo-Timestamp) para datetime. Evita queries extras."""
     if ts is None:
         return None
     if isinstance(ts, datetime):
@@ -76,7 +89,7 @@ def _dentro_sla(
 
 
 def obter_sla_para_exibicao(chamado: Any) -> dict[str, Any] | None:
-    """Retorna dict para exibir SLA na Gestão (dashboard). Sem leituras ao Firestore.
+    """Retorna dict para exibir SLA na Gestão (dashboard). Sem query ao banco.
 
     chamado: objeto com .data_abertura, .data_conclusao, .categoria, .status
     e opcionalmente .data_em_atendimento (usado quando status == 'Em Atendimento').
@@ -171,7 +184,7 @@ class AnalisadorChamados:
         """Retorna métricas gerais dos últimos N dias (até MAX_CHAMADOS_ANALYTICS docs).
 
         Se chamados_pre_carregados for fornecido (lista de dicts já materializados),
-        filtra por data em Python — nenhuma query ao Firestore é feita.
+        filtra por data em Python — nenhuma query ao banco é feita.
         """
         cache_key = f"analytics_metricas_gerais_{dias}"
         if chamados_pre_carregados is None:
@@ -317,7 +330,7 @@ class AnalisadorChamados:
         """Retorna métricas de desempenho de cada supervisor.
 
         Quando chamados_pre_carregados é fornecido (lista de to_dict() já materializados),
-        nenhuma query adicional ao Firestore é feita — elimina o N+1 anterior que fazia
+        nenhuma query adicional ao banco é feita — elimina o N+1 anterior que fazia
         1 query por supervisor. O chamador (obter_relatorio_completo) reutiliza a mesma
         carga de chamados entre todas as métricas.
         """
@@ -411,7 +424,7 @@ class AnalisadorChamados:
     ) -> list[dict[str, Any]]:
         """Retorna métricas de desempenho por área.
 
-        Quando chamados_pre_carregados é fornecido, nenhuma query adicional ao Firestore
+        Quando chamados_pre_carregados é fornecido, nenhuma query adicional ao banco
         é feita — elimina o N+1 anterior que fazia 1 query por área.
         """
         try:
@@ -509,7 +522,7 @@ class AnalisadorChamados:
         - Tempo médio de resolução: Automática vs Manual
         - Distribuição de carga após atribuição
 
-        Limita aos últimos `dias` e a MAX_CHAMADOS_ANALYTICS docs (performance e cota Firestore).
+        Limita aos últimos `dias` e a MAX_CHAMADOS_ANALYTICS registros (performance).
         """
         try:
             data_limite = datetime.now() - timedelta(days=dias)
@@ -708,7 +721,7 @@ class AnalisadorChamados:
         compara com os 30-60 dias atrás; dias=7 compara com os 7-14 dias atrás.
 
         Se chamados_pre_carregados for fornecido, filtra por data em Python —
-        nenhuma query ao Firestore é feita.
+        nenhuma query ao banco é feita.
         """
         cache_key = f"analytics_periodo_anterior_{dias}"
         if chamados_pre_carregados is None:
@@ -820,7 +833,7 @@ class AnalisadorChamados:
     # ========== CARGA UNIFICADA DE CHAMADOS ==========
 
     def _carregar_chamados_analytics(self) -> list[dict[str, Any]]:
-        """Carrega todos os chamados do Firestore com cache (TTL: _RELATORIO_CACHE_TTL_SEC).
+        """Carrega todos os chamados do banco com cache (TTL: _RELATORIO_CACHE_TTL_SEC).
 
         Centraliza a única query a 'chamados' para que obter_relatorio_completo possa
         distribuir o mesmo conjunto de dados para todas as funções de métricas.
@@ -853,7 +866,7 @@ class AnalisadorChamados:
         sem filtro de período.
 
         Com usar_cache=True (padrão), reutiliza resultado por 5 minutos (Redis ou memória),
-        evitando várias queries pesadas ao Firestore.
+        evitando várias queries pesadas ao banco.
         """
         cache_key = f"relatorio_completo_{dias}"
         try:

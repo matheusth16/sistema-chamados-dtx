@@ -556,6 +556,25 @@ def test_sla_dias_padrao_retorna_3():
     assert _sla_dias_por_categoria("Manutencao") == 3
 
 
+def test_sla_dias_padrao_acompanha_config_nao_fica_hardcoded():
+    """Achado da auditoria 2026-08-06: analytics.py duplicava
+    SLA_DIAS_PADRAO/SLA_DIAS_PROJETOS como constantes de módulo fixas, em vez
+    de ler de config.Config (que já é configurável via env var e é a fonte de
+    verdade usada por sla_escalacao_service.py). Isso podia divergir da
+    escalação real sem ninguém perceber. Este teste prova que analytics.py
+    agora reflete config.Config em vez de ter seu próprio valor hardcoded."""
+    from unittest.mock import patch
+
+    from app.services.analytics import _sla_dias_por_categoria
+
+    with (
+        patch("config.Config.SLA_DIAS_RESOLUCAO_PADRAO", 5),
+        patch("config.Config.SLA_DIAS_RESOLUCAO_PROJETOS", 9),
+    ):
+        assert _sla_dias_por_categoria("TI") == 5
+        assert _sla_dias_por_categoria("Projetos") == 9
+
+
 def test_to_datetime_none_retorna_none():
     from app.services.analytics import _to_datetime
 
