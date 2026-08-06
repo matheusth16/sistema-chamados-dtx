@@ -330,3 +330,29 @@ def test_no_legacy_rgba_comma_syntax_in_layout_css():
         "rgba() legado (vírgula) encontrado em CSS de layout — "
         "substituir por color-mix():\n" + "\n".join(violations)
     )
+
+
+# ===========================================================================
+# A6 – Auditoria 2026-08-06: sem innerHTML sem escape com dado do usuário
+# (Usuario.nome / notificação.titulo/mensagem) — XSS armazenado
+# ===========================================================================
+
+
+def test_base_html_notificacoes_nao_concatena_titulo_mensagem_sem_escape():
+    """base.html não deve montar o dropdown de notificações concatenando
+    n.titulo/n.mensagem direto em innerHTML — precisa escapar (textContent ou
+    helper de escape) antes de inserir no DOM."""
+    content = _read(os.path.join(_TEMPLATES, "base.html"))
+    assert '(n.titulo || "")' not in content, "base.html concatena n.titulo sem escape em innerHTML"
+    assert '(n.mensagem || "")' not in content, (
+        "base.html concatena n.mensagem sem escape em innerHTML"
+    )
+
+
+def test_formulario_html_observador_nome_nao_concatenado_sem_escape():
+    """formulario.html não deve montar a tag de observador concatenando
+    obs.nome direto em innerHTML — precisa escapar antes de inserir no DOM."""
+    content = _read(os.path.join(_TEMPLATES, "formulario.html"))
+    assert "'<span class=\"obs-tag-nome\">' + obs.nome + '</span>'" not in content, (
+        "formulario.html concatena obs.nome sem escape em innerHTML"
+    )

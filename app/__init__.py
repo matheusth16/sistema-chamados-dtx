@@ -48,9 +48,8 @@ def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
 
-    # PostgreSQL (Fase 2 — migração gradual do Firestore, ver docs/ENV.md).
-    # No-op se DATABASE_URL não estiver configurada (ainda o caso em produção
-    # até o corte do Marco 12); em testes, usa TEST_DATABASE_URL.
+    # PostgreSQL — banco de dados da aplicação (Firestore aposentado no
+    # Marco 12, 2026-08-04). Em testes, usa TEST_DATABASE_URL.
     from app.db import init_engine
 
     init_engine(app)
@@ -130,8 +129,9 @@ def create_app():
     # Idem para ANEXO_LOCAL_DIR (Fase 1 on-premise), se configurado
     _verificar_anexo_local_dir(app)
 
-    # Firebase é inicializado em app/database.py
-    # Não há tabelas para criar (Firestore é NoSQL)
+    # Schema Postgres é gerenciado via Alembic (alembic upgrade head), não aqui.
+    # app/database.py (Firebase) não é importado neste fluxo — sobra só como
+    # rede de segurança para scripts operacionais legados (ver auditoria 2026-08-05).
 
     # Agendamento: relatório semanal toda sexta-feira às 10h (Brasília)
     # Guard: Flask debug reloader spawns two processes; only the child (WERKZEUG_RUN_MAIN=true)
@@ -502,19 +502,28 @@ def _configurar_seguranca(app: Flask) -> None:
             "camera=(), microphone=(), geolocation=(), payment=()"
         )
         is_https = request.is_secure or request.headers.get("X-Forwarded-Proto") == "https"
-        if is_https and current_app.config.get("ENV") == "production":
-            # HSTS força HTTPS em conexões futuras (31536000 = 1 ano).
-            # preload exige max-age >= 1 ano + includeSubDomains — requisito do
-            # hstspreload.org. A diretiva por si só não coloca o domínio na lista
-            # pré-carregada dos navegadores: isso exige submissão manual em
-            # https://hstspreload.org depois do deploy com HTTPS já funcionando.
-            # Reversão é lenta (ciclo de release dos navegadores) — só habilitar
-            # quando HTTPS for garantidamente permanente no domínio e subdomínios.
-            response.headers["Strict-Transport-Security"] = (
-                "max-age=31536000; includeSubDomains; preload"
-            )
-            # CSP em produção: nonce para scripts inline (sem 'unsafe-inline').
-            # style-src usa 'unsafe-inline' em vez de nonce: o app define estilos via
+        if current_app.config.get("ENV") == "production":
+            if is_https:
+                # HSTS força HTTPS em conexões futuras (31536000 = 1 ano). Só faz
+                # sentido — e só é respeitado pelo browser — sobre uma conexão já
+                # segura; enviá-lo sobre HTTP puro não teria efeito (spec exige
+                # que clientes ignorem o header fora de HTTPS) e sinalizaria uma
+                # garantia de TLS que o deploy atual não tem.
+                # preload exige max-age >= 1 ano + includeSubDomains — requisito do
+                # hstspreload.org. A diretiva por si só não coloca o domínio na lista
+                # pré-carregada dos navegadores: isso exige submissão manual em
+                # https://hstspreload.org depois do deploy com HTTPS já funcionando.
+                # Reversão é lenta (ciclo de release dos navegadores) — só habilitar
+                # quando HTTPS for garantidamente permanente no domínio e subdomínios.
+                response.headers["Strict-Transport-Security"] = (
+                    "max-age=31536000; includeSubDomains; preload"
+                )
+            # CSP protege contra XSS no browser independente do transporte usado
+            # pra chegar até ele — diferente do HSTS, não depende de HTTPS (ver
+            # auditoria 2026-08-05: gate por is_https zerava essa defesa em
+            # deploys LAN-only sem TLS, como o atual).
+            # Nonce para scripts inline (sem 'unsafe-inline'). style-src usa
+            # 'unsafe-inline' em vez de nonce: o app define estilos via
             # element.style.x no JS (barras, cores dinâmicas) e nonce não cobre esse
             # caso (só <style>/<link>) — CSS injection é baixo risco comparado a script.
             nonce = g.get("csp_nonce", "")

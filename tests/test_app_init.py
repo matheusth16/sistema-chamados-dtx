@@ -399,6 +399,21 @@ def test_headers_hsts_csp_em_producao_https(app, client):
     assert "preload" in hsts
 
 
+def test_csp_aplicado_em_producao_mesmo_sem_https(app, client):
+    """LAN-only sem TLS (REQUIRE_HTTPS=False): CSP deve valer mesmo assim —
+    é defesa contra XSS no browser, não depende de transporte seguro. Antes
+    da correção, CSP só era enviado quando is_https, o que zerava a defesa em
+    profundidade em produções sem HTTPS (achado em auditoria, 2026-08-05).
+    HSTS continua não fazendo sentido sem HTTPS (browsers o ignoram fora de
+    conexão segura) e não deve ser enviado."""
+    app.config["ENV"] = "production"
+    app.config["REQUIRE_HTTPS"] = False
+    r = client.get("/login")
+    assert r.status_code == 200
+    assert "Content-Security-Policy" in r.headers
+    assert "Strict-Transport-Security" not in r.headers
+
+
 def test_validar_origin_rota_nao_critica_passa(app, client):
     """POST em rota não-crítica com APP_BASE_URL → não valida origin (retorna None)."""
     app.config["APP_BASE_URL"] = "https://app.example.com"

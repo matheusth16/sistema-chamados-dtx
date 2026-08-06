@@ -653,13 +653,19 @@
         var debounceTimer;
         var indiceAtivo = -1;
 
+        function _escapeHtml(s) {
+            var div = document.createElement('div');
+            div.textContent = s == null ? '' : String(s);
+            return div.innerHTML;
+        }
+
         function _renderTags() {
             tags.innerHTML = '';
             observadores.forEach(function(obs) {
                 var tag = document.createElement('span');
                 tag.className = 'bento-obs-tag';
                 tag.setAttribute('data-id', obs.usuario_id);
-                tag.innerHTML = '<span class="obs-tag-nome">' + obs.nome + '</span>' +
+                tag.innerHTML = '<span class="obs-tag-nome">' + _escapeHtml(obs.nome) + '</span>' +
                     '<button type="button" class="obs-tag-rm" aria-label="{{ t("remove_action") }}">×</button>';
                 tag.querySelector('.obs-tag-rm').addEventListener('click', function() {
                     observadores = observadores.filter(function(o) { return o.usuario_id !== obs.usuario_id; });

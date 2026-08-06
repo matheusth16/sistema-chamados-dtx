@@ -177,6 +177,12 @@
         var btnMarcarTodas = document.getElementById("btn-sino-marcar-todas");
         if (!btn || !lista) return;
 
+        function _escapeHtml(s) {
+          var div = document.createElement("div");
+          div.textContent = s == null ? "" : String(s);
+          return div.innerHTML;
+        }
+
         function dataRelativa(isoStr) {
           if (!isoStr) return "";
           var d = new Date(isoStr);
@@ -305,10 +311,10 @@
                     urlChamado +
                     '">' +
                     '<div class="font-semibold text-gray-800 text-sm">' +
-                    (n.titulo || "") +
+                    _escapeHtml(n.titulo) +
                     "</div>" +
                     '<div class="text-xs text-gray-600 mt-0.5">' +
-                    (n.mensagem || "") +
+                    _escapeHtml(n.mensagem) +
                     "</div>" +
                     (relativa
                       ? '<div class="text-xs text-gray-400 mt-1">' +
