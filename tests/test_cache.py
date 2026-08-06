@@ -151,20 +151,24 @@ def test_cache_get_redis_excecao_retorna_none():
 
 
 def test_cache_set_usa_redis_quando_disponivel():
-    """cache_set com Redis chama setex com key, ttl e JSON serializado."""
+    """cache_set com Redis chama set(key, valor, ex=ttl) com JSON serializado.
+
+    redis-py 8 deprecou setex() em favor de set(..., ex=...) — mesmo
+    comportamento, API recomendada (achado 2026-08-06, validado contra
+    Redis real no servidor antes de bumpar a dependência)."""
     mock_redis = MagicMock()
     with patch("app.cache._get_redis", return_value=mock_redis):
         cache_set("set_key", [1, 2, 3], ttl_seconds=120)
-    mock_redis.setex.assert_called_once()
-    args = mock_redis.setex.call_args[0]
+    mock_redis.set.assert_called_once()
+    args, kwargs = mock_redis.set.call_args
     assert args[0] == "set_key"
-    assert args[1] == 120
+    assert kwargs["ex"] == 120
 
 
 def test_cache_set_redis_excecao_nao_propaga():
     """cache_set com Redis que levanta exceção não propaga o erro."""
     mock_redis = MagicMock()
-    mock_redis.setex.side_effect = Exception("redis write error")
+    mock_redis.set.side_effect = Exception("redis write error")
     with patch("app.cache._get_redis", return_value=mock_redis):
         cache_set("err_set", "value")  # não deve levantar
 

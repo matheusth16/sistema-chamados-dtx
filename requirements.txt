@@ -44,4 +44,4 @@ bleach==6.4.0
 python-dotenv==1.2.2
 python-json-logger==3.2.1
 pytz==2025.2
-redis==7.2.0
+redis==8.1.0

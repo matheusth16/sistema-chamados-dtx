@@ -74,7 +74,7 @@ def cache_set(key: str, value: Any, ttl_seconds: int = 300) -> None:
         try:
             import json
 
-            r.setex(key, ttl_seconds, json.dumps(value, default=str))
+            r.set(key, json.dumps(value, default=str), ex=ttl_seconds)
         except Exception as e:
             logger.debug("Cache set falhou: %s", e)
         return
