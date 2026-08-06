@@ -442,6 +442,28 @@ def test_visualizar_chamado_solicitante_proprio_retorna_200(client_logado_solici
     assert r.status_code == 200
 
 
+def test_visualizar_chamado_solicitante_aguardando_informacao_mostra_resposta_texto(
+    client_logado_solicitante, db_session
+):
+    """GET /chamado/<id> com status 'Aguardando Informação' mostra o bloco de
+    resposta por texto (endpoint /responder-solicitante) — antes só existia o
+    fluxo de anexo tardio, obrigando anexar arquivo só pra escrever uma frase
+    (achado em auditoria, 2026-08-05: endpoint pronto no backend, nunca ligado
+    à UI)."""
+    from tests.factories import make_chamado
+
+    chamado = make_chamado(solicitante_id="sol_1", status="Aguardando Informação")
+    with patch("app.routes.dashboard.CategoriaSetor.get_all", return_value=[]):
+        r = client_logado_solicitante.get(f"/chamado/{chamado.id}", follow_redirects=False)
+    assert r.status_code == 200
+    html = r.get_data(as_text=True)
+    assert 'id="bloco-resposta-texto"' in html
+    assert 'id="sol-resposta-texto"' in html
+    assert "enviar-resposta-solicitante" in html
+    assert "enviarRespostaSolicitante" in html
+    assert "/responder-solicitante" in html
+
+
 def test_visualizar_chamado_solicitante_outro_redireciona(client_logado_solicitante, db_session):
     """GET /chamado/<id> com solicitante tentando ver chamado alheio redireciona."""
     from tests.factories import make_chamado

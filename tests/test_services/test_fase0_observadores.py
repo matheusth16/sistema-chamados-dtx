@@ -187,7 +187,7 @@ class TestPermissoesObservador:
         O controle de quem EDITA (vs só visualiza) é feito nas rotas por perfil.
         Observador com chamado não-Concluído: chamado_aceita_edicao_operacional retorna True.
         """
-        from app.services.permission_validation import chamado_aceita_edicao_operacional
+        from app.services.permissoes_edicao_chamado import chamado_aceita_edicao_operacional
 
         user = _usuario_mock("solicitante", uid="obs_id")
         chamado = _chamado_mock()

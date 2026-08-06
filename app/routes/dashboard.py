@@ -43,14 +43,12 @@ from app.services.dashboard_service import (
 from app.services.excel_export_service import MAX_EXPORT_CHAMADOS, _safe_cell
 from app.services.filters import aplicar_filtros_dashboard_com_paginacao
 from app.services.gestor_dashboard_service import obter_contexto_gestor_dashboard
-from app.services.permission_validation import (
+from app.services.permissions import usuario_pode_operar_chamado, usuario_pode_ver_chamado
+from app.services.permissoes_edicao_chamado import (
     chamado_aceita_transicao_status,
     filtrar_supervisores_por_area,
-    nivel_congelamento_chamado,
-    supervisor_pode_alterar_chamado,
+    montar_flags_detalhe_chamado,
 )
-from app.services.permissions import usuario_pode_operar_chamado, usuario_pode_ver_chamado
-from app.services.solicitante_edicao_service import segundos_restantes_janela_edicao
 from app.services.status_service import atualizar_status_chamado
 from app.utils import formatar_data_para_excel
 from config import Config
@@ -211,29 +209,18 @@ def visualizar_detalhe_chamado(chamado_id: str) -> Response:
                 else url_for("main.meus_chamados")
             )
         )
-        nivel = nivel_congelamento_chamado(chamado)
-        # Escrita é mais restritiva que leitura: usuario_pode_ver_chamado (já
-        # validado acima) libera dono/responsável/fila/participante/observador,
-        # mas só quem tem a área do chamado (ou admin) pode de fato editar — um
-        # supervisor que só enxerga o chamado como observador (cc) fica read-only.
-        # (supervisor_pode_alterar_chamado já bloqueia gestor_only internamente.)
-        pode_editar_base = supervisor_pode_alterar_chamado(current_user, chamado.area, chamado)
-        # Chamado Concluído (qualquer nível) bloqueia edição operacional no formulário
-        pode_editar = pode_editar_base and nivel is None
-        # Descrição é texto do solicitante — só admin pode sobrescrever (ver
-        # edicao_chamado_service.py); supervisor nunca edita o que foi escrito.
-        pode_editar_descricao = pode_editar and current_user.is_admin_or_above
+        flags = montar_flags_detalhe_chamado(current_user, chamado)
 
         usuarios_gestao = get_static_cached("usuarios_all", Usuario.get_all, ttl_seconds=300)
         supervisores_list = [u for u in usuarios_gestao if u.perfil == "supervisor" and u.nome]
-        if pode_editar_base:
+        if flags["pode_editar_base"]:
             supervisores_list = filtrar_supervisores_por_area(current_user, supervisores_list)
         supervisores_detalhados = (
             sorted(
                 [{"id": u.id, "nome": u.nome, "area": u.area} for u in supervisores_list],
                 key=lambda x: (x["nome"] or "").upper(),
             )
-            if pode_editar_base
+            if flags["pode_editar_base"]
             else []
         )
         setores = [
@@ -242,36 +229,19 @@ def visualizar_detalhe_chamado(chamado_id: str) -> Response:
             if getattr(s, "ativo", True)
         ]
 
-        _status_cancelaveis_sol = {"Aberto", "Em Atendimento", "Aguardando Informação"}
-        eh_dono_do_chamado = chamado.solicitante_id == current_user.id and not getattr(
-            current_user, "is_gestor_only", False
-        )
-        segundos_restantes = 0
-        pode_editar_descricao_solicitante = False
-        if eh_dono_do_chamado and chamado.status == "Aberto":
-            dt_ab = chamado._converter_timestamp(chamado.data_abertura)
-            if dt_ab:
-                segundos_restantes = segundos_restantes_janela_edicao(dt_ab)
-                pode_editar_descricao_solicitante = segundos_restantes > 0
-        pode_cancelar_solicitante = eh_dono_do_chamado and chamado.status in _status_cancelaveis_sol
-        _status_permitidos_anexo = {"Aberto", "Em Atendimento", "Aguardando Informação"}
-        pode_anexo_tardio_solicitante = (
-            eh_dono_do_chamado and chamado.status in _status_permitidos_anexo
-        )
-
         return render_template(
             "visualizar_chamado.html",
             chamado=chamado,
             voltar_url=voltar_url,
-            pode_editar=pode_editar,
-            pode_editar_descricao=pode_editar_descricao,
-            nivel_congelamento=nivel,
+            pode_editar=flags["pode_editar"],
+            pode_editar_descricao=flags["pode_editar_descricao"],
+            nivel_congelamento=flags["nivel_congelamento"],
             supervisores_detalhados=supervisores_detalhados,
             setores=setores,
-            pode_editar_descricao_solicitante=pode_editar_descricao_solicitante,
-            segundos_restantes_edicao=segundos_restantes,
-            pode_cancelar_solicitante=pode_cancelar_solicitante,
-            pode_anexo_tardio_solicitante=pode_anexo_tardio_solicitante,
+            pode_editar_descricao_solicitante=flags["pode_editar_descricao_solicitante"],
+            segundos_restantes_edicao=flags["segundos_restantes_edicao"],
+            pode_cancelar_solicitante=flags["pode_cancelar_solicitante"],
+            pode_anexo_tardio_solicitante=flags["pode_anexo_tardio_solicitante"],
         )
     except Exception as e:
         logger.exception("Erro ao exibir chamado %s: %s", chamado_id, e)

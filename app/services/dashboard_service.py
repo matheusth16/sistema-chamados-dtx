@@ -15,8 +15,8 @@ from app.models_categorias import CategoriaGate
 from app.models_usuario import Usuario
 from app.services.analytics import obter_sla_para_exibicao
 from app.services.filters import aplicar_filtros_dashboard_com_paginacao
-from app.services.permission_validation import filtrar_supervisores_por_area
 from app.services.permissions import usuario_pode_ver_chamado_otimizado
+from app.services.permissoes_edicao_chamado import filtrar_supervisores_por_area
 from app.utils import extrair_numero_chamado
 
 logger = logging.getLogger(__name__)
