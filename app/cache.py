@@ -4,8 +4,8 @@ Cache opcional com Redis para relatórios e listas.
 - Se REDIS_URL estiver definida no ambiente: usa Redis (compartilhado entre workers).
 - Senão: usa cache em memória (dict) por processo.
 
-Reduz 30-50% de queries ao Firestore em relatórios e listas pesadas.
-Em produção com Gunicorn/Cloud Run, defina REDIS_URL para cache e rate limit compartilhados.
+Reduz 30-50% de queries ao banco em relatórios e listas pesadas.
+Em produção, defina REDIS_URL para cache e rate limit compartilhados entre workers.
 """
 
 import contextlib

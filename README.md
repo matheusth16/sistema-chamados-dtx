@@ -1,17 +1,17 @@
 # Sistema de Chamados DTX
 
-> Sistema web de gerenciamento de chamados integrado com Firebase/Firestore, construído com Python/Flask.
+> Sistema web de gerenciamento de chamados, construído com Python/Flask + PostgreSQL.
 
 ![CI](https://github.com/matheusth16/sistema-chamados-dtx/actions/workflows/ci.yml/badge.svg)
 
 ## Características
 
 - **Paginação Otimizada**: Cursor-based pagination para performance com grandes volumes (sem OOM)
-- **Índices Firestore**: Índices compostos para máxima velocidade de queries
+- **Índices PostgreSQL**: Índices via migração Alembic para máxima velocidade de queries
 - **Atualização em Tempo Real**: Status atualiza sem recarregar a página
 - **Dashboard Completo**: Visualização, filtros, histórico de alterações e bulk status
 - **Autenticação Segura**: Login com Flask-Login e perfis (solicitante, supervisor, admin)
-- **Upload de Anexos**: Suporte a PDFs, imagens e outros formatos — armazenamento em Cloudflare R2 (privado, URLs pré-assinadas) com fallback para Firebase Storage
+- **Upload de Anexos**: Suporte a PDFs, imagens e outros formatos — armazenamento local (Fase 1) com fallback para Cloudflare R2 (privado, URLs pré-assinadas)
 - **Internacionalização (i18n)**: Suporte a PT-BR, EN e ES com painel de administração de textos
 - **Onboarding Interativo**: Tour guiado por perfil ao primeiro acesso (5–7 passos)
 - **Notificações**: E-mail, Web Push e notificações in-app com retry automático
@@ -22,7 +22,7 @@
 ## Requisitos
 
 - Python 3.14+
-- Firebase Account com Firestore e Firebase Storage
+- PostgreSQL (local ou via `docker compose up postgres`)
 - pip (gerenciador de pacotes Python)
 
 ## Instalação
@@ -153,7 +153,7 @@ sistema-chamados-dtx/
 │   ├── models_categorias.py      # Setores, Gates, Impactos
 │   ├── models_grupo_rl.py        # Grupos RL
 │   ├── models_historico.py       # Histórico de alterações
-│   ├── database.py               # Instância Firestore
+│   ├── database.py               # LEGADO: instância Firestore, não importado por app/ (rede de segurança até ~2026-09-03)
 │   ├── i18n.py                   # Internacionalização (PT-BR, EN, ES)
 │   ├── decoradores.py            # @requer_* decoradores de acesso
 │   └── translations.json         # Textos i18n (PT-BR/EN/ES)
@@ -178,8 +178,7 @@ sistema-chamados-dtx/
 ├── requirements.txt
 ├── requirements-dev.txt
 ├── pytest.ini
-├── firestore.indexes.json
-└── firestore.rules
+└── alembic/                      # Migrações de schema PostgreSQL
 ```
 
 ## CI/CD
@@ -268,16 +267,11 @@ cp .env.test.example .env.test
 | Filtrar (com índice) | 2–5s | 50–100ms | **50x** |
 | Busca full-text | 3–4s | 300–500ms | **10x** |
 
-### Índices Firestore necessários
+### Índices PostgreSQL necessários
 
-```bash
-firebase deploy --only firestore:indexes --project seu-projeto-id
-```
-
-Ou crie manualmente no console:
-1. `categoria` + `status` + `data_abertura`
-2. `status` + `data_abertura`
-3. `gate` + `status` + `data_abertura`
+Definidos via migração Alembic (`alembic/versions/`), não deploy manual. Colunas
+compostas indexadas: `categoria` + `status` + `data_abertura`, `status` +
+`data_abertura`, `gate` + `status` + `data_abertura`.
 
 ## Segurança
 
@@ -287,7 +281,7 @@ Ou crie manualmente no console:
 - CSRF protection ativado (Flask-WTF)
 - Senhas hasheadas com werkzeug
 - Logs de auditoria completos
-- Credenciais Firebase não versionadas
+- Credenciais (banco, R2, Graph API) não versionadas — só em `.env`
 - `SECRET_KEY` forte obrigatória em produção
 - Headers: `X-Content-Type-Options: nosniff`, `X-Frame-Options: SAMEORIGIN`, HSTS em HTTPS
 - Validação de Origin/Referer em POST sensíveis
@@ -306,25 +300,19 @@ Ou crie manualmente no console:
 | [docs/POLITICA_SEGURANCA_LGPD.md](docs/POLITICA_SEGURANCA_LGPD.md) | Segurança e conformidade LGPD |
 | [docs/DEPLOYMENT_PLAN.md](docs/DEPLOYMENT_PLAN.md) | Deploy (Docker / servidor local) |
 | [docs/onboarding.md](docs/onboarding.md) | Onboarding interativo: visão de produto e detalhes técnicos |
-| `firestore.rules` | Regras de segurança Firestore |
-| `firestore.indexes.json` | Índices Firestore |
+| `alembic/` | Migrações de schema PostgreSQL |
 
 ## Troubleshooting
 
-### `FAILED_PRECONDITION` em query
+### Query lenta ou erro de índice faltando
 
-**Causa:** Índice composto faltando no Firestore.
-**Solução:** Criar o índice no Firebase Console ou via `firebase deploy --only firestore:indexes`.
+**Causa:** Índice faltando numa coluna usada em `WHERE`/`ORDER BY` no PostgreSQL.
+**Solução:** Gerar uma migração Alembic com o índice (`alembic revision --autogenerate` ou `op.create_index(...)` manual) e aplicar com `alembic upgrade head`.
 
-### Dashboard carregando lento
+### Erro de conexão com o banco
 
-**Causa:** Firestore ainda indexando em background após criação de índices.
-**Solução:** Aguardar até 15 minutos.
-
-### Erro de conexão com Firebase
-
-**Causa:** `credentials.json` não encontrado na raiz do projeto.
-**Solução:** Baixar da conta de serviço no Firebase Console e colocar na raiz.
+**Causa:** `DATABASE_URL`/`TEST_DATABASE_URL` ausente ou Postgres não está rodando.
+**Solução:** Ver `docs/ENV.md` — confirmar a env var e que o serviço Postgres está de pé (local: `docker compose up postgres` ou instância local).
 
 ### `SECRET_KEY must be set` ao subir em produção
 

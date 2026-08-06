@@ -221,7 +221,7 @@ def get_translated_gate(gate_value, language="pt_BR"):
     Traduz o valor canônico de um gate para o idioma solicitado.
 
     Args:
-        gate_value (str): Valor canônico gravado no Firestore (ex: 'Gate 1 - Desmontagem', 'N/A')
+        gate_value (str): Valor canônico gravado no banco (ex: 'Gate 1 - Desmontagem', 'N/A')
         language (str): Código do idioma (pt_BR, en, es)
 
     Returns:

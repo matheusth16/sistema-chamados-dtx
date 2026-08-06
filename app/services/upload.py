@@ -136,7 +136,7 @@ def _upload_local(arquivo: Any, nome_final: str) -> str | None:
     """
     Salva o arquivo em disco local persistente (ANEXO_LOCAL_DIR).
     Retorna 'local:<nome_final>' em sucesso, ou None em falha (permite a
-    cascata em salvar_anexo continuar para R2/Firebase).
+    cascata em salvar_anexo continuar para R2).
     """
     pasta = current_app.config.get("ANEXO_LOCAL_DIR")
     if not pasta:
@@ -163,9 +163,10 @@ def _upload_local(arquivo: Any, nome_final: str) -> str | None:
 
 def salvar_anexo(arquivo: Any) -> str | None:
     """
-    Salva o anexo e retorna o identificador para guardar no chamado:
-    - URL do Firebase Storage (https://...) quando Storage está disponível;
-    - nome do arquivo quando salvo localmente (fallback).
+    Salva o anexo e retorna o identificador para guardar no chamado. Cascata:
+    local (Fase 1, 'local:<nome>', quando ANEXO_STORAGE_BACKEND=local) → R2
+    (URL https://..., preferencial em produção) → local em desenvolvimento
+    (nome do arquivo, apenas fallback fora de produção).
 
     Args:
         arquivo: FileStorage do request.files

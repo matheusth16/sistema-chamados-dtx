@@ -55,16 +55,16 @@ O Sistema de Chamados DTX Aerospace é uma aplicação web interna que gerencia 
 
 ### Onde roda
 
-- **Produção:** Docker (cloud) — `https://seu-dominio.com` (a definir)
-- **Banco de dados:** Google Firestore (Firebase)
-- **Arquivos:** Cloudflare R2 (bucket privado, URLs pré-assinadas com validade de 1h)
+- **Produção:** Docker no servidor físico on-premise (LAN-only, sem HTTPS/domínio público — ver `docs/ARQUITETURA.md`)
+- **Banco de dados:** PostgreSQL (SQLAlchemy 2.0 + Alembic) — Firestore aposentado em produção desde 2026-08-04 (Marco 12)
+- **Arquivos:** Cloudflare R2 (bucket privado, URLs pré-assinadas com validade de 1h) + disco local (Fase 1)
 - **E-mails:** Microsoft Graph API (client credentials)
 - **Cache / Rate limit:** Redis (em produção), dicionário em memória (local)
 
 ### Stack técnica resumida
 
 ```
-Flask 3.0  +  Firestore  +  Flask-Login  +  Flask-WTF (CSRF)
+Flask 3.1  +  PostgreSQL  +  Flask-Login  +  Flask-WTF (CSRF)
 Tailwind CSS (build via Node.js/Tailwind CLI no Docker)  +  GSAP 3 (animações)
 Python 3.12+  (local: 3.14)
 pytest + unittest.mock
@@ -89,7 +89,7 @@ pytest + unittest.mock
 
 Você vai precisar de acesso a:
 
-1. **Firebase Service Account** — arquivo JSON com credenciais do Firestore. Solicite ao responsável pelo projeto.
+1. **Acesso ao PostgreSQL de desenvolvimento/teste** — `DATABASE_URL`/`TEST_DATABASE_URL`, ver `docs/ENV.md`. (`credentials.json`/Firebase é opcional, só alimenta a rede de segurança de rollback em `app/database.py`.)
 2. **Variáveis de ambiente** — arquivo `.env` com todas as configurações. Ver seção [3.4 — Configurar variáveis de ambiente](#34-configurar-variáveis-de-ambiente).
 3. **Acesso ao repositório Git** — clone via SSH ou HTTPS.
 
@@ -230,7 +230,7 @@ sistema_chamados/
 │
 ├── app/                          # Código da aplicação Flask
 │   ├── __init__.py               # Factory da app, middlewares, scheduler, warmup
-│   ├── database.py               # Instância Firestore (db)
+│   ├── database.py               # LEGADO: instância Firestore, não importado por app/ (rede de segurança até ~2026-09-03)
 │   ├── decoradores.py            # @requer_perfil, @requer_solicitante, @requer_supervisor_area
 │   ├── exceptions.py             # Exceções customizadas do domínio
 │   ├── i18n.py                   # Internacionalização PT-BR / EN / ES
@@ -265,9 +265,9 @@ sistema_chamados/
 │   │   ├── chamados_listagem_service.py  # Consultas e filtros de chamados com paginação
 │   │   ├── edicao_chamado_service.py     # Edição de chamado existente
 │   │   ├── status_service.py             # Atualização de status + histórico + gamificação
-│   │   ├── upload.py                     # Upload R2 → Firebase Storage → disco local
+│   │   ├── upload.py                     # Upload local (Fase 1) → R2 → local (dev)
 │   │   ├── permissions.py                # RBAC: quem pode ver/editar chamado
-│   │   ├── permission_validation.py      # supervisor_pode_alterar_chamado(), verificar_permissao_mudanca_status()
+│   │   ├── permissoes_edicao_chamado.py      # supervisor_pode_alterar_chamado(), verificar_permissao_mudanca_status()
 │   │   ├── analytics.py                  # Métricas, SLA, relatório completo
 │   │   ├── report_service.py             # Relatório semanal por e-mail (HTML)
 │   │   ├── notifications.py              # E-mail via Microsoft Graph API (client credentials)
@@ -281,10 +281,9 @@ sistema_chamados/
 │   │   ├── assignment.py                 # Atribuição automática de responsável
 │   │   ├── translation_service.py        # Tradução PT→EN/ES: mapa estático + MyMemory API
 │   │   ├── gamification_service.py       # Sistema de pontuação e conquistas
-│   │   ├── gates_service.py              # build_gate_subetapas() / is_gate_valido() — Firestore+fallback
+│   │   ├── gates_service.py              # build_gate_subetapas() / is_gate_valido() — Postgres+fallback
 │   │   ├── filters.py                    # Filtros em memória para chamados
 │   │   ├── metrics.py                    # Coleta e agregação de métricas
-│   │   ├── pagination.py                 # Utilitários de paginação Firestore
 │   │   ├── excel_export_service.py       # Exportação de relatórios para Excel
 │   │   ├── contadores_uso.py             # Limite de uso diário por usuário
 │   │   └── onboarding_service.py         # Tour de boas-vindas por perfil
@@ -332,7 +331,7 @@ sistema_chamados/
 ├── Dockerfile                    # Imagem Docker da aplicação
 ├── package.json                  # Dependências Node.js (Tailwind CLI)
 ├── tailwind.config.js            # Configuração do Tailwind CSS e tokens DTX Light
-├── firestore.indexes.json        # 20 índices compostos do Firestore
+├── alembic/                      # Migrações de schema do PostgreSQL
 ├── ruff.toml                     # Configuração do linter
 ├── .pre-commit-config.yaml       # Hooks de pré-commit
 ├── requirements.txt              # Dependências de produção
@@ -352,7 +351,7 @@ sistema_chamados/
 | `app/routes/chamados.py` | Criação e listagem de chamados | chamados_criacao_service, validators | Todos |
 | `app/routes/dashboard.py` | Dashboard, visualização, histórico, export | dashboard_service, status_service | supervisor, admin |
 | `app/routes/api_chamados.py` | Endpoints JSON: status, edição, bulk, paginação, onboarding | permissions, status_service | Todos |
-| `app/routes/api_colaboracao.py` | Endpoints JSON: escalonamento, participantes | permission_validation | supervisor, admin |
+| `app/routes/api_colaboracao.py` | Endpoints JSON: escalonamento, participantes | permissoes_edicao_chamado | supervisor, admin |
 | `app/routes/api_notificacoes.py` | Endpoints JSON: notificações in-app, web push | notifications_inapp, webpush_service | Todos |
 | `app/routes/api_solicitante.py` | Endpoints JSON: self-service do solicitante | permissions | solicitante |
 | `app/routes/usuarios.py` | CRUD de usuários | models_usuario, notifications | admin |
@@ -361,7 +360,6 @@ sistema_chamados/
 | `app/i18n.py` | Internacionalização PT-BR/EN/ES com cache de mtime | translations.json | Todos |
 | `app/cache.py` | Cache Redis/memória com TTL | redis-py | Todos |
 | `app/limiter.py` | Instância Flask-Limiter compartilhada (Redis em prod, memória local) | flask_limiter, redis | Todos |
-| `app/firebase_retry.py` | Decorator `@firebase_retry` com backoff exponencial para operações Firestore | — | Todos |
 | `app/gates_config.py` | Catálogo canônico de gates: `GATE_PAI_OPCOES` e `GATE_SUBETAPAS` (fallback estático) | — | admin |
 | `app/decoradores.py` | `@requer_perfil`, `@requer_supervisor_area`, `@requer_admin_global` | flask_login, i18n | Todos |
 
@@ -370,30 +368,29 @@ sistema_chamados/
 | Módulo | Responsabilidade | Dependências principais | Perfis |
 |---|---|---|---|
 | `app/services/chamados_criacao_service.py` | Criação de chamado, upload, atribuição, notificações | upload, assignment, GrupoRL | Todos |
-| `app/services/chamados_listagem_service.py` | Queries e filtros de chamados com paginação Firestore | database, permissions, pagination | Todos |
-| `app/services/edicao_chamado_service.py` | Edição de campos de chamado existente com histórico | database, validators (max_len=3000) | supervisor, admin |
+| `app/services/chamados_listagem_service.py` | Queries e filtros de chamados com paginação por cursor (Postgres) | app.db (SQLAlchemy), permissions | Todos |
+| `app/services/edicao_chamado_service.py` | Edição de campos de chamado existente com histórico | app.db, validators (max_len=3000) | supervisor, admin |
 | `app/services/status_service.py` | Atualização de status, histórico, gamificação | Historico, notifications, GamificationService | supervisor, admin |
-| `app/services/upload.py` | Upload R2 → Firebase Storage → disco local | boto3, firebase_admin.storage | Todos |
+| `app/services/upload.py` | Upload local (Fase 1) → R2 → local (dev) | boto3 | Todos |
 | `app/services/permissions.py` | RBAC: quem pode ver/editar chamado | models_usuario | supervisor, admin |
-| `app/services/analytics.py` | Métricas, SLA, relatório completo (max 2000 docs) | Firestore, cache | supervisor, admin |
-| `app/services/report_service.py` | Relatório semanal HTML por e-mail para admins/supervisores | Firestore, Usuario, notif | supervisor, admin |
+| `app/services/analytics.py` | Métricas, SLA, relatório completo (max 2000 docs) | Postgres, cache | supervisor, admin |
+| `app/services/report_service.py` | Relatório semanal HTML por e-mail para admins/supervisores/gestores de área | Postgres, Usuario, notif | supervisor, admin |
 | `app/services/notifications.py` | E-mail via Microsoft Graph API (client credentials) | email_templates, GRAPH_TENANT_ID/CLIENT_ID/CLIENT_SECRET/SENDER_EMAIL | Todos |
 | `app/services/notifications_inapp.py` | Notificações in-app via Web Push VAPID | pywebpush, webpush_service | Todos |
-| `app/services/webpush_service.py` | Gerenciamento de inscrições push (criar, obter, deletar) | Firestore | Todos |
+| `app/services/webpush_service.py` | Gerenciamento de inscrições push (criar, obter, deletar) | Postgres | Todos |
 | `app/services/dashboard_service.py` | Lógica do painel administrativo, filtros, agregações | chamados_listagem_service | supervisor, admin |
 | `app/services/login_attempts.py` | Lockout de IP e e-mail, contador de tentativas | cache | Todos |
 | `app/services/validators.py` | Validação de entrada: campos, extensões, magic bytes, gates | models_categorias | Todos |
 | `app/services/assignment.py` | Atribuição automática de supervisor ao chamado (3 estratégias) | models_usuario, models_categorias | Todos |
-| `app/services/translation_service.py` | Tradução PT→EN/ES via mapa estático + MyMemory API (Firestore como fallback secundário) | TRANSLATION_MAP (dict global), MyMemory API | admin |
-| `app/services/gamification_service.py` | EXP, níveis, conquistas, exp_semanal (acumulado) | Firestore, status_service | Todos |
-| `app/services/gates_service.py` | `build_gate_subetapas()` e `is_gate_valido()` — consulta Firestore + fallback em `gates_config.py` | database, app/gates_config.py (full-scan sem cache — F-22) | Todos |
+| `app/services/translation_service.py` | Tradução PT→EN/ES via mapa estático + MyMemory API (Postgres como fallback secundário) | TRANSLATION_MAP (dict global), MyMemory API | admin |
+| `app/services/gamification_service.py` | EXP, níveis, conquistas, exp_semanal (acumulado) | Postgres, status_service | Todos |
+| `app/services/gates_service.py` | `build_gate_subetapas()` e `is_gate_valido()` — consulta Postgres + fallback em `gates_config.py` | app.db, app/gates_config.py (full-scan sem cache — F-22) | Todos |
 | `app/services/filters.py` | Filtragem em memória de chamados já carregados | — | supervisor, admin |
-| `app/services/metrics.py` | Coleta e agregação de métricas de uso e SLA | Firestore | supervisor, admin |
-| `app/services/pagination.py` | Utilitários de paginação cursor-based para Firestore | database | Todos |
+| `app/services/metrics.py` | Coleta e agregação de métricas de uso e SLA | Postgres | supervisor, admin |
 | `app/services/excel_export_service.py` | Exportação de chamados e relatórios para .xlsx | openpyxl | supervisor, admin |
-| `app/services/contadores_uso.py` | Controle de limite diário de uso por usuário | Firestore, Increment | Todos |
+| `app/services/contadores_uso.py` | Controle de limite diário de uso por usuário | Postgres, UPSERT atômico | Todos |
 | `app/services/onboarding_service.py` | Tour de boas-vindas: avancar_passo, concluir_onboarding | models_usuario | Todos |
-| `app/services/permission_validation.py` | `supervisor_pode_alterar_chamado()`, `verificar_permissao_mudanca_status()` | models_usuario, models | supervisor, admin |
+| `app/services/permissoes_edicao_chamado.py` | `supervisor_pode_alterar_chamado()`, `verificar_permissao_mudanca_status()` | models_usuario, models | supervisor, admin |
 | `app/services/email_templates.py` | Builders HTML reutilizáveis para e-mails transacionais | — | Todos |
 | `app/services/notify_retry.py` | `executar_com_retry()` com backoff exponencial para envio de e-mail | — | Todos |
 
@@ -411,7 +408,7 @@ sistema_chamados/
 
 | Módulo | Responsabilidade |
 |---|---|
-| `app/utils_areas.py` | `setor_para_area()` — Firestore `config/setor_para_area` + cache TTL 5 min + fallback estático `SETOR_PARA_AREA`; `invalidar_cache_setor_area()` para flush manual (F-30 resolvido) |
+| `app/utils_areas.py` | `setor_para_area()` — Postgres (`ConfigSetorAreaRow`) + cache TTL 5 min + fallback estático `SETOR_PARA_AREA`; `invalidar_cache_setor_area()` para flush manual (F-30 resolvido) |
 
 ### Scripts operacionais
 
@@ -1358,16 +1355,16 @@ Co-Authored-By: Claude <noreply@anthropic.com>
 R: Para compatibilidade com `unittest.mock`. Se você importar no topo do arquivo, o `patch()` nos testes não consegue interceptar as chamadas. Ver seção 12.
 
 **P: Como adiciono um novo campo ao modelo Chamado?**
-R: Edite `app/models.py`. Adicione o campo ao `to_dict()` e ao `from_dict()`. Se o campo precisa de índice no Firestore, adicione em `firestore.indexes.json` e faça deploy com `firebase deploy --only firestore:indexes`. Consulte `docs/INDICES_FIRESTORE.md`.
+R: Edite `app/models.py` e o mapeamento em `app/db/models/chamado.py` (`ChamadoRow`, `to_row_kwargs()`, `_from_row()`). Gere a migração com `alembic revision --autogenerate -m "descrição"` e aplique com `alembic upgrade head`.
 
-**P: Por que o pytest falha com "FirebaseApp not initialized"?**
-R: O `conftest.py` usa uma instância mock do Firestore. Se você importou `db` no topo de um módulo novo (em vez de dentro da função), o import acontece antes do mock ser aplicado. Mova o import para dentro da função ou use `patch()` corretamente.
+**P: Por que o pytest falha com erro de conexão com o banco?**
+R: A suíte usa Postgres real (`TEST_DATABASE_URL`, fixture `db_session` em `conftest.py`, com rollback por teste), não mock. Confirme que o Postgres de teste está rodando e a env var está setada — ver `.env.test`/`docs/ENV.md`.
 
 **P: Como faço para ver os logs de e-mail em desenvolvimento?**
 R: Deixe `GRAPH_TENANT_ID`, `GRAPH_CLIENT_ID`, `GRAPH_CLIENT_SECRET` e `GRAPH_SENDER_EMAIL` em branco no `.env`. O serviço de notificações detecta a ausência das credenciais e emite um `logging.warning` no console em vez de tentar enviar o e-mail real. Nunca use `MAIL_SERVER`/`BREVO_API_KEY` — essas variáveis não são mais suportadas.
 
-**P: Posso usar `db.collection().get()` para listar todos os chamados?**
-R: Não para coleções grandes. Sempre use paginação com `.limit()` e `.start_after()`. Ver `app/services/chamados_listagem_service.py` como exemplo.
+**P: Posso listar todos os chamados sem paginação?**
+R: Não para tabelas grandes. Use `LIMIT`/`OFFSET` (ou keyset/cursor) nas queries SQLAlchemy. Ver `app/services/chamados_listagem_service.py` como exemplo (paginação por cursor sobre prioridade/data_abertura/id).
 
 **P: Como reseto a senha de um usuário?**
 R: Via painel de admin em `/admin/usuarios`, ou via script: `python scripts/seed/criar_usuario.py --reset-senha`.
@@ -1405,8 +1402,8 @@ R: É um valor padrão inválido em `models_categorias.py:272` — foi escrito `
 **P: Por que `exp_semanal` do ranking não muda entre semanas?**
 R: Resolvido em 2026-06-18 (S4-02). `GamificationService.resetar_ranking_semanal()` é executado todo domingo 23h59 BRT via APScheduler com distributed lock Redis. Se você está em desenvolvimento local sem Redis, pode rodar manualmente: `python scripts/reset_ranking_semanal.py --force`.
 
-**P: Como faço deploy dos índices do Firestore?**
-R: Execute `firebase deploy --only firestore:indexes`. O arquivo `firestore.indexes.json` define os índices compostos. Sobre F-82 (resolvido): o filtro do dashboard por responsável usa o campo **`responsavel`** (nome), conforme `app/services/filters.py` (`FieldFilter("responsavel", "==", ...)`), portanto os índices sobre `responsavel` estão corretos. O campo `responsavel_id` (UID) também existe, mas é usado para agrupamento/atribuição e notificações, não para esse filtro.
+**P: Como adiciono um índice novo no Postgres?**
+R: Gere uma migração Alembic (`alembic revision --autogenerate -m "add index X"` ou escreva `op.create_index(...)` manualmente) e aplique com `alembic upgrade head`. Não existe mais deploy de índice separado (era `firebase deploy --only firestore:indexes`, resíduo da era Firestore).
 
 **P: Quais scripts de migração posso rodar com segurança?**
 R: `scripts/migrations/migrar_setores_catalogo.py` (tem `--dry-run`), `scripts/migrations/migrar_gates_subetapas.py` (idempotente) e `scripts/verificar_dependencias.py` (apenas leitura). Evite `scripts/migrations/atualizar_firebase.py` (obsoleto, apaga sem dry-run) e `scripts/migrations/atualizar_setores_from_print.py` (sem dry-run). Ver tabela de scripts na seção 5.

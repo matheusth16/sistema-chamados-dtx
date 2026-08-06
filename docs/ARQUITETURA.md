@@ -328,7 +328,7 @@ sequenceDiagram
 | `app/routes/chamados.py` | Criação e listagem de chamados (solicitante) | chamados_criacao_service, validators | Todos |
 | `app/routes/dashboard.py` | Dashboard, visualização, histórico, export | dashboard_service, status_service | supervisor, admin |
 | `app/routes/api_chamados.py` | Endpoints JSON: status, edição, bulk, paginação, onboarding, health | permissions, status_service | Todos |
-| `app/routes/api_colaboracao.py` | Endpoints JSON: escalonamento, participantes | permission_validation | supervisor, admin |
+| `app/routes/api_colaboracao.py` | Endpoints JSON: escalonamento, participantes | permissoes_edicao_chamado | supervisor, admin |
 | `app/routes/api_notificacoes.py` | Endpoints JSON: notificações in-app, web push | notifications_inapp, webpush_service | Todos |
 | `app/routes/api_solicitante.py` | Endpoints JSON: self-service do solicitante (download-anexo, editar, cancelar) | permissions | solicitante |
 | `app/routes/usuarios.py` | CRUD de usuários | models_usuario, notifications | admin |
@@ -375,7 +375,7 @@ sequenceDiagram
 | `app/services/onboarding_service.py` | Tour de boas-vindas: avancar_passo, concluir_onboarding | — |
 | `app/services/email_templates.py` | Builders HTML reutilizáveis para e-mails (`build_email_shell`, `build_detail_table`) | Usado por `notifications.py` |
 | `app/services/notify_retry.py` | `executar_com_retry()` com backoff exponencial para envio de e-mail | Usado em `usuarios.py` |
-| `app/services/permission_validation.py` | `supervisor_pode_alterar_chamado()`, `verificar_permissao_mudanca_status()` | Usado em `api_chamados.py`, `api_colaboracao.py` |
+| `app/services/permissoes_edicao_chamado.py` | `supervisor_pode_alterar_chamado()`, `verificar_permissao_mudanca_status()` | Usado em `api_chamados.py`, `api_colaboracao.py` |
 | `app/services/ab_service.py` | A/B test determinístico por UID (`get_variante`) — experimento AB-001 no formulário de chamados | Usado em `chamados.py`, `formulario.html` |
 
 ### Sistema de Gates (produção)
@@ -645,7 +645,7 @@ sequenceDiagram
 
 ### ADR-07 — `firestore.rules` nega todo acesso direto
 
-**Status:** Aceito
+**Status:** SUPERADO (Marco 12, 2026-08-04) — banco migrou pra PostgreSQL, `firestore.rules` foi removido do repositório (não existe cliente direto ao banco por construção; todo acesso é via backend Flask/SQLAlchemy). Preservado abaixo como registro histórico da decisão original.
 
 **Contexto:** O Firestore pode ser acessado tanto via SDK Admin (backend) quanto diretamente pelo cliente (Firebase JS SDK no browser).
 
@@ -878,29 +878,20 @@ Especificação completa: `docs/plans/2026-06-12-dtx-light-design-system.md`
 
 ---
 
-## 18. Índices Firestore
+## 18. Índices PostgreSQL
 
-`firestore.indexes.json` define 20 índices compostos necessários para as queries do dashboard e listagens.
+SUPERADO (Marco 12, 2026-08-04): esta seção descrevia os 20 índices compostos
+do Firestore (`firestore.indexes.json`, removido do repositório) — banco
+migrou pra PostgreSQL. Índices hoje são definidos via migração Alembic
+(`alembic/versions/`), aplicados com `alembic upgrade head`, sem passo de
+deploy separado (não há mais `firebase deploy --only firestore:indexes`).
+Os mesmos grupos lógicos de query (dashboard por status/área/responsável/data,
+listagem do solicitante, notificações, usuários, histórico) continuam
+indexados — ver as migrações em `alembic/versions/` pra composição exata.
 
-### Grupos de índices
+### Nota sobre o campo `responsavel` (F-82 — resolvido, ainda válida)
 
-| Grupo | Quantidade | Queries atendidas |
-|---|---|---|
-| chamados (dashboard) | 8 | Filtros por status, área, responsável, data |
-| chamados (solicitante) | 4 | Listagem dos próprios chamados |
-| notificações | 3 | Notificações por usuário e lidas/não lidas |
-| usuários | 2 | Listagem por área e perfil |
-| histórico | 3 | Histórico de atualizações por chamado |
-
-### Deploy dos índices
-
-```bash
-firebase deploy --only firestore:indexes
-```
-
-### Nota sobre o campo `responsavel` (F-82 — resolvido)
-
-O filtro do dashboard por responsável usa o campo **`responsavel`** (nome), conforme `app/services/filters.py` (`FieldFilter("responsavel", "==", ...)`). Portanto os índices compostos definidos sobre `responsavel` em `firestore.indexes.json` estão **corretos**. O campo `responsavel_id` (UID) também existe no modelo, mas é usado para atribuição, agrupamento e notificações — não para esse filtro. Não há divergência.
+O filtro do dashboard por responsável usa o campo **`responsavel`** (nome), conforme `app/services/filters.py` (`FieldFilter("responsavel", "==", ...)`). O campo `responsavel_id` (UID) também existe no modelo, mas é usado para atribuição, agrupamento e notificações — não para esse filtro. Não há divergência.
 
 ---
 

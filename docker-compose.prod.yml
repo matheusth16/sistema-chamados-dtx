@@ -6,10 +6,10 @@
 # — TESTE de acesso via IP da rede local (10.20.0.199:8080), sem exposição à
 # internet. Ver [[project_migracao_servidor_local]] antes de expor além da LAN.
 #
-# Requisito: .env criado direto no servidor (nunca commitado). Credencial do
-# Firebase vai via GOOGLE_CREDENTIALS_JSON dentro do .env (mesmo padrão já usado
-# no Azure Container Apps — ver app/database.py) — não precisa de arquivo
-# credentials.json montado.
+# Requisito: .env criado direto no servidor (nunca commitado). Banco real é
+# PostgreSQL (ver docs/ENV.md). GOOGLE_CREDENTIALS_JSON é OPCIONAL — só
+# alimenta a rede de segurança de rollback em app/database.py (Firestore, não
+# importado por app/ em runtime normal desde o Marco 12); pode ser omitido.
 
 services:
   # Fase 2 (Marco 12) — Postgres roda em LVM dedicado no HD de 1TB

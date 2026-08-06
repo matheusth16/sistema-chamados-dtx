@@ -1,7 +1,9 @@
 # Docker Compose — desenvolvimento local
 # Uso: docker compose up --build
 #
-# Requisito: credentials.json na raiz (conta de serviço Firebase)
+# Banco: PostgreSQL (ver docs/ENV.md). credentials.json (Firebase) é OPCIONAL —
+# só necessário pra rede de segurança de rollback em app/database.py (que não
+# é mais importado por app/ em runtime normal), remover o mount se não usar.
 # Variáveis de ambiente: copie .env.example -> .env e preencha
 
 services:
@@ -20,7 +22,7 @@ services:
       # Hot-reload do código sem rebuild (apenas em dev)
       - ./app:/app/app:ro
       - ./run.py:/app/run.py:ro
-      # Credenciais Firebase (não vão para a imagem)
+      # Credenciais Firebase (opcional — só p/ rede de segurança app/database.py; não vão para a imagem)
       - ./credentials.json:/app/credentials.json:ro
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')"]

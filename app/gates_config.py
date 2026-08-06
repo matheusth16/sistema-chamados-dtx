@@ -1,7 +1,8 @@
 """Configuração canônica de Gates e sub-etapas DTX.
 
-Valores gravados no Firestore são sempre os valores PT completos, ex.:
-'Gate 1 - Desmontagem'. A tradução para exibição é feita via i18n.
+Valores gravados no banco (chamados.gate, categorias_gates.nome_pt) são sempre
+os valores PT completos, ex.: 'Gate 1 - Desmontagem'. A tradução para exibição
+é feita via i18n.
 """
 
 # Opções do select pai (valor, label PT)
@@ -13,7 +14,7 @@ GATE_PAI_OPCOES: list[tuple[str, str]] = [
     ("Gate 4", "Gate 4"),
 ]
 
-# Sub-etapas por gate — valores canônicos gravados no Firestore
+# Sub-etapas por gate — valores canônicos gravados no banco
 GATE_SUBETAPAS: dict[str, list[str]] = {
     "Gate 1": [
         "Gate 1 - Desmontagem",

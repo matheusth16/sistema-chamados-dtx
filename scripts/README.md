@@ -69,7 +69,7 @@ Não há scripts manuais para acioná-los; esta tabela documenta configuração 
 
 | Job ID | Trigger | Serviço | Dependências em produção |
 |--------|---------|---------|--------------------------|
-| **`sla_escalacao`** (Fases 6–7) | Interval — a cada 10 min | `processar_escada_a()` + `processar_avisos_resolucao()` + `processar_escada_b()` | Usuários com Nível de Gestão cadastrados em `/admin/usuarios` (destinatários resolvidos via `gestor_escalonamento_service.py`, sem env var); índices Firestore `status ASC + escalacao_resposta_nivel ASC` e `status ASC + escalacao_resolucao_nivel ASC` (ver `docs/INDICES_FIRESTORE.md`) |
+| **`sla_escalacao`** (Fases 6–7) | Interval — a cada 10 min | `processar_escada_a()` + `processar_avisos_resolucao()` + `processar_escada_b()` | Usuários com Nível de Gestão cadastrados em `/admin/usuarios` (destinatários resolvidos via `gestor_escalonamento_service.py`, sem env var); índices Postgres em `status` + `escalacao_resposta_nivel` e `status` + `escalacao_resolucao_nivel` (ver `alembic/versions/`) |
 | **`relatorio_semanal`** | Cron — sex 10h00 BRT | `report_service.enviar_relatorio_semanal()` | `GRAPH_*` configurado para envio de e-mail |
 | **`reset_ranking_semanal`** | Cron — dom 23h59 BRT | `GamificationService.resetar_ranking_semanal()` | — |
 | **`limpar_contadores_uso`** | Cron — dom 02h00 BRT | `contadores_uso.limpar_contadores_antigos()` | — |
@@ -85,10 +85,8 @@ Todos os jobs usam `executar_job_com_lock` (`scheduler_lock.py`) para evitar exe
 }
 ```
 
-> **Índice Firestore obrigatório antes do primeiro deploy com Fase 6:**
-> `chamados` — `status ASC, escalacao_resposta_nivel ASC`.
-> Sem ele, `processar_escada_a()` falha com `FAILED_PRECONDITION` no Firestore.
-> Ver `docs/INDICES_FIRESTORE.md`.
+> **Índice Postgres obrigatório para `sla_escalacao` performar bem em volume:**
+> `chamados` — `status, escalacao_resposta_nivel`. Definido via migração Alembic.
 
 ---
 

@@ -12,7 +12,6 @@
 | [GUIA_ONBOARDING_TECNICO.md](GUIA_ONBOARDING_TECNICO.md) | Guia técnico de onboarding de devs |
 | [onboarding.md](onboarding.md) | Onboarding interativo — visão de produto |
 | [INCIDENT_RUNBOOK.md](INCIDENT_RUNBOOK.md) | Runbook de incidentes em produção |
-| [INDICES_FIRESTORE.md](INDICES_FIRESTORE.md) | Índices Firestore obrigatórios |
 | [MATRIZ_ROTAS_PERFIL.md](MATRIZ_ROTAS_PERFIL.md) | Matriz de rotas por perfil de usuário |
 | [POLITICA_SEGURANCA_LGPD.md](POLITICA_SEGURANCA_LGPD.md) | Segurança e conformidade LGPD |
 | [PRODUCT.md](PRODUCT.md) | Visão de produto |
