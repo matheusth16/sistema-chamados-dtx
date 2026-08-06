@@ -8,9 +8,32 @@ from flask_login import current_user, login_required
 from app.i18n import flash_t
 from app.routes import main
 from app.services import mfa_service
+from app.services.login_attempts import LOCKOUT_DURATION, MAX_LOGIN_ATTEMPTS, LoginAttemptTracker
 from app.utils import mask_email_for_log
 
 logger = logging.getLogger(__name__)
+
+
+def _checar_senha_com_rate_limit(senha_atual: str) -> bool:
+    """Reconfirmação de senha para ações sensíveis de MFA (desativar, regenerar
+    backup codes) — mesmo padrão de lockout do /login (achado da auditoria
+    2026-08-06: esses dois endpoints não tinham nenhum rate limit)."""
+    identificador = f"mfa-selfservice:{current_user.id}"
+    if LoginAttemptTracker.is_locked_out(identificador):
+        flash_t("login_temporarily_blocked", "danger", duration=LOCKOUT_DURATION // 60)
+        return False
+
+    if current_user.check_password(senha_atual):
+        LoginAttemptTracker.reset_attempts(identificador)
+        return True
+
+    tentativas = LoginAttemptTracker.increment_attempt(identificador)
+    if tentativas >= MAX_LOGIN_ATTEMPTS:
+        LoginAttemptTracker.apply_lockout(identificador)
+        flash_t("login_temporarily_blocked", "danger", duration=LOCKOUT_DURATION // 60)
+    else:
+        flash_t("current_password_incorrect", "danger")
+    return False
 
 
 @main.route("/mfa/configurar", methods=["GET", "POST"])
@@ -70,8 +93,7 @@ def mfa_codigos_backup() -> Response:
 def mfa_desativar() -> Response:
     """Desativa o MFA da própria conta — exige confirmação da senha atual."""
     senha_atual = request.form.get("senha_atual", "")
-    if not current_user.check_password(senha_atual):
-        flash_t("current_password_incorrect", "danger")
+    if not _checar_senha_com_rate_limit(senha_atual):
         return redirect(url_for("main.mfa_configurar"))
 
     current_user.update(mfa_enabled=False, mfa_secret=None, mfa_backup_codes=None)
@@ -85,8 +107,7 @@ def mfa_desativar() -> Response:
 def mfa_regenerar_backup_codes() -> Response:
     """Gera um novo conjunto de códigos de backup, invalidando os anteriores."""
     senha_atual = request.form.get("senha_atual", "")
-    if not current_user.check_password(senha_atual):
-        flash_t("current_password_incorrect", "danger")
+    if not _checar_senha_com_rate_limit(senha_atual):
         return redirect(url_for("main.mfa_configurar"))
 
     codigos_backup = mfa_service.gerar_codigos_backup()

@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 import pyotp
 
 from app.services import mfa_service
+from app.services.login_attempts import MAX_LOGIN_ATTEMPTS, LoginAttemptTracker
 
 
 def _usuario_mock(uid="u_mfa_setup", email="setup@test.com"):
@@ -311,3 +312,60 @@ def test_mfa_regenerar_backup_codes_com_senha_incorreta_nao_gera(client):
 
     assert r.status_code == 302
     usuario.update.assert_not_called()
+
+
+def test_mfa_desativar_bloqueia_apos_muitas_tentativas_erradas(client):
+    """Achado da auditoria 2026-08-06: /mfa/desativar não tinha rate limit na
+    reconfirmação de senha, diferente do /login (LoginAttemptTracker). Após
+    MAX_LOGIN_ATTEMPTS tentativas com senha errada, o endpoint deve bloquear
+    novas tentativas mesmo com a senha CORRETA (mesmo padrão do /verificar-mfa)."""
+    usuario = _usuario_mock()
+    LoginAttemptTracker.reset_attempts(f"mfa-selfservice:{usuario.id}")
+    with (
+        patch("app.routes.auth.Usuario.get_by_email", return_value=usuario),
+        patch("app.models_usuario.Usuario.get_by_id", return_value=usuario),
+    ):
+        client.post("/login", data={"email": usuario.email, "senha": "ok"})
+        usuario.mfa_enabled = True
+        usuario.check_password = MagicMock(return_value=False)
+
+        for _ in range(MAX_LOGIN_ATTEMPTS):
+            client.post("/mfa/desativar", data={"senha_atual": "errada"}, follow_redirects=False)
+
+        usuario.check_password = MagicMock(return_value=True)
+        r = client.post("/mfa/desativar", data={"senha_atual": "ok"}, follow_redirects=False)
+
+    assert r.status_code == 302
+    usuario.update.assert_not_called()
+    LoginAttemptTracker.reset_attempts(f"mfa-selfservice:{usuario.id}")
+
+
+def test_mfa_regenerar_backup_codes_bloqueia_apos_muitas_tentativas_erradas(client):
+    """Mesmo rate limit se aplica a /mfa/regenerar-backup-codes (compartilha o
+    identificador mfa-selfservice:{user_id} com /mfa/desativar — ambos exigem
+    reconfirmação de senha para uma ação sensível de MFA)."""
+    usuario = _usuario_mock()
+    LoginAttemptTracker.reset_attempts(f"mfa-selfservice:{usuario.id}")
+    with (
+        patch("app.routes.auth.Usuario.get_by_email", return_value=usuario),
+        patch("app.models_usuario.Usuario.get_by_id", return_value=usuario),
+    ):
+        client.post("/login", data={"email": usuario.email, "senha": "ok"})
+        usuario.mfa_enabled = True
+        usuario.check_password = MagicMock(return_value=False)
+
+        for _ in range(MAX_LOGIN_ATTEMPTS):
+            client.post(
+                "/mfa/regenerar-backup-codes",
+                data={"senha_atual": "errada"},
+                follow_redirects=False,
+            )
+
+        usuario.check_password = MagicMock(return_value=True)
+        r = client.post(
+            "/mfa/regenerar-backup-codes", data={"senha_atual": "ok"}, follow_redirects=False
+        )
+
+    assert r.status_code == 302
+    usuario.update.assert_not_called()
+    LoginAttemptTracker.reset_attempts(f"mfa-selfservice:{usuario.id}")
