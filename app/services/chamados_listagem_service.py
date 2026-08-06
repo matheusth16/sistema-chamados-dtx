@@ -94,16 +94,19 @@ def _aplicar_grupo_key(chamados: list[Chamado]) -> None:
 
 def contar_status_por_solicitante(user_id: str) -> dict[str, int]:
     """Contagem por status dos chamados do solicitante (aggregation query, sem
-    carregar documentos) — usada no badge do formulário de novo chamado."""
+    carregar documentos) — usada no badge do formulário de novo chamado.
+
+    Uma única query com GROUP BY (achado BAIXO da auditoria 2026-08-06: antes
+    fazia 4 SELECT COUNT(*) em loop, um por status)."""
+    status_counts = dict.fromkeys(_STATUS, 0)
     with db_module.SessionLocal() as session:
-        status_counts = {}
-        for st in _STATUS:
-            stmt = (
-                select(func.count())
-                .select_from(ChamadoRow)
-                .where(ChamadoRow.solicitante_id == user_id, ChamadoRow.status == st)
-            )
-            status_counts[st] = session.execute(stmt).scalar() or 0
+        stmt = (
+            select(ChamadoRow.status, func.count())
+            .where(ChamadoRow.solicitante_id == user_id, ChamadoRow.status.in_(_STATUS))
+            .group_by(ChamadoRow.status)
+        )
+        for status, total in session.execute(stmt).all():
+            status_counts[status] = total
     return status_counts
 
 

@@ -278,3 +278,32 @@ def test_contar_status_por_solicitante_sem_chamados():
     resultado = contar_status_por_solicitante("user_sem_nenhum_chamado")
 
     assert resultado == {"Aberto": 0, "Em Atendimento": 0, "Concluído": 0, "Cancelado": 0}
+
+
+def test_contar_status_por_solicitante_usa_uma_unica_query(db_session):
+    """Achado BAIXO da auditoria 2026-08-06: contar_status_por_solicitante fazia
+    4 SELECT COUNT(*) em loop (um por status) — deveria ser 1 único GROUP BY."""
+    from sqlalchemy import event
+
+    _criar_chamado("user_group_by", status="Aberto")
+    _criar_chamado("user_group_by", status="Aberto")
+    _criar_chamado("user_group_by", status="Em Atendimento")
+
+    statements = []
+    connection = db_session.get_bind()
+
+    def _capturar(conn, cursor, statement, parameters, context, executemany):
+        statements.append(statement)
+
+    event.listen(connection, "before_cursor_execute", _capturar)
+    try:
+        resultado = contar_status_por_solicitante("user_group_by")
+    finally:
+        event.remove(connection, "before_cursor_execute", _capturar)
+
+    selects_chamados = [s for s in statements if "FROM chamados" in s]
+    assert len(selects_chamados) == 1, (
+        f"esperava 1 única query (GROUP BY), achou {len(selects_chamados)}: {selects_chamados}"
+    )
+    assert resultado["Aberto"] == 2
+    assert resultado["Em Atendimento"] == 1
