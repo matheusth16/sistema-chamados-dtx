@@ -53,7 +53,7 @@ def transferir_area(
     """Transfere o chamado para outra área com novo responsável obrigatório.
 
     Args:
-        chamado_id: ID do documento no Firestore.
+        chamado_id: ID do chamado (chave primária em Postgres).
         area: Área destino (não vazia).
         supervisor_id: ID do supervisor destino — obrigatório (anti-órfão).
         motivo: Razão da transferência — obrigatório e não vazio.
@@ -146,7 +146,7 @@ def escalonar_colega(
     """Escala o chamado para um colega da mesma área sem alterar a área.
 
     Args:
-        chamado_id: ID do documento no Firestore.
+        chamado_id: ID do chamado (chave primária em Postgres).
         supervisor_id: ID do colega destino — obrigatório.
         motivo: Razão do escalonamento — obrigatório e não vazio.
         usuario: Usuário que executa a ação (owner ou admin).
@@ -258,11 +258,13 @@ def incluir_participantes(
     if not participantes_novos:
         return {"sucesso": False, "erro": _t("participants_list_cannot_be_empty")}
 
-    chamado = Chamado.get_by_id(chamado_id)
-    if chamado is None:
+    # ── validação de input (não depende do estado exato de participantes já
+    # existentes — duplicidade é revalidada dentro do lock, na leitura fresca) ──
+    chamado_preview = Chamado.get_by_id(chamado_id)
+    if chamado_preview is None:
         return {"sucesso": False, "erro": _t("ticket_not_found")}
 
-    if not (chamado.responsavel_id == usuario.id or usuario.is_admin_or_above):
+    if not (chamado_preview.responsavel_id == usuario.id or usuario.is_admin_or_above):
         logger.warning(
             "incluir_participantes negado: usuário %s não é owner do chamado %s",
             usuario.id,
@@ -270,10 +272,7 @@ def incluir_participantes(
         )
         return {"sucesso": False, "erro": _t("no_permission_include_participants")}
 
-    participantes_atuais = list(chamado.participantes or [])
-    ids_existentes = {p["supervisor_id"] for p in participantes_atuais}
-    adicionados = []
-
+    itens_validados = []
     for item in participantes_novos:
         sup_id = (item.get("supervisor_id") or "").strip()
         area = (item.get("area") or "").strip()
@@ -283,7 +282,7 @@ def incluir_participantes(
         if not area:
             return {"sucesso": False, "erro": _t("field_area_required_each")}
 
-        if sup_id == chamado.responsavel_id:
+        if sup_id == chamado_preview.responsavel_id:
             return {
                 "sucesso": False,
                 "erro": _t("owner_cannot_be_participant"),
@@ -297,34 +296,43 @@ def incluir_participantes(
                 "erro": _t("supervisor_not_found_in_area", sup_id=sup_id, area=area),
             }
 
-        if sup_id in ids_existentes:
-            continue
+        itens_validados.append({"supervisor_id": sup_id, "area": area, "nome": sup_obj.nome})
 
-        participantes_atuais.append(
-            {
-                "supervisor_id": sup_id,
-                "area": area,
-                "status": "pendente",
-                "concluido_em": None,
-            }
-        )
-        ids_existentes.add(sup_id)
-        adicionados.append({"supervisor_id": sup_id, "area": area, "nome": sup_obj.nome})
+    # ── leitura fresca + mutação + escrita, tudo sob lock da linha do chamado ──
+    with Chamado.editar_com_lock(chamado_id) as chamado:
+        if chamado is None:
+            return {"sucesso": False, "erro": _t("ticket_not_found")}
+
+        participantes_atuais = list(chamado.participantes or [])
+        ids_existentes = {p["supervisor_id"] for p in participantes_atuais}
+        adicionados = []
+
+        for item in itens_validados:
+            if item["supervisor_id"] in ids_existentes:
+                continue
+            participantes_atuais.append(
+                {
+                    "supervisor_id": item["supervisor_id"],
+                    "area": item["area"],
+                    "status": "pendente",
+                    "concluido_em": None,
+                }
+            )
+            ids_existentes.add(item["supervisor_id"])
+            adicionados.append(item)
+
+        total_anterior = len(chamado.participantes or [])
+        if adicionados:
+            chamado.participantes = participantes_atuais
+            chamado.supervisor_ids_com_acesso = calcular_supervisor_ids_com_acesso(
+                chamado.area, chamado.responsavel_id, participantes_atuais
+            )
 
     if not adicionados:
         return {
             "sucesso": False,
             "erro": _t("no_new_participants_to_include"),
         }
-
-    novos_ids = calcular_supervisor_ids_com_acesso(
-        chamado.area, chamado.responsavel_id, participantes_atuais
-    )
-
-    total_anterior = len(chamado.participantes or [])
-    chamado.participantes = participantes_atuais
-    chamado.supervisor_ids_com_acesso = novos_ids
-    chamado.salvar()
 
     nomes_adicionados = (
         ", ".join(f"{a['nome']} ({a['area']})" for a in adicionados) or "nenhum novo"
@@ -369,27 +377,25 @@ def concluir_minha_parte(chamado_id: str, usuario) -> dict:
         {"sucesso": True, "dados": {"pode_concluir_global": bool}}
         ou {"sucesso": False, "erro": "..."}.
     """
-    chamado = Chamado.get_by_id(chamado_id)
-    if chamado is None:
-        return {"sucesso": False, "erro": _t("ticket_not_found")}
+    with Chamado.editar_com_lock(chamado_id) as chamado:
+        if chamado is None:
+            return {"sucesso": False, "erro": _t("ticket_not_found")}
 
-    participantes = list(chamado.participantes or [])
-    idx = next(
-        (i for i, p in enumerate(participantes) if p.get("supervisor_id") == usuario.id),
-        None,
-    )
+        participantes = list(chamado.participantes or [])
+        idx = next(
+            (i for i, p in enumerate(participantes) if p.get("supervisor_id") == usuario.id),
+            None,
+        )
 
-    if idx is None:
-        return {"sucesso": False, "erro": _t("user_not_participant")}
+        if idx is None:
+            return {"sucesso": False, "erro": _t("user_not_participant")}
 
-    if participantes[idx].get("status") == "concluido":
-        return {"sucesso": False, "erro": _t("already_completed_own_part")}
+        if participantes[idx].get("status") == "concluido":
+            return {"sucesso": False, "erro": _t("already_completed_own_part")}
 
-    agora = datetime.now(ZoneInfo(Config.SLA_TIMEZONE))
-    participantes[idx] = {**participantes[idx], "status": "concluido", "concluido_em": agora}
-
-    chamado.participantes = participantes
-    chamado.salvar()
+        agora = datetime.now(ZoneInfo(Config.SLA_TIMEZONE))
+        participantes[idx] = {**participantes[idx], "status": "concluido", "concluido_em": agora}
+        chamado.participantes = participantes
 
     hist = Historico(
         chamado_id=chamado_id,
@@ -431,7 +437,7 @@ def definir_previsao_atendimento(
     Sem teto máximo de quanto pode adiar.
 
     Args:
-        chamado_id: ID do documento no Firestore.
+        chamado_id: ID do chamado (chave primária em Postgres).
         previsao: datetime até quando a escalada fica em silêncio — obrigatória, futura.
         motivo: Razão do adiamento — obrigatório e não vazio.
         usuario: Usuário que executa a ação — precisa ser owner ou admin, E supervisor+

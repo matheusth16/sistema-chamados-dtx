@@ -428,6 +428,88 @@ FERNANDA = _usuario("id_fernanda", "Fernanda Lima", areas=["Engenharia"])
 SOLICITANTE = _usuario("id_sol", "Sol User", "solicitante", areas=[])
 
 
+class TestEditarComLockConcorrencia:
+    """Regressão (auditoria 2026-08-05): salvar() fazia delete-all+reinsert de
+    participantes/observadores sem lock — duas mutações concorrentes no mesmo
+    chamado (ex: incluir_participantes e concluir_minha_parte) podiam sobrescrever
+    uma à outra silenciosamente. editar_com_lock() trava a linha do chamado
+    (SELECT ... FOR UPDATE) durante toda a janela leitura→escrita."""
+
+    def test_editar_com_lock_emite_select_for_update(self, db_session):
+        from sqlalchemy import event
+
+        chamado_id = _criar_chamado_real()
+        statements = []
+        connection = db_session.get_bind()
+
+        def _capturar(conn, cursor, statement, parameters, context, executemany):
+            statements.append(statement)
+
+        event.listen(connection, "before_cursor_execute", _capturar)
+        try:
+            with Chamado.editar_com_lock(chamado_id) as chamado:
+                assert chamado is not None
+                assert chamado.id == chamado_id
+        finally:
+            event.remove(connection, "before_cursor_execute", _capturar)
+
+        selects_chamados = [
+            s for s in statements if "FROM chamados" in s and "chamados_participantes" not in s
+        ]
+        assert selects_chamados, "esperava pelo menos um SELECT em chamados"
+        assert any("FOR UPDATE" in s.upper() for s in selects_chamados), (
+            "editar_com_lock deve travar a linha com SELECT ... FOR UPDATE"
+        )
+
+    def test_editar_com_lock_chamado_inexistente_retorna_none(self):
+        with Chamado.editar_com_lock(_ID_INEXISTENTE) as chamado:
+            assert chamado is None
+
+    def test_editar_com_lock_persiste_mutacao_de_participantes(self):
+        chamado_id = _criar_chamado_real(
+            participantes=[
+                {
+                    "supervisor_id": "id_pedro",
+                    "area": "Logistica",
+                    "status": "pendente",
+                    "concluido_em": None,
+                }
+            ]
+        )
+        with Chamado.editar_com_lock(chamado_id) as chamado:
+            chamado.participantes = [
+                *chamado.participantes,
+                {
+                    "supervisor_id": "id_fernanda",
+                    "area": "Engenharia",
+                    "status": "pendente",
+                    "concluido_em": None,
+                },
+            ]
+
+        recarregado = Chamado.get_by_id(chamado_id)
+        ids = {p["supervisor_id"] for p in recarregado.participantes}
+        assert ids == {"id_pedro", "id_fernanda"}
+
+    def test_editar_com_lock_nao_persiste_mutacao_se_excecao(self):
+        chamado_id = _criar_chamado_real(
+            participantes=[
+                {
+                    "supervisor_id": "id_pedro",
+                    "area": "Logistica",
+                    "status": "pendente",
+                    "concluido_em": None,
+                }
+            ]
+        )
+        with pytest.raises(RuntimeError), Chamado.editar_com_lock(chamado_id) as chamado:
+            chamado.participantes = []
+            raise RuntimeError("simula falha no meio da operação")
+
+        recarregado = Chamado.get_by_id(chamado_id)
+        assert len(recarregado.participantes) == 1
+
+
 class TestIncluirParticipantes:
     """Testes da função incluir_participantes."""
 

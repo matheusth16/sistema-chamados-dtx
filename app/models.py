@@ -1,4 +1,5 @@
 import logging
+from contextlib import contextmanager
 from datetime import datetime
 
 import pytz
@@ -12,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 class Chamado:
-    """Representação de um documento Chamado no Firestore"""
+    """Representação de um chamado (linha da tabela `chamados` no Postgres)."""
 
     def __init__(
         self,
@@ -131,8 +132,9 @@ class Chamado:
         self.motivo_previsao_atendimento = motivo_previsao_atendimento
 
     def _converter_timestamp(self, ts):
-        """Converte timestamp do Firestore para datetime em horário de Brasília.
-        Tolera tipos inesperados (string, etc.) e retorna None em caso de falha.
+        """Converte timestamp (datetime, ou qualquer objeto tipo-Timestamp com
+        .to_pydatetime()) para datetime em horário de Brasília. Tolera tipos
+        inesperados (string, etc.) e retorna None em caso de falha.
         """
         if ts is None:
             return None
@@ -143,10 +145,10 @@ class Chamado:
                 if ts.tzinfo is None:
                     ts = pytz.utc.localize(ts)
                 return ts.astimezone(pytz.timezone("America/Sao_Paulo"))
-            # Se for Timestamp do Firestore, converte para datetime
+            # Objetos tipo-Timestamp (ex.: pandas.Timestamp) expõem to_pydatetime()
             if hasattr(ts, "to_pydatetime"):
                 dt = ts.to_pydatetime()
-                # Firestore timestamps são UTC, então convertemos para Brasília
+                # Assume UTC quando o objeto não carrega timezone
                 if dt.tzinfo is None:
                     dt = pytz.utc.localize(dt)
                 return dt.astimezone(pytz.timezone("America/Sao_Paulo"))
@@ -183,7 +185,7 @@ class Chamado:
         return "-"
 
     def to_dict(self):
-        """Converte para dicionário para salvar no Firestore"""
+        """Converte para dicionário (serialização para templates, notificações, exports)."""
         return {
             "numero_chamado": self.numero_chamado,
             "categoria": self.categoria,
@@ -234,8 +236,8 @@ class Chamado:
 
     @classmethod
     def from_dict(cls, data: dict, id: str = None):
-        """Cria um objeto Chamado a partir de um dicionário do Firestore.
-        Usa valores padrão para campos ausentes (documentos antigos ou migrados).
+        """Cria um objeto Chamado a partir de um dicionário (ver to_dict()).
+        Usa valores padrão para campos ausentes (registros antigos ou migrados).
         Raises:
             ValidacaoChamadoError: Se dados estiverem vazios.
         """
@@ -442,6 +444,48 @@ class Chamado:
         except Exception as e:
             logger.exception("Erro ao buscar chamado %s: %s", chamado_id, e)
             return None
+
+    @classmethod
+    @contextmanager
+    def editar_com_lock(cls, chamado_id):
+        """Carrega o chamado travando a linha (SELECT ... FOR UPDATE) e, ao sair
+        do bloco `with` sem exceção, persiste os campos + participantes/
+        observadores dentro da MESMA transação.
+
+        Serializa mutações concorrentes no mesmo chamado (ex: um participante
+        chamando concluir_minha_parte enquanto o owner chama incluir_participantes)
+        — sem isso, salvar() fazia delete-all+reinsert de participantes/observadores
+        a partir de um snapshot Python já desatualizado, e a escrita que committasse
+        por último apagava silenciosamente a mudança da outra (achado em auditoria,
+        2026-08-05). Em caso de exceção dentro do bloco, a transação é revertida e
+        nada é persistido.
+
+        Uso:
+            with Chamado.editar_com_lock(chamado_id) as chamado:
+                if chamado is None:
+                    ...  # não encontrado
+                chamado.participantes = [...]
+        """
+        try:
+            cid = int(chamado_id)
+        except (TypeError, ValueError):
+            yield None
+            return
+        with db_module.SessionLocal() as session, session.begin():
+            row = session.execute(
+                select(ChamadoRow).where(ChamadoRow.id == cid).with_for_update()
+            ).scalar_one_or_none()
+            if row is None:
+                yield None
+                return
+            participantes = cls._carregar_participantes(session, cid)
+            observadores = cls._carregar_observadores(session, cid)
+            chamado = cls._from_row(row, participantes, observadores)
+            yield chamado
+            for k, v in chamado.to_row_kwargs().items():
+                setattr(row, k, v)
+            chamado._sincronizar_participantes(session)
+            chamado._sincronizar_observadores(session)
 
     def _sincronizar_participantes(self, session) -> None:
         """Substitui todos os participantes do chamado pelo estado atual de
