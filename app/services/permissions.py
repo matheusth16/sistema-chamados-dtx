@@ -1,5 +1,7 @@
 """
-Serviço de Permissões: verifica se um usuário pode ver/editar um chamado.
+Serviço de Permissões: verifica se um usuário pode VER um chamado (visibilidade/
+acesso de leitura). Para regras de MUTAÇÃO — transição de status, janela de
+edição, flags de UI —, ver app/services/permissoes_edicao_chamado.py.
 
 Centraliza a lógica de permissão que estava duplicada em 4+ locais.
 Ordem fail-closed:

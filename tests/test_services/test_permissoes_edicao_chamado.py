@@ -1,14 +1,14 @@
-"""Testes do serviço de validação de permissões (permission_validation)."""
+"""Testes do serviço de validação de permissões (permissoes_edicao_chamado)."""
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
-from app.services.permission_validation import (
+from app.services.permissions import usuario_pode_ver_chamado
+from app.services.permissoes_edicao_chamado import (
     filtrar_supervisores_por_area,
     supervisor_pode_alterar_chamado,
     usuario_pode_mutar_chamado,
     verificar_permissao_mudanca_status,
 )
-from app.services.permissions import usuario_pode_ver_chamado
 
 # ---------------------------------------------------------------------------
 # supervisor_pode_alterar_chamado (já existia, garante não-regressão)
@@ -407,7 +407,7 @@ def test_usuario_pode_mutar_chamado_ignora_argumento_chamado():
 
 def test_nivel_congelamento_nao_concluido_retorna_none():
     """Chamado não Concluído → sem congelamento (None)."""
-    from app.services.permission_validation import nivel_congelamento_chamado
+    from app.services.permissoes_edicao_chamado import nivel_congelamento_chamado
 
     chamado = MagicMock()
     chamado.status = "Aberto"
@@ -417,7 +417,7 @@ def test_nivel_congelamento_nao_concluido_retorna_none():
 
 def test_nivel_congelamento_concluido_pendente():
     """Concluído + confirmacao pendente → nível 1 ('pendente')."""
-    from app.services.permission_validation import nivel_congelamento_chamado
+    from app.services.permissoes_edicao_chamado import nivel_congelamento_chamado
 
     chamado = MagicMock()
     chamado.status = "Concluído"
@@ -427,7 +427,7 @@ def test_nivel_congelamento_concluido_pendente():
 
 def test_nivel_congelamento_concluido_confirmado():
     """Concluído + confirmacao confirmado → nível 2 ('confirmado')."""
-    from app.services.permission_validation import nivel_congelamento_chamado
+    from app.services.permissoes_edicao_chamado import nivel_congelamento_chamado
 
     chamado = MagicMock()
     chamado.status = "Concluído"
@@ -437,7 +437,7 @@ def test_nivel_congelamento_concluido_confirmado():
 
 def test_nivel_congelamento_aceita_dict():
     """nivel_congelamento_chamado aceita dict além de objeto."""
-    from app.services.permission_validation import nivel_congelamento_chamado
+    from app.services.permissoes_edicao_chamado import nivel_congelamento_chamado
 
     assert (
         nivel_congelamento_chamado({"status": "Concluído", "confirmacao_solicitante": "pendente"})
@@ -453,7 +453,7 @@ def test_nivel_congelamento_aceita_dict():
 
 def test_nivel_congelamento_concluido_confirmacao_none_congela_como_pendente():
     """Lacuna 1: Concluído + confirmacao_solicitante=None → congelado como pendente (legado)."""
-    from app.services.permission_validation import nivel_congelamento_chamado
+    from app.services.permissoes_edicao_chamado import nivel_congelamento_chamado
 
     chamado = MagicMock()
     chamado.status = "Concluído"
@@ -463,7 +463,7 @@ def test_nivel_congelamento_concluido_confirmacao_none_congela_como_pendente():
 
 def test_nivel_congelamento_concluido_campo_ausente_no_dict_congela():
     """Lacuna 1: dict Concluído sem campo confirmacao_solicitante → congelado como pendente."""
-    from app.services.permission_validation import nivel_congelamento_chamado
+    from app.services.permissoes_edicao_chamado import nivel_congelamento_chamado
 
     # dict sem a chave (get retorna None)
     assert nivel_congelamento_chamado({"status": "Concluído"}) == "pendente"
@@ -471,7 +471,7 @@ def test_nivel_congelamento_concluido_campo_ausente_no_dict_congela():
 
 def test_nivel_congelamento_concluido_confirmacao_string_vazia_congela():
     """Lacuna 1: Concluído + confirmacao_solicitante='' → congelado como pendente."""
-    from app.services.permission_validation import nivel_congelamento_chamado
+    from app.services.permissoes_edicao_chamado import nivel_congelamento_chamado
 
     assert (
         nivel_congelamento_chamado({"status": "Concluído", "confirmacao_solicitante": ""})
@@ -481,7 +481,7 @@ def test_nivel_congelamento_concluido_confirmacao_string_vazia_congela():
 
 def test_nivel_congelamento_concluido_reaberto_anomalia_congela_como_pendente():
     """Lacuna 1: Concluído + confirmacao='reaberto' é anomalia → congelado como pendente por segurança."""
-    from app.services.permission_validation import nivel_congelamento_chamado
+    from app.services.permissoes_edicao_chamado import nivel_congelamento_chamado
 
     chamado = MagicMock()
     chamado.status = "Concluído"
@@ -492,7 +492,7 @@ def test_nivel_congelamento_concluido_reaberto_anomalia_congela_como_pendente():
 
 def test_edicao_operacional_concluido_legado_none_bloqueado():
     """Lacuna 1: chamado legado (confirmacao=None) com status Concluído bloqueia edição operacional."""
-    from app.services.permission_validation import chamado_aceita_edicao_operacional
+    from app.services.permissoes_edicao_chamado import chamado_aceita_edicao_operacional
 
     admin = MagicMock()
     chamado = MagicMock()
@@ -505,7 +505,7 @@ def test_edicao_operacional_concluido_legado_none_bloqueado():
 
 def test_transicao_nivel1_legado_supervisor_aberto_aceito():
     """Lacuna 1: chamado legado (confirmacao=None) → nível 1; supervisor pode reabrir."""
-    from app.services.permission_validation import chamado_aceita_transicao_status
+    from app.services.permissoes_edicao_chamado import chamado_aceita_transicao_status
 
     sup = MagicMock()
     sup.perfil = "supervisor"
@@ -524,7 +524,7 @@ def test_transicao_nivel1_legado_supervisor_aberto_aceito():
 
 def test_edicao_operacional_nao_concluido_aceita():
     """Chamado Aberto → edição operacional aceita para qualquer perfil."""
-    from app.services.permission_validation import chamado_aceita_edicao_operacional
+    from app.services.permissoes_edicao_chamado import chamado_aceita_edicao_operacional
 
     admin = MagicMock()
     chamado = MagicMock()
@@ -537,7 +537,7 @@ def test_edicao_operacional_nao_concluido_aceita():
 
 def test_edicao_operacional_concluido_pendente_bloqueado_supervisor():
     """Nível 1 (pendente): supervisor não pode editar campos operacionais."""
-    from app.services.permission_validation import chamado_aceita_edicao_operacional
+    from app.services.permissoes_edicao_chamado import chamado_aceita_edicao_operacional
 
     sup = MagicMock()
     sup.perfil = "supervisor"
@@ -551,7 +551,7 @@ def test_edicao_operacional_concluido_pendente_bloqueado_supervisor():
 
 def test_edicao_operacional_concluido_pendente_bloqueado_admin():
     """Nível 1 (pendente): admin não pode editar campos operacionais (apenas reabrir)."""
-    from app.services.permission_validation import chamado_aceita_edicao_operacional
+    from app.services.permissoes_edicao_chamado import chamado_aceita_edicao_operacional
 
     admin = MagicMock()
     admin.perfil = "admin"
@@ -564,7 +564,7 @@ def test_edicao_operacional_concluido_pendente_bloqueado_admin():
 
 def test_edicao_operacional_concluido_confirmado_bloqueado():
     """Nível 2 (confirmado): ninguém pode editar campos operacionais."""
-    from app.services.permission_validation import chamado_aceita_edicao_operacional
+    from app.services.permissoes_edicao_chamado import chamado_aceita_edicao_operacional
 
     admin = MagicMock()
     chamado = MagicMock()
@@ -581,7 +581,7 @@ def test_edicao_operacional_concluido_confirmado_bloqueado():
 
 def test_transicao_status_nao_concluido_sempre_aceita():
     """Chamado não Concluído → sem restrição adicional de congelamento."""
-    from app.services.permission_validation import chamado_aceita_transicao_status
+    from app.services.permissoes_edicao_chamado import chamado_aceita_transicao_status
 
     sup = MagicMock()
     chamado = MagicMock()
@@ -593,7 +593,7 @@ def test_transicao_status_nao_concluido_sempre_aceita():
 
 def test_transicao_nivel1_supervisor_aberto_aceito():
     """Nível 1: supervisor pode reabrir (→ Aberto)."""
-    from app.services.permission_validation import chamado_aceita_transicao_status
+    from app.services.permissoes_edicao_chamado import chamado_aceita_transicao_status
 
     sup = MagicMock()
     sup.perfil = "supervisor"
@@ -607,7 +607,7 @@ def test_transicao_nivel1_supervisor_aberto_aceito():
 
 def test_transicao_nivel1_supervisor_em_atendimento_negado():
     """Nível 1: supervisor NÃO pode ir para Em Atendimento (contorna confirmação)."""
-    from app.services.permission_validation import chamado_aceita_transicao_status
+    from app.services.permissoes_edicao_chamado import chamado_aceita_transicao_status
 
     sup = MagicMock()
     sup.perfil = "supervisor"
@@ -621,7 +621,7 @@ def test_transicao_nivel1_supervisor_em_atendimento_negado():
 
 def test_transicao_nivel1_admin_aberto_aceito():
     """Nível 1: admin pode reabrir (→ Aberto)."""
-    from app.services.permission_validation import chamado_aceita_transicao_status
+    from app.services.permissoes_edicao_chamado import chamado_aceita_transicao_status
 
     admin = MagicMock()
     admin.perfil = "admin"
@@ -635,7 +635,7 @@ def test_transicao_nivel1_admin_aberto_aceito():
 
 def test_transicao_nivel1_admin_em_atendimento_negado():
     """Nível 1: admin NÃO pode ir para Em Atendimento (bloqueia bypass)."""
-    from app.services.permission_validation import chamado_aceita_transicao_status
+    from app.services.permissoes_edicao_chamado import chamado_aceita_transicao_status
 
     admin = MagicMock()
     admin.perfil = "admin"
@@ -649,7 +649,7 @@ def test_transicao_nivel1_admin_em_atendimento_negado():
 
 def test_transicao_nivel2_supervisor_tudo_negado():
     """Nível 2: supervisor não pode fazer nenhuma transição."""
-    from app.services.permission_validation import chamado_aceita_transicao_status
+    from app.services.permissoes_edicao_chamado import chamado_aceita_transicao_status
 
     sup = MagicMock()
     sup.perfil = "supervisor"
@@ -664,7 +664,7 @@ def test_transicao_nivel2_supervisor_tudo_negado():
 
 def test_transicao_nivel2_admin_somente_aberto():
     """Nível 2: admin pode apenas → Aberto; Cancelado e Em Atendimento negados."""
-    from app.services.permission_validation import chamado_aceita_transicao_status
+    from app.services.permissoes_edicao_chamado import chamado_aceita_transicao_status
 
     admin = MagicMock()
     admin.perfil = "admin"
@@ -709,3 +709,147 @@ def test_processar_edicao_chamado_bloqueia_gestor_defesa_em_profundidade():
 
     assert resultado["sucesso"] is False
     assert resultado.get("codigo") == 403
+
+
+# ---------------------------------------------------------------------------
+# montar_flags_detalhe_chamado — extraído de visualizar_detalhe_chamado
+# (app/routes/dashboard.py) na auditoria de 2026-08-05: a rota calculava ~10
+# regras de permissão/estado direto no controller.
+# ---------------------------------------------------------------------------
+
+
+def _chamado_mock(**overrides):
+    chamado = MagicMock()
+    chamado.area = "Manutencao"
+    chamado.status = "Aberto"
+    chamado.solicitante_id = "id_sol"
+    chamado.confirmacao_solicitante = None
+    chamado.data_abertura = "qualquer"
+    chamado._converter_timestamp.return_value = "dt_convertido"
+    for k, v in overrides.items():
+        setattr(chamado, k, v)
+    return chamado
+
+
+def _usuario_mock(**overrides):
+    usuario = MagicMock()
+    usuario.id = "id_sup"
+    usuario.perfil = "supervisor"
+    usuario.areas = ["Manutencao"]
+    usuario.is_admin_or_above = False
+    usuario.is_gestor_only = False
+    for k, v in overrides.items():
+        setattr(usuario, k, v)
+    return usuario
+
+
+def test_montar_flags_supervisor_area_correta_pode_editar():
+    from app.services.permissoes_edicao_chamado import montar_flags_detalhe_chamado
+
+    usuario = _usuario_mock()
+    chamado = _chamado_mock()
+    flags = montar_flags_detalhe_chamado(usuario, chamado)
+    assert flags["pode_editar_base"] is True
+    assert flags["pode_editar"] is True
+    assert flags["pode_editar_descricao"] is False  # supervisor não é admin
+    assert flags["nivel_congelamento"] is None
+
+
+def test_montar_flags_admin_pode_editar_descricao():
+    from app.services.permissoes_edicao_chamado import montar_flags_detalhe_chamado
+
+    usuario = _usuario_mock(perfil="admin", is_admin_or_above=True)
+    chamado = _chamado_mock()
+    flags = montar_flags_detalhe_chamado(usuario, chamado)
+    assert flags["pode_editar_descricao"] is True
+
+
+def test_montar_flags_chamado_concluido_bloqueia_edicao():
+    from app.services.permissoes_edicao_chamado import montar_flags_detalhe_chamado
+
+    usuario = _usuario_mock()
+    chamado = _chamado_mock(status="Concluído", confirmacao_solicitante=None)
+    flags = montar_flags_detalhe_chamado(usuario, chamado)
+    assert flags["nivel_congelamento"] == "pendente"
+    assert flags["pode_editar"] is False
+
+
+def test_montar_flags_dono_aberto_calcula_janela_edicao():
+    from app.services.permissoes_edicao_chamado import montar_flags_detalhe_chamado
+
+    usuario = _usuario_mock(id="id_sol", perfil="solicitante", areas=[])
+    chamado = _chamado_mock(status="Aberto", solicitante_id="id_sol")
+
+    with patch(
+        "app.services.permissoes_edicao_chamado.segundos_restantes_janela_edicao",
+        return_value=120,
+    ):
+        flags = montar_flags_detalhe_chamado(usuario, chamado)
+
+    assert flags["pode_editar_descricao_solicitante"] is True
+    assert flags["segundos_restantes_edicao"] == 120
+    assert flags["pode_cancelar_solicitante"] is True
+    assert flags["pode_anexo_tardio_solicitante"] is True
+
+
+def test_montar_flags_dono_janela_edicao_expirada():
+    from app.services.permissoes_edicao_chamado import montar_flags_detalhe_chamado
+
+    usuario = _usuario_mock(id="id_sol", perfil="solicitante", areas=[])
+    chamado = _chamado_mock(status="Aberto", solicitante_id="id_sol")
+
+    with patch(
+        "app.services.permissoes_edicao_chamado.segundos_restantes_janela_edicao",
+        return_value=0,
+    ):
+        flags = montar_flags_detalhe_chamado(usuario, chamado)
+
+    assert flags["pode_editar_descricao_solicitante"] is False
+    assert flags["segundos_restantes_edicao"] == 0
+    # cancelar/anexo tardio não dependem da janela de 15min, só do status
+    assert flags["pode_cancelar_solicitante"] is True
+
+
+def test_montar_flags_nao_dono_nao_ganha_flags_de_solicitante():
+    from app.services.permissoes_edicao_chamado import montar_flags_detalhe_chamado
+
+    usuario = _usuario_mock(id="id_outro", perfil="solicitante", areas=[])
+    chamado = _chamado_mock(status="Aberto", solicitante_id="id_sol")
+    flags = montar_flags_detalhe_chamado(usuario, chamado)
+    assert flags["pode_cancelar_solicitante"] is False
+    assert flags["pode_anexo_tardio_solicitante"] is False
+    assert flags["pode_editar_descricao_solicitante"] is False
+
+
+def test_montar_flags_gestor_only_nao_ganha_flags_de_solicitante_mesmo_sendo_dono():
+    from app.services.permissoes_edicao_chamado import montar_flags_detalhe_chamado
+
+    usuario = _usuario_mock(id="id_sol", perfil="solicitante", areas=[], is_gestor_only=True)
+    chamado = _chamado_mock(status="Aberto", solicitante_id="id_sol")
+    flags = montar_flags_detalhe_chamado(usuario, chamado)
+    assert flags["pode_cancelar_solicitante"] is False
+    assert flags["pode_anexo_tardio_solicitante"] is False
+
+
+def test_montar_flags_status_aguardando_informacao_permite_cancelar_e_anexo():
+    from app.services.permissoes_edicao_chamado import montar_flags_detalhe_chamado
+
+    usuario = _usuario_mock(id="id_sol", perfil="solicitante", areas=[])
+    chamado = _chamado_mock(status="Aguardando Informação", solicitante_id="id_sol")
+    flags = montar_flags_detalhe_chamado(usuario, chamado)
+    assert flags["pode_cancelar_solicitante"] is True
+    assert flags["pode_anexo_tardio_solicitante"] is True
+    # segundos_restantes só é calculado quando status == "Aberto"
+    assert flags["segundos_restantes_edicao"] == 0
+
+
+def test_docstring_do_modulo_faz_referencia_cruzada_a_permissions():
+    """Achado da task 11 (auditoria pausada 2026-08-05): o docstring de topo
+    deste módulo era genérico ("Validação de permissões de acesso a
+    chamados"), sem deixar claro que é sobre MUTAÇÃO (não visibilidade) nem
+    apontar para permissions.py, que já tem a referência cruzada inversa."""
+    import app.services.permissoes_edicao_chamado as modulo
+
+    doc = modulo.__doc__ or ""
+    assert "MUTAÇÃO" in doc.upper() or "MUTACAO" in doc.upper()
+    assert "permissions.py" in doc

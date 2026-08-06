@@ -1,5 +1,7 @@
 """
-Validação de permissões de acesso a chamados.
+Serviço de Permissões: verifica se um usuário pode fazer MUTAÇÃO num chamado
+(escrita — transição de status, janela de edição, flags de UI). Para regras de
+VISIBILIDADE — quem pode apenas VER o chamado —, ver app/services/permissions.py.
 
 Centraliza blocos de verificação (supervisor → areas) que apareciam
 duplicados em rotas do dashboard.
@@ -7,6 +9,8 @@ duplicados em rotas do dashboard.
 
 import logging
 from typing import Any
+
+from app.services.solicitante_edicao_service import segundos_restantes_janela_edicao
 
 logger = logging.getLogger(__name__)
 
@@ -184,6 +188,59 @@ def chamado_aceita_transicao_status(
         return False, "error_ticket_frozen_no_edit"
 
     return True, None
+
+
+def montar_flags_detalhe_chamado(usuario: Any, chamado: Any) -> dict:
+    """Calcula as flags de permissão/estado da tela de detalhe do chamado
+    (visualizar_chamado.html): o que pode ser editado e a janela de
+    ações do solicitante dono (edição de descrição, cancelamento, anexo tardio).
+
+    Extraído de visualizar_detalhe_chamado (app/routes/dashboard.py) — a rota
+    calculava essas ~10 regras direto no controller, misturando lógica de
+    negócio com montagem de resposta HTTP (achado em auditoria, 2026-08-05).
+    """
+    status_com_janela_solicitante = {"Aberto", "Em Atendimento", "Aguardando Informação"}
+
+    nivel = nivel_congelamento_chamado(chamado)
+    # Escrita é mais restritiva que leitura: usuario_pode_ver_chamado (checado
+    # pelo caller antes de chamar esta função) libera dono/responsável/fila/
+    # participante/observador, mas só quem tem a área do chamado (ou admin)
+    # pode de fato editar — supervisor que só enxerga como observador (cc)
+    # fica read-only. supervisor_pode_alterar_chamado já bloqueia gestor_only.
+    pode_editar_base = supervisor_pode_alterar_chamado(usuario, chamado.area, chamado)
+    # Chamado Concluído (qualquer nível) bloqueia edição operacional no formulário
+    pode_editar = pode_editar_base and nivel is None
+    # Descrição é texto do solicitante — só admin pode sobrescrever (ver
+    # edicao_chamado_service.py); supervisor nunca edita o que foi escrito.
+    pode_editar_descricao = pode_editar and usuario.is_admin_or_above
+
+    eh_dono_do_chamado = chamado.solicitante_id == usuario.id and not getattr(
+        usuario, "is_gestor_only", False
+    )
+    segundos_restantes = 0
+    pode_editar_descricao_solicitante = False
+    if eh_dono_do_chamado and chamado.status == "Aberto":
+        dt_ab = chamado._converter_timestamp(chamado.data_abertura)
+        if dt_ab:
+            segundos_restantes = segundos_restantes_janela_edicao(dt_ab)
+            pode_editar_descricao_solicitante = segundos_restantes > 0
+    pode_cancelar_solicitante = eh_dono_do_chamado and chamado.status in (
+        status_com_janela_solicitante
+    )
+    pode_anexo_tardio_solicitante = eh_dono_do_chamado and chamado.status in (
+        status_com_janela_solicitante
+    )
+
+    return {
+        "nivel_congelamento": nivel,
+        "pode_editar_base": pode_editar_base,
+        "pode_editar": pode_editar,
+        "pode_editar_descricao": pode_editar_descricao,
+        "pode_editar_descricao_solicitante": pode_editar_descricao_solicitante,
+        "segundos_restantes_edicao": segundos_restantes,
+        "pode_cancelar_solicitante": pode_cancelar_solicitante,
+        "pode_anexo_tardio_solicitante": pode_anexo_tardio_solicitante,
+    }
 
 
 def filtrar_supervisores_por_area(usuario: Any, supervisores: list) -> list:
