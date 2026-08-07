@@ -154,9 +154,33 @@ def get_language_code(lang_param):
     return "en"
 
 
+def _get_setores_banco():
+    """Carrega os setores cadastrados via admin (nome_pt/nome_en/nome_es), usando o
+    cache estático em memória (TTL 30 min, invalidado em app/routes/categorias.py
+    a cada criação/edição/exclusão). Só retorna setores ativos.
+
+    Import local (não no topo do módulo) pra evitar import circular:
+    app.models_categorias -> app (pacote) -> app.i18n. Isolado numa função à
+    parte pra dar pra mockar em teste sem precisar de banco real."""
+    try:
+        from app.cache import get_static_cached
+        from app.models_categorias import CategoriaSetor
+
+        return get_static_cached("categorias_setor", CategoriaSetor.get_all, ttl_seconds=1800)
+    except Exception:
+        logger.exception("Erro ao carregar setores do banco para tradução")
+        return []
+
+
 def get_translated_sector(sector_name, language="pt_BR"):
     """
-    Traduz o nome de um setor usando seu mapeamento de chave.
+    Traduz o nome de um setor.
+
+    Primeiro tenta os setores cadastrados no banco (nome_pt/nome_en/nome_es —
+    cobre setores criados ou renomeados via admin/categorias, ex: 'Compradores').
+    Se não achar lá, cai no mapa estático legado (SECTOR_KEYS_MAP), que cobre
+    setores históricos hardcoded, incl. os já desativados que só aparecem em
+    chamados/usuários antigos.
 
     Args:
         sector_name (str): Nome do setor em português (ex: 'Engenharia')
@@ -165,6 +189,14 @@ def get_translated_sector(sector_name, language="pt_BR"):
     Returns:
         str: Texto traduzido ou o nome original se não encontrado
     """
+    for setor in _get_setores_banco():
+        if setor.nome_pt == sector_name:
+            if language == "en":
+                return setor.nome_en or setor.nome_pt
+            if language == "es":
+                return setor.nome_es or setor.nome_pt
+            return setor.nome_pt
+
     translation_key = SECTOR_KEYS_MAP.get(sector_name)
     if translation_key:
         return get_translation(translation_key, language)

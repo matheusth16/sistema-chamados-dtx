@@ -161,20 +161,26 @@ def test_get_translation_kwargs_keyerror_retorna_sem_formato():
 
 
 def test_get_translated_sector_setor_conhecido():
-    """get_translated_sector traduz setor conhecido."""
+    """get_translated_sector traduz setor conhecido via mapa estático (setor não está no banco)."""
     from app.i18n import get_translated_sector
 
     sample = {"maintenance": {"pt_BR": "Manutenção", "en": "Maintenance", "es": "Mantenimiento"}}
-    with patch("app.i18n.get_translations_dict", return_value=sample):
+    with (
+        patch("app.i18n.get_translations_dict", return_value=sample),
+        patch("app.i18n._get_setores_banco", return_value=[]),
+    ):
         result = get_translated_sector("Manutencao", "en")
     assert result == "Maintenance"
 
 
 def test_get_translated_sector_desconhecido_retorna_original():
-    """get_translated_sector retorna nome original quando setor não mapeado."""
+    """get_translated_sector retorna nome original quando setor não mapeado em lugar nenhum."""
     from app.i18n import get_translated_sector
 
-    with patch("app.i18n.get_translations_dict", return_value={}):
+    with (
+        patch("app.i18n.get_translations_dict", return_value={}),
+        patch("app.i18n._get_setores_banco", return_value=[]),
+    ):
         result = get_translated_sector("Setor Desconhecido", "en")
     assert result == "Setor Desconhecido"
 
@@ -187,10 +193,81 @@ def test_get_translated_sector_list_traduz_multiplos():
         "maintenance": {"pt_BR": "Manutenção", "en": "Maintenance", "es": "Mantenimiento"},
         "quality": {"pt_BR": "Qualidade", "en": "Quality", "es": "Calidad"},
     }
-    with patch("app.i18n.get_translations_dict", return_value=sample):
+    with (
+        patch("app.i18n.get_translations_dict", return_value=sample),
+        patch("app.i18n._get_setores_banco", return_value=[]),
+    ):
         result = get_translated_sector_list("Manutencao, Qualidade", "en")
     assert "Maintenance" in result
     assert "Quality" in result
+
+
+# ── get_translated_sector — setor cadastrado no banco (admin/categorias) ──────
+# Bug real: setor renomeado via admin (ex: 'Compradores', EN 'Buyers') aparecia
+# em português mesmo com o app em inglês, porque get_translated_sector só
+# olhava o mapa estático SECTOR_KEYS_MAP (hardcoded), que não conhece setores
+# criados/editados dinamicamente pelo admin.
+
+
+class _SetorFake:
+    def __init__(self, nome_pt, nome_en=None, nome_es=None):
+        self.nome_pt = nome_pt
+        self.nome_en = nome_en
+        self.nome_es = nome_es
+
+
+def test_get_translated_sector_prioriza_setor_do_banco():
+    """Setor cadastrado via admin (fora do mapa estático) traduz corretamente."""
+    from app.i18n import get_translated_sector
+
+    banco = [_SetorFake("Compradores", nome_en="Buyers", nome_es="Compradores")]
+    with patch("app.i18n._get_setores_banco", return_value=banco):
+        assert get_translated_sector("Compradores", "en") == "Buyers"
+        assert get_translated_sector("Compradores", "es") == "Compradores"
+        assert get_translated_sector("Compradores", "pt_BR") == "Compradores"
+
+
+def test_get_translated_sector_banco_tem_prioridade_sobre_mapa_estatico():
+    """Se o mesmo nome existir no banco E no mapa estático, o banco vence (é a fonte viva)."""
+    from app.i18n import get_translated_sector
+
+    sample = {"maintenance": {"pt_BR": "Manutenção", "en": "Maintenance", "es": "Mantenimiento"}}
+    banco = [_SetorFake("Manutencao", nome_en="Maintenance (renamed)", nome_es="Mantenimiento")]
+    with (
+        patch("app.i18n.get_translations_dict", return_value=sample),
+        patch("app.i18n._get_setores_banco", return_value=banco),
+    ):
+        assert get_translated_sector("Manutencao", "en") == "Maintenance (renamed)"
+
+
+def test_get_translated_sector_banco_sem_traducao_usa_nome_pt():
+    """Setor do banco sem nome_en/nome_es preenchido cai pro nome_pt em vez de None."""
+    from app.i18n import get_translated_sector
+
+    banco = [_SetorFake("Compradores", nome_en=None, nome_es=None)]
+    with patch("app.i18n._get_setores_banco", return_value=banco):
+        assert get_translated_sector("Compradores", "en") == "Compradores"
+
+
+def test_get_translated_sector_list_usa_banco():
+    """get_translated_sector_list também respeita setores cadastrados no banco."""
+    from app.i18n import get_translated_sector_list
+
+    banco = [_SetorFake("Compradores", nome_en="Buyers")]
+    with patch("app.i18n._get_setores_banco", return_value=banco):
+        result = get_translated_sector_list("Compradores, Qualidade", "en")
+    assert "Buyers" in result
+
+
+def test_get_setores_banco_erro_retorna_lista_vazia():
+    """_get_setores_banco não propaga exceção (ex: sem conexão) — retorna [] e cai no mapa estático.
+    Patch em app.cache.get_static_cached (não em CategoriaSetor.get_all) pra não depender
+    do cache estático em memória — que persiste entre testes no mesmo processo e poderia
+    mascarar o side_effect se já tivesse um valor cacheado de outro teste."""
+    from app.i18n import _get_setores_banco
+
+    with patch("app.cache.get_static_cached", side_effect=RuntimeError("sem db")):
+        assert _get_setores_banco() == []
 
 
 def test_get_translated_sector_list_vazio_retorna_vazio():
@@ -384,7 +461,10 @@ def test_get_translated_sector_planejamento_producao_en():
             "es": "Planificación de Producción",
         }
     }
-    with patch("app.i18n.get_translations_dict", return_value=sample):
+    with (
+        patch("app.i18n.get_translations_dict", return_value=sample),
+        patch("app.i18n._get_setores_banco", return_value=[]),
+    ):
         assert get_translated_sector("Planejamento de Produção", "en") == "Production Planning"
 
 
@@ -399,7 +479,10 @@ def test_get_translated_sector_planejamento_producao_es():
             "es": "Planificación de Producción",
         }
     }
-    with patch("app.i18n.get_translations_dict", return_value=sample):
+    with (
+        patch("app.i18n.get_translations_dict", return_value=sample),
+        patch("app.i18n._get_setores_banco", return_value=[]),
+    ):
         assert (
             get_translated_sector("Planejamento de Produção", "es") == "Planificación de Producción"
         )
@@ -416,7 +499,10 @@ def test_get_translated_sector_alias_ppcp_en():
             "es": "Planificación de Producción",
         }
     }
-    with patch("app.i18n.get_translations_dict", return_value=sample):
+    with (
+        patch("app.i18n.get_translations_dict", return_value=sample),
+        patch("app.i18n._get_setores_banco", return_value=[]),
+    ):
         assert get_translated_sector("PPCP", "en") == "Production Planning"
 
 
@@ -425,7 +511,10 @@ def test_get_translated_sector_compras_en():
     from app.i18n import get_translated_sector
 
     sample = {"procurement": {"pt_BR": "Compras", "en": "Procurement", "es": "Aprovisionamiento"}}
-    with patch("app.i18n.get_translations_dict", return_value=sample):
+    with (
+        patch("app.i18n.get_translations_dict", return_value=sample),
+        patch("app.i18n._get_setores_banco", return_value=[]),
+    ):
         assert get_translated_sector("Compras", "en") == "Procurement"
 
 
@@ -434,7 +523,10 @@ def test_get_translated_sector_alias_procurement_en():
     from app.i18n import get_translated_sector
 
     sample = {"procurement": {"pt_BR": "Compras", "en": "Procurement", "es": "Aprovisionamiento"}}
-    with patch("app.i18n.get_translations_dict", return_value=sample):
+    with (
+        patch("app.i18n.get_translations_dict", return_value=sample),
+        patch("app.i18n._get_setores_banco", return_value=[]),
+    ):
         assert get_translated_sector("Procurement", "en") == "Procurement"
 
 
@@ -449,7 +541,10 @@ def test_get_translated_sector_producao_usinagem_historico():
             "es": "Producción - Mecanizado",
         }
     }
-    with patch("app.i18n.get_translations_dict", return_value=sample):
+    with (
+        patch("app.i18n.get_translations_dict", return_value=sample),
+        patch("app.i18n._get_setores_banco", return_value=[]),
+    ):
         assert get_translated_sector("Produção - Usinagem", "en") == "Production - Machining"
 
 
