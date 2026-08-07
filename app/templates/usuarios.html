@@ -59,24 +59,24 @@
               {{ translate_sector_list(usuario.area) if usuario.area else '-' }}
             </td>
             <td style="text-align:right;">
-              <div class="flex gap-2 justify-end flex-nowrap">
+              <div class="flex gap-1.5 justify-end flex-nowrap">
                 {% if current_user.perfil == 'admin' %}
                 <form method="POST" action="{{ url_for('main.resetar_exp_usuario', usuario_id=usuario.id) }}" data-confirm="{{ t('confirm_reset_exp', nome=usuario.nome) }}">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                  <button type="submit" class="bento-row-btn" style="background:var(--color-status-open-bg); color:var(--color-bento-warning);" title="{{ t('reset_exp_btn_title') }}">
+                  <button type="submit" class="bento-row-btn compact" style="background:var(--color-status-open-bg); color:var(--color-bento-warning);" title="{{ t('reset_exp_btn_title') }}">
                     {{ t('reset_exp_btn') }}
                   </button>
                 </form>
                 {% endif %}
 
-                <a href="{{ url_for('main.editar_usuario', usuario_id=usuario.id) }}" class="bento-row-btn edit">
+                <a href="{{ url_for('main.editar_usuario', usuario_id=usuario.id) }}" class="bento-row-btn compact edit">
                   {{ t('edit') }}
                 </a>
 
                 {% if usuario.id != current_user.id %}
                 <form method="POST" action="{{ url_for('main.resetar_senha_usuario', usuario_id=usuario.id) }}" data-confirm="{{ t('confirm_reset_password', nome=usuario.nome) }}">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                  <button type="submit" class="bento-row-btn" style="background:#fff7ed; color:#c2410c;" title="{{ t('reset_password_btn_title') }}">
+                  <button type="submit" class="bento-row-btn compact" style="background:#fff7ed; color:#c2410c;" title="{{ t('reset_password_btn_title') }}">
                     {{ t('reset_password_btn') }}
                   </button>
                 </form>
@@ -85,7 +85,7 @@
                 {% if usuario.mfa_enabled %}
                 <form method="POST" action="{{ url_for('main.desativar_mfa_usuario', usuario_id=usuario.id) }}" data-confirm="{{ t('confirm_disable_mfa', nome=usuario.nome) }}">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                  <button type="submit" class="bento-row-btn" style="background:#eff6ff; color:#1d4ed8;" title="{{ t('disable_mfa_btn_title') }}">
+                  <button type="submit" class="bento-row-btn compact" style="background:#eff6ff; color:#1d4ed8;" title="{{ t('disable_mfa_btn_title') }}">
                     {{ t('disable_mfa_btn') }}
                   </button>
                 </form>
@@ -94,12 +94,12 @@
                 {% if usuario.id != current_user.id %}
                 <form method="POST" action="{{ url_for('main.deletar_usuario', usuario_id=usuario.id) }}" data-confirm="{{ t('confirm_delete_user', nome=usuario.nome) }}">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                  <button type="submit" class="bento-row-btn delete">
+                  <button type="submit" class="bento-row-btn compact delete">
                     {{ t('delete') }}
                   </button>
                 </form>
                 {% else %}
-                <button type="button" disabled class="bento-row-btn" style="background:var(--color-surface-canvas); color:var(--color-surface-muted); cursor:not-allowed;" title="{{ t('cannot_delete_yourself') }}">
+                <button type="button" disabled class="bento-row-btn compact" style="background:var(--color-surface-canvas); color:var(--color-surface-muted); cursor:not-allowed;" title="{{ t('cannot_delete_yourself') }}">
                   {{ t('delete') }}
                 </button>
                 {% endif %}

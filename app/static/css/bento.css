@@ -261,12 +261,14 @@ dialog.bento-modal h2{ font-size:1.1rem; font-weight:800; margin:0; }
 dialog.bento-modal textarea{ width:100%; background:var(--color-surface-canvas); border:1.5px solid transparent; border-radius:14px; padding:11px 14px; font-family:inherit; font-size:14px; color:inherit; resize:vertical; min-height:96px; }
 dialog.bento-modal textarea:focus{ outline:none; border-color:var(--color-dtx-500); background:#fff; }
 
-/* usuarios.html — tabela de 5 colunas, ações com vários botões de texto precisa de mais espaço */
-.bento-table-scope table.users-table th:nth-child(1), .bento-table-scope table.users-table td:nth-child(1){ width:14%; }
-.bento-table-scope table.users-table th:nth-child(2), .bento-table-scope table.users-table td:nth-child(2){ width:16%; white-space:normal; }
+/* usuarios.html — tabela de 5 colunas. Ações com até 5 botões de texto: coluna recebe a maior
+   fatia (54%) e os botões usam .bento-row-btn.compact (ver abaixo) pra caber numa linha só,
+   sem quebra, sem corte e sem scroll horizontal. */
+.bento-table-scope table.users-table th:nth-child(1), .bento-table-scope table.users-table td:nth-child(1){ width:8%; }
+.bento-table-scope table.users-table th:nth-child(2), .bento-table-scope table.users-table td:nth-child(2){ width:12%; white-space:normal; }
 .bento-table-scope table.users-table th:nth-child(3), .bento-table-scope table.users-table td:nth-child(3){ width:12%; overflow:visible; text-overflow:clip; }
-.bento-table-scope table.users-table th:nth-child(4), .bento-table-scope table.users-table td:nth-child(4){ width:20%; }
-.bento-table-scope table.users-table th:nth-child(5), .bento-table-scope table.users-table td:nth-child(5){ width:38%; white-space:normal; }
+.bento-table-scope table.users-table th:nth-child(4), .bento-table-scope table.users-table td:nth-child(4){ width:14%; }
+.bento-table-scope table.users-table th:nth-child(5), .bento-table-scope table.users-table td:nth-child(5){ width:54%; overflow:visible; white-space:normal; }
 
 /* Dashboard: tabela de 9 colunas (checkbox + 8) — larguras próprias, mais específicas que .bento-table-scope genérico */
 .bento-table-scope.dash-table th:nth-child(1), .bento-table-scope.dash-table td:nth-child(1){ width:4%; }
@@ -439,6 +441,10 @@ dialog.bento-modal textarea:focus{ outline:none; border-color:var(--color-dtx-50
 .bento-tag-chip{ background:var(--color-surface-canvas); color:var(--color-text-muted); padding:2px 8px; border-radius:8px; font-size:11px; font-weight:700; margin-right:8px; }
 
 .bento-row-btn{ display:inline-flex; align-items:center; flex-shrink:0; min-height:44px; padding:0 14px; font-size:12px; font-weight:800; white-space:nowrap; border-radius:99px; border:none; cursor:pointer; transition:all .15s; text-decoration:none; }
+/* Variante compacta — linhas com muitos botões de ação (ex.: usuarios.html, até 5 por linha).
+   Mantém min-height:44px (alvo de toque WCAG), só reduz padding/fonte pra caber sem quebrar
+   nem cortar. */
+.bento-row-btn.compact{ padding:0 10px; font-size:11px; }
 .bento-row-btn.edit{ background:var(--color-dtx-50); color:var(--color-dtx-700); }
 .bento-row-btn.edit:hover{ background:var(--color-dtx-100); }
 .bento-row-btn.delete{ background:#fff1f2; color:var(--color-bento-danger-deep); }
