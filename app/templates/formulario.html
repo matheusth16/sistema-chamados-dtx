@@ -411,15 +411,14 @@
         var labelNenhum      = "{{ t('preview_none') }}";
         var submitting = false;
 
-        function _preview_texto(el, id, fallback) {
-            var dd = document.getElementById(id);
-            if (dd) dd.textContent = (el && el.value && el.value.trim()) ? el.value.trim() : fallback;
-        }
-
         function _popularPreview() {
-            // Categoria
+            // Categoria — usa o texto visível do label (traduzido), não o value (chave interna em PT)
             var cat = document.querySelector('input[name="categoria"]:checked');
-            _preview_texto(cat, 'preview-categoria', '—');
+            var ddCategoria = document.getElementById('preview-categoria');
+            if (ddCategoria) {
+                var catLabel = cat ? document.querySelector('label[for="' + cat.id + '"]') : null;
+                ddCategoria.textContent = catLabel ? catLabel.textContent.trim() : '—';
+            }
 
             // Setor
             var tipoEl = document.getElementById('tipo');
