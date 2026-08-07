@@ -60,7 +60,14 @@ from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
+from app.i18n import get_translated_category, get_translated_sector, get_translated_status
+from app.i18n import get_translation as t
+
 logger = logging.getLogger(__name__)
+
+# Sentinela interna (não exibida) usada para agrupar chamados sem categoria —
+# o rótulo traduzido (t('no_category_label')) só é aplicado na hora de escrever a célula.
+_SEM_CATEGORIA = "Sem Categoria"
 
 # Limite de chamados na exportação — mantém o relatório em tamanho razoável.
 MAX_EXPORT_CHAMADOS = 100
@@ -132,17 +139,18 @@ class ExportadorExcelAvancado:
         metricas_gerais: dict[str, Any],
         metricas_supervisores: list[dict[str, Any]],
         filtros_aplicados: dict[str, str],
+        language: str = "pt_BR",
     ) -> io.BytesIO:
-        """Exporta relatório completo com múltiplas abas"""
+        """Exporta relatório completo com múltiplas abas, no idioma informado."""
         wb = Workbook()
         wb.remove(wb.active)  # Remove sheet padrão
 
         # Cria abas
-        self._aba_resumo_executivo(wb, metricas_gerais, filtros_aplicados)
-        self._aba_chamados_detalhados(wb, chamados)
-        self._aba_performance_supervisores(wb, metricas_supervisores)
-        self._aba_analise_status(wb, chamados)
-        self._aba_analise_categorias(wb, chamados)
+        self._aba_resumo_executivo(wb, metricas_gerais, filtros_aplicados, language)
+        self._aba_chamados_detalhados(wb, chamados, language)
+        self._aba_performance_supervisores(wb, metricas_supervisores, language)
+        self._aba_analise_status(wb, chamados, language)
+        self._aba_analise_categorias(wb, chamados, language)
 
         # Salva em bytes
         output = io.BytesIO()
@@ -151,10 +159,14 @@ class ExportadorExcelAvancado:
         return output
 
     def _aba_resumo_executivo(
-        self, wb: Workbook, metricas: dict[str, Any], filtros: dict[str, str]
+        self,
+        wb: Workbook,
+        metricas: dict[str, Any],
+        filtros: dict[str, str],
+        language: str,
     ) -> None:
         """Cria aba de resumo executivo com KPIs"""
-        ws = wb.create_sheet("📊 Resumo Executivo", 0)
+        ws = wb.create_sheet(f"📊 {t('excel_sheet_summary', language)}", 0)
         ws.sheet_properties.tabColor = "1F4E78"
 
         # Configurar larguras das colunas
@@ -163,7 +175,7 @@ class ExportadorExcelAvancado:
         ws.column_dimensions["C"].width = 25
 
         # Título
-        ws["A1"] = "RESUMO EXECUTIVO - RELATÓRIO DE CHAMADOS"
+        ws["A1"] = t("excel_report_title", language)
         ws["A1"].font = self.config.FONTE_TITULO
         ws["A1"].fill = self.config.PREENCHIMENTO_TITULO
         ws["A1"].alignment = self.config.ALINHAMENTO_CENTER
@@ -171,13 +183,14 @@ class ExportadorExcelAvancado:
         ws.row_dimensions[1].height = 25
 
         # Data de geração
-        ws["A2"] = f"Relatório gerado em: {datetime.now().strftime('%d/%m/%Y às %H:%M')}"
+        agora = datetime.now().strftime("%d/%m/%Y %H:%M")
+        ws["A2"] = t("excel_generated_on", language, datetime=agora)
         ws["A2"].font = Font(name="Calibri", size=9, italic=True)
         ws.merge_cells("A2:C2")
 
         # Filtros aplicados
         if filtros:
-            ws["A3"] = "Filtros Aplicados:"
+            ws["A3"] = t("excel_filters_applied", language)
             ws["A3"].font = self.config.FONTE_SUBTITULO
             linha = 4
             for chave, valor in filtros.items():
@@ -189,7 +202,7 @@ class ExportadorExcelAvancado:
             linha = 4
 
         # KPIs Principais
-        ws[f"A{linha}"] = "INDICADORES PRINCIPAIS"
+        ws[f"A{linha}"] = t("excel_main_indicators", language)
         ws[f"A{linha}"].font = self.config.FONTE_SUBTITULO
         ws[f"A{linha}"].fill = self.config.PREENCHIMENTO_HEADER
         ws.merge_cells(f"A{linha}:C{linha}")
@@ -198,12 +211,18 @@ class ExportadorExcelAvancado:
 
         # Dados de KPI
         kpis = [
-            ("Total de Chamados", metricas.get("total_chamados", 0)),
-            ("Abertos", metricas.get("abertos", 0)),
-            ("Em Andamento", metricas.get("em_andamento", 0)),
-            ("Concluídos", metricas.get("concluidos", 0)),
-            ("Taxa de Resolução", f"{metricas.get('taxa_resolucao_percentual', 0):.1f}%"),
-            ("Tempo Médio de Resolução", f"{metricas.get('tempo_medio_resolucao_horas', 0):.1f}h"),
+            (t("total_tickets", language), metricas.get("total_chamados", 0)),
+            (t("open_tickets", language), metricas.get("abertos", 0)),
+            (t("in_progress", language), metricas.get("em_andamento", 0)),
+            (t("completed_tickets", language), metricas.get("concluidos", 0)),
+            (
+                t("resolution_rate", language),
+                f"{metricas.get('taxa_resolucao_percentual', 0):.1f}%",
+            ),
+            (
+                t("avg_resolution_time", language),
+                f"{metricas.get('tempo_medio_resolucao_horas', 0):.1f}h",
+            ),
         ]
 
         for chave, valor in kpis:
@@ -226,7 +245,7 @@ class ExportadorExcelAvancado:
 
         # Distribuição por prioridade
         linha += 2
-        ws[f"A{linha}"] = "DISTRIBUIÇÃO POR PRIORIDADE"
+        ws[f"A{linha}"] = t("distribution_by_priority", language).upper()
         ws[f"A{linha}"].font = self.config.FONTE_SUBTITULO
         ws[f"A{linha}"].fill = self.config.PREENCHIMENTO_HEADER
         ws.merge_cells(f"A{linha}:C{linha}")
@@ -234,7 +253,7 @@ class ExportadorExcelAvancado:
         linha += 1
         distribuicao = metricas.get("distribuicao_prioridade", {})
         for prioridade, quantidade in distribuicao.items():
-            ws[f"A{linha}"] = f"Prioridade {prioridade}"
+            ws[f"A{linha}"] = t("excel_priority_n", language, priority=prioridade)
             ws[f"B{linha}"] = quantidade
             ws[f"B{linha}"].alignment = self.config.ALINHAMENTO_RIGHT
 
@@ -247,24 +266,24 @@ class ExportadorExcelAvancado:
 
             linha += 1
 
-    def _aba_chamados_detalhados(self, wb: Workbook, chamados: list[Any]) -> None:
+    def _aba_chamados_detalhados(self, wb: Workbook, chamados: list[Any], language: str) -> None:
         """Cria aba com lista detalhada de chamados"""
-        ws = wb.create_sheet("📋 Chamados", 1)
+        ws = wb.create_sheet(f"📋 {t('excel_sheet_tickets', language)}", 1)
         ws.sheet_properties.tabColor = "4472C4"
 
         # Colunas
         colunas = [
-            ("Chamado", 15),
-            ("Categoria", 12),
-            ("Tipo", 15),
-            ("Status", 12),
-            ("Responsável", 18),
-            ("Solicitante", 15),
-            ("Área", 12),
-            ("Prioridade", 10),
-            ("Data Abertura", 15),
-            ("Data Conclusão", 15),
-            ("Impacto", 10),
+            (t("excel_col_ticket", language), 15),
+            (t("category", language), 12),
+            (t("type_label", language), 15),
+            (t("status", language), 12),
+            (t("responsible", language), 18),
+            (t("requester", language), 15),
+            (t("area_th", language), 12),
+            (t("priority_label", language), 10),
+            (t("opening_date_label", language), 15),
+            (t("closing_date_label", language), 15),
+            (t("impact_label", language), 10),
         ]
 
         # Header
@@ -283,11 +302,12 @@ class ExportadorExcelAvancado:
 
         # Dados
         for numero_linha, chamado in enumerate(chamados, 2):
+            status_raw = chamado.status
             dados_linha = [
                 chamado.numero_chamado,
-                chamado.categoria,
-                chamado.tipo_solicitacao,
-                chamado.status,
+                get_translated_category(chamado.categoria, language),
+                get_translated_sector(chamado.tipo_solicitacao, language),
+                get_translated_status(status_raw, language),
                 chamado.responsavel,
                 chamado.solicitante_nome or "-",
                 chamado.area or "-",
@@ -307,30 +327,30 @@ class ExportadorExcelAvancado:
                 if numero_linha % 2 == 0:
                     cell.fill = self.config.PREENCHIMENTO_LINHA_ALT
 
-                # Colorir status
+                # Colorir status (compara o valor canônico do banco, não o rótulo traduzido)
                 if col_num == 4:  # Status
-                    if valor == "Concluído":
+                    if status_raw == "Concluído":
                         cell.font = Font(name="Calibri", size=10, color="70AD47", bold=True)
-                    elif valor == "Aberto":
+                    elif status_raw == "Aberto":
                         cell.font = Font(name="Calibri", size=10, color="C65911", bold=True)
-                    elif valor == "Em Atendimento":
+                    elif status_raw == "Em Atendimento":
                         cell.font = Font(name="Calibri", size=10, color="4472C4", bold=True)
 
     def _aba_performance_supervisores(
-        self, wb: Workbook, supervisores: list[dict[str, Any]]
+        self, wb: Workbook, supervisores: list[dict[str, Any]], language: str
     ) -> None:
         """Cria aba de performance de supervisores"""
-        ws = wb.create_sheet("👥 Performance", 2)
+        ws = wb.create_sheet(f"👥 {t('excel_sheet_performance', language)}", 2)
         ws.sheet_properties.tabColor = "70AD47"
 
         # Colunas
         colunas = [
-            ("Supervisor", 18),
-            ("Total Atribuídos", 14),
-            ("Concluídos", 12),
-            ("Abertos", 12),
-            ("Taxa Resolução %", 16),
-            ("Tempo Médio (h)", 14),
+            (t("supervisor", language), 18),
+            (t("total_assigned_label", language), 14),
+            (t("completed_tickets", language), 12),
+            (t("open_tickets", language), 12),
+            (t("resolution_rate_pct_label", language), 16),
+            (t("avg_time_hours_label", language), 14),
         ]
 
         for col_num, (titulo, largura) in enumerate(colunas, 1):
@@ -376,27 +396,27 @@ class ExportadorExcelAvancado:
                 else:
                     cell.alignment = self.config.ALINHAMENTO_LEFT
 
-    def _aba_analise_status(self, wb: Workbook, chamados: list[Any]) -> None:
+    def _aba_analise_status(self, wb: Workbook, chamados: list[Any], language: str) -> None:
         """Cria aba de análise por status"""
-        ws = wb.create_sheet("📊 Status", 3)
+        ws = wb.create_sheet(f"📊 {t('status', language)}", 3)
         ws.sheet_properties.tabColor = "F79646"
 
-        # Agrupar por status
+        # Agrupar por status (chave canônica do banco — tradução só na hora de exibir)
         status_counts = {}
 
         for chamado in chamados:
-            status = chamado.status
-            status_counts[status] = status_counts.get(status, 0) + 1
+            status_raw = chamado.status
+            status_counts[status_raw] = status_counts.get(status_raw, 0) + 1
 
         # Header
-        ws["A1"] = "ANÁLISE DE STATUS"
+        ws["A1"] = t("status_analysis_title", language).upper()
         ws["A1"].font = self.config.FONTE_TITULO
         ws["A1"].fill = self.config.PREENCHIMENTO_TITULO
         ws.merge_cells("A1:C1")
 
-        ws["A2"] = "Status"
-        ws["B2"] = "Quantidade"
-        ws["C2"] = "Percentual"
+        ws["A2"] = t("status", language)
+        ws["B2"] = t("quantity_label", language)
+        ws["C2"] = t("percentage_label", language)
 
         for col in ["A", "B", "C"]:
             ws[f"{col}2"].font = self.config.FONTE_HEADER
@@ -411,10 +431,10 @@ class ExportadorExcelAvancado:
         total = len(chamados)
         linha = 3
 
-        for status, quantidade in sorted(status_counts.items()):
+        for status_raw, quantidade in sorted(status_counts.items()):
             percentual = (quantidade / total * 100) if total > 0 else 0
 
-            ws[f"A{linha}"] = status
+            ws[f"A{linha}"] = get_translated_status(status_raw, language)
             ws[f"B{linha}"] = quantidade
             ws[f"C{linha}"] = f"{percentual:.1f}%"
 
@@ -431,36 +451,36 @@ class ExportadorExcelAvancado:
 
             linha += 1
 
-    def _aba_analise_categorias(self, wb: Workbook, chamados: list[Any]) -> None:
+    def _aba_analise_categorias(self, wb: Workbook, chamados: list[Any], language: str) -> None:
         """Cria aba de análise por categoria"""
-        ws = wb.create_sheet("🏷️ Categorias", 4)
+        ws = wb.create_sheet(f"🏷️ {t('nav_categories', language)}", 4)
         ws.sheet_properties.tabColor = "9966FF"
 
-        # Agrupar por categoria
+        # Agrupar por categoria (chave canônica do banco — tradução só na hora de exibir)
         categoria_counts = {}
         categoria_status = {}
 
         for chamado in chamados:
-            cat = chamado.categoria or "Sem Categoria"
+            cat = chamado.categoria or _SEM_CATEGORIA
             categoria_counts[cat] = categoria_counts.get(cat, 0) + 1
 
             if cat not in categoria_status:
                 categoria_status[cat] = {}
 
-            status = chamado.status
-            categoria_status[cat][status] = categoria_status[cat].get(status, 0) + 1
+            status_raw = chamado.status
+            categoria_status[cat][status_raw] = categoria_status[cat].get(status_raw, 0) + 1
 
         # Header
-        ws["A1"] = "ANÁLISE POR CATEGORIA"
+        ws["A1"] = t("category_analysis_title", language).upper()
         ws["A1"].font = self.config.FONTE_TITULO
         ws["A1"].fill = self.config.PREENCHIMENTO_TITULO
         ws.merge_cells("A1:E1")
 
-        ws["A2"] = "Categoria"
-        ws["B2"] = "Total"
-        ws["C2"] = "Abertos"
-        ws["D2"] = "Em Andamento"
-        ws["E2"] = "Concluídos"
+        ws["A2"] = t("category", language)
+        ws["B2"] = t("total", language)
+        ws["C2"] = t("open_tickets", language)
+        ws["D2"] = t("in_progress", language)
+        ws["E2"] = t("completed_tickets", language)
 
         for col in ["A", "B", "C", "D", "E"]:
             ws[f"{col}2"].font = self.config.FONTE_HEADER
@@ -474,7 +494,12 @@ class ExportadorExcelAvancado:
         linha = 3
 
         for categoria in sorted(categoria_counts.keys()):
-            ws[f"A{linha}"] = categoria
+            rotulo_categoria = (
+                t("no_category_label", language)
+                if categoria == _SEM_CATEGORIA
+                else get_translated_category(categoria, language)
+            )
+            ws[f"A{linha}"] = rotulo_categoria
             ws[f"B{linha}"] = categoria_counts[categoria]
             ws[f"C{linha}"] = categoria_status[categoria].get("Aberto", 0)
             ws[f"D{linha}"] = categoria_status[categoria].get("Em Atendimento", 0)

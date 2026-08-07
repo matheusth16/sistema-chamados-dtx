@@ -450,16 +450,21 @@ def exportar_avancado() -> Response:
                 if m.get("area") in areas_usuario
             ]
 
-        # Filtros aplicados (para documentar no Excel)
+        # Filtros aplicados (para documentar no Excel) — chaves traduzidas no idioma da sessão
+        lang = session.get("language", "en")
         filtros_aplicados = {}
         if request.args.get("search"):
-            filtros_aplicados["Busca"] = request.args.get("search")
+            filtros_aplicados[get_translation("excel_filter_search", lang)] = request.args.get(
+                "search"
+            )
         if request.args.get("categoria"):
-            filtros_aplicados["Categoria"] = request.args.get("categoria")
+            filtros_aplicados[get_translation("category", lang)] = request.args.get("categoria")
         if request.args.get("status"):
-            filtros_aplicados["Status"] = request.args.get("status")
+            filtros_aplicados[get_translation("status", lang)] = request.args.get("status")
         if request.args.get("responsavel"):
-            filtros_aplicados["Responsável"] = request.args.get("responsavel")
+            filtros_aplicados[get_translation("responsible", lang)] = request.args.get(
+                "responsavel"
+            )
 
         # Exporta relatório
         output = exportador_excel.exportar_relatorio_completo(
@@ -467,6 +472,7 @@ def exportar_avancado() -> Response:
             metricas_gerais=metricas_gerais,
             metricas_supervisores=metricas_supervisores,
             filtros_aplicados=filtros_aplicados,
+            language=lang,
         )
 
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")

@@ -5038,5 +5038,120 @@
     "pt_BR": "Supervisor não pode alterar a descrição original escrita pelo solicitante.",
     "en": "Supervisors cannot edit the original description written by the requester.",
     "es": "El supervisor no puede editar la descripción original escrita por el solicitante."
+  },
+  "excel_report_title": {
+    "pt_BR": "RESUMO EXECUTIVO - RELATÓRIO DE CHAMADOS",
+    "en": "EXECUTIVE SUMMARY - TICKET REPORT",
+    "es": "RESUMEN EJECUTIVO - INFORME DE TICKETS"
+  },
+  "excel_generated_on": {
+    "pt_BR": "Relatório gerado em: {datetime}",
+    "en": "Report generated on: {datetime}",
+    "es": "Informe generado el: {datetime}"
+  },
+  "excel_filters_applied": {
+    "pt_BR": "Filtros Aplicados:",
+    "en": "Applied Filters:",
+    "es": "Filtros Aplicados:"
+  },
+  "excel_main_indicators": {
+    "pt_BR": "INDICADORES PRINCIPAIS",
+    "en": "MAIN INDICATORS",
+    "es": "INDICADORES PRINCIPALES"
+  },
+  "excel_priority_n": {
+    "pt_BR": "Prioridade {priority}",
+    "en": "Priority {priority}",
+    "es": "Prioridad {priority}"
+  },
+  "excel_sheet_summary": {
+    "pt_BR": "Resumo Executivo",
+    "en": "Executive Summary",
+    "es": "Resumen Ejecutivo"
+  },
+  "excel_sheet_tickets": {
+    "pt_BR": "Chamados",
+    "en": "Tickets",
+    "es": "Tickets"
+  },
+  "excel_sheet_performance": {
+    "pt_BR": "Performance",
+    "en": "Performance",
+    "es": "Rendimiento"
+  },
+  "excel_col_ticket": {
+    "pt_BR": "Chamado",
+    "en": "Ticket",
+    "es": "Ticket"
+  },
+  "type_label": {
+    "pt_BR": "Tipo",
+    "en": "Type",
+    "es": "Tipo"
+  },
+  "priority_label": {
+    "pt_BR": "Prioridade",
+    "en": "Priority",
+    "es": "Prioridad"
+  },
+  "opening_date_label": {
+    "pt_BR": "Data Abertura",
+    "en": "Opening Date",
+    "es": "Fecha de Apertura"
+  },
+  "closing_date_label": {
+    "pt_BR": "Data Conclusão",
+    "en": "Closing Date",
+    "es": "Fecha de Cierre"
+  },
+  "impact_label": {
+    "pt_BR": "Impacto",
+    "en": "Impact",
+    "es": "Impacto"
+  },
+  "total_assigned_label": {
+    "pt_BR": "Total Atribuídos",
+    "en": "Total Assigned",
+    "es": "Total Asignado"
+  },
+  "resolution_rate_pct_label": {
+    "pt_BR": "Taxa Resolução %",
+    "en": "Resolution Rate %",
+    "es": "Tasa de Resolución %"
+  },
+  "avg_time_hours_label": {
+    "pt_BR": "Tempo Médio (h)",
+    "en": "Avg. Time (h)",
+    "es": "Tiempo Promedio (h)"
+  },
+  "status_analysis_title": {
+    "pt_BR": "Análise de Status",
+    "en": "Status Analysis",
+    "es": "Análisis de Estado"
+  },
+  "quantity_label": {
+    "pt_BR": "Quantidade",
+    "en": "Quantity",
+    "es": "Cantidad"
+  },
+  "percentage_label": {
+    "pt_BR": "Percentual",
+    "en": "Percentage",
+    "es": "Porcentaje"
+  },
+  "category_analysis_title": {
+    "pt_BR": "Análise por Categoria",
+    "en": "Category Analysis",
+    "es": "Análisis por Categoría"
+  },
+  "no_category_label": {
+    "pt_BR": "Sem Categoria",
+    "en": "No Category",
+    "es": "Sin Categoría"
+  },
+  "excel_filter_search": {
+    "pt_BR": "Busca",
+    "en": "Search",
+    "es": "Búsqueda"
   }
 }
