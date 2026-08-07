@@ -59,7 +59,7 @@
               {{ translate_sector_list(usuario.area) if usuario.area else '-' }}
             </td>
             <td style="text-align:right;">
-              <div class="flex gap-2 justify-end flex-wrap">
+              <div class="flex gap-2 justify-end flex-nowrap">
                 {% if current_user.perfil == 'admin' %}
                 <form method="POST" action="{{ url_for('main.resetar_exp_usuario', usuario_id=usuario.id) }}" data-confirm="{{ t('confirm_reset_exp', nome=usuario.nome) }}">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
