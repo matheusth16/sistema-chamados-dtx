@@ -1033,11 +1033,11 @@ def test_criacao_grava_supervisor_ids_com_acesso(app):
 
 
 # ---------------------------------------------------------------------------
-# Compradores — setor de distribuição em grupo (sem dono único na criação)
+# Compras — setor de distribuição em grupo (sem dono único na criação)
 # ---------------------------------------------------------------------------
 
 
-def _tres_supervisores_compradores():
+def _tres_supervisores_compras():
     supervisores = []
     for i, nome in enumerate(["Ana", "Bruno", "Carla"], start=1):
         sup = MagicMock()
@@ -1049,10 +1049,10 @@ def _tres_supervisores_compradores():
 
 
 def test_criacao_compras_nao_exige_responsavel_mesmo_com_supervisores(app):
-    """Setor Compradores: form sem responsavel_id não falha mesmo com supervisores cadastrados."""
+    """Setor Compras: form sem responsavel_id não falha mesmo com supervisores cadastrados."""
     from app.i18n import get_translation
 
-    supervisores = _tres_supervisores_compradores()
+    supervisores = _tres_supervisores_compras()
 
     with (
         patch(
@@ -1070,11 +1070,11 @@ def test_criacao_compras_nao_exige_responsavel_mesmo_com_supervisores(app):
         app.app_context(),
     ):
         chamado_id, numero, erro, aviso = criar_chamado(
-            form=_form_base(responsavel_id="", tipo="Compradores"),
+            form=_form_base(responsavel_id="", tipo="Compras"),
             files=_files_empty(),
             solicitante_id="sol1",
             solicitante_nome="Solicitante",
-            area_solicitante="Compradores",
+            area_solicitante="Compras",
         )
 
     assert erro is None
@@ -1082,12 +1082,12 @@ def test_criacao_compras_nao_exige_responsavel_mesmo_com_supervisores(app):
     assert chamado_id is not None
     chamado = Chamado.get_by_id(chamado_id)
     assert chamado.responsavel_id is None
-    assert chamado.responsavel == get_translation("buyers_group_label", "en")
+    assert chamado.responsavel == get_translation("procurement_group_label", "en")
 
 
 def test_criacao_compras_ignora_responsavel_id_enviado_no_form(app):
-    """Setor Compradores: mesmo com responsavel_id no form, o chamado fica sem dono único."""
-    supervisores = _tres_supervisores_compradores()
+    """Setor Compras: mesmo com responsavel_id no form, o chamado fica sem dono único."""
+    supervisores = _tres_supervisores_compras()
 
     with (
         patch(
@@ -1109,13 +1109,11 @@ def test_criacao_compras_ignora_responsavel_id_enviado_no_form(app):
         app.app_context(),
     ):
         chamado_id, numero, erro, _ = criar_chamado(
-            form=_form_base(
-                responsavel_id="id_compradores_1", responsavel_nome="Ana", tipo="Compradores"
-            ),
+            form=_form_base(responsavel_id="id_compras_1", responsavel_nome="Ana", tipo="Compras"),
             files=_files_empty(),
             solicitante_id="sol1",
             solicitante_nome="Solicitante",
-            area_solicitante="Compradores",
+            area_solicitante="Compras",
         )
 
     assert erro is None
@@ -1124,8 +1122,8 @@ def test_criacao_compras_ignora_responsavel_id_enviado_no_form(app):
 
 
 def test_criacao_compras_grava_supervisor_ids_com_acesso_para_todos(app):
-    """Setor Compradores: supervisor_ids_com_acesso grava os 3 supervisores da área (fila sem owner)."""
-    supervisores = _tres_supervisores_compradores()
+    """Setor Compras: supervisor_ids_com_acesso grava os 3 supervisores da área (fila sem owner)."""
+    supervisores = _tres_supervisores_compras()
 
     with (
         patch(
@@ -1143,11 +1141,11 @@ def test_criacao_compras_grava_supervisor_ids_com_acesso_para_todos(app):
         app.app_context(),
     ):
         chamado_id, numero, erro, _ = criar_chamado(
-            form=_form_base(responsavel_id="", tipo="Compradores"),
+            form=_form_base(responsavel_id="", tipo="Compras"),
             files=_files_empty(),
             solicitante_id="sol1",
             solicitante_nome="Solicitante",
-            area_solicitante="Compradores",
+            area_solicitante="Compras",
         )
 
     assert erro is None
@@ -1157,8 +1155,8 @@ def test_criacao_compras_grava_supervisor_ids_com_acesso_para_todos(app):
 
 
 def test_criacao_compras_notifica_todos_supervisores_da_area(app):
-    """Setor Compradores: abertura notifica os 3 supervisores (email + in-app + web push), não só 1."""
-    supervisores = _tres_supervisores_compradores()
+    """Setor Compras: abertura notifica os 3 supervisores (email + in-app + web push), não só 1."""
+    supervisores = _tres_supervisores_compras()
 
     with (
         patch(
@@ -1178,11 +1176,11 @@ def test_criacao_compras_notifica_todos_supervisores_da_area(app):
         app.app_context(),
     ):
         chamado_id, numero, erro, _ = criar_chamado(
-            form=_form_base(responsavel_id="", tipo="Compradores"),
+            form=_form_base(responsavel_id="", tipo="Compras"),
             files=_files_empty(),
             solicitante_id="sol1",
             solicitante_nome="Solicitante",
-            area_solicitante="Compradores",
+            area_solicitante="Compras",
         )
 
     assert erro is None
