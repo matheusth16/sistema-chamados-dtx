@@ -296,9 +296,17 @@
         }
     }
 
+    // Setores de distribuição em grupo (ver AREAS_GRUPO em chamados_criacao_service.py) —
+    // nunca exigem escolha manual de 1 pessoa, caem na fila da área inteira.
+    const AREAS_GRUPO = {{ areas_grupo | default([]) | tojson }};
+    // Template cru (sem substituição — t() sem kwargs devolve o texto com "{setor}"
+    // literal), pra montar o rótulo com o nome do setor já traduzido na tela atual.
+    const SECTOR_GROUP_LABEL_TEMPLATE = "{{ t('sector_group_label') }}";
+
     // Função para carregar responsável automaticamente baseado na área/setor
     function filtrarResponsaveis() {
-        const setor = document.getElementById('tipo').value;
+        const tipoEl = document.getElementById('tipo');
+        const setor = tipoEl.value;
         const campoResponsavel = document.getElementById('responsavel_visual');
         const selectResponsavel = document.getElementById('responsavel_select');
         const hiddenId = document.getElementById('responsavel_id');
@@ -316,17 +324,20 @@
             return;
         }
 
-        if (setor === 'Compras') {
+        if (AREAS_GRUPO.includes(setor)) {
             // Setor de distribuição em grupo: cai pros supervisores da área
             // inteira, sem expor nomes individuais nem exigir escolha manual.
-            campoResponsavel.value = "{{ t('procurement_group_label') }}";
+            const opcaoAtual = tipoEl.options[tipoEl.selectedIndex];
+            const nomeSetorExibido = opcaoAtual ? opcaoAtual.text : setor;
+            campoResponsavel.value = SECTOR_GROUP_LABEL_TEMPLATE.replace('{setor}', nomeSetorExibido);
             campoResponsavel.classList.remove('opacity-50', 'hidden');
             campoResponsavel.classList.add('is-resolved');
             selectResponsavel.classList.add('hidden');
             selectResponsavel.removeAttribute('required');
             hiddenId.value = '';
             // Só pro preview de confirmação (dd#preview-responsavel) — o backend
-            // sempre resolve o grupo no servidor, ignora este valor pra Compras.
+            // sempre resolve o grupo no servidor, ignora este valor pra setores
+            // de grupo (Compras, Armazém, ...).
             hiddenNome.value = campoResponsavel.value;
             return;
         }

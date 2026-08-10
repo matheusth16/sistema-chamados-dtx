@@ -9,9 +9,9 @@ import logging
 import threading
 from typing import Any
 
-from flask import current_app
+from flask import current_app, session
 
-from app.i18n import get_translation_session
+from app.i18n import get_translated_sector, get_translation_session
 from app.models import Chamado
 from app.models_grupo_rl import GrupoRL
 from app.models_historico import Historico
@@ -35,10 +35,9 @@ logger = logging.getLogger(__name__)
 # Setores de distribuição em grupo: nunca exigem escolha manual de 1 pessoa —
 # o chamado fica sem dono único (responsavel_id=None) e cai na fila da área,
 # visível a todos os supervisores cadastrados (ver permissions.py, regra "fila
-# sem owner"). Hoje só Compras (nome do setor cadastrado no catálogo — ver
-# categorias_setores); lista fechada de propósito (sem toggle de admin),
-# decisão explícita do usuário.
-AREAS_GRUPO = {"Compras"}
+# sem owner"). Nomes dos setores cadastrados no catálogo — ver categorias_setores;
+# lista fechada de propósito (sem toggle de admin), decisão explícita do usuário.
+AREAS_GRUPO = {"Compras", "Armazém"}
 
 
 def _eh_area_grupo(area: str) -> bool:
@@ -47,6 +46,15 @@ def _eh_area_grupo(area: str) -> bool:
 
 def _t(key, **kwargs):
     return get_translation_session(key, **kwargs)
+
+
+def _idioma_sessao() -> str:
+    """Mesmo fallback de get_translation_session — fora de request (testes/
+    threads de notificação) usa 'en' em vez de propagar RuntimeError."""
+    try:
+        return session.get("language", "en")
+    except RuntimeError:
+        return "en"
 
 
 def _resolver_responsavel(
@@ -69,7 +77,8 @@ def _resolver_responsavel(
     area_para_atribuicao = setor_para_area(tipo) if tipo else (area_solicitante or "Geral")
 
     if _eh_area_grupo(area_para_atribuicao):
-        nome_grupo = _t("procurement_group_label")
+        nome_setor_traduzido = get_translated_sector(area_para_atribuicao, _idioma_sessao())
+        nome_grupo = _t("sector_group_label", setor=nome_setor_traduzido)
         return (
             nome_grupo,
             None,

@@ -2714,10 +2714,10 @@
     "en": "Procurement",
     "es": "Aprovisionamiento"
   },
-  "procurement_group_label": {
-    "pt_BR": "Grupo de Compras",
-    "en": "Procurement Group",
-    "es": "Grupo de Aprovisionamiento"
+  "sector_group_label": {
+    "pt_BR": "Grupo de {setor}",
+    "en": "{setor} Group",
+    "es": "Grupo de {setor}"
   },
   "confirm_resolution_message": {
     "pt_BR": "O atendimento foi concluído. Confirme se o problema foi resolvido.",

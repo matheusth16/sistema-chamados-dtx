@@ -10,7 +10,7 @@ from app.decoradores import requer_solicitante
 from app.i18n import flash_t
 from app.models_categorias import CategoriaImpacto, CategoriaSetor
 from app.routes import main
-from app.services.chamados_criacao_service import criar_chamado
+from app.services.chamados_criacao_service import AREAS_GRUPO, criar_chamado
 from app.services.chamados_listagem_service import (
     contar_status_por_solicitante,
     listar_chamados_como_observador,
@@ -56,6 +56,7 @@ def index() -> Response:
             "formulario.html",
             setores=setores,
             impactos=impactos,
+            areas_grupo=list(AREAS_GRUPO),
             status_counts=status_counts,
             gate_subetapas=_build_gate_subetapas(),
             ab_variante=ab_variante,
@@ -78,6 +79,7 @@ def index() -> Response:
             "formulario.html",
             setores=setores,
             impactos=impactos,
+            areas_grupo=list(AREAS_GRUPO),
             gate_subetapas=_build_gate_subetapas(),
             ab_variante=ab_variante,
         )
@@ -100,6 +102,7 @@ def index() -> Response:
             "formulario.html",
             setores=setores,
             impactos=impactos,
+            areas_grupo=list(AREAS_GRUPO),
             gate_subetapas=_build_gate_subetapas(),
             ab_variante=ab_variante,
         )

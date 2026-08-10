@@ -1033,7 +1033,8 @@ def test_criacao_grava_supervisor_ids_com_acesso(app):
 
 
 # ---------------------------------------------------------------------------
-# Compras — setor de distribuição em grupo (sem dono único na criação)
+# Setores de distribuição em grupo (sem dono único na criação) — Compras e
+# Armazém hoje; ver AREAS_GRUPO em chamados_criacao_service.py
 # ---------------------------------------------------------------------------
 
 
@@ -1067,6 +1068,10 @@ def test_criacao_compras_nao_exige_responsavel_mesmo_com_supervisores(app):
         patch("app.services.chamados_criacao_service.criar_notificacao"),
         patch("app.services.chamados_criacao_service.enviar_webpush_usuario"),
         patch("app.services.chamados_criacao_service.threading.Thread", side_effect=_FakeThread),
+        patch(
+            "app.services.chamados_criacao_service.get_translated_sector",
+            return_value="Procurement",
+        ),
         app.app_context(),
     ):
         chamado_id, numero, erro, aviso = criar_chamado(
@@ -1082,7 +1087,7 @@ def test_criacao_compras_nao_exige_responsavel_mesmo_com_supervisores(app):
     assert chamado_id is not None
     chamado = Chamado.get_by_id(chamado_id)
     assert chamado.responsavel_id is None
-    assert chamado.responsavel == get_translation("procurement_group_label", "en")
+    assert chamado.responsavel == get_translation("sector_group_label", "en", setor="Procurement")
 
 
 def test_criacao_compras_ignora_responsavel_id_enviado_no_form(app):
@@ -1197,6 +1202,58 @@ def test_criacao_compras_notifica_todos_supervisores_da_area(app):
     assert mock_webpush.call_count == 3
     ids_notificados_webpush = {call.args[0] for call in mock_webpush.call_args_list}
     assert ids_notificados_webpush == {sup.id for sup in supervisores}
+
+
+def _um_supervisor_armazem():
+    sup = MagicMock()
+    sup.id = "id_armazem_1"
+    sup.nome = "Diego"
+    sup.perfil = "supervisor"
+    return [sup]
+
+
+def test_criacao_armazem_nao_exige_responsavel_mesmo_com_supervisor(app):
+    """Setor Armazém: mesmo tratamento de grupo que Compras (AREAS_GRUPO genérico) —
+    não exige escolha manual, e o rótulo do grupo usa o nome do setor traduzido
+    (não fica preso ao texto fixo de Compras)."""
+    from app.i18n import get_translation
+
+    supervisores = _um_supervisor_armazem()
+
+    with (
+        patch(
+            "app.services.chamados_criacao_service.Usuario.get_supervisores_por_area",
+            return_value=supervisores,
+        ),
+        patch(
+            "app.services.chamados_criacao_service.gerar_numero_chamado", return_value="2026-210"
+        ),
+        patch("app.services.chamados_criacao_service.Historico"),
+        patch("app.services.chamados_criacao_service.notificar_aprovador_novo_chamado"),
+        patch("app.services.chamados_criacao_service.criar_notificacao"),
+        patch("app.services.chamados_criacao_service.enviar_webpush_usuario"),
+        patch("app.services.chamados_criacao_service.threading.Thread", side_effect=_FakeThread),
+        patch(
+            "app.services.chamados_criacao_service.get_translated_sector",
+            return_value="Warehouse",
+        ),
+        app.app_context(),
+    ):
+        chamado_id, numero, erro, aviso = criar_chamado(
+            form=_form_base(responsavel_id="", tipo="Armazém"),
+            files=_files_empty(),
+            solicitante_id="sol1",
+            solicitante_nome="Solicitante",
+            area_solicitante="Armazém",
+        )
+
+    assert erro is None
+    assert aviso is None
+    assert chamado_id is not None
+    chamado = Chamado.get_by_id(chamado_id)
+    assert chamado.responsavel_id is None
+    assert chamado.responsavel == get_translation("sector_group_label", "en", setor="Warehouse")
+    assert "id_armazem_1" in chamado.supervisor_ids_com_acesso
 
 
 # ── AOG — abertura já grava nível 4 e dispara broadcast pros 4 gestores ──────
