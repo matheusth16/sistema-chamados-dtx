@@ -59,17 +59,15 @@
                    placeholder="{{ t('ex_maintenance') }}"
                    class="bento-form">
           </div>
-          <div class="grid grid-cols-2 gap-3">
-            <div>
-              <label for="setor-nome-en" class="bento-field-label plain">{{ t('name_english_optional') }}</label>
-              <input type="text" id="setor-nome-en" name="nome_en" class="bento-form">
-            </div>
-            <div>
-              <label for="setor-nome-es" class="bento-field-label plain">{{ t('name_spanish_optional') }}</label>
-              <input type="text" id="setor-nome-es" name="nome_es" class="bento-form">
-            </div>
+          <div>
+            <label for="setor-nome-en" class="bento-field-label plain">{{ t('name_english_optional') }}</label>
+            <input type="text" id="setor-nome-en" name="nome_en" class="bento-form">
           </div>
-          <p style="font-size:12px; color:var(--color-surface-muted); margin-top:-8px;">{{ t('auto_translated_note') }}</p>
+          <div>
+            <label for="setor-nome-es" class="bento-field-label plain">{{ t('name_spanish_optional') }}</label>
+            <input type="text" id="setor-nome-es" name="nome_es" class="bento-form">
+            <p style="font-size:12px; color:var(--color-surface-muted); margin-top:6px;">{{ t('auto_translated_note') }}</p>
+          </div>
           <div>
             <label for="setor-descricao" class="bento-field-label plain">{{ t('description_optional') }}</label>
             <textarea id="setor-descricao" name="descricao_pt"
@@ -347,7 +345,7 @@
         </div>
 
         <!-- Traduções manuais opcionais — só setor -->
-        <div id="campo-traducoes" class="hidden grid grid-cols-2 gap-3">
+        <div id="campo-traducoes" class="hidden space-y-4">
           <div>
             <label for="modal-nome-en" class="bento-field-label plain">{{ t('name_english_optional') }}</label>
             <input type="text" id="modal-nome-en" name="nome_en" class="bento-form">
