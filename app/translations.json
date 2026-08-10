@@ -1320,9 +1320,19 @@
     "es": "ej.: Mantenimiento"
   },
   "auto_translated_note": {
-    "pt_BR": "Será traduzido automaticamente para Inglês e Espanhol",
-    "en": "Will be automatically translated to English and Spanish",
-    "es": "Será traducido automáticamente al Inglés y Español"
+    "pt_BR": "Deixe Inglês/Espanhol em branco para traduzir automaticamente",
+    "en": "Leave English/Spanish blank to translate automatically",
+    "es": "Deje Inglés/Español en blanco para traducir automáticamente"
+  },
+  "name_english_optional": {
+    "pt_BR": "Nome (Inglês) — opcional",
+    "en": "Name (English) — optional",
+    "es": "Nombre (Inglés) — opcional"
+  },
+  "name_spanish_optional": {
+    "pt_BR": "Nome (Espanhol) — opcional",
+    "en": "Name (Spanish) — optional",
+    "es": "Nombre (Español) — opcional"
   },
   "description_optional": {
     "pt_BR": "Descrição (opcional)",

@@ -58,8 +58,18 @@
             <input type="text" id="setor-nome" name="nome_pt" required
                    placeholder="{{ t('ex_maintenance') }}"
                    class="bento-form">
-            <p style="font-size:12px; color:var(--color-surface-muted); margin-top:6px;">{{ t('auto_translated_note') }}</p>
           </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label for="setor-nome-en" class="bento-field-label plain">{{ t('name_english_optional') }}</label>
+              <input type="text" id="setor-nome-en" name="nome_en" class="bento-form">
+            </div>
+            <div>
+              <label for="setor-nome-es" class="bento-field-label plain">{{ t('name_spanish_optional') }}</label>
+              <input type="text" id="setor-nome-es" name="nome_es" class="bento-form">
+            </div>
+          </div>
+          <p style="font-size:12px; color:var(--color-surface-muted); margin-top:-8px;">{{ t('auto_translated_note') }}</p>
           <div>
             <label for="setor-descricao" class="bento-field-label plain">{{ t('description_optional') }}</label>
             <textarea id="setor-descricao" name="descricao_pt"
@@ -102,6 +112,8 @@
                         data-action="edit-setor"
                         data-id="{{ setor.id | tojson | forceescape }}"
                         data-nome-pt="{{ setor.nome_pt | tojson | forceescape }}"
+                        data-nome-en="{{ (setor.nome_en or "") | tojson | forceescape }}"
+                        data-nome-es="{{ (setor.nome_es or "") | tojson | forceescape }}"
                         data-descricao-pt="{{ (setor.descricao_pt or "") | tojson | forceescape }}"
                         data-ativo="{{ setor.ativo | tojson | forceescape }}"
                         aria-label="{{ t('edit') }} {{ setor.nome_pt }}" class="bento-row-btn edit">
@@ -334,6 +346,18 @@
           <input type="text" id="modal-nome-pt" name="nome_pt" class="bento-form">
         </div>
 
+        <!-- Traduções manuais opcionais — só setor -->
+        <div id="campo-traducoes" class="hidden grid grid-cols-2 gap-3">
+          <div>
+            <label for="modal-nome-en" class="bento-field-label plain">{{ t('name_english_optional') }}</label>
+            <input type="text" id="modal-nome-en" name="nome_en" class="bento-form">
+          </div>
+          <div>
+            <label for="modal-nome-es" class="bento-field-label plain">{{ t('name_spanish_optional') }}</label>
+            <input type="text" id="modal-nome-es" name="nome_es" class="bento-form">
+          </div>
+        </div>
+
         <!-- Campos específicos de gate: gate_pai + etapa -->
         <div id="campo-gate-pai" class="hidden">
           <label for="modal-gate-pai" class="bento-field-label plain">{{ t('gate_parent_label') }}</label>
@@ -473,6 +497,7 @@ document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('[data-action="edit-setor"]').forEach(btn => {
         btn.addEventListener('click', () => abrirModalSetor(
             JSON.parse(btn.dataset.id), JSON.parse(btn.dataset.nomePt),
+            JSON.parse(btn.dataset.nomeEn), JSON.parse(btn.dataset.nomeEs),
             JSON.parse(btn.dataset.descricaoPt), JSON.parse(btn.dataset.ativo)
         ));
     });
@@ -519,15 +544,19 @@ function fecharModal() {
     document.getElementById('modal-edicao').classList.add('hidden');
     // Reset estado dos campos específicos de gate
     document.getElementById('campo-nome').classList.add('hidden');
+    document.getElementById('campo-traducoes').classList.add('hidden');
     document.getElementById('campo-gate-pai').classList.add('hidden');
     document.getElementById('campo-etapa').classList.add('hidden');
 }
 
-function abrirModalSetor(setorId, nomePt, descricaoPt, ativo) {
+function abrirModalSetor(setorId, nomePt, nomeEn, nomeEs, descricaoPt, ativo) {
     document.getElementById('campo-nome').classList.remove('hidden');
+    document.getElementById('campo-traducoes').classList.remove('hidden');
     document.getElementById('campo-gate-pai').classList.add('hidden');
     document.getElementById('campo-etapa').classList.add('hidden');
     document.getElementById('modal-nome-pt').value = nomePt;
+    document.getElementById('modal-nome-en').value = nomeEn;
+    document.getElementById('modal-nome-es').value = nomeEs;
     document.getElementById('modal-descricao').value = descricaoPt;
     document.getElementById('modal-ativo').checked = ativo;
     abrirModal('{{ t("edit_sector_title") }}', `/admin/categorias/setor/${setorId}/editar`);
@@ -535,6 +564,7 @@ function abrirModalSetor(setorId, nomePt, descricaoPt, ativo) {
 
 function abrirModalGate(gateId, gatePai, etapa, descricaoPt, ativo) {
     document.getElementById('campo-nome').classList.add('hidden');
+    document.getElementById('campo-traducoes').classList.add('hidden');
     document.getElementById('campo-gate-pai').classList.remove('hidden');
     document.getElementById('campo-etapa').classList.remove('hidden');
     const selectPai = document.getElementById('modal-gate-pai');
@@ -547,6 +577,7 @@ function abrirModalGate(gateId, gatePai, etapa, descricaoPt, ativo) {
 
 function abrirModalImpacto(impactoId, nomePt, descricaoPt, ativo) {
     document.getElementById('campo-nome').classList.remove('hidden');
+    document.getElementById('campo-traducoes').classList.add('hidden');
     document.getElementById('campo-gate-pai').classList.add('hidden');
     document.getElementById('campo-etapa').classList.add('hidden');
     document.getElementById('modal-nome-pt').value = nomePt;

@@ -91,6 +91,10 @@ def criar_setor() -> Response:
     try:
         nome_pt = request.form.get("nome_pt", "").strip()
         descricao_pt = request.form.get("descricao_pt", "").strip()
+        # Tradução manual opcional — em branco, o construtor de CategoriaSetor
+        # cai no fallback de tradução automática (traduzir_categoria).
+        nome_en = request.form.get("nome_en", "").strip() or None
+        nome_es = request.form.get("nome_es", "").strip() or None
 
         if not nome_pt:
             flash_t("sector_name_required", "danger")
@@ -102,6 +106,8 @@ def criar_setor() -> Response:
 
         setor = CategoriaSetor(
             nome_pt=nome_pt,
+            nome_en=nome_en,
+            nome_es=nome_es,
             descricao_pt=descricao_pt,
         )
         setor.save()
@@ -205,14 +211,22 @@ def editar_setor(setor_id: str) -> Response:
             return redirect(url_for("main.admin_categorias"))
 
         novo_nome = request.form.get("nome_pt", setor.nome_pt).strip()
-        if novo_nome != setor.nome_pt:
-            if CategoriaSetor.nome_existe(novo_nome, id_atual=setor_id):
-                flash_t("sector_name_already_exists", "danger")
-                return redirect(url_for("main.admin_categorias"))
-            traducao = traduzir_categoria(novo_nome)
-            setor.nome_pt = novo_nome
-            setor.nome_en = traducao["en"]
-            setor.nome_es = traducao["es"]
+        nome_en_form = request.form.get("nome_en", "").strip()
+        nome_es_form = request.form.get("nome_es", "").strip()
+        nome_mudou = novo_nome != setor.nome_pt
+
+        if nome_mudou and CategoriaSetor.nome_existe(novo_nome, id_atual=setor_id):
+            flash_t("sector_name_already_exists", "danger")
+            return redirect(url_for("main.admin_categorias"))
+
+        # Só chama tradução automática se o nome mudou E falta pelo menos uma
+        # tradução manual — evita API externa quando o admin já informou as duas.
+        precisa_auto_traducao = nome_mudou and not (nome_en_form and nome_es_form)
+        traducao = traduzir_categoria(novo_nome) if precisa_auto_traducao else None
+
+        setor.nome_pt = novo_nome
+        setor.nome_en = nome_en_form or (traducao["en"] if traducao else setor.nome_en)
+        setor.nome_es = nome_es_form or (traducao["es"] if traducao else setor.nome_es)
         setor.descricao_pt = request.form.get("descricao_pt", setor.descricao_pt or "").strip()
         setor.ativo = request.form.get("ativo") == "on"
 

@@ -187,6 +187,122 @@ def test_editar_setor_nao_encontrado_redireciona(client_logado_admin):
     assert r.status_code == 302
 
 
+def test_criar_setor_com_en_es_manual_nao_traduz_automaticamente(client_logado_admin):
+    """POST criar_setor com nome_en/nome_es preenchidos usa esses valores direto —
+    não chama a tradução automática (evita casos tipo 'Armazém' virando
+    'Warehouse Facility' quando o admin já sabe o termo certo em inglês)."""
+    with (
+        patch("app.routes.categorias.CategoriaSetor") as mock_cls,
+        patch("app.routes.categorias.cache_delete"),
+        patch("app.routes.categorias.static_cache_delete"),
+        patch("app.routes.categorias.adicionar_traducao_customizada"),
+        patch("app.routes.categorias.traduzir_categoria") as mock_traduzir,
+    ):
+        mock_cls.nome_existe.return_value = False
+        mock_setor = mock_cls.return_value
+        mock_setor.nome_pt = "Armazém"
+        mock_setor.nome_en = "Warehouse"
+        mock_setor.nome_es = "Almacén"
+        r = client_logado_admin.post(
+            "/admin/categorias/setor/nova",
+            data={
+                "nome_pt": "Armazém",
+                "descricao_pt": "",
+                "nome_en": "Warehouse",
+                "nome_es": "Almacén",
+            },
+            follow_redirects=False,
+        )
+    assert r.status_code == 302
+    mock_traduzir.assert_not_called()
+    kwargs = mock_cls.call_args.kwargs
+    assert kwargs["nome_en"] == "Warehouse"
+    assert kwargs["nome_es"] == "Almacén"
+
+
+def test_criar_setor_sem_en_es_usa_traducao_automatica(client_logado_admin):
+    """POST criar_setor sem nome_en/nome_es continua deixando a tradução automática
+    do construtor de CategoriaSetor decidir (regressão: comportamento de antes)."""
+    with (
+        patch("app.routes.categorias.CategoriaSetor") as mock_cls,
+        patch("app.routes.categorias.cache_delete"),
+        patch("app.routes.categorias.static_cache_delete"),
+        patch("app.routes.categorias.adicionar_traducao_customizada"),
+    ):
+        mock_cls.nome_existe.return_value = False
+        mock_setor = mock_cls.return_value
+        mock_setor.nome_pt = "Qualidade"
+        mock_setor.nome_en = "Quality"
+        mock_setor.nome_es = "Calidad"
+        r = client_logado_admin.post(
+            "/admin/categorias/setor/nova",
+            data={"nome_pt": "Qualidade", "descricao_pt": ""},
+            follow_redirects=False,
+        )
+    assert r.status_code == 302
+    kwargs = mock_cls.call_args.kwargs
+    assert kwargs["nome_en"] is None
+    assert kwargs["nome_es"] is None
+
+
+def test_editar_setor_com_en_es_manual_sobrescreve_sem_mudar_nome(client_logado_admin):
+    """POST editar_setor com nome_pt igual mas nome_en/nome_es novos sobrescreve a
+    tradução sem precisar renomear o setor nem chamar tradução automática."""
+    mock_setor = MagicMock()
+    mock_setor.nome_pt = "Armazém"
+    mock_setor.nome_en = "Warehouse Facility"
+    mock_setor.nome_es = "Almacén"
+    mock_setor.descricao_pt = ""
+    with (
+        patch("app.routes.categorias.CategoriaSetor.get_by_id", return_value=mock_setor),
+        patch("app.routes.categorias.CategoriaSetor.nome_existe", return_value=False),
+        patch("app.routes.categorias.cache_delete"),
+        patch("app.routes.categorias.traduzir_categoria") as mock_traduzir,
+    ):
+        r = client_logado_admin.post(
+            "/admin/categorias/setor/s1/editar",
+            data={
+                "nome_pt": "Armazém",
+                "descricao_pt": "",
+                "ativo": "on",
+                "nome_en": "Warehouse",
+                "nome_es": "Almacén",
+            },
+            follow_redirects=False,
+        )
+    assert r.status_code == 302
+    mock_traduzir.assert_not_called()
+    assert mock_setor.nome_en == "Warehouse"
+    assert mock_setor.nome_es == "Almacén"
+    mock_setor.save.assert_called_once()
+
+
+def test_editar_setor_muda_nome_sem_en_es_continua_traduzindo(client_logado_admin):
+    """POST editar_setor mudando nome_pt sem informar nome_en/nome_es continua
+    traduzindo automaticamente — regressão do comportamento existente."""
+    mock_setor = MagicMock()
+    mock_setor.nome_pt = "TI"
+    mock_setor.descricao_pt = ""
+    with (
+        patch("app.routes.categorias.CategoriaSetor.get_by_id", return_value=mock_setor),
+        patch("app.routes.categorias.CategoriaSetor.nome_existe", return_value=False),
+        patch("app.routes.categorias.cache_delete"),
+        patch(
+            "app.routes.categorias.traduzir_categoria",
+            return_value={"en": "IT Updated", "es": "TI Actualizado"},
+        ) as mock_traduzir,
+    ):
+        r = client_logado_admin.post(
+            "/admin/categorias/setor/s1/editar",
+            data={"nome_pt": "TI Atualizado", "descricao_pt": "", "ativo": "on"},
+            follow_redirects=False,
+        )
+    assert r.status_code == 302
+    mock_traduzir.assert_called_once_with("TI Atualizado")
+    assert mock_setor.nome_en == "IT Updated"
+    assert mock_setor.nome_es == "TI Actualizado"
+
+
 def test_excluir_setor_sucesso(client_logado_admin):
     """POST excluir_setor com setor existente deleta e redireciona."""
     from unittest.mock import MagicMock
