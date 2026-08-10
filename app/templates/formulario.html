@@ -325,7 +325,9 @@
             selectResponsavel.classList.add('hidden');
             selectResponsavel.removeAttribute('required');
             hiddenId.value = '';
-            hiddenNome.value = '';
+            // Só pro preview de confirmação (dd#preview-responsavel) — o backend
+            // sempre resolve o grupo no servidor, ignora este valor pra Compras.
+            hiddenNome.value = campoResponsavel.value;
             return;
         }
 
