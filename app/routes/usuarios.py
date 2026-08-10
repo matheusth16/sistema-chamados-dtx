@@ -25,7 +25,25 @@ DOMINIO_EMAIL_PERMITIDO = "@dtx.aero"
 # nunca ficam sem pelo menos um admin_global de acesso garantido ao sistema.
 EMAILS_ADMIN_RAIZ_PROTEGIDOS = frozenset({"matheus.costa@dtx.aero", "admin@dtx.aero"})
 
+# Hierarquia de exibição da listagem /admin/usuarios — perfis fora daqui (não
+# deveria acontecer, PERFIS_VALIDOS é fechado) vão pro fim.
+_ORDEM_PERFIS_GESTAO = {"admin_global": 0, "admin": 1, "supervisor": 2, "solicitante": 3}
+
 logger = logging.getLogger(__name__)
+
+
+def _ordenar_usuarios_para_gestao(usuarios: list[Usuario]) -> list[Usuario]:
+    """Ordena a listagem de /admin/usuarios: hierarquia de perfil primeiro
+    (admin_global > admin > supervisor > solicitante) e, dentro de supervisor,
+    agrupado pela primeira área cadastrada — colegas do mesmo setor ficam
+    lado a lado em vez de espalhados pela ordem alfabética de nome."""
+
+    def chave(usuario: Usuario):
+        perfil_rank = _ORDEM_PERFIS_GESTAO.get(usuario.perfil, len(_ORDEM_PERFIS_GESTAO))
+        primeira_area = (usuario.areas[0] if usuario.areas else "").lower()
+        return (perfil_rank, primeira_area, (usuario.nome or "").lower())
+
+    return sorted(usuarios, key=chave)
 
 
 def _bloquear_se_admin_raiz(usuario: Usuario, usuario_id: str, translation_key: str, acao: str):
@@ -143,7 +161,7 @@ def gerenciar_usuarios() -> Response:
     try:
         from app.services.lgpd_self_service import listar_usuarios_com_solicitacao_pendente
 
-        usuarios = Usuario.get_all()
+        usuarios = _ordenar_usuarios_para_gestao(Usuario.get_all())
         ids_com_solicitacao_lgpd = listar_usuarios_com_solicitacao_pendente()
         return render_template(
             "usuarios.html", usuarios=usuarios, ids_com_solicitacao_lgpd=ids_com_solicitacao_lgpd

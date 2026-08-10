@@ -61,6 +61,39 @@ def test_admin_usuarios_com_admin_retorna_200(client_logado_admin):
     assert b"usuarios" in r.data.lower() or b"user" in r.data.lower()
 
 
+def test_admin_usuarios_ordena_por_perfil_e_area(client_logado_admin):
+    """Listagem ordena por hierarquia de perfil (admin_global > admin > supervisor >
+    solicitante); supervisores ficam agrupados pela área, não espalhados pela ordem
+    alfabética de nome (bug relatado: supervisora de Logística aparecia longe dos
+    colegas do mesmo setor)."""
+    solicitante = _usuario_fake(uid="s1", nome="Zelia Solicitante", perfil="solicitante")
+    sup_log_b = _usuario_fake(
+        uid="sup_log_b", nome="Bruna Logistica", perfil="supervisor", areas=["Logistica"]
+    )
+    sup_log_a = _usuario_fake(
+        uid="sup_log_a", nome="Ana Logistica", perfil="supervisor", areas=["Logistica"]
+    )
+    sup_ti = _usuario_fake(uid="sup_ti", nome="Carlos TI", perfil="supervisor", areas=["TI"])
+    sub_admin = _usuario_fake(uid="adm1", nome="Diego Admin", perfil="admin")
+    admin_global = _usuario_fake(uid="ag1", nome="Elis Global", perfil="admin_global")
+
+    # Ordem de entrada embaralhada de propósito (não em ordem alfabética nem de perfil).
+    usuarios_desordenados = [sup_log_b, solicitante, sub_admin, sup_ti, admin_global, sup_log_a]
+
+    with patch("app.routes.usuarios.Usuario.get_all", return_value=usuarios_desordenados):
+        r = client_logado_admin.get("/admin/usuarios", follow_redirects=False)
+
+    assert r.status_code == 200
+    html = r.data.decode("utf-8")
+    idx = {u.nome: html.index(u.nome) for u in usuarios_desordenados}
+
+    assert idx["Elis Global"] < idx["Diego Admin"]
+    assert idx["Diego Admin"] < idx["Ana Logistica"]
+    assert idx["Carlos TI"] < idx["Zelia Solicitante"]
+    # Supervisores da mesma área (Logistica) ficam adjacentes, nenhum outro perfil/área no meio.
+    assert idx["Ana Logistica"] < idx["Bruna Logistica"] < idx["Carlos TI"]
+
+
 def test_admin_usuarios_mostra_badge_lgpd_para_usuario_com_solicitacao_pendente(
     client_logado_admin,
 ):
