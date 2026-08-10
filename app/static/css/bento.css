@@ -108,11 +108,7 @@
    mesma especificidade; como bento.css carrega depois de tailwind.min.css em base.html, a regra
    incondicional sempre venceria o empate mesmo com .hidden aplicada. */
 .bento-resp-badge:not(.hidden){ display:inline-flex; }
-/* Seletor com #id: .bento-form input (bento.css:70) tem especificidade (0,1,1),
-   maior que .bento-resp-badge sozinho (0,1,0) — vencia e colapsava o padding-left
-   de 34px (espaço reservado pro ícone) pra 14px, sobrepondo o ícone no texto.
-   Mesma causa raiz do comentário de .bento-resp-badge:not(.hidden) acima. */
-#responsavel_visual.bento-resp-badge{ align-items:center; gap:8px; background:var(--color-surface-canvas); border:none; border-radius:99px; padding:8px 16px 8px 34px; color:var(--color-text-muted); font-size:14px; font-weight:700; position:relative; width:100%; cursor:not-allowed; }
+.bento-resp-badge{ align-items:center; gap:8px; background:var(--color-surface-canvas); border:none; border-radius:99px; padding:8px 16px 8px 34px; color:var(--color-text-muted); font-size:14px; font-weight:700; position:relative; width:100%; cursor:not-allowed; }
 .bento-resp-badge.is-resolved{ background:var(--color-dtx-100); color:var(--color-dtx-500); }
 .bento-resp-badge.is-warning{ background:var(--color-status-open-bg); color:var(--color-status-open-text); }
 .bento-resp-badge.is-error{ background:var(--color-status-cancelled-bg); color:var(--color-status-cancelled-text); }
