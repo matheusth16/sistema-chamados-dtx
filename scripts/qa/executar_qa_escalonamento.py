@@ -617,7 +617,7 @@ def check_esc_10(app) -> Resultado:
 
         # Sub-check B: verificar_permissao_mudanca_status -> False para gestor
         from app.models import Chamado
-        from app.services.permission_validation import verificar_permissao_mudanca_status
+        from app.services.permissoes_edicao_chamado import verificar_permissao_mudanca_status
 
         dados = _chamado_dict(status="Em Atendimento", responsavel_id="sup_a")
         chamado = Chamado.from_dict(dados, "ch_esc10")

@@ -138,7 +138,7 @@ sistema-chamados-dtx/
 │   │   ├── notifications.py      # E-mail e Web Push
 │   │   ├── notifications_inapp.py
 │   │   ├── notify_retry.py       # Retry com backoff exponencial
-│   │   ├── permission_validation.py
+│   │   ├── permissoes_edicao_chamado.py
 │   │   ├── email_templates.py    # Templates HTML de e-mail
 │   │   ├── validators.py
 │   │   ├── analytics.py
