@@ -1032,6 +1032,175 @@ def test_criacao_grava_supervisor_ids_com_acesso(app):
     assert "id_julia" in Chamado.get_by_id(chamado_id).supervisor_ids_com_acesso
 
 
+# ---------------------------------------------------------------------------
+# Compradores — setor de distribuição em grupo (sem dono único na criação)
+# ---------------------------------------------------------------------------
+
+
+def _tres_supervisores_compradores():
+    supervisores = []
+    for i, nome in enumerate(["Ana", "Bruno", "Carla"], start=1):
+        sup = MagicMock()
+        sup.id = f"id_compras_{i}"
+        sup.nome = nome
+        sup.perfil = "supervisor"
+        supervisores.append(sup)
+    return supervisores
+
+
+def test_criacao_compras_nao_exige_responsavel_mesmo_com_supervisores(app):
+    """Setor Compradores: form sem responsavel_id não falha mesmo com supervisores cadastrados."""
+    from app.i18n import get_translation
+
+    supervisores = _tres_supervisores_compradores()
+
+    with (
+        patch(
+            "app.services.chamados_criacao_service.Usuario.get_supervisores_por_area",
+            return_value=supervisores,
+        ),
+        patch(
+            "app.services.chamados_criacao_service.gerar_numero_chamado", return_value="2026-200"
+        ),
+        patch("app.services.chamados_criacao_service.Historico"),
+        patch("app.services.chamados_criacao_service.notificar_aprovador_novo_chamado"),
+        patch("app.services.chamados_criacao_service.criar_notificacao"),
+        patch("app.services.chamados_criacao_service.enviar_webpush_usuario"),
+        patch("app.services.chamados_criacao_service.threading.Thread", side_effect=_FakeThread),
+        app.app_context(),
+    ):
+        chamado_id, numero, erro, aviso = criar_chamado(
+            form=_form_base(responsavel_id="", tipo="Compradores"),
+            files=_files_empty(),
+            solicitante_id="sol1",
+            solicitante_nome="Solicitante",
+            area_solicitante="Compradores",
+        )
+
+    assert erro is None
+    assert aviso is None
+    assert chamado_id is not None
+    chamado = Chamado.get_by_id(chamado_id)
+    assert chamado.responsavel_id is None
+    assert chamado.responsavel == get_translation("buyers_group_label", "en")
+
+
+def test_criacao_compras_ignora_responsavel_id_enviado_no_form(app):
+    """Setor Compradores: mesmo com responsavel_id no form, o chamado fica sem dono único."""
+    supervisores = _tres_supervisores_compradores()
+
+    with (
+        patch(
+            "app.services.chamados_criacao_service.Usuario.get_supervisores_por_area",
+            return_value=supervisores,
+        ),
+        patch(
+            "app.services.chamados_criacao_service.Usuario.get_by_id",
+            return_value=supervisores[0],
+        ),
+        patch(
+            "app.services.chamados_criacao_service.gerar_numero_chamado", return_value="2026-201"
+        ),
+        patch("app.services.chamados_criacao_service.Historico"),
+        patch("app.services.chamados_criacao_service.notificar_aprovador_novo_chamado"),
+        patch("app.services.chamados_criacao_service.criar_notificacao"),
+        patch("app.services.chamados_criacao_service.enviar_webpush_usuario"),
+        patch("app.services.chamados_criacao_service.threading.Thread", side_effect=_FakeThread),
+        app.app_context(),
+    ):
+        chamado_id, numero, erro, _ = criar_chamado(
+            form=_form_base(
+                responsavel_id="id_compradores_1", responsavel_nome="Ana", tipo="Compradores"
+            ),
+            files=_files_empty(),
+            solicitante_id="sol1",
+            solicitante_nome="Solicitante",
+            area_solicitante="Compradores",
+        )
+
+    assert erro is None
+    assert chamado_id is not None
+    assert Chamado.get_by_id(chamado_id).responsavel_id is None
+
+
+def test_criacao_compras_grava_supervisor_ids_com_acesso_para_todos(app):
+    """Setor Compradores: supervisor_ids_com_acesso grava os 3 supervisores da área (fila sem owner)."""
+    supervisores = _tres_supervisores_compradores()
+
+    with (
+        patch(
+            "app.services.chamados_criacao_service.Usuario.get_supervisores_por_area",
+            return_value=supervisores,
+        ),
+        patch(
+            "app.services.chamados_criacao_service.gerar_numero_chamado", return_value="2026-202"
+        ),
+        patch("app.services.chamados_criacao_service.Historico"),
+        patch("app.services.chamados_criacao_service.notificar_aprovador_novo_chamado"),
+        patch("app.services.chamados_criacao_service.criar_notificacao"),
+        patch("app.services.chamados_criacao_service.enviar_webpush_usuario"),
+        patch("app.services.chamados_criacao_service.threading.Thread", side_effect=_FakeThread),
+        app.app_context(),
+    ):
+        chamado_id, numero, erro, _ = criar_chamado(
+            form=_form_base(responsavel_id="", tipo="Compradores"),
+            files=_files_empty(),
+            solicitante_id="sol1",
+            solicitante_nome="Solicitante",
+            area_solicitante="Compradores",
+        )
+
+    assert erro is None
+    ids_com_acesso = Chamado.get_by_id(chamado_id).supervisor_ids_com_acesso
+    for sup in supervisores:
+        assert sup.id in ids_com_acesso
+
+
+def test_criacao_compras_notifica_todos_supervisores_da_area(app):
+    """Setor Compradores: abertura notifica os 3 supervisores (email + in-app + web push), não só 1."""
+    supervisores = _tres_supervisores_compradores()
+
+    with (
+        patch(
+            "app.services.chamados_criacao_service.Usuario.get_supervisores_por_area",
+            return_value=supervisores,
+        ),
+        patch(
+            "app.services.chamados_criacao_service.gerar_numero_chamado", return_value="2026-203"
+        ),
+        patch("app.services.chamados_criacao_service.Historico"),
+        patch(
+            "app.services.chamados_criacao_service.notificar_aprovador_novo_chamado"
+        ) as mock_email,
+        patch("app.services.chamados_criacao_service.criar_notificacao") as mock_inapp,
+        patch("app.services.chamados_criacao_service.enviar_webpush_usuario") as mock_webpush,
+        patch("app.services.chamados_criacao_service.threading.Thread", side_effect=_FakeThread),
+        app.app_context(),
+    ):
+        chamado_id, numero, erro, _ = criar_chamado(
+            form=_form_base(responsavel_id="", tipo="Compradores"),
+            files=_files_empty(),
+            solicitante_id="sol1",
+            solicitante_nome="Solicitante",
+            area_solicitante="Compradores",
+        )
+
+    assert erro is None
+    assert mock_email.call_count == 3
+    ids_notificados_email = {
+        call.kwargs["responsavel_usuario"].id for call in mock_email.call_args_list
+    }
+    assert ids_notificados_email == {sup.id for sup in supervisores}
+
+    assert mock_inapp.call_count == 3
+    ids_notificados_inapp = {call.kwargs["usuario_id"] for call in mock_inapp.call_args_list}
+    assert ids_notificados_inapp == {sup.id for sup in supervisores}
+
+    assert mock_webpush.call_count == 3
+    ids_notificados_webpush = {call.args[0] for call in mock_webpush.call_args_list}
+    assert ids_notificados_webpush == {sup.id for sup in supervisores}
+
+
 # ── AOG — abertura já grava nível 4 e dispara broadcast pros 4 gestores ──────
 
 

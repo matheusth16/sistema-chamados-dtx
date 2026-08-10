@@ -2704,6 +2704,11 @@
     "en": "Procurement",
     "es": "Aprovisionamiento"
   },
+  "buyers_group_label": {
+    "pt_BR": "Grupo de Compradores",
+    "en": "Buyers Group",
+    "es": "Grupo de Compradores"
+  },
   "confirm_resolution_message": {
     "pt_BR": "O atendimento foi concluído. Confirme se o problema foi resolvido.",
     "en": "The service has been completed. Please confirm if the issue was resolved.",

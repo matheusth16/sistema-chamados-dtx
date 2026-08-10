@@ -32,6 +32,18 @@ from app.utils_areas import setor_para_area
 
 logger = logging.getLogger(__name__)
 
+# Setores de distribuição em grupo: nunca exigem escolha manual de 1 pessoa —
+# o chamado fica sem dono único (responsavel_id=None) e cai na fila da área,
+# visível a todos os supervisores cadastrados (ver permissions.py, regra "fila
+# sem owner"). Hoje só Compradores (nome do setor cadastrado no catálogo —
+# ver categorias_setores); lista fechada de propósito (sem toggle de admin),
+# decisão explícita do usuário.
+AREAS_GRUPO = {"Compradores"}
+
+
+def _eh_area_grupo(area: str) -> bool:
+    return area in AREAS_GRUPO
+
 
 def _t(key, **kwargs):
     return get_translation_session(key, **kwargs)
@@ -42,13 +54,29 @@ def _resolver_responsavel(
     solicitante_id: str,
     solicitante_nome: str,
     area_solicitante: str | None,
-) -> tuple[str, str, str, bool]:
+) -> tuple[str, str | None, str, bool]:
     """
     Retorna (responsavel_nome, responsavel_id, motivo_atribuicao, atribuicao_manual).
     Usa responsável escolhido no formulário ou atribuição automática.
     atribuicao_manual indica se o chamado ficou aguardando atribuição manual
     (sem depender do texto traduzido de motivo_atribuicao).
+
+    Setores de grupo (ver _eh_area_grupo) ignoram qualquer responsavel_id/
+    responsavel_nome vindo do form — nunca têm dono único.
     """
+    tipo = form.get("tipo")
+    categoria = form.get("categoria")
+    area_para_atribuicao = setor_para_area(tipo) if tipo else (area_solicitante or "Geral")
+
+    if _eh_area_grupo(area_para_atribuicao):
+        nome_grupo = _t("buyers_group_label")
+        return (
+            nome_grupo,
+            None,
+            _t("assignment_auto_assigned", nome=nome_grupo),
+            False,
+        )
+
     responsavel_id_form = (form.get("responsavel_id") or "").strip()
     responsavel_nome_form = (form.get("responsavel_nome") or "").strip()
     # Bloqueia self-assignment: solicitante não pode ser o próprio responsável
@@ -61,9 +89,6 @@ def _resolver_responsavel(
                 _t("assignment_chosen_by_requester", nome=responsavel_nome_form),
                 False,
             )
-    tipo = form.get("tipo")
-    categoria = form.get("categoria")
-    area_para_atribuicao = setor_para_area(tipo) if tipo else (area_solicitante or "Geral")
     resultado = atribuidor.atribuir(
         area=area_para_atribuicao,
         categoria=categoria,
@@ -213,21 +238,23 @@ def criar_chamado(
         setor_para_area(tipo) if tipo else (area_solicitante if area_solicitante else "Geral")
     )
 
-    # Fase 2 — Supervisor obrigatório quando área tem supervisores cadastrados
-    responsavel_id_form = (form.get("responsavel_id") or "").strip()
-    supervisores_da_area = Usuario.get_supervisores_por_area(area_chamado)
-    if not responsavel_id_form:
-        if supervisores_da_area:
-            return (
-                None,
-                None,
-                _t("select_supervisor_for_area"),
-                None,
-            )
-    elif supervisores_da_area:
-        ids_validos = {s.id for s in supervisores_da_area}
-        if responsavel_id_form not in ids_validos:
-            return (None, None, _t("supervisor_invalid_for_area"), None)
+    # Fase 2 — Supervisor obrigatório quando área tem supervisores cadastrados.
+    # Setores de grupo (ver _eh_area_grupo) nunca exigem escolha manual.
+    if not _eh_area_grupo(area_chamado):
+        responsavel_id_form = (form.get("responsavel_id") or "").strip()
+        supervisores_da_area = Usuario.get_supervisores_por_area(area_chamado)
+        if not responsavel_id_form:
+            if supervisores_da_area:
+                return (
+                    None,
+                    None,
+                    _t("select_supervisor_for_area"),
+                    None,
+                )
+        elif supervisores_da_area:
+            ids_validos = {s.id for s in supervisores_da_area}
+            if responsavel_id_form not in ids_validos:
+                return (None, None, _t("supervisor_invalid_for_area"), None)
 
     responsavel, responsavel_id, motivo_atribuicao, atribuicao_manual = _resolver_responsavel(
         form, solicitante_id, solicitante_nome, area_solicitante
@@ -316,21 +343,36 @@ def criar_chamado(
                                 chamado_id,
                                 exc,
                             )
-                    responsavel_usuario = (
-                        Usuario.get_by_id(responsavel_id) if responsavel_id else None
-                    )
-                    executar_com_retry(
-                        notificar_aprovador_novo_chamado,
-                        chamado_id=chamado_id,
-                        numero_chamado=numero_chamado,
-                        categoria=categoria,
-                        tipo_solicitacao=tipo,
-                        descricao_resumo=(descricao or "")[:500],
-                        area=area_solicitante or "Geral",
-                        solicitante_nome=solicitante_nome,
-                        responsavel_usuario=responsavel_usuario,
-                        solicitante_email=solicitante_email,
-                    )
+                    if responsavel_id:
+                        responsavel_usuario = Usuario.get_by_id(responsavel_id)
+                        executar_com_retry(
+                            notificar_aprovador_novo_chamado,
+                            chamado_id=chamado_id,
+                            numero_chamado=numero_chamado,
+                            categoria=categoria,
+                            tipo_solicitacao=tipo,
+                            descricao_resumo=(descricao or "")[:500],
+                            area=area_solicitante or "Geral",
+                            solicitante_nome=solicitante_nome,
+                            responsavel_usuario=responsavel_usuario,
+                            solicitante_email=solicitante_email,
+                        )
+                    elif _eh_area_grupo(area_chamado):
+                        # Sem dono único: notifica todos os supervisores da área
+                        # (fila compartilhada — ver AREAS_GRUPO).
+                        for supervisor in Usuario.get_supervisores_por_area(area_chamado):
+                            executar_com_retry(
+                                notificar_aprovador_novo_chamado,
+                                chamado_id=chamado_id,
+                                numero_chamado=numero_chamado,
+                                categoria=categoria,
+                                tipo_solicitacao=tipo,
+                                descricao_resumo=(descricao or "")[:500],
+                                area=area_solicitante or "Geral",
+                                solicitante_nome=solicitante_nome,
+                                responsavel_usuario=supervisor,
+                                solicitante_email=solicitante_email,
+                            )
                     if observadores_list:
                         _notificar_observadores_inclusao(
                             _app,
@@ -353,7 +395,16 @@ def criar_chamado(
                             quem_adicionou_nome=solicitante_nome,
                             setores_nomes=", ".join(setores_adicionais_lista),
                         )
+                    destinatarios_inapp = []
                     if responsavel_id and responsavel_id != solicitante_id:
+                        destinatarios_inapp = [responsavel_id]
+                    elif _eh_area_grupo(area_chamado):
+                        destinatarios_inapp = [
+                            sup.id
+                            for sup in Usuario.get_supervisores_por_area(area_chamado)
+                            if sup.id and sup.id != solicitante_id
+                        ]
+                    if destinatarios_inapp:
                         try:
                             from app.services.notifications_inapp import (
                                 texto_notificacao_novo_chamado,
@@ -362,26 +413,27 @@ def criar_chamado(
                             titulo_notif, mensagem_notif = texto_notificacao_novo_chamado(
                                 numero_chamado, categoria or "", solicitante_nome, language="en"
                             )
-                            criar_notificacao(
-                                usuario_id=responsavel_id,
-                                chamado_id=chamado_id,
-                                numero_chamado=numero_chamado,
-                                titulo=titulo_notif,
-                                mensagem=mensagem_notif,
-                                tipo="novo_chamado",
-                                categoria=categoria or "",
-                                solicitante_nome=solicitante_nome,
-                            )
                             base_url = _app.config.get("APP_BASE_URL", "").rstrip("/")
                             url_chamado = (
                                 f"{base_url}/chamado/{chamado_id}/historico" if base_url else None
                             )
-                            enviar_webpush_usuario(
-                                responsavel_id,
-                                titulo=titulo_notif,
-                                corpo=f"{categoria} · {solicitante_nome}",
-                                url=url_chamado,
-                            )
+                            for destinatario_id in destinatarios_inapp:
+                                criar_notificacao(
+                                    usuario_id=destinatario_id,
+                                    chamado_id=chamado_id,
+                                    numero_chamado=numero_chamado,
+                                    titulo=titulo_notif,
+                                    mensagem=mensagem_notif,
+                                    tipo="novo_chamado",
+                                    categoria=categoria or "",
+                                    solicitante_nome=solicitante_nome,
+                                )
+                                enviar_webpush_usuario(
+                                    destinatario_id,
+                                    titulo=titulo_notif,
+                                    corpo=f"{categoria} · {solicitante_nome}",
+                                    url=url_chamado,
+                                )
                         except Exception as e:
                             logger.debug("Notificação in-app/Web Push não enviada: %s", e)
             except Exception as e:

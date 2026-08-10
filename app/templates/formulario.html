@@ -316,6 +316,19 @@
             return;
         }
 
+        if (setor === 'Compradores') {
+            // Setor de distribuição em grupo: cai pros supervisores da área
+            // inteira, sem expor nomes individuais nem exigir escolha manual.
+            campoResponsavel.value = "{{ t('buyers_group_label') }}";
+            campoResponsavel.classList.remove('opacity-50', 'hidden');
+            campoResponsavel.classList.add('is-resolved');
+            selectResponsavel.classList.add('hidden');
+            selectResponsavel.removeAttribute('required');
+            hiddenId.value = '';
+            hiddenNome.value = '';
+            return;
+        }
+
         campoResponsavel.value = "{{ t('loading_supervisors') }}";
         campoResponsavel.classList.add('opacity-50');
 
