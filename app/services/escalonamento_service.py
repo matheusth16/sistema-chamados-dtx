@@ -462,6 +462,15 @@ def definir_previsao_atendimento(
     if chamado is None:
         return {"sucesso": False, "erro": _t("ticket_not_found")}
 
+    # ── AOG é prioridade máxima, sempre — nunca pode ter a escalada
+    # silenciada por previsão de atendimento, nem por owner nem por admin.
+    if chamado.categoria == "AOG":
+        logger.warning(
+            "definir_previsao_atendimento negado: chamado %s é AOG (bloqueio incondicional)",
+            chamado_id,
+        )
+        return {"sucesso": False, "erro": _t("attendance_forecast_not_allowed_aog")}
+
     # ── verifica permissão (owner ou admin, E supervisor+) ────────────────────
     eh_supervisor_ou_acima = getattr(usuario, "perfil", None) in (
         "supervisor",

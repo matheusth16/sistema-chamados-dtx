@@ -554,9 +554,12 @@ def api_confirmar_resolucao(chamado_id: str):
                 status="Aberto",
                 confirmacao_solicitante="reaberto",
                 data_conclusao=None,
-                escalacao_resposta_nivel=0,  # ADR-004: Escada A reinicia na reabertura
-                # Fase 7 — Escada B: reinicia junto com Escada A na reabertura
-                escalacao_resolucao_nivel=0,
+                # Motor de escalonamento reinicia na reabertura (mas o TAT usa
+                # sempre a data_abertura original, que não muda — ver
+                # sla_escalacao_service.py).
+                escalacao_nivel=0,
+                escalacao_proximo_tick_em=None,
+                escalacao_pre_aviso_nivel_enviado=None,
                 alerta_supervisor_50_enviado=False,
                 alerta_supervisor_80_enviado=False,
                 # Lembretes resetados para que o próximo ciclo de conclusão funcione

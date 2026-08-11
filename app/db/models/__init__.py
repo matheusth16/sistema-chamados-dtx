@@ -2,6 +2,7 @@
 
 from app.db.models.apoio import (  # noqa: F401
     ContadorUsoRow,
+    DigestDiarioUsuarioRow,
     HistoricoUsuarioRow,
     PushSubscriptionRow,
     SolicitacaoLgpdRow,

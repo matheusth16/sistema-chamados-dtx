@@ -216,7 +216,7 @@ class Config:
 
     # 7. Session Security
     # PERMANENT_SESSION_LIFETIME só tem efeito se session.permanent=True for definido.
-    # No fluxo atual isso nunca acontece: sessões expiram pelo checar_inatividade (900s)
+    # No fluxo atual isso nunca acontece: sessões expiram pelo checar_inatividade (3600s)
     # em app/__init__.py, ou pelo cookie de "lembrar" (REMEMBER_COOKIE_DURATION, 30 dias).
     PERMANENT_SESSION_LIFETIME = 86400  # 24 horas — reservado para uso futuro
     SESSION_COOKIE_SECURE = _to_bool(
@@ -327,16 +327,26 @@ class Config:
     SLA_HORARIO_FIM = os.getenv("SLA_HORARIO_FIM", "16:30")
     SLA_ALMOCO_INICIO = os.getenv("SLA_ALMOCO_INICIO", "11:30")
     SLA_ALMOCO_FIM = os.getenv("SLA_ALMOCO_FIM", "13:00")
+    # TAT (turnaround time) por categoria — prazo único, contado sempre de
+    # data_abertura (não de data_em_atendimento). Ver sla_escalacao_service.py.
     SLA_DIAS_RESOLUCAO_PROJETOS = int(os.getenv("SLA_DIAS_RESOLUCAO_PROJETOS", "2"))
     SLA_DIAS_RESOLUCAO_PADRAO = int(os.getenv("SLA_DIAS_RESOLUCAO_PADRAO", "3"))
-    SLA_ESCALADA_A_HORAS_UTEIS = [1, 2, 3, 4]
-    SLA_ESCALADA_B_HORAS_UTEIS = [0, 4, 8, 12]
     SLA_INCLUI_FIM_DE_SEMANA = os.getenv("SLA_INCLUI_FIM_DE_SEMANA", "false").lower() == "true"
     SLA_TIMEZONE = os.getenv("SLA_TIMEZONE", "America/Sao_Paulo")
 
     # SLA AOG (Aircraft On Ground): tempo corrido (calendário), não útil — 24/7.
-    # Abertura já notifica os 4 níveis de gestor de uma vez (ver notifications.py);
-    # a escalada abaixo cobre só a resolução (prazo vencido), sequencial como um
-    # chamado normal.
-    SLA_AOG_MINUTOS_RESOLUCAO_DEADLINE = int(os.getenv("SLA_AOG_MINUTOS_RESOLUCAO_DEADLINE", "240"))
-    SLA_AOG_MINUTOS_RESOLUCAO_ESCALADA = [0, 30, 60, 120]
+    # Abertura já notifica todo usuário ativo (ver notifications_escalonamento.py).
+    # TAT_HORAS é o prazo de resolução; CLAIM_HORAS é um limiar mais cedo e
+    # separado, só pra "ninguém assumiu ainda" — ver calcular_deadline_inicial.
+    SLA_AOG_TAT_HORAS = int(os.getenv("SLA_AOG_TAT_HORAS", "24"))
+    SLA_AOG_CLAIM_HORAS = int(os.getenv("SLA_AOG_CLAIM_HORAS", "1"))
+
+    # Cadência dos ticks de escalonamento após o TAT vencer (minutos), escolhida
+    # pelo status do chamado no momento de cada tick: ainda Aberto (não assumido)
+    # escala mais devagar que Em Atendimento (assumido). AOG usa sempre a
+    # cadência "assumido" nas duas fases — ver sla_escalacao_service.py.
+    SLA_CADENCIA_NAO_ASSUMIDO_MINUTOS = int(os.getenv("SLA_CADENCIA_NAO_ASSUMIDO_MINUTOS", "120"))
+    SLA_CADENCIA_ASSUMIDO_MINUTOS = int(os.getenv("SLA_CADENCIA_ASSUMIDO_MINUTOS", "60"))
+
+    # Aviso prévio ao responsável, antes de cada tick de escalonamento.
+    SLA_PRE_AVISO_MINUTOS = int(os.getenv("SLA_PRE_AVISO_MINUTOS", "30"))

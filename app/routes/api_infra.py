@@ -128,7 +128,7 @@ def _obter_cron_token_request() -> str:
 
 @main.route("/internal/cron/sla-escalacao", methods=["POST"])
 def cron_sla_escalacao():
-    """Executa sob demanda o job de escalonamento SLA (Escada A + avisos + Escada B).
+    """Executa sob demanda o job de escalonamento SLA (motor unificado + avisos).
 
     Gatilho manual/backup, não usado em produção normal: o servidor físico
     on-premise fica sempre ligado, então o APScheduler in-process
@@ -160,8 +160,7 @@ def cron_sla_escalacao():
     from app.services.scheduler_lock import executar_job_com_lock
     from app.services.sla_escalacao_service import (
         processar_avisos_resolucao,
-        processar_escada_a,
-        processar_escada_b,
+        processar_escalonamento,
     )
 
     resultado: dict = {}
@@ -170,9 +169,8 @@ def cron_sla_escalacao():
     def _job():
         nonlocal erro
         try:
-            resultado["escada_a"] = processar_escada_a()
+            resultado["escalonamento"] = processar_escalonamento()
             resultado["avisos_resolucao"] = processar_avisos_resolucao()
-            resultado["escada_b"] = processar_escada_b()
         except Exception as exc:  # noqa: BLE001 — convertido em 500 genérico abaixo
             erro = exc
 

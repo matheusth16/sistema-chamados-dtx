@@ -80,8 +80,18 @@ class ChamadoRow(Base):
     motivo_ultima_escalacao: Mapped[str | None] = mapped_column(Text)
     sla_dias: Mapped[int | None] = mapped_column(Integer)
     confirmacao_solicitante: Mapped[str | None] = mapped_column(Text)
-    escalacao_resposta_nivel: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=0)
-    escalacao_resolucao_nivel: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=0)
+    # Motor de escalonamento unificado (TAT único por categoria, contado de
+    # data_abertura) — ver app/services/sla_escalacao_service.py.
+    escalacao_nivel: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=0)
+    # Próximo tick agendado; NULL enquanto escalacao_nivel==0 (o alvo é
+    # recalculado a cada passagem do job a partir de categoria+status+
+    # data_abertura, porque pro AOG o alvo muda se o chamado for assumido
+    # antes do limiar de reivindicação).
+    escalacao_proximo_tick_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Nível-alvo (não boolean) pro qual o aviso prévio de 30min já foi
+    # enviado — dedup natural, já que o próximo tick sempre mira um nível
+    # maior que o anterior.
+    escalacao_pre_aviso_nivel_enviado: Mapped[int | None] = mapped_column(SmallInteger)
     alerta_supervisor_50_enviado: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False
     )

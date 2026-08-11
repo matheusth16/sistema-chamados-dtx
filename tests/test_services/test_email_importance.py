@@ -103,18 +103,18 @@ def test_resolver_importance_lembrete_2_high():
     assert resolver_importance("lembrete_confirmacao", numero_lembrete=2) == "high"
 
 
-def test_resolver_importance_escalada_resposta_high():
-    """escalada_resposta_gerencial → 'high'."""
+def test_resolver_importance_escalada_gerencial_high():
+    """escalada_gerencial → 'high'."""
     from app.services.notifications import resolver_importance
 
-    assert resolver_importance("escalada_resposta_gerencial") == "high"
+    assert resolver_importance("escalada_gerencial") == "high"
 
 
-def test_resolver_importance_escalada_resolucao_high():
-    """escalada_resolucao_gerencial → 'high'."""
+def test_resolver_importance_pre_aviso_escalonamento_high():
+    """pre_aviso_escalonamento → 'high'."""
     from app.services.notifications import resolver_importance
 
-    assert resolver_importance("escalada_resolucao_gerencial") == "high"
+    assert resolver_importance("pre_aviso_escalonamento") == "high"
 
 
 def test_resolver_importance_transferencia_high():
@@ -218,7 +218,7 @@ def test_prefixar_assunto_high_sla_sem_prefixo_adicional():
     from app.services.notifications import _prefixar_assunto_high
 
     assunto = "[SLA Alert] Ticket CHM-001 — no response"
-    assert _prefixar_assunto_high(assunto, "escalada_resposta_gerencial") == assunto
+    assert _prefixar_assunto_high(assunto, "escalada_gerencial") == assunto
 
 
 def test_prefixar_assunto_high_outros_sem_prefixo():
@@ -620,9 +620,9 @@ def test_notificar_lembrete_confirmacao_2_importance_high(app):
     assert mock_send.call_args.kwargs.get("importance") == "high"
 
 
-def test_notificar_escalada_resposta_importance_high(app):
-    """notificar_escalada_resposta_gerencial passa importance='high'."""
-    from app.services.notifications import notificar_escalada_resposta_gerencial
+def test_notificar_escalada_gerencial_importance_high_nao_assumido(app):
+    """notificar_escalada_gerencial (não assumido) passa importance='high'."""
+    from app.services.notifications import notificar_escalada_gerencial
 
     with (
         app.app_context(),
@@ -630,20 +630,21 @@ def test_notificar_escalada_resposta_importance_high(app):
             "app.services.notifications_escalonamento.enviar_email", return_value=(True, None)
         ) as mock_send,
     ):
-        notificar_escalada_resposta_gerencial(
+        notificar_escalada_gerencial(
             chamado_data={"numero_chamado": "CHM-001"},
             chamado_id="ch1",
             nivel=1,
             email_dest="gestor@dtx.aero",
+            assumido=False,
         )
 
     mock_send.assert_called_once()
     assert mock_send.call_args.kwargs.get("importance") == "high"
 
 
-def test_notificar_escalada_resolucao_importance_high(app):
-    """notificar_escalada_resolucao_gerencial passa importance='high'."""
-    from app.services.notifications import notificar_escalada_resolucao_gerencial
+def test_notificar_escalada_gerencial_importance_high_assumido(app):
+    """notificar_escalada_gerencial (assumido, resolução atrasada) passa importance='high'."""
+    from app.services.notifications import notificar_escalada_gerencial
 
     with (
         app.app_context(),
@@ -651,11 +652,12 @@ def test_notificar_escalada_resolucao_importance_high(app):
             "app.services.notifications_escalonamento.enviar_email", return_value=(True, None)
         ) as mock_send,
     ):
-        notificar_escalada_resolucao_gerencial(
+        notificar_escalada_gerencial(
             chamado_data={"numero_chamado": "CHM-001"},
             chamado_id="ch1",
             nivel=1,
             email_dest="gestor@dtx.aero",
+            assumido=True,
         )
 
     mock_send.assert_called_once()

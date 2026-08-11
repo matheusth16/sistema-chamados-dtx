@@ -9,7 +9,7 @@ Consolida a lógica que estava repetida em 3 locais:
 
 import logging
 import threading
-from datetime import datetime
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from flask import current_app, session
@@ -148,9 +148,13 @@ def atualizar_status_chamado(
             update_data["lembrete_confirmacao_1_enviado"] = False
             update_data["lembrete_confirmacao_2_enviado"] = False
         elif status_anterior == "Concluído":
-            # Saindo de Concluído (reabertura) — limpa confirmação e reinicia flags de escalonamento
+            # Saindo de Concluído (reabertura) — limpa confirmação e reinicia o
+            # motor de escalonamento do zero (TAT usa sempre a data_abertura
+            # original, que não muda na reabertura — ver sla_escalacao_service.py).
             update_data["confirmacao_solicitante"] = None
-            update_data["escalacao_resolucao_nivel"] = 0
+            update_data["escalacao_nivel"] = 0
+            update_data["escalacao_proximo_tick_em"] = None
+            update_data["escalacao_pre_aviso_nivel_enviado"] = None
             update_data["alerta_supervisor_50_enviado"] = False
             update_data["alerta_supervisor_80_enviado"] = False
             update_data["lembrete_confirmacao_1_enviado"] = False
@@ -174,10 +178,20 @@ def atualizar_status_chamado(
             update_data["supervisor_ids_com_acesso"] = calcular_supervisor_ids_com_acesso(
                 area, responsavel_atual, participantes
             )
-            # Fase 7 — Escada B: reset dos campos ao iniciar atendimento
-            update_data["escalacao_resolucao_nivel"] = 0
             update_data["alerta_supervisor_50_enviado"] = False
             update_data["alerta_supervisor_80_enviado"] = False
+            # Troca de cadência sem resetar nível: se o chamado já estava
+            # escalando na cadência "não assumido" (2h), assumir agora troca
+            # pra "assumido" (1h) a partir deste instante — sem esperar o
+            # tick de 2h originalmente agendado, mas continuando do nível
+            # atual (não volta pro gestor_setor). AOG já usa cadência
+            # "assumido" nas duas fases, então não precisa antecipar nada.
+            categoria = data_chamado.get("categoria") or ""
+            nivel_atual_escalonamento = int(data_chamado.get("escalacao_nivel") or 0)
+            if categoria != "AOG" and 0 < nivel_atual_escalonamento < 4:
+                update_data["escalacao_proximo_tick_em"] = datetime.now(
+                    ZoneInfo(Config.SLA_TIMEZONE)
+                ).replace(tzinfo=None) + timedelta(minutes=Config.SLA_CADENCIA_ASSUMIDO_MINUTOS)
 
         # Atualiza no Postgres
         chamado_para_atualizar = _chamado_row_fetched or Chamado.get_by_id(chamado_id)

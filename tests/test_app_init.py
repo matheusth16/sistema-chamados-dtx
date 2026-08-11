@@ -195,8 +195,8 @@ def test_iniciar_scheduler_import_error_loga_warning(app):
     # Sem raise → o except ImportError foi tratado corretamente
 
 
-def test_iniciar_scheduler_registra_quatro_jobs(app):
-    """_iniciar_scheduler registra 5 jobs no scheduler e chama scheduler.start()."""
+def test_iniciar_scheduler_registra_seis_jobs(app):
+    """_iniciar_scheduler registra 6 jobs no scheduler e chama scheduler.start()."""
     from app import _iniciar_scheduler
 
     mock_sched = MagicMock()
@@ -211,9 +211,10 @@ def test_iniciar_scheduler_registra_quatro_jobs(app):
     ):
         _iniciar_scheduler(app)
 
-    assert len(add_job_calls) == 5
+    assert len(add_job_calls) == 6
     assert "relatorio_semanal" in add_job_calls
     assert "sla_escalacao" in add_job_calls
+    assert "digest_diario" in add_job_calls
     assert "reset_ranking_semanal" in add_job_calls
     assert "limpar_contadores_uso" in add_job_calls
     assert "lembrete_confirmacao" in add_job_calls
@@ -271,26 +272,21 @@ def test_job_relatorio_excecao_logada(app):
 
 
 def test_job_sla_escalacao_executa(app):
-    """_job_sla_escalacao chama processar_escada_a, processar_avisos_resolucao e processar_escada_b."""
+    """_job_sla_escalacao chama processar_escalonamento e processar_avisos_resolucao."""
     jobs = _capturar_jobs_scheduler(app)
     with (
         patch(
-            "app.services.sla_escalacao_service.processar_escada_a",
+            "app.services.sla_escalacao_service.processar_escalonamento",
             return_value={"escalados": 0},
-        ) as mock_a,
+        ) as mock_escalonamento,
         patch(
             "app.services.sla_escalacao_service.processar_avisos_resolucao",
             return_value={"notificados_50": 0, "notificados_80": 0},
         ) as mock_avisos,
-        patch(
-            "app.services.sla_escalacao_service.processar_escada_b",
-            return_value={"escalados": 0},
-        ) as mock_b,
     ):
         jobs["sla_escalacao"]()
-    mock_a.assert_called_once()
+    mock_escalonamento.assert_called_once()
     mock_avisos.assert_called_once()
-    mock_b.assert_called_once()
 
 
 def test_job_sla_escalacao_excecao_logada(app):
@@ -298,13 +294,33 @@ def test_job_sla_escalacao_excecao_logada(app):
     jobs = _capturar_jobs_scheduler(app)
     with (
         patch(
-            "app.services.sla_escalacao_service.processar_escada_a",
+            "app.services.sla_escalacao_service.processar_escalonamento",
             side_effect=RuntimeError("sla"),
         ),
         patch("app.services.sla_escalacao_service.processar_avisos_resolucao"),
-        patch("app.services.sla_escalacao_service.processar_escada_b"),
     ):
         jobs["sla_escalacao"]()  # não deve propagar
+
+
+def test_job_digest_diario_executa(app):
+    """_job_digest_diario chama processar_digest_diario."""
+    jobs = _capturar_jobs_scheduler(app)
+    with patch(
+        "app.services.digest_diario_service.processar_digest_diario",
+        return_value={"digests_enviados": 0},
+    ) as mock_digest:
+        jobs["digest_diario"]()
+    mock_digest.assert_called_once()
+
+
+def test_job_digest_diario_excecao_logada(app):
+    """_job_digest_diario captura exceção e não propaga."""
+    jobs = _capturar_jobs_scheduler(app)
+    with patch(
+        "app.services.digest_diario_service.processar_digest_diario",
+        side_effect=RuntimeError("digest"),
+    ):
+        jobs["digest_diario"]()  # não deve propagar
 
 
 def test_job_reset_ranking_executa(app):
@@ -640,7 +656,7 @@ def test_timeout_sessao_rota_static_ignorada(client_logado_solicitante):
 
 
 def test_timeout_sessao_expirada_redireciona_login(app, client):
-    """Sessão com last_activity > 15min → logout + redirect para /login."""
+    """Sessão com last_activity > 1h → logout + redirect para /login."""
     from unittest.mock import patch as _patch
 
     user = MagicMock()
@@ -660,6 +676,44 @@ def test_timeout_sessao_expirada_redireciona_login(app, client):
 
     assert r.status_code == 302
     assert "login" in r.location
+
+
+def test_timeout_sessao_remember_me_ativo_nao_desloga(client, app):
+    """Login com 'remember-me' ativo: mesmo com last_activity > 1h, o cookie
+    persistente (30 dias) evita o logout por inatividade — não faz sentido
+    expirar por inatividade um login que o usuário pediu pra lembrar."""
+    usuario = MagicMock()
+    usuario.id = "rem1"
+    usuario.email = "rem@test.com"
+    usuario.nome = "Lembrado"
+    usuario.perfil = "solicitante"
+    usuario.must_change_password = False
+    usuario.mfa_enabled = True
+    usuario.is_gestor_only = False
+    usuario.get_id = lambda: "rem1"
+    usuario.is_authenticated = True
+    usuario.is_active = True
+    usuario.is_anonymous = False
+    usuario.check_password = MagicMock(return_value=True)
+
+    with (
+        patch("app.routes.auth.Usuario.get_by_email", return_value=usuario),
+        patch("app.models_usuario.Usuario.get_by_id", return_value=usuario),
+        patch("app.routes.auth._dispositivo_confiavel", return_value=True),
+    ):
+        r_login = client.post(
+            "/login",
+            data={"email": "rem@test.com", "senha": "ok", "remember-me": "on"},
+            follow_redirects=False,
+        )
+        assert r_login.status_code == 302
+
+        with client.session_transaction() as sess:
+            sess["last_activity"] = 0.0  # timestamp muito antigo
+
+        r = client.get("/meus-chamados")
+
+    assert r.status_code != 302 or "login" not in (r.location or "")
 
 
 def test_must_change_password_redireciona(app, client):

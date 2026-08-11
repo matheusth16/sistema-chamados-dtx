@@ -152,6 +152,24 @@ def obter_contexto_admin(
     condicoes_base = []
     if user.perfil == "supervisor" and getattr(user, "areas", None):
         condicoes_base.append(ChamadoRow.supervisor_ids_com_acesso.contains([user.id]))
+
+    # Preset "meus chamados pendentes" — usado pelo botão "Open system" do
+    # digest diário e do aviso prévio de escalonamento (ver
+    # app/services/digest_diario_service.py, notifications_escalonamento.py).
+    # Quando presente, ignora os filtros normais da querystring (status/
+    # categoria/etc.) e restringe a: responsável = eu, status ainda aberto.
+    # A ordenação AOG > Projetos > demais já aplicada abaixo (chamados_
+    # ordenados) cobre a mesma prioridade usada no digest, sem duplicar lógica.
+    meus_pendentes = (args.get("meus_pendentes") or "").strip() == "1"
+    if meus_pendentes:
+        condicoes_base.append(ChamadoRow.responsavel_id == user.id)
+        condicoes_base.append(ChamadoRow.status.in_(("Aberto", "Em Atendimento")))
+        args = {
+            k: v
+            for k, v in args.items()
+            if k not in ("status", "categoria", "gate", "responsavel", "rl_codigo", "search")
+        }
+
     cursor = (args.get("cursor") or "").strip() or None
     cursor_prev = (args.get("cursor_prev") or "").strip() or None
     pagina_atual = int(args.get("pagina") or 1)

@@ -408,30 +408,34 @@ def test_chamado_participantes_default_lista_vazia():
     assert c.participantes == []
 
 
-# ── Escada B — Fase 7 ──────────────────────────────────────────────────────────
+# ── Motor de escalonamento unificado ────────────────────────────────────────
 
 
-def test_chamado_campos_escada_b_defaults():
-    """Campos da Escada B têm defaults corretos: nivel=0, alertas=False/False."""
+def test_chamado_campos_escalonamento_defaults():
+    """Campos do motor de escalonamento têm defaults corretos."""
     c = _chamado()
-    assert c.escalacao_resolucao_nivel == 0
+    assert c.escalacao_nivel == 0
+    assert c.escalacao_proximo_tick_em is None
+    assert c.escalacao_pre_aviso_nivel_enviado is None
     assert c.alerta_supervisor_50_enviado is False
     assert c.alerta_supervisor_80_enviado is False
 
 
-def test_chamado_to_dict_inclui_campos_escada_b():
-    """to_dict inclui os 3 campos da Escada B."""
+def test_chamado_to_dict_inclui_campos_escalonamento():
+    """to_dict inclui os campos do motor de escalonamento."""
     d = _chamado().to_dict()
-    assert "escalacao_resolucao_nivel" in d
-    assert d["escalacao_resolucao_nivel"] == 0
+    assert "escalacao_nivel" in d
+    assert d["escalacao_nivel"] == 0
+    assert "escalacao_proximo_tick_em" in d
+    assert "escalacao_pre_aviso_nivel_enviado" in d
     assert "alerta_supervisor_50_enviado" in d
     assert d["alerta_supervisor_50_enviado"] is False
     assert "alerta_supervisor_80_enviado" in d
     assert d["alerta_supervisor_80_enviado"] is False
 
 
-def test_chamado_from_dict_campos_escada_b_ausentes_usa_defaults():
-    """from_dict sem campos Escada B usa defaults seguros (retro-compatibilidade)."""
+def test_chamado_from_dict_campos_escalonamento_ausentes_usa_defaults():
+    """from_dict sem campos de escalonamento usa defaults seguros (retro-compatibilidade)."""
     from app.models import Chamado
 
     data = {
@@ -441,7 +445,9 @@ def test_chamado_from_dict_campos_escada_b_ausentes_usa_defaults():
         "responsavel": "Ana",
     }
     c = Chamado.from_dict(data)
-    assert c.escalacao_resolucao_nivel == 0
+    assert c.escalacao_nivel == 0
+    assert c.escalacao_proximo_tick_em is None
+    assert c.escalacao_pre_aviso_nivel_enviado is None
     assert c.alerta_supervisor_50_enviado is False
     assert c.alerta_supervisor_80_enviado is False
 

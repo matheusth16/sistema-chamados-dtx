@@ -1,8 +1,23 @@
-"""Serviço de Escalada Gerencial — Escada A (Fase 6).
+"""Serviço de Escalonamento Gerencial — motor unificado por TAT.
 
-A Escada A notifica gestores quando chamados Abertos excedem thresholds cumulativos
-de minutos úteis sem entrar em atendimento. O job APScheduler chama
-processar_escada_a() a cada 10 minutos.
+Cada chamado tem um único prazo (TAT) por categoria, contado sempre de
+data_abertura (nunca de data_em_atendimento): 3 dias úteis (Não Aplicável),
+2 dias úteis (Projetos), 24h corridas (AOG). AOG tem, além disso, um limiar
+mais cedo e separado — 1h corrida — só pra "ainda não foi assumido", que
+dispara escalonamento antes mesmo do TAT vencer.
+
+Quando o prazo relevante vence, o sistema olha o status do chamado NAQUELE
+MOMENTO: se ainda 'Aberto' (não assumido), escala a cada
+SLA_CADENCIA_NAO_ASSUMIDO_MINUTOS (2h); se 'Em Atendimento' (assumido, não
+resolvido), escala a cada SLA_CADENCIA_ASSUMIDO_MINUTOS (1h). AOG usa sempre
+a cadência "assumido" nas duas fases. Se um chamado que está escalando na
+cadência "não assumido" é assumido no meio do caminho, a cadência muda pra
+"assumido" a partir dali, mas o nível não é resetado (continua de onde
+estava) — ver status_service.py.
+
+30 minutos antes de cada tick (incluindo o primeiro), o responsável recebe
+um aviso prévio (ver notifications_escalonamento.notificar_pre_aviso_
+escalonamento) — dedup por nível-alvo em escalacao_pre_aviso_nivel_enviado.
 
 Decisão de design (sem gestor cadastrado):
   Se não houver usuário ativo com o nivel_gestao daquele nível (ver
@@ -25,8 +40,7 @@ from app.db.models.chamado import ChamadoRow
 from app.models import Chamado
 from app.services.business_time import (
     adicionar_dias_uteis,
-    minutos_corridos_entre,
-    minutos_uteis_entre,
+    adicionar_horas_corridas,
     percentual_prazo_resolucao,
     pode_enviar_notificacao_agora,
 )
@@ -44,50 +58,73 @@ from app.services.gestor_escalonamento_service import (
 )
 from app.services.notifications import (
     notificar_aviso_resolucao_supervisor,
-    notificar_escalada_resolucao_gerencial,
-    notificar_escalada_resposta_gerencial,
+    notificar_escalada_gerencial,
+    notificar_pre_aviso_escalonamento,
 )
 from config import Config
 
 logger = logging.getLogger(__name__)
 
-# Thresholds em minutos úteis derivados de SLA_ESCALADA_A_HORAS_UTEIS = [1, 2, 3, 4]
-_MINUTOS_THRESHOLDS: list[int] = [h * 60 for h in Config.SLA_ESCALADA_A_HORAS_UTEIS]
-
-# Thresholds Escada B: [0, 240, 480, 720] minutos úteis APÓS o deadline de resolução
-_MINUTOS_THRESHOLDS_B: list[int] = [h * 60 for h in Config.SLA_ESCALADA_B_HORAS_UTEIS]
+_NIVEL_MAXIMO = 4
 
 
-def calcular_nivel_esperado_escada_a(minutos_uteis: int) -> int:
-    """Retorna 0–4 conforme thresholds cumulativos de minutos úteis.
+def calcular_deadline_inicial(categoria: str, status: str, data_abertura: datetime) -> datetime:
+    """Deadline do 1º tick (nivel 0 -> 1), sempre contado de data_abertura.
 
-    Exemplo: 59 min → 0, 60 → 1, 120 → 2, 180 → 3, 240 → 4.
+    Recalculada a cada passagem do job enquanto escalacao_nivel==0 (o alvo
+    pode mudar pro AOG, cujo limiar depende do status atual: se já foi
+    assumido antes do limiar de reivindicação, o alvo salta direto pro TAT).
+
+    AOG    Aberto         -> data_abertura + SLA_AOG_CLAIM_HORAS (1h corrida)
+    AOG    Em Atendimento -> data_abertura + SLA_AOG_TAT_HORAS (24h corridas)
+    Demais (Não Aplicável/Projetos) -> data_abertura + TAT em dias úteis
     """
-    nivel = 0
-    for threshold in _MINUTOS_THRESHOLDS:
-        if minutos_uteis >= threshold:
-            nivel += 1
-        else:
-            break
-    return nivel
+    if categoria == "AOG":
+        if status == "Aberto":
+            return adicionar_horas_corridas(data_abertura, Config.SLA_AOG_CLAIM_HORAS)
+        return adicionar_horas_corridas(data_abertura, Config.SLA_AOG_TAT_HORAS)
+    dias = (
+        Config.SLA_DIAS_RESOLUCAO_PROJETOS
+        if categoria == "Projetos"
+        else Config.SLA_DIAS_RESOLUCAO_PADRAO
+    )
+    return adicionar_dias_uteis(data_abertura, dias)
 
 
-def processar_escada_a(agora: datetime | None = None) -> dict:
-    """Processa todos os chamados elegíveis para Escada A.
+def calcular_cadencia_minutos(categoria: str, status: str) -> int:
+    """Cadência (minutos) do próximo tick, escolhida pelo status atual do
+    chamado. AOG usa sempre a cadência "assumido" (mais agressiva) nas duas
+    fases — não faz sentido escalar mais devagar só porque ainda não foi
+    reivindicado quando a categoria já é prioridade máxima."""
+    if categoria == "AOG":
+        return Config.SLA_CADENCIA_ASSUMIDO_MINUTOS
+    return (
+        Config.SLA_CADENCIA_ASSUMIDO_MINUTOS
+        if status == "Em Atendimento"
+        else Config.SLA_CADENCIA_NAO_ASSUMIDO_MINUTOS
+    )
 
-    Consulta chamados com status == 'Aberto' e escalacao_resposta_nivel < 4.
-    Para cada chamado elegível, calcula minutos úteis desde a abertura e
-    incrementa um nível por vez, enviando e-mail ao gestor correspondente.
 
-    O incremento só ocorre dentro da janela de expediente DTX (seg–sex,
-    07:00–11:30, 13:00–16:30). Fora da janela, o chamado é contado em
-    pulados_fora_janela e processado no próximo job dentro do horário.
+def processar_escalonamento(agora: datetime | None = None) -> dict:
+    """Processa todos os chamados elegíveis para o motor de escalonamento
+    unificado (substitui as antigas Escada A + Escada B).
+
+    Consulta chamados com status IN ('Aberto', 'Em Atendimento') e
+    escalacao_nivel < 4. Para cada chamado elegível: dispara aviso prévio
+    quando o próximo tick cai dentro da janela de SLA_PRE_AVISO_MINUTOS (uma
+    vez por nível-alvo); dispara o tick de escalonamento em si quando o
+    prazo vence, incrementando um nível por vez.
+
+    O tick só ocorre dentro da janela de expediente DTX pra Não Aplicável/
+    Projetos (adiado, não perdido, se fora da janela); AOG ignora a janela e
+    dispara 24/7.
 
     Args:
         agora: Instante de referência (naive → tratado como BRT). None = now().
 
     Returns:
-        dict com contadores: processados, escalados, emails, erros, pulados_fora_janela
+        dict com contadores: processados, escalados, emails, pre_avisos, erros,
+        pulados_fora_janela, adiados
     """
     if agora is None:
         agora = datetime.now(ZoneInfo(Config.SLA_TIMEZONE))
@@ -96,6 +133,7 @@ def processar_escada_a(agora: datetime | None = None) -> dict:
         "processados": 0,
         "escalados": 0,
         "emails": 0,
+        "pre_avisos": 0,
         "erros": 0,
         "pulados_fora_janela": 0,
         "adiados": 0,
@@ -108,164 +146,188 @@ def processar_escada_a(agora: datetime | None = None) -> dict:
         with db_module.SessionLocal() as session:
             stmt = (
                 select(ChamadoRow)
-                .where(ChamadoRow.status == "Aberto", ChamadoRow.escalacao_resposta_nivel < 4)
+                .where(
+                    ChamadoRow.status.in_(("Aberto", "Em Atendimento")),
+                    ChamadoRow.escalacao_nivel < _NIVEL_MAXIMO,
+                )
                 .limit(500)
             )
             rows = session.execute(stmt).scalars().all()
     except Exception as exc:
-        logger.exception("Escada A: erro ao consultar chamados: %s", exc)
+        logger.exception("Escalonamento: erro ao consultar chamados: %s", exc)
         stats["erros"] += 1
         return stats
 
     for row in rows:
         stats["processados"] += 1
         try:
-            _processar_chamado_escada_a(
+            _processar_chamado_escalonamento(
                 row, agora, stats, mapa_gestor_setor, mapa_niveis_superiores
             )
         except Exception as exc:
-            logger.exception("Escada A: erro ao processar chamado %s: %s", row.id, exc)
+            logger.exception("Escalonamento: erro ao processar chamado %s: %s", row.id, exc)
             stats["erros"] += 1
 
     return stats
 
 
-def _processar_chamado_escada_a(
+def _obter_alvo_tick(chamado: Chamado, data: dict, nivel_atual: int) -> datetime | None:
+    """Retorna o datetime do próximo tick agendado (alvo).
+
+    Enquanto nivel_atual==0, recalcula a cada passagem a partir de
+    categoria+status+data_abertura (o alvo do AOG pode mudar se o chamado
+    for assumido antes do limiar de reivindicação). A partir do nível 1,
+    usa o valor persistido em escalacao_proximo_tick_em.
+    """
+    if nivel_atual > 0:
+        return data.get("escalacao_proximo_tick_em")
+
+    data_abertura = data.get("data_abertura")
+    if data_abertura is None:
+        return None
+    return calcular_deadline_inicial(data["categoria"], data["status"], data_abertura)
+
+
+def _processar_chamado_escalonamento(
     row: ChamadoRow,
     agora: datetime,
     stats: dict,
     mapa_gestor_setor: dict[str, str],
     mapa_niveis_superiores: dict[str, str],
 ) -> None:
-    """Avalia e (se aplicável) escala um único chamado na Escada A."""
+    """Avalia e (se aplicável) escala ou avisa previamente um único chamado."""
     chamado = Chamado._from_row(row)
     data = chamado.to_dict()
     chamado_id = chamado.id
-
-    # Guard: só processa Abertos (a query filtra, mas defensivo contra dados inconsistentes)
-    if data.get("status") != "Aberto":
-        return
+    categoria = data.get("categoria") or ""
+    status = data.get("status")
+    is_aog = categoria == "AOG"
 
     # Previsão de atendimento: supervisor/admin combinou mais tempo com o gestor —
-    # silencia a escalada inteira (nível não muda) até a data passar.
+    # silencia a escalada inteira (nível não muda) até a data passar. AOG nunca
+    # deveria ter esse campo preenchido (bloqueado em definir_previsao_atendimento),
+    # mas o gate fica aqui também por defesa em profundidade.
     previsao = data.get("previsao_atendimento")
     if previsao is not None and agora.replace(tzinfo=None) < previsao.replace(tzinfo=None):
         stats["adiados"] += 1
         return
 
-    nivel_atual = int(data.get("escalacao_resposta_nivel") or 0)
-
-    data_abertura = data.get("data_abertura")
-    if data_abertura is None:
-        logger.warning("Escada A: chamado %s sem data_abertura; ignorado.", chamado_id)
+    nivel_atual = int(data.get("escalacao_nivel") or 0)
+    alvo_tick = _obter_alvo_tick(chamado, data, nivel_atual)
+    if alvo_tick is None:
+        logger.warning("Escalonamento: chamado %s sem data_abertura; ignorado.", chamado_id)
         return
 
-    minutos = minutos_uteis_entre(data_abertura, agora)
-    nivel_esperado = calcular_nivel_esperado_escada_a(minutos)
+    agora_naive = agora.replace(tzinfo=None)
+    alvo_naive = alvo_tick.replace(tzinfo=None)
+    pode_notificar_agora = is_aog or pode_enviar_notificacao_agora(agora)
 
-    if nivel_esperado <= nivel_atual:
-        return  # threshold não atingido ou chamado já no nível correto
+    # Aviso prévio: dispara uma vez por nível-alvo quando o tick cai dentro
+    # da janela de antecedência configurada, mesmo que o tick em si ainda
+    # não tenha vencido. Mesmo gate de expediente do tick em si (não faz
+    # sentido avisar de madrugada sobre algo que só vai realmente escalar
+    # na próxima janela útil).
+    nivel_alvo = nivel_atual + 1
+    ja_avisado = data.get("escalacao_pre_aviso_nivel_enviado")
+    dentro_janela_aviso = (
+        agora_naive < alvo_naive <= agora_naive + timedelta(minutes=Config.SLA_PRE_AVISO_MINUTOS)
+    )
+    if dentro_janela_aviso and ja_avisado != nivel_alvo and pode_notificar_agora:
+        _enviar_pre_aviso(chamado, data, nivel_alvo, alvo_naive, agora_naive)
+        chamado.atualizar_campos(escalacao_pre_aviso_nivel_enviado=nivel_alvo)
+        stats["pre_avisos"] += 1
 
-    # Threshold atingido: verificar janela de notificação
-    if not pode_enviar_notificacao_agora(agora):
-        # Não incrementar — aguardar próximo job dentro da janela (e-mail adiado, não perdido)
+    if agora_naive < alvo_naive:
+        return  # tick ainda não venceu
+
+    if not pode_notificar_agora:
         stats["pulados_fora_janela"] += 1
         return
 
     novo_nivel = nivel_atual + 1
     chave_gestor = NIVEL_PARA_CHAVE_GESTOR.get(novo_nivel)
-    categoria = data.get("categoria") or ""
     email_dest = _resolver_email_gestor(
         chave_gestor, categoria, mapa_gestor_setor, mapa_niveis_superiores
     )
+    assumido = status == "Em Atendimento"
 
     if email_dest:
         try:
-            notificar_escalada_resposta_gerencial(
+            notificar_escalada_gerencial(
                 chamado_data=data,
                 chamado_id=chamado_id,
                 nivel=novo_nivel,
                 email_dest=email_dest,
+                assumido=assumido,
             )
             stats["emails"] += 1
         except Exception as exc:
             logger.warning(
-                "Escada A: falha ao enviar e-mail nível %d para %s (chamado %s): %s",
+                "Escalonamento: falha ao enviar e-mail nível %d para %s (chamado %s): %s",
                 novo_nivel,
                 email_dest,
                 chamado_id,
                 exc,
             )
     else:
-        # Nenhum usuário ativo cadastrado com esse nivel_gestao: incrementa nível
-        # mesmo assim para evitar loop (ver _construir_mapa_gestor_setor /
-        # _construir_mapa_niveis_superiores).
         logger.warning(
-            "Escada A: chamado %s → nível %d: nenhum usuário ativo com nivel_gestao='%s' "
+            "Escalonamento: chamado %s → nível %d: nenhum usuário ativo com nivel_gestao='%s' "
             "cadastrado. Incrementando nível sem e-mail.",
             chamado_id,
             novo_nivel,
             chave_gestor,
         )
 
-    chamado.atualizar_campos(escalacao_resposta_nivel=novo_nivel)
+    cadencia = calcular_cadencia_minutos(categoria, status)
+    chamado.atualizar_campos(
+        escalacao_nivel=novo_nivel,
+        escalacao_proximo_tick_em=agora.replace(tzinfo=None) + timedelta(minutes=cadencia),
+    )
     stats["escalados"] += 1
 
     logger.info(
-        "Escada A: chamado %s escalado %d→%d (min_uteis=%d, chave=%s, email_ok=%s)",
+        "Escalonamento: chamado %s escalado %d→%d (status=%s, chave=%s, email_ok=%s)",
         chamado_id,
         nivel_atual,
         novo_nivel,
-        minutos,
+        status,
         chave_gestor,
         bool(email_dest),
     )
 
 
+def _enviar_pre_aviso(
+    chamado: Chamado,
+    data: dict,
+    nivel_alvo: int,
+    alvo_naive: datetime,
+    agora_naive: datetime,
+) -> None:
+    minutos_restantes = max(1, int((alvo_naive - agora_naive).total_seconds() // 60))
+    responsavel_id = data.get("responsavel_id")
+    email_dest = _obter_email_responsavel(responsavel_id) if responsavel_id else None
+    try:
+        notificar_pre_aviso_escalonamento(
+            chamado_data=data,
+            chamado_id=chamado.id,
+            nivel_alvo=nivel_alvo,
+            minutos_restantes=minutos_restantes,
+            responsavel_id=responsavel_id,
+            email_dest=email_dest,
+        )
+    except Exception as exc:
+        logger.warning(
+            "Escalonamento: falha ao enviar aviso prévio (chamado %s, nível-alvo %d): %s",
+            chamado.id,
+            nivel_alvo,
+            exc,
+        )
+
+
 # ---------------------------------------------------------------------------
-# Fase 7 — Escada B (resolução) + Avisos 50%/80%
+# Avisos 50%/80% do prazo de resolução — não faz parte do motor de
+# escalonamento gerencial acima, segue com sua própria lógica inalterada.
 # ---------------------------------------------------------------------------
-
-
-def calcular_deadline_resolucao(data_em_atendimento: datetime, categoria: str) -> datetime:
-    """Calcula o deadline de resolução.
-
-    AOG      → SLA_AOG_MINUTOS_RESOLUCAO_DEADLINE minutos corridos (calendário, 24/7).
-    Projetos → SLA_DIAS_RESOLUCAO_PROJETOS dias úteis.
-    Demais   → SLA_DIAS_RESOLUCAO_PADRAO dias úteis.
-    """
-    if categoria == "AOG":
-        return data_em_atendimento + timedelta(minutes=Config.SLA_AOG_MINUTOS_RESOLUCAO_DEADLINE)
-    dias = (
-        Config.SLA_DIAS_RESOLUCAO_PROJETOS
-        if categoria == "Projetos"
-        else Config.SLA_DIAS_RESOLUCAO_PADRAO
-    )
-    return adicionar_dias_uteis(data_em_atendimento, dias)
-
-
-def calcular_nivel_esperado_escada_b(
-    minutos_apos_deadline: int, thresholds: list[int] | None = None
-) -> int:
-    """Retorna 1–4 conforme minutos decorridos APÓS o deadline de resolução.
-
-    Thresholds padrão (SLA_ESCALADA_B_HORAS_UTEIS = [0, 4, 8, 12], minutos úteis):
-      0 min  → nível 1 (deadline ultrapassado)
-      240 min → nível 2 (4h úteis após deadline)
-      480 min → nível 3 (8h úteis após deadline)
-      720 min → nível 4 (12h úteis após deadline)
-
-    `thresholds` customizado (ex: Config.SLA_AOG_MINUTOS_RESOLUCAO_ESCALADA) permite
-    reusar a mesma função para a escada AOG, em minutos corridos.
-    """
-    limites = thresholds if thresholds is not None else _MINUTOS_THRESHOLDS_B
-    nivel = 0
-    for threshold in limites:
-        if minutos_apos_deadline >= threshold:
-            nivel += 1
-        else:
-            break
-    return nivel
 
 
 def processar_avisos_resolucao(agora: datetime | None = None) -> dict:
@@ -354,7 +416,7 @@ def _processar_aviso_resolucao(row: ChamadoRow, agora: datetime, stats: dict) ->
     if not (threshold_50 or threshold_80):
         return
 
-    # Threshold atingido: verificar janela de notificação (mesmo padrão Escada A/B)
+    # Threshold atingido: verificar janela de notificação (mesmo padrão do motor de escalonamento)
     if not pode_enviar_notificacao_agora(agora):
         stats["pulados_fora_janela"] += 1
         return
@@ -409,161 +471,3 @@ def _obter_email_responsavel(responsavel_id: str) -> str | None:
             "Avisos resolução: falha ao buscar e-mail do responsável %s: %s", responsavel_id, exc
         )
     return None
-
-
-def processar_escada_b(agora: datetime | None = None) -> dict:
-    """Processa chamados Em Atendimento que excederam o prazo de resolução (Escada B).
-
-    Consulta chamados com status == 'Em Atendimento' e escalacao_resolucao_nivel < 4.
-    Para cada chamado elegível, calcula minutos úteis após o deadline e incrementa
-    um nível por vez, notificando o gestor correspondente.
-
-    O incremento só ocorre dentro da janela de expediente DTX.
-
-    Args:
-        agora: Instante de referência (naive → BRT). None = now().
-
-    Returns:
-        dict com contadores: processados, escalados, emails, erros, pulados_fora_janela
-    """
-    if agora is None:
-        agora = datetime.now(ZoneInfo(Config.SLA_TIMEZONE))
-
-    stats: dict = {
-        "processados": 0,
-        "escalados": 0,
-        "emails": 0,
-        "erros": 0,
-        "pulados_fora_janela": 0,
-        "adiados": 0,
-    }
-
-    mapa_gestor_setor = _construir_mapa_gestor_setor()
-    mapa_niveis_superiores = _construir_mapa_niveis_superiores()
-
-    try:
-        with db_module.SessionLocal() as session:
-            stmt = (
-                select(ChamadoRow)
-                .where(
-                    ChamadoRow.status == "Em Atendimento", ChamadoRow.escalacao_resolucao_nivel < 4
-                )
-                .limit(500)
-            )
-            rows = session.execute(stmt).scalars().all()
-    except Exception as exc:
-        logger.exception("Escada B: erro ao consultar chamados: %s", exc)
-        stats["erros"] += 1
-        return stats
-
-    for row in rows:
-        stats["processados"] += 1
-        try:
-            _processar_chamado_escada_b(
-                row, agora, stats, mapa_gestor_setor, mapa_niveis_superiores
-            )
-        except Exception as exc:
-            logger.exception("Escada B: erro ao processar chamado %s: %s", row.id, exc)
-            stats["erros"] += 1
-
-    return stats
-
-
-def _processar_chamado_escada_b(
-    row: ChamadoRow,
-    agora: datetime,
-    stats: dict,
-    mapa_gestor_setor: dict[str, str],
-    mapa_niveis_superiores: dict[str, str],
-) -> None:
-    """Avalia e (se aplicável) escala um único chamado na Escada B."""
-    chamado = Chamado._from_row(row)
-    data = chamado.to_dict()
-    chamado_id = chamado.id
-
-    # Previsão de atendimento: silencia a escalada inteira até a data passar
-    # (mesma regra da Escada A — ver _processar_chamado_escada_a).
-    previsao = data.get("previsao_atendimento")
-    if previsao is not None and agora.replace(tzinfo=None) < previsao.replace(tzinfo=None):
-        stats["adiados"] += 1
-        return
-
-    nivel_atual = int(data.get("escalacao_resolucao_nivel") or 0)
-
-    data_em_atendimento = data.get("data_em_atendimento")
-    if data_em_atendimento is None:
-        logger.warning("Escada B: chamado %s sem data_em_atendimento; ignorado.", chamado_id)
-        return
-
-    categoria = data.get("categoria") or ""
-    is_aog = categoria == "AOG"
-    deadline = calcular_deadline_resolucao(data_em_atendimento, categoria)
-
-    # Normaliza para naive a fim de comparar de forma segura (datetimes BRT naive em testes)
-    agora_naive = agora.replace(tzinfo=None)
-    deadline_naive = deadline.replace(tzinfo=None)
-
-    if agora_naive <= deadline_naive:
-        return  # Prazo ainda não vencido
-
-    if is_aog:
-        minutos_apos = minutos_corridos_entre(deadline, agora)
-        nivel_esperado = calcular_nivel_esperado_escada_b(
-            minutos_apos, thresholds=Config.SLA_AOG_MINUTOS_RESOLUCAO_ESCALADA
-        )
-    else:
-        minutos_apos = minutos_uteis_entre(deadline, agora)
-        nivel_esperado = calcular_nivel_esperado_escada_b(minutos_apos)
-
-    if nivel_esperado <= nivel_atual:
-        return  # Já no nível correto
-
-    # Threshold atingido: verificar janela de notificação (AOG é 24/7, não espera expediente)
-    if not is_aog and not pode_enviar_notificacao_agora(agora):
-        stats["pulados_fora_janela"] += 1
-        return
-
-    novo_nivel = nivel_atual + 1
-    chave_gestor = NIVEL_PARA_CHAVE_GESTOR.get(novo_nivel)
-    email_dest = _resolver_email_gestor(
-        chave_gestor, categoria, mapa_gestor_setor, mapa_niveis_superiores
-    )
-
-    if email_dest:
-        try:
-            notificar_escalada_resolucao_gerencial(
-                chamado_data=data,
-                chamado_id=chamado_id,
-                nivel=novo_nivel,
-                email_dest=email_dest,
-            )
-            stats["emails"] += 1
-        except Exception as exc:
-            logger.warning(
-                "Escada B: falha ao enviar e-mail nível %d para %s (chamado %s): %s",
-                novo_nivel,
-                email_dest,
-                chamado_id,
-                exc,
-            )
-    else:
-        logger.warning(
-            "Escada B: chamado %s → nível %d: nenhum usuário ativo com nivel_gestao='%s' "
-            "cadastrado. Incrementando nível sem e-mail.",
-            chamado_id,
-            novo_nivel,
-            chave_gestor,
-        )
-
-    chamado.atualizar_campos(escalacao_resolucao_nivel=novo_nivel)
-    stats["escalados"] += 1
-
-    logger.info(
-        "Escada B: chamado %s escalado %d→%d (min_apos_deadline=%d, chave=%s, email_ok=%s)",
-        chamado_id,
-        nivel_atual,
-        novo_nivel,
-        minutos_apos,
-        chave_gestor,
-        bool(email_dest),
-    )

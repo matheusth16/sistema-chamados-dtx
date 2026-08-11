@@ -1,6 +1,7 @@
 """Tabelas de apoio sem FK entre si — Fase 2, Marco 5.
 
-push_subscriptions, historico_usuarios, solicitacoes_lgpd, contadores_uso.
+push_subscriptions, historico_usuarios, solicitacoes_lgpd, contadores_uso,
+digest_diario_usuarios.
 """
 
 from datetime import date, datetime
@@ -73,3 +74,16 @@ class ContadorUsoRow(Base):
     data: Mapped[date] = mapped_column(Date, primary_key=True)
     relatorio_geracoes: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     export_excel_geracoes: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+
+class DigestDiarioUsuarioRow(Base):
+    """Rastreia por pessoa (não por chamado) o último envio do digest diário
+    de chamados abertos — ver app/services/digest_diario_service.py. O
+    gatilho é "24h desde o chamado pendente mais antigo dela" e depois "a
+    cada 24h enquanto continuar tendo chamados abertos", o que não dá pra
+    derivar só dos campos do chamado."""
+
+    __tablename__ = "digest_diario_usuarios"
+
+    usuario_id: Mapped[str] = mapped_column(Text, primary_key=True)
+    ultimo_envio_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

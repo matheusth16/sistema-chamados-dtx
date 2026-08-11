@@ -360,6 +360,121 @@ def test_obter_contexto_admin_supervisor_aplica_filtro_por_areas():
     )
 
 
+def test_obter_contexto_admin_meus_pendentes_filtra_por_responsavel_e_status():
+    """?meus_pendentes=1 adiciona condições responsavel_id==user.id e
+    status IN (Aberto, Em Atendimento) em condicoes_base — usado pelo link
+    'Open system' do digest diário e do aviso prévio de escalonamento."""
+    from app.services.dashboard_service import obter_contexto_admin
+
+    user = MagicMock()
+    user.perfil = "admin"
+    user.areas = []
+    user.id = "julia1"
+    user.is_admin_or_above = True
+
+    with (
+        patch("app.services.dashboard_service.get_static_cached", return_value=[]),
+        patch("app.services.dashboard_service.filtrar_supervisores_por_area", return_value=[]),
+        patch(
+            "app.services.dashboard_service.aplicar_filtros_dashboard_com_paginacao"
+        ) as mock_filtros,
+        patch("app.services.dashboard_service.obter_sla_para_exibicao", return_value=None),
+    ):
+        mock_filtros.return_value = {
+            "docs": [],
+            "proximo_cursor": None,
+            "tem_proxima": False,
+            "cursor_anterior": None,
+            "tem_anterior": False,
+        }
+        obter_contexto_admin(user, {"meus_pendentes": "1"}, itens_por_pagina=25)
+
+    condicoes_base_passada = mock_filtros.call_args[0][0]
+    assert len(condicoes_base_passada) == 2
+
+
+def test_obter_contexto_admin_meus_pendentes_ignora_outros_filtros_da_querystring():
+    """Com meus_pendentes=1, filtros normais (status/categoria/etc.) da querystring
+    são ignorados — não interferem na lista fixa de 'meus chamados pendentes'."""
+    from app.services.dashboard_service import obter_contexto_admin
+
+    user = MagicMock()
+    user.perfil = "admin"
+    user.areas = []
+    user.id = "julia1"
+    user.is_admin_or_above = True
+
+    with (
+        patch("app.services.dashboard_service.get_static_cached", return_value=[]),
+        patch("app.services.dashboard_service.filtrar_supervisores_por_area", return_value=[]),
+        patch(
+            "app.services.dashboard_service.aplicar_filtros_dashboard_com_paginacao"
+        ) as mock_filtros,
+        patch("app.services.dashboard_service.obter_sla_para_exibicao", return_value=None),
+    ):
+        mock_filtros.return_value = {
+            "docs": [],
+            "proximo_cursor": None,
+            "tem_proxima": False,
+            "cursor_anterior": None,
+            "tem_anterior": False,
+        }
+        obter_contexto_admin(
+            user,
+            {"meus_pendentes": "1", "status": "Concluído", "categoria": "Projetos"},
+            itens_por_pagina=25,
+        )
+
+    args_passados = mock_filtros.call_args[0][1]
+    assert "status" not in args_passados
+    assert "categoria" not in args_passados
+
+
+def test_obter_contexto_admin_meus_pendentes_ordena_por_prioridade_categoria(db_session):
+    """Chamados de 'meus pendentes' seguem a mesma ordenação AOG > Projetos >
+    demais já aplicada no dashboard normal (reaproveitada, não duplicada)."""
+    from app.services.dashboard_service import obter_contexto_admin
+    from tests.factories import make_chamado
+
+    user = MagicMock()
+    user.perfil = "admin"
+    user.areas = []
+    user.id = "julia1"
+    user.is_admin_or_above = True
+
+    docs = [
+        make_chamado(
+            categoria="Manutencao", numero_chamado="00003", status="Aberto", responsavel_id="julia1"
+        ),
+        make_chamado(
+            categoria="AOG",
+            numero_chamado="00002",
+            rl_codigo="AOG-001",
+            status="Aberto",
+            responsavel_id="julia1",
+        ),
+    ]
+
+    with (
+        patch("app.services.dashboard_service.get_static_cached", return_value=[]),
+        patch("app.services.dashboard_service.filtrar_supervisores_por_area", return_value=[]),
+        patch(
+            "app.services.dashboard_service.aplicar_filtros_dashboard_com_paginacao"
+        ) as mock_filtros,
+        patch("app.services.dashboard_service.obter_sla_para_exibicao", return_value=None),
+    ):
+        mock_filtros.return_value = {
+            "docs": docs,
+            "proximo_cursor": None,
+            "tem_proxima": False,
+            "cursor_anterior": None,
+            "tem_anterior": False,
+        }
+        ctx = obter_contexto_admin(user, {"meus_pendentes": "1"}, itens_por_pagina=25)
+
+    assert ctx["chamados"][0].categoria == "AOG"
+
+
 def test_filtrar_chamados_usa_batch_fetch_nao_n_mais_1():
     """_filtrar_chamados_por_permissao usa get_by_ids (1 query) e não get_by_id em loop (N queries)."""
     from app.services.dashboard_service import _filtrar_chamados_por_permissao

@@ -2,6 +2,8 @@
 
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 
 def test_enviar_email_retorna_false_sem_destinatario(app):
     """enviar_email retorna (False, None) quando destinatário está vazio."""
@@ -1339,12 +1341,12 @@ def test_notificar_owner_todos_participantes_concluiram_email_falha_nao_levanta(
         )  # não deve levantar
 
 
-# ── notificar_escalada_resposta_gerencial (Fase 6 — Escada A) ──────────────
+# ── notificar_escalada_gerencial (motor de escalonamento unificado) ────────
 
 
-def test_notificar_escalada_resposta_gerencial_assunto_contem_numero(app):
+def test_notificar_escalada_gerencial_assunto_contem_numero(app):
     """Smoke: assunto do e-mail contém o número do chamado e o nível."""
-    from app.services.notifications import notificar_escalada_resposta_gerencial
+    from app.services.notifications import notificar_escalada_gerencial
 
     chamado_data = {
         "numero_chamado": "CHM-0099",
@@ -1361,11 +1363,12 @@ def test_notificar_escalada_resposta_gerencial_assunto_contem_numero(app):
         ) as mock_send,
     ):
         app.config["APP_BASE_URL"] = "https://example.test"
-        notificar_escalada_resposta_gerencial(
+        notificar_escalada_gerencial(
             chamado_data=chamado_data,
             chamado_id="ch_99",
             nivel=1,
             email_dest="gestor@dtx.aero",
+            assumido=False,
         )
 
     mock_send.assert_called_once()
@@ -1375,9 +1378,9 @@ def test_notificar_escalada_resposta_gerencial_assunto_contem_numero(app):
     assert _dest == "gestor@dtx.aero"
 
 
-def test_notificar_escalada_resposta_gerencial_falha_nao_levanta(app):
+def test_notificar_escalada_gerencial_falha_nao_levanta(app):
     """enviar_email falho não deve propagar exceção (apenas log warning)."""
-    from app.services.notifications import notificar_escalada_resposta_gerencial
+    from app.services.notifications import notificar_escalada_gerencial
 
     with (
         app.app_context(),
@@ -1385,19 +1388,40 @@ def test_notificar_escalada_resposta_gerencial_falha_nao_levanta(app):
             "app.services.notifications_escalonamento.enviar_email", return_value=(False, "timeout")
         ),
     ):
-        notificar_escalada_resposta_gerencial(
+        notificar_escalada_gerencial(
             chamado_data={"numero_chamado": "CHM-0001"},
             chamado_id="ch_1",
             nivel=2,
             email_dest="gerente@dtx.aero",
+            assumido=False,
         )  # não deve levantar
 
 
-# ── AOG — notificar_abertura_aog_todos_gestores ────────────────────────────────────────────────
+# ── AOG — notificar_abertura_aog_todos_gestores (broadcast a todo usuário ativo) ──
 
 
-def test_notificar_abertura_aog_todos_gestores_envia_para_os_4_niveis(app):
-    """Abertura de AOG dispara e-mail simultâneo pros 4 níveis de gestor, não sequencial."""
+@pytest.fixture(autouse=True)
+def _limpar_cache_aog_broadcast():
+    """Evita que o cache de get_static_cached("aog_broadcast_usuarios") vaze
+    entre testes desta suíte (cada teste mocka Usuario.get_all com uma lista
+    diferente)."""
+    from app.cache import static_cache_delete
+
+    static_cache_delete("aog_broadcast_usuarios")
+    yield
+    static_cache_delete("aog_broadcast_usuarios")
+
+
+def _make_usuario(id_, email, ativo=True):
+    u = MagicMock()
+    u.id = id_
+    u.email = email
+    u.ativo = ativo
+    return u
+
+
+def test_notificar_abertura_aog_envia_para_todos_usuarios_ativos_exceto_solicitante(app):
+    """Abertura de AOG dispara e-mail simultâneo pra TODO usuário ativo, exceto quem abriu."""
     from app.services.notifications import notificar_abertura_aog_todos_gestores
 
     chamado_data = {
@@ -1407,82 +1431,56 @@ def test_notificar_abertura_aog_todos_gestores_envia_para_os_4_niveis(app):
         "tipo_solicitacao": "Corretiva",
         "descricao": "Aeronave PR-XYZ em solo, hidráulica falhou.",
     }
-
-    emails_por_nivel = {
-        "gestor_setor": "setor@dtx.aero",
-        "gerente_producao": "producao@dtx.aero",
-        "assistente_gm": "assistente@dtx.aero",
-        "gm": "gm@dtx.aero",
-    }
+    usuarios = [
+        _make_usuario("sol_1", "solicitante@dtx.aero"),  # abriu o chamado — excluído
+        _make_usuario("u2", "julia@dtx.aero"),
+        _make_usuario("u3", "gm@dtx.aero"),
+    ]
 
     with (
         app.app_context(),
         patch(
             "app.services.notifications_escalonamento.enviar_email", return_value=(True, None)
         ) as mock_send,
-        patch(
-            "app.services.gestor_escalonamento_service.construir_mapa_gestor_setor",
-            return_value={"AOG": "setor@dtx.aero"},
-        ),
-        patch(
-            "app.services.gestor_escalonamento_service.construir_mapa_niveis_superiores",
-            return_value={
-                "gerente_producao": "producao@dtx.aero",
-                "assistente_gm": "assistente@dtx.aero",
-                "gm": "gm@dtx.aero",
-            },
-        ),
+        patch("app.models_usuario.Usuario.get_all", return_value=usuarios),
     ):
-        notificar_abertura_aog_todos_gestores(chamado_data=chamado_data, chamado_id="ch_aog_1")
+        notificar_abertura_aog_todos_gestores(
+            chamado_data=chamado_data, chamado_id="ch_aog_1", solicitante_id="sol_1"
+        )
 
-    assert mock_send.call_count == 4
+    assert mock_send.call_count == 2
     destinatarios = {call.args[0] for call in mock_send.call_args_list}
-    assert destinatarios == set(emails_por_nivel.values())
-    # Todos de alta importância (emergência) e mencionam o número do chamado
+    assert destinatarios == {"julia@dtx.aero", "gm@dtx.aero"}
     for call in mock_send.call_args_list:
         _dest, assunto, _html, _txt = call.args
         assert "CHM-AOG-01" in assunto
         assert call.kwargs.get("importance") == "high"
 
 
-def test_notificar_abertura_aog_cascateia_para_nivel_acima_quando_ausente(app):
-    """gestor_setor sem ninguém cadastrado pra área → cascateia pro gerente_producao
-    (emergência: nunca fica sem notificar por lacuna de cadastro)."""
+def test_notificar_abertura_aog_ignora_usuarios_inativos(app):
     from app.services.notifications import notificar_abertura_aog_todos_gestores
 
     chamado_data = {"numero_chamado": "CHM-AOG-02", "categoria": "AOG"}
+    usuarios = [
+        _make_usuario("u1", "ativo@dtx.aero", ativo=True),
+        _make_usuario("u2", "inativo@dtx.aero", ativo=False),
+    ]
 
     with (
         app.app_context(),
         patch(
             "app.services.notifications_escalonamento.enviar_email", return_value=(True, None)
         ) as mock_send,
-        patch(
-            "app.services.gestor_escalonamento_service.construir_mapa_gestor_setor",
-            return_value={},  # nenhum gestor_setor cadastrado pra área "AOG"
-        ),
-        patch(
-            "app.services.gestor_escalonamento_service.construir_mapa_niveis_superiores",
-            return_value={
-                "gerente_producao": "producao@dtx.aero",
-                "assistente_gm": "assistente@dtx.aero",
-                "gm": "gm@dtx.aero",
-            },
-        ),
+        patch("app.models_usuario.Usuario.get_all", return_value=usuarios),
     ):
         notificar_abertura_aog_todos_gestores(chamado_data=chamado_data, chamado_id="ch_aog_2")
 
-    # gestor_setor cascateia pra producao@dtx.aero (mesmo destinatário do nível
-    # gerente_producao) — deduplicado, não duplica o e-mail: 3 envios no total
-    # (producao, assistente, gm), não 4.
-    assert mock_send.call_count == 3
-    destinatarios = [call.args[0] for call in mock_send.call_args_list]
-    assert destinatarios == ["producao@dtx.aero", "assistente@dtx.aero", "gm@dtx.aero"]
+    assert mock_send.call_count == 1
+    assert mock_send.call_args.args[0] == "ativo@dtx.aero"
 
 
-def test_notificar_abertura_aog_sem_ninguem_cadastrado_em_nenhum_nivel_nao_envia(app):
-    """Nenhum nível (nem acima, via cascata) tem alguém cadastrado → nenhum e-mail
-    enviado, sem exception (só log warning)."""
+def test_notificar_abertura_aog_sem_usuarios_ativos_nao_envia(app):
+    """Nenhum usuário ativo cadastrado → nenhum e-mail enviado, sem exception."""
     from app.services.notifications import notificar_abertura_aog_todos_gestores
 
     chamado_data = {"numero_chamado": "CHM-AOG-02B", "categoria": "AOG"}
@@ -1492,14 +1490,7 @@ def test_notificar_abertura_aog_sem_ninguem_cadastrado_em_nenhum_nivel_nao_envia
         patch(
             "app.services.notifications_escalonamento.enviar_email", return_value=(True, None)
         ) as mock_send,
-        patch(
-            "app.services.gestor_escalonamento_service.construir_mapa_gestor_setor",
-            return_value={},
-        ),
-        patch(
-            "app.services.gestor_escalonamento_service.construir_mapa_niveis_superiores",
-            return_value={},
-        ),
+        patch("app.models_usuario.Usuario.get_all", return_value=[]),
     ):
         notificar_abertura_aog_todos_gestores(chamado_data=chamado_data, chamado_id="ch_aog_2b")
 
@@ -1507,34 +1498,28 @@ def test_notificar_abertura_aog_sem_ninguem_cadastrado_em_nenhum_nivel_nao_envia
 
 
 def test_notificar_abertura_aog_falha_de_envio_nao_levanta(app):
-    """Falha no envio de um nível não deve impedir a tentativa dos outros nem propagar exceção."""
+    """Falha no envio pra um destinatário não deve impedir a tentativa dos outros
+    nem propagar exceção."""
     from app.services.notifications import notificar_abertura_aog_todos_gestores
 
     chamado_data = {"numero_chamado": "CHM-AOG-03", "categoria": "AOG"}
+    usuarios = [
+        _make_usuario("u1", "setor@dtx.aero"),
+        _make_usuario("u2", "gm@dtx.aero"),
+    ]
 
     with (
         app.app_context(),
         patch(
             "app.services.notifications_escalonamento.enviar_email", return_value=(False, "timeout")
         ) as mock_send,
-        patch(
-            "app.services.gestor_escalonamento_service.construir_mapa_gestor_setor",
-            return_value={"AOG": "setor@dtx.aero"},
-        ),
-        patch(
-            "app.services.gestor_escalonamento_service.construir_mapa_niveis_superiores",
-            return_value={
-                "gerente_producao": "producao@dtx.aero",
-                "assistente_gm": "assistente@dtx.aero",
-                "gm": "gm@dtx.aero",
-            },
-        ),
+        patch("app.models_usuario.Usuario.get_all", return_value=usuarios),
     ):
         notificar_abertura_aog_todos_gestores(
             chamado_data=chamado_data, chamado_id="ch_aog_3"
         )  # não deve levantar
 
-    assert mock_send.call_count == 4
+    assert mock_send.call_count == 2
 
 
 # ── Fase 7 — notificar_aviso_resolucao_supervisor / notificar_escalada_resolucao_gerencial ────
@@ -1613,9 +1598,10 @@ def test_notificar_aviso_resolucao_supervisor_sem_email_dispara_inapp_e_webpush(
     mock_email.assert_not_called()
 
 
-def test_notificar_escalada_resolucao_gerencial_envia_email(app):
-    """notificar_escalada_resolucao_gerencial envia e-mail com assunto contendo numero_chamado e nivel."""
-    from app.services.notifications import notificar_escalada_resolucao_gerencial
+def test_notificar_escalada_gerencial_assumido_envia_email(app):
+    """notificar_escalada_gerencial (assumido=True, resolução atrasada) envia
+    e-mail com assunto contendo numero_chamado e nivel."""
+    from app.services.notifications import notificar_escalada_gerencial
 
     chamado_data = {
         "numero_chamado": "CHM-0200",
@@ -1632,11 +1618,12 @@ def test_notificar_escalada_resolucao_gerencial_envia_email(app):
         ) as mock_email,
     ):
         app.config["APP_BASE_URL"] = "https://example.test"
-        notificar_escalada_resolucao_gerencial(
+        notificar_escalada_gerencial(
             chamado_data=chamado_data,
             chamado_id="ch_200",
             nivel=2,
             email_dest="gerente@dtx.aero",
+            assumido=True,
         )
 
     mock_email.assert_called_once()
@@ -1644,6 +1631,7 @@ def test_notificar_escalada_resolucao_gerencial_envia_email(app):
     assert "CHM-0200" in assunto
     assert "2" in assunto
     assert _dest == "gerente@dtx.aero"
+    assert "overdue" in assunto.lower()
 
 
 # ── Cobertura: _email_envio_permitido linha 223 ───────────────────────────────
@@ -1661,3 +1649,346 @@ def test_email_suprimido_quando_testing_true(app):
         ok, err = enviar_email("dest@test.com", "Assunto", "<p>Teste</p>")
     assert ok is True
     assert err is None
+
+
+# ── notificar_pre_aviso_escalonamento — cobertura direta ───────────────────
+
+
+def test_notificar_pre_aviso_escalonamento_com_responsavel_e_email(app):
+    """Caminho feliz: dispara in-app + webpush + e-mail, cada um independente."""
+    from app.services.notifications import notificar_pre_aviso_escalonamento
+
+    chamado_data = {
+        "numero_chamado": "CHM-0300",
+        "categoria": "Manutenção",
+        "area": "Engenharia",
+        "tipo_solicitacao": "Corretiva",
+    }
+
+    with (
+        app.app_context(),
+        patch(
+            "app.services.notifications_escalonamento.enviar_email", return_value=(True, None)
+        ) as mock_email,
+        patch("app.services.notifications_inapp.criar_notificacao") as mock_criar,
+        patch("app.services.webpush_service.enviar_webpush_usuario") as mock_webpush,
+    ):
+        app.config["APP_BASE_URL"] = "https://example.test"
+        notificar_pre_aviso_escalonamento(
+            chamado_data=chamado_data,
+            chamado_id="ch_300",
+            nivel_alvo=1,
+            minutos_restantes=30,
+            responsavel_id="resp_1",
+            email_dest="resp@dtx.aero",
+        )
+
+    mock_criar.assert_called_once()
+    assert mock_criar.call_args.kwargs.get("usuario_id") == "resp_1"
+    mock_webpush.assert_called_once()
+    mock_email.assert_called_once()
+    _dest, assunto, _html, _txt = mock_email.call_args[0]
+    assert "CHM-0300" in assunto
+    assert _dest == "resp@dtx.aero"
+
+
+def test_notificar_pre_aviso_escalonamento_sem_responsavel_id_so_tenta_email(app):
+    from app.services.notifications import notificar_pre_aviso_escalonamento
+
+    with (
+        app.app_context(),
+        patch(
+            "app.services.notifications_escalonamento.enviar_email", return_value=(True, None)
+        ) as mock_email,
+        patch("app.services.notifications_inapp.criar_notificacao") as mock_criar,
+        patch("app.services.webpush_service.enviar_webpush_usuario") as mock_webpush,
+    ):
+        notificar_pre_aviso_escalonamento(
+            chamado_data={"numero_chamado": "CHM-0301"},
+            chamado_id="ch_301",
+            nivel_alvo=1,
+            minutos_restantes=30,
+            responsavel_id=None,
+            email_dest="resp@dtx.aero",
+        )
+
+    mock_criar.assert_not_called()
+    mock_webpush.assert_not_called()
+    mock_email.assert_called_once()
+
+
+def test_notificar_pre_aviso_escalonamento_sem_email_nao_envia_email(app):
+    from app.services.notifications import notificar_pre_aviso_escalonamento
+
+    with (
+        app.app_context(),
+        patch("app.services.notifications_escalonamento.enviar_email") as mock_email,
+        patch("app.services.notifications_inapp.criar_notificacao") as mock_criar,
+        patch("app.services.webpush_service.enviar_webpush_usuario") as mock_webpush,
+    ):
+        notificar_pre_aviso_escalonamento(
+            chamado_data={"numero_chamado": "CHM-0302"},
+            chamado_id="ch_302",
+            nivel_alvo=1,
+            minutos_restantes=30,
+            responsavel_id="resp_1",
+            email_dest=None,
+        )
+
+    mock_criar.assert_called_once()
+    mock_webpush.assert_called_once()
+    mock_email.assert_not_called()
+
+
+def test_notificar_pre_aviso_escalonamento_falha_inapp_nao_levanta(app):
+    from app.services.notifications import notificar_pre_aviso_escalonamento
+
+    with (
+        app.app_context(),
+        patch("app.services.notifications_escalonamento.enviar_email", return_value=(True, None)),
+        patch(
+            "app.services.notifications_inapp.criar_notificacao",
+            side_effect=RuntimeError("boom"),
+        ),
+        patch("app.services.webpush_service.enviar_webpush_usuario") as mock_webpush,
+    ):
+        notificar_pre_aviso_escalonamento(
+            chamado_data={"numero_chamado": "CHM-0303"},
+            chamado_id="ch_303",
+            nivel_alvo=1,
+            minutos_restantes=30,
+            responsavel_id="resp_1",
+            email_dest="resp@dtx.aero",
+        )
+
+    mock_webpush.assert_called_once()
+
+
+def test_notificar_pre_aviso_escalonamento_falha_webpush_nao_levanta(app):
+    from app.services.notifications import notificar_pre_aviso_escalonamento
+
+    with (
+        app.app_context(),
+        patch(
+            "app.services.notifications_escalonamento.enviar_email", return_value=(True, None)
+        ) as mock_email,
+        patch("app.services.notifications_inapp.criar_notificacao"),
+        patch(
+            "app.services.webpush_service.enviar_webpush_usuario",
+            side_effect=RuntimeError("boom"),
+        ),
+    ):
+        notificar_pre_aviso_escalonamento(
+            chamado_data={"numero_chamado": "CHM-0304"},
+            chamado_id="ch_304",
+            nivel_alvo=1,
+            minutos_restantes=30,
+            responsavel_id="resp_1",
+            email_dest="resp@dtx.aero",
+        )
+
+    mock_email.assert_called_once()
+
+
+def test_notificar_pre_aviso_escalonamento_email_falha_loga_warning(app):
+    from app.services.notifications import notificar_pre_aviso_escalonamento
+
+    with (
+        app.app_context(),
+        patch(
+            "app.services.notifications_escalonamento.enviar_email",
+            return_value=(False, "timeout"),
+        ),
+    ):
+        notificar_pre_aviso_escalonamento(
+            chamado_data={"numero_chamado": "CHM-0305"},
+            chamado_id="ch_305",
+            nivel_alvo=1,
+            minutos_restantes=30,
+            responsavel_id=None,
+            email_dest="resp@dtx.aero",
+        )
+
+
+# ── notificar_abertura_aog_todos_gestores — exceções ────────────────────────
+
+
+def test_notificar_abertura_aog_falha_ao_listar_usuarios_nao_levanta(app):
+    from app.services.notifications import notificar_abertura_aog_todos_gestores
+
+    with (
+        app.app_context(),
+        patch(
+            "app.cache.get_static_cached",
+            side_effect=RuntimeError("cache boom"),
+        ),
+        patch("app.services.notifications_escalonamento.enviar_email") as mock_email,
+    ):
+        notificar_abertura_aog_todos_gestores(
+            chamado_data={"numero_chamado": "CHM-AOG-04"}, chamado_id="ch_aog_4"
+        )
+
+    mock_email.assert_not_called()
+
+
+def test_notificar_abertura_aog_excecao_no_envio_nao_impede_outros(app):
+    """Exceção ao enviar pra um destinatário não impede a tentativa dos outros."""
+    from app.services.notifications import notificar_abertura_aog_todos_gestores
+
+    usuarios = [_make_usuario("u1", "falha@dtx.aero"), _make_usuario("u2", "ok@dtx.aero")]
+
+    def _enviar_side_effect(dest, *a, **kw):
+        if dest == "falha@dtx.aero":
+            raise RuntimeError("smtp boom")
+        return (True, None)
+
+    with (
+        app.app_context(),
+        patch("app.models_usuario.Usuario.get_all", return_value=usuarios),
+        patch(
+            "app.services.notifications_escalonamento.enviar_email",
+            side_effect=_enviar_side_effect,
+        ) as mock_email,
+    ):
+        notificar_abertura_aog_todos_gestores(
+            chamado_data={"numero_chamado": "CHM-AOG-05"}, chamado_id="ch_aog_5"
+        )
+
+    assert mock_email.call_count == 2
+
+
+# ── notificar_aviso_resolucao_supervisor — exceções + falha de e-mail ──────
+
+
+def test_notificar_aviso_resolucao_supervisor_falha_inapp_nao_levanta(app):
+    from app.services.notifications import notificar_aviso_resolucao_supervisor
+
+    with (
+        app.app_context(),
+        patch("app.services.notifications_escalonamento.enviar_email", return_value=(True, None)),
+        patch(
+            "app.services.notifications_inapp.criar_notificacao",
+            side_effect=RuntimeError("boom"),
+        ),
+        patch("app.services.webpush_service.enviar_webpush_usuario") as mock_webpush,
+    ):
+        notificar_aviso_resolucao_supervisor(
+            chamado_data={"numero_chamado": "CHM-0400"},
+            chamado_id="ch_400",
+            marco=50,
+            responsavel_id="resp_1",
+            email_dest="resp@dtx.aero",
+        )
+
+    mock_webpush.assert_called_once()
+
+
+def test_notificar_aviso_resolucao_supervisor_falha_webpush_nao_levanta(app):
+    from app.services.notifications import notificar_aviso_resolucao_supervisor
+
+    with (
+        app.app_context(),
+        patch(
+            "app.services.notifications_escalonamento.enviar_email", return_value=(True, None)
+        ) as mock_email,
+        patch("app.services.notifications_inapp.criar_notificacao"),
+        patch(
+            "app.services.webpush_service.enviar_webpush_usuario",
+            side_effect=RuntimeError("boom"),
+        ),
+    ):
+        notificar_aviso_resolucao_supervisor(
+            chamado_data={"numero_chamado": "CHM-0401"},
+            chamado_id="ch_401",
+            marco=50,
+            responsavel_id="resp_1",
+            email_dest="resp@dtx.aero",
+        )
+
+    mock_email.assert_called_once()
+
+
+def test_notificar_aviso_resolucao_supervisor_email_falha_loga_warning(app):
+    from app.services.notifications import notificar_aviso_resolucao_supervisor
+
+    with (
+        app.app_context(),
+        patch(
+            "app.services.notifications_escalonamento.enviar_email",
+            return_value=(False, "timeout"),
+        ),
+    ):
+        notificar_aviso_resolucao_supervisor(
+            chamado_data={"numero_chamado": "CHM-0402"},
+            chamado_id="ch_402",
+            marco=80,
+            responsavel_id=None,
+            email_dest="resp@dtx.aero",
+        )
+
+
+# ── notificar_digest_diario — cobertura direta ──────────────────────────────
+
+
+def test_notificar_digest_diario_envia_email_com_tabelas(app):
+    from app.services.notifications import notificar_digest_diario
+
+    vencidos = [{"id": 1, "numero_chamado": "CHM-0500", "categoria": "AOG", "status": "Aberto"}]
+    abertos = [
+        {"id": 2, "numero_chamado": "CHM-0501", "categoria": "Manutenção", "status": "Aberto"}
+    ]
+
+    with (
+        app.app_context(),
+        patch(
+            "app.services.notifications_escalonamento.enviar_email", return_value=(True, None)
+        ) as mock_email,
+    ):
+        app.config["APP_BASE_URL"] = "https://example.test"
+        notificar_digest_diario(
+            usuario_id="resp_1",
+            email_dest="resp@dtx.aero",
+            vencidos_ou_perto=vencidos,
+            abertos=abertos,
+        )
+
+    mock_email.assert_called_once()
+    _dest, assunto, html, _txt = mock_email.call_args[0]
+    assert _dest == "resp@dtx.aero"
+    assert "2 open ticket" in assunto
+    assert "CHM-0500" in html
+    assert "CHM-0501" in html
+
+
+def test_notificar_digest_diario_grupos_vazios_mostra_none(app):
+    from app.services.notifications import notificar_digest_diario
+
+    with (
+        app.app_context(),
+        patch(
+            "app.services.notifications_escalonamento.enviar_email", return_value=(True, None)
+        ) as mock_email,
+    ):
+        notificar_digest_diario(
+            usuario_id="resp_1", email_dest="resp@dtx.aero", vencidos_ou_perto=[], abertos=[]
+        )
+
+    mock_email.assert_called_once()
+    _dest, assunto, html, _txt = mock_email.call_args[0]
+    assert "0 open ticket" in assunto
+    assert "None." in html
+
+
+def test_notificar_digest_diario_falha_loga_warning(app):
+    from app.services.notifications import notificar_digest_diario
+
+    with (
+        app.app_context(),
+        patch(
+            "app.services.notifications_escalonamento.enviar_email",
+            return_value=(False, "timeout"),
+        ),
+    ):
+        notificar_digest_diario(
+            usuario_id="resp_1", email_dest="resp@dtx.aero", vencidos_ou_perto=[], abertos=[]
+        )

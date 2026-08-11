@@ -46,12 +46,13 @@ class Chamado:
         # Fase 2 — Escalonamento SLA
         supervisor_ids_com_acesso: list = None,
         data_em_atendimento=None,
-        escalacao_resposta_nivel: int = 0,
+        # Motor de escalonamento unificado (TAT único por categoria)
+        escalacao_nivel: int = 0,
+        escalacao_proximo_tick_em=None,
+        escalacao_pre_aviso_nivel_enviado: int = None,
         participantes: list = None,
         # Fase 3 — Transferência e escalada
         motivo_ultima_escalacao: str = None,
-        # Fase 7 — Escada B (resolução)
-        escalacao_resolucao_nivel: int = 0,
         alerta_supervisor_50_enviado: bool = False,
         alerta_supervisor_80_enviado: bool = False,
         # Lembretes de confirmação de resolução (24h/48h após Concluído)
@@ -107,16 +108,13 @@ class Chamado:
         # Fase 2 — Escalonamento SLA
         self.supervisor_ids_com_acesso = supervisor_ids_com_acesso or []
         self.data_em_atendimento = data_em_atendimento
-        self.escalacao_resposta_nivel = (
-            escalacao_resposta_nivel if escalacao_resposta_nivel is not None else 0
-        )
+        # Motor de escalonamento unificado (TAT único por categoria)
+        self.escalacao_nivel = escalacao_nivel if escalacao_nivel is not None else 0
+        self.escalacao_proximo_tick_em = escalacao_proximo_tick_em
+        self.escalacao_pre_aviso_nivel_enviado = escalacao_pre_aviso_nivel_enviado
         self.participantes = participantes or []
         # Fase 3 — Transferência e escalada
         self.motivo_ultima_escalacao = motivo_ultima_escalacao
-        # Fase 7 — Escada B (resolução)
-        self.escalacao_resolucao_nivel = (
-            escalacao_resolucao_nivel if escalacao_resolucao_nivel is not None else 0
-        )
         self.alerta_supervisor_50_enviado = bool(alerta_supervisor_50_enviado)
         self.alerta_supervisor_80_enviado = bool(alerta_supervisor_80_enviado)
         self.lembrete_confirmacao_1_enviado = bool(lembrete_confirmacao_1_enviado)
@@ -215,12 +213,12 @@ class Chamado:
             # Fase 2 — Escalonamento SLA
             "supervisor_ids_com_acesso": self.supervisor_ids_com_acesso,
             "data_em_atendimento": self.data_em_atendimento,
-            "escalacao_resposta_nivel": self.escalacao_resposta_nivel,
+            "escalacao_nivel": self.escalacao_nivel,
+            "escalacao_proximo_tick_em": self.escalacao_proximo_tick_em,
+            "escalacao_pre_aviso_nivel_enviado": self.escalacao_pre_aviso_nivel_enviado,
             "participantes": self.participantes,
             # Fase 3 — Transferência e escalada
             "motivo_ultima_escalacao": self.motivo_ultima_escalacao,
-            # Fase 7 — Escada B (resolução)
-            "escalacao_resolucao_nivel": self.escalacao_resolucao_nivel,
             "alerta_supervisor_50_enviado": self.alerta_supervisor_50_enviado,
             "alerta_supervisor_80_enviado": self.alerta_supervisor_80_enviado,
             "lembrete_confirmacao_1_enviado": self.lembrete_confirmacao_1_enviado,
@@ -282,14 +280,14 @@ class Chamado:
             if isinstance(data.get("supervisor_ids_com_acesso"), list)
             else [],
             data_em_atendimento=data.get("data_em_atendimento"),
-            escalacao_resposta_nivel=data.get("escalacao_resposta_nivel", 0),
+            escalacao_nivel=data.get("escalacao_nivel", 0),
+            escalacao_proximo_tick_em=data.get("escalacao_proximo_tick_em"),
+            escalacao_pre_aviso_nivel_enviado=data.get("escalacao_pre_aviso_nivel_enviado"),
             participantes=data.get("participantes")
             if isinstance(data.get("participantes"), list)
             else [],
             # Fase 3 — Transferência e escalada
             motivo_ultima_escalacao=data.get("motivo_ultima_escalacao"),
-            # Fase 7 — Escada B (resolução)
-            escalacao_resolucao_nivel=data.get("escalacao_resolucao_nivel", 0),
             alerta_supervisor_50_enviado=data.get("alerta_supervisor_50_enviado", False),
             alerta_supervisor_80_enviado=data.get("alerta_supervisor_80_enviado", False),
             lembrete_confirmacao_1_enviado=data.get("lembrete_confirmacao_1_enviado", False),
@@ -338,8 +336,9 @@ class Chamado:
             "motivo_ultima_escalacao": self.motivo_ultima_escalacao,
             "sla_dias": self.sla_dias,
             "confirmacao_solicitante": self.confirmacao_solicitante,
-            "escalacao_resposta_nivel": self.escalacao_resposta_nivel,
-            "escalacao_resolucao_nivel": self.escalacao_resolucao_nivel,
+            "escalacao_nivel": self.escalacao_nivel,
+            "escalacao_proximo_tick_em": self.escalacao_proximo_tick_em,
+            "escalacao_pre_aviso_nivel_enviado": self.escalacao_pre_aviso_nivel_enviado,
             "alerta_supervisor_50_enviado": self.alerta_supervisor_50_enviado,
             "alerta_supervisor_80_enviado": self.alerta_supervisor_80_enviado,
             "lembrete_confirmacao_1_enviado": self.lembrete_confirmacao_1_enviado,
@@ -379,10 +378,11 @@ class Chamado:
             confirmacao_solicitante=row.confirmacao_solicitante,
             supervisor_ids_com_acesso=list(row.supervisor_ids_com_acesso or []),
             data_em_atendimento=row.data_em_atendimento,
-            escalacao_resposta_nivel=row.escalacao_resposta_nivel,
+            escalacao_nivel=row.escalacao_nivel,
+            escalacao_proximo_tick_em=row.escalacao_proximo_tick_em,
+            escalacao_pre_aviso_nivel_enviado=row.escalacao_pre_aviso_nivel_enviado,
             participantes=participantes or [],
             motivo_ultima_escalacao=row.motivo_ultima_escalacao,
-            escalacao_resolucao_nivel=row.escalacao_resolucao_nivel,
             alerta_supervisor_50_enviado=row.alerta_supervisor_50_enviado,
             alerta_supervisor_80_enviado=row.alerta_supervisor_80_enviado,
             lembrete_confirmacao_1_enviado=row.lembrete_confirmacao_1_enviado,

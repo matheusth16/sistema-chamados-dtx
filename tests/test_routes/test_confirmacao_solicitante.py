@@ -319,8 +319,9 @@ def test_reabrir_reseta_flags_lembrete(client_logado_solicitante):
     assert atualizado.lembrete_confirmacao_2_enviado is False
 
 
-def test_reabrir_reseta_escalacao_resposta_nivel(client_logado_solicitante):
-    """ADR-004: ao reabrir, escalacao_resposta_nivel deve ser zerado para reiniciar Escada A."""
+def test_reabrir_reseta_escalacao_nivel(client_logado_solicitante):
+    """Ao reabrir, escalacao_nivel (motor de escalonamento unificado) deve
+    ser zerado, junto com o próximo tick agendado e o dedup do aviso prévio."""
     chamado = _criar_chamado()
     with patch("app.routes.api_chamados.Historico"):
         r = client_logado_solicitante.post(
@@ -330,11 +331,13 @@ def test_reabrir_reseta_escalacao_resposta_nivel(client_logado_solicitante):
         )
     assert r.status_code == 200
     atualizado = Chamado.get_by_id(chamado.id)
-    assert atualizado.escalacao_resposta_nivel == 0
+    assert atualizado.escalacao_nivel == 0
+    assert atualizado.escalacao_proximo_tick_em is None
+    assert atualizado.escalacao_pre_aviso_nivel_enviado is None
 
 
-def test_reabrir_reseta_flags_escada_b(client_logado_solicitante):
-    """Fase 7: ao reabrir, campos Escada B devem ser zerados junto com Escada A."""
+def test_reabrir_reseta_flags_alerta_resolucao(client_logado_solicitante):
+    """Ao reabrir, alerta_supervisor_50/80 devem ser zerados junto com o nível."""
     chamado = _criar_chamado()
     with patch("app.routes.api_chamados.Historico"):
         r = client_logado_solicitante.post(
@@ -344,7 +347,6 @@ def test_reabrir_reseta_flags_escada_b(client_logado_solicitante):
         )
     assert r.status_code == 200
     atualizado = Chamado.get_by_id(chamado.id)
-    assert atualizado.escalacao_resolucao_nivel == 0
     assert atualizado.alerta_supervisor_50_enviado is False
     assert atualizado.alerta_supervisor_80_enviado is False
 

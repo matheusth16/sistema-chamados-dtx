@@ -43,9 +43,10 @@ def _criar_chamado_real(
     responsavel="Julia Silva",
     participantes=None,
     status="Em Atendimento",
+    categoria="Manutencao",
 ) -> int:
     chamado = Chamado(
-        categoria="Manutencao",
+        categoria=categoria,
         tipo_solicitacao="Corretiva",
         descricao="Descrição teste",
         responsavel=responsavel,
@@ -1001,6 +1002,28 @@ class TestDefinirPrevisaoAtendimento:
             atualizado.motivo_previsao_atendimento
             == "Combinado com o gestor, preciso de mais tempo"
         )
+
+    def test_definir_previsao_aog_sempre_bloqueada(self):
+        """AOG é prioridade máxima, sempre — nunca pode ter a escalada
+        silenciada por previsão de atendimento, nem por owner nem por admin."""
+        from datetime import datetime, timedelta
+
+        from app.services.escalonamento_service import definir_previsao_atendimento
+
+        chamado_id = _criar_chamado_real(
+            area="Engenharia", responsavel_id="id_julia", categoria="AOG"
+        )
+        previsao = datetime.now() + timedelta(hours=2)
+
+        with patch("app.services.escalonamento_service.Historico"):
+            resultado = definir_previsao_atendimento(
+                chamado_id, previsao, "Aeronave em manutenção externa", JULIA
+            )
+
+        assert resultado["sucesso"] is False
+        atualizado = Chamado.get_by_id(chamado_id)
+        assert atualizado.previsao_atendimento is None
+        assert atualizado.motivo_previsao_atendimento is None
 
     def test_definir_previsao_registra_historico(self):
         from datetime import datetime, timedelta

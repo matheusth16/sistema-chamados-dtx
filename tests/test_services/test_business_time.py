@@ -424,3 +424,59 @@ def test_minutos_corridos_fim_antes_inicio_retorna_zero():
     from app.services.business_time import minutos_corridos_entre
 
     assert minutos_corridos_entre(datetime(2026, 6, 22, 10, 0), datetime(2026, 6, 22, 9, 0)) == 0
+
+
+# ---------------------------------------------------------------------------
+# adicionar_horas_corridas — TAT/limiar AOG (motor de escalonamento unificado)
+# ---------------------------------------------------------------------------
+
+
+def test_adicionar_horas_corridas_simples():
+    from app.services.business_time import adicionar_horas_corridas
+
+    resultado = adicionar_horas_corridas(datetime(2026, 6, 22, 9, 0), 1)
+    assert resultado == datetime(2026, 6, 22, 10, 0)
+
+
+def test_adicionar_horas_corridas_ignora_almoco_e_expediente():
+    """AOG é 24/7 — soma corrida, não respeita almoço/fim de expediente."""
+    from app.services.business_time import adicionar_horas_corridas
+
+    resultado = adicionar_horas_corridas(datetime(2026, 6, 22, 16, 0), 1)
+    assert resultado == datetime(2026, 6, 22, 17, 0)
+
+
+def test_adicionar_horas_corridas_cruza_fim_de_semana():
+    """AOG 24/7 — não pula sábado/domingo, soma corrida direto."""
+    from app.services.business_time import adicionar_horas_corridas
+
+    # sexta 23:00 + 24h = sábado 23:00 (não pula pro próximo dia útil)
+    resultado = adicionar_horas_corridas(datetime(2026, 6, 19, 23, 0), 24)
+    assert resultado == datetime(2026, 6, 20, 23, 0)
+
+
+def test_adicionar_horas_corridas_fracionario():
+    from app.services.business_time import adicionar_horas_corridas
+
+    resultado = adicionar_horas_corridas(datetime(2026, 6, 22, 9, 0), 0.5)
+    assert resultado == datetime(2026, 6, 22, 9, 30)
+
+
+def test_adicionar_horas_corridas_aware_preserva_tz():
+    """Entrada aware BRT → retorno também aware, mesma tz."""
+    from zoneinfo import ZoneInfo
+
+    from app.services.business_time import adicionar_horas_corridas
+
+    brt = ZoneInfo("America/Sao_Paulo")
+    inicio = datetime(2026, 6, 22, 9, 0, tzinfo=brt)
+    resultado = adicionar_horas_corridas(inicio, 1)
+    assert resultado.tzinfo is not None
+    assert resultado == datetime(2026, 6, 22, 10, 0, tzinfo=brt)
+
+
+def test_adicionar_horas_corridas_negativo_levanta_erro():
+    from app.services.business_time import adicionar_horas_corridas
+
+    with pytest.raises(ValueError):
+        adicionar_horas_corridas(datetime(2026, 6, 22, 9, 0), -1)

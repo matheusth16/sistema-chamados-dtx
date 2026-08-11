@@ -107,6 +107,19 @@ def minutos_corridos_entre(inicio: datetime, fim: datetime) -> int:
     return int((fim_local - inicio_local).total_seconds() // 60)
 
 
+def adicionar_horas_corridas(inicio: datetime, horas: float) -> datetime:
+    """Soma horas corridas (calendário, 24/7, sem descontar almoço/fim de semana)
+    a partir de `inicio` — usada pelo TAT e pelo limiar de reivindicação do AOG,
+    que nunca esperam expediente (ver sla_escalacao_service.py).
+
+    Raises:
+        ValueError: se `horas` for negativo.
+    """
+    if horas < 0:
+        raise ValueError(f"horas deve ser >= 0, recebido: {horas}")
+    return inicio + timedelta(hours=horas)
+
+
 def adicionar_dias_uteis(inicio: datetime, n: int) -> datetime:
     """Retorna o N-ésimo dia útil a partir de `inicio` (inclusive), às 16:30 (teto DTX).
 

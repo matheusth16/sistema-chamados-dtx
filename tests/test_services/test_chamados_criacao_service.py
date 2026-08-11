@@ -1259,9 +1259,10 @@ def test_criacao_armazem_nao_exige_responsavel_mesmo_com_supervisor(app):
 # ── AOG — abertura já grava nível 4 e dispara broadcast pros 4 gestores ──────
 
 
-def test_criar_chamado_aog_grava_nivel_4_e_notifica_todos_gestores(app):
-    """categoria='AOG': escalacao_resposta_nivel=4 direto (Escada A já esgotada) e
-    dispara notificar_abertura_aog_todos_gestores pros 4 níveis, síncrono na criação."""
+def test_criar_chamado_aog_nao_grava_nivel_e_notifica_todos_usuarios(app):
+    """categoria='AOG': escalacao_nivel fica 0 (motor unificado, sem sentinel) e
+    dispara notificar_abertura_aog_todos_gestores (broadcast a todo usuário ativo),
+    passando solicitante_id pra excluir quem abriu."""
     form = {
         "categoria": "AOG",
         "tipo": "Manutencao",
@@ -1308,11 +1309,12 @@ def test_criar_chamado_aog_grava_nivel_4_e_notifica_todos_gestores(app):
 
     assert erro is None
     assert chamado_id is not None
-    assert Chamado.get_by_id(chamado_id).escalacao_resposta_nivel == 4
+    assert Chamado.get_by_id(chamado_id).escalacao_nivel == 0
     mock_notif_aog.assert_called_once()
     kwargs = mock_notif_aog.call_args.kwargs
     assert kwargs["chamado_id"] == chamado_id
     assert kwargs["chamado_data"]["numero_chamado"] == "2026-300"
+    assert kwargs["solicitante_id"] == "sol1"
 
 
 def test_criar_chamado_aog_grava_rl_codigo_e_cria_grupo_rl(app):
@@ -1417,7 +1419,7 @@ def test_criar_chamado_normal_nao_grava_nivel_4_nem_notifica_aog(app):
                 solicitante_email="sol@test.com",
             )
 
-    assert Chamado.get_by_id(chamado_id).escalacao_resposta_nivel == 0
+    assert Chamado.get_by_id(chamado_id).escalacao_nivel == 0
     mock_notif_aog.assert_not_called()
 
 

@@ -116,7 +116,7 @@ def create_app():
     # Proteção staging (CWI 4.1 — camada 2 fallback app; camada 1 = VPN/firewall ops)
     _proteger_staging(app)
 
-    # Timeout de inatividade (15 minutos)
+    # Timeout de inatividade (1 hora)
     _configurar_timeout_sessao(app)
 
     # Métricas de tempo de resposta por rota (log para análise de gargalos)
@@ -234,16 +234,16 @@ def _iniciar_scheduler(app: Flask) -> None:
                 try:
                     from app.services.sla_escalacao_service import (
                         processar_avisos_resolucao,
-                        processar_escada_a,
-                        processar_escada_b,
+                        processar_escalonamento,
                     )
 
                     resultado = {
-                        "escada_a": processar_escada_a(),
+                        "escalonamento": processar_escalonamento(),
                         "avisos_resolucao": processar_avisos_resolucao(),
-                        "escada_b": processar_escada_b(),
                     }
-                    app.logger.info("Job SLA Escalonamento (A + avisos + B): %s", resultado)
+                    app.logger.info(
+                        "Job SLA Escalonamento (motor unificado + avisos): %s", resultado
+                    )
                 except Exception as exc:
                     app.logger.exception("Erro no job SLA Escalonamento: %s", exc)
 
@@ -279,6 +279,16 @@ def _iniciar_scheduler(app: Flask) -> None:
                 except Exception as exc:
                     app.logger.exception("Erro no job de lembretes de confirmação: %s", exc)
 
+        def _job_digest_diario():
+            with app.app_context():
+                try:
+                    from app.services.digest_diario_service import processar_digest_diario
+
+                    resultado = processar_digest_diario()
+                    app.logger.info("Digest diário: %s", resultado)
+                except Exception as exc:
+                    app.logger.exception("Erro no job de digest diário: %s", exc)
+
         scheduler = BackgroundScheduler(
             timezone=pytz.timezone("America/Sao_Paulo"),
             job_defaults={"coalesce": True, "max_instances": 1},
@@ -291,12 +301,21 @@ def _iniciar_scheduler(app: Flask) -> None:
             minute=0,
             id="relatorio_semanal",
         )
-        # Job Escada A: escalada gerencial a cada 10 minutos (Fase 6 — ADR-004)
+        # Motor de escalonamento unificado: TAT por categoria, a cada 10 minutos
         scheduler.add_job(
             lambda: executar_job_com_lock(app, "sla_escalacao", _job_sla_escalacao),
             trigger="interval",
             minutes=10,
             id="sla_escalacao",
+        )
+        # Digest diário de chamados abertos: gatilho por pessoa (24h desde o
+        # mais antigo/último envio) — 30 min é granularidade suficiente, não
+        # precisa da mesma frequência do escalonamento.
+        scheduler.add_job(
+            lambda: executar_job_com_lock(app, "digest_diario", _job_digest_diario),
+            trigger="interval",
+            minutes=30,
+            id="digest_diario",
         )
         # alerta_prazo_24h (cron 08h) desativado — Escada A (sla_escalacao) cobre o
         # monitoramento contínuo de chamados sem resposta e usa business_time.
@@ -326,9 +345,9 @@ def _iniciar_scheduler(app: Flask) -> None:
         )
         scheduler.start()
         app.logger.info(
-            "Scheduler iniciado — SLA Escada A a cada 10 min, relatório semanal sexta 10h, "
-            "lembretes confirmação a cada 6 h, reset ranking domingo 23h59, "
-            "limpeza contadores domingo 02h00 (BRT)"
+            "Scheduler iniciado — escalonamento SLA a cada 10 min, digest diário a cada 30 min, "
+            "relatório semanal sexta 10h, lembretes confirmação a cada 6 h, "
+            "reset ranking domingo 23h59, limpeza contadores domingo 02h00 (BRT)"
         )
 
         import atexit
@@ -820,11 +839,11 @@ def _configurar_i18n(app: Flask) -> None:
 
 
 def _configurar_timeout_sessao(app: Flask) -> None:
-    """Configura logout automático por inatividade de sessão (15 minutos)"""
+    """Configura logout automático por inatividade de sessão (1 hora)"""
     from datetime import datetime, timezone
 
     from flask import flash, redirect, request, session, url_for
-    from flask_login import current_user, logout_user
+    from flask_login import current_user, login_remembered, logout_user
 
     from app.i18n import flash_t
 
@@ -837,11 +856,19 @@ def _configurar_timeout_sessao(app: Flask) -> None:
         if current_user.is_authenticated:
             # Pega o timestamp atual
             agora = datetime.now(UTC).timestamp()
-            limite_segundos = 900  # 15 minutos
+
+            # Login com "lembrar-me" ativo: o cookie persistente (REMEMBER_COOKIE_DURATION,
+            # 30 dias) já cobre a expiração — não aplica o timeout de inatividade, senão
+            # o cookie de 30 dias nunca sobrevive a uma aba aberta parada por 1h.
+            if login_remembered():
+                session["last_activity"] = agora
+                return None
+
+            limite_segundos = 3600  # 1 hora
 
             ultima_atividade = session.get("last_activity")
 
-            # Checa se excedeu os 15 minutos sem atividade
+            # Checa se excedeu 1 hora sem atividade
             if ultima_atividade is not None and (agora - ultima_atividade > limite_segundos):
                 lang = session.get("language", "en")
                 logout_user()

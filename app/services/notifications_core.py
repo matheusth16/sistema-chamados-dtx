@@ -34,8 +34,8 @@ _ALWAYS_HIGH_TIPOS: frozenset[str] = frozenset(
         "transferencia_area",
         "escalonamento_colega",
         "chamado_reaberto",
-        "escalada_resposta_gerencial",
-        "escalada_resolucao_gerencial",
+        "escalada_gerencial",
+        "pre_aviso_escalonamento",
         "abertura_aog",
     }
 )

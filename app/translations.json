@@ -4194,6 +4194,11 @@
     "en": "The attendance forecast must be a future date",
     "es": "La previsión de atención debe ser una fecha futura"
   },
+  "attendance_forecast_not_allowed_aog": {
+    "pt_BR": "Previsão de atendimento não pode ser definida para chamados AOG",
+    "en": "Attendance forecast cannot be set for AOG tickets",
+    "es": "La previsión de atención no se puede definir para tickets AOG"
+  },
   "attendance_forecast_label": {
     "pt_BR": "Previsão de atendimento",
     "en": "Attendance forecast",

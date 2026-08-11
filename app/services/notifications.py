@@ -46,8 +46,9 @@ from app.services.notifications_core import (
 from app.services.notifications_escalonamento import (
     notificar_abertura_aog_todos_gestores,
     notificar_aviso_resolucao_supervisor,
-    notificar_escalada_resolucao_gerencial,
-    notificar_escalada_resposta_gerencial,
+    notificar_digest_diario,
+    notificar_escalada_gerencial,
+    notificar_pre_aviso_escalonamento,
 )
 from app.services.notifications_usuarios import (
     notificar_admins_novo_usuario_sso,
@@ -79,8 +80,9 @@ __all__ = [
     "notificar_novo_usuario_sso",
     "notificar_abertura_aog_todos_gestores",
     "notificar_aviso_resolucao_supervisor",
-    "notificar_escalada_resolucao_gerencial",
-    "notificar_escalada_resposta_gerencial",
+    "notificar_digest_diario",
+    "notificar_escalada_gerencial",
+    "notificar_pre_aviso_escalonamento",
     "notificar_aprovador_novo_chamado",
     "notificar_owner_todos_participantes_concluiram",
     "notificar_participante_incluido",

@@ -44,22 +44,18 @@ def test_cron_sla_escalacao_token_invalido_retorna_401(client, _sem_redis):
 
 
 def test_cron_sla_escalacao_token_correto_executa_job(client, _sem_redis):
-    """Token correto: chama os 3 processadores da Escada A/B e retorna sucesso+dados."""
+    """Token correto: chama os 2 processadores (motor unificado + avisos) e retorna sucesso+dados."""
     secret = "segredo-teste-cron-valido-32ch"
     with (
         patch.dict(os.environ, {"CRON_SECRET": secret}, clear=False),
         patch(
-            "app.services.sla_escalacao_service.processar_escada_a",
+            "app.services.sla_escalacao_service.processar_escalonamento",
             return_value={"escalados": 1},
-        ) as mock_a,
+        ) as mock_escalonamento,
         patch(
             "app.services.sla_escalacao_service.processar_avisos_resolucao",
             return_value={"avisados": 0},
         ) as mock_avisos,
-        patch(
-            "app.services.sla_escalacao_service.processar_escada_b",
-            return_value={"escalados": 0},
-        ) as mock_b,
     ):
         resp = client.post(
             "/internal/cron/sla-escalacao",
@@ -69,12 +65,10 @@ def test_cron_sla_escalacao_token_correto_executa_job(client, _sem_redis):
     assert resp.status_code == 200
     body = resp.get_json()
     assert body["sucesso"] is True
-    assert body["dados"]["escada_a"] == {"escalados": 1}
+    assert body["dados"]["escalonamento"] == {"escalados": 1}
     assert body["dados"]["avisos_resolucao"] == {"avisados": 0}
-    assert body["dados"]["escada_b"] == {"escalados": 0}
-    mock_a.assert_called_once()
+    mock_escalonamento.assert_called_once()
     mock_avisos.assert_called_once()
-    mock_b.assert_called_once()
 
 
 def test_cron_sla_escalacao_metodo_get_nao_permitido(client, _sem_redis):
@@ -107,9 +101,8 @@ def test_cron_sla_escalacao_isento_de_csrf():
     secret = "segredo-teste-cron-valido-32ch"
     with (
         patch.dict(os.environ, {"CRON_SECRET": secret, "REDIS_URL": ""}, clear=False),
-        patch("app.services.sla_escalacao_service.processar_escada_a", return_value={}),
+        patch("app.services.sla_escalacao_service.processar_escalonamento", return_value={}),
         patch("app.services.sla_escalacao_service.processar_avisos_resolucao", return_value={}),
-        patch("app.services.sla_escalacao_service.processar_escada_b", return_value={}),
     ):
         resp = client_csrf.post(
             "/internal/cron/sla-escalacao",

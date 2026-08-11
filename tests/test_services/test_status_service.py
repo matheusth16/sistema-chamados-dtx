@@ -6,7 +6,7 @@ db.collection("chamados").document(id).update(...). Testes que antes
 inspecionavam o dict passado a execute_with_retry agora verificam o estado
 real persistido via Chamado.get_by_id(chamado_id)."""
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -650,7 +650,7 @@ def test_claim_atribui_owner_ao_em_atendimento():
                 "solicitante_id": "sol1",
                 "numero_chamado": "CHM-001",
                 "categoria": "Manutenção",
-                "escalacao_resposta_nivel": 0,
+                "escalacao_nivel": 0,
             },
         )
     assert resultado["sucesso"] is True
@@ -684,16 +684,19 @@ def test_claim_nao_sobrescreve_owner_existente():
                 "solicitante_id": "sol1",
                 "numero_chamado": "CHM-001",
                 "categoria": "Manutenção",
-                "escalacao_resposta_nivel": 0,
+                "escalacao_nivel": 0,
             },
         )
     # responsavel_id não deve ser sobrescrito
     assert Chamado.get_by_id(chamado_id).responsavel_id != "id_matheus"
 
 
-def test_escada_a_congelada_ao_virar_em_atendimento():
-    """Nível de escalação Escada A não deve ser incrementado ao virar Em Atendimento."""
-    chamado_id = _criar_chamado_real(status="Aberto", escalacao_resposta_nivel=2)
+def test_escalonamento_nivel_nao_e_resetado_ao_assumir():
+    """escalacao_nivel não deve ser resetado (nem incrementado) só por virar
+    Em Atendimento — motor de escalonamento unificado continua de onde
+    estava, só a cadência do próximo tick pode antecipar (ver
+    test_claim_antecipa_proximo_tick_quando_escalando)."""
+    chamado_id = _criar_chamado_real(status="Aberto", escalacao_nivel=2)
     with (
         patch("app.services.status_service.Historico"),
         patch("app.services.status_service._notificar_solicitante"),
@@ -716,11 +719,113 @@ def test_escada_a_congelada_ao_virar_em_atendimento():
                 "solicitante_id": "sol1",
                 "numero_chamado": "CHM-001",
                 "categoria": "Manutenção",
-                "escalacao_resposta_nivel": 2,
+                "escalacao_nivel": 2,
             },
         )
-    # O nível não deve ter sido alterado — Escada A congela em Em Atendimento
-    assert Chamado.get_by_id(chamado_id).escalacao_resposta_nivel == 2
+    assert Chamado.get_by_id(chamado_id).escalacao_nivel == 2
+
+
+def test_claim_antecipa_proximo_tick_quando_escalando():
+    """Chamado escalando na cadência 'não assumido' (2h) — ao ser assumido, o
+    próximo tick é antecipado pra cadência 'assumido' (1h) a partir de agora,
+    sem esperar o tick de 2h originalmente agendado, sem resetar o nível."""
+    chamado_id = _criar_chamado_real(status="Aberto", categoria="Manutenção", escalacao_nivel=1)
+    with (
+        patch("app.services.status_service.Historico"),
+        patch("app.services.status_service._notificar_solicitante"),
+        patch("app.services.status_service.GamificationService"),
+        patch(
+            "app.services.status_service.calcular_supervisor_ids_com_acesso",
+            return_value=["id_julia"],
+        ),
+    ):
+        atualizar_status_chamado(
+            chamado_id=chamado_id,
+            novo_status="Em Atendimento",
+            usuario_id="id_julia",
+            usuario_nome="Júlia",
+            data_chamado={
+                "status": "Aberto",
+                "responsavel_id": None,
+                "area": "Engenharia",
+                "participantes": [],
+                "solicitante_id": "sol1",
+                "numero_chamado": "CHM-001",
+                "categoria": "Manutenção",
+                "escalacao_nivel": 1,
+            },
+        )
+    atualizado = Chamado.get_by_id(chamado_id)
+    assert atualizado.escalacao_nivel == 1  # não reseta
+    assert atualizado.escalacao_proximo_tick_em is not None
+    delta = atualizado.escalacao_proximo_tick_em.replace(tzinfo=None) - datetime.now()
+    assert timedelta(minutes=55) < delta < timedelta(minutes=65)  # ~60min, não 120min
+
+
+def test_claim_nao_antecipa_tick_quando_nivel_zero():
+    """Chamado ainda no nível 0 (nunca escalou) — claim não mexe em
+    escalacao_proximo_tick_em, porque o alvo do nível 0 é sempre recalculado
+    ao vivo pelo motor (ver calcular_deadline_inicial), não precisa de
+    antecipação manual."""
+    chamado_id = _criar_chamado_real(status="Aberto", categoria="Manutenção", escalacao_nivel=0)
+    with (
+        patch("app.services.status_service.Historico"),
+        patch("app.services.status_service._notificar_solicitante"),
+        patch("app.services.status_service.GamificationService"),
+        patch(
+            "app.services.status_service.calcular_supervisor_ids_com_acesso",
+            return_value=["id_julia"],
+        ),
+    ):
+        atualizar_status_chamado(
+            chamado_id=chamado_id,
+            novo_status="Em Atendimento",
+            usuario_id="id_julia",
+            usuario_nome="Júlia",
+            data_chamado={
+                "status": "Aberto",
+                "responsavel_id": None,
+                "area": "Engenharia",
+                "participantes": [],
+                "solicitante_id": "sol1",
+                "numero_chamado": "CHM-001",
+                "categoria": "Manutenção",
+                "escalacao_nivel": 0,
+            },
+        )
+    assert Chamado.get_by_id(chamado_id).escalacao_proximo_tick_em is None
+
+
+def test_claim_aog_nao_antecipa_tick_ja_usa_cadencia_assumido():
+    """AOG já usa a cadência 'assumido' nas duas fases — claim não precisa
+    antecipar escalacao_proximo_tick_em."""
+    chamado_id = _criar_chamado_real(status="Aberto", categoria="AOG", escalacao_nivel=1)
+    with (
+        patch("app.services.status_service.Historico"),
+        patch("app.services.status_service._notificar_solicitante"),
+        patch("app.services.status_service.GamificationService"),
+        patch(
+            "app.services.status_service.calcular_supervisor_ids_com_acesso",
+            return_value=["id_julia"],
+        ),
+    ):
+        atualizar_status_chamado(
+            chamado_id=chamado_id,
+            novo_status="Em Atendimento",
+            usuario_id="id_julia",
+            usuario_nome="Júlia",
+            data_chamado={
+                "status": "Aberto",
+                "responsavel_id": None,
+                "area": "Engenharia",
+                "participantes": [],
+                "solicitante_id": "sol1",
+                "numero_chamado": "CHM-001",
+                "categoria": "AOG",
+                "escalacao_nivel": 1,
+            },
+        )
+    assert Chamado.get_by_id(chamado_id).escalacao_proximo_tick_em is None
 
 
 def test_claim_atualiza_responsavel_nome():
@@ -748,7 +853,7 @@ def test_claim_atualiza_responsavel_nome():
                 "solicitante_id": "sol1",
                 "numero_chamado": "CHM-001",
                 "categoria": "Manutenção",
-                "escalacao_resposta_nivel": 0,
+                "escalacao_nivel": 0,
             },
         )
     assert Chamado.get_by_id(chamado_id).responsavel == "Júlia Ferreira"
@@ -877,11 +982,13 @@ def test_concluido_grava_confirmacao_solicitante_pendente():
     assert Chamado.get_by_id(chamado_id).confirmacao_solicitante == "pendente"
 
 
-def test_claim_reseta_flags_escada_b():
-    """Fase 7 — Escada B: ao Aberto → Em Atendimento (claim), resetar os 3 campos Escada B."""
+def test_claim_reseta_alertas_resolucao_mas_mantem_nivel_escalonamento():
+    """Ao Aberto → Em Atendimento (claim): alerta_supervisor_50/80 são
+    resetados (novo ciclo de aviso de resolução), mas escalacao_nivel NÃO —
+    o motor de escalonamento unificado continua de onde estava."""
     chamado_id = _criar_chamado_real(
         status="Aberto",
-        escalacao_resolucao_nivel=2,
+        escalacao_nivel=2,
         alerta_supervisor_50_enviado=True,
         alerta_supervisor_80_enviado=True,
     )
@@ -907,13 +1014,13 @@ def test_claim_reseta_flags_escada_b():
                 "solicitante_id": "sol1",
                 "numero_chamado": "CHM-001",
                 "categoria": "Manutenção",
-                "escalacao_resolucao_nivel": 2,
+                "escalacao_nivel": 2,
                 "alerta_supervisor_50_enviado": True,
                 "alerta_supervisor_80_enviado": True,
             },
         )
     chamado_atualizado = Chamado.get_by_id(chamado_id)
-    assert chamado_atualizado.escalacao_resolucao_nivel == 0
+    assert chamado_atualizado.escalacao_nivel == 2
     assert chamado_atualizado.alerta_supervisor_50_enviado is False
     assert chamado_atualizado.alerta_supervisor_80_enviado is False
 

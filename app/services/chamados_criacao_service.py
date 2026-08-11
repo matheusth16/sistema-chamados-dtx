@@ -307,9 +307,6 @@ def criar_chamado(
             setores_adicionais=setores_adicionais_lista,
             supervisor_ids_com_acesso=ids_com_acesso,
             observadores=observadores_list,
-            # AOG já avisa todos os 4 níveis de gestor na abertura (ver notificar_abertura_aog_
-            # todos_gestores abaixo) — Escada A normal (escalada gradual) não se aplica mais.
-            escalacao_resposta_nivel=4 if categoria == "AOG" else 0,
         )
         chamado_id = novo_chamado.salvar()
         if chamado_id is None:
@@ -345,10 +342,11 @@ def criar_chamado(
                             notificar_abertura_aog_todos_gestores(
                                 chamado_data=chamado_dict,
                                 chamado_id=chamado_id,
+                                solicitante_id=solicitante_id,
                             )
                         except Exception as exc:
                             logger.warning(
-                                "AOG: broadcast pros gestores falhou (chamado %s): %s",
+                                "AOG: broadcast pra todos os usuários falhou (chamado %s): %s",
                                 chamado_id,
                                 exc,
                             )
