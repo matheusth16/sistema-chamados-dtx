@@ -316,6 +316,7 @@ def test_api_supervisores_lista_nao_expoe_senha_hash(client_logado_solicitante):
     sup_com_hash.nome = "Supervisor Externo"
     sup_com_hash.email = "ext@dtx.aero"
     sup_com_hash.senha_hash = "scrypt:32768:8:1:HASH_SECRETO"
+    sup_com_hash.nivel_gestao = None
 
     with patch(
         "app.routes.api_chamados.Usuario.get_supervisores_por_area", return_value=[sup_com_hash]

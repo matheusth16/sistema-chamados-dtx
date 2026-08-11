@@ -1,16 +1,19 @@
 """
 Testes do endpoint GET /api/supervisores/lista.
-Cobre filtragem do usuário logado da lista (anti-self-assignment).
+Cobre filtragem do usuário logado da lista (anti-self-assignment) e de
+usuários com nivel_gestao (gestores não devem aparecer como responsável
+sugerido no formulário de abertura).
 """
 
 from unittest.mock import MagicMock, patch
 
 
-def _sup_mock(uid, nome, email):
+def _sup_mock(uid, nome, email, nivel_gestao=None):
     u = MagicMock()
     u.id = uid
     u.nome = nome
     u.email = email
+    u.nivel_gestao = nivel_gestao
     return u
 
 
@@ -73,3 +76,29 @@ def test_supervisores_lista_sem_login_retorna_redirect(client):
     """Sem autenticação → redirect para login (302)."""
     r = client.get("/api/supervisores/lista?area=Manutencao")
     assert r.status_code in (302, 401)
+
+
+def test_supervisores_lista_exclui_usuarios_com_nivel_gestao(client_logado_supervisor):
+    """
+    Gestores (nivel_gestao preenchido — gestor_setor, gerente_producao,
+    assistente_gm, gm) não devem aparecer como responsável sugerido no
+    formulário de abertura, mesmo tendo perfil supervisor/admin na área.
+    """
+    sup_comum = _sup_mock("sup_2", "Supervisor Comum", "comum@test.com")
+    gestor_setor = _sup_mock(
+        "sup_3", "Gestor Setor", "gsetor@test.com", nivel_gestao="gestor_setor"
+    )
+    gerente_prod = _sup_mock(
+        "sup_4", "Gerente Producao", "gprod@test.com", nivel_gestao="gerente_producao"
+    )
+
+    with patch(
+        "app.routes.api_chamados.Usuario.get_supervisores_por_area",
+        return_value=[sup_comum, gestor_setor, gerente_prod],
+    ):
+        r = client_logado_supervisor.get("/api/supervisores/lista?area=Producao")
+
+    assert r.status_code == 200
+    data = r.get_json()
+    ids_retornados = [s["id"] for s in data["supervisores"]]
+    assert ids_retornados == ["sup_2"]

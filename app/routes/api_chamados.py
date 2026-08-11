@@ -608,7 +608,9 @@ def api_lista_supervisores():
                 "nome": u.nome,
             }
             for u in supervisores
-            if u.id != current_user.id
+            # Gestores (nivel_gestao preenchido) não aparecem como responsável
+            # sugerido — são contato de escalonamento, não atendimento direto.
+            if u.id != current_user.id and not getattr(u, "nivel_gestao", None)
         ]
         return sucesso_json(area=area_resolvida, supervisores=dados)
     except Exception as e:
