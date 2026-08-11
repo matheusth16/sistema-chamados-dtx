@@ -6,7 +6,7 @@ pytest==9.1.1
 pytest-cov==6.0.0
 pytest-timeout==2.3.1
 coverage==7.13.4
-pytest-playwright==0.6.2
+pytest-playwright==0.9.0
 
 # --- Qualidade de código (lint-and-validate) ---
 ruff==0.9.10
