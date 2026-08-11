@@ -8,11 +8,13 @@ real persistido via Chamado.get_by_id(chamado_id)."""
 
 from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock, patch
+from zoneinfo import ZoneInfo
 
 import pytest
 
 from app.models import Chamado
 from app.services.status_service import _notificar_solicitante, atualizar_status_chamado
+from config import Config
 
 pytestmark = pytest.mark.usefixtures("db_session")
 
@@ -758,7 +760,11 @@ def test_claim_antecipa_proximo_tick_quando_escalando():
     atualizado = Chamado.get_by_id(chamado_id)
     assert atualizado.escalacao_nivel == 1  # não reseta
     assert atualizado.escalacao_proximo_tick_em is not None
-    delta = atualizado.escalacao_proximo_tick_em.replace(tzinfo=None) - datetime.now()
+    # Compara contra o mesmo fuso que o código de produção usa (Config.SLA_TIMEZONE,
+    # BRT) — datetime.now() puro depende do fuso do SO, que diverge entre a máquina
+    # local (BRT) e o runner do CI (UTC), quebrando essa asserção só no CI.
+    agora_fuso_negocio = datetime.now(ZoneInfo(Config.SLA_TIMEZONE)).replace(tzinfo=None)
+    delta = atualizado.escalacao_proximo_tick_em.replace(tzinfo=None) - agora_fuso_negocio
     assert timedelta(minutes=55) < delta < timedelta(minutes=65)  # ~60min, não 120min
 
 
