@@ -146,8 +146,10 @@ def api_transferir_area(chamado_id: str):
 @main.route("/api/chamado/<chamado_id>/previsao-atendimento", methods=["POST"])
 @login_required
 @requer_supervisor_area
-def api_definir_previsao_atendimento(chamado_id: str):
-    """Define até quando o chamado fica sem escalar e-mail pros gestores (Escada A/B).
+def api_solicitar_previsao_atendimento(chamado_id: str):
+    """Solicita uma nova previsão de atendimento — só passa a valer (pausa
+    escalonamento + vira o prazo oficial) depois que o gestor do setor do
+    chamado aprovar (ver app/services/previsao_atendimento_service.py).
 
     Body JSON: {"previsao": "2026-07-15T16:00", "motivo": str}
     Acesso: owner (responsavel_id == current_user.id) ou admin, e supervisor+.
@@ -189,18 +191,27 @@ def api_definir_previsao_atendimento(chamado_id: str):
         if not _pode_op:
             return erro_json(_t("ticket_completed_no_operation"), 403)
 
-        eh_supervisor_ou_acima = current_user.perfil in ("supervisor", "admin", "admin_global")
-        eh_owner_ou_admin = (
-            chamado.responsavel_id == current_user.id or current_user.is_admin_or_above
-        )
-        if not (eh_supervisor_ou_acima and eh_owner_ou_admin):
-            return erro_json(_t("no_permission_set_attendance_forecast"), 403)
+        from app.services.previsao_atendimento_service import solicitar_previsao_atendimento
 
-        from app.services.escalonamento_service import definir_previsao_atendimento
-
-        resultado = definir_previsao_atendimento(chamado_id, previsao, motivo, current_user)
+        resultado = solicitar_previsao_atendimento(chamado_id, previsao, motivo, current_user)
         if not resultado["sucesso"]:
             return jsonify(resultado), 400
+
+        from app.services.chamado_notificacao_service import (
+            disparar_notificacao_solicitacao_previsao_em_thread,
+        )
+
+        disparar_notificacao_solicitacao_previsao_em_thread(
+            current_app._get_current_object(),
+            chamado_id=chamado_id,
+            numero_chamado=chamado.numero_chamado or "N/A",
+            categoria=chamado.categoria or "",
+            solicitante_nome=current_user.nome,
+            previsao_solicitada=resultado["dados"]["previsao_solicitada"],
+            motivo=motivo,
+            solicitacao_id=resultado["dados"]["solicitacao_id"],
+            gestor_id=resultado["dados"].get("gestor_id"),
+        )
 
         return jsonify(resultado), 200
 
@@ -208,7 +219,60 @@ def api_definir_previsao_atendimento(chamado_id: str):
         logger.debug("Validação previsao_atendimento chamado=%s: %s", chamado_id, exc)
         return erro_json(_t("invalid_request_data"), 400)
     except Exception as exc:
-        logger.exception("Erro em api_definir_previsao_atendimento chamado=%s: %s", chamado_id, exc)
+        logger.exception(
+            "Erro em api_solicitar_previsao_atendimento chamado=%s: %s", chamado_id, exc
+        )
+        return erro_json(_t("internal_error_retry"), 500)
+
+
+@main.route(
+    "/api/chamado/<chamado_id>/previsao-atendimento/<int:solicitacao_id>/decidir",
+    methods=["POST"],
+)
+@login_required
+def api_decidir_previsao_atendimento(chamado_id: str, solicitacao_id: int):
+    """Aprova/rejeita um pedido de previsão de atendimento pelo sistema
+    (alternativa ao link de e-mail — ver app/routes/aprovacao_previsao.py).
+
+    Body JSON: {"acao": "aprovar"|"rejeitar", "motivo_rejeicao"?: str}
+    Acesso: gestor_setor da área do chamado, ou admin.
+    """
+    try:
+        dados = request.get_json(silent=True) or {}
+        acao = (dados.get("acao") or "").strip()
+        if acao not in ("aprovar", "rejeitar"):
+            return erro_json(_t("invalid_request_data"), 400)
+
+        from app.services.previsao_atendimento_service import decidir_previsao_atendimento
+
+        resultado = decidir_previsao_atendimento(
+            solicitacao_id,
+            acao,
+            current_user,
+            motivo_rejeicao=(dados.get("motivo_rejeicao") or "").strip() or None,
+        )
+        if not resultado["sucesso"]:
+            return jsonify(resultado), resultado.get("codigo", 400)
+
+        from app.services.chamado_notificacao_service import (
+            disparar_notificacao_decisao_previsao_em_thread,
+        )
+
+        disparar_notificacao_decisao_previsao_em_thread(
+            current_app._get_current_object(), resultado["dados"], current_user.nome
+        )
+
+        return jsonify(resultado), 200
+
+    except ValueError as exc:
+        logger.debug(
+            "Validação decidir_previsao_atendimento solicitacao=%s: %s", solicitacao_id, exc
+        )
+        return erro_json(_t("invalid_request_data"), 400)
+    except Exception as exc:
+        logger.exception(
+            "Erro em api_decidir_previsao_atendimento solicitacao=%s: %s", solicitacao_id, exc
+        )
         return erro_json(_t("internal_error_retry"), 500)
 
 

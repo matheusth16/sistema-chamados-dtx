@@ -20,6 +20,7 @@ from app import db as db_module
 from app.db.models.chamado import ChamadoRow
 from app.i18n import get_translated_status
 from app.models import Chamado
+from app.models_historico import Historico
 from app.models_usuario import Usuario
 from app.services.analytics import _to_datetime, obter_sla_para_exibicao
 from app.services.gestor_escalonamento_service import construir_mapa_gestor_setor
@@ -515,6 +516,16 @@ def enviar_alertas_prazo_24h() -> dict[str, Any]:
                     chamado_atual.atualizar_campos(
                         alerta_prazo_24h_enviado_em=datetime.now(ZoneInfo(Config.SLA_TIMEZONE))
                     )
+                    Historico(
+                        chamado_id=chamado_id,
+                        usuario_id="sistema",
+                        usuario_nome="Sistema (Alerta de Prazo 24h)",
+                        acao="alerta_prazo_24h",
+                        campo_alterado="alerta_prazo_24h_enviado_em",
+                        valor_anterior=None,
+                        valor_novo="Em risco",
+                        detalhe=f"E-mail enviado para {email}",
+                    ).save()
             enviados += 1
         except Exception as exc:
             erros += 1

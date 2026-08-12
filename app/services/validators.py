@@ -270,7 +270,11 @@ def validar_novo_chamado(
     tipo = form.get("tipo")
     categoria = (form.get("categoria") or "").strip()
     gate = (form.get("gate") or "").strip()
-    impacto = (form.get("impacto") or "").strip()
+    if hasattr(form, "getlist"):
+        impacto = [str(i).strip() for i in form.getlist("impacto") if i and str(i).strip()]
+    else:
+        impacto_bruto = form.get("impacto")
+        impacto = [str(impacto_bruto).strip()] if impacto_bruto else []
 
     from config import Config
 

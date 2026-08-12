@@ -1,6 +1,10 @@
 {% extends "base.html" %}
 
 {% block content %}
+{# Coluna "Atribuído a" só faz sentido pra quem vê chamados de mais de uma
+   pessoa (admin/admin_global) — supervisor só enxerga os próprios chamados
+   (owner único por chamado), então a coluna sempre mostraria o mesmo nome. #}
+{% set mostrar_atribuido = current_user.perfil != 'supervisor' %}
 
 <div class="space-y-4" data-testid="dashboard-container">
 
@@ -20,14 +24,10 @@
                 </div>
             </div>
             <div class="gsap-stagger" style="display:flex; gap:8px; flex-wrap:wrap;">
-                <a href="{{ url_for('main.exportar', **request.args) }}" class="bento-btn-outline" aria-label="{{ t('export') }}">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                    {{ t('export') }}
-                </a>
-                {% if current_user.is_authenticated and current_user.perfil in ['admin', 'supervisor'] %}
+                {% if current_user.is_authenticated and current_user.perfil in ['admin', 'admin_global', 'supervisor'] %}
                 <a href="{{ url_for('main.exportar_avancado', **request.args) }}" class="bento-btn-outline emerald" title="{{ t('export_advanced_report_title') }}">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                    {{ t('reports') }}
+                    {{ t('export') }}
                 </a>
                 {% endif %}
                 {% if current_user.is_authenticated %}
@@ -41,19 +41,6 @@
 
     <!-- Dicionário de Tradução para JavaScript -->
     <script nonce="{{ csp_nonce }}">
-        // Mapeamento de setores para chaves de tradução
-        const sectorMap = {
-            {% for setor in (setores or []) %}
-            {{ setor.nome_pt | tojson }}: {{
-                (
-                    setor.nome_en if current_language == 'en'
-                    else (setor.nome_es if current_language == 'es' else setor.nome_pt)
-                )
-                | tojson
-            }},
-            {% endfor %}
-        };
-
         // Mapeamento de categorias para chaves de tradução
         const categoryMap = {
             'Projetos': '{{ t("projects") }}',
@@ -68,11 +55,7 @@
             'Cancelado': '{{ t("option_cancelled") }}'
         };
 
-        // Função auxiliar para  traduzir setores e categorias
-        function translateSector(sectorName) {
-            return sectorMap[sectorName] || sectorName;
-        }
-
+        // Função auxiliar para traduzir categorias e status
         function translateCategory(categoryName) {
             return categoryMap[categoryName] || categoryName;
         }
@@ -103,7 +86,7 @@
         </div>
     </div>
 
-    <div class="bento-card bento-table-scope dash-table gsap-stagger-container" style="padding:0; overflow:hidden;">
+    <div class="bento-card bento-table-scope dash-table{{ '' if mostrar_atribuido else ' no-assigned' }} gsap-stagger-container" style="padding:0; overflow:hidden;">
         <div style="overflow-x:auto;">
             <table>
                 <thead>
@@ -111,13 +94,15 @@
                         <th>
                             <input type="checkbox" id="bulk-select-all" class="bento-checkbox" title="{{ t('select_all') }}">
                         </th>
-                        <th class="sortable" data-column="1" data-sort-type="number" tabindex="0" role="button" aria-sort="none">{{ t('id_ref') }}<span class="sort-icon ml-1" style="opacity:.4">↕</span></th>
+                        <th class="sortable" data-column="1" data-sort-type="number" tabindex="0" role="button" aria-sort="none">{{ t('id_ref') }}<span class="sort-icon ml-1" style="opacity:.4; display:inline-flex; vertical-align:middle;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M7 15l5 5 5-5M7 9l5-5 5 5"/></svg></span></th>
                         <th class="filterable" data-column="2">{{ t('category') }}</th>
-                        <th class="filterable" data-column="3">{{ t('sector_gate') }}</th>
+                        <th class="filterable" data-column="3">{{ t('gate') }}</th>
+                        {% if mostrar_atribuido %}
                         <th class="filterable" data-column="4">{{ t('assigned_to') }}</th>
+                        {% endif %}
                         <th>{{ t('description') }}</th>
-                        <th class="filterable" data-column="6">{{ t('status') }}</th>
-                        <th class="sortable" data-column="7" data-sort-type="text" style="text-align:center" tabindex="0" role="button" aria-sort="none">SLA<span class="sort-icon ml-1" style="opacity:.4">↕</span></th>
+                        <th class="filterable" data-column="{{ 6 if mostrar_atribuido else 5 }}">{{ t('status') }}</th>
+                        <th class="sortable" data-column="{{ 7 if mostrar_atribuido else 6 }}" data-sort-type="text" style="text-align:center" tabindex="0" role="button" aria-sort="none">SLA<span class="sort-icon ml-1" style="opacity:.4; display:inline-flex; vertical-align:middle;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M7 15l5 5 5-5M7 9l5-5 5 5"/></svg></span></th>
                         <th style="text-align:center">{{ t('actions') }}</th>
                     </tr>
                 </thead>
@@ -126,7 +111,7 @@
                     {% for grupo in chamados|groupby('grupo_key') %}
                     {% set rl = grupo.grouper.split('|')[1] %}
                     {% set categoria_grupo = grupo.list[0].categoria %}
-                    {% set colspan = 9 %}
+                    {% set colspan = 9 if mostrar_atribuido else 8 %}
                     {% include 'components/_rl_header.html' with context %}
                     {% for chamado in grupo.list %}
                     {% include 'components/_ticket_row_dashboard.html' with context %}
@@ -134,7 +119,7 @@
                     {% endfor %}
                     {% else %}
                     <tr>
-                        <td colspan="9" style="text-align:center; padding:64px 16px;">
+                        <td colspan="{{ 9 if mostrar_atribuido else 8 }}" style="text-align:center; padding:64px 16px;">
                             <div style="max-width:24rem; margin:0 auto; display:flex; flex-direction:column; align-items:center;">
                                 <div style="color:var(--color-surface-muted); margin-bottom:16px;">
                                     <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
@@ -383,8 +368,7 @@
                 set('numero', '<div class="num">' + (c.numero_chamado || '') + '</div>' +
                     (c.rl_codigo ? '<span class="bento-chip-badge rl">{{ t("rl_short") }} ' + (c.rl_codigo || '') + '</span>' : ''));
                 set('categoria', '<span class="bento-cat-pill' + (c.categoria === 'Projetos' ? ' projeto' : '') + '">' + cat + '</span>');
-                var setor = typeof translateSector === 'function' ? translateSector(c.tipo_solicitacao) : (sectorMap && sectorMap[c.tipo_solicitacao]) || c.tipo_solicitacao || '';
-                set('setor', setor + (c.gate ? ' <span style="color:var(--color-surface-muted);">· ' + c.gate + '</span>' : ''));
+                set('setor', c.gate || '—');
                 set('responsavel', c.responsavel ? '<span class="bento-avatar-mini">' + (c.responsavel.charAt(0) || '') + '</span>' + nomeCurto(c.responsavel) : '—');
                 var desc = (c.descricao || '').slice(0, 50) + ((c.descricao || '').length > 50 ? '…' : '');
                 set('descricao', desc);

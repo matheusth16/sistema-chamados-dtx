@@ -1,4 +1,5 @@
-"""Testes da rota POST /api/chamado/<id>/previsao-atendimento.
+"""Testes das rotas POST /api/chamado/<id>/previsao-atendimento (solicitar) e
+POST /api/chamado/<id>/previsao-atendimento/<solicitacao_id>/decidir.
 
 Segue padrão do projeto (mesmo de test_api_escalonamento.py, Fase 2, Marco 10):
 - patch('app.routes.api_colaboracao.Chamado') para simular Chamado.get_by_id() (Postgres)
@@ -12,6 +13,8 @@ from unittest.mock import MagicMock, patch
 def _mock_chamado_obj(area="Manutencao", responsavel_id="sup_1"):
     c = MagicMock()
     c.id = "id_chamado_teste"
+    c.numero_chamado = "CHM-0001"
+    c.categoria = "TI"
     c.area = area
     c.responsavel_id = responsavel_id
     c.solicitante_id = "sol_outro"
@@ -20,20 +23,29 @@ def _mock_chamado_obj(area="Manutencao", responsavel_id="sup_1"):
     return c
 
 
-class TestPrevisaoAtendimentoRota:
+class TestSolicitarPrevisaoAtendimentoRota:
     def test_sucesso_retorna_200(self, client_logado_supervisor):
-        """Owner supervisor pode definir previsão com payload válido → 200 sucesso=True."""
+        """Owner supervisor pode solicitar previsão com payload válido → 200 sucesso=True."""
         chamado_mock = _mock_chamado_obj(area="Manutencao", responsavel_id="sup_1")
 
         with (
             patch("app.routes.api_colaboracao.Chamado") as mock_chamado_cls,
             patch("app.routes.api_colaboracao.usuario_pode_ver_chamado", return_value=True),
             patch(
-                "app.services.escalonamento_service.definir_previsao_atendimento",
+                "app.services.previsao_atendimento_service.solicitar_previsao_atendimento",
                 return_value={
                     "sucesso": True,
-                    "dados": {"previsao_atendimento": "2026-07-15 16:00:00"},
+                    "dados": {
+                        "solicitacao_id": 1,
+                        "previsao_solicitada": "2026-07-15 16:00:00",
+                        "gestor_id": None,
+                        "gestor_nome": None,
+                    },
                 },
+            ),
+            patch(
+                "app.services.chamado_notificacao_service."
+                "disparar_notificacao_solicitacao_previsao_em_thread"
             ),
         ):
             mock_chamado_cls.get_by_id.return_value = chamado_mock
@@ -91,24 +103,6 @@ class TestPrevisaoAtendimentoRota:
         )
         assert resp.status_code in (302, 403)
 
-    def test_nao_owner_supervisor_retorna_403(self, client_logado_supervisor):
-        """Supervisor que não é owner do chamado → 403."""
-        chamado_mock = _mock_chamado_obj(area="Manutencao", responsavel_id="outro_sup")
-
-        with (
-            patch("app.routes.api_colaboracao.Chamado") as mock_chamado_cls,
-            patch("app.routes.api_colaboracao.usuario_pode_ver_chamado", return_value=True),
-        ):
-            mock_chamado_cls.get_by_id.return_value = chamado_mock
-
-            resp = client_logado_supervisor.post(
-                "/api/chamado/id123/previsao-atendimento",
-                json={"previsao": "2026-07-15T16:00", "motivo": "motivo"},
-                content_type="application/json",
-            )
-
-        assert resp.status_code == 403
-
     def test_idor_sem_acesso_retorna_403(self, client_logado_supervisor):
         """Supervisor sem acesso ao chamado (usuario_pode_ver_chamado=False) → 403."""
         chamado_mock = _mock_chamado_obj(area="TI", responsavel_id="outro_sup")
@@ -139,18 +133,27 @@ class TestPrevisaoAtendimentoRota:
         assert resp.status_code == 404
 
     def test_admin_nao_owner_permitido(self, client_logado_admin):
-        """Admin pode definir mesmo não sendo owner do chamado."""
+        """Admin pode solicitar mesmo não sendo owner do chamado."""
         chamado_mock = _mock_chamado_obj(area="Manutencao", responsavel_id="sup_1")
 
         with (
             patch("app.routes.api_colaboracao.Chamado") as mock_chamado_cls,
             patch("app.routes.api_colaboracao.usuario_pode_ver_chamado", return_value=True),
             patch(
-                "app.services.escalonamento_service.definir_previsao_atendimento",
+                "app.services.previsao_atendimento_service.solicitar_previsao_atendimento",
                 return_value={
                     "sucesso": True,
-                    "dados": {"previsao_atendimento": "2026-07-15 16:00:00"},
+                    "dados": {
+                        "solicitacao_id": 1,
+                        "previsao_solicitada": "2026-07-15 16:00:00",
+                        "gestor_id": None,
+                        "gestor_nome": None,
+                    },
                 },
+            ),
+            patch(
+                "app.services.chamado_notificacao_service."
+                "disparar_notificacao_solicitacao_previsao_em_thread"
             ),
         ):
             mock_chamado_cls.get_by_id.return_value = chamado_mock
@@ -162,3 +165,81 @@ class TestPrevisaoAtendimentoRota:
             )
 
         assert resp.status_code == 200
+
+
+class TestDecidirPrevisaoAtendimentoRota:
+    def test_aprovar_sucesso_retorna_200(self, client_logado_admin):
+        with (
+            patch(
+                "app.services.previsao_atendimento_service.decidir_previsao_atendimento",
+                return_value={
+                    "sucesso": True,
+                    "dados": {
+                        "chamado_id": 1,
+                        "solicitante_id": "sup_1",
+                        "solicitante_nome": "Julia",
+                        "acao": "aprovar",
+                        "previsao_solicitada": "2026-07-15 16:00:00",
+                        "motivo_rejeicao": None,
+                    },
+                },
+            ),
+            patch(
+                "app.services.chamado_notificacao_service."
+                "disparar_notificacao_decisao_previsao_em_thread"
+            ),
+        ):
+            resp = client_logado_admin.post(
+                "/api/chamado/id123/previsao-atendimento/1/decidir",
+                json={"acao": "aprovar"},
+                content_type="application/json",
+            )
+
+        assert resp.status_code == 200
+        assert resp.get_json()["sucesso"] is True
+
+    def test_acao_invalida_retorna_400(self, client_logado_admin):
+        resp = client_logado_admin.post(
+            "/api/chamado/id123/previsao-atendimento/1/decidir",
+            json={"acao": "deletar_tudo"},
+            content_type="application/json",
+        )
+        assert resp.status_code == 400
+
+    def test_sem_permissao_retorna_403(self, client_logado_supervisor):
+        with patch(
+            "app.services.previsao_atendimento_service.decidir_previsao_atendimento",
+            return_value={
+                "sucesso": False,
+                "erro": "sem permissão",
+                "codigo": 403,
+            },
+        ):
+            resp = client_logado_supervisor.post(
+                "/api/chamado/id123/previsao-atendimento/1/decidir",
+                json={"acao": "aprovar"},
+                content_type="application/json",
+            )
+
+        assert resp.status_code == 403
+
+    def test_solicitacao_ja_decidida_retorna_409(self, client_logado_admin):
+        with patch(
+            "app.services.previsao_atendimento_service.decidir_previsao_atendimento",
+            return_value={"sucesso": False, "erro": "já decidida", "codigo": 409},
+        ):
+            resp = client_logado_admin.post(
+                "/api/chamado/id123/previsao-atendimento/1/decidir",
+                json={"acao": "rejeitar"},
+                content_type="application/json",
+            )
+
+        assert resp.status_code == 409
+
+    def test_nao_autenticado_redireciona_ou_401(self, client):
+        resp = client.post(
+            "/api/chamado/id123/previsao-atendimento/1/decidir",
+            json={"acao": "aprovar"},
+            content_type="application/json",
+        )
+        assert resp.status_code in (302, 401)

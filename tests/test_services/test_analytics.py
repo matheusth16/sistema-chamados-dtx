@@ -842,6 +842,138 @@ def test_obter_sla_tz_aware_abertura():
     assert r["label"] == "Atrasado"
 
 
+# ── Previsão de atendimento aprovada alarga o prazo (não só silencia e-mail) ───
+
+
+def test_obter_sla_aberto_atrasado_com_previsao_futura_vira_no_prazo():
+    """TAT original já venceu, mas o gestor aprovou previsão pra daqui a 5 dias
+    — o chamado deixa de contar como atrasado até essa nova data passar."""
+    from datetime import datetime, timedelta
+
+    from app.services.analytics import obter_sla_para_exibicao
+
+    chamado = type(
+        "C",
+        (),
+        {
+            "data_abertura": datetime.now() - timedelta(days=5),  # SLA=3d, já venceu
+            "data_conclusao": None,
+            "categoria": "TI",
+            "status": "Aberto",
+            "sla_dias": None,
+            "previsao_atendimento": datetime.now() + timedelta(days=5),
+        },
+    )()
+    r = obter_sla_para_exibicao(chamado)
+    assert r is not None
+    assert r["label"] == "No prazo"
+    assert r["dentro_prazo"] is True
+
+
+def test_obter_sla_previsao_ja_passada_nao_protege_mais():
+    """Previsão aprovada que já venceu não protege mais — volta a valer o
+    prazo original (agora ambos vencidos, continua atrasado)."""
+    from datetime import datetime, timedelta
+
+    from app.services.analytics import obter_sla_para_exibicao
+
+    chamado = type(
+        "C",
+        (),
+        {
+            "data_abertura": datetime.now() - timedelta(days=10),
+            "data_conclusao": None,
+            "categoria": "TI",
+            "status": "Aberto",
+            "sla_dias": None,
+            "previsao_atendimento": datetime.now() - timedelta(days=1),
+        },
+    )()
+    r = obter_sla_para_exibicao(chamado)
+    assert r is not None
+    assert r["label"] == "Atrasado"
+
+
+def test_obter_sla_concluido_apos_tat_mas_dentro_da_previsao_aprovada():
+    """Resolvido depois do TAT original, mas antes da previsão aprovada —
+    conta como 'No prazo', não 'Atrasado' (a previsão virou o prazo oficial)."""
+    from datetime import datetime, timedelta
+
+    from app.services.analytics import obter_sla_para_exibicao
+
+    ab = datetime.now() - timedelta(days=10)
+    previsao = ab + timedelta(days=8)  # bem depois do SLA padrão (3d)
+    co = ab + timedelta(days=7)  # depois do TAT original, antes da previsão
+    chamado = type(
+        "C",
+        (),
+        {
+            "data_abertura": ab,
+            "data_conclusao": co,
+            "categoria": "TI",
+            "status": "Concluído",
+            "sla_dias": None,
+            "previsao_atendimento": previsao,
+        },
+    )()
+    r = obter_sla_para_exibicao(chamado)
+    assert r is not None
+    assert r["label"] == "No prazo"
+    assert r["dentro_prazo"] is True
+
+
+def test_obter_sla_em_atendimento_previsao_futura_ignora_percentual_estourado():
+    """Em Atendimento com >80% do prazo de resolução consumido normalmente
+    seria 'Atrasado'/'Em risco', mas uma previsão aprovada ainda futura vence."""
+    from datetime import datetime, timedelta
+
+    from app.services.analytics import obter_sla_para_exibicao
+
+    chamado = type(
+        "C",
+        (),
+        {
+            "data_abertura": datetime.now() - timedelta(days=5),
+            "data_conclusao": None,
+            "categoria": "TI",
+            "status": "Em Atendimento",
+            "data_em_atendimento": datetime.now() - timedelta(days=4),  # bem estourado
+            "sla_dias": None,
+            "previsao_atendimento": datetime.now() + timedelta(days=3),
+        },
+    )()
+    r = obter_sla_para_exibicao(chamado)
+    assert r is not None
+    assert r["label"] == "No prazo"
+
+
+def test_metricas_gerais_nao_conta_atrasado_com_previsao_aprovada_futura():
+    """AnalisadorChamados.obter_metricas_gerais (resumo_sla agregado do
+    dashboard) também não deve contar um chamado como atrasado enquanto a
+    previsão aprovada não vencer — mesma regra do badge individual."""
+    from datetime import UTC, datetime, timedelta
+
+    from app.services.analytics import AnalisadorChamados
+
+    ab = datetime.now(UTC) - timedelta(days=5)
+    chamados = [
+        {
+            "status": "Aberto",
+            "data_abertura": ab,
+            "categoria": "TI",
+            "sla_dias": None,
+            "previsao_atendimento": datetime.now(UTC) + timedelta(days=5),
+            "prioridade": 1,
+        }
+    ]
+
+    a = AnalisadorChamados()
+    r = a.obter_metricas_gerais(dias=30, chamados_pre_carregados=chamados)
+
+    assert r["resumo_sla"]["atrasado"] == 0
+    assert r["resumo_sla"]["em_risco"] == 0
+
+
 # ── Onda 3: cache hits ─────────────────────────────────────────────────────────
 
 

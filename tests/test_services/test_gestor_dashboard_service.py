@@ -2,12 +2,14 @@
 
 from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock, patch
+from zoneinfo import ZoneInfo
 
 from app.services.gestor_dashboard_service import (
     _is_aberto_sem_resposta,
     _is_multi_setor_travado,
     obter_contexto_gestor_dashboard,
 )
+from config import Config
 
 # ---------------------------------------------------------------------------
 # _is_aberto_sem_resposta — usa business_time (Fase 6)
@@ -314,11 +316,47 @@ def test_is_atrasado_com_sla_e_data_abertura_dentro_do_prazo():
     c.status = "Em Atendimento"
     c.sla_dias = 5
     c.data_abertura = datetime(2024, 6, 3, 9, 0)
+    c.previsao_atendimento = None
 
     with patch("app.services.gestor_dashboard_service.minutos_uteis_entre", return_value=100):
         result = _is_atrasado(c)
 
     assert result is False  # 100 min < 5*24*60 = 7200 min
+
+
+def test_is_atrasado_com_previsao_aprovada_futura_nunca_atrasado():
+    """Previsão de atendimento aprovada e ainda futura vence mesmo com
+    sla_dias já estourado — alinhado com obter_sla_para_exibicao."""
+    from app.services.gestor_dashboard_service import _is_atrasado
+
+    c = MagicMock()
+    c.is_atrasado = None
+    c.status = "Em Atendimento"
+    c.sla_dias = 1
+    c.data_abertura = datetime(2024, 6, 3, 9, 0)
+    c.previsao_atendimento = datetime.now(ZoneInfo(Config.SLA_TIMEZONE)) + timedelta(days=5)
+
+    with patch("app.services.gestor_dashboard_service.minutos_uteis_entre", return_value=999999):
+        result = _is_atrasado(c)
+
+    assert result is False
+
+
+def test_is_atrasado_com_previsao_ja_passada_volta_a_calcular_normal():
+    """Previsão já vencida não protege mais — volta a valer sla_dias/tempo decorrido."""
+    from app.services.gestor_dashboard_service import _is_atrasado
+
+    c = MagicMock()
+    c.is_atrasado = None
+    c.status = "Em Atendimento"
+    c.sla_dias = 1
+    c.data_abertura = datetime(2024, 6, 3, 9, 0)
+    c.previsao_atendimento = datetime.now(ZoneInfo(Config.SLA_TIMEZONE)) - timedelta(days=1)
+
+    with patch("app.services.gestor_dashboard_service.minutos_uteis_entre", return_value=999999):
+        result = _is_atrasado(c)
+
+    assert result is True
 
 
 # ---------------------------------------------------------------------------

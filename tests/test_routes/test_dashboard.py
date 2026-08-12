@@ -245,6 +245,58 @@ def test_historico_com_supervisor_permissao_retorna_200(client_logado_supervisor
     assert r.status_code == 200
 
 
+def test_historico_renderiza_todas_acoes_automaticas_sem_quebrar(
+    client_logado_supervisor, db_session
+):
+    """GET /chamado/<id>/historico não quebra com nenhuma das 9 ações novas
+    (previsão de atendimento + automações do motor de SLA): cada uma cai numa
+    branch dedicada (dot colorido + detalhe visível), não no fallback genérico
+    'outro' (cinza, sem detalhe)."""
+    from app.models_historico import Historico
+    from tests.factories import make_chamado
+
+    chamado = make_chamado(area="Manutencao", solicitante_id="sol1")
+    acoes = [
+        "solicitacao_previsao_atendimento",
+        "aprovacao_previsao_atendimento",
+        "rejeicao_previsao_atendimento",
+        "escalonamento_automatico",
+        "aviso_previo_escalonamento",
+        "aviso_resolucao_prazo",
+        "lembrete_confirmacao_enviado",
+        "alerta_prazo_24h",
+        "confirmacao_resolucao",
+    ]
+    eventos = [
+        Historico(
+            chamado_id=chamado.id,
+            usuario_id="sistema",
+            usuario_nome="Sistema",
+            acao=acao,
+            campo_alterado="x",
+            valor_anterior=None,
+            valor_novo="y",
+            detalhe="detalhe de teste",
+        )
+        for acao in acoes
+    ]
+
+    with (
+        patch("app.routes.dashboard.usuario_pode_ver_chamado", return_value=True),
+        patch("app.routes.dashboard.Historico.get_by_chamado_id", return_value=eventos),
+    ):
+        r = client_logado_supervisor.get(f"/chamado/{chamado.id}/historico")
+
+    assert r.status_code == 200
+    body = r.data.decode("utf-8")
+    # As 3 ações de previsão + 5 automações de SLA caem nas branches dedicadas
+    # 'previsao'/'sistema' (não no fallback genérico 'outro', sem cor nem detalhe).
+    assert body.count("bento-timeline-dot previsao") == 3
+    assert body.count("bento-timeline-dot sistema") == 5
+    assert body.count("bento-timeline-dot outro") == 0
+    assert body.count("detalhe de teste") == len(acoes)
+
+
 # ── POST /admin (alteração de status) ─────────────────────────────────────────
 
 
@@ -390,6 +442,104 @@ def test_visualizar_chamado_com_participantes_sem_usuario_atual_retorna_200(
     ):
         r = client_logado_admin.get(f"/chamado/{chamado.id}", follow_redirects=False)
     assert r.status_code == 200
+
+
+def test_visualizar_chamado_mostra_banner_pendente_e_botoes_para_gestor(
+    client_logado_gestor, db_session, app
+):
+    """GET /chamado/<id> com pedido de previsão pendente: gestor_setor da área
+    do chamado vê o banner "aguardando aprovação" + botões Aprovar/Rejeitar."""
+    from unittest.mock import MagicMock
+
+    from tests.factories import make_chamado
+
+    chamado = make_chamado(area="Geral", responsavel_id="sup_dono")
+    solicitante = MagicMock()
+    solicitante.id = "sup_dono"
+    solicitante.nome = "Dono Chamado"
+    solicitante.perfil = "supervisor"
+    solicitante.is_admin_or_above = False
+
+    from datetime import datetime, timedelta
+
+    from app.services.previsao_atendimento_service import solicitar_previsao_atendimento
+
+    with app.app_context():
+        resultado = solicitar_previsao_atendimento(
+            chamado.id, datetime.now() + timedelta(days=2), "Preciso de mais tempo", solicitante
+        )
+    assert resultado["sucesso"] is True
+
+    with (
+        patch("app.routes.dashboard.usuario_pode_ver_chamado", return_value=True),
+        patch("app.routes.dashboard.get_static_cached", return_value=[]),
+        patch("app.routes.dashboard.filtrar_supervisores_por_area", return_value=[]),
+        patch("app.routes.dashboard.CategoriaSetor.get_all", return_value=[]),
+    ):
+        r = client_logado_gestor.get(f"/chamado/{chamado.id}")
+
+    body = r.data.decode("utf-8")
+    assert r.status_code == 200
+    assert "Preciso de mais tempo" in body
+    assert 'data-action="decidir-previsao-aprovar"' in body
+    assert 'data-action="decidir-previsao-rejeitar"' in body
+
+
+def test_visualizar_chamado_mostra_thread_conversa_em_ordem_cronologica(
+    client_logado_admin, db_session
+):
+    """GET /chamado/<id>: resposta_solicitante + resposta_responsavel aparecem
+    juntas na thread de conversa, mais antiga primeiro (Historico vem do banco
+    mais recente primeiro — a rota precisa inverter)."""
+    from app.models_historico import Historico
+    from tests.factories import make_chamado
+
+    chamado = make_chamado()
+
+    Historico(
+        chamado_id=chamado.id,
+        usuario_id="sol_1",
+        usuario_nome="Solicitante Um",
+        acao="resposta_solicitante",
+        campo_alterado="mensagem",
+        valor_anterior=None,
+        valor_novo="Mensagem mais antiga do solicitante",
+    ).save()
+    Historico(
+        chamado_id=chamado.id,
+        usuario_id="sup_1",
+        usuario_nome="Supervisor Um",
+        acao="resposta_responsavel",
+        campo_alterado="mensagem",
+        valor_anterior=None,
+        valor_novo="Resposta mais recente do responsável",
+    ).save()
+    # Ruído: outra ação de histórico que NÃO deve entrar na thread de conversa.
+    Historico(
+        chamado_id=chamado.id,
+        usuario_id="sup_1",
+        usuario_nome="Supervisor Um",
+        acao="alteracao_status",
+        campo_alterado="status",
+        valor_anterior="Aberto",
+        valor_novo="Em Atendimento",
+    ).save()
+
+    with (
+        patch("app.routes.dashboard.usuario_pode_ver_chamado", return_value=True),
+        patch("app.routes.dashboard.get_static_cached", return_value=[]),
+        patch("app.routes.dashboard.filtrar_supervisores_por_area", return_value=[]),
+        patch("app.routes.dashboard.CategoriaSetor.get_all", return_value=[]),
+    ):
+        r = client_logado_admin.get(f"/chamado/{chamado.id}")
+
+    assert r.status_code == 200
+    body = r.data.decode("utf-8")
+    assert "Mensagem mais antiga do solicitante" in body
+    assert "Resposta mais recente do responsável" in body
+    pos_antiga = body.index("Mensagem mais antiga do solicitante")
+    pos_recente = body.index("Resposta mais recente do responsável")
+    assert pos_antiga < pos_recente, "thread deve mostrar mais antiga primeiro"
 
 
 def test_visualizar_chamado_traduz_status_para_ingles(client_logado_admin, db_session):

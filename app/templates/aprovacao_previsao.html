@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+
+{% block title %}{{ t('attendance_forecast_approval_title') }}{% endblock %}
+
+{% block content %}
+<div class="w-full max-w-lg mx-auto">
+    <div class="dtx-card rounded-dtx-xl p-8">
+        <span class="inline-flex items-center text-[11px] font-bold tracking-widest uppercase bg-dtx-100 text-dtx-700 px-3 py-1.5 rounded-full">
+            DTX Aerospace
+        </span>
+
+        <h1 class="font-display text-xl font-extrabold tracking-tight mt-4" style="color: var(--color-dtx-700)">
+            {{ t('attendance_forecast_approval_title') }}
+        </h1>
+
+        {% if chamado %}
+        <p class="mt-1 text-sm" style="color: var(--color-surface-muted)">
+            {{ t('ticket') if t else 'Chamado' }} <strong>{{ chamado.numero_chamado }}</strong> — {{ chamado.categoria }}
+        </p>
+        {% endif %}
+
+        {% if solicitacao %}
+        <div class="mt-5 rounded-dtx-lg p-4 space-y-2 text-sm" style="background: var(--color-surface-canvas);">
+            <p><strong>{{ t('attendance_forecast_approval_field_requested_date') }}:</strong>
+                {{ solicitacao.previsao_solicitada }}</p>
+            <p><strong>{{ t('attendance_forecast_approval_field_requested_by') }}:</strong>
+                {{ solicitacao.solicitante_nome }}</p>
+            <p><strong>{{ t('attendance_forecast_approval_field_reason') }}:</strong>
+                {{ solicitacao.motivo }}</p>
+        </div>
+        {% endif %}
+
+        <div class="mt-6">
+            {% if estado == 'token_invalido' %}
+                <p class="text-sm font-semibold text-red-700">{{ t('attendance_forecast_approval_invalid_token') }}</p>
+
+            {% elif estado == 'nao_encontrada' %}
+                <p class="text-sm font-semibold text-red-700">{{ t('attendance_forecast_approval_not_found') }}</p>
+
+            {% elif estado == 'ja_decidida' %}
+                <p class="text-sm font-semibold" style="color: var(--color-surface-muted)">
+                    {{ t('attendance_forecast_approval_already_decided') }}
+                </p>
+
+            {% elif estado == 'gestor_invalido' %}
+                <p class="text-sm font-semibold text-red-700">
+                    {{ t('attendance_forecast_approval_gestor_invalid') }}
+                </p>
+
+            {% elif estado == 'erro' %}
+                <p class="text-sm font-semibold text-red-700">{{ erro }}</p>
+
+            {% elif estado == 'confirmar' %}
+                <p class="text-sm mb-4" style="color: var(--color-surface-muted)">
+                    {% if acao == 'aprovar' %}
+                        {{ t('attendance_forecast_approval_confirm_approve') }}
+                    {% else %}
+                        {{ t('attendance_forecast_approval_confirm_reject') }}
+                    {% endif %}
+                </p>
+                <form method="POST">
+                    <button type="submit"
+                        class="w-full h-11 inline-flex items-center justify-center gap-2 text-sm font-bold rounded-dtx-lg text-white transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 {% if acao == 'aprovar' %}bg-emerald-600 hover:bg-emerald-700{% else %}bg-red-600 hover:bg-red-700{% endif %}">
+                        {% if acao == 'aprovar' %}
+                            {{ t('attendance_forecast_approval_btn_approve') }}
+                        {% else %}
+                            {{ t('attendance_forecast_approval_btn_reject') }}
+                        {% endif %}
+                    </button>
+                </form>
+
+            {% elif estado == 'decidida' %}
+                <p class="text-sm font-semibold text-emerald-700">
+                    {% if acao == 'aprovar' %}
+                        {{ t('attendance_forecast_approval_approved_success') }}
+                    {% else %}
+                        {{ t('attendance_forecast_approval_rejected_success') }}
+                    {% endif %}
+                </p>
+            {% endif %}
+        </div>
+
+        {% if chamado %}
+        <a href="{{ url_for('main.visualizar_detalhe_chamado', chamado_id=chamado.id) }}"
+            class="mt-6 inline-flex items-center gap-1.5 text-sm font-semibold" style="color: var(--color-dtx-700)">
+            {{ t('view_ticket') if t else 'Ver chamado' }}
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
+            </svg>
+        </a>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

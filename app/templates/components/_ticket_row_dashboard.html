@@ -21,8 +21,9 @@
         </span>
     </td>
     <td data-cell="setor">
-        {{ translate_sector(chamado.tipo_solicitacao) }}{% if chamado.gate %} <span style="color:var(--color-surface-muted);">· {{ translate_gate(chamado.gate) }}</span>{% endif %}
+        {% if chamado.gate %}{{ translate_gate(chamado.gate) }}{% else %}—{% endif %}
     </td>
+    {% if mostrar_atribuido %}
     <td data-cell="responsavel">
         {% if chamado.responsavel %}
         <span class="bento-avatar-mini">{{ chamado.responsavel[0] }}</span>{{ nome_curto(chamado.responsavel) }}
@@ -30,6 +31,7 @@
         —
         {% endif %}
     </td>
+    {% endif %}
     <td data-cell="descricao" title="{{ chamado.descricao }}">
         {{ chamado.descricao[:50] }}{% if chamado.descricao|length > 50 %}…{% endif %}
     </td>

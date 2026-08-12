@@ -324,3 +324,118 @@ def processar_edicao_chamado(
     except Exception as e:
         logger.exception("Erro processando edição do chamado %s: %s", chamado_id, e)
         return {"sucesso": False, "erro": _t("internal_error_saving_changes")}
+
+
+def responder_chamado_supervisor(chamado_id: str, mensagem: str, usuario) -> dict:
+    """Resposta em texto livre do responsável (supervisor/admin) ao solicitante —
+    via inversa de responder_chamado_solicitante (solicitante_edicao_service.py),
+    que só cobre o solicitante respondendo ao responsável. Mesma permissão de
+    escrita usada em processar_edicao_chamado (área + não congelado).
+
+    Bloqueio em 'Cancelado' alinhado com o lado solicitante
+    (solicitante_edicao_service._STATUS_PERMITIDOS_RESPOSTA): sem isso, o
+    responsável podia mandar mensagem num chamado cancelado sem o solicitante
+    ter como responder de volta — achado em auditoria, 2026-08-12."""
+    try:
+        _lang = session.get("language", "en")
+    except RuntimeError:
+        _lang = "en"
+
+    def _t(key, **kwargs):
+        return get_translation(key, _lang, **kwargs)
+
+    if not chamado_id:
+        return {"sucesso": False, "erro": _t("field_ticket_id_required")}
+
+    chamado_obj = Chamado.get_by_id(chamado_id)
+    if chamado_obj is None:
+        return {"sucesso": False, "erro": _t("ticket_not_found"), "codigo": 404}
+
+    from app.services.permissoes_edicao_chamado import (
+        chamado_aceita_edicao_operacional,
+        supervisor_pode_alterar_chamado,
+    )
+
+    if not supervisor_pode_alterar_chamado(usuario, chamado_obj.area, chamado_obj):
+        return {
+            "sucesso": False,
+            "erro": _t("ticket_out_of_area_no_permission"),
+            "codigo": 403,
+        }
+
+    if chamado_obj.status == "Cancelado":
+        return {
+            "sucesso": False,
+            "erro": _t("cannot_reply_status", status=chamado_obj.status),
+            "codigo": 403,
+        }
+
+    pode_op, msg_key = chamado_aceita_edicao_operacional(usuario, chamado_obj)
+    if not pode_op:
+        return {
+            "sucesso": False,
+            "erro": _t(msg_key or "error_ticket_frozen_no_edit"),
+            "codigo": 403,
+        }
+
+    mensagem = (mensagem or "").strip()
+    if len(mensagem) < 2:
+        return {
+            "sucesso": False,
+            "erro": _t("reply_message_required", min_chars=2),
+            "codigo": 400,
+        }
+
+    data_chamado = chamado_obj.to_dict()
+
+    try:
+        Historico(
+            chamado_id=chamado_id,
+            usuario_id=usuario.id,
+            usuario_nome=usuario.nome,
+            acao="resposta_responsavel",
+            campo_alterado="mensagem",
+            valor_anterior=None,
+            valor_novo=mensagem,
+        ).save()
+
+        _notificar_resposta_supervisor(
+            chamado_id=chamado_id,
+            dados=data_chamado,
+            usuario=usuario,
+            mensagem=mensagem,
+        )
+
+        return {"sucesso": True}
+
+    except Exception as exc:
+        logger.exception(
+            "Erro ao registrar resposta do responsável no chamado %s: %s", chamado_id, exc
+        )
+        return {"sucesso": False, "erro": _t("internal_error_saving_reply"), "codigo": 500}
+
+
+def _notificar_resposta_supervisor(chamado_id: str, dados: dict, usuario, mensagem: str) -> None:
+    """Dispara notificação de resposta do responsável em thread background."""
+    app = current_app._get_current_object()  # noqa: SLF001
+    usuario_nome = usuario.nome  # captura antes da thread — ver _notificar_resposta_solicitante
+
+    def _run():
+        with app.app_context():
+            try:
+                from app.services.chamado_notificacao_service import (
+                    notificar_resposta_supervisor_chamado,
+                )
+
+                notificar_resposta_supervisor_chamado(
+                    chamado_id=chamado_id,
+                    numero_chamado=dados.get("numero_chamado") or "N/A",
+                    categoria=dados.get("categoria") or "Chamado",
+                    respondente_nome=usuario_nome,
+                    mensagem=mensagem,
+                    dados_chamado=dados,
+                )
+            except Exception as exc:
+                logger.warning("Notificação de resposta do responsável não enviada: %s", exc)
+
+    threading.Thread(target=_run, daemon=True).start()

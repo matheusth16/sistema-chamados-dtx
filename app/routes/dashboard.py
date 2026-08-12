@@ -47,6 +47,7 @@ from app.services.permissions import usuario_pode_operar_chamado, usuario_pode_v
 from app.services.permissoes_edicao_chamado import (
     chamado_aceita_transicao_status,
     filtrar_supervisores_por_area,
+    montar_anexos_para_exibicao,
     montar_flags_detalhe_chamado,
 )
 from app.services.status_service import atualizar_status_chamado
@@ -229,6 +230,26 @@ def visualizar_detalhe_chamado(chamado_id: str) -> Response:
             if getattr(s, "ativo", True)
         ]
 
+        historico = Historico.get_by_chamado_id(chamado.id)
+        anexos_exibicao = montar_anexos_para_exibicao(chamado, historico)
+
+        from app.services.previsao_atendimento_service import (
+            obter_solicitacao_pendente,
+            usuario_pode_decidir_previsao_atendimento,
+        )
+
+        previsao_pendente = obter_solicitacao_pendente(chamado.id)
+        pode_decidir_previsao = previsao_pendente is not None and (
+            usuario_pode_decidir_previsao_atendimento(current_user, chamado.area or "")
+        )
+
+        # Conversa solicitante↔responsável: só as respostas em texto livre,
+        # em ordem cronológica (historico vem mais recente primeiro).
+        mensagens_conversa = [
+            h for h in historico if h.acao in ("resposta_solicitante", "resposta_responsavel")
+        ]
+        mensagens_conversa.reverse()
+
         return render_template(
             "visualizar_chamado.html",
             chamado=chamado,
@@ -242,6 +263,10 @@ def visualizar_detalhe_chamado(chamado_id: str) -> Response:
             segundos_restantes_edicao=flags["segundos_restantes_edicao"],
             pode_cancelar_solicitante=flags["pode_cancelar_solicitante"],
             pode_anexo_tardio_solicitante=flags["pode_anexo_tardio_solicitante"],
+            anexos_exibicao=anexos_exibicao,
+            previsao_pendente=previsao_pendente,
+            pode_decidir_previsao=pode_decidir_previsao,
+            mensagens_conversa=mensagens_conversa,
         )
     except Exception as e:
         logger.exception("Erro ao exibir chamado %s: %s", chamado_id, e)

@@ -26,7 +26,7 @@ class Chamado:
         area: str = None,
         rl_codigo: str = None,
         gate: str = None,
-        impacto: str = None,
+        impacto: list = None,
         anexo: str = None,
         anexos: list = None,
         numero_chamado: str = None,
@@ -90,7 +90,7 @@ class Chamado:
         )
         self.tipo_solicitacao = tipo_solicitacao
         self.gate = gate
-        self.impacto = impacto
+        self.impacto = impacto or []
         self.descricao = descricao
         self.anexo = anexo
         self.anexos = anexos or []
@@ -254,7 +254,7 @@ class Chamado:
             prioridade=data.get("prioridade", 1),
             tipo_solicitacao=_str(data.get("tipo_solicitacao")),
             gate=data.get("gate"),
-            impacto=data.get("impacto"),
+            impacto=data.get("impacto") if isinstance(data.get("impacto"), list) else [],
             descricao=_str(data.get("descricao")),
             anexo=data.get("anexo"),
             anexos=data.get("anexos") if isinstance(data.get("anexos"), list) else [],
@@ -364,7 +364,7 @@ class Chamado:
             rl_codigo=row.rl_codigo,
             grupo_rl_id=row.grupo_rl_id,
             gate=row.gate,
-            impacto=row.impacto,
+            impacto=list(row.impacto or []),
             anexo=row.anexo,
             anexos=list(row.anexos or []),
             prioridade=row.prioridade,

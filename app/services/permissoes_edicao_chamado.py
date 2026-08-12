@@ -243,6 +243,56 @@ def montar_flags_detalhe_chamado(usuario: Any, chamado: Any) -> dict:
     }
 
 
+def montar_anexos_para_exibicao(chamado: Any, historico: list) -> list[dict]:
+    """Anexos do chamado deduplicados, anotados com quem anexou cada um, e
+    ordenados com os do solicitante primeiro (pra visualizar_chamado.html).
+
+    chamado.anexos é uma lista simples (só o caminho/chave do arquivo) — não
+    guarda quem anexou. Cruza contra o Histórico, que registra isso nos dois
+    fluxos que adicionam anexo DEPOIS da criação: edição do responsável
+    (acao="alteracao_dados", campo_alterado="novo anexo") e anexo tardio do
+    solicitante (acao="anexo_tardio"). Um caminho sem entrada correspondente
+    veio da abertura do chamado — sempre pelo solicitante.
+    """
+    anexos_brutos = (
+        chamado.anexos
+        if (chamado.anexos and len(chamado.anexos) > 0)
+        else ([chamado.anexo] if chamado.anexo and chamado.anexo != "None" else [])
+    )
+    vistos: set = set()
+    anexos_unicos = []
+    for a in anexos_brutos:
+        if a and a != "None" and a not in vistos:
+            vistos.add(a)
+            anexos_unicos.append(a)
+
+    origem_por_caminho = {}
+    for evento in historico:
+        eh_anexo_responsavel = (
+            evento.acao == "alteracao_dados" and evento.campo_alterado == "novo anexo"
+        )
+        eh_anexo_tardio_solicitante = evento.acao == "anexo_tardio"
+        if (eh_anexo_responsavel or eh_anexo_tardio_solicitante) and evento.valor_novo:
+            origem_por_caminho.setdefault(evento.valor_novo, evento)
+
+    itens = []
+    for caminho in anexos_unicos:
+        evento = origem_por_caminho.get(caminho)
+        eh_solicitante = evento is None or evento.usuario_id == chamado.solicitante_id
+        itens.append(
+            {
+                "caminho": caminho,
+                "eh_solicitante": eh_solicitante,
+                "usuario_id": None if eh_solicitante else evento.usuario_id,
+                "usuario_nome": None if eh_solicitante else evento.usuario_nome,
+            }
+        )
+
+    # Sort estável: solicitante primeiro, mantendo ordem relativa original dentro de cada grupo
+    itens.sort(key=lambda item: 0 if item["eh_solicitante"] else 1)
+    return itens
+
+
 def filtrar_supervisores_por_area(usuario: Any, supervisores: list) -> list:
     """Filtra lista de supervisores para mostrar apenas os da mesma área do usuário.
 

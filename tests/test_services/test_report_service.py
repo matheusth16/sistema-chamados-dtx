@@ -90,6 +90,39 @@ def test_alerta_24h_marca_chamado_apos_envio():
     assert Chamado.get_by_id(chamado_id).alerta_prazo_24h_enviado_em is not None
 
 
+def test_alerta_24h_grava_historico():
+    """Alerta automático de prazo 24h deixa rastro no Histórico (achado em
+    auditoria, 2026-08-12)."""
+    from app.models_historico import Historico
+
+    chamado_id = _criar_chamado_real(numero="2026-003", responsavel_id="sup3")
+    chamado = {
+        "id": chamado_id,
+        "numero": "2026-003",
+        "categoria": "Projetos",
+        "tipo": "Manutencao",
+        "area": "Manutencao",
+        "solicitante": "Solicitante",
+        "sla_label": "Em risco",
+        "responsavel_id": "sup3",
+        "alerta_prazo_24h_enviado_em": None,
+    }
+    usuario = MagicMock()
+    usuario.email = "sup3@dtx.aero"
+
+    with (
+        patch("app.services.report_service.buscar_chamados_abertos", return_value=[chamado]),
+        patch("app.services.report_service.Usuario.get_by_id", return_value=usuario),
+        patch("app.services.report_service.notificar_responsavel_prazo_24h"),
+    ):
+        enviar_alertas_prazo_24h()
+
+    eventos = Historico.get_by_chamado_id(chamado_id)
+    alertas = [e for e in eventos if e.acao == "alerta_prazo_24h"]
+    assert len(alertas) == 1
+    assert alertas[0].usuario_id == "sistema"
+
+
 # ── buscar_chamados_abertos ───────────────────────────────────────────────────
 
 

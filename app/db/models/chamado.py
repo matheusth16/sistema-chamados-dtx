@@ -23,6 +23,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, mapped_column
@@ -59,7 +60,7 @@ class ChamadoRow(Base):
     rl_codigo: Mapped[str | None] = mapped_column(Text)
     grupo_rl_id: Mapped[int | None] = mapped_column(ForeignKey("grupos_rl.id"))
     gate: Mapped[str | None] = mapped_column(Text)
-    impacto: Mapped[str | None] = mapped_column(Text)
+    impacto: Mapped[list[str]] = mapped_column(ARRAY(Text), nullable=False, default=list)
     anexo: Mapped[str | None] = mapped_column(Text)
     anexos: Mapped[list[str]] = mapped_column(ARRAY(Text), nullable=False, default=list)
     setores_adicionais: Mapped[list[str]] = mapped_column(ARRAY(Text), nullable=False, default=list)
@@ -144,6 +145,44 @@ class ChamadoObservadorRow(Base):
     usuario_id: Mapped[str] = mapped_column(Text, nullable=False)
     nome: Mapped[str] = mapped_column(Text, nullable=False)
     email: Mapped[str] = mapped_column(Text, nullable=False)
+    criado_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+
+class ChamadoPrevisaoSolicitacaoRow(Base):
+    """Pedido de previsão de atendimento — une o antigo "Prazo do chamado
+    (dias)" (sla_dias) e "Adiar avisos de escalonamento" (previsao_atendimento)
+    numa única solicitação, que só passa a valer em chamados.previsao_atendimento
+    depois de aprovada pelo gestor_setor da área do chamado (ver
+    app/services/previsao_atendimento_service.py). Tabela é audit trail
+    completo — guarda todo pedido, aprovado/rejeitado/pendente, nunca
+    atualizado além da própria decisão."""
+
+    __tablename__ = "chamado_previsao_solicitacoes"
+    __table_args__ = (
+        Index("idx_previsao_solicitacoes_chamado", "chamado_id"),
+        Index(
+            "uq_previsao_solicitacoes_pendente_por_chamado",
+            "chamado_id",
+            unique=True,
+            postgresql_where=text("status = 'pendente'"),
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    chamado_id: Mapped[int] = mapped_column(
+        ForeignKey("chamados.id", ondelete="CASCADE"), nullable=False
+    )
+    solicitante_id: Mapped[str] = mapped_column(Text, nullable=False)
+    solicitante_nome: Mapped[str] = mapped_column(Text, nullable=False)
+    previsao_solicitada: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    motivo: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(Text, nullable=False, default="pendente")
+    gestor_id: Mapped[str | None] = mapped_column(Text)
+    gestor_nome: Mapped[str | None] = mapped_column(Text)
+    motivo_rejeicao: Mapped[str | None] = mapped_column(Text)
+    decidido_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     criado_em: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )

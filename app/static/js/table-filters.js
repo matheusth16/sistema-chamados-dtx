@@ -211,6 +211,19 @@
     /**
      * Atualiza ícones de ordenação nos cabeçalhos
      */
+    // Ícones de ordenação em SVG (não caracteres Unicode ↕/↑/↓ — fonte
+    // fallback do Windows/Chrome pode renderizar esses glifos como pontinhos
+    // em vez de seta, dependendo da fonte instalada).
+    const SORT_ICON_UNSORTED =
+        '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">' +
+        '<path stroke-linecap="round" stroke-linejoin="round" d="M7 15l5 5 5-5M7 9l5-5 5 5"/></svg>';
+    const SORT_ICON_ASC =
+        '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">' +
+        '<path stroke-linecap="round" stroke-linejoin="round" d="M6 15l6-6 6 6"/></svg>';
+    const SORT_ICON_DESC =
+        '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">' +
+        '<path stroke-linecap="round" stroke-linejoin="round" d="M6 9l6 6 6-6"/></svg>';
+
     function updateSortIcons(activeColumn, direction) {
         document.querySelectorAll('th.sortable').forEach(th => {
             const colIndex = parseInt(th.dataset.column);
@@ -218,11 +231,11 @@
             if (!icon) return;
 
             if (colIndex === activeColumn) {
-                icon.innerHTML = direction === 'asc' ? '↑' : '↓';
+                icon.innerHTML = direction === 'asc' ? SORT_ICON_ASC : SORT_ICON_DESC;
                 icon.classList.add('active');
                 th.setAttribute('aria-sort', direction === 'asc' ? 'ascending' : 'descending');
             } else {
-                icon.innerHTML = '↕';
+                icon.innerHTML = SORT_ICON_UNSORTED;
                 icon.classList.remove('active');
                 th.setAttribute('aria-sort', 'none');
             }

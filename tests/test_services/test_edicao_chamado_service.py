@@ -1005,3 +1005,163 @@ def test_edicao_descricao_nao_altera_data_em_atendimento(app):
     assert result["sucesso"] is True
     update_data = mock_chamado.atualizar_campos.call_args.kwargs
     assert "data_em_atendimento" not in update_data
+
+
+# ── responder_chamado_supervisor — resposta em texto livre ao solicitante ──────
+
+
+def test_responder_supervisor_com_permissao_sucede(app):
+    """Supervisor/admin da área + chamado não congelado + mensagem válida → sucesso + histórico."""
+    from app.services.edicao_chamado_service import responder_chamado_supervisor
+
+    u = _make_usuario()
+
+    with (
+        app.app_context(),
+        patch("app.services.edicao_chamado_service.Chamado") as mock_chamado_cls,
+        patch("app.services.edicao_chamado_service.Historico") as mock_hist,
+        patch("app.services.edicao_chamado_service._notificar_resposta_supervisor"),
+    ):
+        mock_chamado_cls.get_by_id.return_value = _make_chamado_mock()
+        mock_hist.return_value.save.return_value = True
+
+        resultado = responder_chamado_supervisor(
+            chamado_id="ch1",
+            mensagem="Já verificamos o equipamento, aguardando a peça chegar.",
+            usuario=u,
+        )
+
+    assert resultado["sucesso"] is True
+    mock_hist.return_value.save.assert_called_once()
+
+
+def test_responder_supervisor_chamado_nao_encontrado_retorna_404(app):
+    from app.services.edicao_chamado_service import responder_chamado_supervisor
+
+    u = _make_usuario()
+
+    with (
+        app.app_context(),
+        patch("app.services.edicao_chamado_service.Chamado") as mock_chamado_cls,
+    ):
+        mock_chamado_cls.get_by_id.return_value = None
+        resultado = responder_chamado_supervisor("ch_x", "Resposta válida", u)
+
+    assert resultado["sucesso"] is False
+    assert resultado.get("codigo") == 404
+
+
+def test_responder_supervisor_sem_permissao_area_retorna_403(app):
+    """Supervisor fora da área do chamado não pode responder."""
+    from app.services.edicao_chamado_service import responder_chamado_supervisor
+
+    supervisor = _make_usuario(perfil="supervisor", uid="sup1", areas=["Qualidade"])
+
+    with (
+        app.app_context(),
+        patch("app.services.edicao_chamado_service.Chamado") as mock_chamado_cls,
+    ):
+        mock_chamado_cls.get_by_id.return_value = _make_chamado_mock()  # area="Manutencao"
+        resultado = responder_chamado_supervisor("ch1", "Resposta qualquer", supervisor)
+
+    assert resultado["sucesso"] is False
+    assert resultado.get("codigo") == 403
+
+
+def test_responder_supervisor_chamado_congelado_retorna_403(app):
+    """Chamado Concluído e confirmado (congelado) bloqueia resposta."""
+    from app.services.edicao_chamado_service import responder_chamado_supervisor
+
+    u = _make_usuario()
+    data = _default_data()
+    data["status"] = "Concluído"
+    data["confirmacao_solicitante"] = "confirmado"
+
+    with (
+        app.app_context(),
+        patch("app.services.edicao_chamado_service.Chamado") as mock_chamado_cls,
+    ):
+        mock_chamado_cls.get_by_id.return_value = _make_chamado_mock(data)
+        resultado = responder_chamado_supervisor("ch1", "Resposta qualquer", u)
+
+    assert resultado["sucesso"] is False
+    assert resultado.get("codigo") == 403
+
+
+def test_responder_supervisor_chamado_cancelado_retorna_403(app):
+    """Chamado Cancelado bloqueia resposta do responsável — alinhado com o lado
+    solicitante (solicitante_edicao_service._STATUS_PERMITIDOS_RESPOSTA), que já
+    não permite responder num chamado cancelado. Sem isso, o responsável podia
+    mandar mensagem sem o solicitante ter como responder de volta."""
+    from app.services.edicao_chamado_service import responder_chamado_supervisor
+
+    u = _make_usuario()
+    data = _default_data()
+    data["status"] = "Cancelado"
+
+    with (
+        app.app_context(),
+        patch("app.services.edicao_chamado_service.Chamado") as mock_chamado_cls,
+    ):
+        mock_chamado_cls.get_by_id.return_value = _make_chamado_mock(data)
+        resultado = responder_chamado_supervisor("ch1", "Resposta qualquer", u)
+
+    assert resultado["sucesso"] is False
+    assert resultado.get("codigo") == 403
+
+
+def test_responder_supervisor_mensagem_vazia_retorna_400(app):
+    from app.services.edicao_chamado_service import responder_chamado_supervisor
+
+    u = _make_usuario()
+
+    with (
+        app.app_context(),
+        patch("app.services.edicao_chamado_service.Chamado") as mock_chamado_cls,
+    ):
+        mock_chamado_cls.get_by_id.return_value = _make_chamado_mock()
+        resultado = responder_chamado_supervisor("ch1", "   ", u)
+
+    assert resultado["sucesso"] is False
+    assert resultado.get("codigo") == 400
+
+
+def test_responder_supervisor_sucesso_dispara_notificacao(app):
+    """Após sucesso, _notificar_resposta_supervisor deve ser chamado."""
+    from app.services.edicao_chamado_service import responder_chamado_supervisor
+
+    u = _make_usuario()
+
+    with (
+        app.app_context(),
+        patch("app.services.edicao_chamado_service.Chamado") as mock_chamado_cls,
+        patch("app.services.edicao_chamado_service.Historico") as mock_hist,
+        patch("app.services.edicao_chamado_service._notificar_resposta_supervisor") as mock_notif,
+    ):
+        mock_chamado_cls.get_by_id.return_value = _make_chamado_mock()
+        mock_hist.return_value.save.return_value = True
+
+        responder_chamado_supervisor("ch1", "Resposta enviada ao solicitante.", u)
+
+    mock_notif.assert_called_once()
+    assert mock_notif.call_args.kwargs["mensagem"] == "Resposta enviada ao solicitante."
+
+
+def test_responder_supervisor_excecao_retorna_500(app):
+    from app.services.edicao_chamado_service import responder_chamado_supervisor
+
+    u = _make_usuario()
+
+    with (
+        app.app_context(),
+        patch("app.services.edicao_chamado_service.Chamado") as mock_chamado_cls,
+        patch(
+            "app.services.edicao_chamado_service.Historico",
+            side_effect=RuntimeError("boom"),
+        ),
+    ):
+        mock_chamado_cls.get_by_id.return_value = _make_chamado_mock()
+        resultado = responder_chamado_supervisor("ch1", "Resposta válida", u)
+
+    assert resultado["sucesso"] is False
+    assert resultado.get("codigo") == 500

@@ -64,15 +64,18 @@
                 <div class="bento-pill-group">
                     <label for="cat_nao_aplicavel" class="bento-pill">
                         <input type="radio" id="cat_nao_aplicavel" name="categoria" value="Nao Aplicavel" checked data-toggle-rl="false" class="sr-only">
-                        {{ t('not_applicable_routine') }}
+                        <span class="bento-pill-label">{{ t('not_applicable_routine') }}</span>
+                        <span class="bento-pill-tat">{{ t('tat_rotina') }}</span>
                     </label>
                     <label for="cat_projetos" class="bento-pill warning">
                         <input type="radio" id="cat_projetos" name="categoria" value="Projetos" data-toggle-rl="true" class="sr-only">
-                        {{ t('projects_high_priority') }}
+                        <span class="bento-pill-label">{{ t('projects_high_priority') }}</span>
+                        <span class="bento-pill-tat">{{ t('tat_projetos') }}</span>
                     </label>
-                    <label for="cat_aog" class="bento-pill danger">
+                    <label for="cat_aog" class="bento-pill danger" title="{{ t('aog_tooltip') }}">
                         <input type="radio" id="cat_aog" name="categoria" value="AOG" data-toggle-rl="true" class="sr-only">
-                        {{ t('aog_max_priority') }}
+                        <span class="bento-pill-label">{{ t('aog_max_priority') }}</span>
+                        <span class="bento-pill-tat">{{ t('tat_aog') }}</span>
                     </label>
                 </div>
                 <p class="bento-field-hint">{{ t('category_priority_hint') }}</p>
@@ -92,45 +95,28 @@
                 <div class="bento-impact-grid">
                     {% for impacto in impactos %}
                     <label class="bento-impact">
-                        <input type="radio" name="impacto" value="{{ impacto.nome_pt }}" required>
+                        <input type="checkbox" name="impacto" value="{{ impacto.nome_pt }}">
                         {% if current_language == 'en' %}{% set imp_display = impacto.nome_en|default(impacto.nome_pt) %}{% elif current_language == 'es' %}{% set imp_display = impacto.nome_es|default(impacto.nome_pt) %}{% else %}{% set imp_display = impacto.nome_pt %}{% endif %}
                         {{ imp_display }}
                     </label>
                     {% endfor %}
                 </div>
+                <p class="bento-field-hint">{{ t('main_impact_hint') }}</p>
             </div>
 
             <div class="bento-section-head"><span class="num">2</span><span>{{ t('form_section_destination') }}</span></div>
 
             <div class="bento-form-section">
-                <div class="bento-grid-2">
-                    <div>
-                        <label for="tipo" class="bento-field-label plain">{{ t('type_sector') }}</label>
-                        <select name="tipo" id="tipo" data-testid="tipo-select" required>
-                            <option value="" disabled selected>{{ t('select') }}</option>
-                            {% for setor in setores %}
-                            {% if current_language == 'en' %}{% set nome_display = setor.nome_en|default(setor.nome_pt) %}{% elif current_language == 'es' %}{% set nome_display = setor.nome_es|default(setor.nome_pt) %}{% else %}{% set nome_display = setor.nome_pt %}{% endif %}
-                            <option value="{{ setor.nome_pt }}">{{ nome_display }}</option>
-                            {% endfor %}
-                        </select>
-                        <p class="bento-field-hint">{{ t('sector_hint') }}</p>
-                    </div>
-
-                    <div>
-                        <label for="gate" class="bento-field-label plain">{{ t('gate') }}</label>
-                        <select name="gate" id="gate" required>
-                            <option value="" disabled selected>{{ t('select') }}</option>
-                            <option value="N/A">{{ t('not_applicable_short') }}</option>
-                            {% for gate_key, etapas in gate_subetapas.items() %}
-                            <optgroup label="{{ gate_key }}">
-                                {% for etapa in etapas %}
-                                <option value="{{ etapa }}">{{ translate_gate(etapa) | replace(gate_key ~ ' - ', '') }}</option>
-                                {% endfor %}
-                            </optgroup>
-                            {% endfor %}
-                        </select>
-                        <p class="bento-field-hint">{{ t('gate_hint') }}</p>
-                    </div>
+                <div>
+                    <label for="tipo" class="bento-field-label plain">{{ t('type_sector') }}</label>
+                    <select name="tipo" id="tipo" data-testid="tipo-select" required>
+                        <option value="" disabled selected>{{ t('select') }}</option>
+                        {% for setor in setores %}
+                        {% if current_language == 'en' %}{% set nome_display = setor.nome_en|default(setor.nome_pt) %}{% elif current_language == 'es' %}{% set nome_display = setor.nome_es|default(setor.nome_pt) %}{% else %}{% set nome_display = setor.nome_pt %}{% endif %}
+                        <option value="{{ setor.nome_pt }}">{{ nome_display }}</option>
+                        {% endfor %}
+                    </select>
+                    <p class="bento-field-hint">{{ t('sector_hint') }}</p>
                 </div>
 
                 <div id="container_responsavel" class="bento-resp-box">
@@ -149,7 +135,25 @@
                 </div>
             </div>
 
-            <div class="bento-section-head"><span class="num">3</span><span>{{ t('form_section_details') }}</span></div>
+            <div class="bento-section-head"><span class="num">3</span><span>{{ t('form_section_gate_location') }}</span></div>
+
+            <div>
+                <label for="gate" class="bento-field-label plain">{{ t('gate') }}</label>
+                <select name="gate" id="gate" required>
+                    <option value="" disabled selected>{{ t('select') }}</option>
+                    <option value="N/A">{{ t('not_applicable_short') }}</option>
+                    {% for gate_key, etapas in gate_subetapas.items() %}
+                    <optgroup label="{{ gate_key }}">
+                        {% for etapa in etapas %}
+                        <option value="{{ etapa }}">{{ translate_gate(etapa) | replace(gate_key ~ ' - ', '') }}</option>
+                        {% endfor %}
+                    </optgroup>
+                    {% endfor %}
+                </select>
+                <p class="bento-field-hint">{{ t('gate_hint') }}</p>
+            </div>
+
+            <div class="bento-section-head"><span class="num">4</span><span>{{ t('form_section_details') }}</span></div>
 
             <div>
                 <label for="descricao" class="bento-field-label plain">{{ t('detailed_description') }}</label>
@@ -200,7 +204,7 @@
                 <div id="container_links_externos"></div>
             </div>
 
-            <div class="bento-section-head"><span class="num">4</span><span>{{ t('form_section_notification') }}</span></div>
+            <div class="bento-section-head"><span class="num">5</span><span>{{ t('form_section_notification') }}</span></div>
 
             <!-- Observadores (em cópia) -->
             <div>
@@ -282,11 +286,11 @@
 
 <script nonce="{{ csp_nonce }}">
     // Função para mostrar/esconder o campo RL
-    function toggleRL(isProject) {
+    function toggleRL(mostrar, categoria) {
         const divRL = document.getElementById('div_rl');
         const inputRL = document.getElementById('rl_codigo');
 
-        if (isProject) {
+        if (mostrar) {
             divRL.classList.remove('hidden');
             inputRL.setAttribute('required', 'true');
         } else {
@@ -294,6 +298,10 @@
             inputRL.removeAttribute('required');
             inputRL.value = ''; // Limpa se esconder
         }
+        // Cor da caixa muda com a categoria — sem isso, trocar de Projetos pra
+        // AOG (ou vice-versa) mantinha a caixa idêntica, sem sinalizar a troca.
+        divRL.classList.toggle('is-projetos', categoria === 'Projetos');
+        divRL.classList.toggle('is-aog', categoria === 'AOG');
     }
 
     // Setores de distribuição em grupo (ver AREAS_GRUPO em chamados_criacao_service.py) —
@@ -408,7 +416,7 @@
     // Alterna a exibição do campo RL conforme a categoria selecionada (CSP: sem onclick inline)
     document.querySelectorAll('[data-toggle-rl]').forEach(function(radio) {
         radio.addEventListener('click', function() {
-            toggleRL(radio.dataset.toggleRl === 'true');
+            toggleRL(radio.dataset.toggleRl === 'true', radio.value);
         });
     });
 
@@ -586,21 +594,64 @@
             lista.appendChild(li);
         }
 
+        // URLs de pré-visualização (blob local, arquivo ainda não foi enviado)
+        // recriadas a cada _renderizar() — revoga as antigas antes pra não
+        // vazar memória com blobs de arquivos já removidos da fila.
+        var urlsPreviewAtivas = [];
+        var labelPreviewAria = "{{ t('preview_attachment_aria') }}";
+
+        function _tipoPreview(arq) {
+            var tipo = (arq.type || '').toLowerCase();
+            var ext = (arq.name.split('.').pop() || '').toLowerCase();
+            if (tipo.indexOf('image/') === 0 || ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'].indexOf(ext) !== -1) return 'imagem';
+            if (tipo === 'application/pdf' || ext === 'pdf') return 'pdf';
+            return 'outro';
+        }
+
         function _renderizar() {
             // Remove apenas os itens de arquivo (não os de link externo)
             var items = lista.querySelectorAll('li:not([data-link-url])');
             for (var i = 0; i < items.length; i++) items[i].remove();
+            urlsPreviewAtivas.forEach(function (u) { URL.revokeObjectURL(u); });
+            urlsPreviewAtivas = [];
             var arquivos = dt.files;
             for (var i = 0; i < arquivos.length; i++) {
                 (function (idx, arq) {
+                    var tipoPreview = _tipoPreview(arq);
                     var li = document.createElement('li');
                     var span = document.createElement('span');
                     span.className = 'flex items-center gap-2 truncate';
-                    span.innerHTML = '<svg class="w-4 h-4 shrink-0" style="color:var(--color-bento-success)" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>';
+
                     var nome = document.createElement('span');
                     nome.className = 'font-medium truncate';
                     nome.textContent = arq.name;
-                    span.appendChild(nome);
+
+                    if (tipoPreview === 'imagem' || tipoPreview === 'pdf') {
+                        var url = URL.createObjectURL(arq);
+                        urlsPreviewAtivas.push(url);
+                        var link = document.createElement('a');
+                        link.href = url;
+                        link.target = '_blank';
+                        link.rel = 'noopener';
+                        link.className = 'flex items-center gap-2 truncate';
+                        link.style.minWidth = '0';
+                        link.setAttribute('aria-label', labelPreviewAria.replace('{filename}', arq.name));
+                        if (tipoPreview === 'imagem') {
+                            var thumb = document.createElement('img');
+                            thumb.className = 'bento-attach-thumb';
+                            thumb.src = url;
+                            thumb.alt = '';
+                            link.appendChild(thumb);
+                        } else {
+                            link.innerHTML = '<svg class="w-4 h-4 shrink-0" style="color:var(--color-bento-success)" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>';
+                        }
+                        link.appendChild(nome);
+                        span.appendChild(link);
+                    } else {
+                        span.innerHTML = '<svg class="w-4 h-4 shrink-0" style="color:var(--color-bento-success)" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>';
+                        span.appendChild(nome);
+                    }
+
                     var btn = document.createElement('button');
                     btn.type = 'button';
                     btn.setAttribute('aria-label', labelRemover.replace('{filename}', arq.name));

@@ -76,6 +76,9 @@
                 case 'enviar-resposta-solicitante':
                     if (typeof enviarRespostaSolicitante === 'function') enviarRespostaSolicitante(el.dataset.chamadoId);
                     break;
+                case 'enviar-resposta-supervisor':
+                    if (typeof enviarRespostaSupervisor === 'function') enviarRespostaSupervisor(el.dataset.chamadoId);
+                    break;
                 case 'salvar-descricao-solicitante':
                     if (typeof salvarDescricaoSolicitante === 'function') salvarDescricaoSolicitante();
                     break;
@@ -96,6 +99,12 @@
                     break;
                 case 'executar-definir-previsao-atendimento':
                     if (typeof executarDefinirPrevisaoAtendimento === 'function') executarDefinirPrevisaoAtendimento();
+                    break;
+                case 'decidir-previsao-aprovar':
+                    if (typeof decidirPrevisaoAtendimento === 'function') decidirPrevisaoAtendimento(el.dataset.solicitacaoId, 'aprovar');
+                    break;
+                case 'decidir-previsao-rejeitar':
+                    if (typeof decidirPrevisaoAtendimento === 'function') decidirPrevisaoAtendimento(el.dataset.solicitacaoId, 'rejeitar');
                     break;
                 case 'executar-concluir-minha-parte':
                     if (typeof executarConcluirMinhaParte === 'function') executarConcluirMinhaParte();
@@ -212,7 +221,7 @@
                 <div class="lg:col-span-2" style="display:flex; flex-direction:column; gap:16px;">
 
                     <!-- Descrição -->
-                    <div class="bento-panel" style="display:flex; flex-direction:column; flex:1; min-height:0;">
+                    <div class="bento-panel">
                         <label for="modal-descricao" class="bento-panel-label">
                             <svg width="16" height="16" style="color:var(--color-surface-muted);" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"></path></svg>
                             {{ t('problem_description') if t else 'Descrição do Problema' }}
@@ -220,12 +229,37 @@
 
                         {% if pode_editar_descricao %}
                         <textarea id="modal-descricao" form="form-status" name="nova_descricao" rows="4"
-                            style="width:100%; box-sizing:border-box; flex:1; min-height:160px; background:var(--color-surface-canvas); border:1.5px solid transparent; border-radius:14px; padding:14px 16px; font-family:inherit; font-size:14px; line-height:1.6; color:inherit; resize:none; overflow:auto;"
+                            style="width:100%; box-sizing:border-box; min-height:160px; max-height:220px; background:var(--color-surface-canvas); border:1.5px solid transparent; border-radius:14px; padding:14px 16px; font-family:inherit; font-size:14px; line-height:1.6; color:inherit; resize:none; overflow:auto; overflow-wrap:break-word; word-break:break-word;"
                             placeholder="{{ t('edit_description_placeholder') if t else 'Descreva o chamado' }}">{{ chamado.descricao }}</textarea>
                         {% else %}
-                        <div style="flex:1; min-height:160px; background:var(--color-surface-canvas); padding:16px; border-radius:14px; font-size:13px; line-height:1.6; white-space:pre-line;">{{ chamado.descricao }}</div>
+                        <div style="min-height:160px; max-height:220px; overflow-y:auto; background:var(--color-surface-canvas); padding:16px; border-radius:14px; font-size:13px; line-height:1.6; white-space:pre-line; overflow-wrap:break-word; word-break:break-word;">{{ chamado.descricao }}</div>
                         {% endif %}
                     </div>
+
+                    <!-- Conversa (solicitante ↔ responsável) — junta resposta_solicitante +
+                         resposta_responsavel do Histórico numa thread única, ordem cronológica
+                         (ver app/routes/dashboard.py::visualizar_detalhe_chamado). -->
+                    {% if mensagens_conversa %}
+                    <div class="bento-panel">
+                        <label class="bento-panel-label">
+                            <svg width="16" height="16" style="color:var(--color-surface-muted);" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path></svg>
+                            {{ t('conversation_title') if t else 'Conversa' }}
+                        </label>
+                        <div class="space-y-3" style="max-height:320px; overflow-y:auto; padding-right:2px;">
+                            {% for msg in mensagens_conversa %}
+                            {% set eh_solicitante = msg.acao == 'resposta_solicitante' %}
+                            <div style="display:flex; {% if not eh_solicitante %}justify-content:flex-end;{% endif %}">
+                                <div style="max-width:80%; border-radius:14px; padding:10px 14px; background:{% if eh_solicitante %}var(--color-surface-canvas){% else %}var(--color-dtx-100){% endif %};">
+                                    <p style="font-size:11px; font-weight:700; color:var(--color-surface-muted); margin-bottom:2px;">
+                                        {{ msg.usuario_nome }} · {{ msg.data_acao_formatada() }}
+                                    </p>
+                                    <p style="font-size:13px; line-height:1.5; white-space:pre-line; overflow-wrap:break-word; word-break:break-word;">{{ msg.valor_novo }}</p>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
 
                     <!-- Arquivos e Anexos -->
                     <div class="bento-panel">
@@ -234,51 +268,77 @@
                             {% set _af = t('attached_file') %}{{ _af if _af != 'attached_file' else 'Anexos' }}
                         </label>
 
-                        <div class="space-y-3">
-                            {% set tem_anexo = false %}
-                            {% set anexos_brutos = chamado.anexos if (chamado.anexos and chamado.anexos|length > 0) else ([chamado.anexo] if chamado.anexo and chamado.anexo != 'None' else []) %}
+                        {% if pode_editar %}
+                        <div style="margin-bottom:16px;">
+                            <label class="bento-panel-label" style="margin-bottom:10px;">
+                                <svg width="16" height="16" style="color:var(--color-surface-muted);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path></svg>
+                                {{ t('supervisor_reply_title') if t else 'Responder ao solicitante' }}
+                            </label>
+                            <p style="font-size:12px; color:var(--color-surface-muted); margin:-6px 0 12px;">{{ t('supervisor_reply_hint') if t else 'Sua mensagem é enviada ao solicitante por e-mail e notificação, e fica registrada no histórico do chamado.' }}</p>
+                            <textarea id="sup-resposta-texto" rows="3"
+                                style="width:100%; box-sizing:border-box; background:var(--color-surface-canvas); border:1.5px solid transparent; border-radius:14px; padding:11px 14px; font-family:inherit; font-size:13px; resize:none; margin-bottom:8px;"
+                                placeholder="{{ t('supervisor_reply_placeholder') if t else 'Escreva sua resposta ao solicitante...' }}"></textarea>
+                            <div id="sup-resposta-erro" class="hidden bento-inline-notice error" style="margin-top:4px;"></div>
+                            <div id="sup-resposta-ok" class="hidden bento-inline-notice ok" style="margin-top:4px;"></div>
+                            <button type="button" data-action="enviar-resposta-supervisor" data-chamado-id="{{ chamado.id }}" class="bento-btn-block solid-blue" style="margin-top:8px;">
+                                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
+                                {{ t('supervisor_reply_send_btn') if t else 'Enviar resposta' }}
+                            </button>
+                        </div>
 
-                            {% if anexos_brutos %}
-                                <!-- Garantir que cada anexo só apareça 1x -->
-                                {% set anexos_unicos = [] %}
-                                {% for a in anexos_brutos %}
-                                    {% if a not in anexos_unicos and a and a != 'None' %}
-                                        {% set _ = anexos_unicos.append(a) %}
-                                    {% endif %}
-                                {% endfor %}
+                        <div class="bento-resp-box">
+                            <label class="bento-field-label" style="margin-bottom:8px;">{% set _natt = t('new_attachment') %}{{ _natt if _natt != 'new_attachment' else 'Novo Anexo' }}</label>
+                            <label for="modal-input-anexo" class="bento-dropzone block" style="padding:16px;" data-upload-placeholder="{% set _cu = t('click_to_upload_file') %}{{ _cu if _cu != 'click_to_upload_file' else 'Clique para enviar um arquivo' }}">
+                                <input type="file" id="modal-input-anexo" form="form-status" name="anexos_novos" class="sr-only" accept="{{ accept_anexo }}" multiple>
+                                <div class="icon" style="margin:0 auto 6px;">
+                                    <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                    </svg>
+                                </div>
+                                <p style="font-size:13px; font-weight:600; color:var(--color-text-muted);" id="nome-arquivo-selecionado">{% set _cu2 = t('click_to_upload_file') %}{{ _cu2 if _cu2 != 'click_to_upload_file' else 'Clique para enviar um arquivo' }}</p>
+                                <small>{% set _od = t('or_drag_drop') %}{{ _od if _od != 'or_drag_drop' else 'ou arraste e solte aqui' }}</small>
+                                <small title="{{ extensoes_permitidas|join(', ') }}">{% set _ft = t('file_types_short') %}{{ _ft if _ft != 'file_types_short' else 'Imagens, PDF, Excel e Word. Máx. 10MB' }}</small>
+                            </label>
+                            <!-- Preview local (imagem/PDF) do que foi selecionado, antes de "Salvar Alteração"
+                                 mandar de verdade pro solicitante — mesmo padrão de app/templates/formulario.html -->
+                            <ul id="preview-anexo-novo" class="bento-attach-list" style="margin-top:8px;"></ul>
+                        </div>
+                        {% endif %}
 
-                                {% if anexos_unicos %}
-                                    {% set tem_anexo = true %}
-                                    <div class="flex flex-col gap-2">
-                                        {% for anx in anexos_unicos %}
-                                            {% set is_r2 = anx.startswith('r2:') %}
-                                            {% set is_local = anx.startswith('local:') %}
-                                            {% set is_onedrive = anx.startswith('onedrive:') %}
-                                            {% set is_url = anx.startswith('http://') or anx.startswith('https://') %}
+                        <div class="space-y-3 {% if pode_editar %}bento-resp-box{% endif %}">
+                            {% if anexos_exibicao %}
+                                <div class="flex flex-col gap-2">
+                                    {% for item in anexos_exibicao %}
+                                        {% set anx = item.caminho %}
+                                        {% set is_r2 = anx.startswith('r2:') %}
+                                        {% set is_local = anx.startswith('local:') %}
+                                        {% set is_onedrive = anx.startswith('onedrive:') %}
+                                        {% set is_url = anx.startswith('http://') or anx.startswith('https://') %}
 
-                                            {# Tenta extrair o nome do arquivo da URL ou chave #}
-                                            {% set nome_limpo = anx %}
-                                            {% if '?' in nome_limpo %}{% set nome_limpo = nome_limpo.split('?')[0] %}{% endif %}
-                                            {% set nome_limpo = nome_limpo.split('/')[-1] %}
-                                            {% set nome_limpo = nome_limpo.split('%2F')[-1] %}
-                                            {% set nome_limpo = nome_limpo | replace('%20', ' ') %}
+                                        {# Tenta extrair o nome do arquivo da URL ou chave #}
+                                        {% set nome_limpo = anx %}
+                                        {% if '?' in nome_limpo %}{% set nome_limpo = nome_limpo.split('?')[0] %}{% endif %}
+                                        {% set nome_limpo = nome_limpo.split('/')[-1] %}
+                                        {% set nome_limpo = nome_limpo.split('%2F')[-1] %}
+                                        {% set nome_limpo = nome_limpo | replace('%20', ' ') %}
 
-                                            {% if nome_limpo | length > 45 %}
-                                                {% set nome_limpo = nome_limpo[:25] + '...' + nome_limpo[-12:] %}
-                                            {% endif %}
+                                        {% if nome_limpo | length > 45 %}
+                                            {% set nome_limpo = nome_limpo[:25] + '...' + nome_limpo[-12:] %}
+                                        {% endif %}
 
-                                            {% if is_r2 or is_local %}
-                                                {% set href_anexo = url_for('main.download_anexo', chamado_id=chamado.id, chave=anx) %}
-                                            {% elif is_onedrive %}
-                                                {% set href_anexo = anx[9:] %}
-                                            {% elif is_url %}
-                                                {% set href_anexo = anx %}
-                                            {% else %}
-                                                {# Legado: anexo salvo em disco antes da Fase 1, sem prefixo — servido
-                                                   via rota autenticada (fecha gap de acesso público em static/uploads) #}
-                                                {% set href_anexo = url_for('main.download_anexo', chamado_id=chamado.id, chave=anx) %}
-                                            {% endif %}
+                                        {% if is_r2 or is_local %}
+                                            {% set href_anexo = url_for('main.download_anexo', chamado_id=chamado.id, chave=anx) %}
+                                        {% elif is_onedrive %}
+                                            {% set href_anexo = anx[9:] %}
+                                        {% elif is_url %}
+                                            {% set href_anexo = anx %}
+                                        {% else %}
+                                            {# Legado: anexo salvo em disco antes da Fase 1, sem prefixo — servido
+                                               via rota autenticada (fecha gap de acesso público em static/uploads) #}
+                                            {% set href_anexo = url_for('main.download_anexo', chamado_id=chamado.id, chave=anx) %}
+                                        {% endif %}
 
+                                        <div class="flex items-center flex-wrap gap-2">
                                             {% if is_onedrive %}
                                             <a href="{{ href_anexo }}" target="_blank" rel="noopener noreferrer" class="bento-attach-link blue" style="width:fit-content;">
                                                 <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
@@ -290,31 +350,20 @@
                                                 <span>{{ nome_limpo }}</span>
                                             </a>
                                             {% endif %}
-                                        {% endfor %}
-                                    </div>
-                                {% endif %}
-                            {% endif %}
-
-                            {% if not tem_anexo %}
+                                            <span style="font-size:11px; color:var(--color-surface-muted); font-style:italic;">
+                                                {% if item.eh_solicitante %}
+                                                    {{ t('attachment_from_requester') if t else 'Anexado pelo solicitante' }}
+                                                {% elif item.usuario_id == current_user.id %}
+                                                    {{ t('attachment_from_you') if t else 'Anexado por você' }}
+                                                {% else %}
+                                                    {{ t('attachment_from_user', nome=item.usuario_nome) if t else 'Anexado por ' + (item.usuario_nome or '?') }}
+                                                {% endif %}
+                                            </span>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                            {% else %}
                             <p style="font-size:13px; color:var(--color-surface-muted); font-style:italic;">{% set _na = t('no_attachments_current') %}{{ _na if _na != 'no_attachments_current' else 'Sem anexos atuais.' }}</p>
-                            {% endif %}
-
-                            <!-- Dropzone para Novo Anexo (Apenas se puder editar) -->
-                            {% if pode_editar %}
-                            <div style="padding-top:10px; {% if tem_anexo %}border-top:1px solid var(--color-surface-border);{% endif %}">
-                                <label class="bento-field-label" style="margin-bottom:8px;">{% set _natt = t('new_attachment') %}{{ _natt if _natt != 'new_attachment' else 'Novo Anexo' }}</label>
-                                <label for="modal-input-anexo" class="bento-dropzone block" style="padding:16px;" data-upload-placeholder="{% set _cu = t('click_to_upload_file') %}{{ _cu if _cu != 'click_to_upload_file' else 'Clique para enviar um arquivo' }}">
-                                    <input type="file" id="modal-input-anexo" form="form-status" name="anexos_novos" class="sr-only" accept="{{ accept_anexo }}" multiple>
-                                    <div class="icon" style="margin:0 auto 6px;">
-                                        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                                        </svg>
-                                    </div>
-                                    <p style="font-size:13px; font-weight:600; color:var(--color-text-muted);" id="nome-arquivo-selecionado">{% set _cu2 = t('click_to_upload_file') %}{{ _cu2 if _cu2 != 'click_to_upload_file' else 'Clique para enviar um arquivo' }}</p>
-                                    <small>{% set _od = t('or_drag_drop') %}{{ _od if _od != 'or_drag_drop' else 'ou arraste e solte aqui' }}</small>
-                                    <small title="{{ extensoes_permitidas|join(', ') }}">{% set _ft = t('file_types_short') %}{{ _ft if _ft != 'file_types_short' else 'Imagens, PDF, Excel e Word. Máx. 10MB' }}</small>
-                                </label>
-                            </div>
                             {% endif %}
                         </div>
 
@@ -396,16 +445,6 @@
                                 </div>
                             </div>
 
-                            <div>
-                                <label for="select-responsavel" class="bento-field-label">{{ t('responsible') if t else 'Responsável' }}</label>
-                                <select name="novo_responsavel_id" id="select-responsavel">
-                                    <option value="">{{ t('no_change') if t else 'Sem alteração' }} ({{ t('current_label') if t else 'Atual' }}: {{ chamado.responsavel or '—' }})</option>
-                                    {% for sup in supervisores_detalhados %}
-                                    <option value="{{ sup.id }}">{{ sup.nome }} ({{ translate_sector_list(sup.area) if sup.area else '—' }})</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-
                             <!-- Participantes (Fase 4) — edição -->
                             {% if chamado.participantes %}
                             <div style="padding-top:16px; border-top:1px solid var(--color-surface-border);">
@@ -436,42 +475,39 @@
                                 </div>
                             </div>
                             {% endif %}
-                            <!-- Prazo e avisos (SLA + previsão de atendimento unificados na UI) -->
+                            <!-- Previsão de atendimento (unifica antigo "Prazo do chamado (dias)" +
+                                 "Adiar avisos de escalonamento" — só vale depois de aprovada pelo
+                                 gestor do setor, ver previsao_atendimento_service.py) -->
                             <div style="padding-top:16px; border-top:1px solid var(--color-surface-border);">
                                 <label class="bento-field-label" style="margin-bottom:10px;">{{ t('deadline_and_alerts_title') if t else 'Prazo e avisos' }}</label>
 
-                                <div style="margin-bottom:16px;">
-                                    <label for="input-sla-dias" class="bento-field-label" style="margin-bottom:4px; font-size:12px; display:flex; align-items:center;">
-                                        {{ t('ticket_deadline_label') if t else 'Prazo do chamado (dias)' }}
-                                        {% if chamado.sla_dias %}
-                                        <span class="bento-active-chip on" style="margin-left:8px;">{{ t('sla_custom_badge') if t else 'Personalizado' }}</span>
-                                        {% endif %}
-                                    </label>
-                                    <p style="font-size:11px; color:var(--color-surface-muted); margin-bottom:10px;">{{ t('ticket_deadline_help') if t else 'Quantos dias esse chamado tem até ficar atrasado. Deixe em branco para manter. Digite 0 para voltar ao padrão.' }}</p>
-                                    <input type="number" id="input-sla-dias" name="sla_dias" form="form-status" min="0" max="365"
-                                        value="{{ chamado.sla_dias if chamado.sla_dias is not none else '' }}"
-                                        placeholder="{{ chamado.sla_dias if chamado.sla_dias else (t('sla_default_placeholder') if t else 'Padrão') }}">
+                                {% if previsao_pendente %}
+                                <div class="bento-action-box amber" style="margin-bottom:12px;">
+                                    <p class="title">{{ t('attendance_forecast_pending_title') if t else 'Aguardando aprovação' }}</p>
+                                    <p style="font-size:12px; font-weight:700; margin-top:4px;">{{ previsao_pendente.previsao_solicitada }}</p>
+                                    <p style="font-size:11px; color:var(--color-surface-muted); margin-top:2px;">{{ previsao_pendente.motivo }}</p>
+                                    <p style="font-size:11px; color:var(--color-surface-muted); margin-top:8px;">
+                                        {{ t('attendance_forecast_pending_gestor') if t else 'Decisão de' }}:
+                                        {{ previsao_pendente.gestor_nome or (t('attendance_forecast_no_gestor') if t else 'nenhum gestor cadastrado') }}
+                                    </p>
                                 </div>
+                                {% elif chamado.previsao_atendimento %}
+                                <div style="background:var(--color-surface-canvas); border-radius:14px; padding:10px 12px; margin-bottom:10px;">
+                                    <p style="font-size:12px; font-weight:700;">{{ chamado.previsao_atendimento_formatada() }}</p>
+                                    {% if chamado.motivo_previsao_atendimento %}
+                                    <p style="font-size:11px; color:var(--color-surface-muted); margin-top:2px;">{{ chamado.motivo_previsao_atendimento }}</p>
+                                    {% endif %}
+                                </div>
+                                {% else %}
+                                <p style="font-size:11px; color:var(--color-surface-muted); margin-bottom:10px;">{{ t('no_forecast_set') if t else 'Nenhuma previsão definida no momento.' }}</p>
+                                {% endif %}
 
-                                <div style="padding-top:14px; border-top:1px dashed var(--color-surface-border);">
-                                    <label class="bento-field-label" style="margin-bottom:6px; font-size:12px;">{{ t('postpone_escalation_label') if t else 'Adiar avisos de escalonamento' }}</label>
-                                    {% if chamado.previsao_atendimento %}
-                                    <div style="background:var(--color-surface-canvas); border-radius:14px; padding:10px 12px; margin-bottom:10px;">
-                                        <p style="font-size:12px; font-weight:700;">{{ chamado.previsao_atendimento_formatada() }}</p>
-                                        {% if chamado.motivo_previsao_atendimento %}
-                                        <p style="font-size:11px; color:var(--color-surface-muted); margin-top:2px;">{{ chamado.motivo_previsao_atendimento }}</p>
-                                        {% endif %}
-                                    </div>
-                                    {% else %}
-                                    <p style="font-size:11px; color:var(--color-surface-muted); margin-bottom:10px;">{{ t('no_forecast_set') if t else 'Nenhum aviso adiado no momento.' }}</p>
-                                    {% endif %}
-                                    {% if pode_escalonar and current_user.perfil in ('supervisor', 'admin', 'admin_global') %}
-                                    <button type="button" data-action="abrir-escalonamento" data-target="modal-previsao-atendimento" class="bento-btn-outline" style="width:100%; justify-content:center;">
-                                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                                        {{ t('attendance_forecast_btn') if t else 'Definir previsão de atendimento' }}
-                                    </button>
-                                    {% endif %}
-                                </div>
+                                {% if not previsao_pendente and pode_escalonar and current_user.perfil in ('supervisor', 'admin', 'admin_global') %}
+                                <button type="button" data-action="abrir-escalonamento" data-target="modal-previsao-atendimento" class="bento-btn-outline" style="width:100%; justify-content:center;">
+                                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                    {{ t('attendance_forecast_btn') if t else 'Solicitar nova previsão de atendimento' }}
+                                </button>
+                                {% endif %}
                             </div>
 
                             <div style="padding-top:16px; margin-top:4px; border-top:1px solid var(--color-surface-border);">
@@ -525,7 +561,7 @@
                                 </div>
                             </div>
                             {% endif %}
-                            {% if chamado.sla_dias or chamado.previsao_atendimento %}
+                            {% if chamado.sla_dias or chamado.previsao_atendimento or previsao_pendente %}
                             <div>
                                 <label class="bento-field-label" style="margin-bottom:6px;">{{ t('deadline_and_alerts_title') if t else 'Prazo e avisos' }}</label>
                                 {% if chamado.sla_dias %}
@@ -534,9 +570,14 @@
                                     <span style="opacity:.7;">({{ t('sla_custom_badge') if t else 'personalizado' }})</span>
                                 </span>
                                 {% endif %}
-                                {% if chamado.previsao_atendimento %}
+                                {% if previsao_pendente %}
+                                <div class="bento-action-box amber" style="margin-top:8px;">
+                                    <p class="title">{{ t('attendance_forecast_pending_title') if t else 'Aguardando aprovação' }}</p>
+                                    <p style="font-size:12px; font-weight:700; margin-top:4px;">{{ previsao_pendente.previsao_solicitada }}</p>
+                                </div>
+                                {% elif chamado.previsao_atendimento %}
                                 <div style="background:var(--color-surface-canvas); border-radius:14px; padding:10px 12px; margin-top:8px;">
-                                    <p style="font-size:11px; font-weight:700; color:var(--color-surface-muted); text-transform:uppercase; letter-spacing:.03em;">{{ t('postpone_escalation_label') if t else 'Adiar avisos de escalonamento' }}</p>
+                                    <p style="font-size:11px; font-weight:700; color:var(--color-surface-muted); text-transform:uppercase; letter-spacing:.03em;">{{ t('deadline_and_alerts_title') if t else 'Previsão de atendimento' }}</p>
                                     <p style="font-size:12px; font-weight:700; margin-top:2px;">{{ chamado.previsao_atendimento_formatada() }}</p>
                                     {% if chamado.motivo_previsao_atendimento %}
                                     <p style="font-size:11px; color:var(--color-surface-muted); margin-top:2px;">{{ chamado.motivo_previsao_atendimento }}</p>
@@ -654,8 +695,41 @@
                         {% endif %}
 
                     </div>
+
                 </div>
             </div>
+
+            {% if pode_decidir_previsao %}
+            <!-- Decisão da previsão de atendimento pendente — bloco independente de
+                 pode_editar: quem decide é o gestor_setor da área (ou admin), que pode
+                 muito bem ser "gestor puro" (is_gestor_only=True, sem poder editar o
+                 chamado em si) — não pode ficar preso dentro do painel de edição. -->
+            <div class="bento-panel" style="margin-top:16px;">
+                <h4 class="bento-panel-label" style="margin-bottom:14px;">
+                    <svg width="16" height="16" style="color:var(--color-surface-muted);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    {{ t('attendance_forecast_pending_title') if t else 'Aguardando aprovação' }}
+                </h4>
+                <p style="font-size:12px; font-weight:700; margin-bottom:2px;">{{ previsao_pendente.previsao_solicitada }}</p>
+                <p style="font-size:12px; color:var(--color-surface-muted); margin-bottom:14px;">{{ previsao_pendente.motivo }}</p>
+                <div class="flex flex-wrap gap-3">
+                    <button type="button" data-action="decidir-previsao-aprovar" data-solicitacao-id="{{ previsao_pendente.id }}" class="bento-btn-block solid-emerald" style="flex:1; min-width:160px; justify-content:center;">
+                        {{ t('approve') if t else 'Aprovar' }}
+                    </button>
+                    <button type="button" data-action="toggle-hidden" data-target="bloco-rejeitar-previsao" class="bento-btn-outline" style="flex:1; min-width:160px; justify-content:center;">
+                        {{ t('reject') if t else 'Rejeitar' }}
+                    </button>
+                </div>
+                <div id="bloco-rejeitar-previsao" class="hidden" style="margin-top:12px;">
+                    <textarea id="previsao-motivo-rejeicao" rows="2" maxlength="500"
+                        placeholder="{{ t('attendance_forecast_reject_reason_placeholder') if t else 'Motivo da rejeição (opcional)' }}"
+                        style="width:100%; background:var(--color-surface-canvas); border:1.5px solid transparent; border-radius:14px; padding:10px 12px; font-family:inherit; font-size:13px; resize:none; margin-bottom:8px;"></textarea>
+                    <button type="button" data-action="decidir-previsao-rejeitar" data-solicitacao-id="{{ previsao_pendente.id }}" class="bento-btn-block solid-rose" style="width:100%; justify-content:center;">
+                        {{ t('attendance_forecast_confirm_reject_btn') if t else 'Confirmar rejeição' }}
+                    </button>
+                </div>
+                <div id="previsao-decisao-erro" class="hidden bento-inline-notice error" style="margin-top:10px;"></div>
+            </div>
+            {% endif %}
 
             {% if pode_escalonar %}
             <!-- Ações de Escalonamento — barra full-width abaixo do grid -->
@@ -826,7 +900,7 @@
     <div class="bento-modal-backdrop"></div>
     <div class="bento-modal-panel" style="position:relative; z-index:1;">
         <div class="head">
-            <h3 id="modal-previsao-atendimento-titulo" style="font-weight:800; font-size:15px;">{{ t('attendance_forecast_btn') if t else 'Definir previsão de atendimento' }}</h3>
+            <h3 id="modal-previsao-atendimento-titulo" style="font-weight:800; font-size:15px;">{{ t('attendance_forecast_btn') if t else 'Solicitar nova previsão de atendimento' }}</h3>
             <button type="button" data-action="fechar-escalonamento" data-target="modal-previsao-atendimento" class="bento-modal-close">
                 <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
             </button>
@@ -850,7 +924,7 @@
                 {{ t('cancel') if t else 'Cancelar' }}
             </button>
             <button type="button" data-action="executar-definir-previsao-atendimento" class="bento-btn-block solid-amber" style="flex:1;">
-                {{ t('attendance_forecast_btn') if t else 'Definir previsão de atendimento' }}
+                {{ t('attendance_forecast_btn') if t else 'Solicitar nova previsão de atendimento' }}
             </button>
         </div>
     </div>
@@ -900,6 +974,38 @@ Object.assign(window.DTX_MSGS, {
         var el = document.getElementById(elId);
         if (el) { el.classList.add('hidden'); }
     }
+
+    // ── Responder ao solicitante (via inversa de enviarRespostaSolicitante,
+    //    definida num bloco condicional só do solicitante mais abaixo —
+    //    inacessível aqui pro supervisor). Botão só existe no DOM quando
+    //    pode_editar (ver painel "Responder ao Solicitante"). ──
+    window.enviarRespostaSupervisor = function(chamadoId) {
+        esconderErro('sup-resposta-erro');
+        esconderErro('sup-resposta-ok');
+        var campoTexto = document.getElementById('sup-resposta-texto');
+        var mensagem = (campoTexto && campoTexto.value || '').trim();
+        if (mensagem.length < 2) {
+            mostrarErro('sup-resposta-erro', {{ t('reply_message_required', min_chars=2) | tojson }});
+            return;
+        }
+        fetch('/api/chamado/' + chamadoId + '/responder', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
+            body: JSON.stringify({ mensagem: mensagem })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.sucesso) {
+                mostrarErro('sup-resposta-ok', {{ t('text_reply_sent_success') | tojson }});
+                if (campoTexto) campoTexto.value = '';
+            } else {
+                mostrarErro('sup-resposta-erro', data.erro || {{ t('error_processing_request') | tojson }});
+            }
+        })
+        .catch(function() {
+            mostrarErro('sup-resposta-erro', {{ t('error_connection') | tojson }});
+        });
+    };
 
     // ── Acessibilidade dos modais de escalonamento: foco + Escape ───────────
     // Os modais são <div class="hidden"> (não <dialog> nativo), então não há
@@ -1062,6 +1168,26 @@ Object.assign(window.DTX_MSGS, {
             else { mostrarErro('previsao-atendimento-erro', data.erro || DTX_MSGS.error_forecast_set); }
         })
         .catch(function() { mostrarErro('previsao-atendimento-erro', DTX_MSGS.error_connection); });
+    };
+
+    window.decidirPrevisaoAtendimento = function(solicitacaoId, acao) {
+        esconderErro('previsao-decisao-erro');
+        var motivoRejeicao = '';
+        if (acao === 'rejeitar') {
+            var motivoEl = document.getElementById('previsao-motivo-rejeicao');
+            motivoRejeicao = motivoEl ? (motivoEl.value || '').trim() : '';
+        }
+        fetch('/api/chamado/' + CHAMADO_ID + '/previsao-atendimento/' + solicitacaoId + '/decidir', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
+            body: JSON.stringify({ acao: acao, motivo_rejeicao: motivoRejeicao })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.sucesso) { window.location.reload(); }
+            else { mostrarErro('previsao-decisao-erro', data.erro || DTX_MSGS.error_forecast_set); }
+        })
+        .catch(function() { mostrarErro('previsao-decisao-erro', DTX_MSGS.error_connection); });
     };
 
     // ── Incluir Participantes (Fase 4) ──────────────────────────────────────
@@ -1248,6 +1374,19 @@ Object.assign(window.DTX_MSGS, {
     })();
     const inputFile = document.getElementById('modal-input-anexo');
     const nomeArquivoEl = document.getElementById('nome-arquivo-selecionado');
+    const previewAnexoNovo = document.getElementById('preview-anexo-novo');
+    var _urlsPreviewAnexoNovo = [];
+
+    // Preview local (blob, sem subir nada pro servidor) do anexo antes de
+    // "Salvar Alteração" mandar de verdade pro solicitante — mesmo padrão de
+    // app/templates/formulario.html (imagem: miniatura; PDF: link em nova aba).
+    function _tipoPreviewAnexoNovo(arq) {
+        var tipo = (arq.type || '').toLowerCase();
+        var ext = (arq.name.split('.').pop() || '').toLowerCase();
+        if (tipo.indexOf('image/') === 0 || ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'].indexOf(ext) !== -1) return 'imagem';
+        if (tipo === 'application/pdf' || ext === 'pdf') return 'pdf';
+        return 'outro';
+    }
 
     if(inputFile) {
         inputFile.addEventListener('change', function(e) {
@@ -1265,6 +1404,39 @@ Object.assign(window.DTX_MSGS, {
                 nomeArquivoEl.textContent = label ? label.getAttribute('data-upload-placeholder') : {{ t('click_to_upload_file') | tojson }};
                 nomeArquivoEl.style.color = '';
                 nomeArquivoEl.style.fontWeight = '';
+            }
+
+            if (previewAnexoNovo) {
+                previewAnexoNovo.innerHTML = '';
+                _urlsPreviewAnexoNovo.forEach(function (u) { URL.revokeObjectURL(u); });
+                _urlsPreviewAnexoNovo = [];
+                Array.prototype.forEach.call(files, function (arq) {
+                    var tipoPreview = _tipoPreviewAnexoNovo(arq);
+                    if (tipoPreview !== 'imagem' && tipoPreview !== 'pdf') return;
+                    var url = URL.createObjectURL(arq);
+                    _urlsPreviewAnexoNovo.push(url);
+                    var li = document.createElement('li');
+                    var link = document.createElement('a');
+                    link.href = url;
+                    link.target = '_blank';
+                    link.rel = 'noopener';
+                    link.className = 'flex items-center gap-2 truncate';
+                    if (tipoPreview === 'imagem') {
+                        var thumb = document.createElement('img');
+                        thumb.className = 'bento-attach-thumb';
+                        thumb.src = url;
+                        thumb.alt = '';
+                        link.appendChild(thumb);
+                    } else {
+                        link.innerHTML = '<svg class="w-4 h-4 shrink-0" style="color:var(--color-bento-success)" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>';
+                    }
+                    var nome = document.createElement('span');
+                    nome.className = 'font-medium truncate';
+                    nome.textContent = arq.name;
+                    link.appendChild(nome);
+                    li.appendChild(link);
+                    previewAnexoNovo.appendChild(li);
+                });
             }
         });
     }

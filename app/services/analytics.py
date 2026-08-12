@@ -76,23 +76,52 @@ def _to_datetime(ts: Any) -> datetime | None:
 
 
 def _dentro_sla(
-    data_abertura, data_conclusao, categoria: str, sla_dias_custom: int | None = None
+    data_abertura,
+    data_conclusao,
+    categoria: str,
+    sla_dias_custom: int | None = None,
+    previsao_atendimento: Any = None,
 ) -> bool | None:
-    """True se concluído dentro do SLA, False se fora. None se não for possível calcular."""
+    """True se concluído dentro do SLA, False se fora. None se não for possível calcular.
+
+    previsao_atendimento (aprovada — ver previsao_atendimento_service.py) alarga
+    o prazo quando for mais tarde que o TAT/sla_dias, nunca encurta."""
     dt_abertura = _to_datetime(data_abertura)
     dt_conclusao = _to_datetime(data_conclusao)
     if not dt_abertura or not dt_conclusao:
         return None
     dias = _sla_dias_por_categoria(categoria or "", sla_dias_custom)
-    limite = dt_abertura + timedelta(days=dias)
+    limite = _prazo_efetivo(dt_abertura + timedelta(days=dias), previsao_atendimento)
     return dt_conclusao <= limite
+
+
+def _prazo_efetivo(limite: datetime, previsao_atendimento: Any) -> datetime:
+    """Alarga `limite` pra `previsao_atendimento` (previsão de atendimento
+    APROVADA — ver previsao_atendimento_service.py) quando ela for mais
+    tarde que o TAT original. Nunca encurta: uma previsão que caiu antes do
+    TAT original (não deveria acontecer no fluxo normal, mas por segurança)
+    não teria efeito nenhum aqui."""
+    dt_previsao = _to_datetime(previsao_atendimento)
+    if dt_previsao is None:
+        return limite
+    a, b = limite, dt_previsao
+    if (a.tzinfo is None) != (b.tzinfo is None):
+        if a.tzinfo is None:
+            a = a.replace(tzinfo=UTC)
+        else:
+            b = b.replace(tzinfo=UTC)
+    return dt_previsao if b > a else limite
 
 
 def obter_sla_para_exibicao(chamado: Any) -> dict[str, Any] | None:
     """Retorna dict para exibir SLA na Gestão (dashboard). Sem query ao banco.
 
     chamado: objeto com .data_abertura, .data_conclusao, .categoria, .status
-    e opcionalmente .data_em_atendimento (usado quando status == 'Em Atendimento').
+    e opcionalmente .data_em_atendimento (usado quando status == 'Em Atendimento')
+    e .previsao_atendimento (previsão de atendimento aprovada pelo gestor do
+    setor — ver previsao_atendimento_service.py; unifica o antigo "Prazo do
+    chamado (dias)" com "Adiar avisos de escalonamento": a data aprovada
+    também vira o prazo oficial usado aqui, não só silencia e-mail).
 
     Para status 'Em Atendimento' com data_em_atendimento presente, o percentual é
     calculado em tempo útil via percentual_prazo_resolucao (Escada B / SLA resolução).
@@ -106,11 +135,12 @@ def obter_sla_para_exibicao(chamado: Any) -> dict[str, Any] | None:
     status = getattr(chamado, "status", None) or "Aberto"
     sla_dias_custom = getattr(chamado, "sla_dias", None)
     data_em_atendimento = getattr(chamado, "data_em_atendimento", None)
+    previsao_atendimento = getattr(chamado, "previsao_atendimento", None)
     dt_abertura = _to_datetime(data_abertura)
     if not dt_abertura:
         return None
     dias = _sla_dias_por_categoria(categoria, sla_dias_custom)
-    limite = dt_abertura + timedelta(days=dias)
+    limite = _prazo_efetivo(dt_abertura + timedelta(days=dias), previsao_atendimento)
     # Comparação consistente: ambos naive ou ambos aware (evita TypeError)
     if limite.tzinfo is not None:
         now = datetime.now(UTC)
@@ -128,8 +158,13 @@ def obter_sla_para_exibicao(chamado: Any) -> dict[str, Any] | None:
             "dentro_prazo": dentro,
             "em_risco": False,
         }
-    # Em Atendimento com data_em_atendimento — usa tempo útil (SLA resolução / Escada B)
+    # Em Atendimento com data_em_atendimento — usa tempo útil (SLA resolução / Escada B).
+    # Previsão de atendimento aprovada e ainda futura vale mais que o percentual
+    # calculado sobre o TAT antigo: enquanto durar a previsão, o chamado está
+    # "no prazo" mesmo que já tivesse estourado 50%/80% do prazo original.
     if status == "Em Atendimento":
+        if previsao_atendimento is not None and now < limite:
+            return {"label": "No prazo", "dentro_prazo": True, "em_risco": False}
         dt_em_atendimento = _to_datetime(data_em_atendimento)
         if dt_em_atendimento is not None:
             # Normaliza para naive para compatibilidade com business_time
@@ -229,7 +264,13 @@ class AnalisadorChamados:
                         tempo = (dt_con - dt_ab).total_seconds() / 3600
                         tempos_resolucao.append(tempo)
                     sla_dias_raw = chamado.get("sla_dias")
-                    dentro = _dentro_sla(data_abertura, data_conclusao, categoria, sla_dias_raw)
+                    dentro = _dentro_sla(
+                        data_abertura,
+                        data_conclusao,
+                        categoria,
+                        sla_dias_raw,
+                        chamado.get("previsao_atendimento"),
+                    )
                     if dentro is True:
                         concluidos_dentro_sla += 1
                     elif dentro is False:
@@ -262,10 +303,27 @@ class AnalisadorChamados:
                 if chamado.get("status") not in ("Concluído",):
                     status_ch = chamado.get("status") or ""
                     dt_em_at = _to_datetime(chamado.get("data_em_atendimento"))
-                    if status_ch == "Em Atendimento" and dt_em_at is not None:
+                    previsao_atendimento = chamado.get("previsao_atendimento")
+                    # Previsão de atendimento aprovada e ainda futura vale mais que o
+                    # percentual/calendário calculados sobre o TAT antigo — alinhado
+                    # com obter_sla_para_exibicao (badge do chamado individual).
+                    dt_previsao_ativa = _to_datetime(previsao_atendimento)
+                    agora_utc = datetime.now(UTC)
+                    previsao_ainda_futura = (
+                        dt_previsao_ativa is not None
+                        and (
+                            dt_previsao_ativa.replace(tzinfo=UTC)
+                            if dt_previsao_ativa.tzinfo is None
+                            else dt_previsao_ativa
+                        )
+                        > agora_utc
+                    )
+                    if previsao_ainda_futura:
+                        pass  # nem atrasado nem em risco enquanto a previsão não vence
+                    elif status_ch == "Em Atendimento" and dt_em_at is not None:
                         # Usa tempo útil para chamados Em Atendimento (alinhado com badge)
                         categoria = chamado.get("categoria") or ""
-                        agora_naive = datetime.now(UTC).replace(tzinfo=None)
+                        agora_naive = agora_utc.replace(tzinfo=None)
                         dt_naive = dt_em_at.replace(tzinfo=None) if dt_em_at.tzinfo else dt_em_at
                         pct = percentual_prazo_resolucao(dt_naive, categoria, agora_naive)
                         if pct > 1.0:
@@ -278,7 +336,9 @@ class AnalisadorChamados:
                         dt_ab = _to_datetime(data_abertura)
                         if dt_ab is not None:
                             dias_sla = _sla_dias_por_categoria(categoria, chamado.get("sla_dias"))
-                            limite = dt_ab + timedelta(days=dias_sla)
+                            limite = _prazo_efetivo(
+                                dt_ab + timedelta(days=dias_sla), previsao_atendimento
+                            )
                             if limite.tzinfo is not None:
                                 now = datetime.now(UTC)
                             else:

@@ -16,6 +16,7 @@ from sqlalchemy import select
 
 from app import db as db_module
 from app.db.models.chamado import ChamadoRow
+from app.models_historico import Historico
 from app.models_usuario import Usuario
 from app.services.notifications import notificar_solicitante_lembrete_confirmacao
 
@@ -63,6 +64,17 @@ def _marcar_lembrete_enviado(chamado_id: int, numero: int) -> None:
         row = session.get(ChamadoRow, chamado_id)
         if row is not None:
             setattr(row, campo, True)
+
+    Historico(
+        chamado_id=chamado_id,
+        usuario_id="sistema",
+        usuario_nome="Sistema (Lembrete de Confirmação)",
+        acao="lembrete_confirmacao_enviado",
+        campo_alterado=campo,
+        valor_anterior=None,
+        valor_novo=str(numero),
+        detalhe=f"{numero}º lembrete ({_LEMBRETE_1_HORAS if numero == 1 else _LEMBRETE_2_HORAS}h após conclusão)",
+    ).save()
 
 
 def processar_lembretes_confirmacao(agora: datetime | None = None) -> dict:

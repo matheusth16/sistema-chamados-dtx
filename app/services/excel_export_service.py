@@ -314,7 +314,7 @@ class ExportadorExcelAvancado:
                 chamado.prioridade,
                 chamado.data_abertura_formatada(),
                 chamado.data_conclusao_formatada(),
-                chamado.impacto or "-",
+                ", ".join(chamado.impacto) if chamado.impacto else "-",
             ]
 
             for col_num, valor in enumerate(dados_linha, 1):

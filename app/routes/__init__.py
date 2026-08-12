@@ -14,6 +14,7 @@ from app.routes import (  # noqa: E402
     api_infra,  # noqa: E402, F401
     api_notificacoes,  # noqa: E402, F401
     api_solicitante,  # noqa: E402, F401
+    aprovacao_previsao,  # noqa: E402, F401
     auth,  # noqa: E402, F401
     categorias,  # noqa: E402, F401
     chamados,  # noqa: E402, F401
@@ -25,5 +26,14 @@ from app.routes import (  # noqa: E402
 # Exporta as views para CSRF exempt no create_app
 from app.routes.api_chamados import atualizar_status_ajax  # noqa: E402, F401
 from app.routes.api_infra import cron_sla_escalacao, csp_report  # noqa: E402, F401
+from app.routes.aprovacao_previsao import (  # noqa: E402
+    aprovacao_previsao as view_aprovacao_previsao,  # noqa: F401
+)
 
-__all__ = ["main", "atualizar_status_ajax", "cron_sla_escalacao", "csp_report"]
+__all__ = [
+    "main",
+    "atualizar_status_ajax",
+    "cron_sla_escalacao",
+    "csp_report",
+    "view_aprovacao_previsao",
+]

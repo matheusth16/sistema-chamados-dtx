@@ -38,6 +38,7 @@ from sqlalchemy import select
 from app import db as db_module
 from app.db.models.chamado import ChamadoRow
 from app.models import Chamado
+from app.models_historico import Historico
 from app.services.business_time import (
     adicionar_dias_uteis,
     adicionar_horas_corridas,
@@ -66,6 +67,12 @@ from config import Config
 logger = logging.getLogger(__name__)
 
 _NIVEL_MAXIMO = 4
+
+# Ator de Histórico para ações disparadas pelo job de escalonamento (sem
+# usuário humano envolvido) — ver app/models_historico.py (usuario_id sem
+# FK, mesmo padrão de responsavel_id/solicitante_id em Chamado).
+USUARIO_ID_SISTEMA = "sistema"
+USUARIO_NOME_SISTEMA_SLA = "Sistema (Motor de Escalonamento SLA)"
 
 
 def calcular_deadline_inicial(categoria: str, status: str, data_abertura: datetime) -> datetime:
@@ -285,6 +292,20 @@ def _processar_chamado_escalonamento(
     )
     stats["escalados"] += 1
 
+    Historico(
+        chamado_id=chamado_id,
+        usuario_id=USUARIO_ID_SISTEMA,
+        usuario_nome=USUARIO_NOME_SISTEMA_SLA,
+        acao="escalonamento_automatico",
+        campo_alterado="escalacao_nivel",
+        valor_anterior=str(nivel_atual),
+        valor_novo=str(novo_nivel),
+        detalhe=f"Nível {nivel_atual}→{novo_nivel}"
+        + (
+            f" — e-mail para {email_dest}" if email_dest else " — sem gestor cadastrado, sem e-mail"
+        ),
+    ).save()
+
     logger.info(
         "Escalonamento: chamado %s escalado %d→%d (status=%s, chave=%s, email_ok=%s)",
         chamado_id,
@@ -322,6 +343,17 @@ def _enviar_pre_aviso(
             nivel_alvo,
             exc,
         )
+
+    Historico(
+        chamado_id=chamado.id,
+        usuario_id=USUARIO_ID_SISTEMA,
+        usuario_nome=USUARIO_NOME_SISTEMA_SLA,
+        acao="aviso_previo_escalonamento",
+        campo_alterado="escalacao_nivel",
+        valor_anterior=None,
+        valor_novo=str(nivel_alvo),
+        detalhe=f"Faltam ~{minutos_restantes}min pro nível {nivel_alvo}",
+    ).save()
 
 
 # ---------------------------------------------------------------------------
@@ -435,6 +467,15 @@ def _processar_aviso_resolucao(row: ChamadoRow, agora: datetime, stats: dict) ->
         )
         stats["notificados_50"] += 1
         updates["alerta_supervisor_50_enviado"] = True
+        Historico(
+            chamado_id=chamado_id,
+            usuario_id=USUARIO_ID_SISTEMA,
+            usuario_nome=USUARIO_NOME_SISTEMA_SLA,
+            acao="aviso_resolucao_prazo",
+            campo_alterado="alerta_supervisor_50_enviado",
+            valor_anterior=None,
+            valor_novo="50%",
+        ).save()
 
     # Aviso 80%
     if threshold_80:
@@ -447,6 +488,15 @@ def _processar_aviso_resolucao(row: ChamadoRow, agora: datetime, stats: dict) ->
         )
         stats["notificados_80"] += 1
         updates["alerta_supervisor_80_enviado"] = True
+        Historico(
+            chamado_id=chamado_id,
+            usuario_id=USUARIO_ID_SISTEMA,
+            usuario_nome=USUARIO_NOME_SISTEMA_SLA,
+            acao="aviso_resolucao_prazo",
+            campo_alterado="alerta_supervisor_80_enviado",
+            valor_anterior=None,
+            valor_novo="80%",
+        ).save()
 
     if updates:
         chamado.atualizar_campos(**updates)

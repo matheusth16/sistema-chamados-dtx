@@ -152,6 +152,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollToPlugin.min.js?t=1" crossorigin="anonymous"></script>
     <!-- GSAP Motion: animações de entrada (conteúdo, flash, elementos com .gsap-animate) -->
     <script src="{{ url_for('static', filename='js/gsap-motion.js') }}"></script>
+    <!-- Substitui a lista de opções de todo <select> por um painel com a cara do bento -->
+    <script src="{{ url_for('static', filename='js/custom-select.js') }}"></script>
     <script nonce="{{ csp_nonce }}">
       window.DTX_i18n = {
         time_now: "{{ t('time_now') }}",

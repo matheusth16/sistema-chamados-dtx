@@ -11,7 +11,12 @@ from html import escape
 from app.i18n import get_translated_status, get_translation
 from app.models_usuario import Usuario
 from app.services import webpush_service
-from app.services.email_templates import build_cta_button, build_detail_table, build_email_shell
+from app.services.email_templates import (
+    build_cta_button,
+    build_detail_table,
+    build_email_shell,
+    build_two_ctas,
+)
 from app.services.notifications import enviar_email
 from app.services.notifications_inapp import criar_notificacao
 
@@ -514,11 +519,409 @@ def notificar_resposta_solicitante_chamado(
             )
 
 
+def destinatarios_para_resposta_supervisor(dados_chamado: dict) -> list:
+    """Resolve e retorna os usuários a notificar quando o RESPONSÁVEL (supervisor/
+    admin) responde em texto livre: o solicitante dono + cada observador — via
+    inversa de destinatarios_do_chamado (usada quando quem responde é o solicitante).
+
+    Deduplicado por usuario.id. Usuários não encontrados são silenciosamente omitidos.
+    """
+    destinatarios: list = []
+    vistos: set = set()
+
+    solicitante_id = dados_chamado.get("solicitante_id")
+    if solicitante_id:
+        solicitante = Usuario.get_by_id(solicitante_id)
+        if solicitante:
+            destinatarios.append(solicitante)
+            vistos.add(solicitante.id)
+
+    for obs in dados_chamado.get("observadores") or []:
+        uid = obs.get("usuario_id") if isinstance(obs, dict) else getattr(obs, "usuario_id", None)
+        if not uid or uid in vistos:
+            continue
+        usuario = Usuario.get_by_id(uid)
+        if usuario:
+            destinatarios.append(usuario)
+            vistos.add(usuario.id)
+
+    return destinatarios
+
+
+def notificar_resposta_supervisor_chamado(
+    *,
+    chamado_id: str,
+    numero_chamado: str,
+    categoria: str,
+    respondente_nome: str,
+    mensagem: str,
+    dados_chamado: dict,
+) -> None:
+    """Notifica solicitante + observadores quando o responsável (supervisor/admin)
+    responde em texto livre — via inversa de notificar_resposta_solicitante_chamado."""
+    destinatarios = destinatarios_para_resposta_supervisor(dados_chamado)
+    if not destinatarios:
+        logger.info("Reply CH %s: no recipients, no e-mail sent.", numero_chamado)
+        return
+
+    assunto = get_translation("push_subject_reply_supervisor", "en", numero=numero_chamado)
+    link = _link_chamado(chamado_id)
+
+    for usuario in destinatarios:
+        email = getattr(usuario, "email", None)
+        uid = getattr(usuario, "id", None)
+
+        if email:
+            corpo_html = build_email_shell(
+                f"Ticket {numero_chamado} — New Reply",
+                "#0891b2",
+                f"<p>The responsible <em>{escape(respondente_nome)}</em> replied to ticket "
+                f"<strong>{escape(numero_chamado)}</strong> ({escape(categoria)}).</p>"
+                + build_detail_table(
+                    [
+                        ("Ticket", numero_chamado),
+                        ("Category", categoria),
+                        ("Message", mensagem),
+                        ("Replied by", respondente_nome),
+                    ]
+                )
+                + (build_cta_button("View ticket", link, "#2563eb") if link else ""),
+            )
+            corpo_texto = (
+                f"Ticket {numero_chamado} — new reply from {respondente_nome}.\n"
+                f"Message: {mensagem}" + (f"\n\nView ticket: {link}" if link else "")
+            )
+            ok, err = enviar_email(email, assunto, corpo_html, corpo_texto, importance="normal")
+            if ok:
+                logger.info("Reply e-mail sent to %s (ticket %s)", email, numero_chamado)
+            else:
+                logger.warning(
+                    "Failed to send reply e-mail to %s (ticket %s): %s",
+                    email,
+                    numero_chamado,
+                    err,
+                )
+
+        if uid:
+            criar_notificacao(
+                usuario_id=uid,
+                chamado_id=chamado_id,
+                numero_chamado=numero_chamado,
+                titulo=f"Nova resposta — Chamado {numero_chamado}",
+                mensagem=categoria,
+                tipo="resposta_responsavel",
+                categoria=categoria,
+            )
+            webpush_service.enviar_webpush_usuario(
+                uid,
+                titulo=assunto,
+                corpo=categoria,
+                url=link or "",
+            )
+
+
 def _link_chamado(chamado_id: str) -> str:
+    """Link "View ticket" usado em todos os e-mails deste módulo.
+
+    Achado ao implementar a aprovação de previsão de atendimento (2026-08-12):
+    o endpoint real da rota de detalhe é 'main.visualizar_detalhe_chamado'
+    (ver app/routes/dashboard.py), não 'main.visualizar_chamado' — o nome
+    errado fazia url_for levantar BuildError, silenciosamente engolido pelo
+    except abaixo, deixando TODOS os botões "View ticket" de TODAS as
+    notificações deste arquivo sempre vazios (href="").
+    """
     try:
         from flask import current_app, url_for
 
         with current_app.test_request_context():
-            return url_for("main.visualizar_chamado", chamado_id=chamado_id, _external=True)
+            return url_for("main.visualizar_detalhe_chamado", chamado_id=chamado_id, _external=True)
     except Exception:
         return ""
+
+
+def _link_decisao_previsao(solicitacao_id: int, acao: str) -> str:
+    """Link assinado (token de uso único) pra decidir o pedido direto do e-mail —
+    ver previsao_atendimento_service.gerar_token_decisao/validar_token_decisao."""
+    try:
+        from flask import current_app, url_for
+
+        from app.services.previsao_atendimento_service import gerar_token_decisao
+
+        token = gerar_token_decisao(solicitacao_id, acao)
+        with current_app.test_request_context():
+            return url_for("main.aprovacao_previsao", token=token, _external=True)
+    except Exception:
+        return ""
+
+
+def notificar_solicitacao_previsao_atendimento(
+    *,
+    chamado_id: str,
+    numero_chamado: str,
+    categoria: str,
+    solicitante_nome: str,
+    previsao_solicitada,
+    motivo: str,
+    solicitacao_id: int,
+    gestor_usuario,
+) -> None:
+    """Notifica o gestor decisor (gestor_setor da área do chamado, ou fallback —
+    ver resolver_gestor_decisor) de um novo pedido de previsão de atendimento,
+    com botões Aprovar/Rejeitar de um clique só (e-mail) + notificação in-app."""
+    if gestor_usuario is None:
+        logger.warning(
+            "Solicitação de previsão CH %s: nenhum gestor decisor encontrado, "
+            "notificação não enviada (pedido fica pendente até alguém decidir pelo sistema).",
+            numero_chamado,
+        )
+        return
+
+    link_aprovar = _link_decisao_previsao(solicitacao_id, "aprovar")
+    link_rejeitar = _link_decisao_previsao(solicitacao_id, "rejeitar")
+    link_chamado = _link_chamado(chamado_id)
+    previsao_fmt = str(previsao_solicitada)
+
+    email = getattr(gestor_usuario, "email", None)
+    uid = getattr(gestor_usuario, "id", None)
+
+    assunto = get_translation(
+        "push_subject_previsao_solicitada", "en", numero=numero_chamado, categoria=categoria
+    )
+
+    if email:
+        ctas = []
+        if link_aprovar:
+            ctas.append(("Approve", link_aprovar, "#16a34a"))
+        if link_rejeitar:
+            ctas.append(("Reject", link_rejeitar, "#dc2626"))
+        corpo_html = build_email_shell(
+            f"Ticket {numero_chamado} — Attendance Forecast Request",
+            "#d97706",
+            f"<p><em>{escape(solicitante_nome)}</em> requested a new attendance forecast for "
+            f"ticket <strong>{escape(numero_chamado)}</strong> ({escape(categoria)}).</p>"
+            + build_detail_table(
+                [
+                    ("Ticket", numero_chamado),
+                    ("Category", categoria),
+                    ("Requested date", previsao_fmt),
+                    ("Reason", motivo),
+                    ("Requested by", solicitante_nome),
+                ]
+            )
+            + build_two_ctas(ctas)
+            + (build_cta_button("View ticket", link_chamado, "#2563eb") if link_chamado else ""),
+        )
+        corpo_texto = (
+            f"Ticket {numero_chamado} — {solicitante_nome} requested a new attendance forecast "
+            f"({previsao_fmt}). Reason: {motivo}\n\nApprove: {link_aprovar}\nReject: {link_rejeitar}"
+        )
+        ok, err = enviar_email(email, assunto, corpo_html, corpo_texto, importance="high")
+        if ok:
+            logger.info(
+                "Attendance forecast request e-mail sent to %s (ticket %s)", email, numero_chamado
+            )
+        else:
+            logger.warning(
+                "Failed to send attendance forecast request e-mail to %s (ticket %s): %s",
+                email,
+                numero_chamado,
+                err,
+            )
+
+    if uid:
+        criar_notificacao(
+            usuario_id=uid,
+            chamado_id=chamado_id,
+            numero_chamado=numero_chamado,
+            titulo=f"Previsão de atendimento pendente — Chamado {numero_chamado}",
+            mensagem=categoria,
+            tipo="previsao_atendimento_solicitada",
+            categoria=categoria,
+        )
+        webpush_service.enviar_webpush_usuario(
+            uid,
+            titulo=assunto,
+            corpo=categoria,
+            url=link_chamado or "",
+        )
+
+
+def notificar_decisao_previsao_atendimento(
+    *,
+    chamado_id: str,
+    numero_chamado: str,
+    categoria: str,
+    acao: str,
+    previsao_solicitada,
+    motivo_rejeicao: str | None,
+    gestor_nome: str,
+    solicitante_id: str,
+) -> None:
+    """Notifica quem PEDIU a previsão de atendimento (supervisor/admin owner do
+    chamado — não o solicitante original do chamado, que nunca pode pedir isso,
+    ver previsao_atendimento_service.solicitar_previsao_atendimento) da decisão
+    do gestor — via inversa de notificar_solicitacao_previsao_atendimento."""
+    solicitante = Usuario.get_by_id(solicitante_id) if solicitante_id else None
+    destinatarios = [solicitante] if solicitante else []
+    if not destinatarios:
+        logger.info(
+            "Decisão de previsão CH %s: solicitante %s não encontrado, no e-mail sent.",
+            numero_chamado,
+            solicitante_id,
+        )
+        return
+
+    aprovado = acao == "aprovar"
+    link = _link_chamado(chamado_id)
+    previsao_fmt = str(previsao_solicitada)
+    assunto = get_translation(
+        "push_subject_previsao_decidida",
+        "en",
+        numero=numero_chamado,
+        status="Approved" if aprovado else "Rejected",
+    )
+
+    for usuario in destinatarios:
+        email = getattr(usuario, "email", None)
+        uid = getattr(usuario, "id", None)
+
+        if email:
+            cor = "#16a34a" if aprovado else "#dc2626"
+            detalhes = [
+                ("Ticket", numero_chamado),
+                ("Category", categoria),
+                ("Requested date", previsao_fmt),
+                ("Decided by", gestor_nome),
+            ]
+            if not aprovado and motivo_rejeicao:
+                detalhes.append(("Rejection reason", motivo_rejeicao))
+            corpo_html = build_email_shell(
+                f"Ticket {numero_chamado} — Attendance Forecast "
+                f"{'Approved' if aprovado else 'Rejected'}",
+                cor,
+                f"<p>Your attendance forecast request for ticket "
+                f"<strong>{escape(numero_chamado)}</strong> was "
+                f"<strong>{'approved' if aprovado else 'rejected'}</strong> by "
+                f"<em>{escape(gestor_nome)}</em>.</p>"
+                + build_detail_table(detalhes)
+                + (build_cta_button("View ticket", link, "#2563eb") if link else ""),
+            )
+            corpo_texto = (
+                f"Ticket {numero_chamado} — attendance forecast request "
+                f"{'approved' if aprovado else 'rejected'} by {gestor_nome}."
+                + (f"\nReason: {motivo_rejeicao}" if not aprovado and motivo_rejeicao else "")
+                + (f"\n\nView ticket: {link}" if link else "")
+            )
+            ok, err = enviar_email(email, assunto, corpo_html, corpo_texto, importance="normal")
+            if ok:
+                logger.info(
+                    "Attendance forecast decision e-mail sent to %s (ticket %s)",
+                    email,
+                    numero_chamado,
+                )
+            else:
+                logger.warning(
+                    "Failed to send attendance forecast decision e-mail to %s (ticket %s): %s",
+                    email,
+                    numero_chamado,
+                    err,
+                )
+
+        if uid:
+            criar_notificacao(
+                usuario_id=uid,
+                chamado_id=chamado_id,
+                numero_chamado=numero_chamado,
+                titulo=(
+                    f"Previsão aprovada — Chamado {numero_chamado}"
+                    if aprovado
+                    else f"Previsão rejeitada — Chamado {numero_chamado}"
+                ),
+                mensagem=categoria,
+                tipo=(
+                    "previsao_atendimento_aprovada"
+                    if aprovado
+                    else "previsao_atendimento_rejeitada"
+                ),
+                categoria=categoria,
+            )
+            webpush_service.enviar_webpush_usuario(
+                uid,
+                titulo=assunto,
+                corpo=categoria,
+                url=link or "",
+            )
+
+
+# ── Helpers de disparo em thread (usados pelas rotas) ───────────────────────
+
+
+def disparar_notificacao_solicitacao_previsao_em_thread(
+    app,
+    *,
+    chamado_id: str,
+    numero_chamado: str,
+    categoria: str,
+    solicitante_nome: str,
+    previsao_solicitada,
+    motivo: str,
+    solicitacao_id: int,
+    gestor_id: str | None,
+) -> None:
+    """Busca o Usuario do gestor e dispara notificar_solicitacao_previsao_atendimento
+    em background — usado por api_colaboracao.api_solicitar_previsao_atendimento."""
+    import threading
+
+    def _run():
+        with app.app_context():
+            try:
+                gestor_usuario = Usuario.get_by_id(gestor_id) if gestor_id else None
+                notificar_solicitacao_previsao_atendimento(
+                    chamado_id=chamado_id,
+                    numero_chamado=numero_chamado,
+                    categoria=categoria,
+                    solicitante_nome=solicitante_nome,
+                    previsao_solicitada=previsao_solicitada,
+                    motivo=motivo,
+                    solicitacao_id=solicitacao_id,
+                    gestor_usuario=gestor_usuario,
+                )
+            except Exception as exc:
+                logger.warning("Notificação de solicitação de previsão não enviada: %s", exc)
+
+    threading.Thread(target=_run, daemon=True).start()
+
+
+def disparar_notificacao_decisao_previsao_em_thread(
+    app, resultado_dados: dict, gestor_nome: str
+) -> None:
+    """Busca numero_chamado/categoria do chamado e dispara
+    notificar_decisao_previsao_atendimento em background — usado tanto pela
+    decisão via sistema quanto pela decisão via link de e-mail
+    (app/routes/aprovacao_previsao.py)."""
+    import threading
+
+    from app.models import Chamado
+
+    chamado_id = resultado_dados["chamado_id"]
+    chamado = Chamado.get_by_id(chamado_id)
+    numero_chamado = chamado.numero_chamado if chamado else "N/A"
+    categoria = chamado.categoria if chamado else ""
+
+    def _run():
+        with app.app_context():
+            try:
+                notificar_decisao_previsao_atendimento(
+                    chamado_id=chamado_id,
+                    numero_chamado=numero_chamado,
+                    categoria=categoria,
+                    acao=resultado_dados["acao"],
+                    previsao_solicitada=resultado_dados["previsao_solicitada"],
+                    motivo_rejeicao=resultado_dados.get("motivo_rejeicao"),
+                    gestor_nome=gestor_nome,
+                    solicitante_id=resultado_dados["solicitante_id"],
+                )
+            except Exception as exc:
+                logger.warning("Notificação de decisão de previsão não enviada: %s", exc)
+
+    threading.Thread(target=_run, daemon=True).start()

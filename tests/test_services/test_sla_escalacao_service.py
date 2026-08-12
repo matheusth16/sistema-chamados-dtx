@@ -823,6 +823,53 @@ def test_escalonamento_pre_aviso_reseta_pro_proximo_nivel_alvo():
 
 
 # ---------------------------------------------------------------------------
+# Histórico completo — ações automáticas do motor de SLA também deixam rastro
+# (achado em auditoria, 2026-08-12: só as ações manuais gravavam Histórico).
+# ---------------------------------------------------------------------------
+
+
+def test_escalonamento_automatico_grava_historico():
+    from app.models_historico import Historico
+
+    abertura = _dt(2024, 6, 3, 9, 0)
+    agora = _dt(2024, 6, 6, 9, 0)
+    chamado_id = _criar_chamado_aberto(data_abertura=abertura)
+
+    with (
+        patch("app.services.sla_escalacao_service.notificar_escalada_gerencial"),
+        patch(
+            "app.services.sla_escalacao_service._construir_mapa_gestor_setor",
+            return_value={"Manutenção": "gestor@dtx.aero"},
+        ),
+    ):
+        processar_escalonamento(agora=agora)
+
+    eventos = Historico.get_by_chamado_id(chamado_id)
+    automaticos = [e for e in eventos if e.acao == "escalonamento_automatico"]
+    assert len(automaticos) == 1
+    assert automaticos[0].usuario_id == "sistema"
+    assert automaticos[0].valor_anterior == "0"
+    assert automaticos[0].valor_novo == "1"
+
+
+def test_pre_aviso_escalonamento_grava_historico():
+    from app.models_historico import Historico
+
+    abertura = _dt(2024, 6, 3, 9, 0)
+    agora = _dt(2024, 6, 5, 16, 5)  # 25 min antes do TAT
+    chamado_id = _criar_chamado_aberto(data_abertura=abertura)
+
+    with patch("app.services.sla_escalacao_service.notificar_pre_aviso_escalonamento"):
+        processar_escalonamento(agora=agora)
+
+    eventos = Historico.get_by_chamado_id(chamado_id)
+    pre_avisos = [e for e in eventos if e.acao == "aviso_previo_escalonamento"]
+    assert len(pre_avisos) == 1
+    assert pre_avisos[0].usuario_id == "sistema"
+    assert pre_avisos[0].valor_novo == "1"
+
+
+# ---------------------------------------------------------------------------
 # processar_avisos_resolucao (Fase 7 — avisos 50%/80%)
 # ---------------------------------------------------------------------------
 
@@ -849,6 +896,27 @@ def test_aviso_50_enviado_quando_percentual_50():
     mock_notif.assert_called_once()
     assert mock_notif.call_args.kwargs["marco"] == 50
     assert Chamado.get_by_id(chamado_id).alerta_supervisor_50_enviado is True
+
+
+def test_aviso_resolucao_50_grava_historico():
+    from app.models_historico import Historico
+    from app.services.sla_escalacao_service import processar_avisos_resolucao
+
+    agora = _dt(2024, 6, 3, 10, 0)
+    chamado_id = _criar_chamado_em_atendimento()
+
+    with (
+        patch("app.services.sla_escalacao_service.percentual_prazo_resolucao", return_value=0.5),
+        patch("app.services.sla_escalacao_service.notificar_aviso_resolucao_supervisor"),
+        patch("app.models_usuario.Usuario.get_by_id", return_value=_mock_usuario()),
+    ):
+        processar_avisos_resolucao(agora=agora)
+
+    eventos = Historico.get_by_chamado_id(chamado_id)
+    avisos = [e for e in eventos if e.acao == "aviso_resolucao_prazo"]
+    assert len(avisos) == 1
+    assert avisos[0].usuario_id == "sistema"
+    assert avisos[0].valor_novo == "50%"
 
 
 def test_aviso_80_enviado_quando_percentual_80():

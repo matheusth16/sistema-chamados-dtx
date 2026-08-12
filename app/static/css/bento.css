@@ -52,7 +52,9 @@
 
 .bento-pill-group{ display:flex; flex-wrap:nowrap; gap:4px; background:var(--color-surface-canvas); padding:6px; border-radius:16px; overflow-x:auto; scrollbar-width:none; -ms-overflow-style:none; }
 .bento-pill-group::-webkit-scrollbar{ display:none; }
-.bento-pill{ display:flex; align-items:center; justify-content:center; flex:1 1 0; padding:9px 10px; border-radius:99px; cursor:pointer; font-size:12.5px; font-weight:700; color:var(--color-text-muted); transition:all .15s; white-space:nowrap; }
+.bento-pill{ display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; flex:1 1 0; padding:9px 10px; border-radius:16px; cursor:pointer; font-size:12.5px; font-weight:700; color:var(--color-text-muted); transition:all .15s; white-space:nowrap; }
+.bento-pill-label{ white-space:nowrap; }
+.bento-pill-tat{ font-size:10.5px; font-weight:600; opacity:.65; white-space:nowrap; }
 .bento-pill:has(input:checked){ background:#fff; box-shadow:0 2px 8px rgba(20,30,60,.08); color:inherit; }
 .bento-pill.danger{ color:var(--color-bento-danger); }
 .bento-pill.danger:has(input:checked){ background:#fff1f2; box-shadow:none; }
@@ -60,9 +62,15 @@
 .bento-pill.warning:has(input:checked){ background:var(--color-status-open-bg); box-shadow:none; }
 .bento-pill:has(input:focus-visible){ outline:2px solid var(--color-dtx-500); outline-offset:2px; }
 
-.bento-rl-field{ background:#fff1f2; border-top:3px solid var(--color-bento-danger); border-radius:16px; border-top-left-radius:0; border-top-right-radius:0; padding:18px 20px; }
-.bento-rl-field label{ font-size:11px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:#9f1239; margin-bottom:8px; display:block; }
+.bento-rl-field{ background:var(--color-bento-danger-bg); border-top:3px solid var(--color-bento-danger-deep); border-radius:16px; border-top-left-radius:0; border-top-right-radius:0; padding:18px 20px; transition:background .15s, border-color .15s; }
+.bento-rl-field label{ font-size:11px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:#9f1239; margin-bottom:8px; display:block; transition:color .15s; }
 .bento-rl-field input{ max-width:320px; }
+/* Cor acompanha a categoria que abriu a caixa (Projetos = âmbar, AOG =
+   vermelho, mesmas cores dos pills acima) — sem isso, trocar de categoria
+   deixava a caixa idêntica, sem sinalizar a mudança (ver toggleRL() no
+   template). .bento-rl-field sem modificador (AOG) já usa o vermelho acima. */
+.bento-rl-field.is-projetos{ background:var(--color-bento-warning-bg); border-top-color:var(--color-bento-warning); }
+.bento-rl-field.is-projetos label{ color:var(--color-bento-warning-deep); }
 
 .bento-grid-2{ display:grid; grid-template-columns:1fr 1fr; gap:20px; padding-bottom:22px; border-bottom:1px solid rgba(20,30,60,.06); }
 @media (max-width:640px){ .bento-grid-2{ grid-template-columns:1fr; } }
@@ -78,7 +86,7 @@
 .bento-form select{ cursor:pointer; }
 
 .bento-impact-grid{ display:flex; flex-wrap:wrap; gap:10px; }
-.bento-impact-grid .bento-impact{ flex:0 1 auto; min-width:110px; }
+.bento-impact-grid .bento-impact{ flex:1 1 0; min-width:110px; justify-content:center; }
 .bento-impact{ border-radius:14px; background:var(--color-surface-canvas); padding:12px 14px; font-size:13px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:8px; transition:all .15s; color:var(--color-text-muted); }
 .bento-impact input{ width:auto; accent-color:var(--color-dtx-500); }
 .bento-impact:has(input:checked){ background:var(--color-dtx-100); color:var(--color-dtx-500); box-shadow:0 0 0 2px rgba(40,78,149,.15) inset; }
@@ -94,6 +102,11 @@
 .bento-attach-list li{ display:flex; align-items:center; justify-content:space-between; gap:8px; padding:9px 14px; border-radius:12px; font-size:13px; font-weight:700; background:var(--color-status-done-bg); color:var(--color-bento-success); }
 .bento-attach-list li.link{ background:var(--color-bento-info-bg); color:var(--color-bento-info); }
 .bento-attach-list button{ background:none; border:none; font-size:11px; font-weight:800; cursor:pointer; opacity:.75; color:inherit; flex-shrink:0; }
+/* Miniatura + link de pré-visualização (imagem/PDF ainda não enviados —
+   URL.createObjectURL local, abre em nova aba) — ver _renderizar() acima. */
+.bento-attach-thumb{ width:26px; height:26px; border-radius:6px; object-fit:cover; flex-shrink:0; }
+.bento-attach-list a{ text-decoration:none; color:inherit; }
+.bento-attach-list a:hover .font-medium{ text-decoration:underline; }
 
 .bento-link-block{ margin-top:12px; padding:14px; background:var(--color-status-open-bg); border:1px solid var(--color-bento-warning-bg); border-radius:16px; }
 .bento-link-block p{ font-size:13px; font-weight:600; color:var(--color-bento-warning-deep); margin:0 0 10px; display:flex; align-items:center; gap:6px; }
@@ -102,7 +115,7 @@
 .bento-btn-secondary{ background:var(--color-dtx-500); color:#fff; border:none; border-radius:12px; padding:0 16px; font-family:inherit; font-weight:600; font-size:13px; cursor:pointer; flex-shrink:0; transition:background .15s; }
 .bento-btn-secondary:hover{ background:var(--color-dtx-600); }
 
-.bento-resp-box{ background:transparent; border:1px solid rgba(20,30,60,.08); border-radius:16px; padding:16px 20px; }
+.bento-resp-box{ background:transparent; border:none; border-top:1px solid rgba(20,30,60,.08); border-radius:0; padding:16px 0 0; margin-top:16px; }
 /* display fica isolado num seletor :not(.hidden) — mesmo padrão de .bento-bulk-bar/.bento-batch-bar
    abaixo. .hidden (Tailwind) e uma regra .bento-resp-badge{ display:... } incondicional têm a
    mesma especificidade; como bento.css carrega depois de tailwind.min.css em base.html, a regra
@@ -250,7 +263,23 @@
 .bento-filter-grid input:focus, .bento-filter-grid select:focus{ outline:none; border-color:var(--color-dtx-500); background:#fff; }
 .bento-filter-grid .actions button[type="submit"]{ flex:1; min-height:44px; }
 
-.bento-checkbox{ width:16px; height:16px; accent-color:var(--color-dtx-500); cursor:pointer; }
+/* Desenhado 100% via CSS (appearance:none) em vez de confiar no checkbox
+   nativo do SO + accent-color — combinação que renderiza de forma
+   inconsistente em alguns Windows/Chrome (escala de tela/DPI fracionário),
+   deixando artefatos visuais junto da caixa. */
+.bento-checkbox{
+  appearance:none; -webkit-appearance:none;
+  width:16px; height:16px; flex-shrink:0; margin:0;
+  border:1.5px solid var(--color-surface-border); border-radius:4px;
+  background:#fff; cursor:pointer; position:relative;
+  transition:background .15s, border-color .15s;
+}
+.bento-checkbox:checked{ background:var(--color-dtx-500); border-color:var(--color-dtx-500); }
+.bento-checkbox:checked::after{
+  content:''; position:absolute; left:4px; top:1px; width:4px; height:8px;
+  border:solid #fff; border-width:0 2px 2px 0; transform:rotate(45deg);
+}
+.bento-checkbox:focus-visible{ outline:2px solid var(--color-dtx-500); outline-offset:2px; }
 
 .bento-bulk-bar:not(.hidden){ display:flex; }
 .bento-bulk-bar{ flex-wrap:wrap; align-items:center; justify-content:space-between; gap:16px; }
@@ -283,14 +312,24 @@ dialog.bento-modal textarea:focus{ outline:none; border-color:var(--color-dtx-50
 
 /* Dashboard: tabela de 9 colunas (checkbox + 8) — larguras próprias, mais específicas que .bento-table-scope genérico */
 .bento-table-scope.dash-table th:nth-child(1), .bento-table-scope.dash-table td:nth-child(1){ width:4%; }
-.bento-table-scope.dash-table th:nth-child(2), .bento-table-scope.dash-table td:nth-child(2){ width:8%; }
+.bento-table-scope.dash-table th:nth-child(2), .bento-table-scope.dash-table td:nth-child(2){ width:8%; overflow:visible; text-overflow:clip; }
 .bento-table-scope.dash-table th:nth-child(3), .bento-table-scope.dash-table td:nth-child(3){ width:12%; overflow:visible; text-overflow:clip; }
 .bento-table-scope.dash-table th:nth-child(4), .bento-table-scope.dash-table td:nth-child(4){ width:15%; }
 .bento-table-scope.dash-table th:nth-child(5), .bento-table-scope.dash-table td:nth-child(5){ width:11%; }
 .bento-table-scope.dash-table th:nth-child(6), .bento-table-scope.dash-table td:nth-child(6){ width:15%; }
-.bento-table-scope.dash-table th:nth-child(7), .bento-table-scope.dash-table td:nth-child(7){ width:12%; }
-.bento-table-scope.dash-table th:nth-child(8), .bento-table-scope.dash-table td:nth-child(8){ width:11%; text-align:center; }
-.bento-table-scope.dash-table th:nth-child(9), .bento-table-scope.dash-table td:nth-child(9){ width:12%; }
+.bento-table-scope.dash-table th:nth-child(7), .bento-table-scope.dash-table td:nth-child(7){ width:12%; overflow:visible; text-overflow:clip; }
+.bento-table-scope.dash-table th:nth-child(8), .bento-table-scope.dash-table td:nth-child(8){ width:11%; text-align:center; overflow:visible; text-overflow:clip; }
+
+/* Variante sem a coluna "Atribuído a" (supervisor — só vê os próprios
+   chamados, coluna sempre repetiria o mesmo nome, ver dashboard.html) —
+   8 colunas, larguras recalculadas; espaço liberado vai pra Descrição
+   (campo mais cortado) e um pouco pra SLA. */
+.bento-table-scope.dash-table.no-assigned th:nth-child(4), .bento-table-scope.dash-table.no-assigned td:nth-child(4){ width:13%; }
+.bento-table-scope.dash-table.no-assigned th:nth-child(5), .bento-table-scope.dash-table.no-assigned td:nth-child(5){ width:25%; }
+.bento-table-scope.dash-table.no-assigned th:nth-child(6), .bento-table-scope.dash-table.no-assigned td:nth-child(6){ width:12%; overflow:visible; text-overflow:clip; }
+.bento-table-scope.dash-table.no-assigned th:nth-child(7), .bento-table-scope.dash-table.no-assigned td:nth-child(7){ width:14%; overflow:visible; text-overflow:clip; }
+.bento-table-scope.dash-table.no-assigned th:nth-child(8), .bento-table-scope.dash-table.no-assigned td:nth-child(8){ width:12%; text-align:center; overflow:visible; text-overflow:clip; }
+.bento-table-scope.dash-table th:nth-child(9), .bento-table-scope.dash-table td:nth-child(9){ width:12%; overflow:visible; text-overflow:clip; }
 
 /* ── components/navbar.html — mesma aparência já aprovada, portada de utilitário Tailwind pra CSS próprio.
    Os estados de abrir/fechar do hambúrguer e do sino continuam via classe utilitária Tailwind
@@ -409,11 +448,15 @@ dialog.bento-modal textarea:focus{ outline:none; border-color:var(--color-dtx-50
 .bento-timeline-dot.status{ background:var(--color-dtx-500); }
 .bento-timeline-dot.dados{ background:var(--color-bento-violet); }
 .bento-timeline-dot.outro{ background:var(--color-surface-muted); }
+.bento-timeline-dot.resposta{ background:var(--color-bento-info); }
+.bento-timeline-dot.previsao{ background:var(--color-bento-warning-icon); }
+.bento-timeline-dot.sistema{ background:var(--color-surface-muted); }
 .bento-timeline-card{ flex:1; background:var(--color-surface-base); border:1px solid rgba(20,30,60,.06); border-radius:16px; padding:18px 20px; }
 .bento-timeline-badge{ font-size:11px; font-weight:800; padding:2px 8px; border-radius:99px; background:var(--color-dtx-100); color:var(--color-dtx-500); }
 .bento-timeline-time{ display:flex; flex-direction:column; align-items:flex-end; font-size:11px; font-weight:700; background:var(--color-surface-canvas); padding:8px 12px; border-radius:12px; flex-shrink:0; }
 .bento-timeline-detail{ margin-top:12px; padding:14px 16px; background:var(--color-surface-canvas); border-radius:14px; border-top-left-radius:0; border-top-right-radius:0; border-top:3px solid var(--color-dtx-500); }
 .bento-timeline-detail.dados{ border-top-color:var(--color-bento-violet); }
+.bento-timeline-detail.resposta{ border-top-color:var(--color-bento-info); }
 .bento-diff-chip{ display:inline-flex; align-items:center; padding:5px 10px; border-radius:10px; font-size:13px; font-weight:700; }
 .bento-diff-chip.before{ background:#fff1f2; color:var(--color-bento-danger-deep); }
 .bento-diff-chip.after{ background:var(--color-status-done-bg); color:var(--color-bento-success); }
@@ -679,3 +722,49 @@ dialog.bento-modal textarea:focus{ outline:none; border-color:var(--color-dtx-50
 .bento-toast.info::before{ background:var(--color-dtx-500); }
 .bento-toast.info .bento-toast-icon{ background:var(--color-dtx-100); color:var(--color-dtx-500); }
 .bento-risk-chip.multi_setor{ background:#faf5ff; color:var(--color-bento-purple); }
+
+/* ── custom-select (app/static/js/custom-select.js) ──
+   Estiliza a lista de opções de TODO <select> do site. A lista nativa do
+   navegador não é estilizável de forma consistente entre engines (cantos,
+   sombra, hover), então o JS troca o visual por este painel; o <select>
+   original segue no DOM (só opacity:0 + pointer-events:none) pra manter
+   teclado, leitor de tela e Playwright (select_option()) funcionando. */
+.bento-select-shell{ position:relative; width:100%; }
+.bento-select-native{
+  position:absolute; inset:0; width:100%; height:100%; margin:0; padding:0;
+  border:0; opacity:0; pointer-events:none; appearance:none;
+}
+.bento-select-trigger{
+  display:flex; align-items:center; justify-content:space-between; gap:8px;
+  width:100%; box-sizing:border-box; background:var(--color-surface-canvas);
+  border:1.5px solid transparent; border-radius:14px; padding:11px 14px;
+  font-size:14px; font-weight:500; color:inherit; cursor:pointer;
+  transition:border-color .15s, background .15s;
+}
+.bento-select-trigger-text{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.bento-select-trigger-text.is-placeholder{ color:var(--color-surface-muted); }
+.bento-select-chevron{ width:16px; height:16px; flex-shrink:0; color:var(--color-surface-muted); transition:transform .15s; }
+.bento-select-shell.is-open .bento-select-chevron{ transform:rotate(180deg); }
+.bento-select-shell.is-focused .bento-select-trigger,
+.bento-select-shell.is-open .bento-select-trigger{ border-color:var(--color-dtx-500); background:#fff; }
+.bento-select-shell.is-disabled .bento-select-trigger{ cursor:not-allowed; opacity:.6; }
+
+.bento-select-panel{
+  list-style:none; margin:0; padding:6px; position:absolute; top:calc(100% + 4px);
+  left:0; right:0; background:#fff; border:1px solid var(--color-surface-border);
+  border-radius:14px; box-shadow:0 8px 24px rgba(20,30,60,.12); max-height:260px;
+  overflow-y:auto; z-index:30; opacity:0; transform:translateY(-4px);
+  pointer-events:none; transition:opacity .12s, transform .12s;
+}
+.bento-select-shell.is-open .bento-select-panel{ opacity:1; transform:translateY(0); pointer-events:auto; }
+
+.bento-select-option{ padding:9px 12px; border-radius:10px; font-size:13.5px; font-weight:500; cursor:pointer; }
+.bento-select-option:hover{ background:var(--color-dtx-100); }
+.bento-select-option.is-selected{ background:var(--color-dtx-500); color:#fff; font-weight:700; }
+.bento-select-option.is-disabled{ color:var(--color-surface-muted); cursor:not-allowed; }
+.bento-select-group-label{
+  padding:6px 10px; margin:4px 0 4px; font-size:11px; font-weight:800;
+  text-transform:uppercase; letter-spacing:.06em; color:var(--color-dtx-600);
+  background:var(--color-dtx-100); border-radius:8px;
+}
+.bento-select-group-label:not(:first-child){ margin-top:14px; }

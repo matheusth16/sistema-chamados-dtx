@@ -599,6 +599,143 @@ class TestNotificarRespostaSolicitanteChamado:
         mock_email.assert_not_called()
 
 
+class TestDestinatariosParaRespostaSupervisor:
+    def test_retorna_solicitante_e_observadores(self):
+        """Com solicitante + 2 observadores → lista com 3 usuários."""
+        from app.services.chamado_notificacao_service import (
+            destinatarios_para_resposta_supervisor,
+        )
+
+        dados_chamado = {
+            "solicitante_id": "sol_1",
+            "observadores": [
+                {"usuario_id": "obs_a", "email": "a@test.com", "nome": "Obs A"},
+                {"usuario_id": "obs_b", "email": "b@test.com", "nome": "Obs B"},
+            ],
+        }
+        sol = _usuario_mock("sol_1", "Solicitante", "sol@test.com", perfil="solicitante")
+        obs_a = _usuario_mock("obs_a", "Obs A", "a@test.com")
+        obs_b = _usuario_mock("obs_b", "Obs B", "b@test.com")
+
+        def get_by_id_side(uid):
+            return {"sol_1": sol, "obs_a": obs_a, "obs_b": obs_b}.get(uid)
+
+        with patch("app.services.chamado_notificacao_service.Usuario") as mock_cls:
+            mock_cls.get_by_id.side_effect = get_by_id_side
+            resultado = destinatarios_para_resposta_supervisor(dados_chamado)
+
+        ids = [u.id for u in resultado]
+        assert "sol_1" in ids
+        assert "obs_a" in ids
+        assert "obs_b" in ids
+
+    def test_sem_solicitante_retorna_so_observadores(self):
+        from app.services.chamado_notificacao_service import (
+            destinatarios_para_resposta_supervisor,
+        )
+
+        dados_chamado = {
+            "solicitante_id": None,
+            "observadores": [{"usuario_id": "obs_a", "email": "a@test.com", "nome": "Obs A"}],
+        }
+        obs_a = _usuario_mock("obs_a", "Obs A", "a@test.com")
+
+        with patch("app.services.chamado_notificacao_service.Usuario") as mock_cls:
+            mock_cls.get_by_id.return_value = obs_a
+            resultado = destinatarios_para_resposta_supervisor(dados_chamado)
+
+        assert len(resultado) == 1
+        assert resultado[0].id == "obs_a"
+
+
+class TestNotificarRespostaSupervisorChamado:
+    def test_email_enviado_ao_solicitante_e_observadores(self):
+        """notificar_resposta_supervisor_chamado envia email ao solicitante + observadores."""
+        from app.services.chamado_notificacao_service import (
+            notificar_resposta_supervisor_chamado,
+        )
+
+        sol = _usuario_mock("sol_1", "Solicitante", "sol@test.com", perfil="solicitante")
+        obs = _usuario_mock("obs_1", "Obs A", "obs@test.com")
+
+        with (
+            patch(
+                "app.services.chamado_notificacao_service.destinatarios_para_resposta_supervisor",
+                return_value=[sol, obs],
+            ),
+            patch("app.services.chamado_notificacao_service.enviar_email") as mock_email,
+            patch("app.services.chamado_notificacao_service.criar_notificacao"),
+        ):
+            mock_email.return_value = (True, None)
+            notificar_resposta_supervisor_chamado(
+                chamado_id="ch_1",
+                numero_chamado="CH-001",
+                categoria="TI",
+                respondente_nome="Supervisor Demo",
+                mensagem="Já verificamos, aguardando a peça chegar.",
+                dados_chamado={"solicitante_id": "sol_1", "observadores": []},
+            )
+
+        assert mock_email.call_count == 2
+        emails_enviados = [c[0][0] for c in mock_email.call_args_list]
+        assert "sol@test.com" in emails_enviados
+        assert "obs@test.com" in emails_enviados
+
+    def test_corpo_contem_mensagem(self):
+        """Corpo do email deve incluir a mensagem enviada pelo responsável."""
+        from app.services.chamado_notificacao_service import (
+            notificar_resposta_supervisor_chamado,
+        )
+
+        sol = _usuario_mock("sol_1", "Solicitante", "sol@test.com", perfil="solicitante")
+
+        with (
+            patch(
+                "app.services.chamado_notificacao_service.destinatarios_para_resposta_supervisor",
+                return_value=[sol],
+            ),
+            patch("app.services.chamado_notificacao_service.enviar_email") as mock_email,
+            patch("app.services.chamado_notificacao_service.criar_notificacao"),
+        ):
+            mock_email.return_value = (True, None)
+            notificar_resposta_supervisor_chamado(
+                chamado_id="ch_2",
+                numero_chamado="CH-002",
+                categoria="Infra",
+                respondente_nome="Supervisor Demo",
+                mensagem="A peça chegou, resolvendo hoje",
+                dados_chamado={"solicitante_id": "sol_1", "observadores": []},
+            )
+
+        corpo_html = mock_email.call_args[0][2]
+        assert "CH-002" in corpo_html
+        assert "resolvendo hoje" in corpo_html
+
+    def test_sem_destinatarios_nao_envia_email(self):
+        """Sem solicitante nem observadores → nenhum email enviado."""
+        from app.services.chamado_notificacao_service import (
+            notificar_resposta_supervisor_chamado,
+        )
+
+        with (
+            patch(
+                "app.services.chamado_notificacao_service.destinatarios_para_resposta_supervisor",
+                return_value=[],
+            ),
+            patch("app.services.chamado_notificacao_service.enviar_email") as mock_email,
+        ):
+            notificar_resposta_supervisor_chamado(
+                chamado_id="ch_3",
+                numero_chamado="CH-003",
+                categoria="TI",
+                respondente_nome="Supervisor Demo",
+                mensagem="Resposta qualquer",
+                dados_chamado={},
+            )
+
+        mock_email.assert_not_called()
+
+
 class TestInAppEWebPushNotificacoes:
     """Lacunas A+B: in-app e web push para edição/anexo/cancelamento."""
 
@@ -1032,3 +1169,183 @@ class TestNotificarObservadoresCriacaoInApp:
                 observadores=obs_list,
             )
         mock_inapp.assert_not_called()
+
+
+class TestNotificarSolicitacaoPrevisaoAtendimento:
+    def test_email_enviado_ao_gestor_com_dois_ctas(self):
+        """E-mail vai pro gestor decisor com botões Aprovar/Rejeitar."""
+        from app.services.chamado_notificacao_service import (
+            notificar_solicitacao_previsao_atendimento,
+        )
+
+        gestor = _usuario_mock("gestor_1", "Gestor Setor", "gestor@test.com")
+
+        with (
+            patch(
+                "app.services.chamado_notificacao_service._link_decisao_previsao",
+                side_effect=lambda sid, acao: f"https://x/decidir/{sid}/{acao}",
+            ),
+            patch("app.services.chamado_notificacao_service.enviar_email") as mock_email,
+            patch("app.services.chamado_notificacao_service.criar_notificacao"),
+            patch("app.services.chamado_notificacao_service.webpush_service"),
+        ):
+            mock_email.return_value = (True, None)
+            notificar_solicitacao_previsao_atendimento(
+                chamado_id="ch_1",
+                numero_chamado="CH-001",
+                categoria="TI",
+                solicitante_nome="Julia Silva",
+                previsao_solicitada="2026-08-20 16:00:00",
+                motivo="Preciso de mais tempo",
+                solicitacao_id=42,
+                gestor_usuario=gestor,
+            )
+
+        assert mock_email.called
+        args = mock_email.call_args[0]
+        assert args[0] == "gestor@test.com"
+        corpo_html = args[2]
+        assert "/decidir/42/aprovar" in corpo_html
+        assert "/decidir/42/rejeitar" in corpo_html
+        assert "Julia Silva" in corpo_html
+
+    def test_sem_gestor_nao_envia_nada(self):
+        """gestor_usuario=None (ninguém cadastrado, nem fallback) → não quebra, só loga."""
+        from app.services.chamado_notificacao_service import (
+            notificar_solicitacao_previsao_atendimento,
+        )
+
+        with patch("app.services.chamado_notificacao_service.enviar_email") as mock_email:
+            notificar_solicitacao_previsao_atendimento(
+                chamado_id="ch_1",
+                numero_chamado="CH-001",
+                categoria="TI",
+                solicitante_nome="Julia Silva",
+                previsao_solicitada="2026-08-20 16:00:00",
+                motivo="motivo",
+                solicitacao_id=1,
+                gestor_usuario=None,
+            )
+
+        mock_email.assert_not_called()
+
+    def test_inapp_criada_pro_gestor(self):
+        from app.services.chamado_notificacao_service import (
+            notificar_solicitacao_previsao_atendimento,
+        )
+
+        gestor = _usuario_mock("gestor_1", "Gestor Setor", "gestor@test.com")
+
+        with (
+            patch(
+                "app.services.chamado_notificacao_service._link_decisao_previsao",
+                return_value="",
+            ),
+            patch(
+                "app.services.chamado_notificacao_service.enviar_email", return_value=(True, None)
+            ),
+            patch("app.services.chamado_notificacao_service.criar_notificacao") as mock_inapp,
+            patch("app.services.chamado_notificacao_service.webpush_service"),
+        ):
+            notificar_solicitacao_previsao_atendimento(
+                chamado_id="ch_1",
+                numero_chamado="CH-001",
+                categoria="TI",
+                solicitante_nome="Julia Silva",
+                previsao_solicitada="2026-08-20 16:00:00",
+                motivo="motivo",
+                solicitacao_id=1,
+                gestor_usuario=gestor,
+            )
+
+        mock_inapp.assert_called_once()
+        assert mock_inapp.call_args.kwargs.get("usuario_id") == "gestor_1"
+        assert mock_inapp.call_args.kwargs.get("tipo") == "previsao_atendimento_solicitada"
+
+
+class TestNotificarDecisaoPrevisaoAtendimento:
+    def test_aprovacao_envia_email_pro_solicitante_do_pedido(self):
+        from app.services.chamado_notificacao_service import (
+            notificar_decisao_previsao_atendimento,
+        )
+
+        solicitante = _usuario_mock("sup_1", "Julia Silva", "julia@test.com")
+
+        with (
+            patch(
+                "app.services.chamado_notificacao_service.Usuario.get_by_id",
+                return_value=solicitante,
+            ),
+            patch("app.services.chamado_notificacao_service.enviar_email") as mock_email,
+            patch("app.services.chamado_notificacao_service.criar_notificacao"),
+            patch("app.services.chamado_notificacao_service.webpush_service"),
+        ):
+            mock_email.return_value = (True, None)
+            notificar_decisao_previsao_atendimento(
+                chamado_id="ch_1",
+                numero_chamado="CH-001",
+                categoria="TI",
+                acao="aprovar",
+                previsao_solicitada="2026-08-20 16:00:00",
+                motivo_rejeicao=None,
+                gestor_nome="Gestor Setor",
+                solicitante_id="sup_1",
+            )
+
+        assert mock_email.called
+        assert mock_email.call_args[0][0] == "julia@test.com"
+        assert "approved" in mock_email.call_args[0][2].lower()
+
+    def test_rejeicao_inclui_motivo_no_corpo(self):
+        from app.services.chamado_notificacao_service import (
+            notificar_decisao_previsao_atendimento,
+        )
+
+        solicitante = _usuario_mock("sup_1", "Julia Silva", "julia@test.com")
+
+        with (
+            patch(
+                "app.services.chamado_notificacao_service.Usuario.get_by_id",
+                return_value=solicitante,
+            ),
+            patch("app.services.chamado_notificacao_service.enviar_email") as mock_email,
+            patch("app.services.chamado_notificacao_service.criar_notificacao"),
+            patch("app.services.chamado_notificacao_service.webpush_service"),
+        ):
+            mock_email.return_value = (True, None)
+            notificar_decisao_previsao_atendimento(
+                chamado_id="ch_1",
+                numero_chamado="CH-001",
+                categoria="TI",
+                acao="rejeitar",
+                previsao_solicitada="2026-08-20 16:00:00",
+                motivo_rejeicao="Sem verba pra terceirizar",
+                gestor_nome="Gestor Setor",
+                solicitante_id="sup_1",
+            )
+
+        corpo_html = mock_email.call_args[0][2]
+        assert "rejected" in corpo_html.lower()
+        assert "Sem verba pra terceirizar" in corpo_html
+
+    def test_solicitante_nao_encontrado_nao_envia_email(self):
+        from app.services.chamado_notificacao_service import (
+            notificar_decisao_previsao_atendimento,
+        )
+
+        with (
+            patch("app.services.chamado_notificacao_service.Usuario.get_by_id", return_value=None),
+            patch("app.services.chamado_notificacao_service.enviar_email") as mock_email,
+        ):
+            notificar_decisao_previsao_atendimento(
+                chamado_id="ch_1",
+                numero_chamado="CH-001",
+                categoria="TI",
+                acao="aprovar",
+                previsao_solicitada="2026-08-20 16:00:00",
+                motivo_rejeicao=None,
+                gestor_nome="Gestor Setor",
+                solicitante_id="sup_inexistente",
+            )
+
+        mock_email.assert_not_called()

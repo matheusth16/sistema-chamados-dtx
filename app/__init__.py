@@ -98,7 +98,7 @@ def create_app():
     _configurar_i18n(app)
 
     # Importa e registra as rotas
-    from app.routes import cron_sla_escalacao, csp_report, main
+    from app.routes import cron_sla_escalacao, csp_report, main, view_aprovacao_previsao
 
     app.register_blueprint(main)
 
@@ -109,6 +109,11 @@ def create_app():
     # /internal/cron/sla-escalacao é chamada pelo GitHub Actions via curl puro
     # (sem sessão/token CSRF) — autenticação é feita por CRON_SECRET, não CSRF.
     csrf.exempt(cron_sla_escalacao)
+
+    # /aprovacao-previsao/<token> é acessada a partir de um link de e-mail, sem
+    # sessão nem token CSRF — autenticação é o próprio token assinado de uso
+    # único (ver previsao_atendimento_service.validar_token_decisao).
+    csrf.exempt(view_aprovacao_previsao)
 
     # Segurança: headers e validação Origin/Referer em POST sensíveis
     _configurar_seguranca(app)

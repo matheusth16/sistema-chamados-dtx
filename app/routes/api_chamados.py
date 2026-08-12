@@ -250,6 +250,35 @@ def api_editar_chamado():
         return erro_json(_t("internal_error_retry"), 500)
 
 
+@main.route("/api/chamado/<chamado_id>/responder", methods=["POST"])
+@login_required
+def api_responder_chamado_supervisor(chamado_id: str):
+    """Resposta em texto livre do responsável (supervisor/admin) — notifica o
+    solicitante + observadores. Via inversa de api_responder_solicitante
+    (app/routes/api_solicitante.py), que só cobre o solicitante respondendo."""
+    if not current_user.is_supervisor_or_above:
+        return erro_json(_t("access_denied_generic"), 403)
+    if getattr(current_user, "is_gestor_only", None) is True:
+        return erro_json(_t("access_denied_generic"), 403)
+
+    payload = request.get_json(silent=True) or {}
+    mensagem = (payload.get("mensagem") or "").strip()
+    if not mensagem:
+        return erro_json(_t("reply_message_required", min_chars=2), 400)
+
+    from app.services.edicao_chamado_service import responder_chamado_supervisor
+
+    resultado = responder_chamado_supervisor(
+        chamado_id=chamado_id,
+        mensagem=mensagem,
+        usuario=current_user,
+    )
+
+    if resultado.get("sucesso"):
+        return sucesso_json()
+    return erro_json(resultado.get("erro"), resultado.get("codigo", 400))
+
+
 @main.route("/api/bulk-status", methods=["POST"])
 @login_required
 @limiter.limit("10 per minute", methods=["POST"])
@@ -536,6 +565,15 @@ def api_confirmar_resolucao(chamado_id: str):
 
         if acao == "confirmar":
             chamado.atualizar_campos(confirmacao_solicitante="confirmado")
+            Historico(
+                chamado_id=chamado_id,
+                usuario_id=current_user.id,
+                usuario_nome=current_user.nome,
+                acao="confirmacao_resolucao",
+                campo_alterado="confirmacao_solicitante",
+                valor_anterior="pendente",
+                valor_novo="confirmado",
+            ).save()
             with contextlib.suppress(RuntimeError):
                 _enviar_notificacao_confirmar(
                     current_app._get_current_object(),

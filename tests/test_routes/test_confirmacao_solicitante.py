@@ -64,6 +64,26 @@ def test_confirmar_resolucao_sucesso(client_logado_solicitante):
     assert atualizado.confirmacao_solicitante == "confirmado"
 
 
+def test_confirmar_resolucao_grava_historico(client_logado_solicitante):
+    """Confirmar resolução deixa rastro no Histórico — só "reabrir" gravava
+    antes (achado em auditoria, 2026-08-12)."""
+    from app.models_historico import Historico
+
+    chamado = _criar_chamado()
+    r = client_logado_solicitante.post(
+        f"/api/chamado/{chamado.id}/confirmar-resolucao",
+        json={"acao": "confirmar"},
+        content_type="application/json",
+    )
+    assert r.status_code == 200
+
+    eventos = Historico.get_by_chamado_id(chamado.id)
+    confirmacoes = [e for e in eventos if e.acao == "confirmacao_resolucao"]
+    assert len(confirmacoes) == 1
+    assert confirmacoes[0].usuario_id == "sol_1"
+    assert confirmacoes[0].valor_novo == "confirmado"
+
+
 def test_reabrir_chamado_sucesso(client_logado_solicitante):
     """Solicitante rejeita resolução: status volta para 'Aberto', motivo salvo no histórico."""
     chamado = _criar_chamado()

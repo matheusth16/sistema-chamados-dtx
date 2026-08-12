@@ -77,6 +77,37 @@ def test_envia_lembrete_1_apos_24h(app):
     assert Chamado.get_by_id(chamado_id).lembrete_confirmacao_1_enviado is True
 
 
+def test_lembrete_1_enviado_grava_historico(app):
+    """Lembrete automático deixa rastro no Histórico do chamado (achado em
+    auditoria, 2026-08-12: _marcar_lembrete_enviado escrevia direto na sessão,
+    sem passar por Historico)."""
+    from app.models_historico import Historico
+
+    chamado_id = _criar_chamado_concluido(horas_atras=25, lembrete_1=False, lembrete_2=False)
+    solicitante = MagicMock()
+    solicitante.email = "sol@test.com"
+
+    with (
+        app.app_context(),
+        patch("app.services.lembrete_confirmacao_service.Usuario") as mock_usuario,
+        patch(
+            "app.services.lembrete_confirmacao_service.notificar_solicitante_lembrete_confirmacao"
+        ),
+        patch("app.services.lembrete_confirmacao_service._criar_inapp_lembrete"),
+    ):
+        mock_usuario.get_by_id.return_value = solicitante
+
+        from app.services.lembrete_confirmacao_service import processar_lembretes_confirmacao
+
+        processar_lembretes_confirmacao()
+
+    eventos = Historico.get_by_chamado_id(chamado_id)
+    lembretes = [e for e in eventos if e.acao == "lembrete_confirmacao_enviado"]
+    assert len(lembretes) == 1
+    assert lembretes[0].usuario_id == "sistema"
+    assert lembretes[0].valor_novo == "1"
+
+
 def test_nao_envia_lembrete_1_antes_de_24h(app):
     """Não deve enviar lembrete se ainda não passaram 24 h."""
     _criar_chamado_concluido(horas_atras=10, lembrete_1=False, lembrete_2=False)

@@ -400,7 +400,7 @@ def test_localizar_notificacao_novo_chamado_em_ingles():
     }
     out = localizar_notificacao(doc, "en")
     assert out["titulo"] == "New ticket: CHM-0006"
-    assert out["mensagem"] == "Not Applicable · Requester: Matheus Costa"
+    assert out["mensagem"] == "Routine · Requester: Matheus Costa"
 
 
 def test_localizar_notificacao_novo_chamado_em_pt():
@@ -433,7 +433,7 @@ def test_localizar_notificacao_legacy_sem_metadados():
     out = localizar_notificacao(doc, "en")
     assert "New ticket" in out["titulo"]
     assert "Requester" in out["mensagem"]
-    assert "Not Applicable" in out["mensagem"]
+    assert "Routine" in out["mensagem"]
 
 
 def test_localizar_notificacao_tipo_desconhecido_nao_altera():

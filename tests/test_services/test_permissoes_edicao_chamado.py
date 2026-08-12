@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 from app.services.permissions import usuario_pode_ver_chamado
 from app.services.permissoes_edicao_chamado import (
     filtrar_supervisores_por_area,
+    montar_anexos_para_exibicao,
     supervisor_pode_alterar_chamado,
     usuario_pode_mutar_chamado,
     verificar_permissao_mudanca_status,
@@ -841,6 +842,117 @@ def test_montar_flags_status_aguardando_informacao_permite_cancelar_e_anexo():
     assert flags["pode_anexo_tardio_solicitante"] is True
     # segundos_restantes só é calculado quando status == "Aberto"
     assert flags["segundos_restantes_edicao"] == 0
+
+
+# ---------------------------------------------------------------------------
+# montar_anexos_para_exibicao
+# ---------------------------------------------------------------------------
+
+
+def _chamado_anexos_mock(anexos=None, anexo=None, solicitante_id="sol_1"):
+    m = MagicMock()
+    m.anexos = anexos or []
+    m.anexo = anexo
+    m.solicitante_id = solicitante_id
+    return m
+
+
+def _evento_mock(acao, campo_alterado=None, valor_novo=None, usuario_id=None, usuario_nome=None):
+    m = MagicMock()
+    m.acao = acao
+    m.campo_alterado = campo_alterado
+    m.valor_novo = valor_novo
+    m.usuario_id = usuario_id
+    m.usuario_nome = usuario_nome
+    return m
+
+
+def test_anexos_sem_historico_sao_todos_do_solicitante():
+    """Anexo sem entrada no histórico veio da abertura do chamado — sempre do solicitante."""
+    chamado = _chamado_anexos_mock(anexos=["local:a.pdf", "local:b.png"])
+    itens = montar_anexos_para_exibicao(chamado, historico=[])
+    assert len(itens) == 2
+    assert all(item["eh_solicitante"] for item in itens)
+    assert all(item["usuario_nome"] is None for item in itens)
+
+
+def test_anexo_adicionado_pelo_responsavel_nao_e_do_solicitante():
+    """acao=alteracao_dados + campo_alterado=novo anexo, autor != solicitante → não é do solicitante."""
+    chamado = _chamado_anexos_mock(anexos=["local:a.pdf", "local:novo.png"], solicitante_id="sol_1")
+    evento = _evento_mock(
+        "alteracao_dados",
+        campo_alterado="novo anexo",
+        valor_novo="local:novo.png",
+        usuario_id="sup_1",
+        usuario_nome="Supervisor Demo",
+    )
+    itens = montar_anexos_para_exibicao(chamado, historico=[evento])
+    por_caminho = {item["caminho"]: item for item in itens}
+    assert por_caminho["local:a.pdf"]["eh_solicitante"] is True
+    assert por_caminho["local:novo.png"]["eh_solicitante"] is False
+    assert por_caminho["local:novo.png"]["usuario_nome"] == "Supervisor Demo"
+    assert por_caminho["local:novo.png"]["usuario_id"] == "sup_1"
+
+
+def test_anexo_tardio_do_proprio_solicitante_continua_sendo_do_solicitante():
+    """acao=anexo_tardio com usuario_id == solicitante_id → continua eh_solicitante=True."""
+    chamado = _chamado_anexos_mock(anexos=["local:tardio.pdf"], solicitante_id="sol_1")
+    evento = _evento_mock(
+        "anexo_tardio",
+        campo_alterado="anexos",
+        valor_novo="local:tardio.pdf",
+        usuario_id="sol_1",
+        usuario_nome="Solicitante Demo",
+    )
+    itens = montar_anexos_para_exibicao(chamado, historico=[evento])
+    assert itens[0]["eh_solicitante"] is True
+    assert itens[0]["usuario_nome"] is None
+
+
+def test_ordem_solicitante_primeiro_mesmo_se_apareceu_depois_na_lista_bruta():
+    """Solicitante sempre primeiro na exibição, independente da ordem em chamado.anexos."""
+    chamado = _chamado_anexos_mock(
+        anexos=["local:do_supervisor.pdf", "local:do_solicitante.pdf"], solicitante_id="sol_1"
+    )
+    evento = _evento_mock(
+        "alteracao_dados",
+        campo_alterado="novo anexo",
+        valor_novo="local:do_supervisor.pdf",
+        usuario_id="sup_1",
+        usuario_nome="Supervisor Demo",
+    )
+    itens = montar_anexos_para_exibicao(chamado, historico=[evento])
+    assert itens[0]["caminho"] == "local:do_solicitante.pdf"
+    assert itens[1]["caminho"] == "local:do_supervisor.pdf"
+
+
+def test_anexos_duplicados_sao_deduplicados():
+    chamado = _chamado_anexos_mock(anexos=["local:a.pdf", "local:a.pdf", "local:b.pdf"])
+    itens = montar_anexos_para_exibicao(chamado, historico=[])
+    assert len(itens) == 2
+
+
+def test_fallback_anexo_legado_singular_quando_anexos_vazio():
+    """chamado.anexos vazio mas chamado.anexo (legado, singular) setado — ainda funciona."""
+    chamado = _chamado_anexos_mock(anexos=[], anexo="local:legado.pdf")
+    itens = montar_anexos_para_exibicao(chamado, historico=[])
+    assert len(itens) == 1
+    assert itens[0]["caminho"] == "local:legado.pdf"
+    assert itens[0]["eh_solicitante"] is True
+
+
+def test_evento_historico_irrelevante_nao_afeta_origem():
+    """Entrada de histórico de outro tipo (ex.: alteracao_status) não deve ser usada como origem de anexo."""
+    chamado = _chamado_anexos_mock(anexos=["local:a.pdf"], solicitante_id="sol_1")
+    evento = _evento_mock(
+        "alteracao_status",
+        campo_alterado="status",
+        valor_novo="Em Atendimento",
+        usuario_id="sup_1",
+        usuario_nome="Supervisor Demo",
+    )
+    itens = montar_anexos_para_exibicao(chamado, historico=[evento])
+    assert itens[0]["eh_solicitante"] is True
 
 
 def test_docstring_do_modulo_faz_referencia_cruzada_a_permissions():

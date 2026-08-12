@@ -205,7 +205,7 @@ def test_exportar_relatorio_completo_traduz_valores_status_e_categoria():
     ws = wb.worksheets[1]  # aba "Chamados"
     linha = [c.value for c in ws[2]]
     # índices: 0=numero, 1=categoria, 2=tipo, 3=status
-    assert linha[1] == "Not Applicable"
+    assert linha[1] == "Routine"
     assert linha[3] == "Completed"
 
 

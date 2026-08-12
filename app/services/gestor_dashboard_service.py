@@ -39,20 +39,32 @@ def _is_atrasado(chamado: Chamado) -> bool:
     """Classifica chamado como atrasado.
 
     Usa campo is_atrasado do documento se disponível; caso contrário,
-    verifica sla_dias e tempo desde abertura como proxy.
+    verifica sla_dias e tempo desde abertura como proxy. Uma previsão de
+    atendimento APROVADA e ainda futura (ver previsao_atendimento_service.py)
+    sempre vence essa checagem — alinhado com obter_sla_para_exibicao, pra
+    esse painel nunca contradizer o badge do próprio chamado.
     """
     if getattr(chamado, "is_atrasado", None) is True:
         return True
     status = getattr(chamado, "status", "")
     if status in _STATUS_FINALIZADOS:
         return False
-    sla_dias = getattr(chamado, "sla_dias", None)
-    if sla_dias is None:
-        return False
     data_abertura = getattr(chamado, "data_abertura", None)
     if data_abertura is None:
         return False
     agora = datetime.now(ZoneInfo(Config.SLA_TIMEZONE))
+    previsao_atendimento = getattr(chamado, "previsao_atendimento", None)
+    if isinstance(previsao_atendimento, datetime):
+        previsao_naive = (
+            previsao_atendimento.replace(tzinfo=None)
+            if previsao_atendimento.tzinfo
+            else previsao_atendimento
+        )
+        if agora.replace(tzinfo=None) < previsao_naive:
+            return False
+    sla_dias = getattr(chamado, "sla_dias", None)
+    if sla_dias is None:
+        return False
     minutos = minutos_uteis_entre(data_abertura, agora)
     return minutos > sla_dias * 24 * 60
 

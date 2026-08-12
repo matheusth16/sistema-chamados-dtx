@@ -170,14 +170,34 @@
     "es": "Apertura de Ticket"
   },
   "not_applicable_routine": {
-    "pt_BR": "Não Aplicável (Rotina)",
-    "en": "Not Applicable (Routine)",
-    "es": "No Aplicable (Rutina)"
+    "pt_BR": "Rotina",
+    "en": "Routine",
+    "es": "Rutina"
   },
   "aog_max_priority": {
-    "pt_BR": "AOG (Emergência — Prioridade Máxima)",
-    "en": "AOG (Emergency — Maximum Priority)",
-    "es": "AOG (Emergencia — Prioridad Máxima)"
+    "pt_BR": "AOG (Prioridade Máxima)",
+    "en": "AOG (Maximum Priority)",
+    "es": "AOG (Prioridad Máxima)"
+  },
+  "tat_rotina": {
+    "pt_BR": "3 dias úteis",
+    "en": "3 business days",
+    "es": "3 días hábiles"
+  },
+  "tat_projetos": {
+    "pt_BR": "2 dias úteis",
+    "en": "2 business days",
+    "es": "2 días hábiles"
+  },
+  "tat_aog": {
+    "pt_BR": "Imediatamente",
+    "en": "Immediately",
+    "es": "Inmediatamente"
+  },
+  "aog_tooltip": {
+    "pt_BR": "Aircraft On Ground",
+    "en": "Aircraft On Ground",
+    "es": "Aircraft On Ground"
   },
   "error_loading": {
     "pt_BR": "Erro ao carregar - Será atribuído manualmente",
@@ -218,6 +238,11 @@
     "pt_BR": "Quem mais será avisado",
     "en": "Who else gets notified",
     "es": "Quién más será notificado"
+  },
+  "form_section_gate_location": {
+    "pt_BR": "Onde Foi Identificado",
+    "en": "Where It Was Identified",
+    "es": "Dónde Se Identificó"
   },
   "form_section_destination": {
     "pt_BR": "Destino do Chamado",
@@ -320,9 +345,9 @@
     "es": "Responsable Sugerido"
   },
   "export": {
-    "pt_BR": "Exportar",
-    "en": "Export",
-    "es": "Exportar"
+    "pt_BR": "Exportar Excel",
+    "en": "Export Excel",
+    "es": "Exportar Excel"
   },
   "period": {
     "pt_BR": "Período",
@@ -358,6 +383,11 @@
     "pt_BR": "Remover",
     "en": "Remove",
     "es": "Quitar"
+  },
+  "preview_attachment_aria": {
+    "pt_BR": "Visualizar anexo {filename} em nova aba",
+    "en": "View attachment {filename} in a new tab",
+    "es": "Ver adjunto {filename} en una pestaña nueva"
   },
   "remove_attachment_aria": {
     "pt_BR": "Remover anexo {filename}",
@@ -563,6 +593,11 @@
     "pt_BR": "Novo Chamado",
     "en": "New Ticket",
     "es": "Nuevo Ticket"
+  },
+  "main_impact_hint": {
+    "pt_BR": "Pode marcar mais de uma opção.",
+    "en": "You can select more than one option.",
+    "es": "Puede marcar más de una opción."
   },
   "main_impact": {
     "pt_BR": "Impacto Principal",
@@ -800,9 +835,9 @@
     "es": "Área/Sector"
   },
   "not_applicable": {
-    "pt_BR": "Não Aplicável",
-    "en": "Not Applicable",
-    "es": "No Aplicable"
+    "pt_BR": "Rotina",
+    "en": "Routine",
+    "es": "Rutina"
   },
   "page": {
     "pt_BR": "Página",
@@ -985,9 +1020,9 @@
     "es": "Posponer avisos de escalonamiento"
   },
   "no_forecast_set": {
-    "pt_BR": "Nenhum aviso adiado no momento.",
-    "en": "No alerts postponed right now.",
-    "es": "Ningún aviso pospuesto por ahora."
+    "pt_BR": "Nenhuma previsão definida no momento.",
+    "en": "No forecast set right now.",
+    "es": "Ninguna previsión definida por ahora."
   },
   "escalation_transfer_area_help": {
     "pt_BR": "Muda a área dona e o responsável pelo chamado — o chamado deixa de ser seu e passa para o novo responsável escolhido.",
@@ -1008,6 +1043,21 @@
     "pt_BR": "Sem anexos atuais.",
     "en": "No current attachments.",
     "es": "Sin archivos adjuntos actuales."
+  },
+  "attachment_from_requester": {
+    "pt_BR": "Anexado pelo solicitante",
+    "en": "Attached by the requester",
+    "es": "Adjuntado por el solicitante"
+  },
+  "attachment_from_you": {
+    "pt_BR": "Anexado por você",
+    "en": "Attached by you",
+    "es": "Adjuntado por usted"
+  },
+  "attachment_from_user": {
+    "pt_BR": "Anexado por {nome}",
+    "en": "Attached by {nome}",
+    "es": "Adjuntado por {nome}"
   },
   "click_to_upload_file": {
     "pt_BR": "Clique para enviar um arquivo",
@@ -1233,6 +1283,16 @@
     "pt_BR": "Dados Modificados",
     "en": "Data Modified",
     "es": "Datos Modificados"
+  },
+  "history_reply_from_requester": {
+    "pt_BR": "Resposta do Solicitante",
+    "en": "Reply from Requester",
+    "es": "Respuesta del Solicitante"
+  },
+  "history_reply_from_responsible": {
+    "pt_BR": "Resposta do Responsável",
+    "en": "Reply from Responsible",
+    "es": "Respuesta del Responsable"
   },
   "brasilia_time": {
     "pt_BR": "Horário de Brasília",
@@ -4205,9 +4265,9 @@
     "es": "Previsión de atención"
   },
   "attendance_forecast_btn": {
-    "pt_BR": "Definir previsão de atendimento",
-    "en": "Set attendance forecast",
-    "es": "Definir previsión de atención"
+    "pt_BR": "Solicitar nova previsão de atendimento",
+    "en": "Request new attendance forecast",
+    "es": "Solicitar nueva previsión de atención"
   },
   "attendance_forecast_reason_placeholder": {
     "pt_BR": "Ex: combinei com o gestor, preciso de mais tempo antes de atender",
@@ -5049,6 +5109,31 @@
     "en": "[Reply] Ticket {numero} — requester replied",
     "es": "[Respuesta] Ticket {numero} — el solicitante respondió"
   },
+  "push_subject_reply_supervisor": {
+    "pt_BR": "[Resposta] Chamado {numero} — responsável respondeu",
+    "en": "[Reply] Ticket {numero} — responsible replied",
+    "es": "[Respuesta] Ticket {numero} — el responsable respondió"
+  },
+  "supervisor_reply_title": {
+    "pt_BR": "Responder ao solicitante",
+    "en": "Reply to requester",
+    "es": "Responder al solicitante"
+  },
+  "supervisor_reply_hint": {
+    "pt_BR": "Sua mensagem é enviada ao solicitante por e-mail e notificação, e fica registrada no histórico do chamado.",
+    "en": "Your message is sent to the requester by email and notification, and logged in the ticket history.",
+    "es": "Su mensaje se envía al solicitante por correo y notificación, y queda registrado en el historial del ticket."
+  },
+  "supervisor_reply_placeholder": {
+    "pt_BR": "Escreva sua resposta ao solicitante...",
+    "en": "Write your reply to the requester...",
+    "es": "Escriba su respuesta al solicitante..."
+  },
+  "supervisor_reply_send_btn": {
+    "pt_BR": "Enviar resposta",
+    "en": "Send reply",
+    "es": "Enviar respuesta"
+  },
   "reopen_limit_reached": {
     "pt_BR": "Limite de {limite} reaberturas atingido. Fale com o responsável ou supervisor para reabrir manualmente.",
     "en": "Limit of {limite} reopenings reached. Contact the assignee or supervisor to reopen manually.",
@@ -5173,5 +5258,190 @@
     "pt_BR": "Busca",
     "en": "Search",
     "es": "Búsqueda"
+  },
+  "attendance_forecast_request_already_pending": {
+    "pt_BR": "Já existe um pedido de previsão de atendimento pendente pra esse chamado",
+    "en": "There's already a pending attendance forecast request for this ticket",
+    "es": "Ya existe un pedido de previsión de atención pendiente para este ticket"
+  },
+  "attendance_forecast_request_not_found": {
+    "pt_BR": "Pedido de previsão de atendimento não encontrado",
+    "en": "Attendance forecast request not found",
+    "es": "Pedido de previsión de atención no encontrado"
+  },
+  "attendance_forecast_request_already_decided": {
+    "pt_BR": "Esse pedido já foi decidido",
+    "en": "This request has already been decided",
+    "es": "Este pedido ya fue decidido"
+  },
+  "no_permission_decide_attendance_forecast": {
+    "pt_BR": "Apenas o gestor do setor do chamado (ou admin) pode aprovar ou rejeitar esse pedido",
+    "en": "Only the ticket's sector manager (or admin) can approve or reject this request",
+    "es": "Solo el gestor del sector del ticket (o admin) puede aprobar o rechazar este pedido"
+  },
+  "attendance_forecast_pending_title": {
+    "pt_BR": "Aguardando aprovação",
+    "en": "Awaiting approval",
+    "es": "Esperando aprobación"
+  },
+  "attendance_forecast_pending_gestor": {
+    "pt_BR": "Decisão de",
+    "en": "Decision from",
+    "es": "Decisión de"
+  },
+  "attendance_forecast_no_gestor": {
+    "pt_BR": "nenhum gestor cadastrado",
+    "en": "no manager registered",
+    "es": "ningún gestor registrado"
+  },
+  "attendance_forecast_reject_reason_placeholder": {
+    "pt_BR": "Motivo da rejeição (opcional)",
+    "en": "Rejection reason (optional)",
+    "es": "Motivo del rechazo (opcional)"
+  },
+  "attendance_forecast_confirm_reject_btn": {
+    "pt_BR": "Confirmar rejeição",
+    "en": "Confirm rejection",
+    "es": "Confirmar rechazo"
+  },
+  "approve": {
+    "pt_BR": "Aprovar",
+    "en": "Approve",
+    "es": "Aprobar"
+  },
+  "reject": {
+    "pt_BR": "Rejeitar",
+    "en": "Reject",
+    "es": "Rechazar"
+  },
+  "conversation_title": {
+    "pt_BR": "Conversa",
+    "en": "Conversation",
+    "es": "Conversación"
+  },
+  "attendance_forecast_approval_title": {
+    "pt_BR": "Aprovação de previsão de atendimento",
+    "en": "Attendance forecast approval",
+    "es": "Aprobación de previsión de atención"
+  },
+  "ticket": {
+    "pt_BR": "Chamado",
+    "en": "Ticket",
+    "es": "Ticket"
+  },
+  "view_ticket": {
+    "pt_BR": "Ver chamado",
+    "en": "View ticket",
+    "es": "Ver ticket"
+  },
+  "attendance_forecast_approval_field_requested_date": {
+    "pt_BR": "Data solicitada",
+    "en": "Requested date",
+    "es": "Fecha solicitada"
+  },
+  "attendance_forecast_approval_field_requested_by": {
+    "pt_BR": "Solicitado por",
+    "en": "Requested by",
+    "es": "Solicitado por"
+  },
+  "attendance_forecast_approval_field_reason": {
+    "pt_BR": "Motivo",
+    "en": "Reason",
+    "es": "Motivo"
+  },
+  "attendance_forecast_approval_invalid_token": {
+    "pt_BR": "Link inválido ou expirado.",
+    "en": "Invalid or expired link.",
+    "es": "Enlace inválido o expirado."
+  },
+  "attendance_forecast_approval_not_found": {
+    "pt_BR": "Pedido de previsão de atendimento não encontrado.",
+    "en": "Attendance forecast request not found.",
+    "es": "Pedido de previsión de atención no encontrado."
+  },
+  "attendance_forecast_approval_already_decided": {
+    "pt_BR": "Esse pedido já foi decidido anteriormente.",
+    "en": "This request has already been decided.",
+    "es": "Este pedido ya fue decidido anteriormente."
+  },
+  "attendance_forecast_approval_gestor_invalid": {
+    "pt_BR": "O gestor que recebeu esse pedido não foi encontrado. Decida pelo sistema, já logado.",
+    "en": "The manager who received this request could not be found. Decide from the system instead, while logged in.",
+    "es": "No se encontró el gestor que recibió este pedido. Decida desde el sistema, ya conectado."
+  },
+  "attendance_forecast_approval_confirm_approve": {
+    "pt_BR": "Confirme abaixo para aprovar esta previsão de atendimento.",
+    "en": "Confirm below to approve this attendance forecast.",
+    "es": "Confirme abajo para aprobar esta previsión de atención."
+  },
+  "attendance_forecast_approval_confirm_reject": {
+    "pt_BR": "Confirme abaixo para rejeitar esta previsão de atendimento.",
+    "en": "Confirm below to reject this attendance forecast.",
+    "es": "Confirme abajo para rechazar esta previsión de atención."
+  },
+  "attendance_forecast_approval_btn_approve": {
+    "pt_BR": "Aprovar previsão",
+    "en": "Approve forecast",
+    "es": "Aprobar previsión"
+  },
+  "attendance_forecast_approval_btn_reject": {
+    "pt_BR": "Rejeitar previsão",
+    "en": "Reject forecast",
+    "es": "Rechazar previsión"
+  },
+  "attendance_forecast_approval_approved_success": {
+    "pt_BR": "Previsão de atendimento aprovada com sucesso.",
+    "en": "Attendance forecast approved successfully.",
+    "es": "Previsión de atención aprobada con éxito."
+  },
+  "attendance_forecast_approval_rejected_success": {
+    "pt_BR": "Previsão de atendimento rejeitada.",
+    "en": "Attendance forecast rejected.",
+    "es": "Previsión de atención rechazada."
+  },
+  "history_forecast_requested": {
+    "pt_BR": "Previsão de atendimento solicitada",
+    "en": "Attendance forecast requested",
+    "es": "Previsión de atención solicitada"
+  },
+  "history_forecast_approved": {
+    "pt_BR": "Previsão de atendimento aprovada",
+    "en": "Attendance forecast approved",
+    "es": "Previsión de atención aprobada"
+  },
+  "history_forecast_rejected": {
+    "pt_BR": "Previsão de atendimento rejeitada",
+    "en": "Attendance forecast rejected",
+    "es": "Previsión de atención rechazada"
+  },
+  "history_auto_escalation": {
+    "pt_BR": "Escalonamento automático",
+    "en": "Automatic escalation",
+    "es": "Escalonamiento automático"
+  },
+  "history_pre_escalation_notice": {
+    "pt_BR": "Aviso prévio de escalonamento",
+    "en": "Pre-escalation notice",
+    "es": "Aviso previo de escalonamiento"
+  },
+  "history_resolution_deadline_notice": {
+    "pt_BR": "Aviso de prazo de resolução",
+    "en": "Resolution deadline notice",
+    "es": "Aviso de plazo de resolución"
+  },
+  "history_confirmation_reminder": {
+    "pt_BR": "Lembrete de confirmação enviado",
+    "en": "Confirmation reminder sent",
+    "es": "Recordatorio de confirmación enviado"
+  },
+  "history_deadline_alert_24h": {
+    "pt_BR": "Alerta de prazo (24h)",
+    "en": "Deadline alert (24h)",
+    "es": "Alerta de plazo (24h)"
+  },
+  "history_resolution_confirmed": {
+    "pt_BR": "Solicitante confirmou a resolução",
+    "en": "Requester confirmed the resolution",
+    "es": "El solicitante confirmó la resolución"
   }
 }

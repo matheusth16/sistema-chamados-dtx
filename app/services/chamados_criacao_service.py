@@ -182,13 +182,15 @@ def criar_chamado(
     # desfazer aqui, o autoescape do Jinja na renderização escapa de novo e o
     # usuário vê "&gt;" literal na tela em vez de ">".
     descricao = html.unescape(bleach.clean(form.get("descricao") or "", tags=[], strip=True))
-    impacto = form.get("impacto")
     gate = form.get("gate")
     if hasattr(form, "getlist"):
+        impacto = [str(i).strip() for i in form.getlist("impacto") if i and str(i).strip()]
         setores_adicionais_lista = [
             str(s).strip() for s in form.getlist("setores_adicionais") if s and str(s).strip()
         ]
     else:
+        impacto_bruto = form.get("impacto")
+        impacto = [str(impacto_bruto).strip()] if impacto_bruto else []
         setores_adicionais_bruto = form.get("setores_adicionais", [])
         if isinstance(setores_adicionais_bruto, list):
             setores_adicionais_lista = [
