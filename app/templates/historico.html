@@ -62,19 +62,28 @@
                             <!-- Ponto da Timeline -->
                             {% set _acoes_previsao = ('solicitacao_previsao_atendimento', 'aprovacao_previsao_atendimento', 'rejeicao_previsao_atendimento') %}
                             {% set _acoes_sistema = ('escalonamento_automatico', 'aviso_previo_escalonamento', 'aviso_resolucao_prazo', 'lembrete_confirmacao_enviado', 'alerta_prazo_24h') %}
-                            <div class="bento-timeline-dot {% if evento.acao == 'criacao' %}criacao{% elif evento.acao in ('alteracao_status', 'confirmacao_resolucao') %}status{% elif evento.acao == 'alteracao_dados' %}dados{% elif evento.acao in ('resposta_solicitante', 'resposta_responsavel') %}resposta{% elif evento.acao in _acoes_previsao %}previsao{% elif evento.acao in _acoes_sistema %}sistema{% else %}outro{% endif %}">
+                            {% set _acoes_colaboracao = ('transferencia_area', 'escalonamento_colega', 'inclusao_participantes', 'conclusao_parte_participante', 'inclusao_observadores') %}
+                            <div class="bento-timeline-dot {% if evento.acao == 'criacao' %}criacao{% elif evento.acao in ('alteracao_status', 'confirmacao_resolucao', 'reabertura') %}status{% elif evento.acao in ('alteracao_dados', 'anexo_tardio', 'edicao_descricao') %}dados{% elif evento.acao in ('resposta_solicitante', 'resposta_responsavel') %}resposta{% elif evento.acao in _acoes_previsao %}previsao{% elif evento.acao in _acoes_sistema %}sistema{% elif evento.acao in _acoes_colaboracao %}colaboracao{% else %}outro{% endif %}">
                                 {% if evento.acao == 'criacao' %}
                                     <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                                     </svg>
-                                {% elif evento.acao in ('alteracao_status', 'confirmacao_resolucao') %}
+                                {% elif evento.acao == 'anexo_tardio' %}
+                                    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/>
+                                    </svg>
+                                {% elif evento.acao in ('alteracao_status', 'confirmacao_resolucao', 'reabertura') %}
                                     <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
                                     </svg>
-                                {% elif evento.acao == 'alteracao_dados' %}
+                                {% elif evento.acao in ('alteracao_dados', 'edicao_descricao') %}
                                     <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                    </svg>
+                                {% elif evento.acao in _acoes_colaboracao %}
+                                    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
                                     </svg>
                                 {% elif evento.acao in ('resposta_solicitante', 'resposta_responsavel') %}
                                     <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -103,6 +112,22 @@
                                                     {{ t('status_updated_event') }}
                                                 {% elif evento.acao == 'alteracao_dados' %}
                                                     {{ t('data_modified') }}
+                                                {% elif evento.acao == 'edicao_descricao' %}
+                                                    {{ t('history_description_edited') }}
+                                                {% elif evento.acao == 'anexo_tardio' %}
+                                                    {{ t('history_attachment_added') }}
+                                                {% elif evento.acao == 'reabertura' %}
+                                                    {{ t('history_ticket_reopened') }}
+                                                {% elif evento.acao == 'transferencia_area' %}
+                                                    {{ t('history_area_transferred') }}
+                                                {% elif evento.acao == 'escalonamento_colega' %}
+                                                    {{ t('history_transferred_to_colleague') }}
+                                                {% elif evento.acao == 'inclusao_participantes' %}
+                                                    {{ t('history_participants_included') }}
+                                                {% elif evento.acao == 'conclusao_parte_participante' %}
+                                                    {{ t('history_participant_part_completed') }}
+                                                {% elif evento.acao == 'inclusao_observadores' %}
+                                                    {{ t('history_observers_included') }}
                                                 {% elif evento.acao == 'resposta_solicitante' %}
                                                     {{ t('history_reply_from_requester') }}
                                                 {% elif evento.acao == 'resposta_responsavel' %}
@@ -144,7 +169,7 @@
                                 </div>
 
                                 <!-- Detalhes da Alteração -->
-                                {% if evento.acao == 'alteracao_status' %}
+                                {% if evento.acao in ('alteracao_status', 'reabertura') %}
                                     <div class="bento-timeline-detail">
                                         <div class="flex items-center gap-3 flex-wrap">
                                             <span style="font-size:13px; color:var(--color-text-muted); font-weight:600;">{{ evento.campo_alterado|translate_field_label }}:</span>
@@ -159,6 +184,26 @@
                                                     {% if evento.campo_alterado == 'status' %}{{ translate_status(evento.valor_novo) }}{% else %}{{ evento.valor_novo }}{% endif %}
                                                 </span>
                                             </div>
+                                        </div>
+                                        {% if evento.acao in ('alteracao_status', 'reabertura') and evento.detalhe %}
+                                        <p style="font-size:13px; white-space:pre-wrap; word-break:break-word; margin-top:8px;">{{ evento.detalhe }}</p>
+                                        {% endif %}
+                                    </div>
+                                {% elif evento.acao == 'edicao_descricao' %}
+                                    <div class="bento-timeline-detail dados space-y-3">
+                                        <div class="space-y-2">
+                                            {% if evento.valor_anterior %}
+                                            <div>
+                                                <p style="font-size:11px; font-weight:800; text-transform:uppercase; color:var(--color-text-muted); margin-bottom:4px;">{{ t('history_previous_description') }}</p>
+                                                <div style="padding:10px 12px; background:var(--color-surface-base); border-radius:12px; border:1px solid var(--color-surface-border); font-size:13px; white-space:pre-wrap; word-break:break-word;">{{ evento.valor_anterior }}</div>
+                                            </div>
+                                            {% endif %}
+                                            {% if evento.valor_novo %}
+                                            <div>
+                                                <p style="font-size:11px; font-weight:800; text-transform:uppercase; color:var(--color-text-muted); margin-bottom:4px;">{{ t('history_new_description') }}</p>
+                                                <div style="padding:10px 12px; background:var(--color-status-done-bg); border-radius:12px; font-size:13px; white-space:pre-wrap; word-break:break-word;">{{ evento.valor_novo }}</div>
+                                            </div>
+                                            {% endif %}
                                         </div>
                                     </div>
                                 {% elif evento.acao == 'alteracao_dados' %}
@@ -215,7 +260,23 @@
                                     <div class="bento-timeline-detail resposta">
                                         <p style="font-size:13px; white-space:pre-wrap; word-break:break-word;">{{ evento.valor_novo }}</p>
                                     </div>
-                                {% elif evento.acao in _acoes_previsao or evento.acao in _acoes_sistema or evento.acao == 'confirmacao_resolucao' %}
+                                {% elif evento.acao == 'anexo_tardio' %}
+                                    <div class="bento-timeline-detail dados space-y-3">
+                                        <p style="font-size:13px;">
+                                            <span style="font-weight:700; color:var(--color-bento-violet);">{{ t('history_attachment_added') }}:</span>
+                                            <span style="font-weight:600;">{{ evento.valor_novo.split('/')[-1] if evento.valor_novo else '' }}</span>
+                                        </p>
+                                        {% if evento.detalhe %}
+                                        <p style="font-size:13px; white-space:pre-wrap; word-break:break-word;">{{ evento.detalhe }}</p>
+                                        {% endif %}
+                                        {% if evento.valor_novo and (evento.valor_novo.startswith('http') or evento.valor_novo.startswith('/')) %}
+                                        <a href="{{ evento.valor_novo }}" target="_blank" rel="noopener noreferrer" class="bento-btn-ghost" style="display:inline-flex;">
+                                            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                                            {{ t('history_open_attachment') }}
+                                        </a>
+                                        {% endif %}
+                                    </div>
+                                {% elif evento.acao in _acoes_previsao or evento.acao in _acoes_sistema or evento.acao in _acoes_colaboracao or evento.acao == 'confirmacao_resolucao' %}
                                     <div class="bento-timeline-detail">
                                         {% if evento.detalhe %}
                                         <p style="font-size:13px; white-space:pre-wrap; word-break:break-word;">{{ evento.detalhe }}</p>

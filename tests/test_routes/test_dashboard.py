@@ -297,6 +297,178 @@ def test_historico_renderiza_todas_acoes_automaticas_sem_quebrar(
     assert body.count("detalhe de teste") == len(acoes)
 
 
+def test_historico_anexo_tardio_renderiza_com_titulo_e_motivo(client_logado_supervisor, db_session):
+    """GET /chamado/<id>/historico não deixa o evento 'anexo_tardio' (anexo
+    enviado pelo solicitante após a criação, via adicionar_anexo_tardio) cair
+    no fallback genérico 'outro' — achado em auditoria 2026-08-13: essa acao
+    não tinha nenhuma branch dedicada no template, então título e corpo do
+    card ficavam em branco (só badge/autor/data visíveis)."""
+    from app.models_historico import Historico
+    from tests.factories import make_chamado
+
+    chamado = make_chamado(area="Manutencao", solicitante_id="sol1")
+    evento = Historico(
+        chamado_id=chamado.id,
+        usuario_id="sol1",
+        usuario_nome="Solicitante Teste",
+        acao="anexo_tardio",
+        campo_alterado="anexos",
+        valor_anterior=None,
+        valor_novo="uploads/comprovante.pdf",
+        detalhe="Motivo do anexo tardio",
+    )
+
+    with (
+        patch("app.routes.dashboard.usuario_pode_ver_chamado", return_value=True),
+        patch("app.routes.dashboard.Historico.get_by_chamado_id", return_value=[evento]),
+    ):
+        r = client_logado_supervisor.get(f"/chamado/{chamado.id}/historico")
+
+    assert r.status_code == 200
+    body = r.data.decode("utf-8")
+    assert "bento-timeline-dot outro" not in body
+    assert "bento-timeline-dot dados" in body
+    assert "comprovante.pdf" in body
+    assert "Motivo do anexo tardio" in body
+
+
+def test_historico_acoes_colaboracao_e_edicao_nao_caem_no_fallback_generico(
+    client_logado_supervisor, db_session
+):
+    """GET /chamado/<id>/historico — mesma auditoria 2026-08-13: 7 ações reais
+    (transferência de área, transferência para colega, inclusão de
+    participantes, conclusão de parte, inclusão de observadores, edição de
+    descrição e reabertura) não tinham branch dedicada e caíam no fallback
+    genérico 'outro', sem título nem corpo visível."""
+    from app.models_historico import Historico
+    from tests.factories import make_chamado
+
+    chamado = make_chamado(area="Manutencao", solicitante_id="sol1")
+    eventos = [
+        Historico(
+            chamado_id=chamado.id,
+            usuario_id="sup1",
+            usuario_nome="Supervisor Teste",
+            acao="transferencia_area",
+            campo_alterado="area",
+            valor_anterior="Manutencao",
+            valor_novo="Producao",
+            detalhe="Transferido para Producao — motivo teste",
+        ),
+        Historico(
+            chamado_id=chamado.id,
+            usuario_id="sup1",
+            usuario_nome="Supervisor Teste",
+            acao="escalonamento_colega",
+            campo_alterado="responsavel_id",
+            valor_anterior="sup1",
+            valor_novo="sup2",
+            detalhe="Escalado para Colega Teste — motivo teste",
+        ),
+        Historico(
+            chamado_id=chamado.id,
+            usuario_id="sup1",
+            usuario_nome="Supervisor Teste",
+            acao="inclusao_participantes",
+            campo_alterado="participantes",
+            valor_anterior="0",
+            valor_novo="1",
+            detalhe="Participantes incluídos: Colega Teste (Manutencao)",
+        ),
+        Historico(
+            chamado_id=chamado.id,
+            usuario_id="sup2",
+            usuario_nome="Colega Teste",
+            acao="conclusao_parte_participante",
+            campo_alterado="participantes",
+            valor_anterior="pendente",
+            valor_novo="concluido",
+            detalhe="Participante Colega Teste concluiu sua parte",
+        ),
+        Historico(
+            chamado_id=chamado.id,
+            usuario_id="sol1",
+            usuario_nome="Solicitante Teste",
+            acao="inclusao_observadores",
+            campo_alterado="observadores",
+            valor_anterior=None,
+            valor_novo="Observador Teste",
+        ),
+        Historico(
+            chamado_id=chamado.id,
+            usuario_id="sol1",
+            usuario_nome="Solicitante Teste",
+            acao="edicao_descricao",
+            campo_alterado="descricao",
+            valor_anterior="Descrição antiga",
+            valor_novo="Descrição nova",
+        ),
+        Historico(
+            chamado_id=chamado.id,
+            usuario_id="sup1",
+            usuario_nome="Supervisor Teste",
+            acao="reabertura",
+            campo_alterado="status",
+            valor_anterior="Concluído",
+            valor_novo="Aberto",
+            detalhe="Reabertura administrativa",
+        ),
+    ]
+
+    with (
+        patch("app.routes.dashboard.usuario_pode_ver_chamado", return_value=True),
+        patch("app.routes.dashboard.Historico.get_by_chamado_id", return_value=eventos),
+    ):
+        r = client_logado_supervisor.get(f"/chamado/{chamado.id}/historico")
+
+    assert r.status_code == 200
+    body = r.data.decode("utf-8")
+    assert "bento-timeline-dot outro" not in body
+    assert body.count("bento-timeline-dot colaboracao") == 5
+    assert "Transferido para Producao — motivo teste" in body
+    assert "Escalado para Colega Teste — motivo teste" in body
+    assert "Participantes incluídos: Colega Teste (Manutencao)" in body
+    assert "Participante Colega Teste concluiu sua parte" in body
+    assert "Observador Teste" in body
+    assert "Descrição antiga" in body
+    assert "Descrição nova" in body
+    assert "Reabertura administrativa" in body
+
+
+def test_historico_motivo_cancelamento_solicitante_aparece_no_alteracao_status(
+    client_logado_supervisor, db_session
+):
+    """GET /chamado/<id>/historico — achado em auditoria 2026-08-13: o
+    cancelamento feito pelo solicitante (cancelamento_solicitante_service.py)
+    grava só um evento 'alteracao_status' com o motivo no campo `detalhe`,
+    mas o template só mostrava `detalhe` pra 'reabertura' — o motivo do
+    cancelamento nunca aparecia no histórico."""
+    from app.models_historico import Historico
+    from tests.factories import make_chamado
+
+    chamado = make_chamado(area="Manutencao", solicitante_id="sol1", status="Cancelado")
+    evento = Historico(
+        chamado_id=chamado.id,
+        usuario_id="sol1",
+        usuario_nome="Solicitante Teste",
+        acao="alteracao_status",
+        campo_alterado="status",
+        valor_anterior="Aberto",
+        valor_novo="Cancelado",
+        detalhe="Não preciso mais deste chamado",
+    )
+
+    with (
+        patch("app.routes.dashboard.usuario_pode_ver_chamado", return_value=True),
+        patch("app.routes.dashboard.Historico.get_by_chamado_id", return_value=[evento]),
+    ):
+        r = client_logado_supervisor.get(f"/chamado/{chamado.id}/historico")
+
+    assert r.status_code == 200
+    body = r.data.decode("utf-8")
+    assert "Não preciso mais deste chamado" in body
+
+
 # ── POST /admin (alteração de status) ─────────────────────────────────────────
 
 

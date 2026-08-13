@@ -25,7 +25,11 @@
     var flash = document.getElementById('flash-messages');
 
     var defaultFrom = { opacity: 0, y: 28 };
-    var defaultTo = { opacity: 1, y: 0, duration: 0.55, ease: 'power2.out' };
+    // clearProps:'transform' — sem isso, o `y` da entrada fica como transform inline
+    // (mesmo chegando em 0) e QUALQUER ancestral com transform vira containing block
+    // pra `position:sticky` dos filhos, quebrando o sticky em vez de só decorar a
+    // entrada (achado em auditoria 2026-08-13, barra lateral do chamado sumindo).
+    var defaultTo = { opacity: 1, y: 0, duration: 0.55, ease: 'power2.out', clearProps: 'transform' };
 
     // Registra plugins (se carregados)
     if (typeof ScrollTrigger !== 'undefined') {
@@ -151,6 +155,7 @@
                     y: 0,
                     duration: 0.65,
                     ease: 'power2.out',
+                    clearProps: 'transform',
                     scrollTrigger: {
                         trigger: el,
                         start: 'top 88%',
@@ -167,6 +172,7 @@
                         duration: 0.5,
                         stagger: 0.1,
                         ease: 'power2.out',
+                        clearProps: 'transform',
                         scrollTrigger: {
                             trigger: container,
                             start: 'top 85%',

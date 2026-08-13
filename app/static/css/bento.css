@@ -451,6 +451,7 @@ dialog.bento-modal textarea:focus{ outline:none; border-color:var(--color-dtx-50
 .bento-timeline-dot.resposta{ background:var(--color-bento-info); }
 .bento-timeline-dot.previsao{ background:var(--color-bento-warning-icon); }
 .bento-timeline-dot.sistema{ background:var(--color-surface-muted); }
+.bento-timeline-dot.colaboracao{ background:var(--color-bento-teal); }
 .bento-timeline-card{ flex:1; background:var(--color-surface-base); border:1px solid rgba(20,30,60,.06); border-radius:16px; padding:18px 20px; }
 .bento-timeline-badge{ font-size:11px; font-weight:800; padding:2px 8px; border-radius:99px; background:var(--color-dtx-100); color:var(--color-dtx-500); }
 .bento-timeline-time{ display:flex; flex-direction:column; align-items:flex-end; font-size:11px; font-weight:700; background:var(--color-surface-canvas); padding:8px 12px; border-radius:12px; flex-shrink:0; }
@@ -658,6 +659,12 @@ dialog.bento-modal textarea:focus{ outline:none; border-color:var(--color-dtx-50
 .bento-escalation-btn.amber{ background:var(--color-status-open-bg); color:var(--color-bento-warning); border-color:var(--color-bento-warning-bg); } .bento-escalation-btn.amber:hover{ background:var(--color-bento-warning-bg); }
 .bento-escalation-btn.violet{ background:#f5f3ff; color:var(--color-bento-violet); border-color:#ddd6fe; } .bento-escalation-btn.violet:hover{ background:#ddd6fe; }
 .bento-escalation-btn.teal{ background:#f0fdfa; color:var(--color-bento-teal); border-color:#99f6e4; } .bento-escalation-btn.teal:hover{ background:#99f6e4; }
+
+.bento-info-btn{ position:absolute; top:-7px; right:-7px; width:20px; height:20px; border-radius:50%; background:var(--color-surface-base); border:1.5px solid currentColor; display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 2px 6px rgba(20,30,60,.12); z-index:2; padding:0; }
+.bento-info-btn:hover{ transform:scale(1.1); }
+/* display omitido de propósito — .hidden (Tailwind) precisa vencer sem empate de especificidade */
+.bento-info-card{ position:absolute; bottom:calc(100% + 10px); left:50%; transform:translateX(-50%); width:220px; background:var(--color-surface-base); border:1px solid var(--color-surface-border); border-radius:14px; padding:12px 14px; box-shadow:0 12px 32px rgba(20,30,60,.14); font-size:12px; line-height:1.5; color:var(--color-text); text-align:left; z-index:20; }
+.bento-info-card::after{ content:''; position:absolute; top:100%; left:50%; transform:translateX(-50%); border:6px solid transparent; border-top-color:var(--color-surface-base); }
 
 /* display isolado em :not(.hidden) — mesmo motivo de .bento-resp-badge acima: uma regra
    .bento-inline-notice{ display:... } incondicional tinha a mesma especificidade de .hidden
