@@ -359,6 +359,11 @@
     "en": "Try again",
     "es": "Intentar de nuevo"
   },
+  "cancellation_date": {
+    "pt_BR": "Data do Cancelamento",
+    "en": "Cancellation Date",
+    "es": "Fecha de Cancelación"
+  },
   "completion_date": {
     "pt_BR": "Data de Conclusão",
     "en": "Completion Date",
@@ -1030,9 +1035,9 @@
     "es": "Cambia el área dueña y el responsable del ticket — el ticket deja de ser suyo y pasa al nuevo responsable elegido."
   },
   "escalation_include_supervisors_help": {
-    "pt_BR": "Colaborar com acesso — os supervisores incluídos acompanham o chamado individualmente, sem tirar a sua responsabilidade por ele.",
-    "en": "Collaborate with access — the supervisors you add can track the ticket individually, without taking your responsibility for it away.",
-    "es": "Colaborar con acceso — los supervisores incluidos siguen el ticket individualmente, sin quitarle su responsabilidad sobre él."
+    "pt_BR": "Adiciona um supervisor como participante — ele acompanha o chamado e precisa marcar a parte dele como concluída antes que o chamado possa ser encerrado, sem tirar a sua responsabilidade principal por ele.",
+    "en": "Adds a supervisor as a participant — they track the ticket and must mark their part as done before the ticket can be closed, without taking your main responsibility for it away.",
+    "es": "Agrega un supervisor como participante — sigue el ticket y debe marcar su parte como concluida antes de que el ticket pueda cerrarse, sin quitarle su responsabilidad principal sobre él."
   },
   "edit_description_placeholder": {
     "pt_BR": "Edite ou adicione texto à descrição existente...",
@@ -1308,6 +1313,41 @@
     "pt_BR": "Anexo adicionado",
     "en": "Attachment added",
     "es": "Archivo adjunto añadido"
+  },
+  "history_description_edited": {
+    "pt_BR": "Descrição editada",
+    "en": "Description edited",
+    "es": "Descripción editada"
+  },
+  "history_ticket_reopened": {
+    "pt_BR": "Chamado reaberto",
+    "en": "Ticket reopened",
+    "es": "Ticket reabierto"
+  },
+  "history_area_transferred": {
+    "pt_BR": "Área transferida",
+    "en": "Area transferred",
+    "es": "Área transferida"
+  },
+  "history_transferred_to_colleague": {
+    "pt_BR": "Transferido para colega",
+    "en": "Transferred to colleague",
+    "es": "Transferido a colega"
+  },
+  "history_participants_included": {
+    "pt_BR": "Participantes incluídos",
+    "en": "Participants included",
+    "es": "Participantes incluidos"
+  },
+  "history_participant_part_completed": {
+    "pt_BR": "Parte do participante concluída",
+    "en": "Participant's part completed",
+    "es": "Parte del participante completada"
+  },
+  "history_observers_included": {
+    "pt_BR": "Adicionado(s) em cópia",
+    "en": "Added as Cc",
+    "es": "Agregado(s) en copia"
   },
   "history_open_attachment": {
     "pt_BR": "Abrir anexo",
@@ -3055,14 +3095,14 @@
     "es": "Transferir Área"
   },
   "escalation_escalate_colleague_btn": {
-    "pt_BR": "Escalonar para Colega",
-    "en": "Escalate to Colleague",
-    "es": "Escalar a Colega"
+    "pt_BR": "Transferir para Colega",
+    "en": "Transfer to Colleague",
+    "es": "Transferir a Colega"
   },
   "escalation_include_supervisors_btn": {
-    "pt_BR": "Incluir supervisores",
-    "en": "Include Supervisors",
-    "es": "Incluir supervisores"
+    "pt_BR": "Incluir Participantes",
+    "en": "Include Participants",
+    "es": "Incluir Participantes"
   },
   "escalation_transfer_modal_title": {
     "pt_BR": "Transferir Área",
@@ -3105,29 +3145,44 @@
     "es": "Transferir"
   },
   "escalation_escalate_modal_title": {
-    "pt_BR": "Escalonar para Colega",
-    "en": "Escalate to Colleague",
-    "es": "Escalar a Colega"
+    "pt_BR": "Transferir para Colega",
+    "en": "Transfer to Colleague",
+    "es": "Transferir a Colega"
   },
   "escalation_colleague_label": {
     "pt_BR": "Colega (mesma área)",
     "en": "Colleague (same area)",
     "es": "Colega (misma área)"
   },
+  "escalation_info_aria": {
+    "pt_BR": "O que essa ação faz",
+    "en": "What this action does",
+    "es": "Qué hace esta acción"
+  },
+  "escalation_transfer_colleague_help": {
+    "pt_BR": "Passa a responsabilidade do chamado para um colega (ou o gestor) da mesma área — você deixa de ser o responsável, sem mudar a área do chamado.",
+    "en": "Passes ticket ownership to a colleague (or the manager) in the same area — you stop being the responsible party, without changing the ticket's area.",
+    "es": "Pasa la responsabilidad del ticket a un colega (o al gestor) de la misma área — usted deja de ser el responsable, sin cambiar el área del ticket."
+  },
+  "escalation_manager_suffix": {
+    "pt_BR": "Gestor",
+    "en": "Manager",
+    "es": "Gestor"
+  },
   "escalation_escalate_reason_placeholder": {
-    "pt_BR": "Descreva o motivo do escalonamento...",
-    "en": "Describe the reason for the escalation...",
-    "es": "Describa el motivo de la escalación..."
+    "pt_BR": "Descreva o motivo da transferência...",
+    "en": "Describe the reason for the transfer...",
+    "es": "Describa el motivo de la transferencia..."
   },
   "escalation_escalate_confirm_btn": {
-    "pt_BR": "Escalonar",
-    "en": "Escalate",
-    "es": "Escalar"
+    "pt_BR": "Transferir",
+    "en": "Transfer",
+    "es": "Transferir"
   },
   "escalation_include_modal_title": {
-    "pt_BR": "Incluir supervisores",
-    "en": "Include Supervisors",
-    "es": "Incluir supervisores"
+    "pt_BR": "Incluir Participantes",
+    "en": "Include Participants",
+    "es": "Incluir Participantes"
   },
   "escalation_area_label": {
     "pt_BR": "Área",
@@ -5328,6 +5383,11 @@
     "pt_BR": "Conversa",
     "en": "Conversation",
     "es": "Conversación"
+  },
+  "conversation_empty": {
+    "pt_BR": "Nenhuma mensagem ainda — inicie a conversa.",
+    "en": "No messages yet — start the conversation.",
+    "es": "Aún no hay mensajes — inicia la conversación."
   },
   "attendance_forecast_approval_title": {
     "pt_BR": "Aprovação de previsão de atendimento",

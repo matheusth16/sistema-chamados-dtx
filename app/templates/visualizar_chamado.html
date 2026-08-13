@@ -154,7 +154,13 @@
     </script>
 
     <!-- Ticket Card -->
-    <div class="gsap-animate bento-card" style="padding:0; overflow:hidden;">
+    <!-- overflow:hidden tirado daqui (achado em auditoria 2026-08-13): quebrava
+         `position:sticky` na barra lateral do body — overflow != visible em
+         qualquer ancestral interrompe a cadeia de rolagem que o sticky
+         depende, e o card some em vez de fixar. Só o Body precisava do
+         corte (fundo diferente do header, cantos inferiores arredondados) —
+         ele agora arredonda os próprios cantos de baixo. -->
+    <div class="gsap-animate bento-card" style="padding:0;">
 
         <!-- Header -->
         <div style="padding:20px 24px; border-bottom:1px solid var(--color-surface-border); display:flex; flex-wrap:wrap; justify-content:space-between; align-items:flex-start; gap:12px;">
@@ -190,8 +196,8 @@
                     </span>
                     <span aria-hidden="true" style="width:1px; height:14px; background:var(--color-surface-border); flex-shrink:0;"></span>
                     <span style="display:inline-flex; align-items:baseline; gap:8px; min-width:0;">
-                        <span style="font-size:10px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; opacity:.75; white-space:nowrap;">{{ t('completion_date') if t else 'Conclusão' }}</span>
-                        <span style="font-weight:600; color:var(--color-text); white-space:nowrap;">{{ chamado.data_conclusao_formatada() or '—' }}</span>
+                        <span style="font-size:10px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; opacity:.75; white-space:nowrap;">{{ (t('cancellation_date') if t else 'Cancelamento') if chamado.status == 'Cancelado' else (t('completion_date') if t else 'Conclusão') }}</span>
+                        <span style="font-weight:600; color:var(--color-text); white-space:nowrap;">{{ (chamado.data_cancelamento_formatada() if chamado.status == 'Cancelado' else chamado.data_conclusao_formatada()) or '—' }}</span>
                     </span>
                     {% if chamado.observadores %}
                     <span aria-hidden="true" style="width:1px; height:14px; background:var(--color-surface-border); flex-shrink:0;"></span>
@@ -214,8 +220,8 @@
         </div>
 
         <!-- Body -->
-        <div style="padding:24px; background:var(--color-surface-canvas);">
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div style="padding:24px; background:var(--color-surface-canvas); border-radius:0 0 24px 24px;">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
 
                 <!-- Coluna Principal (Esquerda) -->
                 <div class="lg:col-span-2" style="display:flex; flex-direction:column; gap:16px;">
@@ -238,13 +244,23 @@
 
                     <!-- Conversa (solicitante ↔ responsável) — junta resposta_solicitante +
                          resposta_responsavel do Histórico numa thread única, ordem cronológica
-                         (ver app/routes/dashboard.py::visualizar_detalhe_chamado). -->
-                    {% if mensagens_conversa %}
+                         (ver app/routes/dashboard.py::visualizar_detalhe_chamado). O campo de
+                         resposta do responsável mora no MESMO card da thread (achado em
+                         auditoria 2026-08-13: antes ficava escondido dentro do painel de
+                         Anexos, sob o rótulo "Arquivo Anexado" — ninguém procura "responder"
+                         ali). Mesma correção aplicada ao lado do solicitante: "Responder por
+                         texto" morava lá embaixo na barra lateral, misturado com "Editar
+                         descrição"/"Cancelar chamado" em "Suas ações" — sem nenhuma relação
+                         visual com a thread. Card aparece sempre que há mensagem OU o usuário
+                         (responsável OU solicitante dono) pode responder — nunca fica sem
+                         nenhum jeito visível de iniciar a conversa. -->
+                    {% if mensagens_conversa or pode_editar or pode_anexo_tardio_solicitante %}
                     <div class="bento-panel">
                         <label class="bento-panel-label">
                             <svg width="16" height="16" style="color:var(--color-surface-muted);" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path></svg>
                             {{ t('conversation_title') if t else 'Conversa' }}
                         </label>
+                        {% if mensagens_conversa %}
                         <div class="space-y-3" style="max-height:320px; overflow-y:auto; padding-right:2px;">
                             {% for msg in mensagens_conversa %}
                             {% set eh_solicitante = msg.acao == 'resposta_solicitante' %}
@@ -258,23 +274,14 @@
                             </div>
                             {% endfor %}
                         </div>
-                    </div>
-                    {% endif %}
-
-                    <!-- Arquivos e Anexos -->
-                    <div class="bento-panel">
-                        <label class="bento-panel-label">
-                            <svg width="16" height="16" style="color:var(--color-surface-muted);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path></svg>
-                            {% set _af = t('attached_file') %}{{ _af if _af != 'attached_file' else 'Anexos' }}
-                        </label>
+                        {% elif pode_editar or pode_anexo_tardio_solicitante %}
+                        {% set _ce = t('conversation_empty') %}
+                        <p style="font-size:13px; color:var(--color-surface-muted); font-style:italic;">{{ _ce if _ce != 'conversation_empty' else 'Nenhuma mensagem ainda — inicie a conversa.' }}</p>
+                        {% endif %}
 
                         {% if pode_editar %}
-                        <div style="margin-bottom:16px;">
-                            <label class="bento-panel-label" style="margin-bottom:10px;">
-                                <svg width="16" height="16" style="color:var(--color-surface-muted);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path></svg>
-                                {{ t('supervisor_reply_title') if t else 'Responder ao solicitante' }}
-                            </label>
-                            <p style="font-size:12px; color:var(--color-surface-muted); margin:-6px 0 12px;">{{ t('supervisor_reply_hint') if t else 'Sua mensagem é enviada ao solicitante por e-mail e notificação, e fica registrada no histórico do chamado.' }}</p>
+                        <div style="margin-top:16px; {% if mensagens_conversa %}padding-top:16px; border-top:1px solid var(--color-surface-border);{% endif %}">
+                            <p style="font-size:12px; color:var(--color-surface-muted); margin:0 0 10px;">{{ t('supervisor_reply_hint') if t else 'Sua mensagem é enviada ao solicitante por e-mail e notificação, e fica registrada no histórico do chamado.' }}</p>
                             <textarea id="sup-resposta-texto" rows="3"
                                 style="width:100%; box-sizing:border-box; background:var(--color-surface-canvas); border:1.5px solid transparent; border-radius:14px; padding:11px 14px; font-family:inherit; font-size:13px; resize:none; margin-bottom:8px;"
                                 placeholder="{{ t('supervisor_reply_placeholder') if t else 'Escreva sua resposta ao solicitante...' }}"></textarea>
@@ -285,7 +292,31 @@
                                 {{ t('supervisor_reply_send_btn') if t else 'Enviar resposta' }}
                             </button>
                         </div>
+                        {% elif pode_anexo_tardio_solicitante %}
+                        <div id="bloco-resposta-texto" style="margin-top:16px; {% if mensagens_conversa %}padding-top:16px; border-top:1px solid var(--color-surface-border);{% endif %}">
+                            <p style="font-size:12px; color:var(--color-surface-muted); margin:0 0 10px;">{{ t('text_reply_hint') if t else 'Sem precisar anexar arquivo — use isso pra responder um pedido de informação.' }}</p>
+                            <textarea id="sol-resposta-texto" rows="3"
+                                style="width:100%; box-sizing:border-box; background:var(--color-surface-canvas); border:1.5px solid transparent; border-radius:14px; padding:11px 14px; font-family:inherit; font-size:13px; resize:none; margin-bottom:8px;"
+                                placeholder="{{ t('text_reply_placeholder') if t else 'Escreva sua resposta...' }}"></textarea>
+                            <div id="sol-resposta-erro" class="hidden bento-inline-notice error" style="margin-top:4px;"></div>
+                            <div id="sol-resposta-ok" class="hidden bento-inline-notice ok" style="margin-top:4px;"></div>
+                            <button type="button" data-action="enviar-resposta-solicitante" data-chamado-id="{{ chamado.id }}" class="bento-btn-block solid-blue" style="margin-top:8px;">
+                                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
+                                {{ t('text_reply_send_btn') if t else 'Enviar resposta' }}
+                            </button>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endif %}
 
+                    <!-- Anexos -->
+                    <div class="bento-panel">
+                        <label class="bento-panel-label">
+                            <svg width="16" height="16" style="color:var(--color-surface-muted);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path></svg>
+                            {% set _af = t('attached_file') %}{{ _af if _af != 'attached_file' else 'Anexos' }}
+                        </label>
+
+                        {% if pode_editar %}
                         <div class="bento-resp-box">
                             <label class="bento-field-label" style="margin-bottom:8px;">{% set _natt = t('new_attachment') %}{{ _natt if _natt != 'new_attachment' else 'Novo Anexo' }}</label>
                             <label for="modal-input-anexo" class="bento-dropzone block" style="padding:16px;" data-upload-placeholder="{% set _cu = t('click_to_upload_file') %}{{ _cu if _cu != 'click_to_upload_file' else 'Clique para enviar um arquivo' }}">
@@ -303,11 +334,48 @@
                                  mandar de verdade pro solicitante — mesmo padrão de app/templates/formulario.html -->
                             <ul id="preview-anexo-novo" class="bento-attach-list" style="margin-top:8px;"></ul>
                         </div>
+                        {% elif pode_anexo_tardio_solicitante %}
+                        <!-- "Adicionar Documento" do solicitante mora aqui, na mesma posição do
+                             "Novo Anexo" do responsável (achado em auditoria 2026-08-13: antes
+                             ficava na barra lateral, dentro de "Suas ações", enquanto o
+                             equivalente do responsável sempre esteve neste painel — mesmo com o
+                             dropzone já igualado visualmente, a página inteira ficava
+                             estruturalmente diferente entre os dois papéis). -->
+                        <div id="bloco-anexo-tardio" class="bento-resp-box">
+                            <label class="bento-field-label" style="margin-bottom:8px;">{{ t('late_attachment_title') if t else 'Adicionar Documento' }}</label>
+                            <p style="font-size:12px; color:var(--color-surface-muted); margin:-4px 0 10px;">{{ t('late_attachment_hint') if t else 'Informe o motivo e selecione o arquivo.' }}</p>
+                            <textarea id="sol-anexo-motivo" rows="2"
+                                style="width:100%; box-sizing:border-box; background:var(--color-surface-canvas); border:1.5px solid transparent; border-radius:14px; padding:11px 14px; font-family:inherit; font-size:13px; resize:none; margin-bottom:8px;"
+                                placeholder="{{ t('late_attachment_motivo_placeholder') if t else 'Motivo (mínimo 10 caracteres)' }}"></textarea>
+                            <label for="sol-anexo-file" class="bento-dropzone block" style="padding:16px;" data-upload-placeholder="{% set _cu3 = t('click_to_upload_file') %}{{ _cu3 if _cu3 != 'click_to_upload_file' else 'Clique para enviar um arquivo' }}">
+                                <input type="file" id="sol-anexo-file" class="sr-only" accept="{{ accept_anexo }}">
+                                <div class="icon" style="margin:0 auto 6px;">
+                                    <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                    </svg>
+                                </div>
+                                <p style="font-size:13px; font-weight:600; color:var(--color-text-muted);" id="sol-anexo-nome-arquivo">{% set _cu4 = t('click_to_upload_file') %}{{ _cu4 if _cu4 != 'click_to_upload_file' else 'Clique para enviar um arquivo' }}</p>
+                                <small>{% set _od2 = t('or_drag_drop') %}{{ _od2 if _od2 != 'or_drag_drop' else 'ou arraste e solte aqui' }}</small>
+                                <small title="{{ extensoes_permitidas|join(', ') }}">{% set _ft2 = t('file_types_short') %}{{ _ft2 if _ft2 != 'file_types_short' else 'Imagens, PDF, Excel e Word. Máx. 10MB' }}</small>
+                            </label>
+                            <ul id="sol-anexo-preview" class="bento-attach-list" style="margin-top:8px;"></ul>
+                            <div id="sol-anexo-erro" class="hidden bento-inline-notice error" style="margin-top:8px;"></div>
+                            <div id="sol-anexo-ok" class="hidden bento-inline-notice ok" style="margin-top:8px;"></div>
+                            <button type="button" data-action="enviar-anexo-tardio" data-chamado-id="{{ chamado.id }}" class="bento-btn-block solid-blue" style="margin-top:10px;">
+                                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                                {{ t('late_attachment_send_btn') if t else 'Enviar documento' }}
+                            </button>
+                        </div>
                         {% endif %}
 
-                        <div class="space-y-3 {% if pode_editar %}bento-resp-box{% endif %}">
+                        <div class="space-y-3 {% if pode_editar or pode_anexo_tardio_solicitante %}bento-resp-box{% endif %}">
                             {% if anexos_exibicao %}
-                                <div class="flex flex-col gap-2">
+                                <!-- Mesmo componente de lista (.bento-attach-list) já usado no preview
+                                     de "novo anexo" — cada anexo vira uma linha delimitada (fundo +
+                                     padding + nome à esquerda/legenda à direita), em vez de um pill
+                                     solto com a legenda grudada do lado (achado em auditoria
+                                     2026-08-13: visualmente desagrupado/apertado). -->
+                                <ul class="bento-attach-list">
                                     {% for item in anexos_exibicao %}
                                         {% set anx = item.caminho %}
                                         {% set is_r2 = anx.startswith('r2:') %}
@@ -338,19 +406,19 @@
                                             {% set href_anexo = url_for('main.download_anexo', chamado_id=chamado.id, chave=anx) %}
                                         {% endif %}
 
-                                        <div class="flex items-center flex-wrap gap-2">
+                                        <li class="{% if is_onedrive %}link{% endif %}">
                                             {% if is_onedrive %}
-                                            <a href="{{ href_anexo }}" target="_blank" rel="noopener noreferrer" class="bento-attach-link blue" style="width:fit-content;">
-                                                <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
-                                                <span>{% set _ol = t('open_external_link') %}{{ _ol if _ol != 'open_external_link' else 'Open link' }} — OneDrive/SharePoint</span>
+                                            <a href="{{ href_anexo }}" target="_blank" rel="noopener noreferrer" class="flex items-center gap-2 truncate" style="min-width:0;">
+                                                <svg width="18" height="18" class="shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
+                                                <span class="font-medium truncate">{% set _ol = t('open_external_link') %}{{ _ol if _ol != 'open_external_link' else 'Open link' }} — OneDrive/SharePoint</span>
                                             </a>
                                             {% else %}
-                                            <a href="{{ href_anexo }}" target="_blank" class="bento-attach-link accent" style="width:fit-content;">
-                                                <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path></svg>
-                                                <span>{{ nome_limpo }}</span>
+                                            <a href="{{ href_anexo }}" target="_blank" class="flex items-center gap-2 truncate" style="min-width:0;">
+                                                <svg width="18" height="18" class="shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path></svg>
+                                                <span class="font-medium truncate">{{ nome_limpo }}</span>
                                             </a>
                                             {% endif %}
-                                            <span style="font-size:11px; color:var(--color-surface-muted); font-style:italic;">
+                                            <span style="font-size:11px; font-weight:500; font-style:italic; opacity:.75; flex-shrink:0;">
                                                 {% if item.eh_solicitante %}
                                                     {{ t('attachment_from_requester') if t else 'Anexado pelo solicitante' }}
                                                 {% elif item.usuario_id == current_user.id %}
@@ -359,9 +427,9 @@
                                                     {{ t('attachment_from_user', nome=item.usuario_nome) if t else 'Anexado por ' + (item.usuario_nome or '?') }}
                                                 {% endif %}
                                             </span>
-                                        </div>
+                                        </li>
                                     {% endfor %}
-                                </div>
+                                </ul>
                             {% else %}
                             <p style="font-size:13px; color:var(--color-surface-muted); font-style:italic;">{% set _na = t('no_attachments_current') %}{{ _na if _na != 'no_attachments_current' else 'Sem anexos atuais.' }}</p>
                             {% endif %}
@@ -370,8 +438,13 @@
                     </div>
                 </div>
 
-                <!-- Barra Lateral (Direita) — só ações / detalhes -->
-                <div class="space-y-4">
+                <!-- Barra Lateral (Direita) — só ações / detalhes. `items-start` no grid +
+                     sticky aqui: sem isso, o grid esticava esta coluna pra ter a mesma altura
+                     da esquerda (Conversa/Anexos, bem mais alta desde a fusão da thread com o
+                     composer), deixando um vão de fundo vazio embaixo do card curto (achado em
+                     auditoria 2026-08-13). Sticky aproveita esse espaço mantendo o card visível
+                     enquanto rola a coluna comprida, em vez de só encolher e desaparecer. -->
+                <div class="space-y-4 lg:sticky" style="top:6rem;">
 
                     <!-- Formulário de Edição / Visualização do Status -->
                     <div class="bento-panel">
@@ -438,11 +511,30 @@
                                     {{ t('participantes_pendentes_aviso') if t else 'Há participantes com parte pendente — status Concluído bloqueado.' }}
                                 </p>
                                 {% endif %}
-                                <div id="wrap-motivo-cancelamento" class="{% if chamado.status != 'Cancelado' %}hidden{% endif %}" style="margin-top:14px;">
+                                <!-- Sempre começa escondido (achado em auditoria 2026-08-13): antes ficava
+                                     visível/editável de cara sempre que o chamado JÁ estava Cancelado,
+                                     pré-preenchido com o motivo original do solicitante — deixando o
+                                     supervisor livre pra editar/apagar um texto que não é dele. O JS
+                                     abaixo só revela isso quando o supervisor troca o dropdown de status
+                                     PARA "Cancelado" a partir de outro status (cancelamento novo, motivo
+                                     em branco) — nunca reaparece pra um chamado que já está cancelado. -->
+                                <div id="wrap-motivo-cancelamento" class="hidden" style="margin-top:14px;">
                                     <label for="motivo_cancelamento" class="bento-field-label">{% set _cr = t('cancellation_reason') %}{{ _cr if _cr != 'cancellation_reason' else 'Motivo do cancelamento' }} <span style="color:var(--color-bento-danger);">*</span></label>
                                     <textarea id="motivo_cancelamento" form="form-status" name="motivo_cancelamento" rows="2" maxlength="500"
-                                        placeholder="{% set _crp = t('cancellation_reason_placeholder') %}{{ _crp if _crp != 'cancellation_reason_placeholder' else 'Informe o motivo do cancelamento' }}">{{ chamado.motivo_cancelamento or '' }}</textarea>
+                                        placeholder="{% set _crp = t('cancellation_reason_placeholder') %}{{ _crp if _crp != 'cancellation_reason_placeholder' else 'Informe o motivo do cancelamento' }}">{{ '' if chamado.status == 'Cancelado' else (chamado.motivo_cancelamento or '') }}</textarea>
                                 </div>
+                                {% if chamado.status == 'Cancelado' and chamado.motivo_cancelamento %}
+                                <!-- Motivo original somente-leitura (achado em auditoria 2026-08-13):
+                                     precisa continuar visível pra quem pode editar o chamado, já que a
+                                     textarea acima (editável) some pra chamado já cancelado. -->
+                                <div style="margin-top:14px;">
+                                    <label class="bento-field-label" style="margin-bottom:8px;">{% set _cr3 = t('cancellation_reason') %}{{ _cr3 if _cr3 != 'cancellation_reason' else 'Motivo do cancelamento' }}</label>
+                                    <div style="font-size:13px; font-weight:600; background:#fff1f2; border:1px solid var(--color-bento-danger-bg); border-radius:14px; padding:14px;">{{ chamado.motivo_cancelamento }}</div>
+                                    {% if chamado.data_cancelamento_formatada() and chamado.data_cancelamento_formatada() != '-' %}
+                                    <p style="font-size:11px; color:var(--color-surface-muted); font-weight:600; margin-top:8px;">{{ t('cancelled_on') if t else 'Cancelado em' }}: {{ chamado.data_cancelamento_formatada() }}</p>
+                                    {% endif %}
+                                </div>
+                                {% endif %}
                             </div>
 
                             <!-- Participantes (Fase 4) — edição -->
@@ -656,38 +748,13 @@
                                 </button>
                                 {% endif %}
 
-                                {% if pode_anexo_tardio_solicitante %}
-                                <div id="bloco-resposta-texto" class="bento-action-box blue" style="margin-bottom:12px;">
-                                    <p class="title">{{ t('text_reply_title') if t else 'Responder por texto' }}</p>
-                                    <p>{{ t('text_reply_hint') if t else 'Sem precisar anexar arquivo — use isso pra responder um pedido de informação.' }}</p>
-                                    <textarea id="sol-resposta-texto" rows="3"
-                                        style="width:100%; background:#fff; border:1.5px solid transparent; border-radius:14px; padding:11px 14px; font-family:inherit; font-size:13px; resize:none; margin-bottom:8px;"
-                                        placeholder="{{ t('text_reply_placeholder') if t else 'Escreva sua resposta...' }}"></textarea>
-                                    <div id="sol-resposta-erro" class="hidden bento-inline-notice error" style="margin-top:4px;"></div>
-                                    <div id="sol-resposta-ok" class="hidden bento-inline-notice ok" style="margin-top:4px;"></div>
-                                    <button type="button" data-action="enviar-resposta-solicitante" data-chamado-id="{{ chamado.id }}" class="bento-btn-block solid-blue" style="margin-top:8px;">
-                                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
-                                        {{ t('text_reply_send_btn') if t else 'Enviar resposta' }}
-                                    </button>
-                                </div>
-                                {% endif %}
-
-                                {% if pode_anexo_tardio_solicitante %}
-                                <div id="bloco-anexo-tardio" class="bento-action-box blue">
-                                    <p class="title">{{ t('late_attachment_title') if t else 'Adicionar Documento' }}</p>
-                                    <p>{{ t('late_attachment_hint') if t else 'Informe o motivo e selecione o arquivo.' }}</p>
-                                    <textarea id="sol-anexo-motivo" rows="2"
-                                        style="width:100%; background:#fff; border:1.5px solid transparent; border-radius:14px; padding:11px 14px; font-family:inherit; font-size:13px; resize:none; margin-bottom:8px;"
-                                        placeholder="{{ t('late_attachment_motivo_placeholder') if t else 'Motivo (mínimo 10 caracteres)' }}"></textarea>
-                                    <input type="file" id="sol-anexo-file" class="bento-file-input-mini" style="margin-bottom:8px;">
-                                    <div id="sol-anexo-erro" class="hidden bento-inline-notice error" style="margin-top:4px;"></div>
-                                    <div id="sol-anexo-ok" class="hidden bento-inline-notice ok" style="margin-top:4px;"></div>
-                                    <button type="button" data-action="enviar-anexo-tardio" data-chamado-id="{{ chamado.id }}" class="bento-btn-block solid-blue" style="margin-top:8px;">
-                                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
-                                        {{ t('late_attachment_send_btn') if t else 'Enviar documento' }}
-                                    </button>
-                                </div>
-                                {% endif %}
+                                <!-- "Responder por texto" morava aqui — movido pro card unificado
+                                     "Conversa" no topo da coluna esquerda (mesma correção aplicada
+                                     do lado do responsável): ninguém procura responder dentro de
+                                     "Suas ações", junto de editar descrição/cancelar chamado.
+                                     "Adicionar Documento" também saiu daqui — foi pro painel
+                                     "Anexos" (mesma coluna/posição do "Novo Anexo" do responsável),
+                                     ver mais abaixo. -->
                             </div>
                             {% endif %}
 
@@ -739,18 +806,42 @@
                     {{ t('escalation_actions_title') if t else 'Ações de Escalonamento' }}
                 </h4>
                 <div class="flex flex-wrap gap-3">
-                    <button type="button" data-action="abrir-escalonamento" data-target="modal-transferir-area" class="bento-escalation-btn amber" title="{{ t('escalation_transfer_area_help') if t else 'Muda a área dona e o responsável pelo chamado — o chamado deixa de ser seu' }}">
-                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
-                        {{ t('escalation_transfer_area_btn') if t else 'Transferir Área' }}
-                    </button>
-                    <button type="button" data-action="carregar-colegas-e-abrir-modal" class="bento-escalation-btn violet">
-                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>
-                        {{ t('escalation_escalate_colleague_btn') if t else 'Escalonar para Colega' }}
-                    </button>
-                    <button type="button" data-action="abrir-escalonamento" data-target="modal-incluir-participantes" class="bento-escalation-btn teal" title="{{ t('escalation_include_supervisors_help') if t else 'Colaborar com acesso — outros supervisores acompanham o chamado sem tirar sua responsabilidade' }}">
-                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                        {{ t('escalation_include_supervisors_btn') if t else 'Incluir supervisores' }}
-                    </button>
+                    <div class="flex-1" style="position:relative; min-width:150px;">
+                        <button type="button" data-action="abrir-escalonamento" data-target="modal-transferir-area" class="bento-escalation-btn amber" style="justify-content:center; width:100%;">
+                            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+                            {{ t('escalation_transfer_area_btn') if t else 'Transferir Área' }}
+                        </button>
+                        <button type="button" data-action="toggle-hidden" data-target="info-transferir-area" class="bento-info-btn" style="color:var(--color-bento-warning);" aria-label="{{ t('escalation_info_aria') if t else 'O que essa ação faz' }}" aria-describedby="info-transferir-area">
+                            <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        </button>
+                        <div id="info-transferir-area" role="tooltip" class="hidden bento-info-card">
+                            {{ t('escalation_transfer_area_help') if t else 'Muda a área dona e o responsável pelo chamado — o chamado deixa de ser seu.' }}
+                        </div>
+                    </div>
+                    <div class="flex-1" style="position:relative; min-width:150px;">
+                        <button type="button" data-action="carregar-colegas-e-abrir-modal" class="bento-escalation-btn violet" style="justify-content:center; width:100%;">
+                            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>
+                            {{ t('escalation_escalate_colleague_btn') if t else 'Transferir para Colega' }}
+                        </button>
+                        <button type="button" data-action="toggle-hidden" data-target="info-transferir-colega" class="bento-info-btn" style="color:var(--color-bento-violet);" aria-label="{{ t('escalation_info_aria') if t else 'O que essa ação faz' }}" aria-describedby="info-transferir-colega">
+                            <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        </button>
+                        <div id="info-transferir-colega" role="tooltip" class="hidden bento-info-card">
+                            {{ t('escalation_transfer_colleague_help') if t else 'Passa a responsabilidade do chamado para um colega (ou o gestor) da mesma área — você deixa de ser o responsável, sem mudar a área do chamado.' }}
+                        </div>
+                    </div>
+                    <div class="flex-1" style="position:relative; min-width:150px;">
+                        <button type="button" data-action="abrir-escalonamento" data-target="modal-incluir-participantes" class="bento-escalation-btn teal" style="justify-content:center; width:100%;">
+                            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                            {{ t('escalation_include_supervisors_btn') if t else 'Incluir Participantes' }}
+                        </button>
+                        <button type="button" data-action="toggle-hidden" data-target="info-incluir-participantes" class="bento-info-btn" style="color:var(--color-bento-teal);" aria-label="{{ t('escalation_info_aria') if t else 'O que essa ação faz' }}" aria-describedby="info-incluir-participantes">
+                            <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        </button>
+                        <div id="info-incluir-participantes" role="tooltip" class="hidden bento-info-card">
+                            {{ t('escalation_include_supervisors_help') if t else 'Adiciona um supervisor como participante — ele precisa marcar a parte dele como concluída antes que o chamado possa ser encerrado, sem tirar a sua responsabilidade principal por ele.' }}
+                        </div>
+                    </div>
                 </div>
             </div>
             {% endif %}
@@ -810,12 +901,12 @@
     </div>
 </div>
 
-<!-- Modal: Escalonar para Colega -->
+<!-- Modal: Transferir para Colega -->
 <div id="modal-escalonar-colega" class="hidden bento-modal-overlay flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="modal-escalonar-colega-titulo">
     <div class="bento-modal-backdrop"></div>
     <div class="bento-modal-panel" style="position:relative; z-index:1;">
         <div class="head">
-            <h3 id="modal-escalonar-colega-titulo" style="font-weight:800; font-size:15px;">{{ t('escalation_escalate_modal_title') if t else 'Escalonar para Colega' }}</h3>
+            <h3 id="modal-escalonar-colega-titulo" style="font-weight:800; font-size:15px;">{{ t('escalation_escalate_modal_title') if t else 'Transferir para Colega' }}</h3>
             <button type="button" data-action="fechar-escalonamento" data-target="modal-escalonar-colega" class="bento-modal-close">
                 <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
             </button>
@@ -831,7 +922,7 @@
             <div>
                 <label for="escalonar-motivo" class="bento-field-label" style="margin-bottom:6px;">{{ t('escalation_reason_label') if t else 'Motivo' }} <span style="color:var(--color-bento-danger);">*</span></label>
                 <textarea id="escalonar-motivo" rows="3" maxlength="500"
-                    placeholder="{{ t('escalation_escalate_reason_placeholder') if t else 'Descreva o motivo do escalonamento...' }}"
+                    placeholder="{{ t('escalation_escalate_reason_placeholder') if t else 'Descreva o motivo da transferência...' }}"
                     style="width:100%; background:var(--color-surface-canvas); border:1.5px solid transparent; border-radius:14px; padding:11px 14px; font-family:inherit; font-size:14px; resize:none;"></textarea>
             </div>
             <div id="escalonar-erro" class="hidden bento-inline-notice error"></div>
@@ -841,24 +932,24 @@
                 {{ t('cancel') if t else 'Cancelar' }}
             </button>
             <button type="button" data-action="executar-escalonar-colega" class="bento-btn-block" style="flex:1; background:var(--color-bento-violet); color:#fff;">
-                {{ t('escalation_escalate_confirm_btn') if t else 'Escalonar' }}
+                {{ t('escalation_escalate_confirm_btn') if t else 'Transferir' }}
             </button>
         </div>
     </div>
 </div>
 
-<!-- Modal: Incluir Supervisores (Fase 4) -->
+<!-- Modal: Incluir Participantes (Fase 4) -->
 <div id="modal-incluir-participantes" class="hidden bento-modal-overlay flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="modal-incluir-participantes-titulo">
     <div class="bento-modal-backdrop"></div>
     <div class="bento-modal-panel" style="position:relative; z-index:1;">
         <div class="head">
-            <h3 id="modal-incluir-participantes-titulo" style="font-weight:800; font-size:15px;">{{ t('escalation_include_modal_title') if t else 'Incluir supervisores' }}</h3>
+            <h3 id="modal-incluir-participantes-titulo" style="font-weight:800; font-size:15px;">{{ t('escalation_include_modal_title') if t else 'Incluir Participantes' }}</h3>
             <button type="button" data-action="fechar-escalonamento" data-target="modal-incluir-participantes" class="bento-modal-close">
                 <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
             </button>
         </div>
         <div class="space-y-4" style="padding:24px;">
-            <p style="font-size:12px; color:var(--color-surface-muted); line-height:1.4; margin-top:-4px;">{{ t('escalation_include_supervisors_help') if t else 'Colaborar com acesso — os supervisores incluídos acompanham o chamado individualmente, sem tirar a sua responsabilidade por ele.' }}</p>
+            <p style="font-size:12px; color:var(--color-surface-muted); line-height:1.4; margin-top:-4px;">{{ t('escalation_include_supervisors_help') if t else 'Adiciona um supervisor como participante — ele precisa marcar a parte dele como concluída antes que o chamado possa ser encerrado, sem tirar a sua responsabilidade principal por ele.' }}</p>
             <div>
                 <label for="incluir-area-select" class="bento-field-label" style="margin-bottom:6px;">{{ t('escalation_area_label') if t else 'Área' }} <span style="color:var(--color-bento-danger);">*</span></label>
                 <select id="incluir-area-select"
@@ -938,6 +1029,7 @@ Object.assign(window.DTX_MSGS, {
     select_responsible: {{ t('escalation_select_responsible') | tojson }},
     select_colleague: {{ t('escalation_select_colleague') | tojson }},
     select_supervisor: {{ t('escalation_select_supervisor') | tojson }},
+    manager_suffix: {{ t('escalation_manager_suffix') | tojson }},
     no_supervisor_available: {{ t('escalation_no_supervisor_available') | tojson }},
     no_colleague_available: {{ t('escalation_no_colleague_available') | tojson }},
     error_loading: {{ t('error_loading_short') | tojson }},
@@ -1087,7 +1179,7 @@ Object.assign(window.DTX_MSGS, {
         var selSup = document.getElementById('escalonar-supervisor-select');
         selSup.disabled = true;
         selSup.innerHTML = '<option value="">' + DTX_MSGS.loading + '</option>';
-        fetch('/api/supervisores/lista?area=' + encodeURIComponent(AREA_ATUAL), {
+        fetch('/api/supervisores/lista?area=' + encodeURIComponent(AREA_ATUAL) + '&incluir_gestor=1', {
             headers: { 'X-CSRFToken': CSRF_TOKEN }
         })
         .then(function(r) { return r.json(); })
@@ -1096,7 +1188,8 @@ Object.assign(window.DTX_MSGS, {
             var colegas = (data.supervisores || []).filter(function(s) { return s.id !== CURRENT_USER_ID; });
             colegas.forEach(function(s) {
                 var opt = document.createElement('option');
-                opt.value = s.id; opt.textContent = s.nome;
+                opt.value = s.id;
+                opt.textContent = s.gestor ? (s.nome + ' (' + DTX_MSGS.manager_suffix + ')') : s.nome;
                 selSup.appendChild(opt);
             });
             selSup.disabled = colegas.length === 0;
@@ -1722,6 +1815,7 @@ function cancelarChamadoAdmin() {
                 okEl.textContent = {{ t('document_sent_success') | tojson }};
                 okEl.classList.remove('hidden');
                 fileInput.value = '';
+                fileInput.dispatchEvent(new Event('change'));
                 document.getElementById('sol-anexo-motivo').value = '';
             } else {
                 erroEl.textContent = data.erro || {{ t('error_sending_document') | tojson }};
@@ -1730,6 +1824,68 @@ function cancelarChamadoAdmin() {
         })
         .catch(function() { erroEl.textContent = {{ t('error_connection') | tojson }}; erroEl.classList.remove('hidden'); });
     };
+
+    // Mesmo dropzone (visual + preview local) do painel "Anexos" do
+    // responsável — 1 arquivo só, sem `multiple`.
+    (function () {
+        var inputFile = document.getElementById('sol-anexo-file');
+        var nomeArquivoEl = document.getElementById('sol-anexo-nome-arquivo');
+        var previewEl = document.getElementById('sol-anexo-preview');
+        var urlPreview = null;
+        if (!inputFile) return;
+
+        function tipoPreview(arq) {
+            var tipo = (arq.type || '').toLowerCase();
+            var ext = (arq.name.split('.').pop() || '').toLowerCase();
+            if (tipo.indexOf('image/') === 0 || ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'].indexOf(ext) !== -1) return 'imagem';
+            if (tipo === 'application/pdf' || ext === 'pdf') return 'pdf';
+            return 'outro';
+        }
+
+        inputFile.addEventListener('change', function (e) {
+            var arq = e.target.files && e.target.files[0];
+            if (arq) {
+                nomeArquivoEl.textContent = arq.name;
+                nomeArquivoEl.style.color = 'var(--color-dtx-500)';
+                nomeArquivoEl.style.fontWeight = '800';
+            } else {
+                var label = inputFile.closest('[data-upload-placeholder]');
+                nomeArquivoEl.textContent = label ? label.getAttribute('data-upload-placeholder') : {{ t('click_to_upload_file') | tojson }};
+                nomeArquivoEl.style.color = '';
+                nomeArquivoEl.style.fontWeight = '';
+            }
+
+            if (previewEl) {
+                previewEl.innerHTML = '';
+                if (urlPreview) { URL.revokeObjectURL(urlPreview); urlPreview = null; }
+                var tipo = arq ? tipoPreview(arq) : null;
+                if (arq && (tipo === 'imagem' || tipo === 'pdf')) {
+                    urlPreview = URL.createObjectURL(arq);
+                    var li = document.createElement('li');
+                    var link = document.createElement('a');
+                    link.href = urlPreview;
+                    link.target = '_blank';
+                    link.rel = 'noopener';
+                    link.className = 'flex items-center gap-2 truncate';
+                    if (tipo === 'imagem') {
+                        var thumb = document.createElement('img');
+                        thumb.className = 'bento-attach-thumb';
+                        thumb.src = urlPreview;
+                        thumb.alt = '';
+                        link.appendChild(thumb);
+                    } else {
+                        link.innerHTML = '<svg class="w-4 h-4 shrink-0" style="color:var(--color-bento-success)" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>';
+                    }
+                    var nome = document.createElement('span');
+                    nome.className = 'font-medium truncate';
+                    nome.textContent = arq.name;
+                    link.appendChild(nome);
+                    li.appendChild(link);
+                    previewEl.appendChild(li);
+                }
+            }
+        });
+    })();
     {% endif %}
 })();
 </script>
