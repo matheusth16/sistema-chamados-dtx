@@ -27,6 +27,16 @@ def supervisor_pode_alterar_chamado(usuario: Any, chamado_area: str, chamado: An
     de colega da própria área não vira permissão de escrita — só dono/fila/
     participante/quem abriu (ver usuario_pode_operar_chamado).
 
+    Dono do chamado (responsavel_id == usuario.id) sempre pode alterar,
+    mesmo que a área do chamado não esteja mais nas áreas cadastradas do
+    supervisor — bug real, auditoria 2026-08-13, achado em dado vivo do
+    banco de dev: renomear/editar o cadastro de área de um supervisor (ou a
+    área do próprio chamado) depois da atribuição não é uma FK, não
+    propaga (ver feedback_verificar_dado_vivo_antes_hardcode), e sem essa
+    checagem o responsável de fato ficava sem NENHUM controle na tela —
+    nem trocar status, nem responder ao solicitante — no chamado que ele
+    mesmo estava tratando.
+
     Args:
         usuario: current_user (com .perfil e .areas)
         chamado_area: campo area do chamado
@@ -43,7 +53,7 @@ def supervisor_pode_alterar_chamado(usuario: Any, chamado_area: str, chamado: An
     if usuario.perfil != "supervisor":
         return False
     if chamado_area not in getattr(usuario, "areas", []):
-        return False
+        return chamado is not None and getattr(chamado, "responsavel_id", None) == usuario.id
     if chamado is not None and getattr(usuario, "nivel_gestao", None) == "gestor_setor":
         from app.services.permissions import usuario_pode_operar_chamado
 

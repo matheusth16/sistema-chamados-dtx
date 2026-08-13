@@ -44,6 +44,45 @@ def test_supervisor_pode_alterar_chamado_solicitante_nunca_pode():
     assert supervisor_pode_alterar_chamado(sol, "Manutencao") is False
 
 
+def test_supervisor_pode_alterar_chamado_dono_fora_da_propria_area_ainda_pode():
+    """Bug real (auditoria 2026-08-13, achado em dado vivo do banco de dev):
+    a checagem só olhava pra `chamado_area in usuario.areas`, nunca pra posse
+    (responsavel_id). Se a área do chamado ou o cadastro de áreas do
+    supervisor mudar depois da atribuição (ver feedback_verificar_dado_vivo_
+    antes_hardcode — renomear/editar setor não é FK, não propaga), o
+    responsável de fato ficava sem NENHUM controle na tela — nem status, nem
+    resposta ao solicitante — mesmo sendo o dono do chamado."""
+    sup = MagicMock()
+    sup.perfil = "supervisor"
+    sup.areas = ["Demo"]
+    sup.is_admin_or_above = False
+    sup.is_gestor_only = False
+    sup.nivel_gestao = None
+    sup.id = "id_supervisor_dono"
+
+    chamado = MagicMock()
+    chamado.responsavel_id = "id_supervisor_dono"
+
+    assert supervisor_pode_alterar_chamado(sup, "Setor Teste QA", chamado) is True
+
+
+def test_supervisor_pode_alterar_chamado_fora_da_area_e_nao_dono_continua_negado():
+    """Não é um bypass geral: fora da área e sem ser o dono continua negado
+    mesmo passando o objeto chamado."""
+    sup = MagicMock()
+    sup.perfil = "supervisor"
+    sup.areas = ["Demo"]
+    sup.is_admin_or_above = False
+    sup.is_gestor_only = False
+    sup.nivel_gestao = None
+    sup.id = "id_supervisor_qualquer"
+
+    chamado = MagicMock()
+    chamado.responsavel_id = "outro_usuario"
+
+    assert supervisor_pode_alterar_chamado(sup, "Setor Teste QA", chamado) is False
+
+
 # ---------------------------------------------------------------------------
 # verificar_permissao_mudanca_status
 # ---------------------------------------------------------------------------
