@@ -159,7 +159,11 @@ def atualizar_status_chamado(
             update_data["alerta_supervisor_80_enviado"] = False
             update_data["lembrete_confirmacao_1_enviado"] = False
             update_data["lembrete_confirmacao_2_enviado"] = False
-        elif novo_status == "Cancelado":
+        elif novo_status == "Cancelado" and status_anterior != "Cancelado":
+            # Guarda contra reenvio "sem mudança real" (chamado já Cancelado,
+            # form de status resubmetido) sobrescrever o motivo original —
+            # quem escreveu o motivo (ex.: o solicitante) não é necessariamente
+            # quem está reenviando o form (achado em auditoria 2026-08-13).
             update_data["motivo_cancelamento"] = (motivo_cancelamento or "").strip()
             update_data["data_cancelamento"] = datetime.now(ZoneInfo(Config.SLA_TIMEZONE))
 

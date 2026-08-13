@@ -191,6 +191,39 @@ def test_atualizar_cancelado_com_motivo_retorna_sucesso():
     assert Chamado.get_by_id(chamado_id).status == "Cancelado"
 
 
+def test_atualizar_cancelado_reenvio_sem_mudanca_nao_sobrescreve_motivo_original():
+    """Reenvio do form de status com novo_status='Cancelado' quando o chamado
+    JÁ está Cancelado (achado em auditoria 2026-08-13: a textarea de motivo no
+    form de status do supervisor vinha pré-preenchida e editável com o motivo
+    original do solicitante) não pode sobrescrever motivo_cancelamento nem
+    data_cancelamento originais — só uma transição de verdade pra Cancelado
+    grava esses campos."""
+    data_original = datetime(2026, 8, 1, 10, 0, tzinfo=ZoneInfo(Config.SLA_TIMEZONE))
+    chamado_id = _criar_chamado_real(
+        status="Cancelado",
+        motivo_cancelamento="Motivo original do solicitante",
+        data_cancelamento=data_original,
+    )
+
+    with (
+        patch("app.services.status_service.Historico"),
+        patch("app.services.status_service._notificar_solicitante"),
+    ):
+        resultado = atualizar_status_chamado(
+            chamado_id=chamado_id,
+            novo_status="Cancelado",
+            usuario_id="sup1",
+            usuario_nome="Supervisor Teste",
+            data_chamado={"status": "Cancelado", "solicitante_id": "sol1"},
+            motivo_cancelamento="Texto editado pelo supervisor",
+        )
+
+    assert resultado["sucesso"] is True
+    chamado_depois = Chamado.get_by_id(chamado_id)
+    assert chamado_depois.motivo_cancelamento == "Motivo original do solicitante"
+    assert chamado_depois.data_cancelamento == data_original
+
+
 def test_atualizar_em_atendimento_chama_gamificacao_inicial():
     """Em Atendimento chama GamificationService.avaliar_atendimento_inicial."""
     chamado_id = _criar_chamado_real(status="Aberto")

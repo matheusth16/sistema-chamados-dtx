@@ -102,3 +102,28 @@ def test_supervisores_lista_exclui_usuarios_com_nivel_gestao(client_logado_super
     data = r.get_json()
     ids_retornados = [s["id"] for s in data["supervisores"]]
     assert ids_retornados == ["sup_2"]
+
+
+def test_supervisores_lista_incluir_gestor_traz_gestores_marcados(client_logado_supervisor):
+    """incluir_gestor=1 (usado só por "Transferir para Colega") inclui gestores
+    da área na lista, com o flag `gestor` marcado — sem esse parâmetro, o
+    comportamento padrão (exclui gestores) continua intacto para os outros
+    dois formulários que usam o mesmo endpoint (Transferir Área, Incluir
+    Supervisores)."""
+    sup_comum = _sup_mock("sup_2", "Supervisor Comum", "comum@test.com")
+    gestor_setor = _sup_mock(
+        "sup_3", "Gestor Setor", "gsetor@test.com", nivel_gestao="gestor_setor"
+    )
+
+    with patch(
+        "app.routes.api_chamados.Usuario.get_supervisores_por_area",
+        return_value=[sup_comum, gestor_setor],
+    ):
+        r = client_logado_supervisor.get("/api/supervisores/lista?area=Producao&incluir_gestor=1")
+
+    assert r.status_code == 200
+    data = r.get_json()
+    por_id = {s["id"]: s for s in data["supervisores"]}
+    assert set(por_id) == {"sup_2", "sup_3"}
+    assert por_id["sup_2"]["gestor"] is False
+    assert por_id["sup_3"]["gestor"] is True
