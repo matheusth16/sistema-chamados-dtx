@@ -14,6 +14,7 @@ from collections import defaultdict
 from datetime import UTC, datetime, timedelta
 from statistics import mean
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
 
@@ -75,6 +76,18 @@ def _to_datetime(ts: Any) -> datetime | None:
     return None
 
 
+def _comparavel(dt: datetime, referencia: datetime) -> datetime:
+    """Ajusta `dt` pra ter a mesma "awareness" de `referencia` (anexa UTC se
+    referencia for aware e dt for naive; descarta tzinfo se referencia for
+    naive e dt for aware) — evita TypeError comparando datetime tz-aware com
+    naive. `_prazo_efetivo` pode devolver um `limite` tz-aware (quando há
+    previsao_atendimento) mesmo que a data original de abertura/conclusão
+    seja naive (comum em objetos de teste)."""
+    if (dt.tzinfo is None) == (referencia.tzinfo is None):
+        return dt
+    return dt.replace(tzinfo=None) if referencia.tzinfo is None else dt.replace(tzinfo=UTC)
+
+
 def _dentro_sla(
     data_abertura,
     data_conclusao,
@@ -92,7 +105,29 @@ def _dentro_sla(
         return None
     dias = _sla_dias_por_categoria(categoria or "", sla_dias_custom)
     limite = _prazo_efetivo(dt_abertura + timedelta(days=dias), previsao_atendimento)
-    return dt_conclusao <= limite
+    return _comparavel(dt_conclusao, limite) <= limite
+
+
+def _previsao_atendimento_instante(previsao_atendimento: Any) -> datetime | None:
+    """Interpreta `previsao_atendimento` (aprovada — ver
+    previsao_atendimento_service.py) como um horário no fuso de negócio
+    (Config.SLA_TIMEZONE) — mesma convenção usada na escrita
+    (solicitar_previsao_atendimento recebe naive do <input type=datetime-local>)
+    e na leitura em sla_escalacao_service.py (compara ambos os lados como
+    naive, no fuso de negócio).
+
+    Colunas DateTime(timezone=True) do Postgres sempre devolvem datetimes
+    tz-aware na leitura, mas o tzinfo anexado pelo driver não reflete o fuso
+    de negócio — os dígitos continuam sendo o horário local gravado. Bug
+    real (auditoria 2026-08-13): comparar esse valor direto contra
+    datetime.now(UTC), como se o tzinfo anexado já fosse a hora UTC
+    correta, introduzia um erro silencioso igual ao offset de
+    Config.SLA_TIMEZONE. Por isso qualquer tzinfo existente é descartado e
+    o valor é relocalizado antes de virar um instante comparável."""
+    dt_previsao = _to_datetime(previsao_atendimento)
+    if dt_previsao is None:
+        return None
+    return dt_previsao.replace(tzinfo=ZoneInfo(config_module.Config.SLA_TIMEZONE))
 
 
 def _prazo_efetivo(limite: datetime, previsao_atendimento: Any) -> datetime:
@@ -101,15 +136,12 @@ def _prazo_efetivo(limite: datetime, previsao_atendimento: Any) -> datetime:
     tarde que o TAT original. Nunca encurta: uma previsão que caiu antes do
     TAT original (não deveria acontecer no fluxo normal, mas por segurança)
     não teria efeito nenhum aqui."""
-    dt_previsao = _to_datetime(previsao_atendimento)
+    dt_previsao = _previsao_atendimento_instante(previsao_atendimento)
     if dt_previsao is None:
         return limite
     a, b = limite, dt_previsao
-    if (a.tzinfo is None) != (b.tzinfo is None):
-        if a.tzinfo is None:
-            a = a.replace(tzinfo=UTC)
-        else:
-            b = b.replace(tzinfo=UTC)
+    if a.tzinfo is None:
+        a = a.replace(tzinfo=UTC)
     return dt_previsao if b > a else limite
 
 
@@ -152,7 +184,7 @@ def obter_sla_para_exibicao(chamado: Any) -> dict[str, Any] | None:
         dt_conclusao = _to_datetime(data_conclusao)
         if not dt_conclusao:
             return None
-        dentro = dt_conclusao <= limite
+        dentro = _comparavel(dt_conclusao, limite) <= limite
         return {
             "label": "No prazo" if dentro else "Atrasado",
             "dentro_prazo": dentro,
@@ -163,7 +195,13 @@ def obter_sla_para_exibicao(chamado: Any) -> dict[str, Any] | None:
     # calculado sobre o TAT antigo: enquanto durar a previsão, o chamado está
     # "no prazo" mesmo que já tivesse estourado 50%/80% do prazo original.
     if status == "Em Atendimento":
-        if previsao_atendimento is not None and now < limite:
+        # Compara contra a própria data da previsão (não contra `limite`,
+        # que nunca encurta abaixo do TAT original) — senão, uma vez
+        # aprovada, o chamado ficaria "No prazo" pro resto da vida útil
+        # mesmo com a previsão já vencida há muito tempo (bug real,
+        # auditoria 2026-08-13).
+        dt_previsao_instante = _previsao_atendimento_instante(previsao_atendimento)
+        if dt_previsao_instante is not None and datetime.now(UTC) < dt_previsao_instante:
             return {"label": "No prazo", "dentro_prazo": True, "em_risco": False}
         dt_em_atendimento = _to_datetime(data_em_atendimento)
         if dt_em_atendimento is not None:
@@ -307,16 +345,10 @@ class AnalisadorChamados:
                     # Previsão de atendimento aprovada e ainda futura vale mais que o
                     # percentual/calendário calculados sobre o TAT antigo — alinhado
                     # com obter_sla_para_exibicao (badge do chamado individual).
-                    dt_previsao_ativa = _to_datetime(previsao_atendimento)
+                    dt_previsao_instante = _previsao_atendimento_instante(previsao_atendimento)
                     agora_utc = datetime.now(UTC)
                     previsao_ainda_futura = (
-                        dt_previsao_ativa is not None
-                        and (
-                            dt_previsao_ativa.replace(tzinfo=UTC)
-                            if dt_previsao_ativa.tzinfo is None
-                            else dt_previsao_ativa
-                        )
-                        > agora_utc
+                        dt_previsao_instante is not None and dt_previsao_instante > agora_utc
                     )
                     if previsao_ainda_futura:
                         pass  # nem atrasado nem em risco enquanto a previsão não vence

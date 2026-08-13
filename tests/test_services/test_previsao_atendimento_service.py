@@ -79,7 +79,7 @@ class TestSolicitarPrevisaoAtendimento:
         from app.services.previsao_atendimento_service import solicitar_previsao_atendimento
 
         chamado_id = _criar_chamado_real()
-        previsao = _futuro(days=2)
+        previsao = _futuro(days=5)  # depois do TAT padrão (3 dias)
 
         resultado = solicitar_previsao_atendimento(
             chamado_id, previsao, "Preciso de mais tempo, terceiro externo", JULIA
@@ -96,7 +96,7 @@ class TestSolicitarPrevisaoAtendimento:
         from app.services.previsao_atendimento_service import solicitar_previsao_atendimento
 
         chamado_id = _criar_chamado_real(area="Engenharia")
-        previsao = _futuro(days=1)
+        previsao = _futuro(days=5)  # depois do TAT padrão (3 dias)
 
         with patch("app.models_usuario.Usuario.get_all", return_value=[GESTOR_ENGENHARIA]):
             resultado = solicitar_previsao_atendimento(chamado_id, previsao, "motivo", JULIA)
@@ -162,7 +162,7 @@ class TestSolicitarPrevisaoAtendimento:
         from app.services.previsao_atendimento_service import solicitar_previsao_atendimento
 
         chamado_id = _criar_chamado_real()
-        resultado = solicitar_previsao_atendimento(chamado_id, _futuro(days=1), "motivo", ADMIN)
+        resultado = solicitar_previsao_atendimento(chamado_id, _futuro(days=5), "motivo", ADMIN)
 
         assert resultado["sucesso"] is True
 
@@ -191,12 +191,42 @@ class TestSolicitarPrevisaoAtendimento:
 
         with patch("app.services.previsao_atendimento_service.Historico") as mock_hist_cls:
             mock_hist_cls.return_value = hist_instancia
-            solicitar_previsao_atendimento(chamado_id, _futuro(days=1), "motivo", JULIA)
+            solicitar_previsao_atendimento(chamado_id, _futuro(days=5), "motivo", JULIA)
 
         _, kwargs = mock_hist_cls.call_args
         assert kwargs.get("acao") == "solicitacao_previsao_atendimento"
         assert kwargs.get("campo_alterado") == "previsao_atendimento"
         hist_instancia.save.assert_called_once()
+
+    def test_previsao_antes_do_prazo_tat_e_rejeitada(self):
+        """Bug real (auditoria 2026-08-13): nada validava a previsão contra
+        o prazo TAT da categoria — dava pra pedir (e aprovar) uma previsão
+        de "daqui a 2 minutos" num chamado cujo TAT ainda estava a dias de
+        distância, o que não faz sentido (_prazo_efetivo nunca encurta o
+        prazo, então essa previsão nunca teria efeito nenhum se aprovada)."""
+        from app.services.previsao_atendimento_service import solicitar_previsao_atendimento
+
+        # categoria "Manutencao" (não-Projetos) usa SLA_DIAS_RESOLUCAO_PADRAO (3 dias)
+        chamado_id = _criar_chamado_real(categoria="Manutencao")
+        previsao_dentro_do_tat = _futuro(minutes=2)
+
+        resultado = solicitar_previsao_atendimento(
+            chamado_id, previsao_dentro_do_tat, "motivo", JULIA
+        )
+
+        assert resultado["sucesso"] is False
+
+    def test_previsao_depois_do_prazo_tat_e_aceita(self):
+        from app.services.previsao_atendimento_service import solicitar_previsao_atendimento
+
+        chamado_id = _criar_chamado_real(categoria="Manutencao")
+        previsao_depois_do_tat = _futuro(days=5)  # TAT padrão = 3 dias
+
+        resultado = solicitar_previsao_atendimento(
+            chamado_id, previsao_depois_do_tat, "motivo", JULIA
+        )
+
+        assert resultado["sucesso"] is True
 
     def test_segundo_pedido_enquanto_pendente_e_rejeitado(self):
         """Só 1 pedido pendente por chamado — evita spam de solicitações
@@ -204,10 +234,10 @@ class TestSolicitarPrevisaoAtendimento:
         from app.services.previsao_atendimento_service import solicitar_previsao_atendimento
 
         chamado_id = _criar_chamado_real()
-        primeiro = solicitar_previsao_atendimento(chamado_id, _futuro(days=1), "motivo 1", JULIA)
+        primeiro = solicitar_previsao_atendimento(chamado_id, _futuro(days=5), "motivo 1", JULIA)
         assert primeiro["sucesso"] is True
 
-        segundo = solicitar_previsao_atendimento(chamado_id, _futuro(days=2), "motivo 2", JULIA)
+        segundo = solicitar_previsao_atendimento(chamado_id, _futuro(days=6), "motivo 2", JULIA)
 
         assert segundo["sucesso"] is False
 
@@ -220,7 +250,7 @@ class TestDecidirPrevisaoAtendimento:
         from app.services.previsao_atendimento_service import solicitar_previsao_atendimento
 
         resultado = solicitar_previsao_atendimento(
-            chamado_id, previsao or _futuro(days=2), motivo, usuario
+            chamado_id, previsao or _futuro(days=5), motivo, usuario
         )
         assert resultado["sucesso"] is True
         return resultado["dados"]["solicitacao_id"]
@@ -229,7 +259,7 @@ class TestDecidirPrevisaoAtendimento:
         from app.services.previsao_atendimento_service import decidir_previsao_atendimento
 
         chamado_id = _criar_chamado_real(area="Engenharia")
-        previsao = _futuro(days=3)
+        previsao = _futuro(days=5)  # depois do TAT padrão (3 dias)
         solicitacao_id = self._pedir(chamado_id, previsao, "motivo do pedido")
 
         resultado = decidir_previsao_atendimento(solicitacao_id, "aprovar", GESTOR_ENGENHARIA)
@@ -284,6 +314,57 @@ class TestDecidirPrevisaoAtendimento:
         solicitacao_id = self._pedir(chamado_id)
 
         resultado = decidir_previsao_atendimento(solicitacao_id, "aprovar", ADMIN)
+
+        assert resultado["sucesso"] is True
+
+    def test_aprovar_pedido_de_chamado_cancelado_enquanto_pendente_e_recusado(self):
+        """Bug real (auditoria 2026-08-13, TOCTOU): o pedido fica pendente por
+        tempo arbitrário até o gestor decidir; se o chamado for cancelado
+        nesse meio-tempo, aprovar não deveria mais escrever previsao_atendimento
+        nele — a aprovação vira uma rejeição automática, sem tocar no chamado."""
+        from app.services.previsao_atendimento_service import decidir_previsao_atendimento
+
+        chamado_id = _criar_chamado_real(area="Engenharia")
+        solicitacao_id = self._pedir(chamado_id)
+
+        chamado = Chamado.get_by_id(chamado_id)
+        assert chamado.atualizar_campos(status="Cancelado") is True
+
+        resultado = decidir_previsao_atendimento(solicitacao_id, "aprovar", GESTOR_ENGENHARIA)
+
+        assert resultado["sucesso"] is False
+        atualizado = Chamado.get_by_id(chamado_id)
+        assert atualizado.previsao_atendimento is None
+
+    def test_aprovar_pedido_de_chamado_concluido_enquanto_pendente_e_recusado(self):
+        from app.services.previsao_atendimento_service import decidir_previsao_atendimento
+
+        chamado_id = _criar_chamado_real(area="Engenharia")
+        solicitacao_id = self._pedir(chamado_id)
+
+        chamado = Chamado.get_by_id(chamado_id)
+        assert chamado.atualizar_campos(status="Concluído") is True
+
+        resultado = decidir_previsao_atendimento(solicitacao_id, "aprovar", GESTOR_ENGENHARIA)
+
+        assert resultado["sucesso"] is False
+        atualizado = Chamado.get_by_id(chamado_id)
+        assert atualizado.previsao_atendimento is None
+
+    def test_rejeitar_pedido_de_chamado_cancelado_continua_permitido(self):
+        """Rejeitar nunca escreve no chamado — permitir mesmo com o chamado
+        já encerrado, pra fechar formalmente o pedido pendente."""
+        from app.services.previsao_atendimento_service import decidir_previsao_atendimento
+
+        chamado_id = _criar_chamado_real(area="Engenharia")
+        solicitacao_id = self._pedir(chamado_id)
+
+        chamado = Chamado.get_by_id(chamado_id)
+        assert chamado.atualizar_campos(status="Cancelado") is True
+
+        resultado = decidir_previsao_atendimento(
+            solicitacao_id, "rejeitar", GESTOR_ENGENHARIA, motivo_rejeicao="sem tempo"
+        )
 
         assert resultado["sucesso"] is True
 
@@ -407,6 +488,35 @@ class TestUsuarioPodeDecidirPrevisaoAtendimento:
         )
 
         assert usuario_pode_decidir_previsao_atendimento(JULIA, "Engenharia") is False
+
+    def test_gestor_setor_desativado_nao_pode(self):
+        """Bug real (auditoria 2026-08-13): a checagem nunca olhava pra
+        `ativo`. Um gestor_setor desativado depois que o e-mail com o link de
+        aprovação (token de uso único, válido por 30 dias) já foi enviado
+        continuaria conseguindo decidir via link indefinidamente, já que
+        aquele fluxo não passa por login/sessão."""
+        from app.services.previsao_atendimento_service import (
+            usuario_pode_decidir_previsao_atendimento,
+        )
+
+        gestor_desativado = _usuario(
+            "id_gestor_desativado",
+            "Gestor Desativado",
+            areas=["Engenharia"],
+            nivel_gestao="gestor_setor",
+            ativo=False,
+        )
+
+        assert usuario_pode_decidir_previsao_atendimento(gestor_desativado, "Engenharia") is False
+
+    def test_admin_desativado_nao_pode(self):
+        from app.services.previsao_atendimento_service import (
+            usuario_pode_decidir_previsao_atendimento,
+        )
+
+        admin_desativado = _usuario("id_admin_desativado", "Admin Desativado", "admin", ativo=False)
+
+        assert usuario_pode_decidir_previsao_atendimento(admin_desativado, "Qualquer Area") is False
 
 
 # ── token de aprovação por e-mail ───────────────────────────────────────────

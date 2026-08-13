@@ -947,6 +947,38 @@ def test_obter_sla_em_atendimento_previsao_futura_ignora_percentual_estourado():
     assert r["label"] == "No prazo"
 
 
+def test_obter_sla_em_atendimento_previsao_ja_passada_nao_protege_mais():
+    """Bug real (auditoria 2026-08-13): a checagem de previsão em 'Em
+    Atendimento' comparava `now` contra o `limite` alargado (que nunca
+    encurta abaixo do TAT original) em vez de contra a própria data da
+    previsão — então, uma vez aprovada, o chamado ficava 'No prazo' pelo
+    resto da vida útil mesmo com a previsão já vencida havia muito tempo,
+    enquanto o TAT original (3 dias) ainda não tivesse estourado. Depois que
+    a previsão aprovada vence, ela deve deixar de proteger e o cálculo
+    normal (percentual de tempo útil) volta a valer — mesmo comportamento já
+    coberto para o status 'Aberto' em test_obter_sla_previsao_ja_passada_nao_protege_mais."""
+    from datetime import datetime, timedelta
+
+    from app.services.analytics import obter_sla_para_exibicao
+
+    chamado = type(
+        "C",
+        (),
+        {
+            "data_abertura": datetime.now() - timedelta(days=1),  # TAT=3d, ainda longe
+            "data_conclusao": None,
+            "categoria": "TI",
+            "status": "Em Atendimento",
+            "data_em_atendimento": datetime.now() - timedelta(days=4),  # bem estourado
+            "sla_dias": None,
+            "previsao_atendimento": datetime.now() - timedelta(hours=2),  # já venceu
+        },
+    )()
+    r = obter_sla_para_exibicao(chamado)
+    assert r is not None
+    assert r["label"] != "No prazo"
+
+
 def test_metricas_gerais_nao_conta_atrasado_com_previsao_aprovada_futura():
     """AnalisadorChamados.obter_metricas_gerais (resumo_sla agregado do
     dashboard) também não deve contar um chamado como atrasado enquanto a

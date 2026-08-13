@@ -4259,6 +4259,16 @@
     "en": "Attendance forecast cannot be set for AOG tickets",
     "es": "La previsión de atención no se puede definir para tickets AOG"
   },
+  "attendance_forecast_must_be_after_tat_deadline": {
+    "pt_BR": "A previsão de atendimento precisa ser depois do prazo original da categoria",
+    "en": "The attendance forecast must be after the category's original deadline",
+    "es": "La previsión de atención debe ser posterior al plazo original de la categoría"
+  },
+  "attendance_forecast_ticket_no_longer_open": {
+    "pt_BR": "O chamado não está mais aberto — o pedido de previsão foi rejeitado automaticamente",
+    "en": "The ticket is no longer open — the attendance forecast request was automatically rejected",
+    "es": "El ticket ya no está abierto — el pedido de previsión fue rechazado automáticamente"
+  },
   "attendance_forecast_label": {
     "pt_BR": "Previsão de atendimento",
     "en": "Attendance forecast",

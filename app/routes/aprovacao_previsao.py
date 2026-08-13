@@ -20,11 +20,6 @@ from app.limiter import limiter
 from app.models import Chamado
 from app.models_usuario import Usuario
 from app.routes import main
-from app.services.previsao_atendimento_service import (
-    decidir_previsao_atendimento,
-    obter_solicitacao_por_id,
-    validar_token_decisao,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +27,12 @@ logger = logging.getLogger(__name__)
 @main.route("/aprovacao-previsao/<token>", methods=["GET", "POST"])
 @limiter.limit("20 per minute")
 def aprovacao_previsao(token: str):
+    from app.services.previsao_atendimento_service import (
+        decidir_previsao_atendimento,
+        obter_solicitacao_por_id,
+        validar_token_decisao,
+    )
+
     payload = validar_token_decisao(token)
     if payload is None:
         return render_template("aprovacao_previsao.html", estado="token_invalido"), 400

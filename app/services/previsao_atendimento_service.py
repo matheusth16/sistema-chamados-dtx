@@ -20,7 +20,7 @@ prefetch de e-mail disparando a decisão), POST efetiva a decisão.
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from flask import current_app
@@ -33,6 +33,7 @@ from app.db.models.chamado import ChamadoPrevisaoSolicitacaoRow, ChamadoRow
 from app.i18n import get_translation_session
 from app.models import Chamado
 from app.models_historico import Historico
+from app.services.analytics import _sla_dias_por_categoria
 from config import Config
 
 logger = logging.getLogger(__name__)
@@ -125,7 +126,16 @@ def usuario_pode_decidir_previsao_atendimento(usuario, chamado_area: str) -> boo
     """Admin sempre pode. gestor_setor só se a área do chamado estiver entre
     as áreas que ele gerencia — independente de quem foi registrado como
     gestor_id no pedido (se o gestor mudou depois do pedido, quem qualifica
-    hoje decide)."""
+    hoje decide).
+
+    Conta ativo=False sempre nega, admin incluso: a decisão por link de
+    e-mail (app/routes/aprovacao_previsao.py) é uma rota pública sem
+    login/sessão, então desativar a conta não bloqueia por si só o fluxo —
+    quem desativou um gestor_setor pode não saber que um link de e-mail
+    ainda válido (token dura até 30 dias) continua permitindo decidir (bug
+    real, auditoria 2026-08-13)."""
+    if not getattr(usuario, "ativo", True):
+        return False
     if getattr(usuario, "is_admin_or_above", False):
         return True
     return getattr(usuario, "nivel_gestao", None) == "gestor_setor" and chamado_area in (
@@ -235,6 +245,26 @@ def solicitar_previsao_atendimento(chamado_id: str, previsao, motivo: str, usuar
     agora_fuso_negocio = datetime.now(ZoneInfo(Config.SLA_TIMEZONE)).replace(tzinfo=None)
     if previsao <= agora_fuso_negocio:
         return {"sucesso": False, "erro": _t("attendance_forecast_must_be_future")}
+
+    # previsao_atendimento_service nunca ENCURTA o prazo TAT (ver
+    # analytics._prazo_efetivo) — uma previsão pedida pra antes do TAT da
+    # categoria não teria efeito nenhum se aprovada, e permitir isso só
+    # confundia quem decide (bug real, auditoria 2026-08-13: nada validava
+    # essa relação, dava pra pedir/aprovar previsão pra "daqui a 2 minutos"
+    # num chamado com TAT de dias).
+    if chamado.data_abertura is not None:
+        dias_tat = _sla_dias_por_categoria(
+            chamado.categoria or "", getattr(chamado, "sla_dias", None)
+        )
+        prazo_tat = chamado.data_abertura + timedelta(days=dias_tat)
+        previsao_instante = previsao.replace(tzinfo=ZoneInfo(Config.SLA_TIMEZONE))
+        prazo_tat_instante = (
+            prazo_tat
+            if prazo_tat.tzinfo is not None
+            else prazo_tat.replace(tzinfo=ZoneInfo(Config.SLA_TIMEZONE))
+        )
+        if previsao_instante <= prazo_tat_instante:
+            return {"sucesso": False, "erro": _t("attendance_forecast_must_be_after_tat_deadline")}
 
     pendente_existente = obter_solicitacao_pendente(chamado.id)
     if pendente_existente is not None:
@@ -350,14 +380,38 @@ def decidir_previsao_atendimento(
                 "codigo": 403,
             }
 
-        row.status = "aprovada" if acao == "aprovar" else "rejeitada"
+        # TOCTOU: o pedido fica pendente por tempo arbitrário até o gestor
+        # decidir — o chamado pode ter sido cancelado/concluído nesse
+        # meio-tempo. Aprovar nesse caso reabriria um prazo pra um chamado
+        # que não está mais ativo, então a aprovação vira uma rejeição
+        # automática (fecha o pedido sem tocar em chamados.previsao_atendimento).
+        # Rejeitar nunca escreve no chamado, então continua permitido mesmo
+        # com o chamado já encerrado — fecha formalmente o pedido pendente.
+        encerrado_automaticamente = acao == "aprovar" and chamado_row.status in (
+            "Cancelado",
+            "Concluído",
+        )
+        acao_efetiva = "rejeitar" if encerrado_automaticamente else acao
+        if encerrado_automaticamente:
+            logger.warning(
+                "decidir_previsao_atendimento: aprovação de %s recusada — chamado %s está %s",
+                solicitacao_id,
+                row.chamado_id,
+                chamado_row.status,
+            )
+
+        row.status = "aprovada" if acao_efetiva == "aprovar" else "rejeitada"
         row.gestor_id = gestor.id
         row.gestor_nome = gestor.nome
         row.decidido_em = datetime.now(ZoneInfo(Config.SLA_TIMEZONE))
-        if acao == "rejeitar":
-            row.motivo_rejeicao = (motivo_rejeicao or "").strip()[:500] or None
+        if acao_efetiva == "rejeitar":
+            row.motivo_rejeicao = (
+                _t("attendance_forecast_ticket_no_longer_open")[:500]
+                if encerrado_automaticamente
+                else (motivo_rejeicao or "").strip()[:500] or None
+            )
 
-        if acao == "aprovar":
+        if acao_efetiva == "aprovar":
             chamado_row.previsao_atendimento = row.previsao_solicitada
             chamado_row.motivo_previsao_atendimento = row.motivo
 
@@ -373,12 +427,12 @@ def decidir_previsao_atendimento(
         usuario_id=gestor.id,
         usuario_nome=gestor.nome,
         acao="aprovacao_previsao_atendimento"
-        if acao == "aprovar"
+        if acao_efetiva == "aprovar"
         else "rejeicao_previsao_atendimento",
         campo_alterado="previsao_atendimento",
         valor_anterior=motivo_pedido,
-        valor_novo=str(previsao_solicitada) if acao == "aprovar" else None,
-        detalhe=motivo_rejeicao_final if acao == "rejeitar" else None,
+        valor_novo=str(previsao_solicitada) if acao_efetiva == "aprovar" else None,
+        detalhe=motivo_rejeicao_final if acao_efetiva == "rejeitar" else None,
     ).save()
 
     logger.info(
@@ -386,9 +440,16 @@ def decidir_previsao_atendimento(
         chamado_id,
         previsao_solicitada,
         solicitacao_id,
-        "aprovado" if acao == "aprovar" else "rejeitado",
+        "aprovado" if acao_efetiva == "aprovar" else "rejeitado",
         gestor.id,
     )
+
+    if encerrado_automaticamente:
+        return {
+            "sucesso": False,
+            "erro": _t("attendance_forecast_ticket_no_longer_open"),
+            "codigo": 409,
+        }
 
     return {
         "sucesso": True,

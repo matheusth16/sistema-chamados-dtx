@@ -466,7 +466,10 @@ def test_visualizar_chamado_mostra_banner_pendente_e_botoes_para_gestor(
 
     with app.app_context():
         resultado = solicitar_previsao_atendimento(
-            chamado.id, datetime.now() + timedelta(days=2), "Preciso de mais tempo", solicitante
+            chamado.id,
+            datetime.now() + timedelta(days=5),  # depois do TAT padrão (3 dias)
+            "Preciso de mais tempo",
+            solicitante,
         )
     assert resultado["sucesso"] is True
 
