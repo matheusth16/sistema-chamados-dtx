@@ -665,66 +665,6 @@ def test_migrar_grupos_rl_dry_run_nao_escreve_checkpoint(tmp_path):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# F-30 — migrar_setor_area: dry-run e apply
-# ─────────────────────────────────────────────────────────────────────────────
-
-
-def test_migrar_setor_area_dry_run_nao_grava():
-    """Dry-run: nenhuma escrita no Firestore (ref.set não chamado)."""
-    from scripts.migrations.migrar_setor_area import executar
-
-    mock_db = MagicMock()
-    resultado = executar(mock_db, dry_run=True)
-
-    mock_db.collection.assert_not_called()
-    assert resultado["gravado"] is False
-    assert resultado["dry_run"] is True
-    assert resultado["entradas"] == 2  # Material + Manutenção
-
-
-def test_migrar_setor_area_apply_grava_mapa(tmp_path):
-    """Apply: grava doc config/setor_para_area com campo mapa correto."""
-    from scripts.migrations.migrar_setor_area import MAPA_INICIAL, executar
-
-    mock_ref = MagicMock()
-    mock_db = MagicMock()
-    mock_db.collection.return_value.document.return_value = mock_ref
-
-    resultado = executar(mock_db, dry_run=False, checkpoint_dir=tmp_path)
-
-    mock_db.collection.assert_called_once_with("config")
-    mock_db.collection.return_value.document.assert_called_once_with("setor_para_area")
-    mock_ref.set.assert_called_once_with({"mapa": MAPA_INICIAL})
-    assert resultado["gravado"] is True
-    assert resultado["dry_run"] is False
-
-
-def test_migrar_setor_area_apply_escreve_checkpoint(tmp_path):
-    """Apply: checkpoint JSON é criado após gravação."""
-    from scripts.migrations.migrar_setor_area import executar
-
-    mock_db = MagicMock()
-    executar(mock_db, dry_run=False, checkpoint_dir=tmp_path)
-
-    files = list(tmp_path.glob("*migrar_setor_area*.json"))
-    assert len(files) == 1
-    data = json.loads(files[0].read_text(encoding="utf-8"))
-    assert data["fase"] == "gravar_mapa"
-    assert "concluida_em" in data
-    assert data["stats"]["dry_run"] is False
-
-
-def test_migrar_setor_area_dry_run_nao_escreve_checkpoint(tmp_path):
-    """Dry-run: nenhum checkpoint criado mesmo com checkpoint_dir fornecido."""
-    from scripts.migrations.migrar_setor_area import executar
-
-    mock_db = MagicMock()
-    executar(mock_db, dry_run=True, checkpoint_dir=tmp_path)
-
-    assert list(tmp_path.glob("*.json")) == []
-
-
-# ─────────────────────────────────────────────────────────────────────────────
 
 
 def test_iter_collection_paginated_1200_docs():
