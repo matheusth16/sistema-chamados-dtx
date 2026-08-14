@@ -195,8 +195,8 @@ def test_iniciar_scheduler_import_error_loga_warning(app):
     # Sem raise → o except ImportError foi tratado corretamente
 
 
-def test_iniciar_scheduler_registra_seis_jobs(app):
-    """_iniciar_scheduler registra 6 jobs no scheduler e chama scheduler.start()."""
+def test_iniciar_scheduler_registra_sete_jobs(app):
+    """_iniciar_scheduler registra 7 jobs no scheduler e chama scheduler.start()."""
     from app import _iniciar_scheduler
 
     mock_sched = MagicMock()
@@ -211,12 +211,14 @@ def test_iniciar_scheduler_registra_seis_jobs(app):
     ):
         _iniciar_scheduler(app)
 
-    assert len(add_job_calls) == 6
+    assert len(add_job_calls) == 7
     assert "relatorio_semanal" in add_job_calls
     assert "sla_escalacao" in add_job_calls
     assert "digest_diario" in add_job_calls
     assert "reset_ranking_semanal" in add_job_calls
     assert "limpar_contadores_uso" in add_job_calls
+    assert "lembrete_confirmacao" in add_job_calls
+    assert "lembrete_mfa_pendente" in add_job_calls
     assert "lembrete_confirmacao" in add_job_calls
     mock_sched.start.assert_called_once()
 
@@ -358,6 +360,27 @@ def test_job_limpar_contadores_excecao_logada(app):
         side_effect=RuntimeError("limpeza"),
     ):
         jobs["limpar_contadores_uso"]()
+
+
+def test_job_lembrete_mfa_executa(app):
+    """_job_lembrete_mfa chama processar_lembretes_mfa."""
+    jobs = _capturar_jobs_scheduler(app)
+    with patch(
+        "app.services.mfa_lembrete_service.processar_lembretes_mfa",
+        return_value={"processados": 0, "enviados": 0, "erros": 0},
+    ) as mock_lembrete:
+        jobs["lembrete_mfa_pendente"]()
+    mock_lembrete.assert_called_once()
+
+
+def test_job_lembrete_mfa_excecao_logada(app):
+    """_job_lembrete_mfa captura exceção e não propaga."""
+    jobs = _capturar_jobs_scheduler(app)
+    with patch(
+        "app.services.mfa_lembrete_service.processar_lembretes_mfa",
+        side_effect=RuntimeError("mfa"),
+    ):
+        jobs["lembrete_mfa_pendente"]()  # não deve propagar
 
 
 # ── _configurar_metricas_performance ───────────────────────────────────────

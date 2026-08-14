@@ -293,6 +293,16 @@ def _iniciar_scheduler(app: Flask) -> None:
                 except Exception as exc:
                     app.logger.exception("Erro no job de digest diário: %s", exc)
 
+        def _job_lembrete_mfa():
+            with app.app_context():
+                try:
+                    from app.services.mfa_lembrete_service import processar_lembretes_mfa
+
+                    resultado = processar_lembretes_mfa()
+                    app.logger.info("Lembretes MFA pendente: %s", resultado)
+                except Exception as exc:
+                    app.logger.exception("Erro no job de lembretes de MFA pendente: %s", exc)
+
         scheduler = BackgroundScheduler(
             timezone=pytz.timezone("America/Sao_Paulo"),
             job_defaults={"coalesce": True, "max_instances": 1},
@@ -347,10 +357,20 @@ def _iniciar_scheduler(app: Flask) -> None:
             hours=6,
             id="lembrete_confirmacao",
         )
+        # Lembrete de MFA pendente: reenvio a cada 3 dias (checado a cada 6h, mesmo
+        # intervalo do job irmão — a cadência de 3 dias é garantida pela elegibilidade
+        # + claim atômico dentro do serviço, não pela frequência do job)
+        scheduler.add_job(
+            lambda: executar_job_com_lock(app, "lembrete_mfa_pendente", _job_lembrete_mfa),
+            trigger="interval",
+            hours=6,
+            id="lembrete_mfa_pendente",
+        )
         scheduler.start()
         app.logger.info(
             "Scheduler iniciado — escalonamento SLA a cada 10 min, digest diário a cada 30 min, "
             "relatório semanal sexta 10h, lembretes confirmação a cada 6 h, "
+            "lembretes MFA pendente a cada 6 h, "
             "reset ranking domingo 23h59, limpeza contadores domingo 02h00 (BRT)"
         )
 
