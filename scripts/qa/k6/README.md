@@ -1,91 +1,64 @@
-# k6 Load Tests — sistema_chamados
+# k6 — testes de performance
 
-Testes de performance para validar o Cloud Run antes do go-live (deadline 19/06/2026).
+Os scripts validam o serviço Flask em desenvolvimento, staging e, quando
+explicitamente autorizado, no servidor on-premise de produção.
 
-## Instalação do k6
+## Proteção contra execução acidental
+
+`_shared.js` bloqueia qualquer `BASE_URL` que não seja `localhost` ou
+`127.0.0.1`. Para um alvo remoto, a confirmação precisa estar no mesmo comando:
 
 ```powershell
-# Windows (Chocolatey)
-choco install k6
+k6 run -e BASE_URL=https://staging.example.com -e K6_CONFIRM_PROD=1 scripts/qa/k6/smoke.js
+```
 
-# Verificar
+Use `K6_CONFIRM_PROD=1` somente após conferir URL, janela e tipo de teste.
+Nunca use credenciais reais na linha de comando ou em arquivos versionados.
+
+## Instalação no Windows
+
+```powershell
+winget install --id GrafanaLabs.k6 --exact --accept-package-agreements --accept-source-agreements
+# alternativa:
+choco install k6 -y
+
 k6 version
 ```
 
-## Scripts disponíveis
+## Scripts
 
-| Script | Objetivo | VUs | Duração |
-|---|---|---|---|
-| `smoke.js` | Sanidade — serviço está no ar? | 1 | 30s |
-| `load.js` | Carga realista (10 usuários simultâneos) | 10 | ~4 min |
-| `stress.js` | Encontrar ponto de ruptura | até 30 | ~7 min |
+- `smoke.js`: 1 VU por 30 segundos; verifica `/health` e `/login`.
+- `load.js`: rampa até 10 VUs por cerca de 4 minutos.
+- `stress.js`: rampa até 30 VUs; use apenas em janela controlada.
+- `spike.js`: pico moderado de 15 VUs por 3 minutos.
+- `soak.js`: 3 VUs por 15 minutos; altere com `K6_DURATION`.
 
-## Como rodar
+Todos usam alvo local por padrão e aplicam o guard compartilhado.
 
-### 1. Smoke test (antes de qualquer deploy)
+## Smoke local automatizado
 
-```bash
-k6 run -e BASE_URL=http://localhost:5000 scripts/qa/k6/smoke.js
+O runner inicia um stub Flask sem banco e sem secrets, espera `/health`, executa
+o smoke e encerra o processo no bloco `finally`:
+
+```powershell
+.\scripts\qa\k6\run_local_smoke.ps1
 ```
 
-### 2. Load test (antes do go-live)
+Execução direta:
 
-```bash
-k6 run \
-  -e BASE_URL=https://SEU_DOMINIO \
-  -e ADMIN_EMAIL=admin@dtx.aero \
-  -e ADMIN_SENHA=SUA_SENHA \
-  -e SUP_EMAIL=supervisor@dtx.aero \
-  -e SUP_SENHA=SUA_SENHA \
-  scripts/qa/k6/load.js
+```powershell
+k6 run -e BASE_URL=http://127.0.0.1:5000 scripts/qa/k6/smoke.js
+k6 run -e BASE_URL=http://127.0.0.1:5000 scripts/qa/k6/spike.js
+k6 run -e BASE_URL=http://127.0.0.1:5000 -e K6_DURATION=30m scripts/qa/k6/soak.js
 ```
 
-### 3. Stress test (encontrar limite do Cloud Run)
+## CI e produção
 
-```bash
-k6 run \
-  -e BASE_URL=https://SEU_DOMINIO \
-  scripts/qa/k6/stress.js
-```
+`.github/workflows/k6-smoke.yml` mantém o smoke semanal contra
+`PRODUCTION_URL`. O workflow define a confirmação explícita para esse schedule.
+Em execução manual, é obrigatório marcar `confirm_production`; sem isso o job e
+o próprio script bloqueiam o alvo remoto.
 
-## SLOs esperados (Cloud Run: 1 CPU, 512Mi, 1 worker + 8 threads)
-
-| Métrica | Alvo | Crítico |
-|---|---|---|
-| p95 latência HTML | < 1500ms | > 3000ms |
-| p95 latência API JSON | < 800ms | > 2000ms |
-| Taxa de erro | < 1% | > 5% |
-| Health check p99 | < 500ms | > 1000ms |
-
-## Interpretando os resultados
-
-### Load test passou → pronto para go-live
-
-```
-✓ http_req_failed........: 0.00%   ✓ 0   ✗ 0
-✓ http_req_duration......: avg=342ms p(95)=892ms
-```
-
-### Stress test — identificar gargalo
-
-Observe em qual estágio o p95 cruza 3s:
-- Se cruzar já em 10 VUs → problema no código (N+1, bloqueio)
-- Se cruzar em 20-30 VUs → limite da config atual do Cloud Run (normal)
-- Se health check degradar → problema sistêmico (CPU/memória)
-
-### Após o stress test, verificar logs do Cloud Run:
-
-```bash
-gcloud run services logs read sistema-chamados \
-  --region=southamerica-east1 \
-  --limit=100
-```
-
-Sinais de alerta nos logs:
-- `WORKER TIMEOUT` → query Postgres lenta (N+1 no dashboard, checar índice faltando)
-- `Memory limit exceeded` → aumentar limite de memória do container
-- `Too many connections` → checar pool de conexões do Postgres/SQLAlchemy
-
-> Nota: os comandos `gcloud logging` acima (`--region=southamerica-east1`, filtros Cloud Run) são
-> de uma infra anterior (Cloud Run/GCP) que não é mais usada — produção hoje é servidor físico
-> on-premise. Pra ver logs reais, usar `docker logs sistema_chamados-web-1` (ver `docs/INCIDENT_RUNBOOK.md`).
+Após testes remotos, consulte os logs on-premise conforme
+`docs/INCIDENT_RUNBOOK.md`. Alertas principais: timeout de worker, aumento
+contínuo de latência, esgotamento de memória e conexões PostgreSQL.

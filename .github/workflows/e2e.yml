@@ -73,6 +73,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Configurar Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Instalar axe-core
+        run: npm ci
+
       - name: Configurar Python 3.14
         uses: actions/setup-python@v5
         with:
@@ -96,6 +105,13 @@ jobs:
             --tb=short -q \
             --no-header \
             --ignore=tests/e2e/test_solicitante.py
+
+      - name: Rodar auditoria de acessibilidade axe
+        run: |
+          pytest tests/e2e -m a11y \
+            --base-url "${FLASK_TEST_URL:-http://127.0.0.1:5000}" \
+            --tb=short -q \
+            --no-header
 
       - name: Subir relatório de traces (falhas)
         if: failure()

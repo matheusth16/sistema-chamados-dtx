@@ -24,6 +24,7 @@
 import http from "k6/http";
 import { check, sleep } from "k6";
 import { Trend, Rate } from "k6/metrics";
+import { assertSafeTarget } from "./_shared.js";
 
 const relatoriosLatency = new Trend("relatorios_latency", true);
 const healthLatency = new Trend("health_latency", true);
@@ -45,7 +46,7 @@ export const options = {
   },
 };
 
-const BASE_URL = __ENV.BASE_URL || "http://localhost:5000";
+const BASE_URL = assertSafeTarget(__ENV.BASE_URL || "http://127.0.0.1:5000");
 
 // Sessão simples — health check não precisa de login
 export default function () {

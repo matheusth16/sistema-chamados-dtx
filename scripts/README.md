@@ -27,7 +27,6 @@ A maioria dos scripts que tocam o banco requer `credentials.json` na raiz.
 | **gerar_chave_criptografia.py** | Gerar chave Fernet para criptografia de PII (LGPD) para o `.env` |
 | **init_categorias.py** | Inicializar categorias padrão no Firestore (setores, gates, impactos) |
 | **migrar_setores_catalogo.py** | Sincronizar catálogo de setores (idempotente, com `--dry-run`) |
-| **migrar_setor_area.py** | Semear `config/setor_para_area` no Firestore (mapa setor → área); default dry-run, `--apply` para gravar (F-30) |
 | **migrar_gates_subetapas.py** | Migração: estrutura de gates com subetapas |
 | **migrar_grupos_rl.py** | Migração: criar grupos RL e vincular chamados de Projetos |
 | **migrar_campo_senha.py** | Migração: adicionar campos de controle de senha em usuários |
@@ -325,32 +324,6 @@ python scripts/limpar_contadores_uso.py --apply --dias 30
 ```
 
 **Armadilha:** sem `--apply`, o script nunca deleta nada. O batch Firestore opera em lotes de ≤500 ops; coleções grandes são processadas em múltiplos commits.
-
-### migrar_setor_area.py
-
-Semeia o documento `config/setor_para_area` no Firestore com o campo `mapa` (setor → área). Necessário para que `utils_areas.setor_para_area()` use o Firestore como fonte de verdade em vez do dicionário hardcoded (F-30).
-
-Padrão: **dry-run** — exibe o payload sem escrever nada.
-
-```bash
-python scripts/migrations/migrar_setor_area.py          # dry-run: mostra o que seria gravado
-python scripts/migrations/migrar_setor_area.py --apply  # grava config/setor_para_area no Firestore
-```
-
-**Ordem de deploy recomendada:**
-1. Fazer deploy do código (app já usa fallback estático se o doc não existir)
-2. Executar `--apply` para semear o Firestore
-3. O cache se aquece automaticamente no próximo request (`TTL 5 min`)
-
-**Após editar o mapa no Firestore** (via console ou script), o cache expira em até 5 minutos. Para flush imediato (por processo):
-```python
-from app.utils_areas import invalidar_cache_setor_area
-invalidar_cache_setor_area()
-```
-
-Após `--apply`, um checkpoint JSON é gravado em `scripts/.checkpoints/migrar_setor_area_<ts>_gravar_mapa.json`.
-
-> **Referência:** `docs/plans/adr-f30-setor-para-area.md`
 
 ### migrar_usuarios_ativo.py
 

@@ -11,6 +11,7 @@
 
 import http from "k6/http";
 import { check, sleep } from "k6";
+import { assertSafeTarget } from "./_shared.js";
 
 export const options = {
   vus: 1,
@@ -21,7 +22,7 @@ export const options = {
   },
 };
 
-const BASE_URL = __ENV.BASE_URL || "http://localhost:5000";
+const BASE_URL = assertSafeTarget(__ENV.BASE_URL || "http://127.0.0.1:5000");
 
 export default function () {
   // 1. Health check

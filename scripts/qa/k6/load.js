@@ -23,6 +23,7 @@
 import http from "k6/http";
 import { check, group, sleep } from "k6";
 import { Trend, Rate } from "k6/metrics";
+import { assertSafeTarget } from "./_shared.js";
 
 // Métricas customizadas
 const dashboardLatency = new Trend("dashboard_latency", true);
@@ -44,7 +45,7 @@ export const options = {
   },
 };
 
-const BASE_URL = __ENV.BASE_URL || "http://localhost:5000";
+const BASE_URL = assertSafeTarget(__ENV.BASE_URL || "http://127.0.0.1:5000");
 
 // Perfis de usuário para distribuição de carga
 const USUARIOS = [
