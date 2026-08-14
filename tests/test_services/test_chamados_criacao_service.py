@@ -1036,7 +1036,8 @@ def test_criacao_grava_supervisor_ids_com_acesso(app):
 
 # ---------------------------------------------------------------------------
 # Setores de distribuição em grupo (sem dono único na criação) — Compras e
-# Armazém hoje; ver AREAS_GRUPO em chamados_criacao_service.py
+# Estoque (ex-Armazém, renomeado no catálogo) hoje; ver AREAS_GRUPO em
+# chamados_criacao_service.py
 # ---------------------------------------------------------------------------
 
 
@@ -1206,21 +1207,21 @@ def test_criacao_compras_notifica_todos_supervisores_da_area(app):
     assert ids_notificados_webpush == {sup.id for sup in supervisores}
 
 
-def _um_supervisor_armazem():
+def _um_supervisor_estoque():
     sup = MagicMock()
-    sup.id = "id_armazem_1"
+    sup.id = "id_estoque_1"
     sup.nome = "Diego"
     sup.perfil = "supervisor"
     return [sup]
 
 
-def test_criacao_armazem_nao_exige_responsavel_mesmo_com_supervisor(app):
-    """Setor Armazém: mesmo tratamento de grupo que Compras (AREAS_GRUPO genérico) —
-    não exige escolha manual, e o rótulo do grupo usa o nome do setor traduzido
-    (não fica preso ao texto fixo de Compras)."""
+def test_criacao_estoque_nao_exige_responsavel_mesmo_com_supervisor(app):
+    """Setor Estoque (ex-Armazém): mesmo tratamento de grupo que Compras
+    (AREAS_GRUPO genérico) — não exige escolha manual, e o rótulo do grupo usa
+    o nome do setor traduzido (não fica preso ao texto fixo de Compras)."""
     from app.i18n import get_translation
 
-    supervisores = _um_supervisor_armazem()
+    supervisores = _um_supervisor_estoque()
 
     with (
         patch(
@@ -1242,11 +1243,11 @@ def test_criacao_armazem_nao_exige_responsavel_mesmo_com_supervisor(app):
         app.app_context(),
     ):
         chamado_id, numero, erro, aviso = criar_chamado(
-            form=_form_base(responsavel_id="", tipo="Armazém"),
+            form=_form_base(responsavel_id="", tipo="Estoque"),
             files=_files_empty(),
             solicitante_id="sol1",
             solicitante_nome="Solicitante",
-            area_solicitante="Armazém",
+            area_solicitante="Estoque",
         )
 
     assert erro is None
@@ -1255,7 +1256,7 @@ def test_criacao_armazem_nao_exige_responsavel_mesmo_com_supervisor(app):
     chamado = Chamado.get_by_id(chamado_id)
     assert chamado.responsavel_id is None
     assert chamado.responsavel == get_translation("sector_group_label", "en", setor="Warehouse")
-    assert "id_armazem_1" in chamado.supervisor_ids_com_acesso
+    assert "id_estoque_1" in chamado.supervisor_ids_com_acesso
 
 
 # ── AOG — abertura já grava nível 4 e dispara broadcast pros 4 gestores ──────

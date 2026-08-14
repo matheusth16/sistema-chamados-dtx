@@ -37,7 +37,7 @@ logger = logging.getLogger(__name__)
 # visível a todos os supervisores cadastrados (ver permissions.py, regra "fila
 # sem owner"). Nomes dos setores cadastrados no catálogo — ver categorias_setores;
 # lista fechada de propósito (sem toggle de admin), decisão explícita do usuário.
-AREAS_GRUPO = {"Compras", "Armazém"}
+AREAS_GRUPO = {"Compras", "Estoque"}
 
 
 def _eh_area_grupo(area: str) -> bool:
