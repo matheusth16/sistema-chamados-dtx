@@ -468,6 +468,45 @@ def test_get_all_atinge_teto_de_seguranca_loga_aviso_encryption_on(app, monkeypa
     assert len(resultado) == 1
 
 
+# ── get_sem_mfa ──────────────────────────────────────────────────────────────
+
+
+def test_get_sem_mfa_retorna_apenas_ativos_sem_mfa(app):
+    with _pii_off():
+        Usuario(id="u_sem_mfa", email="sem@b.com", nome="Sem MFA", mfa_enabled=False).save()
+        Usuario(id="u_com_mfa", email="com@b.com", nome="Com MFA", mfa_enabled=True).save()
+        Usuario(
+            id="u_inativo",
+            email="inativo@b.com",
+            nome="Inativo Sem MFA",
+            mfa_enabled=False,
+            ativo=False,
+        ).save()
+
+        resultado = Usuario.get_sem_mfa()
+
+    ids = [u.id for u in resultado]
+    assert ids == ["u_sem_mfa"]
+
+
+def test_get_sem_mfa_ordenado_por_nome(app):
+    with _pii_off():
+        Usuario(id="u_z", email="z@b.com", nome="Zeca", mfa_enabled=False).save()
+        Usuario(id="u_a", email="a@b.com", nome="Ana", mfa_enabled=False).save()
+
+        resultado = Usuario.get_sem_mfa()
+
+    nomes = [u.nome for u in resultado]
+    assert nomes.index("Ana") < nomes.index("Zeca")
+
+
+def test_get_sem_mfa_sem_usuarios_retorna_lista_vazia(app):
+    with _pii_off():
+        resultado = Usuario.get_sem_mfa()
+
+    assert resultado == []
+
+
 # ── email_existe ──────────────────────────────────────────────────────────────
 
 

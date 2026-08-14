@@ -55,3 +55,5 @@ class UsuarioRow(Base):
     mfa_secret: Mapped[str | None] = mapped_column(Text)
     mfa_backup_codes: Mapped[list[str]] = mapped_column(ARRAY(Text), nullable=False, default=list)
     auth_provider: Mapped[str] = mapped_column(Text, nullable=False, default="local")
+    criado_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    mfa_lembrete_enviado_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

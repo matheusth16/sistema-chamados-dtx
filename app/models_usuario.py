@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
 
 from flask_login import UserMixin
 from sqlalchemy import select
@@ -61,6 +61,8 @@ class Usuario(UserMixin):
         mfa_secret: str | None = None,
         mfa_backup_codes: list | None = None,
         auth_provider: str = "local",
+        criado_em=None,
+        mfa_lembrete_enviado_em=None,
     ):
         self.id = id
         self.email = email
@@ -102,6 +104,12 @@ class Usuario(UserMixin):
         self.auth_provider: str = (
             auth_provider if auth_provider in AUTH_PROVIDERS_VALIDOS else "local"
         )
+
+        # Lembrete de MFA pendente: criado_em popula só na criação (Usuario.save()),
+        # nunca sobrescrito em update; mfa_lembrete_enviado_em é o claim/histórico
+        # de reenvio do job agendado (app/services/mfa_lembrete_service.py)
+        self.criado_em = criado_em
+        self.mfa_lembrete_enviado_em = mfa_lembrete_enviado_em
 
     @property
     def is_admin_or_above(self) -> bool:
@@ -253,6 +261,8 @@ class Usuario(UserMixin):
             mfa_secret=(maybe_decrypt(row.mfa_secret) if row.mfa_secret else None),
             mfa_backup_codes=list(row.mfa_backup_codes or []),
             auth_provider=row.auth_provider,
+            criado_em=row.criado_em,
+            mfa_lembrete_enviado_em=row.mfa_lembrete_enviado_em,
         )
         usuario.senha_hash = row.senha_hash
         return usuario
@@ -281,6 +291,7 @@ class Usuario(UserMixin):
         row.mfa_secret = maybe_encrypt(self.mfa_secret) if self.mfa_secret else None
         row.mfa_backup_codes = self.mfa_backup_codes
         row.auth_provider = self.auth_provider
+        row.mfa_lembrete_enviado_em = self.mfa_lembrete_enviado_em
 
     @classmethod
     def _buscar_por_email_lookup(cls, session, email_norm: str) -> UsuarioRow | None:
@@ -334,6 +345,7 @@ class Usuario(UserMixin):
                 row = session.get(UsuarioRow, self.id)
                 if row is None:
                     row = UsuarioRow(id=self.id)
+                    row.criado_em = self.criado_em or datetime.now(UTC)
                     session.add(row)
                 self._preencher_row(row)
             return True
@@ -541,6 +553,36 @@ class Usuario(UserMixin):
                     return usuarios
         except Exception as e:
             logger.exception("Erro ao buscar usuários: %s", e)
+            return []
+
+    @classmethod
+    def get_sem_mfa(cls) -> list["Usuario"]:
+        """Retorna usuários ativos sem MFA configurado, ordenados por nome.
+
+        Usado pelo lembrete de MFA pendente (mfa_lembrete_service.py). Não
+        precisa do branching de PII encryption do get_all(): mfa_enabled e
+        ativo nunca são criptografados.
+        """
+        try:
+            with db_module.SessionLocal() as session:
+                rows = (
+                    session.execute(
+                        select(UsuarioRow)
+                        .where(UsuarioRow.mfa_enabled.is_(False), UsuarioRow.ativo.is_(True))
+                        .limit(MAX_USUARIOS_GET_ALL)
+                    )
+                    .scalars()
+                    .all()
+                )
+                usuarios = [cls._from_row(row) for row in rows]
+                if len(usuarios) >= MAX_USUARIOS_GET_ALL:
+                    logger.warning(
+                        "Usuario.get_sem_mfa() atingiu o teto de segurança (%d) — resultado pode estar incompleto",
+                        MAX_USUARIOS_GET_ALL,
+                    )
+                return sorted(usuarios, key=lambda u: (u.nome or "").lower())
+        except Exception as e:
+            logger.exception("Erro ao buscar usuários sem MFA: %s", e)
             return []
 
     @classmethod
