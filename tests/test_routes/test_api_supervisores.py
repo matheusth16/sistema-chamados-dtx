@@ -45,7 +45,7 @@ def test_supervisores_lista_exclui_usuario_logado(client_logado_supervisor):
 def test_supervisores_lista_area_sem_supervisores_retorna_lista_vazia(client_logado_supervisor):
     """Área sem supervisores → lista vazia, sem erro."""
     with patch("app.routes.api_chamados.Usuario.get_supervisores_por_area", return_value=[]):
-        r = client_logado_supervisor.get("/api/supervisores/lista?area=Inexistente")
+        r = client_logado_supervisor.get("/api/supervisores/lista?area=Manutencao")
 
     assert r.status_code == 200
     data = r.get_json()
@@ -72,10 +72,11 @@ def test_supervisores_lista_quando_unico_supervisor_e_o_proprio_logado_retorna_v
     assert data["supervisores"] == []
 
 
-def test_supervisores_lista_sem_login_retorna_redirect(client):
-    """Sem autenticação → redirect para login (302)."""
+def test_supervisores_lista_sem_login_retorna_json_401(client):
+    """Sem autenticação → contrato JSON 401."""
     r = client.get("/api/supervisores/lista?area=Manutencao")
-    assert r.status_code in (302, 401)
+    assert r.status_code == 401
+    assert r.is_json
 
 
 def test_supervisores_lista_exclui_usuarios_com_nivel_gestao(client_logado_supervisor):
@@ -96,7 +97,7 @@ def test_supervisores_lista_exclui_usuarios_com_nivel_gestao(client_logado_super
         "app.routes.api_chamados.Usuario.get_supervisores_por_area",
         return_value=[sup_comum, gestor_setor, gerente_prod],
     ):
-        r = client_logado_supervisor.get("/api/supervisores/lista?area=Producao")
+        r = client_logado_supervisor.get("/api/supervisores/lista?area=Manutencao")
 
     assert r.status_code == 200
     data = r.get_json()
@@ -119,7 +120,7 @@ def test_supervisores_lista_incluir_gestor_traz_gestores_marcados(client_logado_
         "app.routes.api_chamados.Usuario.get_supervisores_por_area",
         return_value=[sup_comum, gestor_setor],
     ):
-        r = client_logado_supervisor.get("/api/supervisores/lista?area=Producao&incluir_gestor=1")
+        r = client_logado_supervisor.get("/api/supervisores/lista?area=Manutencao&incluir_gestor=1")
 
     assert r.status_code == 200
     data = r.get_json()
@@ -127,3 +128,92 @@ def test_supervisores_lista_incluir_gestor_traz_gestores_marcados(client_logado_
     assert set(por_id) == {"sup_2", "sup_3"}
     assert por_id["sup_2"]["gestor"] is False
     assert por_id["sup_3"]["gestor"] is True
+
+
+def test_supervisor_pode_consultar_area_fora_das_proprias_para_rotear_chamado(
+    client_logado_supervisor,
+):
+    """Sem incluir_gestor, qualquer área é consultável — abrir/transferir um
+    chamado para outro setor é um fluxo legítimo e comum, não uma tentativa
+    de enumeração (bug real: solicitante/supervisor ficava sem ninguém pra
+    escolher como responsável ao rotear pra um setor fora da própria área)."""
+    with patch(
+        "app.routes.api_chamados.Usuario.get_supervisores_por_area", return_value=[]
+    ) as mock_buscar:
+        r = client_logado_supervisor.get("/api/supervisores/lista?area=Financeiro")
+
+    assert r.status_code == 200
+    mock_buscar.assert_called_once_with("Financeiro")
+
+
+def test_supervisor_nao_enumera_gestores_fora_das_areas_permitidas(client_logado_supervisor):
+    """incluir_gestor=1 (usado só por "Transferir para Colega", sempre com a
+    área do próprio chamado que o usuário já atende) continua restrito à(s)
+    própria(s) área(s) — essa é a única variante que expõe identidade de
+    gestores, então segue com a checagem anti-enumeração."""
+    with patch("app.routes.api_chamados.Usuario.get_supervisores_por_area") as mock_buscar:
+        r = client_logado_supervisor.get("/api/supervisores/lista?area=Financeiro&incluir_gestor=1")
+
+    assert r.status_code == 403
+    assert r.get_json()["sucesso"] is False
+    mock_buscar.assert_not_called()
+
+
+def test_solicitante_pode_consultar_qualquer_area_para_abrir_chamado(client_logado_solicitante):
+    """Abertura de chamado deixa o solicitante escolher qualquer setor de
+    destino — a pré-visualização de responsável precisa funcionar pra
+    qualquer área, não só a própria."""
+    with patch(
+        "app.routes.api_chamados.Usuario.get_supervisores_por_area", return_value=[]
+    ) as mock_buscar:
+        propria = client_logado_solicitante.get("/api/supervisores/lista?area=Planejamento")
+        outra = client_logado_solicitante.get("/api/supervisores/lista?area=Financeiro")
+
+    assert propria.status_code == 200
+    assert outra.status_code == 200
+    assert mock_buscar.call_count == 2
+
+
+def test_solicitante_com_incluir_gestor_ainda_bloqueado_fora_da_propria_area(
+    client_logado_solicitante,
+):
+    """incluir_gestor=1 continua exigindo área própria mesmo pro solicitante
+    (na prática o solicitante nunca manda esse parâmetro — é usado só pela
+    tela de escalonamento do supervisor — mas a checagem de servidor não deve
+    depender de quem está pedindo)."""
+    with patch("app.routes.api_chamados.Usuario.get_supervisores_por_area") as mock_buscar:
+        r = client_logado_solicitante.get(
+            "/api/supervisores/lista?area=Financeiro&incluir_gestor=1"
+        )
+
+    assert r.status_code == 403
+    mock_buscar.assert_not_called()
+
+
+def test_admin_pode_consultar_area_arbitraria(client_logado_admin):
+    with patch(
+        "app.routes.api_chamados.Usuario.get_supervisores_por_area", return_value=[]
+    ) as mock_buscar:
+        r = client_logado_admin.get("/api/supervisores/lista?area=Financeiro")
+
+    assert r.status_code == 200
+    mock_buscar.assert_called_once_with("Financeiro")
+
+
+def test_admin_global_pode_consultar_area_arbitraria(client_logado_admin_global):
+    with patch("app.routes.api_chamados.Usuario.get_supervisores_por_area", return_value=[]):
+        r = client_logado_admin_global.get("/api/supervisores/lista?area=Financeiro")
+
+    assert r.status_code == 200
+
+
+def test_supervisores_lista_erro_interno_retorna_500(client_logado_supervisor):
+    with patch(
+        "app.routes.api_chamados.Usuario.get_supervisores_por_area",
+        side_effect=RuntimeError("db interno"),
+    ):
+        r = client_logado_supervisor.get("/api/supervisores/lista?area=Manutencao")
+
+    assert r.status_code == 500
+    assert r.get_json()["sucesso"] is False
+    assert "db interno" not in r.get_data(as_text=True)

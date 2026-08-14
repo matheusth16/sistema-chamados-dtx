@@ -4,8 +4,9 @@ Fornece contexto read-only para /gestor/dashboard: contadores e listas de
 chamados classificados por filtro (atrasados, aberto_sem_resposta, multi_setor_travado).
 
 Regras de classificação v1 (critérios mínimos):
-- atrasados: campo `sla_dias` preenchido e minutos úteis desde abertura excedem o limite
-             OU campo is_atrasado=True (se disponível no documento)
+- atrasados: label "Atrasado" de obter_sla_para_exibicao (mesma função do
+             badge de SLA no Painel de Gestão) OU is_atrasado=True (se
+             disponível no documento)
 - aberto_sem_resposta: status == "Aberto" e chamado aberto há mais de 60 min úteis (1h Escada A)
 - multi_setor_travado: len(participantes) > 0 E algum participante status != "concluido"
                        E chamado não está "Concluído"
@@ -20,6 +21,7 @@ from sqlalchemy import select
 from app import db as db_module
 from app.db.models.chamado import ChamadoRow
 from app.models import Chamado
+from app.services.analytics import obter_sla_para_exibicao
 from app.services.business_time import minutos_uteis_entre
 from config import Config
 
@@ -35,38 +37,35 @@ _STATUS_FINALIZADOS = {"Concluído", "Cancelado"}
 _LIMITE_POR_RAIA = 6
 
 
-def _is_atrasado(chamado: Chamado) -> bool:
+def _is_atrasado(chamado: Chamado, agora: datetime | None = None) -> bool:
     """Classifica chamado como atrasado.
 
-    Usa campo is_atrasado do documento se disponível; caso contrário,
-    verifica sla_dias e tempo desde abertura como proxy. Uma previsão de
-    atendimento APROVADA e ainda futura (ver previsao_atendimento_service.py)
-    sempre vence essa checagem — alinhado com obter_sla_para_exibicao, pra
-    esse painel nunca contradizer o badge do próprio chamado.
+    Delega inteiramente a obter_sla_para_exibicao — a mesma função usada pelo
+    badge de SLA no Painel de Gestão — pra esse painel NUNCA contradizer o
+    badge do próprio chamado. Bug real (auditoria QA 2026-08-14): a versão
+    anterior reimplementava a lógica com minutos_uteis_entre comparado
+    contra um limite de "sla_dias × 24h" — um modelo de tempo útil bem mais
+    tolerante que o calendário corrido que obter_sla_para_exibicao usa pra
+    "Aberto"/"Em Atendimento" sem data_em_atendimento — fazendo o Painel
+    Gerencial mostrar "0 atrasados" com vários chamados já com badge
+    "Atrasado" no Painel de Gestão.
+
+    `agora` opcional (default: horário real) — thread-through do instante de
+    referência único usado por obter_contexto_gestor_dashboard, mesmo padrão
+    de _is_aberto_sem_resposta.
+
+    Chamados finalizados (Concluído/Cancelado) nunca entram no bucket de
+    triagem, mesmo se tiverem terminado fora do prazo — ainda precisam de
+    ação zero.
     """
     if getattr(chamado, "is_atrasado", None) is True:
         return True
     status = getattr(chamado, "status", "")
     if status in _STATUS_FINALIZADOS:
         return False
-    data_abertura = getattr(chamado, "data_abertura", None)
-    if data_abertura is None:
-        return False
-    agora = datetime.now(ZoneInfo(Config.SLA_TIMEZONE))
-    previsao_atendimento = getattr(chamado, "previsao_atendimento", None)
-    if isinstance(previsao_atendimento, datetime):
-        previsao_naive = (
-            previsao_atendimento.replace(tzinfo=None)
-            if previsao_atendimento.tzinfo
-            else previsao_atendimento
-        )
-        if agora.replace(tzinfo=None) < previsao_naive:
-            return False
-    sla_dias = getattr(chamado, "sla_dias", None)
-    if sla_dias is None:
-        return False
-    minutos = minutos_uteis_entre(data_abertura, agora)
-    return minutos > sla_dias * 24 * 60
+    _agora = agora or datetime.now(ZoneInfo(Config.SLA_TIMEZONE))
+    sla_info = obter_sla_para_exibicao(chamado, agora=_agora)
+    return bool(sla_info) and sla_info.get("label") == "Atrasado"
 
 
 def _is_aberto_sem_resposta(chamado: Chamado, agora: datetime | None = None) -> bool:
@@ -153,6 +152,11 @@ def _calcular_insights(
         "area_critica": area_critica,
         "tempo_medio_sem_resposta_min": tempo_medio_sem_resposta_min,
         "saude_percentual": saude_percentual,
+        # União dos 3 buckets — nunca soma-los direto: um chamado pode ser
+        # atrasado E estar sem resposta ao mesmo tempo (bug real, auditoria
+        # QA 2026-08-14: o template somava os buckets e chegava a mostrar
+        # mais chamados "em risco" do que o total carregado).
+        "em_risco_total": len(ids_em_risco),
     }
 
 
@@ -191,7 +195,7 @@ def obter_contexto_gestor_dashboard(
         areas_gestor = set(getattr(usuario, "areas", None) or [])
         todos = [c for c in todos if getattr(c, "area", None) in areas_gestor]
 
-    atrasados = [c for c in todos if _is_atrasado(c)]
+    atrasados = [c for c in todos if _is_atrasado(c, _agora)]
     abertos_sem_resp = [c for c in todos if _is_aberto_sem_resposta(c, _agora)]
     multi_travados = [c for c in todos if _is_multi_setor_travado(c)]
 

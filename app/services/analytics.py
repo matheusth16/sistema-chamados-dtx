@@ -145,7 +145,7 @@ def _prazo_efetivo(limite: datetime, previsao_atendimento: Any) -> datetime:
     return dt_previsao if b > a else limite
 
 
-def obter_sla_para_exibicao(chamado: Any) -> dict[str, Any] | None:
+def obter_sla_para_exibicao(chamado: Any, agora: datetime | None = None) -> dict[str, Any] | None:
     """Retorna dict para exibir SLA na Gestão (dashboard). Sem query ao banco.
 
     chamado: objeto com .data_abertura, .data_conclusao, .categoria, .status
@@ -154,6 +154,10 @@ def obter_sla_para_exibicao(chamado: Any) -> dict[str, Any] | None:
     setor — ver previsao_atendimento_service.py; unifica o antigo "Prazo do
     chamado (dias)" com "Adiar avisos de escalonamento": a data aprovada
     também vira o prazo oficial usado aqui, não só silencia e-mail).
+
+    agora: instante de referência opcional (default: datetime.now(UTC)) — só
+    pra permitir thread-through de um instante fixo em quem precisa de um
+    único "agora" consistente entre várias chamadas (ex.: gestor_dashboard_service).
 
     Para status 'Em Atendimento' com data_em_atendimento presente, o percentual é
     calculado em tempo útil via percentual_prazo_resolucao (Escada B / SLA resolução).
@@ -171,13 +175,14 @@ def obter_sla_para_exibicao(chamado: Any) -> dict[str, Any] | None:
     dt_abertura = _to_datetime(data_abertura)
     if not dt_abertura:
         return None
+    _agora_aware = agora or datetime.now(UTC)
     dias = _sla_dias_por_categoria(categoria, sla_dias_custom)
     limite = _prazo_efetivo(dt_abertura + timedelta(days=dias), previsao_atendimento)
     # Comparação consistente: ambos naive ou ambos aware (evita TypeError)
     if limite.tzinfo is not None:
-        now = datetime.now(UTC)
+        now = _agora_aware
     else:
-        now = datetime.now(UTC).replace(tzinfo=None)
+        now = _agora_aware.replace(tzinfo=None) if _agora_aware.tzinfo else _agora_aware
     if status == "Cancelado":
         return None  # Chamados cancelados não entram em SLA
     if status == "Concluído":
@@ -201,7 +206,7 @@ def obter_sla_para_exibicao(chamado: Any) -> dict[str, Any] | None:
         # mesmo com a previsão já vencida há muito tempo (bug real,
         # auditoria 2026-08-13).
         dt_previsao_instante = _previsao_atendimento_instante(previsao_atendimento)
-        if dt_previsao_instante is not None and datetime.now(UTC) < dt_previsao_instante:
+        if dt_previsao_instante is not None and _agora_aware < dt_previsao_instante:
             return {"label": "No prazo", "dentro_prazo": True, "em_risco": False}
         dt_em_atendimento = _to_datetime(data_em_atendimento)
         if dt_em_atendimento is not None:

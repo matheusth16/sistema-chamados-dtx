@@ -127,6 +127,49 @@ def test_gestor_acessa_dashboard(client_logado_gestor):
     assert b"gestor" in resp.data.lower() or b"dashboard" in resp.data.lower()
 
 
+def test_gestor_dashboard_mostra_nivel_gestao_traduzido(client, app):
+    """Bug real (auditoria QA 2026-08-14): o badge de nivel_gestao no Painel
+    Gerencial usava `nivel_gestao | replace("_", " ") | title`, que produzia
+    rótulos crus e errados — "Gerente Producao" sem acento, "Assistente Gm"
+    com a sigla mal capitalizada — em vez das traduções management_level_*
+    já usadas no cadastro de usuário (usuario_form.html)."""
+    ctx_mock = {
+        "contadores": {
+            "total": 0,
+            "atrasados": 0,
+            "aberto_sem_resposta": 0,
+            "multi_setor_travado": 0,
+        },
+        "chamados": [],
+        "filtro_ativo": "todos",
+        "insights": {
+            "area_critica": None,
+            "tempo_medio_sem_resposta_min": None,
+            "saude_percentual": 100,
+            "em_risco_total": 0,
+        },
+        "grupos": [],
+    }
+    casos = {
+        "gestor_setor": "Gestor de Setor",
+        "gerente_producao": "Gerente de Produção",
+        "assistente_gm": "Assistente GM",
+        "gm": "GM (Diretor Geral)",
+    }
+    for nivel, esperado in casos.items():
+        user = _mock_gestor(uid=f"gest_{nivel}", nivel_gestao=nivel)
+        with (
+            patch("app.routes.auth.Usuario.get_by_email", return_value=user),
+            patch("app.models_usuario.Usuario.get_by_id", return_value=user),
+            patch("app.routes.auth._dispositivo_confiavel", return_value=True),
+            patch("app.routes.dashboard.obter_contexto_gestor_dashboard", return_value=ctx_mock),
+        ):
+            client.post("/login", data={"email": user.email, "senha": "ok"}, follow_redirects=False)
+            resp = client.get("/gestor/dashboard?lang=pt_BR")
+            body = resp.get_data(as_text=True)
+            assert esperado in body, f"nivel_gestao={nivel} esperava {esperado!r} no HTML"
+
+
 def test_admin_acessa_gestor_dashboard(client_logado_admin_gestor):
     """Admin com nivel_gestao acessa /gestor/dashboard com 200."""
     ctx_mock = {
@@ -253,6 +296,107 @@ def test_gestor_setor_dual_role_nao_muda_status_de_chamado_do_colega(
     )
 
     assert resp.status_code == 403
+
+
+def test_gestor_setor_puro_ve_js_de_decisao_de_previsao_mesmo_sem_escalonar(
+    client_logado_gestor, db_session, app
+):
+    """Bug real (auditoria QA 2026-08-14): os botões "Aprovar"/"Rejeitar" de
+    previsão de atendimento são renderizados fora do bloco `pode_escalonar`
+    de propósito (comentário no template explica: um gestor_setor "puro",
+    is_gestor_only=True, pode decidir sem poder editar/escalonar o chamado).
+    Só que a função JS decidirPrevisaoAtendimento (e CHAMADO_ID/CSRF_TOKEN/
+    mostrarErro/esconderErro de que ela depende) estava definida só dentro
+    do <script> gated por `pode_escalonar` — pra esse gestor puro (que é
+    exatamente o caso que o comentário diz que devia funcionar) os botões
+    apareciam mas o clique não fazia nada: sem request, sem erro, silêncio
+    total. Reproduzido ao vivo no browser antes desta correção."""
+    from datetime import datetime, timedelta
+
+    from app.services.previsao_atendimento_service import solicitar_previsao_atendimento
+    from tests.factories import make_chamado
+
+    chamado = make_chamado(area="Geral", responsavel_id="resp1")
+
+    solicitante = MagicMock()
+    solicitante.id = "resp1"
+    solicitante.nome = "Responsável Teste"
+    solicitante.perfil = "supervisor"
+    solicitante.is_admin_or_above = False
+    with app.app_context():
+        resultado = solicitar_previsao_atendimento(
+            chamado.id,
+            datetime.now() + timedelta(days=10),
+            "Motivo de teste",
+            solicitante,
+        )
+    assert resultado["sucesso"] is True, resultado.get("erro")
+
+    with (
+        patch("app.routes.dashboard.usuario_pode_ver_chamado", return_value=True),
+        patch("app.routes.dashboard.get_static_cached", return_value=[]),
+        patch("app.routes.dashboard.CategoriaSetor.get_all", return_value=[]),
+    ):
+        resp = client_logado_gestor.get(f"/chamado/{chamado.id}")
+
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    # Botão renderizado (já funcionava antes)
+    assert 'data-action="decidir-previsao-aprovar"' in body
+    # A DEFINIÇÃO da função precisa estar presente — não basta o dispatcher
+    # que só CHAMA decidirPrevisaoAtendimento (esse dispatcher já está fora
+    # do bloco pode_escalonar e sempre aparece; o bug real é a ausência da
+    # atribuição window.decidirPrevisaoAtendimento = function(...), que só
+    # existia dentro do bloco pode_escalonar, False pra gestor_setor puro)
+    assert "window.decidirPrevisaoAtendimento = function" in body
+
+
+def test_previsao_pendente_exibe_data_formatada_nao_iso_bruto(
+    client_logado_gestor, db_session, app
+):
+    """Bug real (auditoria QA 2026-08-14, mesma sessão do bug acima): a data
+    da previsão pendente era impressa como string bruta do banco (ex.
+    "2026-08-20 14:00:00-03:00") em vez do formato dd/mm/aaaa hh:mm usado no
+    resto do sistema — inclusive na mesma tela, uma vez aprovada
+    (chamado.previsao_atendimento_formatada()). Reproduzido ao vivo no
+    browser: a tela "Aguardando aprovação" mostrava a data bruta."""
+    from datetime import datetime, timedelta
+
+    from app.services.previsao_atendimento_service import (
+        obter_solicitacao_pendente,
+        solicitar_previsao_atendimento,
+    )
+    from tests.factories import make_chamado
+
+    chamado = make_chamado(area="Geral", responsavel_id="resp1")
+
+    solicitante = MagicMock()
+    solicitante.id = "resp1"
+    solicitante.nome = "Responsável Teste"
+    solicitante.perfil = "supervisor"
+    solicitante.is_admin_or_above = False
+    with app.app_context():
+        resultado = solicitar_previsao_atendimento(
+            chamado.id,
+            datetime.now() + timedelta(days=10),
+            "Motivo de teste",
+            solicitante,
+        )
+        assert resultado["sucesso"] is True, resultado.get("erro")
+        pendente = obter_solicitacao_pendente(chamado.id)
+        esperado_formatado = pendente["previsao_solicitada"].strftime("%d/%m/%Y %H:%M")
+        formato_bruto_iso = pendente["previsao_solicitada"].isoformat(sep=" ")
+
+    with (
+        patch("app.routes.dashboard.usuario_pode_ver_chamado", return_value=True),
+        patch("app.routes.dashboard.get_static_cached", return_value=[]),
+        patch("app.routes.dashboard.CategoriaSetor.get_all", return_value=[]),
+    ):
+        resp = client_logado_gestor.get(f"/chamado/{chamado.id}")
+
+    body = resp.get_data(as_text=True)
+    assert esperado_formatado in body
+    assert formato_bruto_iso not in body
 
 
 def test_gestor_visualizar_chamado_pode_editar_false(client_logado_gestor, db_session):

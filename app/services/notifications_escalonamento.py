@@ -23,6 +23,15 @@ NOMES_NIVEL: dict[int, str] = {
     4: "GM",
 }
 
+# Só para in-app/webpush (PT) — o e-mail usa NOMES_NIVEL (EN, deliberado, ver
+# notificar_digest_diario). Espelha management_level_* em translations.json.
+NOMES_NIVEL_PT: dict[int, str] = {
+    1: "Gestor de Setor",
+    2: "Gerente de Produção",
+    3: "Assistente GM",
+    4: "GM (Diretor Geral)",
+}
+
 
 def notificar_escalada_gerencial(
     chamado_data: dict,
@@ -129,6 +138,10 @@ def notificar_pre_aviso_escalonamento(
     app/services/digest_diario_service.py pro resumo diário geral. Canais:
     in-app + Web Push (quando responsavel_id) + e-mail (quando email_dest),
     cada um independente (falha em um não bloqueia os outros).
+
+    In-app/webpush em PT (mesmo padrão do resto do sino de notificações, ver
+    chamado_notificacao_service.py); e-mail em inglês, deliberado (idioma por
+    destinatário é trabalho futuro não iniciado — ver notificar_digest_diario).
     """
     numero_chamado = chamado_data.get("numero_chamado") or "N/A"
     categoria = chamado_data.get("categoria") or ""
@@ -138,12 +151,18 @@ def notificar_pre_aviso_escalonamento(
     area_d = _ts(area)
     tipo_d = _ts(tipo_solicitacao)
     nome_nivel = NOMES_NIVEL.get(nivel_alvo, f"Level {nivel_alvo}")
+    nome_nivel_pt = NOMES_NIVEL_PT.get(nivel_alvo, f"Nível {nivel_alvo}")
 
     link = _link_chamado(chamado_id)
     assunto = f"[Heads up] Ticket {numero_chamado} will escalate in {minutos_restantes} min"
     mensagem_curta = (
         f"Ticket {numero_chamado} will escalate to the {nome_nivel} "
         f"in about {minutos_restantes} minutes if it's not handled."
+    )
+    titulo_inapp = f"Aviso: Chamado {numero_chamado} vai escalar em {minutos_restantes} min"
+    mensagem_inapp = (
+        f"Chamado {numero_chamado} vai escalar para {nome_nivel_pt} "
+        f"em ~{minutos_restantes} minutos se não for atendido."
     )
 
     if responsavel_id:
@@ -154,8 +173,8 @@ def notificar_pre_aviso_escalonamento(
                 usuario_id=responsavel_id,
                 chamado_id=chamado_id,
                 numero_chamado=numero_chamado,
-                titulo=assunto,
-                mensagem=mensagem_curta,
+                titulo=titulo_inapp,
+                mensagem=mensagem_inapp,
                 tipo="pre_aviso_escalonamento",
                 categoria=categoria,
             )
@@ -167,8 +186,8 @@ def notificar_pre_aviso_escalonamento(
 
             enviar_webpush_usuario(
                 usuario_id=responsavel_id,
-                titulo=assunto,
-                corpo=mensagem_curta,
+                titulo=titulo_inapp,
+                corpo=mensagem_inapp,
                 url=link or None,
             )
         except Exception as exc:
@@ -359,10 +378,13 @@ def notificar_aviso_resolucao_supervisor(
     tipo_d = _ts(tipo_solicitacao)
 
     assunto = f"[SLA {marco}%] Ticket {numero_chamado} — resolution deadline approaching"
+    titulo_inapp = f"Chamado {numero_chamado} — {marco}% do prazo de resolução"
+    mensagem_inapp = f"Chamado {numero_chamado} está em {marco}% do prazo de resolução."
     link = _link_chamado(chamado_id)
     link_dash = _link_dashboard()
 
-    # Notificação in-app
+    # Notificação in-app (PT, mesmo padrão do resto do sino — e-mail segue em
+    # inglês, deliberado, ver notificar_digest_diario)
     if responsavel_id:
         try:
             from app.services.notifications_inapp import criar_notificacao
@@ -371,8 +393,8 @@ def notificar_aviso_resolucao_supervisor(
                 usuario_id=responsavel_id,
                 chamado_id=chamado_id,
                 numero_chamado=numero_chamado,
-                titulo=assunto,
-                mensagem=f"Ticket {numero_chamado} is at {marco}% of the resolution SLA deadline.",
+                titulo=titulo_inapp,
+                mensagem=mensagem_inapp,
                 tipo="sla_resolucao",
                 categoria=categoria,
             )
@@ -385,8 +407,8 @@ def notificar_aviso_resolucao_supervisor(
 
             enviar_webpush_usuario(
                 usuario_id=responsavel_id,
-                titulo=assunto,
-                corpo=f"Ticket {numero_chamado} is at {marco}% of the resolution deadline.",
+                titulo=titulo_inapp,
+                corpo=mensagem_inapp,
                 url=link or None,
             )
         except Exception as exc:

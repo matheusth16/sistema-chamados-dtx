@@ -43,7 +43,13 @@
                     <p>
                         {{ t('gestor_dashboard_subtitle') }}
                         {% if current_user.is_authenticated and current_user.nivel_gestao %}
-                        · <span class="bento-count-chip">{{ current_user.nivel_gestao | replace("_", " ") | title }}</span>
+                        {% set nivel_gestao_labels = {
+                            'gestor_setor': t('management_level_sector_manager'),
+                            'gerente_producao': t('management_level_production_manager'),
+                            'assistente_gm': t('management_level_gm_assistant'),
+                            'gm': t('management_level_gm'),
+                        } %}
+                        · <span class="bento-count-chip">{{ nivel_gestao_labels.get(current_user.nivel_gestao, current_user.nivel_gestao) }}</span>
                         {% endif %}
                         · {{ current_user.nome }}
                     </p>
@@ -111,7 +117,7 @@
                 </div>
             </div>
             <p style="font-size:13px; color:var(--color-text-muted); flex:1;">
-                {{ t('tickets_loaded_risk_summary', total=contadores.total, risco=(contadores.atrasados + contadores.aberto_sem_resposta + contadores.multi_setor_travado)) }}
+                {{ t('tickets_loaded_risk_summary', total=contadores.total, risco=insights.em_risco_total) }}
             </p>
         </div>
     </div>

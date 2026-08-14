@@ -1522,6 +1522,47 @@ def test_notificar_abertura_aog_falha_de_envio_nao_levanta(app):
     assert mock_send.call_count == 2
 
 
+def test_notificar_aviso_resolucao_supervisor_inapp_em_portugues(app):
+    """Mesmo bug de notificar_pre_aviso_escalonamento, mesma correção: in-app
+    e webpush em PT, e-mail continua em inglês (deliberado)."""
+    from app.services.notifications import notificar_aviso_resolucao_supervisor
+
+    chamado_data = {
+        "numero_chamado": "CHM-0410",
+        "categoria": "Manutenção",
+        "area": "Engenharia",
+        "tipo_solicitacao": "Corretiva",
+    }
+
+    with (
+        app.app_context(),
+        patch(
+            "app.services.notifications_escalonamento.enviar_email", return_value=(True, None)
+        ) as mock_email,
+        patch("app.services.notifications_inapp.criar_notificacao") as mock_criar,
+        patch("app.services.webpush_service.enviar_webpush_usuario") as mock_webpush,
+    ):
+        notificar_aviso_resolucao_supervisor(
+            chamado_data=chamado_data,
+            chamado_id="ch_410",
+            marco=80,
+            responsavel_id="resp_1",
+            email_dest="resp@dtx.aero",
+        )
+
+    titulo_inapp = mock_criar.call_args.kwargs.get("titulo") or ""
+    mensagem_inapp = mock_criar.call_args.kwargs.get("mensagem") or ""
+    assert "deadline" not in titulo_inapp
+    assert "CHM-0410" in titulo_inapp
+    assert "prazo" in mensagem_inapp.lower()
+
+    titulo_webpush = mock_webpush.call_args.kwargs.get("titulo") or ""
+    assert "deadline" not in titulo_webpush
+
+    _dest, assunto_email, _html, _txt = mock_email.call_args[0]
+    assert "deadline" in assunto_email
+
+
 # ── Fase 7 — notificar_aviso_resolucao_supervisor / notificar_escalada_resolucao_gerencial ────
 
 
@@ -1690,6 +1731,54 @@ def test_notificar_pre_aviso_escalonamento_com_responsavel_e_email(app):
     _dest, assunto, _html, _txt = mock_email.call_args[0]
     assert "CHM-0300" in assunto
     assert _dest == "resp@dtx.aero"
+
+
+def test_notificar_pre_aviso_escalonamento_inapp_em_portugues(app):
+    """Bug real (auditoria QA 2026-08-14): notificação in-app/webpush de
+    pré-aviso de escalonamento saía 100% em inglês hardcoded, mesmo com a
+    interface em PT — inconsistente com todo o resto do sino de notificações
+    (que é sempre construído em PT, ver chamado_notificacao_service.py). O
+    e-mail continua em inglês de propósito (idioma por destinatário é
+    trabalho futuro não iniciado — ver notificar_digest_diario)."""
+    from app.services.notifications import notificar_pre_aviso_escalonamento
+
+    chamado_data = {
+        "numero_chamado": "CHM-0310",
+        "categoria": "Manutenção",
+        "area": "Engenharia",
+        "tipo_solicitacao": "Corretiva",
+    }
+
+    with (
+        app.app_context(),
+        patch(
+            "app.services.notifications_escalonamento.enviar_email", return_value=(True, None)
+        ) as mock_email,
+        patch("app.services.notifications_inapp.criar_notificacao") as mock_criar,
+        patch("app.services.webpush_service.enviar_webpush_usuario") as mock_webpush,
+    ):
+        notificar_pre_aviso_escalonamento(
+            chamado_data=chamado_data,
+            chamado_id="ch_310",
+            nivel_alvo=1,
+            minutos_restantes=30,
+            responsavel_id="resp_1",
+            email_dest="resp@dtx.aero",
+        )
+
+    titulo_inapp = mock_criar.call_args.kwargs.get("titulo") or ""
+    mensagem_inapp = mock_criar.call_args.kwargs.get("mensagem") or ""
+    assert "will escalate" not in titulo_inapp
+    assert "Heads up" not in titulo_inapp
+    assert "CHM-0310" in titulo_inapp
+    assert "escalar" in mensagem_inapp.lower()
+
+    titulo_webpush = mock_webpush.call_args.kwargs.get("titulo") or ""
+    assert "will escalate" not in titulo_webpush
+
+    # E-mail permanece em inglês (deliberado, ver notificar_digest_diario)
+    _dest, assunto_email, _html, _txt = mock_email.call_args[0]
+    assert "will escalate" in assunto_email
 
 
 def test_notificar_pre_aviso_escalonamento_sem_responsavel_id_so_tenta_email(app):

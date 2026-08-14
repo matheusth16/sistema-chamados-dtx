@@ -1,6 +1,6 @@
 """Testes unitários do serviço gestor_dashboard_service (Fases 5 e 6)."""
 
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from unittest.mock import MagicMock, patch
 from zoneinfo import ZoneInfo
 
@@ -153,17 +153,28 @@ def test_is_multi_setor_travado_misto_pelo_menos_um_pendente():
 
 
 def _make_chamado_aberto_antigo():
-    """Chamado Aberto há 120 min úteis em relação a _AGORA_FIXED → classifica como sem resposta."""
+    """Chamado Aberto há 120 min úteis em relação a _AGORA_FIXED → classifica como sem resposta.
+
+    previsao_atendimento/data_em_atendimento explícitos em None: um Chamado
+    real sempre tem esses campos (None ou valor) — MagicMock() solto sem eles
+    dispara o "trap" do MagicMock (hasattr/isinstance sempre truthy) dentro
+    de obter_sla_para_exibicao, que _is_atrasado agora usa de verdade.
+    """
     c = MagicMock()
     c.status = "Aberto"
     c.data_abertura = datetime(2024, 6, 3, 9, 0)  # 2h antes de _AGORA_FIXED (11:00)
     c.is_atrasado = False
     c.sla_dias = None
+    c.data_conclusao = None
+    c.data_em_atendimento = None
+    c.previsao_atendimento = None
     c.participantes = []
     return c
 
 
 def _make_chamado_atrasado():
+    """is_atrasado=True dá short-circuit em _is_atrasado antes de chamar
+    obter_sla_para_exibicao — não precisa de previsao_atendimento/data_em_atendimento."""
     c = MagicMock()
     c.status = "Em Atendimento"
     c.is_atrasado = True
@@ -177,7 +188,10 @@ def _make_chamado_multi_travado():
     c.status = "Em Atendimento"
     c.is_atrasado = False
     c.sla_dias = None
-    c.data_abertura = datetime.now(tz=UTC)
+    c.data_abertura = datetime(2024, 6, 3, 10, 15)  # naive, mesma convenção de _AGORA_FIXED
+    c.data_conclusao = None
+    c.data_em_atendimento = None
+    c.previsao_atendimento = None
     c.participantes = [{"supervisor_id": "s1", "status": "pendente"}]
     return c
 
@@ -189,6 +203,9 @@ def _make_chamado_saudavel():
     c.is_atrasado = False
     c.sla_dias = None
     c.data_abertura = datetime(2024, 6, 3, 10, 30)
+    c.data_conclusao = None
+    c.data_em_atendimento = None
+    c.previsao_atendimento = None
     c.participantes = []
     return c
 
@@ -308,20 +325,40 @@ def test_is_atrasado_status_finalizado_retorna_false():
 
 
 def test_is_atrasado_com_sla_e_data_abertura_dentro_do_prazo():
-    """_is_atrasado calcula minutos úteis quando sla_dias e data_abertura preenchidos (linhas 46-51)."""
+    """_is_atrasado (via obter_sla_para_exibicao) considera dentro do prazo
+    quando o tempo corrido desde a abertura ainda não passou de sla_dias."""
     from app.services.gestor_dashboard_service import _is_atrasado
 
     c = MagicMock()
     c.is_atrasado = None
     c.status = "Em Atendimento"
     c.sla_dias = 5
+    c.categoria = "Rotina"
     c.data_abertura = datetime(2024, 6, 3, 9, 0)
+    c.data_conclusao = None
+    c.data_em_atendimento = None
     c.previsao_atendimento = None
 
-    with patch("app.services.gestor_dashboard_service.minutos_uteis_entre", return_value=100):
-        result = _is_atrasado(c)
+    agora = datetime(2024, 6, 4, 9, 0)  # 1 dia depois, dentro dos 5 dias de SLA
+    assert _is_atrasado(c, agora) is False
 
-    assert result is False  # 100 min < 5*24*60 = 7200 min
+
+def test_is_atrasado_com_sla_estourado_fica_atrasado():
+    """Complementar: mesmo chamado, mas agora além do sla_dias customizado."""
+    from app.services.gestor_dashboard_service import _is_atrasado
+
+    c = MagicMock()
+    c.is_atrasado = None
+    c.status = "Em Atendimento"
+    c.sla_dias = 5
+    c.categoria = "Rotina"
+    c.data_abertura = datetime(2024, 6, 3, 9, 0)
+    c.data_conclusao = None
+    c.data_em_atendimento = None
+    c.previsao_atendimento = None
+
+    agora = datetime(2024, 6, 9, 9, 0)  # 6 dias depois, além dos 5 dias de SLA
+    assert _is_atrasado(c, agora) is True
 
 
 def test_is_atrasado_com_previsao_aprovada_futura_nunca_atrasado():
@@ -333,13 +370,55 @@ def test_is_atrasado_com_previsao_aprovada_futura_nunca_atrasado():
     c.is_atrasado = None
     c.status = "Em Atendimento"
     c.sla_dias = 1
+    c.categoria = "Rotina"
     c.data_abertura = datetime(2024, 6, 3, 9, 0)
+    c.data_conclusao = None
+    c.data_em_atendimento = None
     c.previsao_atendimento = datetime.now(ZoneInfo(Config.SLA_TIMEZONE)) + timedelta(days=5)
 
-    with patch("app.services.gestor_dashboard_service.minutos_uteis_entre", return_value=999999):
-        result = _is_atrasado(c)
+    assert _is_atrasado(c) is False
 
-    assert result is False
+
+def test_is_atrasado_sem_sla_customizado_usa_padrao_da_categoria_projetos():
+    """Bug real (auditoria QA 2026-08-14): chamado sem sla_dias customizado
+    (o caso normal — SLA vem da categoria) sempre voltava False aqui, mesmo
+    estourado, porque a função desistia assim que via sla_dias is None em vez
+    de cair no fallback por categoria que obter_sla_para_exibicao usa. Isso
+    fazia o Painel Gerencial reportar "0 atrasados" com chamados atrasados de
+    verdade no Painel de Gestão. Projetos = 2 dias corridos (Config default)."""
+    from app.services.gestor_dashboard_service import _is_atrasado
+
+    c = MagicMock()
+    c.is_atrasado = None
+    c.status = "Aberto"
+    c.sla_dias = None
+    c.categoria = "Projetos"
+    c.data_abertura = datetime(2024, 6, 3, 9, 0)
+    c.data_conclusao = None
+    c.data_em_atendimento = None
+    c.previsao_atendimento = None
+
+    agora = datetime(2024, 6, 7, 9, 0)  # 4 dias corridos > 2 dias do SLA de Projetos
+    assert _is_atrasado(c, agora) is True
+
+
+def test_is_atrasado_sem_sla_customizado_dentro_do_prazo_da_categoria():
+    """Mesmo cenário sem sla_dias customizado, mas ainda dentro do prazo
+    padrão da categoria (Padrão = 3 dias corridos) — não deve ser atrasado."""
+    from app.services.gestor_dashboard_service import _is_atrasado
+
+    c = MagicMock()
+    c.is_atrasado = None
+    c.status = "Aberto"
+    c.sla_dias = None
+    c.categoria = "Rotina"
+    c.data_abertura = datetime(2024, 6, 3, 9, 0)
+    c.data_conclusao = None
+    c.data_em_atendimento = None
+    c.previsao_atendimento = None
+
+    agora = datetime(2024, 6, 4, 9, 0)  # 1 dia corrido < 3 dias do SLA padrão
+    assert _is_atrasado(c, agora) is False
 
 
 def test_is_atrasado_com_previsao_ja_passada_volta_a_calcular_normal():
@@ -350,13 +429,13 @@ def test_is_atrasado_com_previsao_ja_passada_volta_a_calcular_normal():
     c.is_atrasado = None
     c.status = "Em Atendimento"
     c.sla_dias = 1
+    c.categoria = "Rotina"
     c.data_abertura = datetime(2024, 6, 3, 9, 0)
+    c.data_conclusao = None
+    c.data_em_atendimento = None
     c.previsao_atendimento = datetime.now(ZoneInfo(Config.SLA_TIMEZONE)) - timedelta(days=1)
 
-    with patch("app.services.gestor_dashboard_service.minutos_uteis_entre", return_value=999999):
-        result = _is_atrasado(c)
-
-    assert result is True
+    assert _is_atrasado(c) is True
 
 
 # ---------------------------------------------------------------------------
@@ -460,6 +539,32 @@ def test_insights_saude_percentual_reflete_proporcao_em_risco():
 
     # 1 de 4 em risco → 75% saudável
     assert ctx["insights"]["saude_percentual"] == 75
+
+
+def test_insights_em_risco_total_nao_conta_chamado_duplicado():
+    """Bug real (auditoria QA 2026-08-14): a string "X chamados carregados; Y
+    em algum estado de risco" no template (gestor_dashboard.html) somava os 3
+    buckets (atrasados + aberto_sem_resposta + multi_setor) em vez de usar a
+    união — um chamado atrasado E sem resposta ao mesmo tempo (caso comum, dá
+    pra ver os dois badges juntos no Painel de Gestão) era contado duas
+    vezes, chegando a superar o total de chamados carregados (22 carregados;
+    23 em risco, visto ao vivo). insights['em_risco_total'] precisa ser a
+    união, igual ao que já alimenta saude_percentual."""
+    c = MagicMock()
+    c.status = "Aberto"
+    c.is_atrasado = True  # atrasado
+    c.data_abertura = datetime(2024, 6, 3, 9, 0)  # 2h antes de _AGORA_FIXED → também sem resposta
+    c.participantes = []
+
+    with patch(
+        "app.services.gestor_dashboard_service._carregar_todos_chamados",
+        return_value=[c],
+    ):
+        ctx = obter_contexto_gestor_dashboard(agora=_AGORA_FIXED)
+
+    assert ctx["contadores"]["atrasados"] == 1
+    assert ctx["contadores"]["aberto_sem_resposta"] == 1
+    assert ctx["insights"]["em_risco_total"] == 1  # união, não soma (2)
 
 
 def test_insights_saude_percentual_100_quando_lista_vazia():
@@ -605,6 +710,9 @@ def _make_chamado_em_area(area: str):
     c.sla_dias = None
     c.area = area
     c.data_abertura = datetime(2024, 6, 3, 9, 0)
+    c.data_conclusao = None
+    c.data_em_atendimento = None
+    c.previsao_atendimento = None
     c.participantes = []
     return c
 
