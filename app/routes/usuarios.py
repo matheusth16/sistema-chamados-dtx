@@ -1,8 +1,6 @@
 """Rotas de gerenciamento de usuários (CRUD). Apenas para admins."""
 
 import logging
-import secrets
-import string
 import threading
 import uuid
 
@@ -18,6 +16,7 @@ from app.routes import main
 from app.services.historico_usuario_service import registrar_historico_usuario
 from app.services.notifications import notificar_mudanca_perfil, notificar_novo_usuario_cadastrado
 from app.services.notify_retry import executar_com_retry
+from app.services.senha_service import gerar_senha_aleatoria
 
 DOMINIO_EMAIL_PERMITIDO = "@dtx.aero"
 
@@ -64,24 +63,6 @@ def _bloquear_se_admin_raiz(usuario: Usuario, usuario_id: str, translation_key: 
     return None
 
 
-def _gerar_senha_aleatoria(tamanho: int = 12) -> str:
-    """Gera senha aleatória segura com maiúsculas, minúsculas, dígitos e símbolos.
-    Garante ao menos 1 char de cada classe para satisfazer políticas de complexidade."""
-    especiais = "!@#$%&*"
-    alfabeto = string.ascii_letters + string.digits + especiais
-    # Posições fixas garantem representação mínima de cada classe
-    obrigatorios = [
-        secrets.choice(string.ascii_uppercase),
-        secrets.choice(string.ascii_lowercase),
-        secrets.choice(string.digits),
-        secrets.choice(especiais),
-    ]
-    restante = [secrets.choice(alfabeto) for _ in range(tamanho - 4)]
-    senha = obrigatorios + restante
-    secrets.SystemRandom().shuffle(senha)
-    return "".join(senha)
-
-
 @main.route("/admin/usuarios", methods=["GET", "POST"])
 @requer_perfil("admin")
 def gerenciar_usuarios() -> Response:
@@ -113,7 +94,7 @@ def gerenciar_usuarios() -> Response:
                 flash_t(e, "danger")
             return redirect(url_for("main.gerenciar_usuarios"))
         try:
-            senha_inicial = _gerar_senha_aleatoria()
+            senha_inicial = gerar_senha_aleatoria()
             u = Usuario(
                 id=f"user_{uuid.uuid4().hex}",
                 email=email,
@@ -404,7 +385,7 @@ def resetar_senha_usuario(usuario_id: str) -> Response:
             return redirect(url_for("main.gerenciar_usuarios"))
 
         nome_usuario = usuario.nome
-        senha_inicial = _gerar_senha_aleatoria()
+        senha_inicial = gerar_senha_aleatoria()
         usuario.update(senha=senha_inicial, must_change_password=True)
 
         cache_delete(CACHE_KEY_USUARIOS)

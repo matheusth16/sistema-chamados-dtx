@@ -718,39 +718,8 @@ def test_resetar_exp_usuario_nao_encontrado(client_logado_admin):
 
 
 # ── Testes de segurança: senha e ID ──────────────────────────────────────────
-
-
-def test_gerar_senha_aleatoria_tamanho_minimo():
-    """Senha gerada deve ter ao menos 12 chars."""
-    from app.routes.usuarios import _gerar_senha_aleatoria
-
-    for _ in range(20):
-        senha = _gerar_senha_aleatoria()
-        assert len(senha) >= 12, f"Senha muito curta: {len(senha)} chars"
-
-
-def test_gerar_senha_aleatoria_complexidade():
-    """Senha gerada deve conter maiúscula, minúscula, dígito e símbolo especial."""
-    from app.routes.usuarios import _gerar_senha_aleatoria
-
-    especiais = set("!@#$%&*")
-    for _ in range(50):
-        senha = _gerar_senha_aleatoria()
-        assert any(c.isupper() for c in senha), "Falta maiúscula"
-        assert any(c.islower() for c in senha), "Falta minúscula"
-        assert any(c.isdigit() for c in senha), "Falta dígito"
-        assert any(c in especiais for c in senha), "Falta símbolo especial"
-
-
-def test_gerar_senha_aleatoria_nao_tem_chars_invalidos():
-    """Senha não deve conter espaço nem barras (que causam problemas em logs/URLs)."""
-    from app.routes.usuarios import _gerar_senha_aleatoria
-
-    for _ in range(30):
-        senha = _gerar_senha_aleatoria()
-        assert " " not in senha
-        assert "/" not in senha
-        assert "\\" not in senha
+# test_gerar_senha_aleatoria_* movidos pra tests/test_services/test_senha_service.py
+# (função extraída de _gerar_senha_aleatoria privada pra app.services.senha_service)
 
 
 def test_criar_usuario_id_usa_uuid_completo(client_logado_admin):
