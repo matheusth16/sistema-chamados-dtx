@@ -107,7 +107,7 @@ Para referência completa de todas as variáveis: **[docs/ENV.md](ENV.md)**
 Execute os comandos abaixo antes de rodar a aplicação pela primeira vez:
 
 ```powershell
-npm install            # instala tailwindcss (Node 20+)
+npm ci                 # instala versões exatas do lockfile (Tailwind 3 + axe-core)
 npm run build:css      # gera app/static/css/tailwind.min.css
 npm run watch:css      # regenera automaticamente ao salvar (desenvolvimento)
 ```
@@ -157,6 +157,18 @@ python scripts/check_coverage_per_module.py --json-only
 ```
 
 Exit 0 = todos os 52 módulos OK. Exit 1 = lista os módulos abaixo do gate.
+
+Para a auditoria E2E de acessibilidade, copie `.env.test.example` para
+`.env.test`, configure um PostgreSQL de teste e instale o Chromium:
+
+```powershell
+playwright install chromium
+pytest tests/e2e -m a11y --base-url http://127.0.0.1:5000 --tb=short -q
+```
+
+Os testes injetam o `axe-core` instalado pelo `npm ci` e falham em violações
+`critical` ou `serious`. Para os testes k6, consulte
+`scripts/qa/k6/README.md`.
 
 ---
 

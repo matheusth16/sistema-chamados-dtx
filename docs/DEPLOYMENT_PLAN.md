@@ -427,15 +427,16 @@ recorrente. `utils_areas.setor_para_area()` lê da tabela `config_setor_area` (c
 fonte de verdade; sem a linha, a app usa o fallback estático (comportamento legado, sem risco de
 indisponibilidade).
 
-> **⚠️ Achado 2026-08-06 — `scripts/migrations/migrar_setor_area.py` está obsoleto/quebrado.**
-> Esse script ainda grava em `config/setor_para_area` no **Firestore** (`from app.database import
-> db`), mas `app/utils_areas.py` já lê exclusivamente de Postgres (`ConfigSetorAreaRow`) desde o
-> Marco 12 — rodar esse script hoje não tem efeito nenhum na app real. **Não precisa rodar este
-> passo** em deploys novos: a linha `config_setor_area` já foi semeada de uma vez só durante o
-> corte pra Postgres (`scripts/migrate_firestore_to_postgres.py::_load_config_setor_area`). Se
-> precisar editar o mapa setor→área hoje, é direto na tabela Postgres — não existe script
-> dedicado ainda (candidato a criar um `scripts/migrations/atualizar_setor_area_postgres.py`,
-> mas não existe até este achado ser tratado). Script antigo marcado como candidato à remoção.
+> **✅ Achado 2026-08-06, removido 2026-08-14 — `scripts/migrations/migrar_setor_area.py` estava
+> obsoleto/quebrado.** Esse script gravava em `config/setor_para_area` no **Firestore** (`from
+> app.database import db`), mas `app/utils_areas.py` já lê exclusivamente de Postgres
+> (`ConfigSetorAreaRow`) desde o Marco 12 — rodar esse script não tinha efeito nenhum na app real.
+> Removido junto com os 4 testes que só cobriam a própria mecânica isolada do script
+> (`test_migrar_scripts.py`). **Não precisa rodar nenhum passo aqui** em deploys novos: a linha
+> `config_setor_area` já foi semeada de uma vez só durante o corte pra Postgres
+> (`scripts/migrate_firestore_to_postgres.py::_load_config_setor_area`). Se precisar editar o mapa
+> setor→área hoje, é direto na tabela Postgres — não existe script dedicado (candidato a criar um
+> `scripts/migrations/atualizar_setor_area_postgres.py` se a necessidade aparecer).
 
 **Após editar o mapa diretamente no Postgres**: aguardar TTL 5 min ou chamar
 `invalidar_cache_setor_area()` por processo para flush imediato.

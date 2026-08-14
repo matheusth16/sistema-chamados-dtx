@@ -9,6 +9,13 @@
 
 ---
 
+> **Atualização 2026-08-14:** a fonte de verdade migrou de Firestore pra PostgreSQL no Marco 12
+> (2026-08-04) — `config_setor_area` é a tabela real hoje, mesmo padrão de fallback/cache descrito
+> abaixo. O script `scripts/migrations/migrar_setor_area.py` citado neste ADR gravava só no
+> Firestore (já sem efeito desde o Marco 12) e foi removido; o dado já foi migrado pra Postgres via
+> `scripts/migrate_firestore_to_postgres.py::_load_config_setor_area`. Texto original preservado
+> abaixo como registro histórico da decisão.
+
 ## Contexto
 
 `app/utils_areas.py` contém um dicionário estático `SETOR_PARA_AREA` com apenas 2 mapeamentos

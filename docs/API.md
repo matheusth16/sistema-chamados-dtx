@@ -1,7 +1,7 @@
 # API — DTX Digital Andon System
 
 Referência completa dos endpoints JSON utilizados pelo frontend.
-Atualizado em: 2026-06-10 | Versão: 1.0
+Atualizado em: 2026-08-13 | Versão: 1.1
 
 ---
 
@@ -35,11 +35,16 @@ X-CSRFToken: <valor da meta tag <meta name="csrf-token">>
 
 Para POSTs com `FormData` (multipart), o token é lido automaticamente do cookie.
 
+Quando `APP_BASE_URL` está configurada, todo `POST /api/*` também exige
+`Origin` ou `Referer` da mesma origem. A única exceção é `/api/csp-report`,
+enviado nativamente pelo mecanismo CSP do navegador.
+
 ### Códigos de status comuns
 
 | Código | Significado |
 |--------|-------------|
 | `200` | Sucesso |
+| `401` | Sessão ausente ou expirada (JSON nas rotas `/api/*`) |
 | `302` | Redirecionamento (download de anexo) |
 | `400` | Requisição inválida (parâmetro ausente ou formato incorreto) |
 | `403` | Sem permissão (perfil inadequado ou recurso de outro usuário) |
@@ -51,8 +56,12 @@ Para POSTs com `FormData` (multipart), o token é lido automaticamente do cookie
 
 ## Autenticação
 
-Todas as rotas (exceto `/health` e `/sw.js`) exigem que o usuário esteja autenticado.
-Requisições não autenticadas recebem **302 → `/login`** (não JSON).
+As APIs protegidas exigem sessão Flask-Login. Requisições sem sessão para
+`/api/*` recebem **401 JSON** no formato
+`{ "sucesso": false, "erro": "..." }`. Páginas HTML protegidas continuam
+recebendo **302 → `/login`**.
+
+`/health`, `/sw.js` e `/api/csp-report` não exigem sessão.
 
 **Perfis:**
 - `solicitante` — acesso ao próprio chamado
@@ -117,8 +126,7 @@ Verifica disponibilidade da aplicação. Não exige autenticação.
     "postgres": "ok",
     "cache": "ok"
   },
-  "duration_ms": 42.3,
-  "version": "a1b2c3d"
+  "duration_ms": 42.3
 }
 ```
 
@@ -127,11 +135,10 @@ Verifica disponibilidade da aplicação. Não exige autenticação.
 {
   "status": "degraded",
   "checks": {
-    "postgres": "error:ConnectionError",
+    "postgres": "error",
     "cache": "ok"
   },
-  "duration_ms": 2041.0,
-  "version": "a1b2c3d"
+  "duration_ms": 2041.0
 }
 ```
 
@@ -719,6 +726,8 @@ Lista supervisores disponíveis para uma área. Usado no formulário de abertura
 | `area` | `Geral` | Nome do setor (ex.: `Planejamento`, `TI`) |
 
 > O parâmetro `area` passa por resolução interna (`setor_para_area`) antes da busca. O mapa de setores → áreas é lido do PostgreSQL (`ConfigSetorAreaRow`) com cache TTL 5 min e fallback estático (F-30 resolvido).
+> `admin` e `admin_global` podem consultar qualquer área. `supervisor` e
+> `solicitante` ficam restritos às áreas cadastradas no próprio usuário.
 
 **Resposta 200:**
 ```json
@@ -726,13 +735,14 @@ Lista supervisores disponíveis para uma área. Usado no formulário de abertura
   "sucesso": true,
   "area": "Planejamento",
   "supervisores": [
-    { "id": "uid123", "nome": "João Silva", "email": "joao@dtx.com" },
-    { "id": "uid456", "nome": "Maria Santos", "email": "maria@dtx.com" }
+    { "id": "uid123", "nome": "João Silva", "gestor": false },
+    { "id": "uid456", "nome": "Maria Santos", "gestor": true }
   ]
 }
 ```
 
-> Sempre retorna `200` mesmo em erro interno (lista vazia + campo `erro`).
+E-mail, hash de senha e demais campos internos nunca são retornados.
+Área fora do escopo recebe `403`; erro interno recebe `500`.
 
 ---
 
@@ -1107,8 +1117,9 @@ Não exige autenticação.
 
 ### Erros de autenticação
 
-Rotas sem sessão retornam `302 → /login` (não JSON).
+Rotas `/api/*` sem sessão retornam `401` JSON.
 Rotas com perfil insuficiente retornam `403 { "sucesso": false, "erro": "Acesso negado" }`.
+Páginas HTML sem sessão continuam retornando `302 → /login`.
 
 ---
 
@@ -1120,17 +1131,18 @@ Rotas com perfil insuficiente retornam `403 { "sucesso": false, "erro": "Acesso 
 | `POST /api/bulk-status` | 10/min |
 | `POST /api/push-subscribe` | 5/min |
 | `POST /api/csp-report` | 20/min |
+| `GET /api/usuarios/buscar` | 5/min |
+| `GET /api/supervisores/lista` | 5/min |
 | `POST /login` | 10/min |
 | `GET /exportar` | 10/hora |
 | `GET /exportar-avancado` | 5/hora |
-| Demais endpoints | Sem limite explícito (Flask-Limiter sem `default_limits`) |
+| Demais endpoints | `RATELIMIT_DEFAULT` (`200/hora, 2000/dia`) |
 
 Ao exceder: `429 Too Many Requests` (resposta do Flask-Limiter).
 
-> Os limites são aplicados por decorador `@limiter.limit(...)` nas rotas. Endpoints
-> não listados (ex.: `/api/chamados/paginar`, `/api/carregar-mais`,
-> `/api/supervisores/lista`) **não** têm limite explícito — o limitador é
-> configurado sem `default_limits` (ver `app/limiter.py`).
+> Antes da autenticação, a chave do limitador é o IP remoto. Após o login, usa
+> IP + `current_user.id`, evitando que usuários distintos no mesmo endereço
+> compartilhem o mesmo contador autenticado.
 
 ---
 
