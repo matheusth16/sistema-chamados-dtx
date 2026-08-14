@@ -5,7 +5,7 @@ from html import escape
 
 from app.i18n import get_translated_role, get_translated_sector_list
 from app.services.email_templates import build_cta_button, build_detail_table, build_email_shell
-from app.services.notifications_core import _base_url, _link_dashboard, enviar_email
+from app.services.notifications_core import _base_url, _link_dashboard, _link_login, enviar_email
 
 logger = logging.getLogger(__name__)
 
@@ -205,3 +205,116 @@ def notificar_mudanca_perfil(
         logger.info("Role-change e-mail sent to %s", email_dest)
     else:
         logger.warning("Failed to send role-change e-mail to %s: %s", email_dest, err)
+
+
+def notificar_lembrete_mfa_pendente(usuario_email: str, usuario_nome: str = "") -> bool:
+    """Send a reminder e-mail to a user who never finished MFA setup.
+
+    Unlike its siblings in this module, returns bool: the caller
+    (mfa_lembrete_service.py) needs the outcome to decide whether to keep
+    or release the atomic claim on mfa_lembrete_enviado_em.
+    """
+    if not usuario_email or not str(usuario_email).strip():
+        logger.warning("MFA pending reminder skipped: empty e-mail")
+        return False
+
+    email_dest = usuario_email.strip()
+    link_login = _link_login()
+    assunto = "Action required: finish setting up two-factor authentication"
+
+    acesso_html = (
+        f'<p style="margin-top: 20px;">{build_cta_button("Sign in", link_login, "#2563eb")}</p>'
+        if link_login
+        else ""
+    )
+    corpo_html = build_email_shell(
+        header_title="Two-factor authentication pending — Andon",
+        header_color="#dc2626",
+        body_html=(
+            f"<p>Hello, <strong>{escape(usuario_nome or 'user')}</strong>! "
+            "Your Andon account still needs two-factor authentication (2FA) set up "
+            "before you can sign in.</p>"
+            "<p>Sign in with your password and follow the on-screen steps to finish "
+            "setting up 2FA.</p>" + acesso_html
+        ),
+    )
+    corpo_texto = (
+        f"Hello {usuario_nome or 'user'},\n\n"
+        "Your Andon account still needs two-factor authentication (2FA) set up "
+        "before you can sign in.\n"
+        "Sign in with your password and follow the on-screen steps to finish "
+        "setting up 2FA.\n" + (f"Sign in: {link_login}\n" if link_login else "")
+    )
+
+    ok, err = enviar_email(email_dest, assunto, corpo_html, corpo_texto, importance="normal")
+    if ok:
+        logger.info("MFA pending reminder e-mail sent to %s", email_dest)
+    else:
+        logger.warning("Failed to send MFA pending reminder e-mail to %s: %s", email_dest, err)
+    return ok
+
+
+def notificar_lembrete_mfa_pendente_com_senha(
+    usuario_email: str, usuario_nome: str, senha_nova: str
+) -> bool:
+    """Send a reminder e-mail to a user who never logged in at all — bundles a
+    freshly generated password (their previous one, if any, is now invalid)
+    with the pending 2FA setup reminder.
+
+    Used by mfa_lembrete_service.py for accounts with must_change_password
+    still True: the original initial password was never persisted anywhere
+    recoverable (only its hash), so there is nothing to resend — a new one
+    has to be issued instead, same as the admin's manual password-reset flow.
+    """
+    if not usuario_email or not str(usuario_email).strip():
+        logger.warning("MFA pending reminder (with new password) skipped: empty e-mail")
+        return False
+
+    email_dest = usuario_email.strip()
+    link_login = _link_login()
+    assunto = "Action required: new password and two-factor authentication setup"
+
+    detalhes_html = build_detail_table(
+        [
+            ("E-mail", email_dest),
+            ("New password", senha_nova),
+        ]
+    )
+    acesso_html = (
+        f'<p style="margin-top: 20px;">{build_cta_button("Sign in", link_login, "#2563eb")}</p>'
+        if link_login
+        else ""
+    )
+    corpo_html = build_email_shell(
+        header_title="New password — two-factor authentication pending — Andon",
+        header_color="#dc2626",
+        body_html=(
+            f"<p>Hello, <strong>{escape(usuario_nome or 'user')}</strong>! "
+            "Your Andon account has not been accessed yet, so a new password was "
+            "generated for you — your previous one no longer works.</p>"
+            + detalhes_html
+            + "<p>Sign in with the password above, then follow the on-screen steps to "
+            "finish setting up two-factor authentication (2FA), which is required "
+            "before you can use the system.</p>" + acesso_html
+        ),
+    )
+    corpo_texto = (
+        f"Hello {usuario_nome or 'user'},\n\n"
+        "Your Andon account has not been accessed yet, so a new password was "
+        "generated for you — your previous one no longer works.\n"
+        f"E-mail: {email_dest}\nNew password: {senha_nova}\n\n"
+        "Sign in with the password above, then follow the on-screen steps to "
+        "finish setting up two-factor authentication (2FA), which is required "
+        "before you can use the system.\n" + (f"Sign in: {link_login}\n" if link_login else "")
+    )
+
+    ok, err = enviar_email(email_dest, assunto, corpo_html, corpo_texto, importance="normal")
+    if ok:
+        logger.info("MFA pending reminder (with new password) e-mail sent to %s", email_dest)
+    else:
+        logger.warning(
+            "Failed to send MFA pending reminder (with new password) e-mail to %s: %s",
+            email_dest,
+            err,
+        )
+    return ok

@@ -270,3 +270,11 @@ def _link_historico(chamado_id: str) -> str:
 def _link_dashboard() -> str:
     base = _base_url()
     return f"{base}/admin" if base else ""
+
+
+def _link_login() -> str:
+    """Link de login para e-mails enviados fora de request context (jobs
+    agendados) — nunca /mfa/configurar diretamente, pois exige sessão
+    autenticada que um clique frio no e-mail não tem."""
+    base = _base_url()
+    return f"{base}/login" if base else ""

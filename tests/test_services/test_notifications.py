@@ -180,6 +180,118 @@ def test_notificar_mudanca_perfil_sem_email_nao_envia(app):
     mock_enviar.assert_not_called()
 
 
+def test_notificar_lembrete_mfa_pendente_envia_email_com_link_login(app):
+    """notificar_lembrete_mfa_pendente avisa o usuário e retorna bool de sucesso."""
+    from app.services.notifications import notificar_lembrete_mfa_pendente
+
+    with (
+        app.app_context(),
+        patch("app.services.notifications_usuarios.enviar_email") as mock_enviar,
+    ):
+        app.config["APP_BASE_URL"] = "https://example.test"
+        mock_enviar.return_value = (True, None)
+        resultado = notificar_lembrete_mfa_pendente(
+            usuario_email="sem.mfa@dtx.aero", usuario_nome="Sem MFA"
+        )
+
+    assert resultado is True
+    assert mock_enviar.called
+    destinatario, assunto, corpo_html, _corpo_texto = mock_enviar.call_args[0]
+    assert destinatario == "sem.mfa@dtx.aero"
+    assert "two-factor" in assunto.lower()
+    assert "https://example.test/login" in corpo_html
+
+
+def test_notificar_lembrete_mfa_pendente_falha_envio_retorna_false(app):
+    """notificar_lembrete_mfa_pendente retorna False quando enviar_email falha."""
+    from app.services.notifications import notificar_lembrete_mfa_pendente
+
+    with (
+        app.app_context(),
+        patch("app.services.notifications_usuarios.enviar_email") as mock_enviar,
+    ):
+        mock_enviar.return_value = (False, "erro simulado")
+        resultado = notificar_lembrete_mfa_pendente(
+            usuario_email="sem.mfa@dtx.aero", usuario_nome="Sem MFA"
+        )
+
+    assert resultado is False
+
+
+def test_notificar_lembrete_mfa_pendente_sem_email_nao_envia(app):
+    """notificar_lembrete_mfa_pendente não chama enviar_email quando e-mail é vazio."""
+    from app.services.notifications import notificar_lembrete_mfa_pendente
+
+    with (
+        app.app_context(),
+        patch("app.services.notifications_usuarios.enviar_email") as mock_enviar,
+    ):
+        resultado = notificar_lembrete_mfa_pendente(usuario_email="", usuario_nome="X")
+
+    mock_enviar.assert_not_called()
+    assert resultado is False
+
+
+def test_notificar_lembrete_mfa_pendente_com_senha_envia_email_com_senha_e_link_login(app):
+    """notificar_lembrete_mfa_pendente_com_senha inclui a senha nova e o link de login."""
+    from app.services.notifications import notificar_lembrete_mfa_pendente_com_senha
+
+    with (
+        app.app_context(),
+        patch("app.services.notifications_usuarios.enviar_email") as mock_enviar,
+    ):
+        app.config["APP_BASE_URL"] = "https://example.test"
+        mock_enviar.return_value = (True, None)
+        resultado = notificar_lembrete_mfa_pendente_com_senha(
+            usuario_email="nunca.logou@dtx.aero",
+            usuario_nome="Nunca Logou",
+            senha_nova="Senha!Nova123",
+        )
+
+    assert resultado is True
+    assert mock_enviar.called
+    destinatario, assunto, corpo_html, corpo_texto = mock_enviar.call_args[0]
+    assert destinatario == "nunca.logou@dtx.aero"
+    assert "two-factor" in assunto.lower() or "password" in assunto.lower()
+    assert "Senha!Nova123" in corpo_html
+    assert "Senha!Nova123" in corpo_texto
+    assert "https://example.test/login" in corpo_html
+
+
+def test_notificar_lembrete_mfa_pendente_com_senha_falha_envio_retorna_false(app):
+    """notificar_lembrete_mfa_pendente_com_senha retorna False quando enviar_email falha."""
+    from app.services.notifications import notificar_lembrete_mfa_pendente_com_senha
+
+    with (
+        app.app_context(),
+        patch("app.services.notifications_usuarios.enviar_email") as mock_enviar,
+    ):
+        mock_enviar.return_value = (False, "erro simulado")
+        resultado = notificar_lembrete_mfa_pendente_com_senha(
+            usuario_email="nunca.logou@dtx.aero",
+            usuario_nome="Nunca Logou",
+            senha_nova="X1!aaaaaaaa",
+        )
+
+    assert resultado is False
+
+
+def test_notificar_lembrete_mfa_pendente_com_senha_sem_email_nao_envia(app):
+    """notificar_lembrete_mfa_pendente_com_senha não chama enviar_email quando e-mail é vazio."""
+    from app.services.notifications import notificar_lembrete_mfa_pendente_com_senha
+
+    with (
+        app.app_context(),
+        patch("app.services.notifications_usuarios.enviar_email") as mock_enviar,
+    ):
+        resultado = notificar_lembrete_mfa_pendente_com_senha(
+            usuario_email="", usuario_nome="X", senha_nova="X1!aaaaaaaa"
+        )
+
+    mock_enviar.assert_not_called()
+    assert resultado is False
+
+
 def test_notificar_responsavel_prazo_24h_envia_direto(app):
     """notificar_responsavel_prazo_24h envia direto ao responsável via Graph API."""
     from app.services.notifications import notificar_responsavel_prazo_24h

@@ -52,6 +52,8 @@ from app.services.notifications_escalonamento import (
 )
 from app.services.notifications_usuarios import (
     notificar_admins_novo_usuario_sso,
+    notificar_lembrete_mfa_pendente,
+    notificar_lembrete_mfa_pendente_com_senha,
     notificar_mudanca_perfil,
     notificar_novo_usuario_cadastrado,
     notificar_novo_usuario_sso,
@@ -75,6 +77,8 @@ __all__ = [
     "enviar_email",
     "resolver_importance",
     "notificar_admins_novo_usuario_sso",
+    "notificar_lembrete_mfa_pendente",
+    "notificar_lembrete_mfa_pendente_com_senha",
     "notificar_mudanca_perfil",
     "notificar_novo_usuario_cadastrado",
     "notificar_novo_usuario_sso",
