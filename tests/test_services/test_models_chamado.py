@@ -516,6 +516,61 @@ def test_atualizar_campos_ignora_chaves_invalidas(app):
     assert c.atualizar_campos(campo_que_nao_existe="x") is False
 
 
+def test_atualizar_campos_cas_aplica_quando_precondicoes_conferem(app):
+    c = _chamado(numero_chamado="CHM-CAS-1", status="Aberto", responsavel_id=None)
+    c.salvar()
+
+    resultado = c.atualizar_campos_cas(
+        precondicoes={"status": "Aberto", "responsavel_id": None},
+        status="Em Atendimento",
+        responsavel_id="sup-1",
+    )
+
+    assert resultado is True
+    recarregado = _chamado_get_by_id(c.id)
+    assert recarregado.status == "Em Atendimento"
+    assert recarregado.responsavel_id == "sup-1"
+
+
+def test_atualizar_campos_cas_rejeita_snapshot_obsoleto(app):
+    c = _chamado(numero_chamado="CHM-CAS-2", status="Aberto")
+    c.salvar()
+    assert c.atualizar_campos(status="Em Atendimento")
+
+    resultado = c.atualizar_campos_cas(
+        precondicoes={"status": "Aberto"},
+        status="Cancelado",
+    )
+
+    assert resultado is False
+    assert _chamado_get_by_id(c.id).status == "Em Atendimento"
+
+
+def test_atualizar_campos_cas_incrementa_contador_no_banco(app):
+    c = _chamado(
+        numero_chamado="CHM-CAS-3",
+        status="Concluído",
+        confirmacao_solicitante="pendente",
+        reaberturas_solicitante_count=1,
+    )
+    c.salvar()
+
+    resultado = c.atualizar_campos_cas(
+        precondicoes={
+            "status": "Concluído",
+            "confirmacao_solicitante": "pendente",
+        },
+        incrementos={"reaberturas_solicitante_count": 1},
+        status="Aberto",
+        confirmacao_solicitante="reaberto",
+    )
+
+    assert resultado is True
+    recarregado = _chamado_get_by_id(c.id)
+    assert recarregado.reaberturas_solicitante_count == 2
+    assert recarregado.status == "Aberto"
+
+
 def test_deletar_remove_chamado(app):
     c = _chamado(numero_chamado="CHM-0006")
     c.salvar()

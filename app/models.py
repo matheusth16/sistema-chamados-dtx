@@ -3,7 +3,7 @@ from contextlib import contextmanager
 from datetime import datetime
 
 import pytz
-from sqlalchemy import delete, select
+from sqlalchemy import case, delete, select, update
 
 from app import db as db_module
 from app.db.models.chamado import ChamadoObservadorRow, ChamadoParticipanteRow, ChamadoRow
@@ -569,6 +569,95 @@ class Chamado:
         except Exception as e:
             logger.exception("Erro ao atualizar chamado %s: %s", self.id, e)
             return False
+
+    def atualizar_campos_cas(
+        self,
+        *,
+        precondicoes: dict,
+        incrementos: dict | None = None,
+        **kwargs,
+    ) -> bool:
+        """Atualiza campos somente se o snapshot esperado ainda for válido.
+
+        Executa um único ``UPDATE ... WHERE <precondições> RETURNING``. O
+        retorno False representa conflito concorrente ou linha inexistente;
+        participantes/observadores não são alterados.
+        """
+        if not self.id:
+            return False
+
+        campos_validos = set(self.to_row_kwargs().keys())
+        if not precondicoes or any(campo not in campos_validos for campo in precondicoes):
+            return False
+
+        alteracoes = {k: v for k, v in kwargs.items() if k in campos_validos}
+        deltas = {
+            k: v
+            for k, v in (incrementos or {}).items()
+            if k in campos_validos and isinstance(v, int | float)
+        }
+        if not alteracoes and not deltas:
+            return False
+
+        valores = dict(alteracoes)
+        for campo, delta in deltas.items():
+            valores[campo] = getattr(ChamadoRow, campo) + delta
+
+        stmt = update(ChamadoRow).where(ChamadoRow.id == int(self.id))
+        for campo, esperado in precondicoes.items():
+            stmt = stmt.where(getattr(ChamadoRow, campo) == esperado)
+        colunas_retorno = [
+            getattr(ChamadoRow, campo) for campo in dict.fromkeys([*alteracoes, *deltas])
+        ]
+        stmt = stmt.values(**valores).returning(*colunas_retorno)
+
+        try:
+            with db_module.SessionLocal() as session, session.begin():
+                atualizado = session.execute(stmt).mappings().one_or_none()
+                if atualizado is None:
+                    return False
+                for campo, valor in atualizado.items():
+                    setattr(self, campo, valor)
+            return True
+        except Exception as e:
+            logger.exception("Erro no CAS do chamado %s: %s", self.id, e)
+            return False
+
+    def adicionar_anexos_atomico(
+        self,
+        caminhos: list[str],
+        *,
+        precondicoes: dict | None = None,
+    ) -> list[str] | None:
+        """Concatena anexos no próprio ``UPDATE``, sem read-modify-write em Python."""
+        caminhos = [c for c in caminhos if c]
+        if not self.id or not caminhos:
+            return None
+        campos_validos = set(self.to_row_kwargs().keys())
+        if any(campo not in campos_validos for campo in (precondicoes or {})):
+            return None
+
+        stmt = update(ChamadoRow).where(ChamadoRow.id == int(self.id))
+        for campo, esperado in (precondicoes or {}).items():
+            stmt = stmt.where(getattr(ChamadoRow, campo) == esperado)
+        stmt = stmt.values(
+            anexos=ChamadoRow.anexos + caminhos,
+            anexo=case(
+                (ChamadoRow.anexo.is_(None), caminhos[0]),
+                else_=ChamadoRow.anexo,
+            ),
+        ).returning(ChamadoRow.anexos, ChamadoRow.anexo)
+        try:
+            with db_module.SessionLocal() as session, session.begin():
+                atualizado = session.execute(stmt).mappings().one_or_none()
+                if atualizado is None:
+                    return None
+                self.anexos = list(atualizado["anexos"] or [])
+                self.anexo = atualizado["anexo"]
+            return self.anexos
+        except Exception as e:
+            logger.exception("Erro ao anexar arquivos no chamado %s: %s", self.id, e)
+            return None
 
     def deletar(self) -> bool:
         """Remove o chamado (participantes/observadores somem via ON DELETE CASCADE)."""

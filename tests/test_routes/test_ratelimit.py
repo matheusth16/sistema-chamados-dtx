@@ -3,6 +3,9 @@
 Usa fixture `app_rl` que habilita rate limiting via Config antes de create_app().
 """
 
+from contextlib import nullcontext
+from unittest.mock import MagicMock, patch
+
 import pytest
 
 
@@ -21,9 +24,11 @@ def app_rl():
     old_enabled = _app_module.Config.RATELIMIT_ENABLED
     old_storage_url = _app_module.Config.RATELIMIT_STORAGE_URL
     old_storage_uri = _app_module.Config.RATELIMIT_STORAGE_URI
+    old_default = _app_module.Config.RATELIMIT_DEFAULT
     old_limiter_enabled = _limiter.enabled
 
     _app_module.Config.RATELIMIT_ENABLED = True
+    _app_module.Config.RATELIMIT_DEFAULT = "2 per minute"
     _app_module.Config.RATELIMIT_STORAGE_URL = "memory://"
     _app_module.Config.RATELIMIT_STORAGE_URI = "memory://"
 
@@ -42,11 +47,34 @@ def app_rl():
     _app_module.Config.RATELIMIT_ENABLED = old_enabled
     _app_module.Config.RATELIMIT_STORAGE_URL = old_storage_url
     _app_module.Config.RATELIMIT_STORAGE_URI = old_storage_uri
+    _app_module.Config.RATELIMIT_DEFAULT = old_default
 
 
 @pytest.fixture
 def client_rl(app_rl):
     return app_rl.test_client()
+
+
+def _usuario_rl(uid="u_rl"):
+    usuario = MagicMock()
+    usuario.id = uid
+    usuario.email = f"{uid}@test.com"
+    usuario.nome = "RL User"
+    usuario.perfil = "supervisor"
+    usuario.areas = ["Manutencao"]
+    usuario.must_change_password = False
+    usuario.mfa_enabled = True
+    usuario.get_id.return_value = uid
+    usuario.is_authenticated = True
+    usuario.is_active = True
+    usuario.is_anonymous = False
+    return usuario
+
+
+def _autenticar_sessao(client, uid="u_rl"):
+    with client.session_transaction() as sess:
+        sess["_user_id"] = uid
+        sess["_fresh"] = True
 
 
 # ── /api/csp-report ───────────────────────────────────────────────────────────
@@ -75,6 +103,59 @@ def test_csp_report_retorna_429_apos_exceder_limite(client_rl):
         if r.status_code == 429:
             break
     assert 429 in status_codes, f"Esperava 429 mas obteve apenas: {status_codes}"
+
+
+def test_ratelimit_default_configurado_e_aplicado(client_rl):
+    respostas = [client_rl.get("/api/push-vapid-public") for _ in range(3)]
+
+    assert [r.status_code for r in respostas[:2]] == [401, 401]
+    assert respostas[2].status_code == 429
+
+
+def test_chave_rate_limit_pre_auth_usa_ip_puro(app_rl):
+    from app.limiter import rate_limit_key
+
+    with app_rl.test_request_context("/", environ_base={"REMOTE_ADDR": "203.0.113.10"}):
+        assert rate_limit_key() == "203.0.113.10"
+
+
+def test_chave_rate_limit_pos_login_combina_ip_e_usuario(app_rl):
+    from app.limiter import rate_limit_key
+
+    usuario = _usuario_rl("usuario-123")
+    with (
+        app_rl.test_request_context("/", environ_base={"REMOTE_ADDR": "203.0.113.10"}),
+        patch("app.limiter.current_user", usuario),
+    ):
+        assert rate_limit_key() == "203.0.113.10:user:usuario-123"
+
+
+@pytest.mark.parametrize(
+    ("rota", "patch_alvo"),
+    [
+        ("/api/usuarios/buscar", None),
+        (
+            "/api/supervisores/lista?area=Manutencao",
+            "app.routes.api_chamados.Usuario.get_supervisores_por_area",
+        ),
+    ],
+)
+def test_endpoints_de_enumeracao_tem_limite_dedicado(app_rl, rota, patch_alvo):
+    client = app_rl.test_client()
+    usuario = _usuario_rl()
+    _autenticar_sessao(client)
+
+    patches = [patch("app.models_usuario.Usuario.get_by_id", return_value=usuario)]
+    if patch_alvo:
+        patches.append(patch(patch_alvo, return_value=[]))
+
+    with patches[0]:
+        contexto_extra = patches[1] if len(patches) > 1 else nullcontext()
+        with contexto_extra:
+            respostas = [client.get(rota) for _ in range(6)]
+
+    assert all(r.status_code != 429 for r in respostas[:5])
+    assert respostas[-1].status_code == 429
 
 
 # ── /api/atualizar-status ─────────────────────────────────────────────────────

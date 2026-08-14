@@ -204,14 +204,16 @@ def test_atribuir_sucesso_com_balanceamento(mock_get_sup):
 
 @patch("app.services.assignment.Usuario.get_supervisores_por_area")
 def test_atribuir_excecao_retorna_falha(mock_get_sup):
-    """Exceção interna em atribuir() retorna sucesso=False sem explodir."""
+    """Exceção interna retorna falha genérica sem expor detalhes."""
     from app.services.assignment import AtribuidorAutomatico
 
-    mock_get_sup.side_effect = Exception("Postgres error")
+    segredo = "postgres://usuario:senha@db-interno"
+    mock_get_sup.side_effect = Exception(segredo)
     atrib = AtribuidorAutomatico()
     r = atrib.atribuir(area="TI")
     assert r["sucesso"] is False
-    assert "Error assigning" in r["motivo"]
+    assert r["motivo"] == "Internal error. Please try again."
+    assert segredo not in r["motivo"]
 
 
 # ── obter_disponibilidade ─────────────────────────────────────────────────────

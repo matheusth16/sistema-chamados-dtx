@@ -86,9 +86,9 @@ def test_escalation_transfer_area_btn_i18n(lang, expected_substr):
 @pytest.mark.parametrize(
     "lang,expected_substr",
     [
-        ("pt_BR", "Escalonar"),
-        ("en", "Escalate"),
-        ("es", "Escalar"),
+        ("pt_BR", "Transferir"),
+        ("en", "Transfer"),
+        ("es", "Transferir"),
     ],
 )
 def test_escalation_escalate_colleague_btn_i18n(lang, expected_substr):

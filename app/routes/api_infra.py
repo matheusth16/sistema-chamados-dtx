@@ -96,7 +96,7 @@ def health():
             session.execute(text("SELECT 1"))
         critical_checks["postgres"] = "ok"
     except Exception as exc:
-        critical_checks["postgres"] = f"error:{type(exc).__name__}"
+        critical_checks["postgres"] = "error"
         logger.error("health_check postgres falhou: %s", exc)
 
     # Redis / cache em memória — opcional, degrada performance mas não bloqueia
@@ -104,7 +104,8 @@ def health():
         cache_set("__health__", "1", ttl_seconds=10)
         optional_checks["cache"] = "ok"
     except Exception as exc:
-        optional_checks["cache"] = f"degraded:{type(exc).__name__}"
+        optional_checks["cache"] = "degraded"
+        logger.warning("health_check cache falhou: %s", exc)
 
     duration_ms = round((time.perf_counter() - start) * 1000, 1)
     all_critical_ok = all(v == "ok" for v in critical_checks.values())

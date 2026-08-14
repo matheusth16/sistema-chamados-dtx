@@ -169,7 +169,7 @@ class AtribuidorAutomatico:
             return {
                 "sucesso": False,
                 "supervisor": None,
-                "motivo": _t("assignment_error", error=str(e)),
+                "motivo": _t("internal_error_retry"),
                 "estrategia_usada": self.estrategia,
             }
 

@@ -87,7 +87,7 @@ def test_confirmar_resolucao_grava_historico(client_logado_solicitante):
 def test_reabrir_chamado_sucesso(client_logado_solicitante):
     """Solicitante rejeita resolução: status volta para 'Aberto', motivo salvo no histórico."""
     chamado = _criar_chamado()
-    with patch("app.routes.api_chamados.Historico") as mock_historico:
+    with patch("app.services.confirmacao_solicitante_service.Historico") as mock_historico:
         r = client_logado_solicitante.post(
             f"/api/chamado/{chamado.id}/confirmar-resolucao",
             json={"acao": "reabrir", "motivo": "Problema ainda persiste"},
@@ -124,7 +124,7 @@ def test_reabrir_sem_motivo_retorna_400(client_logado_solicitante):
 def test_reabrir_incrementa_contador(client_logado_solicitante):
     """Reabertura bem-sucedida incrementa reaberturas_solicitante_count."""
     chamado = _criar_chamado(reaberturas_count=1)
-    with patch("app.routes.api_chamados.Historico"):
+    with patch("app.services.confirmacao_solicitante_service.Historico"):
         r = client_logado_solicitante.post(
             f"/api/chamado/{chamado.id}/confirmar-resolucao",
             json={"acao": "reabrir", "motivo": "Ainda com problema"},
@@ -138,7 +138,7 @@ def test_reabrir_incrementa_contador(client_logado_solicitante):
 def test_reabrir_no_limite_ainda_permite_terceira_vez(client_logado_solicitante):
     """Com 2 reaberturas anteriores, a 3ª ainda é permitida (limite = 3)."""
     chamado = _criar_chamado(reaberturas_count=2)
-    with patch("app.routes.api_chamados.Historico"):
+    with patch("app.services.confirmacao_solicitante_service.Historico"):
         r = client_logado_solicitante.post(
             f"/api/chamado/{chamado.id}/confirmar-resolucao",
             json={"acao": "reabrir", "motivo": "Ainda com problema"},
@@ -255,7 +255,7 @@ def test_reabrir_dispara_notificacao_supervisor(client_logado_solicitante):
     """Reabrir chamado chama _enviar_notificacao_reabrir com os dados corretos."""
     chamado = _criar_chamado()
     with (
-        patch("app.routes.api_chamados.Historico"),
+        patch("app.services.confirmacao_solicitante_service.Historico"),
         patch("app.routes.api_chamados._enviar_notificacao_reabrir") as mock_notif,
     ):
         r = client_logado_solicitante.post(
@@ -327,7 +327,7 @@ def test_confirmar_nao_notifica_se_confirmacao_nao_persistiu(client_logado_solic
 def test_reabrir_reseta_flags_lembrete(client_logado_solicitante):
     """Ao reabrir, flags de lembrete devem ser zeradas para o próximo ciclo de conclusão."""
     chamado = _criar_chamado()
-    with patch("app.routes.api_chamados.Historico"):
+    with patch("app.services.confirmacao_solicitante_service.Historico"):
         r = client_logado_solicitante.post(
             f"/api/chamado/{chamado.id}/confirmar-resolucao",
             json={"acao": "reabrir", "motivo": "Ainda com problema"},
@@ -343,7 +343,7 @@ def test_reabrir_reseta_escalacao_nivel(client_logado_solicitante):
     """Ao reabrir, escalacao_nivel (motor de escalonamento unificado) deve
     ser zerado, junto com o próximo tick agendado e o dedup do aviso prévio."""
     chamado = _criar_chamado()
-    with patch("app.routes.api_chamados.Historico"):
+    with patch("app.services.confirmacao_solicitante_service.Historico"):
         r = client_logado_solicitante.post(
             f"/api/chamado/{chamado.id}/confirmar-resolucao",
             json={"acao": "reabrir", "motivo": "Não resolvido"},
@@ -359,7 +359,7 @@ def test_reabrir_reseta_escalacao_nivel(client_logado_solicitante):
 def test_reabrir_reseta_flags_alerta_resolucao(client_logado_solicitante):
     """Ao reabrir, alerta_supervisor_50/80 devem ser zerados junto com o nível."""
     chamado = _criar_chamado()
-    with patch("app.routes.api_chamados.Historico"):
+    with patch("app.services.confirmacao_solicitante_service.Historico"):
         r = client_logado_solicitante.post(
             f"/api/chamado/{chamado.id}/confirmar-resolucao",
             json={"acao": "reabrir", "motivo": "Não resolvido"},
@@ -402,7 +402,7 @@ def test_reabrir_nao_notifica_se_chamado_removido_antes_do_email(client_logado_s
     chamado = _criar_chamado()
 
     with (
-        patch("app.routes.api_chamados.Historico"),
+        patch("app.services.confirmacao_solicitante_service.Historico"),
         patch("app.routes.api_chamados.threading.Thread", _thread_executa_sync),
         patch("app.services.notifications.notificar_supervisor_chamado_reaberto") as mock_notif,
         patch(

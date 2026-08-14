@@ -146,6 +146,26 @@ def test_requer_supervisor_area_bloqueia_solicitante(app):
     assert resp.status_code == 302
 
 
+def test_requer_supervisor_area_api_bloqueia_solicitante_com_json_403(app):
+    from app.decoradores import requer_supervisor_area
+
+    @requer_supervisor_area
+    def rota():
+        return "ok"
+
+    with (
+        app.test_request_context("/api/restrita"),
+        patch("app.decoradores.current_user", _usuario("solicitante")),
+        patch("app.decoradores.flash_t") as mock_flash,
+    ):
+        resp, status = rota()
+
+    assert status == 403
+    assert resp.get_json()["sucesso"] is False
+    assert resp.get_json()["erro"]
+    mock_flash.assert_not_called()
+
+
 def test_requer_supervisor_area_permite_supervisor(app):
     from app.decoradores import requer_supervisor_area
 

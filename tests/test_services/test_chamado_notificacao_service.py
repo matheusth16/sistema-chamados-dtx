@@ -735,6 +735,40 @@ class TestNotificarRespostaSupervisorChamado:
 
         mock_email.assert_not_called()
 
+    def test_categoria_rotina_traduzida_para_ingles_no_email(self):
+        """Categoria 'Rotina' deve virar 'Routine' no corpo do e-mail, nunca 'Rotina' —
+        regressão do bug de e-mails com texto em PT-BR achado em QA manual (2026-08-13):
+        este arquivo nunca traduzia `categoria`, ao contrário de notifications_chamados.py."""
+        from app.services.chamado_notificacao_service import (
+            notificar_resposta_supervisor_chamado,
+        )
+
+        sol = _usuario_mock("sol_1", "Solicitante", "sol@test.com", perfil="solicitante")
+
+        with (
+            patch(
+                "app.services.chamado_notificacao_service.destinatarios_para_resposta_supervisor",
+                return_value=[sol],
+            ),
+            patch("app.services.chamado_notificacao_service.enviar_email") as mock_email,
+            patch("app.services.chamado_notificacao_service.criar_notificacao"),
+        ):
+            mock_email.return_value = (True, None)
+            notificar_resposta_supervisor_chamado(
+                chamado_id="ch_4",
+                numero_chamado="CH-004",
+                categoria="Rotina",
+                respondente_nome="Supervisor Demo",
+                mensagem="Resposta de teste",
+                dados_chamado={"solicitante_id": "sol_1", "observadores": []},
+            )
+
+        corpo_html = mock_email.call_args[0][2]
+        corpo_texto = mock_email.call_args[0][3]
+        assert "Routine" in corpo_html
+        assert "Rotina" not in corpo_html
+        assert "Rotina" not in corpo_texto
+
 
 class TestInAppEWebPushNotificacoes:
     """Lacunas A+B: in-app e web push para edição/anexo/cancelamento."""
@@ -1262,6 +1296,41 @@ class TestNotificarSolicitacaoPrevisaoAtendimento:
         assert mock_inapp.call_args.kwargs.get("usuario_id") == "gestor_1"
         assert mock_inapp.call_args.kwargs.get("tipo") == "previsao_atendimento_solicitada"
 
+    def test_assunto_nao_e_a_chave_de_traducao_crua(self):
+        """Regressão (2026-08-14): 'push_subject_previsao_solicitada' não existe em
+        translations.json — get_translation() cai no fallback e devolve a própria
+        chave como assunto do e-mail (nem PT nem EN, texto ilegível pro usuário)."""
+        from app.services.chamado_notificacao_service import (
+            notificar_solicitacao_previsao_atendimento,
+        )
+
+        gestor = _usuario_mock("gestor_1", "Gestor Setor", "gestor@test.com")
+
+        with (
+            patch(
+                "app.services.chamado_notificacao_service._link_decisao_previsao",
+                return_value="",
+            ),
+            patch("app.services.chamado_notificacao_service.enviar_email") as mock_email,
+            patch("app.services.chamado_notificacao_service.criar_notificacao"),
+            patch("app.services.chamado_notificacao_service.webpush_service"),
+        ):
+            mock_email.return_value = (True, None)
+            notificar_solicitacao_previsao_atendimento(
+                chamado_id="ch_1",
+                numero_chamado="CH-001",
+                categoria="TI",
+                solicitante_nome="Julia Silva",
+                previsao_solicitada="2026-08-20 16:00:00",
+                motivo="motivo",
+                solicitacao_id=1,
+                gestor_usuario=gestor,
+            )
+
+        assunto = mock_email.call_args[0][1]
+        assert assunto != "push_subject_previsao_solicitada"
+        assert "CH-001" in assunto
+
 
 class TestNotificarDecisaoPrevisaoAtendimento:
     def test_aprovacao_envia_email_pro_solicitante_do_pedido(self):
@@ -1327,6 +1396,41 @@ class TestNotificarDecisaoPrevisaoAtendimento:
         corpo_html = mock_email.call_args[0][2]
         assert "rejected" in corpo_html.lower()
         assert "Sem verba pra terceirizar" in corpo_html
+
+    def test_assunto_nao_e_a_chave_de_traducao_crua(self):
+        """Regressão (2026-08-14): 'push_subject_previsao_decidida' não existe em
+        translations.json — get_translation() cai no fallback e devolve a própria
+        chave como assunto do e-mail."""
+        from app.services.chamado_notificacao_service import (
+            notificar_decisao_previsao_atendimento,
+        )
+
+        solicitante = _usuario_mock("sup_1", "Julia Silva", "julia@test.com")
+
+        with (
+            patch(
+                "app.services.chamado_notificacao_service.Usuario.get_by_id",
+                return_value=solicitante,
+            ),
+            patch("app.services.chamado_notificacao_service.enviar_email") as mock_email,
+            patch("app.services.chamado_notificacao_service.criar_notificacao"),
+            patch("app.services.chamado_notificacao_service.webpush_service"),
+        ):
+            mock_email.return_value = (True, None)
+            notificar_decisao_previsao_atendimento(
+                chamado_id="ch_1",
+                numero_chamado="CH-001",
+                categoria="TI",
+                acao="aprovar",
+                previsao_solicitada="2026-08-20 16:00:00",
+                motivo_rejeicao=None,
+                gestor_nome="Gestor Setor",
+                solicitante_id="sup_1",
+            )
+
+        assunto = mock_email.call_args[0][1]
+        assert assunto != "push_subject_previsao_decidida"
+        assert "CH-001" in assunto
 
     def test_solicitante_nao_encontrado_nao_envia_email(self):
         from app.services.chamado_notificacao_service import (

@@ -321,7 +321,7 @@ def test_api_supervisores_lista_nao_expoe_senha_hash(client_logado_solicitante):
     with patch(
         "app.routes.api_chamados.Usuario.get_supervisores_por_area", return_value=[sup_com_hash]
     ):
-        r = client_logado_solicitante.get("/api/supervisores/lista?area=Manutencao")
+        r = client_logado_solicitante.get("/api/supervisores/lista?area=Planejamento")
 
     assert r.status_code == 200
     body = r.data.decode("utf-8", errors="replace")
@@ -335,4 +335,6 @@ def test_api_supervisores_lista_nao_expoe_senha_hash(client_logado_solicitante):
     supervisores = data.get("supervisores", [])
     assert len(supervisores) == 1
     sup = supervisores[0]
-    assert set(sup.keys()) == {"id", "nome"}, f"Campos inesperados na resposta: {set(sup.keys())}"
+    assert set(sup.keys()) == {"id", "nome", "gestor"}, (
+        f"Campos inesperados na resposta: {set(sup.keys())}"
+    )

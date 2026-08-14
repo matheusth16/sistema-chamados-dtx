@@ -670,9 +670,9 @@ def test_edicao_aceita_arquivos_novos_como_lista(app):
 
     assert result["sucesso"] is True
     assert mock_salvar.call_count == 2
-    update_data = mock_chamado.atualizar_campos.call_args.kwargs
-    assert "r2:relatorio.pdf" in update_data.get("anexos", [])
-    assert "r2:foto.png" in update_data.get("anexos", [])
+    caminhos = mock_chamado.adicionar_anexos_atomico.call_args.args[0]
+    assert "r2:relatorio.pdf" in caminhos
+    assert "r2:foto.png" in caminhos
 
 
 def test_edicao_lista_vazia_nao_altera_anexos(app):
@@ -720,7 +720,10 @@ def test_edicao_falha_em_um_arquivo_retorna_erro_sem_persistir(app):
         patch("app.services.edicao_chamado_service.Chamado") as mock_chamado_cls,
         patch(
             "app.services.edicao_chamado_service.salvar_anexo",
-            side_effect=["r2:bom.pdf", ValueError("Extensão não permitida")],
+            side_effect=[
+                "r2:bom.pdf",
+                ValueError("scanner interno falhou em C:\\segredos\\arquivo"),
+            ],
         ),
     ):
         mock_chamado = _base_patches(mock_chamado_cls)
@@ -737,10 +740,8 @@ def test_edicao_falha_em_um_arquivo_retorna_erro_sem_persistir(app):
         )
 
     assert result["sucesso"] is False
-    assert (
-        "extensão" in result.get("erro", "").lower()
-        or "permitida" in result.get("erro", "").lower()
-    )
+    assert result["erro"] == "Invalid file format."
+    assert "segredos" not in result["erro"]
     mock_chamado.atualizar_campos.assert_not_called()
 
 

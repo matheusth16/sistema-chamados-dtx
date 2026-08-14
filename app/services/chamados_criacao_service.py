@@ -209,8 +209,8 @@ def criar_chamado(
             caminho = salvar_anexo(arq)
             if caminho:
                 caminhos_anexos.append(caminho)
-        except ValueError as e:
-            return (None, None, str(e), None)
+        except ValueError:
+            return (None, None, _t("upload_invalid_format_generic"), None)
 
     # Links externos OneDrive/SharePoint (alternativa a upload >10 MB)
     if hasattr(form, "getlist"):

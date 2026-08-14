@@ -137,7 +137,7 @@ def test_criar_chamado_descricao_com_caractere_especial_nao_fica_escapada(app):
 
 
 def test_criar_chamado_anexo_invalido_retorna_erro():
-    """criar_chamado quando salvar_anexo levanta ValueError retorna (None, None, mensagem, None)."""
+    """Falha no upload retorna mensagem segura, sem propagar ValueError bruto."""
     form = {
         "categoria": "Manutencao",
         "tipo": "Manutencao",
@@ -152,9 +152,10 @@ def test_criar_chamado_anexo_invalido_retorna_erro():
     files.get.return_value = MagicMock()
     files.getlist.return_value = [arq]
 
+    detalhe_interno = "scanner interno falhou em C:\\segredos\\arquivo"
     with patch(
         "app.services.chamados_criacao_service.salvar_anexo",
-        side_effect=ValueError("Extensão não permitida"),
+        side_effect=ValueError(detalhe_interno),
     ):
         chamado_id, numero, erro, aviso = criar_chamado(
             form=form,
@@ -166,7 +167,8 @@ def test_criar_chamado_anexo_invalido_retorna_erro():
 
     assert chamado_id is None
     assert numero is None
-    assert erro == "Extensão não permitida"
+    assert erro == "Invalid file format."
+    assert detalhe_interno not in erro
     assert aviso is None
 
 

@@ -312,3 +312,70 @@ def test_adicionar_exp_concorrencia_20_requests(db_engine, monkeypatch):
         with db_engine.connect() as conn:
             conn.execute(text("DELETE FROM usuarios WHERE id = 'user_concorrente'"))
             conn.commit()
+
+
+def test_conquistas_e_level_concorrentes_usam_exp_final(db_engine, monkeypatch):
+    import threading
+    from unittest.mock import patch
+
+    from sqlalchemy import select, text
+    from sqlalchemy.orm import scoped_session, sessionmaker
+
+    from app.db.models.usuario import UsuarioRow
+    from app.services import gamification_service
+
+    factory = scoped_session(sessionmaker(bind=db_engine, autoflush=False, expire_on_commit=False))
+    monkeypatch.setattr(gamification_service.db_module, "SessionLocal", factory)
+    with factory() as session, session.begin():
+        session.add(
+            UsuarioRow(
+                id="user_badges_concorrente",
+                email="badges@test.com",
+                nome="Badges",
+                exp_total=0,
+                exp_semanal=0,
+                level=1,
+                conquistas=[],
+            )
+        )
+    factory.remove()
+
+    barreira = threading.Barrier(2)
+    original_get = Usuario.get_by_id
+
+    def _get_sincronizado(uid):
+        usuario = original_get(uid)
+        barreira.wait(timeout=5)
+        return usuario
+
+    def _ganhar_exp():
+        try:
+            GamificationService._adicionar_exp(
+                "user_badges_concorrente",
+                150,
+                "Chamado Concluído no Prazo",
+            )
+        finally:
+            factory.remove()
+
+    try:
+        with patch.object(Usuario, "get_by_id", side_effect=_get_sincronizado):
+            threads = [threading.Thread(target=_ganhar_exp) for _ in range(2)]
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join(timeout=10)
+
+        with factory() as session:
+            row = session.execute(
+                select(UsuarioRow).where(UsuarioRow.id == "user_badges_concorrente")
+            ).scalar_one()
+            assert row.exp_total == 300
+            assert row.level == 3
+            assert "nivel_3" in row.conquistas
+            assert "primeira_resolucao" in row.conquistas
+        factory.remove()
+    finally:
+        with db_engine.connect() as conn:
+            conn.execute(text("DELETE FROM usuarios WHERE id = 'user_badges_concorrente'"))
+            conn.commit()

@@ -52,7 +52,7 @@ DEFAULT_TIMEOUT = 10_000  # ms — tempo padrão de espera para assertions E2E
 # ---------------------------------------------------------------------------
 
 
-def _seed_usuarios_teste() -> None:
+def _seed_usuarios_teste() -> list[str]:
     """Semeia no Postgres real de teste os usuários E2E (solicitante/supervisor/admin) a
     partir de TEST_<PERFIL>_EMAIL/PASSWORD/TOTP_SECRET já definidas no workflow do E2E —
     mesmo padrão de scripts/seed/seed_dados_demo_onboarding.py.
@@ -70,6 +70,7 @@ def _seed_usuarios_teste() -> None:
         ("e2e-supervisor", "SUPERVISOR", "supervisor", "E2E Supervisor", ["Planejamento"]),
         ("e2e-admin", "ADMIN", "admin", "E2E Admin", []),
     ]
+    ids_criados: list[str] = []
 
     for uid, env_prefix, perfil, nome, areas in especificacoes:
         email = os.environ.get(f"TEST_{env_prefix}_EMAIL", "")
@@ -78,9 +79,10 @@ def _seed_usuarios_teste() -> None:
         if not email or not senha:
             continue
 
-        usuario = Usuario.get_by_email(email) or Usuario(
-            id=uid, email=email, nome=nome, perfil=perfil, areas=areas
-        )
+        usuario = Usuario.get_by_email(email)
+        if usuario is None:
+            usuario = Usuario(id=uid, email=email, nome=nome, perfil=perfil, areas=areas)
+            ids_criados.append(uid)
         usuario.nome = nome
         usuario.perfil = perfil
         usuario.areas = areas
@@ -92,6 +94,17 @@ def _seed_usuarios_teste() -> None:
         usuario.mfa_enabled = bool(totp_secret)
         usuario.mfa_secret = totp_secret or None
         usuario.save()
+    return ids_criados
+
+
+def _cleanup_usuarios_teste(ids_criados: list[str]) -> None:
+    """Remove somente os usuários criados pelo stub nesta execução."""
+    from app.models_usuario import Usuario
+
+    for usuario_id in ids_criados:
+        usuario = Usuario.get_by_id(usuario_id)
+        if usuario is not None:
+            usuario.delete()
 
 
 @pytest.fixture(scope="session")
@@ -127,7 +140,7 @@ def _stub_server() -> Generator[str | None]:
     # Desativa rate limiting no stub para que SMOKE-02 (login inválido) não bloqueie
     stub.config["RATELIMIT_ENABLED"] = False
 
-    _seed_usuarios_teste()
+    ids_criados = _seed_usuarios_teste()
 
     # Porta 0 = OS escolhe uma porta livre (sem race condition)
     server = make_server("127.0.0.1", 0, stub)
@@ -137,9 +150,11 @@ def _stub_server() -> Generator[str | None]:
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
 
-    yield url
-
-    server.shutdown()
+    try:
+        yield url
+    finally:
+        server.shutdown()
+        _cleanup_usuarios_teste(ids_criados)
 
 
 # ---------------------------------------------------------------------------

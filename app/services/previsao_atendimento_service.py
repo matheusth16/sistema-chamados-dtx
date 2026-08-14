@@ -364,7 +364,9 @@ def decidir_previsao_atendimento(
                 "codigo": 409,
             }
 
-        chamado_row = session.get(ChamadoRow, row.chamado_id)
+        chamado_row = session.execute(
+            select(ChamadoRow).where(ChamadoRow.id == row.chamado_id).with_for_update()
+        ).scalar_one_or_none()
         if chamado_row is None:
             return {"sucesso": False, "erro": _t("ticket_not_found"), "codigo": 404}
 

@@ -639,7 +639,10 @@ def test_confirmar_resolucao_excecao_retorna_500(client_logado_solicitante, db_s
     chamado = make_chamado(
         status="Concluído", confirmacao_solicitante="pendente", solicitante_id="sol_1"
     )
-    with patch("app.routes.api_chamados.Chamado.atualizar_campos", side_effect=Exception("db")):
+    with patch(
+        "app.services.confirmacao_solicitante_service.processar_confirmacao_solicitante",
+        side_effect=Exception("db"),
+    ):
         r = client_logado_solicitante.post(
             f"/api/chamado/{chamado.id}/confirmar-resolucao",
             json={"acao": "confirmar"},
@@ -655,13 +658,13 @@ def test_confirmar_resolucao_excecao_retorna_500(client_logado_solicitante, db_s
 # ---------------------------------------------------------------------------
 
 
-def test_api_lista_supervisores_excecao_retorna_200_vazio(client_logado_solicitante):
-    """GET /api/supervisores/lista com exceção retorna 200 com lista vazia (degradado)."""
+def test_api_lista_supervisores_excecao_retorna_500_generico(client_logado_admin):
+    """GET /api/supervisores/lista com exceção retorna erro REST genérico."""
     with patch(
         "app.routes.api_chamados.Usuario.get_supervisores_por_area", side_effect=Exception("db")
     ):
-        r = client_logado_solicitante.get("/api/supervisores/lista?area=TI")
-    assert r.status_code == 200
+        r = client_logado_admin.get("/api/supervisores/lista?area=Manutencao")
+    assert r.status_code == 500
     data = r.get_json()
     assert data is not None
     assert data.get("sucesso") is False

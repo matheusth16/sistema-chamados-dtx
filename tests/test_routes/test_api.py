@@ -82,12 +82,11 @@ def test_api_editar_chamado_supervisor_outra_area_retorna_403(client_logado_supe
     )
 
 
-def test_carregar_mais_sem_login_redireciona(client):
-    """POST /api/carregar-mais sem login retorna 401, 403 ou 302."""
+def test_carregar_mais_sem_login_retorna_401_json(client):
+    """POST /api/carregar-mais sem login respeita o contrato REST."""
     r = client.post("/api/carregar-mais", json={}, content_type="application/json")
-    assert r.status_code in (401, 403, 302)
-    if r.status_code == 401:
-        assert r.get_json() and r.get_json().get("requer_login") is True
+    assert r.status_code == 401
+    assert r.get_json() == {"sucesso": False, "erro": "Unauthorized access."}
 
 
 def test_carregar_mais_retorna_estrutura_esperada(client_logado_supervisor):
@@ -113,12 +112,11 @@ def test_carregar_mais_retorna_estrutura_esperada(client_logado_supervisor):
         assert "tem_proxima" in data
 
 
-def test_api_notificacoes_listar_sem_login_redireciona(client):
-    """GET /api/notificacoes sem login retorna 401, 403 ou 302."""
+def test_api_notificacoes_listar_sem_login_retorna_401_json(client):
+    """GET /api/notificacoes sem login respeita o contrato REST."""
     r = client.get("/api/notificacoes")
-    assert r.status_code in (401, 403, 302)
-    if r.status_code == 401:
-        assert r.get_json() and r.get_json().get("requer_login") is True
+    assert r.status_code == 401
+    assert r.get_json() == {"sucesso": False, "erro": "Unauthorized access."}
 
 
 def test_api_notificacoes_listar_retorna_estrutura(client_logado_solicitante):
@@ -189,11 +187,10 @@ def test_api_push_subscribe_subscription_sem_endpoint_retorna_400(client_logado_
 
 
 def test_api_push_vapid_public_requer_login(client):
-    """GET /api/push-vapid-public sem login retorna 401, 403 ou 302."""
+    """GET /api/push-vapid-public sem login retorna JSON 401."""
     r = client.get("/api/push-vapid-public")
-    assert r.status_code in (401, 403, 302)
-    if r.status_code == 401:
-        assert r.get_json() and r.get_json().get("requer_login") is True
+    assert r.status_code == 401
+    assert r.get_json() == {"sucesso": False, "erro": "Unauthorized access."}
 
 
 def test_api_supervisores_disponibilidade_sem_login_retorna_401_json(client):
@@ -247,12 +244,10 @@ def test_bulk_status_supervisor_outra_area_retorna_erro_por_chamado(
 
 
 def test_api_chamados_paginar_sem_login_retorna_401(client):
-    """CT-PAG-01: GET /api/chamados/paginar sem autenticação retorna 401, 403 ou 302."""
+    """CT-PAG-01: GET /api/chamados/paginar sem autenticação retorna JSON 401."""
     r = client.get("/api/chamados/paginar")
-    assert r.status_code in (401, 403, 302)
-    if r.status_code == 401:
-        data = r.get_json()
-        assert data is not None and data.get("requer_login") is True
+    assert r.status_code == 401
+    assert r.get_json() == {"sucesso": False, "erro": "Unauthorized access."}
 
 
 def test_api_chamado_por_id_solicitante_chamado_de_outro_retorna_403(

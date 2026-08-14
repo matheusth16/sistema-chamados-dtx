@@ -140,6 +140,20 @@ def test_buscar_chamados_abertos_retorna_lista():
     assert result[0]["numero"] == "CH-001"
 
 
+def test_buscar_chamados_abertos_traduz_categoria_para_ingles():
+    """categoria 'Rotina' deve vir traduzida ('Routine') — regressão do bug de
+    relatório semanal em PT-BR achado em QA manual (2026-08-13): buscar_chamados_abertos
+    devolvia chamado.categoria cru, sem passar por get_translated_category."""
+    from app.services.report_service import buscar_chamados_abertos
+
+    _criar_chamado_real()  # categoria="Projetos" -- também deve traduzir
+
+    with patch("app.services.report_service.obter_sla_para_exibicao", return_value={"label": "Ok"}):
+        result = buscar_chamados_abertos()
+
+    assert result[0]["categoria"] == "Projects"
+
+
 def test_buscar_chamados_abertos_retorna_vazio_sem_docs():
     """buscar_chamados_abertos retorna [] quando não há chamados."""
     from app.services.report_service import buscar_chamados_abertos

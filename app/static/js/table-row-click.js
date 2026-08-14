@@ -14,11 +14,7 @@ document.addEventListener('DOMContentLoaded', function () {
       var url = row.getAttribute('data-detail-url');
       if (!url) return;
 
-      try {
-        window.open(url, '_blank', 'noopener');
-      } catch (e) {
-        window.location.href = url;
-      }
+      window.location.href = url;
     });
   });
 });

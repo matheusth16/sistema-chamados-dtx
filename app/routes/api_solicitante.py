@@ -8,6 +8,7 @@ from flask_login import current_user, login_required
 from werkzeug.utils import secure_filename
 
 from app.i18n import get_translation
+from app.limiter import limiter
 from app.models import Chamado
 from app.models_usuario import Usuario
 from app.routes import main
@@ -99,6 +100,7 @@ def download_anexo():
 
 @main.route("/api/usuarios/buscar", methods=["GET"])
 @login_required
+@limiter.limit("5 per minute")
 def api_buscar_usuarios():
     """Busca usuários ativos por nome/e-mail para seleção de observadores.
 

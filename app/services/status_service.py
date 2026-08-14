@@ -201,8 +201,18 @@ def atualizar_status_chamado(
         chamado_para_atualizar = _chamado_row_fetched or Chamado.get_by_id(chamado_id)
         if chamado_para_atualizar is None:
             return {"sucesso": False, "erro": _t("ticket_not_found"), "codigo": 404}
-        if not chamado_para_atualizar.atualizar_campos(**update_data):
-            return {"sucesso": False, "erro": _t("internal_error_retry"), "codigo": 500}
+        precondicoes = {"status": status_anterior or chamado_para_atualizar.status}
+        if novo_status == "Em Atendimento" and status_anterior == "Aberto":
+            precondicoes["responsavel_id"] = data_chamado.get("responsavel_id")
+        if not chamado_para_atualizar.atualizar_campos_cas(
+            precondicoes=precondicoes,
+            **update_data,
+        ):
+            return {
+                "sucesso": False,
+                "erro": _t("internal_error_retry"),
+                "codigo": 409,
+            }
 
         # Registra histórico se houve mudança
         if status_anterior != novo_status:

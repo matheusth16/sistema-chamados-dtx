@@ -18,7 +18,7 @@ from sqlalchemy import select
 
 from app import db as db_module
 from app.db.models.chamado import ChamadoRow
-from app.i18n import get_translated_status
+from app.i18n import get_translated_category, get_translated_sector, get_translated_status
 from app.models import Chamado
 from app.models_historico import Historico
 from app.models_usuario import Usuario
@@ -100,7 +100,9 @@ def buscar_chamados_abertos() -> list[dict[str, Any]]:
             {
                 "id": chamado.id,
                 "numero": chamado.numero_chamado or chamado.id,
-                "categoria": chamado.categoria or "—",
+                "categoria": get_translated_category(chamado.categoria, "en")
+                if chamado.categoria
+                else "—",
                 "tipo": chamado.tipo_solicitacao or "—",
                 "area": chamado.area or "—",
                 "responsavel": chamado.responsavel or "—",
@@ -440,10 +442,11 @@ def _enviar_resumo_gestores_area(
         if not email_gestor:
             continue
 
+        area_en = get_translated_sector(area, "en") if area else area
         atrasados = [c for c in lista if c["atrasado"]]
         html = (
             '<div style="font-family:Arial,sans-serif;max-width:760px;">'
-            f'<h2 style="color:#111827;">Weekly Area Report — {escape(area)} — {data_ref}</h2>'
+            f'<h2 style="color:#111827;">Weekly Area Report — {escape(area_en)} — {data_ref}</h2>'
             f"<p><strong>Total open:</strong> {len(lista)} &nbsp;|&nbsp; "
             f'<span style="color:#dc2626;"><strong>Overdue:</strong> {len(atrasados)}</span></p>'
             + _tabela_html(lista, link_base)
@@ -457,7 +460,7 @@ def _enviar_resumo_gestores_area(
             + '<p style="margin-top:24px;color:#9ca3af;font-size:11px;"><em>Andon</em></p>'
             "</div>"
         )
-        assunto = f"Weekly area report — {area} — {data_ref}"
+        assunto = f"Weekly area report — {area_en} — {data_ref}"
         ok, err = enviar_email(email_gestor, assunto, html, importance="low")
         if ok:
             logger.info(

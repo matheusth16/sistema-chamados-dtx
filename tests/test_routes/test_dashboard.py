@@ -1662,3 +1662,60 @@ def test_visualizar_chamado_admin_mostra_descricao_editavel(client_logado_admin,
         r = client_logado_admin.get(f"/chamado/{chamado.id}", follow_redirects=False)
     assert r.status_code == 200
     assert b'id="modal-descricao"' in r.data
+
+
+def test_navbar_admin_expoe_menu_de_perfil_com_relacao_programatica(client_logado_admin):
+    """O acionador do perfil identifica e controla programaticamente seu painel."""
+    with (
+        patch("app.routes.dashboard.obter_contexto_admin") as mock_ctx,
+        patch("app.routes.dashboard.get_static_cached", return_value=[]),
+    ):
+        mock_ctx.return_value = {
+            "chamados": [],
+            "gates": [],
+            "responsaveis": [],
+            "sla_map": {},
+            "tem_proxima": False,
+            "tem_anterior": False,
+            "proximo_cursor": None,
+            "cursor_anterior": None,
+        }
+        resposta = client_logado_admin.get("/admin")
+
+    html = resposta.get_data(as_text=True)
+    assert resposta.status_code == 200
+    assert 'id="btn-profile-menu"' in html
+    assert 'aria-controls="nav-profile-dropdown"' in html
+    painel = html.split('id="nav-profile-dropdown"', 1)[1][:250]
+    assert 'role="region"' in painel
+    assert 'aria-labelledby="btn-profile-menu"' in painel
+
+
+def test_historico_renderiza_eventos_com_lista_e_datetime(client_logado_admin, db_session):
+    """A rota de histórico preserva a semântica da timeline no HTML renderizado."""
+    from datetime import datetime
+
+    from app.models_historico import Historico
+    from tests.factories import make_chamado
+
+    chamado = make_chamado()
+    evento = Historico(
+        chamado_id=chamado.id,
+        usuario_id="admin_1",
+        usuario_nome="Administrador",
+        acao="criacao",
+        campo_alterado="status",
+        valor_novo="Aberto",
+        data_acao=datetime(2026, 8, 13, 14, 30),
+    )
+    with (
+        patch("app.routes.dashboard.usuario_pode_ver_chamado", return_value=True),
+        patch("app.routes.dashboard.Historico.get_by_chamado_id", return_value=[evento]),
+    ):
+        resposta = client_logado_admin.get(f"/chamado/{chamado.id}/historico")
+
+    html = resposta.get_data(as_text=True)
+    assert resposta.status_code == 200
+    assert '<ol class="bento-timeline space-y-5"' in html
+    assert '<li class="bento-timeline-item">' in html
+    assert 'datetime="2026-08-13T14:30:00"' in html

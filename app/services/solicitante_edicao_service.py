@@ -201,15 +201,20 @@ def adicionar_anexo_tardio(
         }
 
     try:
-        anexos_atualizados = list(data.get("anexos") or [])
-        if caminho_anexo not in anexos_atualizados:
-            anexos_atualizados.append(caminho_anexo)
-        if not chamado.atualizar_campos(anexos=anexos_atualizados):
+        anexos_atualizados = chamado.adicionar_anexos_atomico(
+            [caminho_anexo],
+            precondicoes={
+                "solicitante_id": usuario.id,
+                "status": status,
+            },
+        )
+        if anexos_atualizados is None:
             return {
                 "sucesso": False,
-                "erro": _t("internal_error_adding_attachment"),
-                "codigo": 500,
+                "erro": _t("cannot_add_attachment_status", status=status),
+                "codigo": 409,
             }
+        data["anexos"] = anexos_atualizados
 
         Historico(
             chamado_id=chamado_id,

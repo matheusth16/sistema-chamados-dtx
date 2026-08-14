@@ -11,7 +11,6 @@ from app.db.models.chamado import ChamadoRow
 from app.i18n import get_translation
 from app.limiter import limiter
 from app.models import Chamado
-from app.models_historico import Historico
 from app.models_usuario import Usuario
 from app.routes import main
 from app.services.analytics import obter_sla_para_exibicao
@@ -551,29 +550,25 @@ def api_confirmar_resolucao(chamado_id: str):
         return erro_json(_t("ticket_reopen_reason_required"), 400)
 
     try:
-        chamado = Chamado.get_by_id(chamado_id)
-        if chamado is None:
-            return erro_json(_t("ticket_not_found"), 404)
+        from app.services.confirmacao_solicitante_service import (
+            processar_confirmacao_solicitante,
+        )
 
-        data = chamado.to_dict()
+        resultado = processar_confirmacao_solicitante(
+            chamado_id,
+            acao=acao,
+            motivo=motivo,
+            usuario=current_user,
+            limite_reaberturas=LIMITE_REABERTURAS_SOLICITANTE,
+        )
+        if not resultado.get("sucesso"):
+            return erro_json(
+                resultado.get("erro") or _t("internal_error_retry"),
+                resultado.get("codigo", 400),
+            )
 
-        if data.get("solicitante_id") != current_user.id:
-            return erro_json(_t("access_denied_generic"), 403)
-
-        if data.get("status") != "Concluído" or data.get("confirmacao_solicitante") != "pendente":
-            return erro_json(_t("ticket_not_awaiting_confirmation"), 400)
-
+        data = resultado["dados"]
         if acao == "confirmar":
-            chamado.atualizar_campos(confirmacao_solicitante="confirmado")
-            Historico(
-                chamado_id=chamado_id,
-                usuario_id=current_user.id,
-                usuario_nome=current_user.nome,
-                acao="confirmacao_resolucao",
-                campo_alterado="confirmacao_solicitante",
-                valor_anterior="pendente",
-                valor_novo="confirmado",
-            ).save()
             with contextlib.suppress(RuntimeError):
                 _enviar_notificacao_confirmar(
                     current_app._get_current_object(),
@@ -582,40 +577,6 @@ def api_confirmar_resolucao(chamado_id: str):
                     current_user.nome,
                 )
         else:
-            reaberturas_atual = data.get("reaberturas_solicitante_count", 0)
-            if reaberturas_atual >= LIMITE_REABERTURAS_SOLICITANTE:
-                return erro_json(
-                    _t("reopen_limit_reached", limite=LIMITE_REABERTURAS_SOLICITANTE), 403
-                )
-
-            chamado.atualizar_campos(
-                status="Aberto",
-                confirmacao_solicitante="reaberto",
-                data_conclusao=None,
-                # Motor de escalonamento reinicia na reabertura (mas o TAT usa
-                # sempre a data_abertura original, que não muda — ver
-                # sla_escalacao_service.py).
-                escalacao_nivel=0,
-                escalacao_proximo_tick_em=None,
-                escalacao_pre_aviso_nivel_enviado=None,
-                alerta_supervisor_50_enviado=False,
-                alerta_supervisor_80_enviado=False,
-                # Lembretes resetados para que o próximo ciclo de conclusão funcione
-                lembrete_confirmacao_1_enviado=False,
-                lembrete_confirmacao_2_enviado=False,
-                # Limite de auto-reabertura (Nível 1): supervisor/admin reabrem sem esse teto
-                reaberturas_solicitante_count=reaberturas_atual + 1,
-            )
-            Historico(
-                chamado_id=chamado_id,
-                usuario_id=current_user.id,
-                usuario_nome=current_user.nome,
-                acao="reabertura",
-                campo_alterado="status",
-                valor_anterior="Concluído",
-                valor_novo="Aberto",
-                detalhe=motivo[:500],
-            ).save()
             with contextlib.suppress(RuntimeError):
                 _enviar_notificacao_reabrir(
                     current_app._get_current_object(),
@@ -634,6 +595,7 @@ def api_confirmar_resolucao(chamado_id: str):
 
 @main.route("/api/supervisores/lista", methods=["GET"])
 @login_required
+@limiter.limit("5 per minute")
 def api_lista_supervisores():
     """Lista simples de supervisores por área para o formulário (rápida, sem contar carga)."""
     area = request.args.get("area", "").strip() or "Geral"
@@ -643,6 +605,31 @@ def api_lista_supervisores():
     incluir_gestor = request.args.get("incluir_gestor") == "1"
     try:
         area_resolvida = setor_para_area(area) or area
+        # A checagem anti-enumeração fica restrita a incluir_gestor=1 (só usado
+        # por "Transferir para Colega", sempre com a área do próprio chamado
+        # que o usuário já atende — nunca precisa sair da própria área). Sem
+        # esse parâmetro, o endpoint é usado por "Novo Chamado" (o solicitante
+        # pode rotear pra qualquer setor) e por "Transferir Área"/"Incluir
+        # Supervisores" (o supervisor precisa ver o time do setor DESTINO, que
+        # por definição não é o dele) — restringir por área própria nesses
+        # casos deixava o usuário sem ninguém pra escolher e travava a
+        # abertura/transferência do chamado (bug real, auditoria QA 2026-08-14).
+        if incluir_gestor and current_user.perfil not in ("admin", "admin_global"):
+            areas_usuario = list(getattr(current_user, "areas", None) or [])
+            areas_permitidas = {
+                (setor_para_area(area_usuario) or area_usuario).casefold()
+                for area_usuario in areas_usuario
+                if area_usuario
+            }
+            if area_resolvida.casefold() not in areas_permitidas:
+                logger.warning(
+                    "Enumeração de gestores bloqueada: usuario=%s perfil=%s area=%s",
+                    current_user.id,
+                    current_user.perfil,
+                    area_resolvida,
+                )
+                return erro_json(_t("unauthorized_access"), 403)
+
         supervisores = Usuario.get_supervisores_por_area(area_resolvida)
         dados = [
             {
@@ -663,7 +650,7 @@ def api_lista_supervisores():
                 "supervisores": [],
                 "erro": _t("internal_error_retry"),
             }
-        ), 200
+        ), 500
 
 
 LIMITE_REABERTURAS_SOLICITANTE = 3

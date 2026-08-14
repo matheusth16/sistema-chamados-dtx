@@ -58,8 +58,8 @@
       </div>
 
       <!-- Áreas (visível apenas para supervisor) -->
-      <div id="areaDiv" class="hidden">
-        <label class="bento-field-label plain">{{ t('areas_sectors_select_one_or_more') }}</label>
+      <fieldset id="areaDiv" class="hidden" style="border:0; padding:0; margin:0; min-width:0;">
+        <legend class="bento-field-label plain">{{ t('areas_sectors_select_one_or_more') }}</legend>
         <p style="font-size:12px; color:var(--color-surface-muted); margin-bottom:8px;">{{ t('supervisor_area_help') }}</p>
         <div class="bento-checkbox-grid">
           {% set areas_usuario = usuario.areas if usuario and usuario.areas else [] %}
@@ -89,7 +89,7 @@
           {% endfor %}
           {% endif %}
         </div>
-      </div>
+      </fieldset>
 
       <!-- Status da conta (visível apenas na edição) -->
       {% if usuario %}

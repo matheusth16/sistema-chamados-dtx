@@ -72,7 +72,8 @@ def test_health_deep_postgres_falha(client):
     assert data is not None
     assert data.get("status") in ("degraded", "error")
     assert "postgres" in data.get("checks", {})
-    assert data["checks"]["postgres"].startswith("error:")
+    assert data["checks"]["postgres"] == "error"
+    assert "RuntimeError" not in r.get_data(as_text=True)
 
 
 def test_health_deep_nao_expoe_versao(client, db_engine):
@@ -182,9 +183,8 @@ def test_health_deep_cache_branch_degraded_quando_excecao(client, db_engine):
     data = r.get_json()
     assert data is not None
     cache_status = data.get("checks", {}).get("cache", "")
-    assert cache_status.startswith("degraded:"), (
-        f"cache deveria iniciar com 'degraded:', obteve: {cache_status!r}"
-    )
+    assert cache_status == "degraded"
+    assert "RuntimeError" not in r.get_data(as_text=True)
 
 
 # ---------------------------------------------------------------------------

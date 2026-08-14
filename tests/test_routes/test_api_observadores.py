@@ -57,7 +57,8 @@ class TestBuscarUsuarios:
     def test_busca_requer_login(self, client, app):
         """Rota /api/usuarios/buscar é protegida por login."""
         resp = client.get("/api/usuarios/buscar?q=teste")
-        assert resp.status_code in (302, 401, 403)
+        assert resp.status_code == 401
+        assert resp.is_json
 
     def test_busca_sem_q_retorna_lista_vazia(self, client_logado_solicitante, app):
         """q com menos de 2 chars retorna lista vazia sem erro."""

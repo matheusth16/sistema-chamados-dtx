@@ -8,7 +8,7 @@
 {% set participante_atual = _participantes_atuais[0] if _participantes_atuais else none %}
 {% set pode_concluir_parte = participante_atual is not none and participante_atual['status'] != 'concluido' %}
 {% set pode_escalonar = pode_editar and chamado.status in ('Aberto', 'Em Atendimento') and (chamado.responsavel_id == current_user.id or current_user.is_admin_or_above) %}
-<div class="max-w-5xl mx-auto space-y-3">
+<div id="ticket-detail-content" class="max-w-5xl mx-auto space-y-3">
     <!-- Voltar: avisa a aba Gestão para atualizar o chamado, fecha a aba (ou redireciona se o navegador bloquear). -->
     <div>
         <a href="{{ voltar_url | default(url_for(dashboard_endpoint)) }}" id="btn-voltar-detalhes" data-chamado-id="{{ chamado.id }}" class="bento-btn-outline">
@@ -49,13 +49,23 @@
                     if (document.getElementById(target)) document.getElementById(target).classList.add('hidden');
                     break;
                 case 'toggle-hidden':
-                    if (document.getElementById(target)) document.getElementById(target).classList.toggle('hidden');
+                    var disclosure = document.getElementById(target);
+                    if (disclosure) {
+                        var abriu = disclosure.classList.contains('hidden');
+                        disclosure.classList.toggle('hidden');
+                        el.setAttribute('aria-expanded', abriu ? 'true' : 'false');
+                    }
                     break;
                 case 'show-dialog':
-                    if (document.getElementById(target)) document.getElementById(target).showModal();
+                    var dialog = document.getElementById(target);
+                    if (dialog) {
+                        dialog._triggerElement = el;
+                        dialog.showModal();
+                    }
                     break;
                 case 'close-dialog':
-                    if (document.getElementById(target)) document.getElementById(target).close();
+                    var dialogAberto = document.getElementById(target);
+                    if (dialogAberto) dialogAberto.close();
                     break;
                 case 'abrir-escalonamento':
                     if (typeof abrirModalEscalonamento === 'function') abrirModalEscalonamento(target);
@@ -125,6 +135,25 @@
         });
 
         document.addEventListener('DOMContentLoaded', function() {
+            document.querySelectorAll('.bento-info-btn[aria-controls]').forEach(function(btn) {
+                btn.addEventListener('keydown', function(event) {
+                    if (event.key !== 'Escape') return;
+                    var painel = document.getElementById(btn.getAttribute('aria-controls'));
+                    if (painel && !painel.classList.contains('hidden')) {
+                        painel.classList.add('hidden');
+                        btn.setAttribute('aria-expanded', 'false');
+                        btn.focus();
+                    }
+                });
+            });
+            document.querySelectorAll('dialog').forEach(function(dialog) {
+                dialog.addEventListener('close', function() {
+                    if (dialog._triggerElement && typeof dialog._triggerElement.focus === 'function') {
+                        dialog._triggerElement.focus();
+                    }
+                    dialog._triggerElement = null;
+                });
+            });
             var descricaoTextarea = document.getElementById('modal-descricao');
             if (descricaoTextarea) {
                 descricaoTextarea.addEventListener('focus', function() {
@@ -149,6 +178,72 @@
                 incluirAreaSelect.addEventListener('change', function() {
                     if (typeof carregarSupervisoresParaIncluir === 'function') carregarSupervisoresParaIncluir(this.value);
                 });
+            }
+        });
+
+        var _ultimoElementoFocado = null;
+        var _paginaPrincipal = document.getElementById('ticket-detail-content') || document.getElementById('main-content');
+
+        function _focaveisDoModal(modal) {
+            return Array.prototype.slice
+                .call(modal.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'))
+                .filter(function(el) { return !el.disabled && el.offsetParent !== null; });
+        }
+
+        function _trapFocusHandler(event) {
+            var modal = event.currentTarget;
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                fecharModalEscalonamento(modal.id);
+                return;
+            }
+            if (event.key !== 'Tab') return;
+            var focaveis = _focaveisDoModal(modal);
+            if (!focaveis.length) return;
+            var primeiro = focaveis[0];
+            var ultimo = focaveis[focaveis.length - 1];
+            if (event.shiftKey && document.activeElement === primeiro) {
+                ultimo.focus();
+                event.preventDefault();
+            } else if (!event.shiftKey && document.activeElement === ultimo) {
+                primeiro.focus();
+                event.preventDefault();
+            }
+        }
+
+        window.abrirModalEscalonamento = function(modalId) {
+            var modal = document.getElementById(modalId);
+            if (!modal) return;
+            _ultimoElementoFocado = document.activeElement;
+            if (_paginaPrincipal) {
+                _paginaPrincipal.setAttribute('inert', '');
+                _paginaPrincipal.setAttribute('aria-hidden', 'true');
+            }
+            modal.classList.remove('hidden');
+            modal.addEventListener('keydown', _trapFocusHandler);
+            var focaveis = _focaveisDoModal(modal);
+            if (focaveis.length) focaveis[0].focus();
+        };
+
+        window.fecharModalEscalonamento = function(modalId) {
+            var modal = document.getElementById(modalId);
+            if (!modal) return;
+            modal.classList.add('hidden');
+            modal.removeEventListener('keydown', _trapFocusHandler);
+            if (_paginaPrincipal) {
+                _paginaPrincipal.removeAttribute('inert');
+                _paginaPrincipal.removeAttribute('aria-hidden');
+            }
+            if (_ultimoElementoFocado && typeof _ultimoElementoFocado.focus === 'function') {
+                _ultimoElementoFocado.focus();
+            }
+            _ultimoElementoFocado = null;
+        };
+
+        document.addEventListener('click', function(event) {
+            var backdrop = event.target.closest('.bento-modal-backdrop');
+            if (backdrop && backdrop.parentElement) {
+                fecharModalEscalonamento(backdrop.parentElement.id);
             }
         });
     </script>
@@ -227,20 +322,23 @@
                 <div class="lg:col-span-2" style="display:flex; flex-direction:column; gap:16px;">
 
                     <!-- Descrição -->
-                    <div class="bento-panel">
+                    <section class="bento-panel" aria-labelledby="problem-description-title">
+                        {% if pode_editar_descricao %}
                         <label for="modal-descricao" class="bento-panel-label">
                             <svg width="16" height="16" style="color:var(--color-surface-muted);" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"></path></svg>
-                            {{ t('problem_description') if t else 'Descrição do Problema' }}
+                            <span id="problem-description-title">{{ t('problem_description') if t else 'Descrição do Problema' }}</span>
                         </label>
-
-                        {% if pode_editar_descricao %}
                         <textarea id="modal-descricao" form="form-status" name="nova_descricao" rows="4"
                             style="width:100%; box-sizing:border-box; min-height:160px; max-height:220px; background:var(--color-surface-canvas); border:1.5px solid transparent; border-radius:14px; padding:14px 16px; font-family:inherit; font-size:14px; line-height:1.6; color:inherit; resize:none; overflow:auto; overflow-wrap:break-word; word-break:break-word;"
                             placeholder="{{ t('edit_description_placeholder') if t else 'Descreva o chamado' }}">{{ chamado.descricao }}</textarea>
                         {% else %}
+                        <h2 id="problem-description-title" class="bento-panel-label">
+                            <svg width="16" height="16" style="color:var(--color-surface-muted);" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"></path></svg>
+                            {{ t('problem_description') if t else 'Descrição do Problema' }}
+                        </h2>
                         <div style="min-height:160px; max-height:220px; overflow-y:auto; background:var(--color-surface-canvas); padding:16px; border-radius:14px; font-size:13px; line-height:1.6; white-space:pre-line; overflow-wrap:break-word; word-break:break-word;">{{ chamado.descricao }}</div>
                         {% endif %}
-                    </div>
+                    </section>
 
                     <!-- Conversa (solicitante ↔ responsável) — junta resposta_solicitante +
                          resposta_responsavel do Histórico numa thread única, ordem cronológica
@@ -255,25 +353,25 @@
                          (responsável OU solicitante dono) pode responder — nunca fica sem
                          nenhum jeito visível de iniciar a conversa. -->
                     {% if mensagens_conversa or pode_editar or pode_anexo_tardio_solicitante %}
-                    <div class="bento-panel">
-                        <label class="bento-panel-label">
+                    <section class="bento-panel" aria-labelledby="conversation-title">
+                        <h2 id="conversation-title" class="bento-panel-label">
                             <svg width="16" height="16" style="color:var(--color-surface-muted);" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path></svg>
                             {{ t('conversation_title') if t else 'Conversa' }}
-                        </label>
+                        </h2>
                         {% if mensagens_conversa %}
-                        <div class="space-y-3" style="max-height:320px; overflow-y:auto; padding-right:2px;">
+                        <ol role="log" aria-live="polite" aria-relevant="additions" aria-labelledby="conversation-title" aria-label="{{ t('conversation_log_aria') }}" class="space-y-3" style="max-height:320px; overflow-y:auto; padding-right:2px;">
                             {% for msg in mensagens_conversa %}
                             {% set eh_solicitante = msg.acao == 'resposta_solicitante' %}
-                            <div style="display:flex; {% if not eh_solicitante %}justify-content:flex-end;{% endif %}">
-                                <div style="max-width:80%; border-radius:14px; padding:10px 14px; background:{% if eh_solicitante %}var(--color-surface-canvas){% else %}var(--color-dtx-100){% endif %};">
+                            <li style="display:flex; {% if not eh_solicitante %}justify-content:flex-end;{% endif %}">
+                                <article style="max-width:80%; border-radius:14px; padding:10px 14px; background:{% if eh_solicitante %}var(--color-surface-canvas){% else %}var(--color-dtx-100){% endif %};">
                                     <p style="font-size:11px; font-weight:700; color:var(--color-surface-muted); margin-bottom:2px;">
-                                        {{ msg.usuario_nome }} · {{ msg.data_acao_formatada() }}
+                                        {{ msg.usuario_nome }} · <time datetime="{{ msg.data_acao.isoformat() if msg.data_acao else '' }}" aria-label="{{ t('message_sent_at') }} {{ msg.data_acao_formatada() }}">{{ msg.data_acao_formatada() }}</time>
                                     </p>
                                     <p style="font-size:13px; line-height:1.5; white-space:pre-line; overflow-wrap:break-word; word-break:break-word;">{{ msg.valor_novo }}</p>
-                                </div>
-                            </div>
+                                </article>
+                            </li>
                             {% endfor %}
-                        </div>
+                        </ol>
                         {% elif pode_editar or pode_anexo_tardio_solicitante %}
                         {% set _ce = t('conversation_empty') %}
                         <p style="font-size:13px; color:var(--color-surface-muted); font-style:italic;">{{ _ce if _ce != 'conversation_empty' else 'Nenhuma mensagem ainda — inicie a conversa.' }}</p>
@@ -282,31 +380,33 @@
                         {% if pode_editar %}
                         <div style="margin-top:16px; {% if mensagens_conversa %}padding-top:16px; border-top:1px solid var(--color-surface-border);{% endif %}">
                             <p style="font-size:12px; color:var(--color-surface-muted); margin:0 0 10px;">{{ t('supervisor_reply_hint') if t else 'Sua mensagem é enviada ao solicitante por e-mail e notificação, e fica registrada no histórico do chamado.' }}</p>
-                            <textarea id="sup-resposta-texto" rows="3"
+                            <label for="sup-resposta-texto" class="bento-field-label plain">{{ t('supervisor_reply_title') }}</label>
+                            <textarea id="sup-resposta-texto" rows="3" aria-describedby="sup-resposta-erro" aria-invalid="false"
                                 style="width:100%; box-sizing:border-box; background:var(--color-surface-canvas); border:1.5px solid transparent; border-radius:14px; padding:11px 14px; font-family:inherit; font-size:13px; resize:none; margin-bottom:8px;"
                                 placeholder="{{ t('supervisor_reply_placeholder') if t else 'Escreva sua resposta ao solicitante...' }}"></textarea>
-                            <div id="sup-resposta-erro" class="hidden bento-inline-notice error" style="margin-top:4px;"></div>
-                            <div id="sup-resposta-ok" class="hidden bento-inline-notice ok" style="margin-top:4px;"></div>
+                            <div id="sup-resposta-erro" role="alert" aria-live="assertive" class="hidden bento-inline-notice error" style="margin-top:4px;"></div>
+                            <div id="sup-resposta-ok" role="status" aria-live="polite" class="hidden bento-inline-notice ok" style="margin-top:4px;"></div>
                             <button type="button" data-action="enviar-resposta-supervisor" data-chamado-id="{{ chamado.id }}" class="bento-btn-block solid-blue" style="margin-top:8px;">
-                                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
+                                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M22 2L11 13M22 2L15 22L11 13L2 9L22 2Z"></path></svg>
                                 {{ t('supervisor_reply_send_btn') if t else 'Enviar resposta' }}
                             </button>
                         </div>
                         {% elif pode_anexo_tardio_solicitante %}
                         <div id="bloco-resposta-texto" style="margin-top:16px; {% if mensagens_conversa %}padding-top:16px; border-top:1px solid var(--color-surface-border);{% endif %}">
                             <p style="font-size:12px; color:var(--color-surface-muted); margin:0 0 10px;">{{ t('text_reply_hint') if t else 'Sem precisar anexar arquivo — use isso pra responder um pedido de informação.' }}</p>
-                            <textarea id="sol-resposta-texto" rows="3"
+                            <label for="sol-resposta-texto" class="bento-field-label plain">{{ t('text_reply_title') }}</label>
+                            <textarea id="sol-resposta-texto" rows="3" aria-describedby="sol-resposta-erro" aria-invalid="false"
                                 style="width:100%; box-sizing:border-box; background:var(--color-surface-canvas); border:1.5px solid transparent; border-radius:14px; padding:11px 14px; font-family:inherit; font-size:13px; resize:none; margin-bottom:8px;"
                                 placeholder="{{ t('text_reply_placeholder') if t else 'Escreva sua resposta...' }}"></textarea>
-                            <div id="sol-resposta-erro" class="hidden bento-inline-notice error" style="margin-top:4px;"></div>
-                            <div id="sol-resposta-ok" class="hidden bento-inline-notice ok" style="margin-top:4px;"></div>
+                            <div id="sol-resposta-erro" role="alert" aria-live="assertive" class="hidden bento-inline-notice error" style="margin-top:4px;"></div>
+                            <div id="sol-resposta-ok" role="status" aria-live="polite" class="hidden bento-inline-notice ok" style="margin-top:4px;"></div>
                             <button type="button" data-action="enviar-resposta-solicitante" data-chamado-id="{{ chamado.id }}" class="bento-btn-block solid-blue" style="margin-top:8px;">
-                                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
+                                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M22 2L11 13M22 2L15 22L11 13L2 9L22 2Z"></path></svg>
                                 {{ t('text_reply_send_btn') if t else 'Enviar resposta' }}
                             </button>
                         </div>
                         {% endif %}
-                    </div>
+                    </section>
                     {% endif %}
 
                     <!-- Anexos -->
@@ -342,9 +442,10 @@
                              dropzone já igualado visualmente, a página inteira ficava
                              estruturalmente diferente entre os dois papéis). -->
                         <div id="bloco-anexo-tardio" class="bento-resp-box">
-                            <label class="bento-field-label" style="margin-bottom:8px;">{{ t('late_attachment_title') if t else 'Adicionar Documento' }}</label>
+                            <p class="bento-field-label" style="margin-bottom:8px;">{{ t('late_attachment_title') if t else 'Adicionar Documento' }}</p>
                             <p style="font-size:12px; color:var(--color-surface-muted); margin:-4px 0 10px;">{{ t('late_attachment_hint') if t else 'Informe o motivo e selecione o arquivo.' }}</p>
-                            <textarea id="sol-anexo-motivo" rows="2"
+                            <label for="sol-anexo-motivo" class="bento-field-label plain">{{ t('cancellation_reason') }}</label>
+                            <textarea id="sol-anexo-motivo" rows="2" aria-describedby="sol-anexo-erro" aria-invalid="false"
                                 style="width:100%; box-sizing:border-box; background:var(--color-surface-canvas); border:1.5px solid transparent; border-radius:14px; padding:11px 14px; font-family:inherit; font-size:13px; resize:none; margin-bottom:8px;"
                                 placeholder="{{ t('late_attachment_motivo_placeholder') if t else 'Motivo (mínimo 10 caracteres)' }}"></textarea>
                             <label for="sol-anexo-file" class="bento-dropzone block" style="padding:16px;" data-upload-placeholder="{% set _cu3 = t('click_to_upload_file') %}{{ _cu3 if _cu3 != 'click_to_upload_file' else 'Clique para enviar um arquivo' }}">
@@ -359,7 +460,7 @@
                                 <small title="{{ extensoes_permitidas|join(', ') }}">{% set _ft2 = t('file_types_short') %}{{ _ft2 if _ft2 != 'file_types_short' else 'Imagens, PDF, Excel e Word. Máx. 10MB' }}</small>
                             </label>
                             <ul id="sol-anexo-preview" class="bento-attach-list" style="margin-top:8px;"></ul>
-                            <div id="sol-anexo-erro" class="hidden bento-inline-notice error" style="margin-top:8px;"></div>
+                            <div id="sol-anexo-erro" role="alert" aria-live="assertive" class="hidden bento-inline-notice error" style="margin-top:8px;"></div>
                             <div id="sol-anexo-ok" class="hidden bento-inline-notice ok" style="margin-top:8px;"></div>
                             <button type="button" data-action="enviar-anexo-tardio" data-chamado-id="{{ chamado.id }}" class="bento-btn-block solid-blue" style="margin-top:10px;">
                                 <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
@@ -576,7 +677,7 @@
                                 {% if previsao_pendente %}
                                 <div class="bento-action-box amber" style="margin-bottom:12px;">
                                     <p class="title">{{ t('attendance_forecast_pending_title') if t else 'Aguardando aprovação' }}</p>
-                                    <p style="font-size:12px; font-weight:700; margin-top:4px;">{{ previsao_pendente.previsao_solicitada }}</p>
+                                    <p style="font-size:12px; font-weight:700; margin-top:4px;">{{ previsao_pendente.previsao_solicitada.strftime('%d/%m/%Y %H:%M') if previsao_pendente.previsao_solicitada else '' }}</p>
                                     <p style="font-size:11px; color:var(--color-surface-muted); margin-top:2px;">{{ previsao_pendente.motivo }}</p>
                                     <p style="font-size:11px; color:var(--color-surface-muted); margin-top:8px;">
                                         {{ t('attendance_forecast_pending_gestor') if t else 'Decisão de' }}:
@@ -665,7 +766,7 @@
                                 {% if previsao_pendente %}
                                 <div class="bento-action-box amber" style="margin-top:8px;">
                                     <p class="title">{{ t('attendance_forecast_pending_title') if t else 'Aguardando aprovação' }}</p>
-                                    <p style="font-size:12px; font-weight:700; margin-top:4px;">{{ previsao_pendente.previsao_solicitada }}</p>
+                                    <p style="font-size:12px; font-weight:700; margin-top:4px;">{{ previsao_pendente.previsao_solicitada.strftime('%d/%m/%Y %H:%M') if previsao_pendente.previsao_solicitada else '' }}</p>
                                 </div>
                                 {% elif chamado.previsao_atendimento %}
                                 <div style="background:var(--color-surface-canvas); border-radius:14px; padding:10px 12px; margin-top:8px;">
@@ -701,12 +802,13 @@
                                 </div>
 
                                 <div id="form-reabrir" class="hidden" style="margin-top:14px;">
-                                    <label class="bento-field-label" style="margin-bottom:6px;">
+                                    <label for="motivo-reabrir" class="bento-field-label" style="margin-bottom:6px;">
                                         {{ t('reopen_reason_label') if t else 'O que ainda precisa ser resolvido?' }} <span style="color:var(--color-bento-danger);">*</span>
                                     </label>
-                                    <textarea id="motivo-reabrir" rows="3" maxlength="500"
+                                    <textarea id="motivo-reabrir" rows="3" maxlength="500" aria-describedby="motivo-reabrir-erro" aria-invalid="false"
                                         placeholder="{{ t('reopen_reason_placeholder') if t else 'Descreva o que ficou pendente...' }}"
                                         style="width:100%; background:var(--color-surface-canvas); border:1.5px solid transparent; border-radius:14px; padding:11px 14px; font-family:inherit; font-size:14px; resize:none;"></textarea>
+                                    <div id="motivo-reabrir-erro" role="alert" aria-live="assertive" class="hidden bento-inline-notice error" style="margin-top:8px;"></div>
                                     <button type="button" data-action="confirmar-resolucao" data-decisao="reabrir" class="bento-btn-block solid-rose" style="margin-top:8px;">
                                         {{ t('reopen_ticket_btn') if t else 'Reabrir chamado' }}
                                     </button>
@@ -730,10 +832,11 @@
                                         </span>
                                     </div>
                                     <p>{{ t('edit_description_sol_hint') if t else 'Disponível por 30 minutos após a abertura.' }}</p>
-                                    <textarea id="sol-nova-descricao" rows="4"
+                                    <label for="sol-nova-descricao" class="bento-field-label plain">{{ t('problem_description') }}</label>
+                                    <textarea id="sol-nova-descricao" rows="4" aria-describedby="sol-edit-erro" aria-invalid="false"
                                         style="width:100%; background:#fff; border:1.5px solid transparent; border-radius:14px; padding:11px 14px; font-family:inherit; font-size:13px; resize:none;"
                                         placeholder="{{ t('edit_description_placeholder') if t else 'Descreva o chamado' }}">{{ chamado.descricao }}</textarea>
-                                    <div id="sol-edit-erro" class="hidden bento-inline-notice error" style="margin-top:8px;"></div>
+                                    <div id="sol-edit-erro" role="alert" aria-live="assertive" class="hidden bento-inline-notice error" style="margin-top:8px;"></div>
                                     <button type="button" data-action="salvar-descricao-solicitante" class="bento-btn-block solid-amber" style="margin-top:10px;">
                                         <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
                                         {{ t('edit_description_save_btn') if t else 'Salvar descrição' }}
@@ -776,7 +879,7 @@
                     <svg width="16" height="16" style="color:var(--color-surface-muted);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                     {{ t('attendance_forecast_pending_title') if t else 'Aguardando aprovação' }}
                 </h4>
-                <p style="font-size:12px; font-weight:700; margin-bottom:2px;">{{ previsao_pendente.previsao_solicitada }}</p>
+                <p style="font-size:12px; font-weight:700; margin-bottom:2px;">{{ previsao_pendente.previsao_solicitada.strftime('%d/%m/%Y %H:%M') if previsao_pendente.previsao_solicitada else '' }}</p>
                 <p style="font-size:12px; color:var(--color-surface-muted); margin-bottom:14px;">{{ previsao_pendente.motivo }}</p>
                 <div class="flex flex-wrap gap-3">
                     <button type="button" data-action="decidir-previsao-aprovar" data-solicitacao-id="{{ previsao_pendente.id }}" class="bento-btn-block solid-emerald" style="flex:1; min-width:160px; justify-content:center;">
@@ -787,15 +890,63 @@
                     </button>
                 </div>
                 <div id="bloco-rejeitar-previsao" class="hidden" style="margin-top:12px;">
-                    <textarea id="previsao-motivo-rejeicao" rows="2" maxlength="500"
+                    <label for="previsao-motivo-rejeicao" class="bento-field-label plain">{{ t('attendance_forecast_reject_reason_placeholder') }}</label>
+                    <textarea id="previsao-motivo-rejeicao" rows="2" maxlength="500" aria-describedby="previsao-decisao-erro" aria-invalid="false"
                         placeholder="{{ t('attendance_forecast_reject_reason_placeholder') if t else 'Motivo da rejeição (opcional)' }}"
                         style="width:100%; background:var(--color-surface-canvas); border:1.5px solid transparent; border-radius:14px; padding:10px 12px; font-family:inherit; font-size:13px; resize:none; margin-bottom:8px;"></textarea>
                     <button type="button" data-action="decidir-previsao-rejeitar" data-solicitacao-id="{{ previsao_pendente.id }}" class="bento-btn-block solid-rose" style="width:100%; justify-content:center;">
                         {{ t('attendance_forecast_confirm_reject_btn') if t else 'Confirmar rejeição' }}
                     </button>
                 </div>
-                <div id="previsao-decisao-erro" class="hidden bento-inline-notice error" style="margin-top:10px;"></div>
+                <div id="previsao-decisao-erro" role="alert" aria-live="assertive" class="hidden bento-inline-notice error" style="margin-top:10px;"></div>
             </div>
+
+            <!-- JS da decisão em bloco próprio, gated só por pode_decidir_previsao
+                 (não por pode_escalonar): um gestor_setor "puro" (is_gestor_only=True)
+                 vê os botões acima mas pode_escalonar é False pra ele — sem este
+                 bloco, decidirPrevisaoAtendimento nunca era definida e o clique
+                 não fazia nada, sem request nem erro (bug real, auditoria QA
+                 2026-08-14). CHAMADO_ID/CSRF_TOKEN/mostrarErro/esconderErro
+                 duplicados aqui de propósito: var/function redeclaram sem
+                 problema quando pode_escalonar também é True na mesma página. -->
+            <script nonce="{{ csp_nonce }}">
+            (function() {
+                var CHAMADO_ID = {{ chamado.id | tojson }};
+                var CSRF_TOKEN = document.querySelector('meta[name="csrf-token"]') ? document.querySelector('meta[name="csrf-token"]').content : '';
+
+                function mostrarErro(elId, msg) {
+                    var el = document.getElementById(elId);
+                    if (!el) return;
+                    el.textContent = msg;
+                    el.classList.remove('hidden');
+                }
+                function esconderErro(elId) {
+                    var el = document.getElementById(elId);
+                    if (!el) return;
+                    el.classList.add('hidden');
+                }
+
+                window.decidirPrevisaoAtendimento = function(solicitacaoId, acao) {
+                    esconderErro('previsao-decisao-erro');
+                    var motivoRejeicao = '';
+                    if (acao === 'rejeitar') {
+                        var motivoEl = document.getElementById('previsao-motivo-rejeicao');
+                        motivoRejeicao = motivoEl ? (motivoEl.value || '').trim() : '';
+                    }
+                    fetch('/api/chamado/' + CHAMADO_ID + '/previsao-atendimento/' + solicitacaoId + '/decidir', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
+                        body: JSON.stringify({ acao: acao, motivo_rejeicao: motivoRejeicao })
+                    })
+                    .then(function(r) { return r.json(); })
+                    .then(function(data) {
+                        if (data.sucesso) { window.location.reload(); }
+                        else { mostrarErro('previsao-decisao-erro', data.erro || {{ t('error_forecast_set') | tojson }}); }
+                    })
+                    .catch(function() { mostrarErro('previsao-decisao-erro', {{ t('error_connection') | tojson }}); });
+                };
+            })();
+            </script>
             {% endif %}
 
             {% if pode_escalonar %}
@@ -811,10 +962,10 @@
                             <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
                             {{ t('escalation_transfer_area_btn') if t else 'Transferir Área' }}
                         </button>
-                        <button type="button" data-action="toggle-hidden" data-target="info-transferir-area" class="bento-info-btn" style="color:var(--color-bento-warning);" aria-label="{{ t('escalation_info_aria') if t else 'O que essa ação faz' }}" aria-describedby="info-transferir-area">
+                        <button type="button" id="btn-info-transferir-area" data-action="toggle-hidden" data-target="info-transferir-area" class="bento-info-btn" style="color:var(--color-bento-warning);" aria-label="{{ t('info_transfer_area_aria') }}" aria-expanded="false" aria-controls="info-transferir-area">
                             <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                         </button>
-                        <div id="info-transferir-area" role="tooltip" class="hidden bento-info-card">
+                        <div id="info-transferir-area" role="region" aria-labelledby="btn-info-transferir-area" class="hidden bento-info-card">
                             {{ t('escalation_transfer_area_help') if t else 'Muda a área dona e o responsável pelo chamado — o chamado deixa de ser seu.' }}
                         </div>
                     </div>
@@ -823,10 +974,10 @@
                             <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>
                             {{ t('escalation_escalate_colleague_btn') if t else 'Transferir para Colega' }}
                         </button>
-                        <button type="button" data-action="toggle-hidden" data-target="info-transferir-colega" class="bento-info-btn" style="color:var(--color-bento-violet);" aria-label="{{ t('escalation_info_aria') if t else 'O que essa ação faz' }}" aria-describedby="info-transferir-colega">
+                        <button type="button" id="btn-info-transferir-colega" data-action="toggle-hidden" data-target="info-transferir-colega" class="bento-info-btn" style="color:var(--color-bento-violet);" aria-label="{{ t('info_transfer_colleague_aria') }}" aria-expanded="false" aria-controls="info-transferir-colega">
                             <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                         </button>
-                        <div id="info-transferir-colega" role="tooltip" class="hidden bento-info-card">
+                        <div id="info-transferir-colega" role="region" aria-labelledby="btn-info-transferir-colega" class="hidden bento-info-card">
                             {{ t('escalation_transfer_colleague_help') if t else 'Passa a responsabilidade do chamado para um colega (ou o gestor) da mesma área — você deixa de ser o responsável, sem mudar a área do chamado.' }}
                         </div>
                     </div>
@@ -835,10 +986,10 @@
                             <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
                             {{ t('escalation_include_supervisors_btn') if t else 'Incluir Participantes' }}
                         </button>
-                        <button type="button" data-action="toggle-hidden" data-target="info-incluir-participantes" class="bento-info-btn" style="color:var(--color-bento-teal);" aria-label="{{ t('escalation_info_aria') if t else 'O que essa ação faz' }}" aria-describedby="info-incluir-participantes">
+                        <button type="button" id="btn-info-incluir-participantes" data-action="toggle-hidden" data-target="info-incluir-participantes" class="bento-info-btn" style="color:var(--color-bento-teal);" aria-label="{{ t('info_include_participants_aria') }}" aria-expanded="false" aria-controls="info-incluir-participantes">
                             <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                         </button>
-                        <div id="info-incluir-participantes" role="tooltip" class="hidden bento-info-card">
+                        <div id="info-incluir-participantes" role="region" aria-labelledby="btn-info-incluir-participantes" class="hidden bento-info-card">
                             {{ t('escalation_include_supervisors_help') if t else 'Adiciona um supervisor como participante — ele precisa marcar a parte dele como concluída antes que o chamado possa ser encerrado, sem tirar a sua responsabilidade principal por ele.' }}
                         </div>
                     </div>
@@ -857,15 +1008,15 @@
     <div class="bento-modal-panel" style="position:relative; z-index:1;">
         <div class="head">
             <h3 id="modal-transferir-area-titulo" style="font-weight:800; font-size:15px;">{{ t('escalation_transfer_modal_title') if t else 'Transferir Área' }}</h3>
-            <button type="button" data-action="fechar-escalonamento" data-target="modal-transferir-area" class="bento-modal-close">
-                <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            <button type="button" data-action="fechar-escalonamento" data-target="modal-transferir-area" class="bento-modal-close" aria-label="{{ t('close_modal') }}">
+                <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
             </button>
         </div>
         <div class="space-y-4" style="padding:24px;">
             <p style="font-size:12px; color:var(--color-surface-muted); line-height:1.4; margin-top:-4px;">{{ t('escalation_transfer_area_help') if t else 'Muda a área dona e o responsável pelo chamado — o chamado deixa de ser seu e passa para o novo responsável escolhido.' }}</p>
             <div>
                 <label for="transferir-area-select" class="bento-field-label" style="margin-bottom:6px;">{{ t('escalation_dest_area_label') if t else 'Área Destino' }} <span style="color:var(--color-bento-danger);">*</span></label>
-                <select id="transferir-area-select"
+                <select id="transferir-area-select" aria-describedby="transferir-erro" aria-invalid="false"
                     style="width:100%; background:var(--color-surface-canvas); border:1.5px solid transparent; border-radius:14px; padding:11px 14px; font-family:inherit; font-size:14px;">
                     <option value="">{{ t('escalation_select_area') if t else 'Selecione uma área...' }}</option>
                     {% for setor in setores %}
@@ -877,18 +1028,18 @@
             </div>
             <div>
                 <label for="transferir-supervisor-select" class="bento-field-label" style="margin-bottom:6px;">{{ t('escalation_dest_responsible_label') if t else 'Responsável Destino' }} <span style="color:var(--color-bento-danger);">*</span></label>
-                <select id="transferir-supervisor-select" disabled
+                <select id="transferir-supervisor-select" disabled aria-describedby="transferir-erro" aria-invalid="false"
                     style="width:100%; background:var(--color-surface-canvas); border:1.5px solid transparent; border-radius:14px; padding:11px 14px; font-family:inherit; font-size:14px;">
                     <option value="">{{ t('escalation_select_area_first') if t else 'Selecione a área primeiro...' }}</option>
                 </select>
             </div>
             <div>
                 <label for="transferir-motivo" class="bento-field-label" style="margin-bottom:6px;">{{ t('escalation_reason_label') if t else 'Motivo' }} <span style="color:var(--color-bento-danger);">*</span></label>
-                <textarea id="transferir-motivo" rows="3" maxlength="500"
+                <textarea id="transferir-motivo" rows="3" maxlength="500" aria-describedby="transferir-erro" aria-invalid="false"
                     placeholder="{{ t('escalation_transfer_reason_placeholder') if t else 'Descreva o motivo da transferência...' }}"
                     style="width:100%; background:var(--color-surface-canvas); border:1.5px solid transparent; border-radius:14px; padding:11px 14px; font-family:inherit; font-size:14px; resize:none;"></textarea>
             </div>
-            <div id="transferir-erro" class="hidden bento-inline-notice error"></div>
+            <div id="transferir-erro" role="alert" aria-live="assertive" class="hidden bento-inline-notice error"></div>
         </div>
         <div class="flex gap-3" style="padding:0 24px 24px;">
             <button type="button" data-action="fechar-escalonamento" data-target="modal-transferir-area" class="bento-btn-outline" style="flex:1; justify-content:center;">
@@ -907,25 +1058,25 @@
     <div class="bento-modal-panel" style="position:relative; z-index:1;">
         <div class="head">
             <h3 id="modal-escalonar-colega-titulo" style="font-weight:800; font-size:15px;">{{ t('escalation_escalate_modal_title') if t else 'Transferir para Colega' }}</h3>
-            <button type="button" data-action="fechar-escalonamento" data-target="modal-escalonar-colega" class="bento-modal-close">
-                <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            <button type="button" data-action="fechar-escalonamento" data-target="modal-escalonar-colega" class="bento-modal-close" aria-label="{{ t('close_modal') }}">
+                <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
             </button>
         </div>
         <div class="space-y-4" style="padding:24px;">
             <div>
                 <label for="escalonar-supervisor-select" class="bento-field-label" style="margin-bottom:6px;">{{ t('escalation_colleague_label') if t else 'Colega' }} ({{ chamado.area }}) <span style="color:var(--color-bento-danger);">*</span></label>
-                <select id="escalonar-supervisor-select" disabled
+                <select id="escalonar-supervisor-select" disabled aria-describedby="escalonar-erro" aria-invalid="false"
                     style="width:100%; background:var(--color-surface-canvas); border:1.5px solid transparent; border-radius:14px; padding:11px 14px; font-family:inherit; font-size:14px;">
                     <option value="">{{ t('loading_generic') if t else 'Carregando...' }}</option>
                 </select>
             </div>
             <div>
                 <label for="escalonar-motivo" class="bento-field-label" style="margin-bottom:6px;">{{ t('escalation_reason_label') if t else 'Motivo' }} <span style="color:var(--color-bento-danger);">*</span></label>
-                <textarea id="escalonar-motivo" rows="3" maxlength="500"
+                <textarea id="escalonar-motivo" rows="3" maxlength="500" aria-describedby="escalonar-erro" aria-invalid="false"
                     placeholder="{{ t('escalation_escalate_reason_placeholder') if t else 'Descreva o motivo da transferência...' }}"
                     style="width:100%; background:var(--color-surface-canvas); border:1.5px solid transparent; border-radius:14px; padding:11px 14px; font-family:inherit; font-size:14px; resize:none;"></textarea>
             </div>
-            <div id="escalonar-erro" class="hidden bento-inline-notice error"></div>
+            <div id="escalonar-erro" role="alert" aria-live="assertive" class="hidden bento-inline-notice error"></div>
         </div>
         <div class="flex gap-3" style="padding:0 24px 24px;">
             <button type="button" data-action="fechar-escalonamento" data-target="modal-escalonar-colega" class="bento-btn-outline" style="flex:1; justify-content:center;">
@@ -944,15 +1095,15 @@
     <div class="bento-modal-panel" style="position:relative; z-index:1;">
         <div class="head">
             <h3 id="modal-incluir-participantes-titulo" style="font-weight:800; font-size:15px;">{{ t('escalation_include_modal_title') if t else 'Incluir Participantes' }}</h3>
-            <button type="button" data-action="fechar-escalonamento" data-target="modal-incluir-participantes" class="bento-modal-close">
-                <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            <button type="button" data-action="fechar-escalonamento" data-target="modal-incluir-participantes" class="bento-modal-close" aria-label="{{ t('close_modal') }}">
+                <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
             </button>
         </div>
         <div class="space-y-4" style="padding:24px;">
             <p style="font-size:12px; color:var(--color-surface-muted); line-height:1.4; margin-top:-4px;">{{ t('escalation_include_supervisors_help') if t else 'Adiciona um supervisor como participante — ele precisa marcar a parte dele como concluída antes que o chamado possa ser encerrado, sem tirar a sua responsabilidade principal por ele.' }}</p>
             <div>
                 <label for="incluir-area-select" class="bento-field-label" style="margin-bottom:6px;">{{ t('escalation_area_label') if t else 'Área' }} <span style="color:var(--color-bento-danger);">*</span></label>
-                <select id="incluir-area-select"
+                <select id="incluir-area-select" aria-describedby="incluir-erro" aria-invalid="false"
                     style="width:100%; background:var(--color-surface-canvas); border:1.5px solid transparent; border-radius:14px; padding:11px 14px; font-family:inherit; font-size:14px;">
                     <option value="">{{ t('escalation_select_area') if t else 'Selecione uma área...' }}</option>
                     {% for setor in setores %}
@@ -963,7 +1114,7 @@
             <div>
                 <label for="incluir-supervisor-select" class="bento-field-label" style="margin-bottom:6px;">{{ t('escalation_supervisor_label') if t else 'Supervisor' }} <span style="color:var(--color-bento-danger);">*</span></label>
                 <div class="flex gap-2">
-                    <select id="incluir-supervisor-select" disabled
+                    <select id="incluir-supervisor-select" disabled aria-describedby="incluir-erro" aria-invalid="false"
                         style="flex:1; background:var(--color-surface-canvas); border:1.5px solid transparent; border-radius:14px; padding:11px 14px; font-family:inherit; font-size:14px;">
                         <option value="">{{ t('escalation_select_area_first') if t else 'Selecione a área primeiro...' }}</option>
                     </select>
@@ -973,7 +1124,7 @@
                 </div>
             </div>
             <div id="incluir-lista-preview" class="space-y-1.5 max-h-36 overflow-y-auto"></div>
-            <div id="incluir-erro" class="hidden bento-inline-notice error"></div>
+            <div id="incluir-erro" role="alert" aria-live="assertive" class="hidden bento-inline-notice error"></div>
         </div>
         <div class="flex gap-3" style="padding:0 24px 24px;">
             <button type="button" data-action="fechar-escalonamento-limpar-incluir" data-target="modal-incluir-participantes" class="bento-btn-outline" style="flex:1; justify-content:center;">
@@ -992,23 +1143,23 @@
     <div class="bento-modal-panel" style="position:relative; z-index:1;">
         <div class="head">
             <h3 id="modal-previsao-atendimento-titulo" style="font-weight:800; font-size:15px;">{{ t('attendance_forecast_btn') if t else 'Solicitar nova previsão de atendimento' }}</h3>
-            <button type="button" data-action="fechar-escalonamento" data-target="modal-previsao-atendimento" class="bento-modal-close">
-                <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            <button type="button" data-action="fechar-escalonamento" data-target="modal-previsao-atendimento" class="bento-modal-close" aria-label="{{ t('close_modal') }}">
+                <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
             </button>
         </div>
         <div class="space-y-4" style="padding:24px;">
             <div>
                 <label for="previsao-atendimento-data" class="bento-field-label" style="margin-bottom:6px;">{{ t('attendance_forecast_label') if t else 'Previsão de atendimento' }} <span style="color:var(--color-bento-danger);">*</span></label>
-                <input type="datetime-local" id="previsao-atendimento-data"
+                <input type="datetime-local" id="previsao-atendimento-data" aria-describedby="previsao-atendimento-erro" aria-invalid="false"
                     style="width:100%; background:var(--color-surface-canvas); border:1.5px solid transparent; border-radius:14px; padding:11px 14px; font-family:inherit; font-size:14px;">
             </div>
             <div>
                 <label for="previsao-atendimento-motivo" class="bento-field-label" style="margin-bottom:6px;">{{ t('escalation_reason_label') if t else 'Motivo' }} <span style="color:var(--color-bento-danger);">*</span></label>
-                <textarea id="previsao-atendimento-motivo" rows="3" maxlength="500"
+                <textarea id="previsao-atendimento-motivo" rows="3" maxlength="500" aria-describedby="previsao-atendimento-erro" aria-invalid="false"
                     placeholder="{{ t('attendance_forecast_reason_placeholder') if t else 'Ex: combinei com o gestor, preciso de mais tempo antes de atender' }}"
                     style="width:100%; background:var(--color-surface-canvas); border:1.5px solid transparent; border-radius:14px; padding:11px 14px; font-family:inherit; font-size:14px; resize:none;"></textarea>
             </div>
-            <div id="previsao-atendimento-erro" class="hidden bento-inline-notice error"></div>
+            <div id="previsao-atendimento-erro" role="alert" aria-live="assertive" class="hidden bento-inline-notice error"></div>
         </div>
         <div class="flex gap-3" style="padding:0 24px 24px;">
             <button type="button" data-action="fechar-escalonamento" data-target="modal-previsao-atendimento" class="bento-btn-outline" style="flex:1; justify-content:center;">
@@ -1060,11 +1211,22 @@ Object.assign(window.DTX_MSGS, {
 
     function mostrarErro(elId, msg) {
         var el = document.getElementById(elId);
-        if (el) { el.textContent = msg; el.classList.remove('hidden'); }
+        if (el) {
+            el.textContent = msg;
+            el.classList.remove('hidden');
+            document.querySelectorAll('[aria-describedby~="' + elId + '"]').forEach(function(campo) {
+                campo.setAttribute('aria-invalid', 'true');
+            });
+        }
     }
     function esconderErro(elId) {
         var el = document.getElementById(elId);
-        if (el) { el.classList.add('hidden'); }
+        if (el) {
+            el.classList.add('hidden');
+            document.querySelectorAll('[aria-describedby~="' + elId + '"]').forEach(function(campo) {
+                campo.removeAttribute('aria-invalid');
+            });
+        }
     }
 
     // ── Responder ao solicitante (via inversa de enviarRespostaSolicitante,
@@ -1097,58 +1259,6 @@ Object.assign(window.DTX_MSGS, {
         .catch(function() {
             mostrarErro('sup-resposta-erro', {{ t('error_connection') | tojson }});
         });
-    };
-
-    // ── Acessibilidade dos modais de escalonamento: foco + Escape ───────────
-    // Os modais são <div class="hidden"> (não <dialog> nativo), então não há
-    // focus trap nem Escape-to-close por padrão do navegador — implementado
-    // aqui manualmente.
-    var _ultimoElementoFocado = null;
-
-    function _focaveisDoModal(modal) {
-        return Array.prototype.slice
-            .call(modal.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'))
-            .filter(function(el) { return !el.disabled && el.offsetParent !== null; });
-    }
-
-    function _trapFocusHandler(e) {
-        var modal = e.currentTarget;
-        if (e.key === 'Escape') {
-            fecharModalEscalonamento(modal.id);
-            return;
-        }
-        if (e.key !== 'Tab') { return; }
-        var focaveis = _focaveisDoModal(modal);
-        if (focaveis.length === 0) { return; }
-        var primeiro = focaveis[0];
-        var ultimo = focaveis[focaveis.length - 1];
-        if (e.shiftKey && document.activeElement === primeiro) {
-            ultimo.focus();
-            e.preventDefault();
-        } else if (!e.shiftKey && document.activeElement === ultimo) {
-            primeiro.focus();
-            e.preventDefault();
-        }
-    }
-
-    window.abrirModalEscalonamento = function(modalId) {
-        var modal = document.getElementById(modalId);
-        if (!modal) { return; }
-        _ultimoElementoFocado = document.activeElement;
-        modal.classList.remove('hidden');
-        modal.addEventListener('keydown', _trapFocusHandler);
-        var focaveis = _focaveisDoModal(modal);
-        if (focaveis.length > 0) { focaveis[0].focus(); }
-    };
-
-    window.fecharModalEscalonamento = function(modalId) {
-        var modal = document.getElementById(modalId);
-        if (!modal) { return; }
-        modal.classList.add('hidden');
-        modal.removeEventListener('keydown', _trapFocusHandler);
-        if (_ultimoElementoFocado && typeof _ultimoElementoFocado.focus === 'function') {
-            _ultimoElementoFocado.focus();
-        }
     };
 
     window.carregarSupervisoresDestino = function(area) {
@@ -1543,17 +1653,18 @@ Object.assign(window.DTX_MSGS, {
     <div class="bento-modal-panel" style="position:relative; z-index:1;">
         <div class="head">
             <h3 id="modal-reabrir-admin-titulo" class="font-display" style="font-weight:800; font-size:15px;">{{ t('ticket_reopen_admin_btn') if t else 'Reabrir chamado' }}</h3>
-            <button type="button" data-action="fechar-escalonamento" data-target="modal-reabrir-admin" class="bento-modal-close">
-                <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            <button type="button" data-action="fechar-escalonamento" data-target="modal-reabrir-admin" class="bento-modal-close" aria-label="{{ t('close_modal') }}">
+                <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
             </button>
         </div>
         <div class="space-y-4" style="padding:24px;">
-            <label class="bento-field-label" style="margin-bottom:6px;">
+            <label for="motivo-reabrir-admin" class="bento-field-label" style="margin-bottom:6px;">
                 {{ t('reopen_reason_label') if t else 'Motivo da reabertura' }} <span style="color:var(--color-bento-danger);">*</span>
             </label>
-            <textarea id="motivo-reabrir-admin" rows="3" maxlength="500"
+            <textarea id="motivo-reabrir-admin" rows="3" maxlength="500" aria-describedby="reabrir-admin-erro" aria-invalid="false"
                 placeholder="{{ t('reopen_reason_placeholder') if t else 'Descreva o motivo para reabrir este chamado...' }}"
                 style="width:100%; background:var(--color-surface-canvas); border:1.5px solid transparent; border-radius:14px; padding:11px 14px; font-family:inherit; font-size:14px; resize:none;"></textarea>
+            <div id="reabrir-admin-erro" role="alert" aria-live="assertive" class="hidden bento-inline-notice error"></div>
             <div class="flex gap-3 pt-2">
                 <button type="button" data-action="fechar-escalonamento" data-target="modal-reabrir-admin" class="bento-btn-outline" style="flex:1; justify-content:center;">
                     {{ t('cancel') if t else 'Cancelar' }}
@@ -1567,9 +1678,16 @@ Object.assign(window.DTX_MSGS, {
 </div>
 <script nonce="{{ csp_nonce }}">
 function reabrirChamadoAdmin() {
-    var motivo = (document.getElementById('motivo-reabrir-admin').value || '').trim();
+    var campo = document.getElementById('motivo-reabrir-admin');
+    var motivo = (campo.value || '').trim();
+    campo.removeAttribute('aria-invalid');
+    document.getElementById('reabrir-admin-erro').classList.add('hidden');
     if (!motivo) {
-        document.getElementById('motivo-reabrir-admin').focus();
+        var erro = document.getElementById('reabrir-admin-erro');
+        campo.setAttribute('aria-invalid', 'true');
+        erro.textContent = {{ t('reopen_reason_min_3') | tojson }};
+        erro.classList.remove('hidden');
+        campo.focus();
         return;
     }
     fetch('/api/atualizar-status', {
@@ -1593,17 +1711,18 @@ function reabrirChamadoAdmin() {
     <div class="bento-modal-panel" style="position:relative; z-index:1;">
         <div class="head">
             <h3 id="modal-cancelar-admin-titulo" class="font-display" style="font-weight:800; font-size:15px; color:var(--color-bento-danger-deep);">{{ t('ticket_cancel_frozen_btn') if t else 'Cancelar chamado' }}</h3>
-            <button type="button" data-action="fechar-escalonamento" data-target="modal-cancelar-admin" class="bento-modal-close">
-                <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            <button type="button" data-action="fechar-escalonamento" data-target="modal-cancelar-admin" class="bento-modal-close" aria-label="{{ t('close_modal') }}">
+                <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
             </button>
         </div>
         <div class="space-y-4" style="padding:24px;">
-            <label class="bento-field-label" style="margin-bottom:6px;">
+            <label for="motivo-cancelar-admin" class="bento-field-label" style="margin-bottom:6px;">
                 {{ t('ticket_cancel_frozen_confirm') if t else 'Informe o motivo do cancelamento' }} <span style="color:var(--color-bento-danger);">*</span>
             </label>
-            <textarea id="motivo-cancelar-admin" rows="3" maxlength="500"
+            <textarea id="motivo-cancelar-admin" rows="3" maxlength="500" aria-describedby="cancelar-admin-erro" aria-invalid="false"
                 placeholder="{{ t('ticket_cancel_frozen_confirm') if t else 'Descreva o motivo para cancelar este chamado...' }}"
                 style="width:100%; background:var(--color-surface-canvas); border:1.5px solid transparent; border-radius:14px; padding:11px 14px; font-family:inherit; font-size:14px; resize:none;"></textarea>
+            <div id="cancelar-admin-erro" role="alert" aria-live="assertive" class="hidden bento-inline-notice error"></div>
             <div class="flex gap-3 pt-2">
                 <button type="button" data-action="fechar-escalonamento" data-target="modal-cancelar-admin" class="bento-btn-outline" style="flex:1; justify-content:center;">
                     {{ t('cancel') if t else 'Fechar' }}
@@ -1617,9 +1736,16 @@ function reabrirChamadoAdmin() {
 </div>
 <script nonce="{{ csp_nonce }}">
 function cancelarChamadoAdmin() {
-    var motivo = (document.getElementById('motivo-cancelar-admin').value || '').trim();
+    var campo = document.getElementById('motivo-cancelar-admin');
+    var motivo = (campo.value || '').trim();
+    campo.removeAttribute('aria-invalid');
+    document.getElementById('cancelar-admin-erro').classList.add('hidden');
     if (motivo.length < 3) {
-        document.getElementById('motivo-cancelar-admin').focus();
+        var erro = document.getElementById('cancelar-admin-erro');
+        campo.setAttribute('aria-invalid', 'true');
+        erro.textContent = {{ t('reason_min_3_chars') | tojson }};
+        erro.classList.remove('hidden');
+        campo.focus();
         return;
     }
     fetch('/api/atualizar-status', {
@@ -1644,22 +1770,22 @@ function cancelarChamadoAdmin() {
 <dialog id="modal-cancelar-solicitante" class="bento-modal" aria-labelledby="modal-cancelar-solicitante-titulo">
     <div class="head" style="display:flex; align-items:center; justify-content:space-between; padding:20px 24px; border-bottom:1px solid var(--color-surface-border);">
         <h3 id="modal-cancelar-solicitante-titulo" class="font-display" style="font-weight:800; font-size:15px;">{{ t('cancel_ticket_sol_title') if t else 'Cancelar chamado' }}</h3>
-        <button type="button" data-action="close-dialog" data-target="modal-cancelar-solicitante" class="bento-modal-close">
-            <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        <button type="button" data-action="close-dialog" data-target="modal-cancelar-solicitante" class="bento-modal-close" aria-label="{{ t('close_modal') }}">
+            <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
         </button>
     </div>
     <div class="space-y-4" style="padding:24px;">
         <p style="font-size:13px; font-weight:600;">{{ t('cancel_ticket_sol_hint') if t else 'Informe o motivo do cancelamento (obrigatório).' }}</p>
         <div>
-            <label class="bento-field-label" style="margin-bottom:6px;">
+            <label for="sol-motivo-cancelar" class="bento-field-label" style="margin-bottom:6px;">
                 {% set _cr = t('cancellation_reason') %}{{ _cr if _cr != 'cancellation_reason' else 'Motivo' }} <span style="color:var(--color-bento-danger);">*</span>
             </label>
-            <textarea id="sol-motivo-cancelar" rows="3" maxlength="500"
+            <textarea id="sol-motivo-cancelar" rows="3" maxlength="500" aria-describedby="sol-cancelar-erro" aria-invalid="false"
                 placeholder="{{ t('cancellation_reason_placeholder') if t else 'Informe o motivo do cancelamento' }}"
                 style="width:100%; background:var(--color-surface-canvas); border:1.5px solid transparent; border-radius:14px; padding:11px 14px; font-family:inherit; font-size:14px; resize:none;"></textarea>
             <p style="font-size:11px; color:var(--color-surface-muted); margin-top:6px;">{{ t('min_chars_hint') if t else 'Mínimo 10 caracteres.' }}</p>
         </div>
-        <div id="sol-cancelar-erro" class="hidden bento-inline-notice error"></div>
+        <div id="sol-cancelar-erro" role="alert" aria-live="assertive" class="hidden bento-inline-notice error"></div>
     </div>
     <div class="flex gap-3" style="padding:0 24px 24px;">
         <button type="button" data-action="close-dialog" data-target="modal-cancelar-solicitante" class="bento-btn-outline" style="flex:1; justify-content:center;">
@@ -1703,11 +1829,14 @@ function cancelarChamadoAdmin() {
 
     window.salvarDescricaoSolicitante = function() {
         var erroEl = document.getElementById('sol-edit-erro');
+        var campoDescricao = document.getElementById('sol-nova-descricao');
         erroEl.classList.add('hidden');
-        var novaDesc = (document.getElementById('sol-nova-descricao').value || '').trim();
+        campoDescricao.removeAttribute('aria-invalid');
+        var novaDesc = (campoDescricao.value || '').trim();
         if (novaDesc.length < 3) {
             erroEl.textContent = {{ t('description_min_3_chars') | tojson }};
             erroEl.classList.remove('hidden');
+            campoDescricao.setAttribute('aria-invalid', 'true');
             return;
         }
         fetch('/api/chamado/' + _CHAMADO_ID_SOL + '/editar-solicitante', {
@@ -1727,11 +1856,14 @@ function cancelarChamadoAdmin() {
     {% if pode_cancelar_solicitante %}
     window.executarCancelarSolicitante = function() {
         var erroEl = document.getElementById('sol-cancelar-erro');
+        var campoMotivo = document.getElementById('sol-motivo-cancelar');
         erroEl.classList.add('hidden');
-        var motivo = (document.getElementById('sol-motivo-cancelar').value || '').trim();
+        campoMotivo.removeAttribute('aria-invalid');
+        var motivo = (campoMotivo.value || '').trim();
         if (motivo.length < 10) {
             erroEl.textContent = {{ t('reason_min_10_chars') | tojson }};
             erroEl.classList.remove('hidden');
+            campoMotivo.setAttribute('aria-invalid', 'true');
             return;
         }
         fetch('/api/chamado/' + _CHAMADO_ID_SOL + '/cancelar-solicitante', {
@@ -1752,12 +1884,15 @@ function cancelarChamadoAdmin() {
     window.enviarRespostaSolicitante = function(chamadoId) {
         var erroEl = document.getElementById('sol-resposta-erro');
         var okEl = document.getElementById('sol-resposta-ok');
+        var campoResposta = document.getElementById('sol-resposta-texto');
         erroEl.classList.add('hidden');
         okEl.classList.add('hidden');
-        var mensagem = (document.getElementById('sol-resposta-texto').value || '').trim();
+        campoResposta.removeAttribute('aria-invalid');
+        var mensagem = (campoResposta.value || '').trim();
         if (mensagem.length < 2) {
             erroEl.textContent = {{ t('reply_message_required', min_chars=2) | tojson }};
             erroEl.classList.remove('hidden');
+            campoResposta.setAttribute('aria-invalid', 'true');
             return;
         }
         fetch('/api/chamado/' + chamadoId + '/responder-solicitante', {
@@ -1787,12 +1922,15 @@ function cancelarChamadoAdmin() {
     window.enviarAnexoTardio = function(chamadoId) {
         var erroEl = document.getElementById('sol-anexo-erro');
         var okEl = document.getElementById('sol-anexo-ok');
+        var campoMotivo = document.getElementById('sol-anexo-motivo');
         erroEl.classList.add('hidden');
         okEl.classList.add('hidden');
-        var motivo = (document.getElementById('sol-anexo-motivo').value || '').trim();
+        campoMotivo.removeAttribute('aria-invalid');
+        var motivo = (campoMotivo.value || '').trim();
         if (motivo.length < 10) {
             erroEl.textContent = {{ t('reason_min_10_chars') | tojson }};
             erroEl.classList.remove('hidden');
+            campoMotivo.setAttribute('aria-invalid', 'true');
             return;
         }
         var fileInput = document.getElementById('sol-anexo-file');
@@ -1896,9 +2034,16 @@ function cancelarChamadoAdmin() {
 function confirmarResolucao(acao) {
     var motivo = '';
     if (acao === 'reabrir') {
-        motivo = (document.getElementById('motivo-reabrir').value || '').trim();
+        var campoMotivo = document.getElementById('motivo-reabrir');
+        var erroMotivo = document.getElementById('motivo-reabrir-erro');
+        campoMotivo.removeAttribute('aria-invalid');
+        erroMotivo.classList.add('hidden');
+        motivo = (campoMotivo.value || '').trim();
         if (!motivo) {
-            document.getElementById('motivo-reabrir').focus();
+            erroMotivo.textContent = {{ t('reopen_reason_min_3') | tojson }};
+            erroMotivo.classList.remove('hidden');
+            campoMotivo.setAttribute('aria-invalid', 'true');
+            campoMotivo.focus();
             return;
         }
     }

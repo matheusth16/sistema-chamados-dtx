@@ -55,7 +55,7 @@
             <!-- Hamburger Menu (supervisor/admin) -->
             {% if current_user.is_authenticated and current_user.perfil != 'solicitante' %}
             <div class="relative" id="nav-hamburger-wrap">
-                <button type="button" id="btn-hamburger" aria-label="{{ t('open_menu') }}" aria-expanded="false" class="bento-nav-icon-btn">
+                <button type="button" id="btn-hamburger" aria-label="{{ t('open_menu') }}" aria-expanded="false" aria-controls="nav-menu-dropdown" aria-haspopup="menu" class="bento-nav-icon-btn">
                     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
                     </svg>
@@ -143,7 +143,7 @@
             {% if current_user.is_authenticated %}
             <div class="relative" id="nav-notificacoes">
                 <button type="button" id="btn-sino" class="bento-nav-icon-btn"
-                    aria-label="{{ t('notifications') }}" aria-expanded="false" aria-haspopup="true">
+                    aria-label="{{ t('notifications') }}" aria-expanded="false" aria-haspopup="true" aria-controls="sino-dropdown">
                     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                             d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
@@ -152,9 +152,10 @@
                 </button>
                 <!-- Dropdown Notificações -->
                 <div id="sino-dropdown"
-                    class="bento-nav-dropdown absolute right-0 mt-2 w-80 sm:w-96 max-h-[80vh] flex flex-col opacity-0 invisible scale-95 translate-y-2 transition-all duration-200 z-dropdown">
+                    class="bento-nav-dropdown absolute right-0 mt-2 w-80 sm:w-96 max-h-[80vh] flex flex-col opacity-0 invisible scale-95 translate-y-2 transition-all duration-200 z-dropdown"
+                    role="region" aria-labelledby="sino-dropdown-title">
                     <div class="bento-nav-dropdown-header flex items-center justify-between shrink-0">
-                        <div class="bento-nav-dropdown-title">
+                        <div id="sino-dropdown-title" class="bento-nav-dropdown-title">
                             <svg class="w-4 h-4" style="color:var(--color-dtx-500)" fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z"/></svg>
                             {{ t('notifications') }}
                         </div>
@@ -180,7 +181,7 @@
 
             <!-- Seletor de Idioma -->
             <div class="relative bento-nav-hover-wrap">
-                <button class="bento-nav-icon-btn" aria-label="{{ t('select_language') }}" aria-haspopup="true" aria-expanded="false">
+                <button class="bento-nav-icon-btn" aria-label="{{ t('select_language') }}" aria-haspopup="true" aria-expanded="false" aria-controls="nav-language-dropdown">
                     <span class="bento-nav-lang-btn">
                         <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -193,7 +194,7 @@
                     </span>
                 </button>
                 <!-- Dropdown Idiomas -->
-                <div class="bento-nav-dropdown absolute right-0 mt-2 w-48 z-dropdown">
+                <div id="nav-language-dropdown" class="bento-nav-dropdown absolute right-0 mt-2 w-48 z-dropdown">
                     <div class="bento-nav-dropdown-header">
                         <h3 class="text-[10px] font-black uppercase tracking-widest" style="color:#9ca3af;">
                             {{ t('select_language') }}
@@ -219,7 +220,7 @@
             <!-- Perfil do Usuário -->
             {% if current_user.is_authenticated %}
             <div class="relative bento-nav-hover-wrap ml-1">
-                <button class="bento-nav-profile-btn" aria-haspopup="true" aria-expanded="false">
+                <button id="btn-profile-menu" class="bento-nav-profile-btn" aria-label="{{ t('profile_menu_aria') }}" aria-haspopup="true" aria-expanded="false" aria-controls="nav-profile-dropdown">
                     <div class="hidden sm:block">
                         <div class="bento-nav-profile-name">{{ current_user.nome }}</div>
                         {% if current_user.area %}
@@ -237,7 +238,7 @@
                 </button>
 
                 <!-- Dropdown Perfil -->
-                <div class="bento-nav-dropdown absolute right-0 mt-2 w-64 z-dropdown overflow-hidden">
+                <div id="nav-profile-dropdown" class="bento-nav-dropdown absolute right-0 mt-2 w-64 z-dropdown overflow-hidden" role="region" aria-labelledby="btn-profile-menu">
                     <div class="bento-nav-profile-card">
                         <div class="name">{{ current_user.nome }}</div>
                         <div class="email">

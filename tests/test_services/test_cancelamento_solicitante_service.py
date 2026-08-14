@@ -119,21 +119,21 @@ def test_cancelar_chamado_sucesso_atualiza_status_e_grava_historico(app, status_
     assert mock_historico.call_args.kwargs["valor_novo"] == "Cancelado"
 
 
-def test_cancelar_chamado_erro_no_update_retorna_500(app):
+def test_cancelar_chamado_conflito_no_cas_retorna_409(app):
     from app.services.cancelamento_solicitante_service import cancelar_chamado_solicitante
 
     chamado_id = _criar_chamado_real(solicitante_id="sol_1", status="Aberto")
 
     with (
         app.app_context(),
-        patch("app.models.Chamado.atualizar_campos", return_value=False),
+        patch("app.models.Chamado.atualizar_campos_cas", return_value=False),
     ):
         resultado = cancelar_chamado_solicitante(
             chamado_id, "Motivo qualquer aqui", _usuario_mock()
         )
 
     assert resultado["sucesso"] is False
-    assert resultado["codigo"] == 500
+    assert resultado["codigo"] == 409
 
 
 def test_notificar_cancelamento_dispara_thread_daemon(app):

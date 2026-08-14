@@ -269,6 +269,37 @@ class TestDecidirPrevisaoAtendimento:
         assert atualizado.previsao_atendimento.replace(tzinfo=None) == previsao
         assert atualizado.motivo_previsao_atendimento == "motivo do pedido"
 
+    def test_decisao_trava_tambem_linha_do_chamado(self, db_session):
+        from sqlalchemy import event
+
+        from app.services.previsao_atendimento_service import decidir_previsao_atendimento
+
+        chamado_id = _criar_chamado_real(area="Engenharia")
+        solicitacao_id = self._pedir(chamado_id)
+        statements = []
+        connection = db_session.get_bind()
+
+        def _capturar(conn, cursor, statement, parameters, context, executemany):
+            statements.append(statement)
+
+        event.listen(connection, "before_cursor_execute", _capturar)
+        try:
+            resultado = decidir_previsao_atendimento(
+                solicitacao_id,
+                "aprovar",
+                GESTOR_ENGENHARIA,
+            )
+        finally:
+            event.remove(connection, "before_cursor_execute", _capturar)
+
+        assert resultado["sucesso"] is True
+        selects_chamado = [
+            sql
+            for sql in statements
+            if "FROM chamados" in sql and "chamado_previsao_solicitacoes" not in sql
+        ]
+        assert any("FOR UPDATE" in sql.upper() for sql in selects_chamado)
+
     def test_rejeitar_nao_aplica_previsao_no_chamado(self):
         from app.services.previsao_atendimento_service import decidir_previsao_atendimento
 

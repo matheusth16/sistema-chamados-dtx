@@ -94,14 +94,15 @@ class TestSolicitarPrevisaoAtendimentoRota:
         )
         assert resp.status_code == 400
 
-    def test_solicitante_retorna_302_ou_403(self, client_logado_solicitante):
+    def test_solicitante_retorna_json_403(self, client_logado_solicitante):
         """Solicitante não tem acesso à rota de supervisor (@requer_supervisor_area)."""
         resp = client_logado_solicitante.post(
             "/api/chamado/id123/previsao-atendimento",
             json={"previsao": "2026-07-15T16:00", "motivo": "motivo"},
             content_type="application/json",
         )
-        assert resp.status_code in (302, 403)
+        assert resp.status_code == 403
+        assert resp.is_json
 
     def test_idor_sem_acesso_retorna_403(self, client_logado_supervisor):
         """Supervisor sem acesso ao chamado (usuario_pode_ver_chamado=False) → 403."""
@@ -236,10 +237,11 @@ class TestDecidirPrevisaoAtendimentoRota:
 
         assert resp.status_code == 409
 
-    def test_nao_autenticado_redireciona_ou_401(self, client):
+    def test_nao_autenticado_retorna_json_401(self, client):
         resp = client.post(
             "/api/chamado/id123/previsao-atendimento/1/decidir",
             json={"acao": "aprovar"},
             content_type="application/json",
         )
-        assert resp.status_code in (302, 401)
+        assert resp.status_code == 401
+        assert resp.is_json

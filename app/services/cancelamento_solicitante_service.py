@@ -57,15 +57,19 @@ def cancelar_chamado_solicitante(chamado_id: str, motivo: str, usuario) -> dict:
         }
 
     try:
-        if not chamado.atualizar_campos(
+        if not chamado.atualizar_campos_cas(
+            precondicoes={
+                "status": status_atual,
+                "solicitante_id": usuario.id,
+            },
             status="Cancelado",
             motivo_cancelamento=motivo,
             data_cancelamento=datetime.now(ZoneInfo(Config.SLA_TIMEZONE)),
         ):
             return {
                 "sucesso": False,
-                "erro": _t("internal_error_canceling_ticket"),
-                "codigo": 500,
+                "erro": _t("cannot_cancel_status", status=status_atual),
+                "codigo": 409,
             }
 
         Historico(

@@ -322,9 +322,9 @@ def test_reabertura_admin_grava_historico_com_motivo():
 
 
 def test_atualizar_status_excecao_retorna_falso():
-    """Falha ao persistir (atualizar_campos retorna False) retorna sucesso=False."""
+    """Falha/conflito ao persistir via CAS retorna sucesso=False."""
     chamado_id = _criar_chamado_real(status="Em Atendimento")
-    with patch("app.models.Chamado.atualizar_campos", return_value=False):
+    with patch("app.models.Chamado.atualizar_campos_cas", return_value=False):
         resultado = atualizar_status_chamado(
             chamado_id=chamado_id,
             novo_status="Aberto",

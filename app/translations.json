@@ -5179,6 +5179,16 @@
     "en": "[Reply] Ticket {numero} — responsible replied",
     "es": "[Respuesta] Ticket {numero} — el responsable respondió"
   },
+  "push_subject_previsao_solicitada": {
+    "pt_BR": "[Previsão] Chamado {numero} — {categoria} — nova previsão solicitada",
+    "en": "[Forecast] Ticket {numero} — {categoria} — new attendance forecast requested",
+    "es": "[Previsión] Ticket {numero} — {categoria} — nueva previsión solicitada"
+  },
+  "push_subject_previsao_decidida": {
+    "pt_BR": "[Previsão {status}] Chamado {numero} — decisão registrada",
+    "en": "[Forecast {status}] Ticket {numero} — decision recorded",
+    "es": "[Previsión {status}] Ticket {numero} — decisión registrada"
+  },
   "supervisor_reply_title": {
     "pt_BR": "Responder ao solicitante",
     "en": "Reply to requester",
@@ -5513,5 +5523,50 @@
     "pt_BR": "Solicitante confirmou a resolução",
     "en": "Requester confirmed the resolution",
     "es": "El solicitante confirmó la resolución"
+  },
+  "profile_menu_aria": {
+    "pt_BR": "Abrir menu do perfil",
+    "en": "Open profile menu",
+    "es": "Abrir menú del perfil"
+  },
+  "external_link_label": {
+    "pt_BR": "Link externo do OneDrive ou SharePoint",
+    "en": "External OneDrive or SharePoint link",
+    "es": "Enlace externo de OneDrive o SharePoint"
+  },
+  "observer_search_label": {
+    "pt_BR": "Buscar observadores por nome ou e-mail",
+    "en": "Search observers by name or email",
+    "es": "Buscar observadores por nombre o correo electrónico"
+  },
+  "info_transfer_area_aria": {
+    "pt_BR": "Mais informações sobre transferir área",
+    "en": "More information about transferring area",
+    "es": "Más información sobre transferir área"
+  },
+  "info_transfer_colleague_aria": {
+    "pt_BR": "Mais informações sobre transferir para colega",
+    "en": "More information about transferring to a colleague",
+    "es": "Más información sobre transferir a un colega"
+  },
+  "info_include_participants_aria": {
+    "pt_BR": "Mais informações sobre incluir participantes",
+    "en": "More information about adding participants",
+    "es": "Más información sobre incluir participantes"
+  },
+  "conversation_log_aria": {
+    "pt_BR": "Mensagens da conversa do chamado",
+    "en": "Ticket conversation messages",
+    "es": "Mensajes de la conversación del ticket"
+  },
+  "message_sent_at": {
+    "pt_BR": "Enviada em",
+    "en": "Sent at",
+    "es": "Enviado el"
+  },
+  "reason_min_3_chars": {
+    "pt_BR": "Informe um motivo com pelo menos 3 caracteres.",
+    "en": "Enter a reason with at least 3 characters.",
+    "es": "Indique un motivo con al menos 3 caracteres."
   }
 }

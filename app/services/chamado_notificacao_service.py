@@ -8,7 +8,7 @@ Fan-out centralizado de notificações de chamado.
 import logging
 from html import escape
 
-from app.i18n import get_translated_status, get_translation
+from app.i18n import get_translated_category, get_translated_status, get_translation
 from app.models_usuario import Usuario
 from app.services import webpush_service
 from app.services.email_templates import (
@@ -68,8 +68,9 @@ def notificar_cancelamento_chamado(
         logger.info("Cancellation CH %s: no recipients, no e-mail sent.", numero_chamado)
         return
 
+    categoria_en = get_translated_category(categoria, "en")
     assunto = get_translation(
-        "push_subject_cancelled", "en", numero=numero_chamado, categoria=categoria
+        "push_subject_cancelled", "en", numero=numero_chamado, categoria=categoria_en
     )
     link = _link_chamado(chamado_id)
 
@@ -86,7 +87,7 @@ def notificar_cancelamento_chamado(
                 + build_detail_table(
                     [
                         ("Ticket", numero_chamado),
-                        ("Category", categoria),
+                        ("Category", categoria_en),
                         ("Reason", motivo),
                         ("Cancelled by", solicitante_nome),
                     ]
@@ -95,7 +96,7 @@ def notificar_cancelamento_chamado(
             )
             corpo_texto = (
                 f"Ticket {numero_chamado} cancelled by {solicitante_nome}.\n"
-                f"Reason: {motivo}\nCategory: {categoria}"
+                f"Reason: {motivo}\nCategory: {categoria_en}"
                 + (f"\n\nView ticket: {link}" if link else "")
             )
             ok, err = enviar_email(email, assunto, corpo_html, corpo_texto, importance="normal")
@@ -143,6 +144,7 @@ def notificar_edicao_descricao_solicitante(
         logger.info("Description edit CH %s: no recipients, no e-mail sent.", numero_chamado)
         return
 
+    categoria_en = get_translated_category(categoria, "en")
     assunto = get_translation("push_subject_updated", "en", numero=numero_chamado)
     link = _link_chamado(chamado_id)
     _max_chars = 300
@@ -159,11 +161,11 @@ def notificar_edicao_descricao_solicitante(
                 f"Ticket {numero_chamado} — Description Edited",
                 "#2563eb",
                 f"<p>The requester <em>{escape(solicitante_nome)}</em> edited the description of ticket "
-                f"<strong>{escape(numero_chamado)}</strong> ({escape(categoria)}).</p>"
+                f"<strong>{escape(numero_chamado)}</strong> ({escape(categoria_en)}).</p>"
                 + build_detail_table(
                     [
                         ("Ticket", numero_chamado),
-                        ("Category", categoria),
+                        ("Category", categoria_en),
                         ("Edited by", solicitante_nome),
                         ("Previous description", anterior_trunc),
                         ("New description", novo_trunc),
@@ -217,7 +219,10 @@ def notificar_observadores_criacao(
     if not observadores:
         return
 
-    assunto = get_translation("push_subject_cc", "en", numero=numero_chamado, categoria=categoria)
+    categoria_en = get_translated_category(categoria, "en")
+    assunto = get_translation(
+        "push_subject_cc", "en", numero=numero_chamado, categoria=categoria_en
+    )
     link = _link_chamado(chamado_id)
 
     for obs in observadores:
@@ -238,20 +243,20 @@ def notificar_observadores_criacao(
                 "#7c3aed",
                 f"<p>Hello{f' {escape(nome)}' if nome else ''},</p>"
                 f"<p>You have been added as an <strong>observer</strong> of ticket "
-                f"<strong>{escape(numero_chamado)}</strong> ({escape(categoria)}) opened by "
+                f"<strong>{escape(numero_chamado)}</strong> ({escape(categoria_en)}) opened by "
                 f"<em>{escape(solicitante_nome)}</em>.</p>"
                 "<p>You will receive notifications about updates to this ticket.</p>"
                 + build_detail_table(
                     [
                         ("Ticket", numero_chamado),
-                        ("Category", categoria),
+                        ("Category", categoria_en),
                         ("Opened by", solicitante_nome),
                     ]
                 )
                 + (build_cta_button("View ticket", link, "#2563eb") if link else ""),
             )
             corpo_texto = (
-                f"You have been added as an observer of ticket {numero_chamado} ({categoria})"
+                f"You have been added as an observer of ticket {numero_chamado} ({categoria_en})"
                 f" opened by {solicitante_nome}." + (f"\n\nView ticket: {link}" if link else "")
             )
             ok, err = enviar_email(email, assunto, corpo_html, corpo_texto, importance="normal")
@@ -303,12 +308,13 @@ def notificar_observadores_mudanca_status(
         return
 
     status_en = get_translated_status(novo_status, "en")
+    categoria_en = get_translated_category(categoria, "en")
     assunto = get_translation(
         "push_subject_status_change",
         "en",
         status=status_en,
         numero=numero_chamado,
-        categoria=categoria,
+        categoria=categoria_en,
     )
     link = _link_chamado(chamado_id)
 
@@ -320,12 +326,12 @@ def notificar_observadores_mudanca_status(
             corpo_html = build_email_shell(
                 f"Ticket {numero_chamado}: {status_en}",
                 "#2563eb",
-                f"<p>The status of ticket <strong>{escape(numero_chamado)}</strong> ({escape(categoria)}) "
+                f"<p>The status of ticket <strong>{escape(numero_chamado)}</strong> ({escape(categoria_en)}) "
                 f"was updated to <strong>{escape(status_en)}</strong>.</p>"
                 + build_detail_table(
                     [
                         ("Ticket", numero_chamado),
-                        ("Category", categoria),
+                        ("Category", categoria_en),
                         ("New status", status_en),
                     ]
                 )
@@ -390,6 +396,7 @@ def notificar_anexo_tardio_chamado(
         logger.info("Late attachment CH %s: no recipients, no e-mail sent.", numero_chamado)
         return
 
+    categoria_en = get_translated_category(categoria, "en")
     assunto = get_translation("push_subject_attachment", "en", numero=numero_chamado)
     link = _link_chamado(chamado_id)
 
@@ -402,11 +409,11 @@ def notificar_anexo_tardio_chamado(
                 f"Ticket {numero_chamado} — New Attachment",
                 "#0891b2",
                 f"<p>The requester <em>{escape(solicitante_nome)}</em> added a new attachment to ticket "
-                f"<strong>{escape(numero_chamado)}</strong> ({escape(categoria)}).</p>"
+                f"<strong>{escape(numero_chamado)}</strong> ({escape(categoria_en)}).</p>"
                 + build_detail_table(
                     [
                         ("Ticket", numero_chamado),
-                        ("Category", categoria),
+                        ("Category", categoria_en),
                         ("File", nome_arquivo),
                         ("Reason", motivo),
                         ("Added by", solicitante_nome),
@@ -463,6 +470,7 @@ def notificar_resposta_solicitante_chamado(
         logger.info("Reply CH %s: no recipients, no e-mail sent.", numero_chamado)
         return
 
+    categoria_en = get_translated_category(categoria, "en")
     assunto = get_translation("push_subject_reply", "en", numero=numero_chamado)
     link = _link_chamado(chamado_id)
 
@@ -475,11 +483,11 @@ def notificar_resposta_solicitante_chamado(
                 f"Ticket {numero_chamado} — New Reply",
                 "#0891b2",
                 f"<p>The requester <em>{escape(solicitante_nome)}</em> replied to ticket "
-                f"<strong>{escape(numero_chamado)}</strong> ({escape(categoria)}).</p>"
+                f"<strong>{escape(numero_chamado)}</strong> ({escape(categoria_en)}).</p>"
                 + build_detail_table(
                     [
                         ("Ticket", numero_chamado),
-                        ("Category", categoria),
+                        ("Category", categoria_en),
                         ("Message", mensagem),
                         ("Replied by", solicitante_nome),
                     ]
@@ -564,6 +572,7 @@ def notificar_resposta_supervisor_chamado(
         logger.info("Reply CH %s: no recipients, no e-mail sent.", numero_chamado)
         return
 
+    categoria_en = get_translated_category(categoria, "en")
     assunto = get_translation("push_subject_reply_supervisor", "en", numero=numero_chamado)
     link = _link_chamado(chamado_id)
 
@@ -576,11 +585,11 @@ def notificar_resposta_supervisor_chamado(
                 f"Ticket {numero_chamado} — New Reply",
                 "#0891b2",
                 f"<p>The responsible <em>{escape(respondente_nome)}</em> replied to ticket "
-                f"<strong>{escape(numero_chamado)}</strong> ({escape(categoria)}).</p>"
+                f"<strong>{escape(numero_chamado)}</strong> ({escape(categoria_en)}).</p>"
                 + build_detail_table(
                     [
                         ("Ticket", numero_chamado),
-                        ("Category", categoria),
+                        ("Category", categoria_en),
                         ("Message", mensagem),
                         ("Replied by", respondente_nome),
                     ]
@@ -684,8 +693,9 @@ def notificar_solicitacao_previsao_atendimento(
     email = getattr(gestor_usuario, "email", None)
     uid = getattr(gestor_usuario, "id", None)
 
+    categoria_en = get_translated_category(categoria, "en")
     assunto = get_translation(
-        "push_subject_previsao_solicitada", "en", numero=numero_chamado, categoria=categoria
+        "push_subject_previsao_solicitada", "en", numero=numero_chamado, categoria=categoria_en
     )
 
     if email:
@@ -698,11 +708,11 @@ def notificar_solicitacao_previsao_atendimento(
             f"Ticket {numero_chamado} — Attendance Forecast Request",
             "#d97706",
             f"<p><em>{escape(solicitante_nome)}</em> requested a new attendance forecast for "
-            f"ticket <strong>{escape(numero_chamado)}</strong> ({escape(categoria)}).</p>"
+            f"ticket <strong>{escape(numero_chamado)}</strong> ({escape(categoria_en)}).</p>"
             + build_detail_table(
                 [
                     ("Ticket", numero_chamado),
-                    ("Category", categoria),
+                    ("Category", categoria_en),
                     ("Requested date", previsao_fmt),
                     ("Reason", motivo),
                     ("Requested by", solicitante_nome),
@@ -774,6 +784,7 @@ def notificar_decisao_previsao_atendimento(
     aprovado = acao == "aprovar"
     link = _link_chamado(chamado_id)
     previsao_fmt = str(previsao_solicitada)
+    categoria_en = get_translated_category(categoria, "en")
     assunto = get_translation(
         "push_subject_previsao_decidida",
         "en",
@@ -789,7 +800,7 @@ def notificar_decisao_previsao_atendimento(
             cor = "#16a34a" if aprovado else "#dc2626"
             detalhes = [
                 ("Ticket", numero_chamado),
-                ("Category", categoria),
+                ("Category", categoria_en),
                 ("Requested date", previsao_fmt),
                 ("Decided by", gestor_nome),
             ]

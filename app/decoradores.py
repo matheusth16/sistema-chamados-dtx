@@ -10,12 +10,21 @@ Uso:
 import logging
 from functools import wraps
 
-from flask import current_app, redirect, url_for
+from flask import current_app, jsonify, redirect, request, url_for
 from flask_login import current_user
 
 from app.i18n import flash_t
 
 logger = logging.getLogger(__name__)
+
+
+def _resposta_api_acesso_negado(codigo: int):
+    """Retorna o contrato JSON de autenticação/autorização das rotas REST."""
+    from app.i18n import get_translation_session
+
+    return jsonify(
+        {"sucesso": False, "erro": get_translation_session("unauthorized_access")}
+    ), codigo
 
 
 def requer_perfil(*perfis_permitidos):
@@ -44,6 +53,8 @@ def requer_perfil(*perfis_permitidos):
                 logger.warning(
                     "Acesso negado: usuário não autenticado tentou acessar %s", f.__name__
                 )
+                if request.path.startswith("/api/"):
+                    return _resposta_api_acesso_negado(401)
                 flash_t("login_required_msg", "danger")
                 return redirect(url_for("main.login"))
 
@@ -102,6 +113,8 @@ def requer_supervisor_area(f):
         # Se não está autenticado, redireciona para login
         if not current_user.is_authenticated:
             logger.warning("Acesso negado: usuário não autenticado tentou acessar %s", f.__name__)
+            if request.path.startswith("/api/"):
+                return _resposta_api_acesso_negado(401)
             flash_t("login_required_msg", "danger")
             return redirect(url_for("main.login"))
 
@@ -112,6 +125,8 @@ def requer_supervisor_area(f):
                 current_user.email,
                 f.__name__,
             )
+            if request.path.startswith("/api/"):
+                return _resposta_api_acesso_negado(403)
             flash_t("access_denied_supervisors", "danger")
             return redirect(url_for("main.index"))
 

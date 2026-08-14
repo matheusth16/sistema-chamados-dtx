@@ -8,7 +8,7 @@ from datetime import UTC
 from logging.handlers import RotatingFileHandler
 from urllib.parse import urlparse
 
-from flask import Flask, g, jsonify, redirect, request, session
+from flask import Flask, g, jsonify, redirect, request, session, url_for
 from flask_login import LoginManager
 from flask_wtf.csrf import CSRFProtect
 from pythonjsonlogger import json as jsonlogger
@@ -29,19 +29,6 @@ class _WindowsSafeRotatingFileHandler(RotatingFileHandler):
     def doRollover(self) -> None:  # noqa: N802 — sobrescreve método da biblioteca
         with contextlib.suppress(PermissionError):
             super().doRollover()
-
-
-# Rotas POST sensíveis que devem validar Origin/Referer quando APP_BASE_URL estiver definido
-_POST_ORIGIN_CHECK_PATHS = frozenset(
-    {
-        "/api/atualizar-status",
-        "/api/bulk-status",
-        "/api/push-subscribe",
-        "/api/carregar-mais",
-        "/api/editar-chamado",
-        "/api/notificacoes/ler-todas",
-    }
-)
 
 
 def create_app():
@@ -82,6 +69,18 @@ def create_app():
     login_manager.login_view = "main.login"  # Redireciona para login se não autenticado
     login_manager.login_message = "Please log in to continue."
     login_manager.login_message_category = "info"
+
+    @login_manager.unauthorized_handler
+    def _nao_autenticado():
+        if request.path.startswith("/api/"):
+            from app.i18n import get_translation
+
+            mensagem = get_translation("unauthorized_access", session.get("language", "en"))
+            return jsonify({"sucesso": False, "erro": mensagem}), 401
+        from app.i18n import flash_t
+
+        flash_t("login_required_msg", "danger")
+        return redirect(url_for("main.login", next=request.url))
 
     # Carregador de usuários para Flask-Login
     @login_manager.user_loader
@@ -567,7 +566,7 @@ def _configurar_seguranca(app: Flask) -> None:
     @app.before_request
     def _validar_origin_referer():
         """
-        Valida Origin/Referer para POST em rotas sensíveis.
+        Valida Origin/Referer para todo POST /api/*, exceto relatórios CSP.
 
         Se APP_BASE_URL está definida em config:
         - Rejeita requisições POST de origem diferente
@@ -575,11 +574,8 @@ def _configurar_seguranca(app: Flask) -> None:
         - Registra tentativas suspeitas em logs
 
         Rotas protegidas (quando APP_BASE_URL está configurada):
-        - /api/atualizar-status
-        - /api/bulk-status
-        - /api/push-subscribe
-        - /api/carregar-mais
-        - /api/notificacoes/*/ler
+        - todo POST /api/*
+        - exceção: /api/csp-report, enviado nativamente pelo navegador
 
         Examples:
             GET /admin    → Passa (não é POST)
@@ -594,15 +590,8 @@ def _configurar_seguranca(app: Flask) -> None:
         if not base_url or request.method != "POST":
             return None
 
-        # Verifica se a rota é crítica (precisa validação)
         path = request.path
-        eh_rota_critica = (
-            path in _POST_ORIGIN_CHECK_PATHS
-            or (path.startswith("/api/notificacoes/") and path.endswith("/ler"))
-            or path.startswith("/api/onboarding/")
-        )
-
-        if not eh_rota_critica:
+        if not path.startswith("/api/") or path == "/api/csp-report":
             return None
 
         # ============================================================

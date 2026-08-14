@@ -71,6 +71,7 @@ def processar_edicao_chamado(
     update_data = {}
     mensagens = []
     historico_pendente = []  # acumula Historico para batch write único
+    caminhos_anexos_novos = []
 
     # Congelamento: Chamado Concluído é read-only para edição operacional.
     # Reabertura deve ser feita via /api/atualizar-status com chamado_aceita_transicao_status.
@@ -220,23 +221,21 @@ def processar_edicao_chamado(
         # 5. Anexos (suporta múltiplos arquivos)
         arquivos_validos = [a for a in (arquivos_novos or []) if getattr(a, "filename", "")]
         if arquivos_validos:
-            anexos_existentes = list(data_chamado.get("anexos") or [])
-            anexo_principal = data_chamado.get("anexo")
-            if anexo_principal and anexo_principal not in anexos_existentes:
-                anexos_existentes.insert(0, anexo_principal)
-
             for arq in arquivos_validos:
                 try:
                     caminho_anexo = salvar_anexo(arq)
-                except ValueError as e:
-                    return {"sucesso": False, "erro": str(e)}
+                except ValueError:
+                    return {
+                        "sucesso": False,
+                        "erro": _t("upload_invalid_format_generic"),
+                    }
 
                 if caminho_anexo is None and current_app.config.get("ENV") == "production":
                     mensagens.append(_t("file_save_error_production"))
                     continue
 
                 if caminho_anexo:
-                    anexos_existentes.append(caminho_anexo)
+                    caminhos_anexos_novos.append(caminho_anexo)
                     historico_pendente.append(
                         Historico(
                             chamado_id=chamado_id,
@@ -249,10 +248,6 @@ def processar_edicao_chamado(
                             detalhe=arq.filename,
                         )
                     )
-
-            update_data["anexos"] = anexos_existentes
-            if not anexo_principal and anexos_existentes:
-                update_data["anexo"] = anexos_existentes[0]
 
         # 6. Setores adicionais
         setores_atuais = data_chamado.get("setores_adicionais") or []
@@ -305,13 +300,35 @@ def processar_edicao_chamado(
                 )
             )
 
+        # I/O dos uploads terminou antes desta escrita. A concatenação acontece
+        # no próprio UPDATE para não perder anexos enviados por outro request.
+        if caminhos_anexos_novos:
+            anexos_atualizados = chamado_obj.adicionar_anexos_atomico(
+                caminhos_anexos_novos,
+                precondicoes={"status": data_chamado.get("status")},
+            )
+            if anexos_atualizados is None:
+                return {
+                    "sucesso": False,
+                    "erro": _t("internal_error_saving_changes"),
+                    "codigo": 409,
+                }
+            update_data["anexos"] = anexos_atualizados
+            update_data["anexo"] = chamado_obj.anexo
+
         # Persiste histórico em lote único (N writes → 1 round-trip)
         if historico_pendente:
             Historico.salvar_lote(historico_pendente)
 
         # Efetivar as alterações de Dados
         if update_data:
-            if not chamado_obj.atualizar_campos(**update_data):
+            campos_ja_persistidos = {"anexos", "anexo"}
+            campos_restantes = {
+                campo: valor
+                for campo, valor in update_data.items()
+                if campo not in campos_ja_persistidos
+            }
+            if campos_restantes and not chamado_obj.atualizar_campos(**campos_restantes):
                 return {"sucesso": False, "erro": _t("internal_error_saving_changes")}
             mensagens.insert(0, _t("changes_saved"))
             return {"sucesso": True, "mensagem": " ".join(mensagens), "dados": update_data}

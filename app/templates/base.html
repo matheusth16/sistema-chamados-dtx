@@ -394,6 +394,12 @@
           )
             fecharDropdown();
         });
+        document.addEventListener("keydown", function (e) {
+          if (e.key === "Escape" && dropdownAberto()) {
+            fecharDropdown();
+            btn.focus();
+          }
+        });
         if (btnMarcarTodas) {
           btnMarcarTodas.addEventListener("click", function (e) {
             e.preventDefault();
@@ -474,6 +480,9 @@
         }
         function mostrarToastSucesso() {
           var toast = document.createElement("div");
+          toast.setAttribute("role", "status");
+          toast.setAttribute("aria-live", "polite");
+          toast.setAttribute("aria-atomic", "true");
           toast.className =
             "fixed bottom-24 left-1/2 -translate-x-1/2 z-toast bg-white border border-green-200 text-green-800 rounded-dtx-lg shadow-dtx px-4 py-2 text-sm font-medium";
           toast.textContent = "{{ t('webpush_ativado') }}";
@@ -608,7 +617,10 @@
           document.querySelectorAll(".bento-nav-hover-wrap.open").forEach(function (w) {
             w.classList.remove("open");
             var b = w.querySelector("button");
-            if (b) b.setAttribute("aria-expanded", "false");
+            if (b) {
+              b.setAttribute("aria-expanded", "false");
+              b.focus();
+            }
           });
         });
       })();
@@ -664,7 +676,10 @@
           if (!menu.classList.contains("invisible")) close();
         });
         document.addEventListener("keydown", function (e) {
-          if (e.key === "Escape") close();
+          if (e.key === "Escape" && !menu.classList.contains("invisible")) {
+            close();
+            btn.focus();
+          }
         });
       })();
     </script>

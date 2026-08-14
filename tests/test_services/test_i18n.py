@@ -300,6 +300,27 @@ def test_get_translated_category_desconhecida_retorna_original():
     assert result == "Desconhecida"
 
 
+def test_get_translated_category_rotina():
+    """get_translated_category traduz 'Rotina' — categoria mais comum do sistema,
+    faltava em CATEGORY_KEYS_MAP e vazava PT-BR em e-mails em inglês (2026-08-13)."""
+    from app.i18n import get_translated_category
+
+    sample = {"not_applicable_routine": {"pt_BR": "Rotina", "en": "Routine", "es": "Rutina"}}
+    with patch("app.i18n.get_translations_dict", return_value=sample):
+        result = get_translated_category("Rotina", "en")
+    assert result == "Routine"
+
+
+def test_get_translated_category_aog():
+    """get_translated_category traduz 'AOG' — faltava em CATEGORY_KEYS_MAP (2026-08-13)."""
+    from app.i18n import get_translated_category
+
+    sample = {"aog_short": {"pt_BR": "AOG", "en": "AOG", "es": "AOG"}}
+    with patch("app.i18n.get_translations_dict", return_value=sample):
+        result = get_translated_category("AOG", "en")
+    assert result == "AOG"
+
+
 def test_get_translated_status_aberto():
     """get_translated_status traduz 'Aberto'."""
     from app.i18n import get_translated_status

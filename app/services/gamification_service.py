@@ -1,11 +1,10 @@
 import logging
 from typing import Any
 
-from sqlalchemy import update
+from sqlalchemy import select, update
 
 from app import db as db_module
 from app.db.models.usuario import UsuarioRow
-from app.models_usuario import Usuario
 
 logger = logging.getLogger(__name__)
 
@@ -82,36 +81,26 @@ class GamificationService:
         level e conquistas são calculados otimisticamente a partir do valor pré-leitura.
         """
         try:
-            usuario = Usuario.get_by_id(usuario_id)
-            if not usuario:
-                return False
-
-            # Cálculo otimístico para level e conquistas (aceitável — são valores de exibição)
-            nova_exp_total = usuario.exp_total + pontos
-            novo_level = GamificationService.get_level_for_exp(nova_exp_total)
-
-            novas_conquistas = GamificationService._verificar_novas_conquistas(
-                conquistas_atuais=list(usuario.conquistas or []),
-                motivo=motivo,
-                novo_level=novo_level,
-                nova_exp_total=nova_exp_total,
-            )
-            conquistas_atualizadas = list(usuario.conquistas or []) + novas_conquistas
-
-            # UPDATE ... SET exp_total = exp_total + pontos aplica o delta
-            # atomicamente no Postgres, eliminando o race condition de
-            # read-then-write (F-14) — equivalente ao antigo Increment() do Firestore.
             with db_module.SessionLocal() as session, session.begin():
-                session.execute(
-                    update(UsuarioRow)
-                    .where(UsuarioRow.id == usuario_id)
-                    .values(
-                        exp_total=UsuarioRow.exp_total + pontos,
-                        exp_semanal=UsuarioRow.exp_semanal + pontos,
-                        level=novo_level,
-                        conquistas=conquistas_atualizadas,
-                    )
+                usuario_row = session.execute(
+                    select(UsuarioRow).where(UsuarioRow.id == usuario_id).with_for_update()
+                ).scalar_one_or_none()
+                if usuario_row is None:
+                    return False
+
+                nova_exp_total = usuario_row.exp_total + pontos
+                novo_level = GamificationService.get_level_for_exp(nova_exp_total)
+                conquistas_atuais = list(usuario_row.conquistas or [])
+                novas_conquistas = GamificationService._verificar_novas_conquistas(
+                    conquistas_atuais=conquistas_atuais,
+                    motivo=motivo,
+                    novo_level=novo_level,
+                    nova_exp_total=nova_exp_total,
                 )
+                usuario_row.exp_total = nova_exp_total
+                usuario_row.exp_semanal += pontos
+                usuario_row.level = novo_level
+                usuario_row.conquistas = conquistas_atuais + novas_conquistas
 
             logger.info(
                 "Usuário %s ganhou %s EXP (%s). Novo nível: %s.",

@@ -12,6 +12,15 @@ import pytest
 # --- Health e Service Worker (sem auth) ---
 
 
+def test_pagina_html_sem_login_preserva_redirect_e_flash(client):
+    r = client.get("/meus-dados/exportar", follow_redirects=False)
+
+    assert r.status_code == 302
+    assert "/login" in (r.location or "")
+    with client.session_transaction() as sess:
+        assert sess.get("_flashes")
+
+
 @pytest.mark.api
 def test_api_health_contrato_200_status_ok(client):
     """GET /health retorna 200 e corpo { status: ok }."""
@@ -33,14 +42,15 @@ def test_api_sw_js_contrato_200_javascript(client):
 
 @pytest.mark.api
 def test_api_atualizar_status_sem_login_401(client):
-    """POST /api/atualizar-status sem login redireciona (302) ou retorna 401/403 — acesso bloqueado."""
+    """POST /api/atualizar-status sem login retorna JSON 401."""
     r = client.post(
         "/api/atualizar-status",
         json={"chamado_id": "x", "novo_status": "Aberto"},
         content_type="application/json",
     )
-    assert r.status_code in (302, 401, 403)
-    assert r.status_code != 200
+    assert r.status_code == 401
+    assert r.is_json
+    assert r.get_json()["sucesso"] is False
 
 
 @pytest.mark.api
@@ -95,13 +105,14 @@ def test_api_atualizar_status_sucesso_200_estrutura(client_logado_supervisor, db
 
 @pytest.mark.api
 def test_api_bulk_status_sem_login_401(client):
-    """POST /api/bulk-status sem login redireciona (302) ou retorna 401/403 — acesso bloqueado."""
+    """POST /api/bulk-status sem login retorna JSON 401."""
     r = client.post(
         "/api/bulk-status",
         json={"chamado_ids": ["ch1"], "novo_status": "Concluído"},
         content_type="application/json",
     )
-    assert r.status_code in (302, 401, 403)
+    assert r.status_code == 401
+    assert r.is_json
 
 
 @pytest.mark.api
@@ -155,11 +166,12 @@ def test_api_bulk_status_sucesso_200_estrutura(client_logado_supervisor, db_sess
 
 @pytest.mark.api
 def test_api_editar_chamado_sem_login_401(client):
-    """POST /api/editar-chamado sem login retorna 401, 403 ou 302."""
+    """POST /api/editar-chamado sem login retorna JSON 401."""
     r = client.post(
         "/api/editar-chamado", data={"chamado_id": "ch1"}, content_type="multipart/form-data"
     )
-    assert r.status_code in (401, 403, 302)
+    assert r.status_code == 401
+    assert r.is_json
 
 
 @pytest.mark.api
@@ -197,9 +209,10 @@ def test_api_editar_chamado_inexistente_404(client_logado_supervisor):
 
 @pytest.mark.api
 def test_api_chamados_paginar_sem_login_401(client):
-    """GET /api/chamados/paginar sem login retorna 401, 403 ou 302."""
+    """GET /api/chamados/paginar sem login retorna JSON 401."""
     r = client.get("/api/chamados/paginar")
-    assert r.status_code in (401, 403, 302)
+    assert r.status_code == 401
+    assert r.is_json
 
 
 @pytest.mark.api
@@ -218,11 +231,12 @@ def test_api_chamados_paginar_sucesso_200_estrutura(client_logado_supervisor):
 
 @pytest.mark.api
 def test_api_carregar_mais_sem_login_401(client):
-    """POST /api/carregar-mais sem login redireciona (302) ou retorna 401/403 — acesso bloqueado."""
+    """POST /api/carregar-mais sem login retorna JSON 401."""
     r = client.post(
         "/api/carregar-mais", json={"cursor": None, "limite": 20}, content_type="application/json"
     )
-    assert r.status_code in (302, 401, 403)
+    assert r.status_code == 401
+    assert r.is_json
 
 
 @pytest.mark.api
@@ -250,9 +264,10 @@ def test_api_carregar_mais_sucesso_200_estrutura(client_logado_supervisor):
 
 @pytest.mark.api
 def test_api_chamado_por_id_sem_login_401(client):
-    """GET /api/chamado/<id> sem login retorna 401, 403 ou 302."""
+    """GET /api/chamado/<id> sem login retorna JSON 401."""
     r = client.get("/api/chamado/ch123")
-    assert r.status_code in (401, 403, 302)
+    assert r.status_code == 401
+    assert r.is_json
 
 
 @pytest.mark.api
@@ -286,9 +301,10 @@ def test_api_chamado_por_id_sucesso_200_estrutura(client_logado_supervisor, db_s
 
 @pytest.mark.api
 def test_api_notificacoes_sem_login_401(client):
-    """GET /api/notificacoes sem login retorna 401, 403 ou 302."""
+    """GET /api/notificacoes sem login retorna JSON 401."""
     r = client.get("/api/notificacoes")
-    assert r.status_code in (401, 403, 302)
+    assert r.status_code == 401
+    assert r.is_json
 
 
 @pytest.mark.api
@@ -309,9 +325,10 @@ def test_api_notificacoes_sucesso_200_estrutura(client_logado_solicitante):
 
 @pytest.mark.api
 def test_api_notificacoes_ler_sem_login_401(client):
-    """POST /api/notificacoes/<id>/ler sem login redireciona (302) ou retorna 401/403."""
+    """POST /api/notificacoes/<id>/ler sem login retorna JSON 401."""
     r = client.post("/api/notificacoes/not_123/ler", content_type="application/json")
-    assert r.status_code in (302, 401, 403)
+    assert r.status_code == 401
+    assert r.is_json
 
 
 @pytest.mark.api
@@ -332,9 +349,10 @@ def test_api_notificacoes_ler_sucesso_200_estrutura(client_logado_solicitante):
 
 @pytest.mark.api
 def test_api_push_vapid_public_sem_login_401(client):
-    """GET /api/push-vapid-public sem login retorna 401, 403 ou 302."""
+    """GET /api/push-vapid-public sem login retorna JSON 401."""
     r = client.get("/api/push-vapid-public")
-    assert r.status_code in (401, 403, 302)
+    assert r.status_code == 401
+    assert r.is_json
 
 
 @pytest.mark.api
@@ -351,13 +369,14 @@ def test_api_push_vapid_public_sucesso_200_estrutura(client_logado_solicitante):
 
 @pytest.mark.api
 def test_api_push_subscribe_sem_login_401(client):
-    """POST /api/push-subscribe sem login redireciona (302) ou retorna 401/403."""
+    """POST /api/push-subscribe sem login retorna JSON 401."""
     r = client.post(
         "/api/push-subscribe",
         json={"subscription": {"endpoint": "https://x"}},
         content_type="application/json",
     )
-    assert r.status_code in (302, 401, 403)
+    assert r.status_code == 401
+    assert r.is_json
 
 
 @pytest.mark.api

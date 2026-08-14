@@ -59,8 +59,8 @@
 
             <div class="bento-section-head"><span class="num">1</span><span>{{ t('form_section_classification') }}</span></div>
 
-            <div>
-                <label class="bento-field-label">{{ t('request_category') }}</label>
+            <fieldset style="border:0; padding:0; margin:0; min-width:0;">
+                <legend class="bento-field-label">{{ t('request_category') }}</legend>
                 <div class="bento-pill-group">
                     <label for="cat_nao_aplicavel" class="bento-pill">
                         <input type="radio" id="cat_nao_aplicavel" name="categoria" value="Nao Aplicavel" checked data-toggle-rl="false" class="sr-only">
@@ -79,7 +79,7 @@
                     </label>
                 </div>
                 <p class="bento-field-hint">{{ t('category_priority_hint') }}</p>
-            </div>
+            </fieldset>
 
             <div id="div_rl" class="bento-rl-field hidden">
                 <label for="rl_codigo">{{ t('rl_code_label') }} *</label>
@@ -90,8 +90,8 @@
                 </p>
             </div>
 
-            <div>
-                <label class="bento-field-label">{{ t('main_impact') }}</label>
+            <fieldset style="border:0; padding:0; margin:0; min-width:0;">
+                <legend class="bento-field-label">{{ t('main_impact') }}</legend>
                 <div class="bento-impact-grid">
                     {% for impacto in impactos %}
                     <label class="bento-impact">
@@ -102,7 +102,7 @@
                     {% endfor %}
                 </div>
                 <p class="bento-field-hint">{{ t('main_impact_hint') }}</p>
-            </div>
+            </fieldset>
 
             <div class="bento-section-head"><span class="num">2</span><span>{{ t('form_section_destination') }}</span></div>
 
@@ -190,15 +190,18 @@
                         <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                         <span>{{ t('file_too_large_use_link') }}</span>
                     </p>
+                    <label for="input_link_externo" class="bento-field-label plain">{{ t('external_link_label') }}</label>
                     <div class="bento-link-row">
                         <input type="text" id="input_link_externo"
                                placeholder="{{ t('external_link_placeholder') }}"
-                               autocomplete="off">
+                               autocomplete="off"
+                               aria-describedby="msg_link_invalido"
+                               aria-invalid="false">
                         <button type="button" id="btn_add_link" class="bento-btn-secondary">
                             {{ t('external_link_add_btn') }}
                         </button>
                     </div>
-                    <p id="msg_link_invalido" class="hidden text-xs mt-1" style="color:var(--color-bento-danger)">{{ t('external_link_invalid') }}</p>
+                    <p id="msg_link_invalido" role="alert" aria-live="assertive" class="hidden text-xs mt-1" style="color:var(--color-bento-danger)">{{ t('external_link_invalid') }}</p>
                 </div>
                 <!-- Hidden inputs para links externos confirmados (inseridos por JS) -->
                 <div id="container_links_externos"></div>
@@ -208,7 +211,7 @@
 
             <!-- Observadores (em cópia) -->
             <div>
-                <label class="bento-field-label">{{ t('observers_cc') }}</label>
+                <label for="obs-busca" class="bento-field-label">{{ t('observer_search_label') }}</label>
                 {% set _obs_ph = t('search_user_placeholder') %}
                 {% set _obs_hint = t('observers_hint') %}
                 <div class="relative">
@@ -225,7 +228,7 @@
 
             {# type="button" — interceptado por JS para abrir modal de pré-envio #}
             <button id="btn-submit" data-testid="submit-btn" type="button" class="bento-submit-btn">
-                <svg id="btn-submit-icon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
+                <svg id="btn-submit-icon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M22 2L11 13M22 2L15 22L11 13L2 9L22 2Z"</path></svg>
                 <svg id="btn-submit-spinner" class="w-5 h-5 hidden animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
                 <span id="btn-submit-text">{{ t('submit_request') }}</span>
             </button>
@@ -698,10 +701,12 @@
             var url = inputLink.value.trim();
             if (!_linkValido(url)) {
                 msgInvalido.classList.remove('hidden');
+                inputLink.setAttribute('aria-invalid', 'true');
                 inputLink.focus();
                 return;
             }
             msgInvalido.classList.add('hidden');
+            inputLink.removeAttribute('aria-invalid');
             _adicionarLinkExterno(url);
             inputLink.value = '';
             blocoLink.classList.add('hidden');
@@ -714,6 +719,7 @@
         inputLink.addEventListener('input', function() {
             if (msgInvalido && !msgInvalido.classList.contains('hidden')) {
                 msgInvalido.classList.add('hidden');
+                inputLink.removeAttribute('aria-invalid');
             }
         });
     })();

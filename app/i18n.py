@@ -84,7 +84,9 @@ SECTOR_KEYS_MAP = {
 
 # Mapa de Categorias para Chaves de Tradução
 CATEGORY_KEYS_MAP = {
+    "Rotina": "not_applicable_routine",
     "Projetos": "projects",
+    "AOG": "aog_short",
     "Nao Aplicavel": "not_applicable",  # Sem acento no banco de dados
 }
 

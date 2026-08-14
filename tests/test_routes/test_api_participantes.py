@@ -133,13 +133,14 @@ class TestIncluirParticipantesRota:
         assert resp.status_code == 403
 
     def test_incluir_solicitante_bloqueado(self, client_logado_solicitante):
-        """Solicitante não tem acesso à rota (requer_supervisor_area → redirect 302)."""
+        """Solicitante não tem acesso à rota e recebe JSON 403."""
         resp = client_logado_solicitante.post(
             "/api/chamado/id123/incluir-participantes",
             json={"participantes": [{"supervisor_id": "id_dest", "area": "Logistica"}]},
             content_type="application/json",
         )
-        assert resp.status_code in (302, 403)
+        assert resp.status_code == 403
+        assert resp.is_json
 
     def test_incluir_idor_supervisor_sem_acesso_retorna_403(self, client_logado_supervisor):
         """Supervisor sem acesso ao chamado (usuario_pode_ver_chamado=False) → 403."""
