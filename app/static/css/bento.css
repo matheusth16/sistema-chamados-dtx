@@ -530,8 +530,9 @@ dialog.bento-modal textarea:focus{ outline:none; border-color:var(--color-dtx-50
 .bento-notice.info code{ background:var(--color-bento-info-bg-deep); padding:2px 6px; border-radius:6px; font-size:12px; font-family:var(--font-mono,monospace); }
 
 .bento-checkbox-grid{ display:flex; flex-wrap:wrap; gap:10px; background:var(--color-surface-canvas); border-radius:16px; padding:14px; }
-.bento-checkbox-label{ display:flex; align-items:flex-start; gap:8px; font-size:13px; font-weight:600; text-align:left; flex:0 0 calc(50% - 5px); box-sizing:border-box; }
+.bento-checkbox-label{ display:flex; align-items:flex-start; gap:8px; font-size:13px; font-weight:600; text-align:left; flex:0 0 calc(50% - 5px); box-sizing:border-box; padding:6px 8px; border-radius:10px; transition:background .15s, box-shadow .15s; }
 .bento-checkbox-label input{ margin-top:2px; flex-shrink:0; }
+.bento-checkbox-label:has(input:checked){ background:var(--color-dtx-100); color:var(--color-dtx-500); box-shadow:0 0 0 1.5px var(--color-dtx-500) inset; }
 
 .bento-form-section{ border:1px solid rgba(20,30,60,.06); border-radius:16px; padding:16px; }
 .bento-form-section .help{ font-size:12px; color:var(--color-surface-muted); margin-top:6px; }
