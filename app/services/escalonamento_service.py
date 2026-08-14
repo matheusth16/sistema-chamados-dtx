@@ -77,42 +77,39 @@ def transferir_area(
     if not area:
         raise ValueError("área obrigatória")
 
-    # ── carrega chamado ──────────────────────────────────────────────────────
-    chamado = Chamado.get_by_id(chamado_id)
-    if chamado is None:
-        return {"sucesso": False, "erro": _t("ticket_not_found")}
+    # Ownership e estado usados no update são lidos novamente sob lock. Assim,
+    # duas transferências concorrentes do mesmo ex-owner não podem vencer.
+    with Chamado.editar_com_lock(chamado_id) as chamado:
+        if chamado is None:
+            return {"sucesso": False, "erro": _t("ticket_not_found")}
+        if not (chamado.responsavel_id == usuario.id or usuario.is_admin_or_above):
+            logger.warning(
+                "transferir_area negado: usuário %s não é owner do chamado %s",
+                usuario.id,
+                chamado_id,
+            )
+            return {
+                "sucesso": False,
+                "erro": _t("no_permission_transfer_ticket"),
+                "codigo": 409,
+            }
 
-    # ── verifica permissão (owner ou admin) ──────────────────────────────────
-    if not (chamado.responsavel_id == usuario.id or usuario.is_admin_or_above):
-        logger.warning(
-            "transferir_area negado: usuário %s não é owner do chamado %s",
-            usuario.id,
-            chamado_id,
+        supervisores_destino = Usuario.get_supervisores_por_area(area)
+        sup_destino = next((s for s in supervisores_destino if s.id == supervisor_id), None)
+        if not sup_destino:
+            return {
+                "sucesso": False,
+                "erro": _t("target_supervisor_not_found_area"),
+            }
+
+        area_anterior = chamado.area
+        chamado.area = area
+        chamado.responsavel_id = supervisor_id
+        chamado.responsavel = sup_destino.nome
+        chamado.motivo_ultima_escalacao = motivo[:500]
+        chamado.supervisor_ids_com_acesso = calcular_supervisor_ids_com_acesso(
+            area, supervisor_id, chamado.participantes
         )
-        return {"sucesso": False, "erro": _t("no_permission_transfer_ticket")}
-
-    # ── valida supervisor destino na área destino ────────────────────────────
-    supervisores_destino = Usuario.get_supervisores_por_area(area)
-    sup_destino = next((s for s in supervisores_destino if s.id == supervisor_id), None)
-    if not sup_destino:
-        return {
-            "sucesso": False,
-            "erro": _t("target_supervisor_not_found_area"),
-        }
-
-    # ── recalcula supervisor_ids_com_acesso ──────────────────────────────────
-    novos_ids = calcular_supervisor_ids_com_acesso(area, supervisor_id, chamado.participantes)
-
-    area_anterior = chamado.area
-
-    # ── update atômico ───────────────────────────────────────────────────────
-    chamado.atualizar_campos(
-        area=area,
-        responsavel_id=supervisor_id,
-        responsavel=sup_destino.nome,
-        motivo_ultima_escalacao=motivo[:500],
-        supervisor_ids_com_acesso=novos_ids,
-    )
 
     # ── histórico ────────────────────────────────────────────────────────────
     hist = Historico(
@@ -165,50 +162,41 @@ def escalonar_colega(
     if not motivo:
         raise ValueError("motivo obrigatório")
 
-    # ── carrega chamado ──────────────────────────────────────────────────────
-    chamado = Chamado.get_by_id(chamado_id)
-    if chamado is None:
-        return {"sucesso": False, "erro": _t("ticket_not_found")}
+    with Chamado.editar_com_lock(chamado_id) as chamado:
+        if chamado is None:
+            return {"sucesso": False, "erro": _t("ticket_not_found")}
+        if not (chamado.responsavel_id == usuario.id or usuario.is_admin_or_above):
+            logger.warning(
+                "escalonar_colega negado: usuário %s não é owner do chamado %s",
+                usuario.id,
+                chamado_id,
+            )
+            return {
+                "sucesso": False,
+                "erro": _t("no_permission_escalate_ticket"),
+                "codigo": 409,
+            }
+        if supervisor_id == chamado.responsavel_id:
+            return {
+                "sucesso": False,
+                "erro": _t("target_same_as_current_responsible"),
+            }
 
-    # ── verifica permissão (owner ou admin) ──────────────────────────────────
-    if not (chamado.responsavel_id == usuario.id or usuario.is_admin_or_above):
-        logger.warning(
-            "escalonar_colega negado: usuário %s não é owner do chamado %s",
-            usuario.id,
-            chamado_id,
+        supervisores_area = Usuario.get_supervisores_por_area(chamado.area)
+        colega = next((s for s in supervisores_area if s.id == supervisor_id), None)
+        if not colega:
+            return {
+                "sucesso": False,
+                "erro": _t("target_supervisor_wrong_area"),
+            }
+
+        responsavel_anterior = chamado.responsavel_id
+        chamado.responsavel_id = supervisor_id
+        chamado.responsavel = colega.nome
+        chamado.motivo_ultima_escalacao = motivo[:500]
+        chamado.supervisor_ids_com_acesso = calcular_supervisor_ids_com_acesso(
+            chamado.area, supervisor_id, chamado.participantes
         )
-        return {"sucesso": False, "erro": _t("no_permission_escalate_ticket")}
-
-    # ── destino ≠ owner atual ────────────────────────────────────────────────
-    if supervisor_id == chamado.responsavel_id:
-        return {
-            "sucesso": False,
-            "erro": _t("target_same_as_current_responsible"),
-        }
-
-    # ── valida colega na mesma área ──────────────────────────────────────────
-    supervisores_area = Usuario.get_supervisores_por_area(chamado.area)
-    colega = next((s for s in supervisores_area if s.id == supervisor_id), None)
-    if not colega:
-        return {
-            "sucesso": False,
-            "erro": _t("target_supervisor_wrong_area"),
-        }
-
-    # ── recalcula supervisor_ids_com_acesso ──────────────────────────────────
-    novos_ids = calcular_supervisor_ids_com_acesso(
-        chamado.area, supervisor_id, chamado.participantes
-    )
-
-    responsavel_anterior = chamado.responsavel_id
-
-    # ── update atômico (área inalterada) ─────────────────────────────────────
-    chamado.atualizar_campos(
-        responsavel_id=supervisor_id,
-        responsavel=colega.nome,
-        motivo_ultima_escalacao=motivo[:500],
-        supervisor_ids_com_acesso=novos_ids,
-    )
 
     # ── histórico ────────────────────────────────────────────────────────────
     hist = Historico(
@@ -258,20 +246,6 @@ def incluir_participantes(
     if not participantes_novos:
         return {"sucesso": False, "erro": _t("participants_list_cannot_be_empty")}
 
-    # ── validação de input (não depende do estado exato de participantes já
-    # existentes — duplicidade é revalidada dentro do lock, na leitura fresca) ──
-    chamado_preview = Chamado.get_by_id(chamado_id)
-    if chamado_preview is None:
-        return {"sucesso": False, "erro": _t("ticket_not_found")}
-
-    if not (chamado_preview.responsavel_id == usuario.id or usuario.is_admin_or_above):
-        logger.warning(
-            "incluir_participantes negado: usuário %s não é owner do chamado %s",
-            usuario.id,
-            chamado_id,
-        )
-        return {"sucesso": False, "erro": _t("no_permission_include_participants")}
-
     itens_validados = []
     for item in participantes_novos:
         sup_id = (item.get("supervisor_id") or "").strip()
@@ -282,26 +256,44 @@ def incluir_participantes(
         if not area:
             return {"sucesso": False, "erro": _t("field_area_required_each")}
 
-        if sup_id == chamado_preview.responsavel_id:
-            return {
-                "sucesso": False,
-                "erro": _t("owner_cannot_be_participant"),
-            }
-
-        supervisores_area = Usuario.get_supervisores_por_area(area)
-        sup_obj = next((s for s in supervisores_area if s.id == sup_id), None)
-        if not sup_obj:
-            return {
-                "sucesso": False,
-                "erro": _t("supervisor_not_found_in_area", sup_id=sup_id, area=area),
-            }
-
-        itens_validados.append({"supervisor_id": sup_id, "area": area, "nome": sup_obj.nome})
+        itens_validados.append({"supervisor_id": sup_id, "area": area})
 
     # ── leitura fresca + mutação + escrita, tudo sob lock da linha do chamado ──
     with Chamado.editar_com_lock(chamado_id) as chamado:
         if chamado is None:
             return {"sucesso": False, "erro": _t("ticket_not_found")}
+        if not (chamado.responsavel_id == usuario.id or usuario.is_admin_or_above):
+            logger.warning(
+                "incluir_participantes negado: usuário %s não é owner do chamado %s",
+                usuario.id,
+                chamado_id,
+            )
+            return {
+                "sucesso": False,
+                "erro": _t("no_permission_include_participants"),
+                "codigo": 409,
+            }
+        for item in itens_validados:
+            supervisores_area = Usuario.get_supervisores_por_area(item["area"])
+            sup_obj = next(
+                (s for s in supervisores_area if s.id == item["supervisor_id"]),
+                None,
+            )
+            if not sup_obj:
+                return {
+                    "sucesso": False,
+                    "erro": _t(
+                        "supervisor_not_found_in_area",
+                        sup_id=item["supervisor_id"],
+                        area=item["area"],
+                    ),
+                }
+            item["nome"] = sup_obj.nome
+        if any(item["supervisor_id"] == chamado.responsavel_id for item in itens_validados):
+            return {
+                "sucesso": False,
+                "erro": _t("owner_cannot_be_participant"),
+            }
 
         participantes_atuais = list(chamado.participantes or [])
         ids_existentes = {p["supervisor_id"] for p in participantes_atuais}

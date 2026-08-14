@@ -80,6 +80,7 @@ def _criar_chamado_aberto(
     nivel: int = 0,
     data_abertura: datetime | None = None,
     categoria: str = "Manutenção",
+    area: str = "Engenharia",
     previsao_atendimento: datetime | None = None,
     status: str = "Aberto",
     proximo_tick_em: datetime | None = None,
@@ -90,7 +91,7 @@ def _criar_chamado_aberto(
         tipo_solicitacao="Corretiva",
         descricao="Teste",
         responsavel="Resp",
-        area="Engenharia",
+        area=area,
         status=status,
         numero_chamado=_numero_unico(),
         escalacao_nivel=nivel,
@@ -120,6 +121,7 @@ def _criar_chamado_em_atendimento(
     data_em_atendimento=_NAO_INFORMADO,
     data_abertura: datetime | None = None,
     categoria: str = "Manutenção",
+    area: str = "Engenharia",
     alerta_50: bool = False,
     alerta_80: bool = False,
     nivel: int = 0,
@@ -139,7 +141,7 @@ def _criar_chamado_em_atendimento(
         descricao="Teste",
         responsavel="Resp",
         responsavel_id=responsavel_id or None,
-        area="Engenharia",
+        area=area,
         status="Em Atendimento",
         numero_chamado=_numero_unico(),
         escalacao_nivel=nivel,
@@ -374,7 +376,7 @@ def test_escalonamento_regressao_tat_conta_da_abertura_nao_do_atendimento():
         patch("app.services.sla_escalacao_service.notificar_escalada_gerencial") as mock_notif,
         patch(
             "app.services.sla_escalacao_service._construir_mapa_gestor_setor",
-            return_value={"Manutenção": "gestor@dtx.aero"},
+            return_value={"Engenharia": "gestor@dtx.aero"},
         ),
     ):
         resultado = processar_escalonamento(agora=agora)
@@ -413,7 +415,7 @@ def test_escalonamento_aberto_no_tat_escala_cadencia_2h():
         patch("app.services.sla_escalacao_service.notificar_escalada_gerencial") as mock_notif,
         patch(
             "app.services.sla_escalacao_service._construir_mapa_gestor_setor",
-            return_value={"Manutenção": "gestor@dtx.aero"},
+            return_value={"Engenharia": "gestor@dtx.aero"},
         ),
     ):
         resultado = processar_escalonamento(agora=agora)
@@ -428,11 +430,16 @@ def test_escalonamento_aberto_no_tat_escala_cadencia_2h():
     )
 
 
-def test_escalonamento_nivel_1_usa_email_do_setor_do_chamado():
+def test_escalonamento_nivel_1_usa_email_da_area_do_chamado_nao_da_categoria():
+    """Regressão (2026-08-14): nível 1 deve resolver o e-mail pela ÁREA do chamado,
+    nunca pela categoria — categoria só pode ser Rotina/Projetos/AOG, nenhuma bate
+    com nome de área real, então usar categoria como chave nunca resolve na prática.
+    categoria e área propositalmente diferentes aqui pra provar que é a área que
+    importa, não a categoria."""
     abertura = _dt(2024, 6, 3, 9, 0)
     agora = _dt(2024, 6, 6, 9, 0)
 
-    chamado_id = _criar_chamado_aberto(data_abertura=abertura, categoria="Qualidade")
+    chamado_id = _criar_chamado_aberto(data_abertura=abertura, categoria="Rotina", area="Qualidade")
 
     with (
         patch("app.services.sla_escalacao_service.notificar_escalada_gerencial") as mock_notif,
@@ -449,20 +456,21 @@ def test_escalonamento_nivel_1_usa_email_do_setor_do_chamado():
     assert kwargs["chamado_id"] == chamado_id
     assert kwargs["nivel"] == 1
     assert kwargs["email_dest"] == "qualidade@dtx.aero"
-    assert kwargs["chamado_data"]["categoria"] == "Qualidade"
+    assert kwargs["chamado_data"]["categoria"] == "Rotina"
+    assert kwargs["chamado_data"]["area"] == "Qualidade"
 
 
-def test_escalonamento_nivel_1_sem_fallback_quando_setor_sem_gestor_cadastrado():
+def test_escalonamento_nivel_1_sem_fallback_quando_area_sem_gestor_cadastrado():
     abertura = _dt(2024, 6, 3, 9, 0)
     agora = _dt(2024, 6, 6, 9, 0)
 
-    _criar_chamado_aberto(data_abertura=abertura, categoria="Manutenção")
+    _criar_chamado_aberto(data_abertura=abertura, categoria="Rotina", area="Manutencao")
 
     with (
         patch("app.services.sla_escalacao_service.notificar_escalada_gerencial") as mock_notif,
         patch(
             "app.services.sla_escalacao_service._construir_mapa_gestor_setor",
-            return_value={"Qualidade": "qualidade@dtx.aero"},  # não tem "Manutenção"
+            return_value={"Qualidade": "qualidade@dtx.aero"},  # não tem "Manutencao"
         ),
     ):
         resultado = processar_escalonamento(agora=agora)
@@ -667,7 +675,7 @@ def test_escalonamento_aog_claim_threshold_1h_dispara_antes_do_tat():
         patch("app.services.sla_escalacao_service.notificar_escalada_gerencial") as mock_notif,
         patch(
             "app.services.sla_escalacao_service._construir_mapa_gestor_setor",
-            return_value={"AOG": "gestor@dtx.aero"},
+            return_value={"Engenharia": "gestor@dtx.aero"},
         ),
     ):
         resultado = processar_escalonamento(agora=agora)
@@ -708,7 +716,7 @@ def test_escalonamento_aog_assumido_antes_do_claim_usa_tat_24h():
         patch("app.services.sla_escalacao_service.notificar_escalada_gerencial") as mock_notif_2,
         patch(
             "app.services.sla_escalacao_service._construir_mapa_gestor_setor",
-            return_value={"AOG": "gestor@dtx.aero"},
+            return_value={"Engenharia": "gestor@dtx.aero"},
         ),
     ):
         resultado_2 = processar_escalonamento(agora=agora_apos_tat)
@@ -731,7 +739,7 @@ def test_escalonamento_aog_ignora_janela_de_expediente():
         patch("app.services.sla_escalacao_service.notificar_escalada_gerencial") as mock_notif,
         patch(
             "app.services.sla_escalacao_service._construir_mapa_gestor_setor",
-            return_value={"AOG": "gestor@dtx.aero"},
+            return_value={"Engenharia": "gestor@dtx.aero"},
         ),
     ):
         resultado = processar_escalonamento(agora=agora)
@@ -839,7 +847,7 @@ def test_escalonamento_automatico_grava_historico():
         patch("app.services.sla_escalacao_service.notificar_escalada_gerencial"),
         patch(
             "app.services.sla_escalacao_service._construir_mapa_gestor_setor",
-            return_value={"Manutenção": "gestor@dtx.aero"},
+            return_value={"Engenharia": "gestor@dtx.aero"},
         ),
     ):
         processar_escalonamento(agora=agora)
@@ -1169,7 +1177,7 @@ def test_escalonamento_com_previsao_atendimento_ja_vencida_escala_normal():
         patch("app.services.sla_escalacao_service.notificar_escalada_gerencial"),
         patch(
             "app.services.sla_escalacao_service._construir_mapa_gestor_setor",
-            return_value={"Manutenção": "gestor@dtx.aero"},
+            return_value={"Engenharia": "gestor@dtx.aero"},
         ),
     ):
         resultado = processar_escalonamento(agora=agora)

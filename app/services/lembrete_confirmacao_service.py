@@ -12,7 +12,7 @@ será retentado na próxima execução do job (a cada 6 h).
 import logging
 from datetime import UTC, datetime
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from app import db as db_module
 from app.db.models.chamado import ChamadoRow
@@ -77,6 +77,40 @@ def _marcar_lembrete_enviado(chamado_id: int, numero: int) -> None:
     ).save()
 
 
+def _claim_lembrete(chamado_id: int, numero: int) -> bool:
+    campo = getattr(ChamadoRow, f"lembrete_confirmacao_{numero}_enviado")
+    stmt = (
+        update(ChamadoRow)
+        .where(
+            ChamadoRow.id == chamado_id,
+            ChamadoRow.status == "Concluído",
+            ChamadoRow.confirmacao_solicitante == "pendente",
+            campo.is_(False),
+        )
+        .values({campo.key: True})
+        .returning(ChamadoRow.id)
+    )
+    if numero == 2:
+        stmt = stmt.where(ChamadoRow.lembrete_confirmacao_1_enviado.is_(True))
+    with db_module.SessionLocal() as session, session.begin():
+        return session.execute(stmt).scalar_one_or_none() is not None
+
+
+def _liberar_lembrete(chamado_id: int, numero: int) -> None:
+    campo = getattr(ChamadoRow, f"lembrete_confirmacao_{numero}_enviado")
+    with db_module.SessionLocal() as session, session.begin():
+        session.execute(
+            update(ChamadoRow)
+            .where(
+                ChamadoRow.id == chamado_id,
+                ChamadoRow.status == "Concluído",
+                ChamadoRow.confirmacao_solicitante == "pendente",
+                campo.is_(True),
+            )
+            .values({campo.key: False})
+        )
+
+
 def processar_lembretes_confirmacao(agora: datetime | None = None) -> dict:
     """Verifica chamados Concluídos pendentes de confirmação e envia lembretes.
 
@@ -136,6 +170,8 @@ def _processar_chamado(row: ChamadoRow, agora: datetime, stats: dict) -> None:
     categoria = row.categoria or "Chamado"
 
     if not enviou_1 and horas_decorridas >= _LEMBRETE_1_HORAS:
+        if not _claim_lembrete(chamado_id, 1):
+            return
         solicitante = Usuario.get_by_id(solicitante_id) if solicitante_id else None
         enviado = notificar_solicitante_lembrete_confirmacao(
             chamado_id=chamado_id,
@@ -151,9 +187,12 @@ def _processar_chamado(row: ChamadoRow, agora: datetime, stats: dict) -> None:
             if solicitante_id:
                 _criar_inapp_lembrete(chamado_id, solicitante_id, numero_chamado, categoria, 1)
         else:
+            _liberar_lembrete(chamado_id, 1)
             logger.warning("Lembrete 1 falhou para chamado %s — será tentado novamente", chamado_id)
 
     elif enviou_1 and not enviou_2 and horas_decorridas >= _LEMBRETE_2_HORAS:
+        if not _claim_lembrete(chamado_id, 2):
+            return
         solicitante = Usuario.get_by_id(solicitante_id) if solicitante_id else None
         enviado = notificar_solicitante_lembrete_confirmacao(
             chamado_id=chamado_id,
@@ -169,4 +208,5 @@ def _processar_chamado(row: ChamadoRow, agora: datetime, stats: dict) -> None:
             if solicitante_id:
                 _criar_inapp_lembrete(chamado_id, solicitante_id, numero_chamado, categoria, 2)
         else:
+            _liberar_lembrete(chamado_id, 2)
             logger.warning("Lembrete 2 falhou para chamado %s — será tentado novamente", chamado_id)

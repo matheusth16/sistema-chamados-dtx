@@ -106,14 +106,20 @@ def construir_mapa_niveis_superiores() -> dict[str, str]:
 
 def resolver_email_gestor(
     chave_gestor: str | None,
-    categoria: str,
+    area: str,
     mapa_gestor_setor: dict[str, str],
     mapa_niveis_superiores: dict[str, str],
 ) -> str | None:
     """Resolve o e-mail de destino para o nível de escalonamento — sempre a partir
-    do cadastro real de usuários (nivel_gestao), nunca de configuração estática."""
+    do cadastro real de usuários (nivel_gestao), nunca de configuração estática.
+
+    `area` é a área do CHAMADO (chamado.area), não a categoria — mapa_gestor_setor
+    é indexado por área (ver construir_mapa_gestor_setor). Bug real corrigido
+    2026-08-14: o parâmetro chamava-se `categoria` e recebia a categoria do
+    chamado (Rotina/Projetos/AOG), que nunca bate com nome de área nenhuma —
+    e-mail de nível 1 nunca resolvia na prática."""
     if chave_gestor == "gestor_setor":
-        return mapa_gestor_setor.get(categoria)
+        return mapa_gestor_setor.get(area)
     if chave_gestor:
         return mapa_niveis_superiores.get(chave_gestor)
     return None
@@ -121,7 +127,7 @@ def resolver_email_gestor(
 
 def resolver_email_gestor_com_cascata(
     chave_gestor: str,
-    categoria: str,
+    area: str,
     mapa_gestor_setor: dict[str, str],
     mapa_niveis_superiores: dict[str, str],
 ) -> str | None:
@@ -135,7 +141,7 @@ def resolver_email_gestor_com_cascata(
         return None
     for nivel_candidato in ordem[ordem.index(chave_gestor) :]:
         email = resolver_email_gestor(
-            nivel_candidato, categoria, mapa_gestor_setor, mapa_niveis_superiores
+            nivel_candidato, area, mapa_gestor_setor, mapa_niveis_superiores
         )
         if email:
             return email

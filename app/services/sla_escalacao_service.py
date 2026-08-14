@@ -33,7 +33,7 @@ import logging
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from app import db as db_module
 from app.db.models.chamado import ChamadoRow
@@ -73,6 +73,15 @@ _NIVEL_MAXIMO = 4
 # FK, mesmo padrão de responsavel_id/solicitante_id em Chamado).
 USUARIO_ID_SISTEMA = "sistema"
 USUARIO_NOME_SISTEMA_SLA = "Sistema (Motor de Escalonamento SLA)"
+
+
+def _claim_cas(chamado_id: int, precondicoes: dict, alteracoes: dict) -> bool:
+    stmt = update(ChamadoRow).where(ChamadoRow.id == chamado_id)
+    for campo, esperado in precondicoes.items():
+        stmt = stmt.where(getattr(ChamadoRow, campo) == esperado)
+    stmt = stmt.values(**alteracoes).returning(ChamadoRow.id)
+    with db_module.SessionLocal() as session, session.begin():
+        return session.execute(stmt).scalar_one_or_none() is not None
 
 
 def calcular_deadline_inicial(categoria: str, status: str, data_abertura: datetime) -> datetime:
@@ -207,6 +216,7 @@ def _processar_chamado_escalonamento(
     data = chamado.to_dict()
     chamado_id = chamado.id
     categoria = data.get("categoria") or ""
+    area = data.get("area") or ""
     status = data.get("status")
     is_aog = categoria == "AOG"
 
@@ -240,8 +250,18 @@ def _processar_chamado_escalonamento(
         agora_naive < alvo_naive <= agora_naive + timedelta(minutes=Config.SLA_PRE_AVISO_MINUTOS)
     )
     if dentro_janela_aviso and ja_avisado != nivel_alvo and pode_notificar_agora:
+        venceu_pre_aviso = _claim_cas(
+            chamado_id,
+            {
+                "status": status,
+                "escalacao_nivel": nivel_atual,
+                "escalacao_pre_aviso_nivel_enviado": ja_avisado,
+            },
+            {"escalacao_pre_aviso_nivel_enviado": nivel_alvo},
+        )
+        if not venceu_pre_aviso:
+            return
         _enviar_pre_aviso(chamado, data, nivel_alvo, alvo_naive, agora_naive)
-        chamado.atualizar_campos(escalacao_pre_aviso_nivel_enviado=nivel_alvo)
         stats["pre_avisos"] += 1
 
     if agora_naive < alvo_naive:
@@ -254,9 +274,22 @@ def _processar_chamado_escalonamento(
     novo_nivel = nivel_atual + 1
     chave_gestor = NIVEL_PARA_CHAVE_GESTOR.get(novo_nivel)
     email_dest = _resolver_email_gestor(
-        chave_gestor, categoria, mapa_gestor_setor, mapa_niveis_superiores
+        chave_gestor, area, mapa_gestor_setor, mapa_niveis_superiores
     )
     assumido = status == "Em Atendimento"
+
+    cadencia = calcular_cadencia_minutos(categoria, status)
+    proximo_tick = agora.replace(tzinfo=None) + timedelta(minutes=cadencia)
+    venceu_tick = _claim_cas(
+        chamado_id,
+        {"status": status, "escalacao_nivel": nivel_atual},
+        {
+            "escalacao_nivel": novo_nivel,
+            "escalacao_proximo_tick_em": proximo_tick,
+        },
+    )
+    if not venceu_tick:
+        return
 
     if email_dest:
         try:
@@ -285,11 +318,6 @@ def _processar_chamado_escalonamento(
             chave_gestor,
         )
 
-    cadencia = calcular_cadencia_minutos(categoria, status)
-    chamado.atualizar_campos(
-        escalacao_nivel=novo_nivel,
-        escalacao_proximo_tick_em=agora.replace(tzinfo=None) + timedelta(minutes=cadencia),
-    )
     stats["escalados"] += 1
 
     Historico(
@@ -454,10 +482,17 @@ def _processar_aviso_resolucao(row: ChamadoRow, agora: datetime, stats: dict) ->
         return
 
     email_resp: str | None = _obter_email_responsavel(responsavel_id)
-    updates: dict = {}
 
     # Aviso 50%
-    if threshold_50:
+    if threshold_50 and _claim_cas(
+        chamado_id,
+        {
+            "status": "Em Atendimento",
+            "responsavel_id": responsavel_id,
+            "alerta_supervisor_50_enviado": False,
+        },
+        {"alerta_supervisor_50_enviado": True},
+    ):
         notificar_aviso_resolucao_supervisor(
             chamado_data=data,
             chamado_id=chamado_id,
@@ -466,7 +501,6 @@ def _processar_aviso_resolucao(row: ChamadoRow, agora: datetime, stats: dict) ->
             email_dest=email_resp,
         )
         stats["notificados_50"] += 1
-        updates["alerta_supervisor_50_enviado"] = True
         Historico(
             chamado_id=chamado_id,
             usuario_id=USUARIO_ID_SISTEMA,
@@ -478,7 +512,15 @@ def _processar_aviso_resolucao(row: ChamadoRow, agora: datetime, stats: dict) ->
         ).save()
 
     # Aviso 80%
-    if threshold_80:
+    if threshold_80 and _claim_cas(
+        chamado_id,
+        {
+            "status": "Em Atendimento",
+            "responsavel_id": responsavel_id,
+            "alerta_supervisor_80_enviado": False,
+        },
+        {"alerta_supervisor_80_enviado": True},
+    ):
         notificar_aviso_resolucao_supervisor(
             chamado_data=data,
             chamado_id=chamado_id,
@@ -487,7 +529,6 @@ def _processar_aviso_resolucao(row: ChamadoRow, agora: datetime, stats: dict) ->
             email_dest=email_resp,
         )
         stats["notificados_80"] += 1
-        updates["alerta_supervisor_80_enviado"] = True
         Historico(
             chamado_id=chamado_id,
             usuario_id=USUARIO_ID_SISTEMA,
@@ -498,14 +539,11 @@ def _processar_aviso_resolucao(row: ChamadoRow, agora: datetime, stats: dict) ->
             valor_novo="80%",
         ).save()
 
-    if updates:
-        chamado.atualizar_campos(**updates)
-        logger.info(
-            "Avisos resolução: chamado %s atualizado (pct=%.0f%%), flags=%s",
-            chamado_id,
-            pct * 100,
-            list(updates.keys()),
-        )
+    logger.info(
+        "Avisos resolução: chamado %s avaliado com claims CAS (pct=%.0f%%)",
+        chamado_id,
+        pct * 100,
+    )
 
 
 def _obter_email_responsavel(responsavel_id: str) -> str | None:

@@ -125,7 +125,8 @@ class TestTransferirAreaRota:
             json={"area": "Planejamento", "supervisor_id": "id_dest", "motivo": "motivo"},
             content_type="application/json",
         )
-        assert resp.status_code in (302, 403)
+        assert resp.status_code == 403
+        assert resp.is_json
 
     def test_transferir_area_nao_owner_supervisor_retorna_403(self, client_logado_supervisor):
         """Supervisor que não é owner do chamado → 403."""
@@ -349,7 +350,8 @@ class TestEscalonarColegaRota:
             json={"supervisor_id": "id_colega", "motivo": "motivo"},
             content_type="application/json",
         )
-        assert resp.status_code in (302, 403)
+        assert resp.status_code == 403
+        assert resp.is_json
 
     def test_escalonar_colega_idor_sem_acesso_retorna_403(self, client_logado_supervisor):
         """Supervisor sem acesso ao chamado → 403 (IDOR protection)."""
@@ -437,54 +439,40 @@ class TestEscalonarColegaRota:
         mock_threading.Thread.return_value.start.assert_called_once()
 
 
-# ── Regressão: contrato de erro inconsistente pra perfil sem permissão ────────
-#
-# Estas 3 rotas são só consumidas via fetch() do JS (ver visualizar_chamado.html)
-# e são protegidas por @requer_supervisor_area, que SEMPRE redireciona (302) em
-# vez de responder JSON — diferente do resto de /api/*, que responde
-# `{"sucesso": false, "erro": ...}` com 403 (ver decoradores.py::requer_supervisor_area).
-# Sem risco de segurança: a ação é bloqueada antes de qualquer lógica de negócio
-# rodar. Mas o fetch() do frontend recebe um redirect pra HTML onde esperava JSON,
-# e `response.json()` estoura em vez de cair no `.catch()` com mensagem clara.
+# ── Regressão: contrato JSON para perfil sem permissão ────────────────────────
 
 
 class TestContratoErroSolicitanteSemPermissao:
-    def test_transferir_area_solicitante_recebe_redirect_nao_json_403(
-        self, client_logado_solicitante
-    ):
-        """Solicitante chamando transferir-area recebe 302 (redirect do decorador),
-        não o JSON 403 padrão do resto da API."""
+    def test_transferir_area_solicitante_recebe_json_403(self, client_logado_solicitante):
+        """Solicitante chamando transferir-area recebe o contrato JSON 403."""
         resp = client_logado_solicitante.post(
             "/api/chamado/id123/transferir-area",
             json={"area": "Engenharia", "supervisor_id": "sup_x", "motivo": "motivo válido"},
             content_type="application/json",
             follow_redirects=False,
         )
-        assert resp.status_code == 302
-        assert resp.content_type != "application/json"
+        assert resp.status_code == 403
+        assert resp.is_json
+        assert resp.get_json()["sucesso"] is False
 
-    def test_escalonar_colega_solicitante_recebe_redirect_nao_json_403(
-        self, client_logado_solicitante
-    ):
-        """Solicitante chamando escalonar-colega recebe 302, não JSON 403."""
+    def test_escalonar_colega_solicitante_recebe_json_403(self, client_logado_solicitante):
+        """Solicitante chamando escalonar-colega recebe JSON 403."""
         resp = client_logado_solicitante.post(
             "/api/chamado/id123/escalonar-colega",
             json={"supervisor_id": "sup_x", "motivo": "motivo válido"},
             content_type="application/json",
             follow_redirects=False,
         )
-        assert resp.status_code == 302
-        assert resp.content_type != "application/json"
+        assert resp.status_code == 403
+        assert resp.is_json
 
-    def test_incluir_participantes_solicitante_recebe_redirect_nao_json_403(
-        self, client_logado_solicitante
-    ):
-        """Solicitante chamando incluir-participantes recebe 302, não JSON 403."""
+    def test_incluir_participantes_solicitante_recebe_json_403(self, client_logado_solicitante):
+        """Solicitante chamando incluir-participantes recebe JSON 403."""
         resp = client_logado_solicitante.post(
             "/api/chamado/id123/incluir-participantes",
             json={"participantes": [{"supervisor_id": "sup_x", "area": "Engenharia"}]},
             content_type="application/json",
             follow_redirects=False,
         )
-        assert resp.status_code == 302
-        assert resp.content_type != "application/json"
+        assert resp.status_code == 403
+        assert resp.is_json
