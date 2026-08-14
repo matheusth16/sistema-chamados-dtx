@@ -956,25 +956,41 @@ def test_obter_sla_em_atendimento_previsao_ja_passada_nao_protege_mais():
     enquanto o TAT original (3 dias) ainda não tivesse estourado. Depois que
     a previsão aprovada vence, ela deve deixar de proteger e o cálculo
     normal (percentual de tempo útil) volta a valer — mesmo comportamento já
-    coberto para o status 'Aberto' em test_obter_sla_previsao_ja_passada_nao_protege_mais."""
-    from datetime import datetime, timedelta
+    coberto para o status 'Aberto' em test_obter_sla_previsao_ja_passada_nao_protege_mais.
+
+    Datas fixas (não datetime.now()) — bug real de flakiness achado em CI
+    2026-08-14: com datetime.now() relativo, "4 dias atrás" podia cair do
+    outro lado de um fim de semana dependendo de QUANDO o teste roda,
+    derrubando o percentual de tempo útil decorrido pra menos de 100% e
+    fazendo o teste falhar por sorte de calendário, não por bug de código.
+    data_em_atendimento 2 semanas antes de agora garante >3 dias úteis
+    decorridos (SLA padrão) não importa o dia da semana.
+
+    `agora` precisa ser aware no fuso de negócio (mesmo fuso que
+    _previsao_atendimento_instante já assume pra datas naive) — misturar
+    agora UTC-aware com previsao_atendimento naive (interpretada como BRT)
+    desalinha os dois por ~3h e pode inverter passado/futuro."""
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
 
     from app.services.analytics import obter_sla_para_exibicao
+    from config import Config
 
+    agora = datetime(2024, 6, 10, 11, 0, tzinfo=ZoneInfo(Config.SLA_TIMEZONE))  # segunda-feira
     chamado = type(
         "C",
         (),
         {
-            "data_abertura": datetime.now() - timedelta(days=1),  # TAT=3d, ainda longe
+            "data_abertura": datetime(2024, 6, 9, 11, 0),  # TAT=3d, ainda longe
             "data_conclusao": None,
             "categoria": "TI",
             "status": "Em Atendimento",
-            "data_em_atendimento": datetime.now() - timedelta(days=4),  # bem estourado
+            "data_em_atendimento": datetime(2024, 5, 27, 9, 0),  # 2 semanas atrás, bem estourado
             "sla_dias": None,
-            "previsao_atendimento": datetime.now() - timedelta(hours=2),  # já venceu
+            "previsao_atendimento": datetime(2024, 6, 10, 9, 0),  # já venceu (2h antes de agora)
         },
     )()
-    r = obter_sla_para_exibicao(chamado)
+    r = obter_sla_para_exibicao(chamado, agora=agora)
     assert r is not None
     assert r["label"] != "No prazo"
 
