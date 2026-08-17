@@ -5199,6 +5199,11 @@
     "en": "[Forecast {status}] Ticket {numero} — decision recorded",
     "es": "[Previsión {status}] Ticket {numero} — decisión registrada"
   },
+  "push_subject_previsao_extensao_automatica": {
+    "pt_BR": "[Previsão] Chamado {numero} — {categoria} — prazo adiado automaticamente",
+    "en": "[Forecast] Ticket {numero} — {categoria} — deadline automatically extended",
+    "es": "[Previsión] Ticket {numero} — {categoria} — plazo extendido automáticamente"
+  },
   "supervisor_reply_title": {
     "pt_BR": "Responder ao solicitante",
     "en": "Reply to requester",
@@ -5348,6 +5353,36 @@
     "pt_BR": "Já existe um pedido de previsão de atendimento pendente pra esse chamado",
     "en": "There's already a pending attendance forecast request for this ticket",
     "es": "Ya existe un pedido de previsión de atención pendiente para este ticket"
+  },
+  "attendance_forecast_self_service_locked": {
+    "pt_BR": "Este chamado já passou por decisão do gestor — extensões futuras precisam de aprovação",
+    "en": "This ticket already had a manager decision — future extensions require approval",
+    "es": "Este ticket ya tuvo una decisión del gestor — las extensiones futuras requieren aprobación"
+  },
+  "attendance_forecast_self_service_limit_reached": {
+    "pt_BR": "As 3 extensões automáticas grátis já foram usadas — solicite aprovação do gestor",
+    "en": "All 3 free automatic extensions have been used — request manager approval",
+    "es": "Las 3 extensiones automáticas gratuitas ya fueron usadas — solicite aprobación del gestor"
+  },
+  "attendance_forecast_self_service_blocked_by_pending": {
+    "pt_BR": "Já existe um pedido de previsão pendente — decida-o antes de usar a extensão automática",
+    "en": "There's already a pending forecast request — decide it before using the automatic extension",
+    "es": "Ya existe un pedido de previsión pendiente — decídalo antes de usar la extensión automática"
+  },
+  "attendance_forecast_auto_extend_btn": {
+    "pt_BR": "Estender prazo automaticamente",
+    "en": "Extend deadline automatically",
+    "es": "Extender el plazo automáticamente"
+  },
+  "attendance_forecast_extensions_remaining": {
+    "pt_BR": "{restantes} de {total} extensões automáticas restantes",
+    "en": "{restantes} of {total} automatic extensions remaining",
+    "es": "{restantes} de {total} extensiones automáticas restantes"
+  },
+  "attendance_forecast_extensions_exhausted": {
+    "pt_BR": "Extensões automáticas esgotadas — peça aprovação ao gestor",
+    "en": "Automatic extensions exhausted — request manager approval",
+    "es": "Extensiones automáticas agotadas — solicite aprobación del gestor"
   },
   "attendance_forecast_request_not_found": {
     "pt_BR": "Pedido de previsão de atendimento não encontrado",

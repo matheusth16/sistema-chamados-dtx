@@ -241,6 +241,7 @@ def visualizar_detalhe_chamado(chamado_id: str) -> Response:
         anexos_exibicao = montar_anexos_para_exibicao(chamado, historico)
 
         from app.services.previsao_atendimento_service import (
+            LIMITE_EXTENSOES_AUTOMATICAS,
             obter_solicitacao_pendente,
             usuario_pode_decidir_previsao_atendimento,
         )
@@ -274,6 +275,7 @@ def visualizar_detalhe_chamado(chamado_id: str) -> Response:
             previsao_pendente=previsao_pendente,
             pode_decidir_previsao=pode_decidir_previsao,
             mensagens_conversa=mensagens_conversa,
+            limite_extensoes_automaticas=LIMITE_EXTENSOES_AUTOMATICAS,
         )
     except Exception as e:
         logger.exception("Erro ao exibir chamado %s: %s", chamado_id, e)

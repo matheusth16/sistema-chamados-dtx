@@ -1252,6 +1252,224 @@ class TestNotificarObservadoresCriacaoInApp:
         mock_inapp.assert_not_called()
 
 
+class TestNotificarExtensaoAutomaticaPrevisao:
+    def _patch_padrao(
+        self,
+        *,
+        solicitante=None,
+        responsavel=None,
+        gestor_solicitante=None,
+        gestor_solicitado=None,
+    ):
+        usuarios_por_id = {}
+        if solicitante is not None:
+            usuarios_por_id[solicitante.id] = solicitante
+        if responsavel is not None:
+            usuarios_por_id[responsavel.id] = responsavel
+
+        def _get_by_id(uid):
+            return usuarios_por_id.get(uid)
+
+        return (
+            patch(
+                "app.services.chamado_notificacao_service.Usuario.get_by_id",
+                side_effect=_get_by_id,
+            ),
+            patch(
+                "app.services.previsao_atendimento_service.resolver_gestor_do_solicitante",
+                return_value=gestor_solicitante,
+            ),
+            patch(
+                "app.services.previsao_atendimento_service.resolver_gestor_decisor",
+                return_value=gestor_solicitado,
+            ),
+            patch(
+                "app.services.chamado_notificacao_service.enviar_email",
+                return_value=(True, None),
+            ),
+            patch("app.services.chamado_notificacao_service.criar_notificacao"),
+            patch("app.services.chamado_notificacao_service.webpush_service"),
+        )
+
+    def test_quatro_destinatarios_recebem_quando_todos_distintos(self):
+        from app.services.chamado_notificacao_service import (
+            notificar_extensao_automatica_previsao,
+        )
+
+        solicitante = _usuario_mock("sol_1", "Solicitante", "sol@test.com")
+        responsavel = _usuario_mock("resp_1", "Responsável", "resp@test.com")
+        gestor_sol = _usuario_mock("gestor_sol_1", "Gestor do Solicitante", "gsol@test.com")
+        gestor_atendimento = _usuario_mock("gestor_at_1", "Gestor Atendimento", "gat@test.com")
+
+        p0, p1, p2, p3, p4, p5 = self._patch_padrao(
+            solicitante=solicitante,
+            responsavel=responsavel,
+            gestor_solicitante=gestor_sol,
+            gestor_solicitado=gestor_atendimento,
+        )
+        with p0, p1, p2, p3 as mock_email, p4 as mock_inapp, p5:
+            notificar_extensao_automatica_previsao(
+                chamado_id="ch_1",
+                numero_chamado="CH-001",
+                categoria="TI",
+                previsao_nova="2026-08-25 16:30:00",
+                extensoes_usadas=1,
+                extensoes_restantes=2,
+                solicitante_id="sol_1",
+                responsavel_id="resp_1",
+                chamado_area="Engenharia",
+            )
+
+        assert mock_email.call_count == 4
+        assert mock_inapp.call_count == 4
+        destinatarios_email = {call.args[0] for call in mock_email.call_args_list}
+        assert destinatarios_email == {
+            "sol@test.com",
+            "gsol@test.com",
+            "gat@test.com",
+            "resp@test.com",
+        }
+
+    def test_dedup_quando_gestor_solicitante_e_gestor_solicitado_coincidem(self):
+        from app.services.chamado_notificacao_service import (
+            notificar_extensao_automatica_previsao,
+        )
+
+        solicitante = _usuario_mock("sol_2", "Solicitante", "sol2@test.com")
+        responsavel = _usuario_mock("resp_2", "Responsável", "resp2@test.com")
+        gestor_unico = _usuario_mock("gestor_unico", "Gestor Único", "gu@test.com")
+
+        p0, p1, p2, p3, p4, p5 = self._patch_padrao(
+            solicitante=solicitante,
+            responsavel=responsavel,
+            gestor_solicitante=gestor_unico,
+            gestor_solicitado=gestor_unico,
+        )
+        with p0, p1, p2, p3 as mock_email, p4, p5:
+            notificar_extensao_automatica_previsao(
+                chamado_id="ch_2",
+                numero_chamado="CH-002",
+                categoria="TI",
+                previsao_nova="2026-08-25 16:30:00",
+                extensoes_usadas=1,
+                extensoes_restantes=2,
+                solicitante_id="sol_2",
+                responsavel_id="resp_2",
+                chamado_area="Engenharia",
+            )
+
+        assert mock_email.call_count == 3
+        destinatarios_email = [call.args[0] for call in mock_email.call_args_list]
+        assert destinatarios_email.count("gu@test.com") == 1
+
+    def test_responsavel_coincide_com_solicitante_nao_duplica(self):
+        from app.services.chamado_notificacao_service import (
+            notificar_extensao_automatica_previsao,
+        )
+
+        mesma_pessoa = _usuario_mock("mesma_1", "Admin Owner", "mesma@test.com")
+
+        p0, p1, p2, p3, p4, p5 = self._patch_padrao(
+            solicitante=mesma_pessoa,
+            responsavel=mesma_pessoa,
+            gestor_solicitante=None,
+            gestor_solicitado=None,
+        )
+        with p0, p1, p2, p3 as mock_email, p4, p5:
+            notificar_extensao_automatica_previsao(
+                chamado_id="ch_3",
+                numero_chamado="CH-003",
+                categoria="TI",
+                previsao_nova="2026-08-25 16:30:00",
+                extensoes_usadas=1,
+                extensoes_restantes=2,
+                solicitante_id="mesma_1",
+                responsavel_id="mesma_1",
+                chamado_area="Engenharia",
+            )
+
+        assert mock_email.call_count == 1
+
+    def test_mensagem_do_responsavel_contem_extensoes_restantes(self):
+        from app.services.chamado_notificacao_service import (
+            notificar_extensao_automatica_previsao,
+        )
+
+        responsavel = _usuario_mock("resp_4", "Responsável", "resp4@test.com")
+
+        p0, p1, p2, p3, p4, p5 = self._patch_padrao(responsavel=responsavel)
+        with p0, p1, p2, p3 as mock_email, p4, p5:
+            notificar_extensao_automatica_previsao(
+                chamado_id="ch_4",
+                numero_chamado="CH-004",
+                categoria="TI",
+                previsao_nova="2026-08-25 16:30:00",
+                extensoes_usadas=2,
+                extensoes_restantes=1,
+                solicitante_id=None,
+                responsavel_id="resp_4",
+                chamado_area="Engenharia",
+            )
+
+        assert mock_email.call_count == 1
+        corpo_html = mock_email.call_args[0][2]
+        assert "1" in corpo_html
+
+    def test_gestor_ausente_nao_quebra_fluxo(self):
+        from app.services.chamado_notificacao_service import (
+            notificar_extensao_automatica_previsao,
+        )
+
+        solicitante = _usuario_mock("sol_5", "Solicitante", "sol5@test.com")
+        responsavel = _usuario_mock("resp_5", "Responsável", "resp5@test.com")
+
+        p0, p1, p2, p3, p4, p5 = self._patch_padrao(
+            solicitante=solicitante,
+            responsavel=responsavel,
+            gestor_solicitante=None,
+            gestor_solicitado=None,
+        )
+        with p0, p1, p2, p3 as mock_email, p4, p5:
+            notificar_extensao_automatica_previsao(
+                chamado_id="ch_5",
+                numero_chamado="CH-005",
+                categoria="TI",
+                previsao_nova="2026-08-25 16:30:00",
+                extensoes_usadas=1,
+                extensoes_restantes=2,
+                solicitante_id="sol_5",
+                responsavel_id="resp_5",
+                chamado_area="Área Órfã",
+            )
+
+        assert mock_email.call_count == 2
+
+    def test_assunto_sempre_em_ingles(self):
+        from app.services.chamado_notificacao_service import (
+            notificar_extensao_automatica_previsao,
+        )
+
+        responsavel = _usuario_mock("resp_6", "Responsável", "resp6@test.com")
+
+        p0, p1, p2, p3, p4, p5 = self._patch_padrao(responsavel=responsavel)
+        with p0, p1, p2, p3 as mock_email, p4, p5:
+            notificar_extensao_automatica_previsao(
+                chamado_id="ch_6",
+                numero_chamado="CH-006",
+                categoria="TI",
+                previsao_nova="2026-08-25 16:30:00",
+                extensoes_usadas=1,
+                extensoes_restantes=2,
+                solicitante_id=None,
+                responsavel_id="resp_6",
+                chamado_area="Engenharia",
+            )
+
+        assunto = mock_email.call_args[0][1]
+        assert assunto != "push_subject_previsao_extensao_automatica"
+        assert "CH-006" in assunto
+
+
 class TestNotificarSolicitacaoPrevisaoAtendimento:
     def test_email_enviado_ao_gestor_com_dois_ctas(self):
         """E-mail vai pro gestor decisor com botões Aprovar/Rejeitar."""

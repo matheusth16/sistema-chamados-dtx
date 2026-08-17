@@ -865,6 +865,168 @@ def notificar_decisao_previsao_atendimento(
             )
 
 
+def notificar_extensao_automatica_previsao(
+    *,
+    chamado_id: str,
+    numero_chamado: str,
+    categoria: str,
+    previsao_nova,
+    extensoes_usadas: int,
+    extensoes_restantes: int,
+    solicitante_id: str | None,
+    responsavel_id: str,
+    chamado_area: str,
+) -> None:
+    """Notifica os 4 papéis de uma extensão automática (self-service, sem
+    aprovação do gestor) aplicada com sucesso: o solicitante do chamado, o
+    gestor_setor do departamento do solicitante (resolver_gestor_do_solicitante
+    — NÃO o mesmo lookup do gestor decisor), o gestor_setor da área que
+    atende o chamado (resolver_gestor_decisor, igual ao fluxo manual), e o
+    responsável que clicou — esse último com uma mensagem própria de
+    confirmação, avisando quantas extensões automáticas ainda restam."""
+    from app.services.previsao_atendimento_service import (
+        resolver_gestor_decisor,
+        resolver_gestor_do_solicitante,
+    )
+
+    solicitante_usuario = Usuario.get_by_id(solicitante_id) if solicitante_id else None
+    responsavel_usuario = Usuario.get_by_id(responsavel_id) if responsavel_id else None
+    gestor_solicitante = (
+        resolver_gestor_do_solicitante(solicitante_usuario) if solicitante_usuario else None
+    )
+    gestor_solicitado = resolver_gestor_decisor(chamado_area or "")
+
+    link = _link_chamado(chamado_id)
+    previsao_fmt = str(previsao_nova)
+    categoria_en = get_translated_category(categoria, "en")
+    assunto = get_translation(
+        "push_subject_previsao_extensao_automatica",
+        "en",
+        numero=numero_chamado,
+        categoria=categoria_en,
+    )
+    detalhes = [
+        ("Ticket", numero_chamado),
+        ("Category", categoria_en),
+        ("New deadline", previsao_fmt),
+    ]
+
+    vistos: set = set()
+
+    for usuario in (solicitante_usuario, gestor_solicitante, gestor_solicitado):
+        if usuario is None:
+            continue
+        uid = getattr(usuario, "id", None)
+        if uid is None or uid in vistos:
+            continue
+        vistos.add(uid)
+
+        email = getattr(usuario, "email", None)
+        if email:
+            corpo_html = build_email_shell(
+                f"Ticket {numero_chamado} — Deadline Automatically Extended",
+                "#d97706",
+                f"<p>The deadline for ticket <strong>{escape(numero_chamado)}</strong> "
+                f"({escape(categoria_en)}) was automatically extended to "
+                f"<strong>{escape(previsao_fmt)}</strong> (self-service, no manager approval "
+                "was needed for this extension).</p>"
+                + build_detail_table(detalhes)
+                + (build_cta_button("View ticket", link, "#2563eb") if link else ""),
+            )
+            corpo_texto = (
+                f"Ticket {numero_chamado} — deadline automatically extended to {previsao_fmt}."
+                + (f"\n\nView ticket: {link}" if link else "")
+            )
+            ok, err = enviar_email(email, assunto, corpo_html, corpo_texto, importance="normal")
+            if ok:
+                logger.info(
+                    "Automatic extension e-mail sent to %s (ticket %s)", email, numero_chamado
+                )
+            else:
+                logger.warning(
+                    "Failed to send automatic extension e-mail to %s (ticket %s): %s",
+                    email,
+                    numero_chamado,
+                    err,
+                )
+
+        if uid:
+            criar_notificacao(
+                usuario_id=uid,
+                chamado_id=chamado_id,
+                numero_chamado=numero_chamado,
+                titulo=f"Prazo adiado automaticamente — Chamado {numero_chamado}",
+                mensagem=categoria,
+                tipo="previsao_extensao_automatica_aplicada",
+                categoria=categoria,
+            )
+            webpush_service.enviar_webpush_usuario(
+                uid,
+                titulo=assunto,
+                corpo=categoria,
+                url=link or "",
+            )
+
+    # 5º papel: o responsável que clicou — mensagem própria com a contagem
+    # de extensões restantes, não misturada no loop genérico acima.
+    if responsavel_usuario is not None:
+        uid = getattr(responsavel_usuario, "id", None)
+        if uid not in vistos:
+            email = getattr(responsavel_usuario, "email", None)
+            if email:
+                corpo_html = build_email_shell(
+                    f"Ticket {numero_chamado} — Automatic Extension Applied",
+                    "#16a34a",
+                    f"<p>Your automatic extension for ticket "
+                    f"<strong>{escape(numero_chamado)}</strong> was applied — new deadline "
+                    f"<strong>{escape(previsao_fmt)}</strong>. You have "
+                    f"<strong>{extensoes_restantes}</strong> automatic extension(s) left on "
+                    "this ticket before a manager approval is required.</p>"
+                    + build_detail_table(detalhes)
+                    + (build_cta_button("View ticket", link, "#2563eb") if link else ""),
+                )
+                corpo_texto = (
+                    f"Ticket {numero_chamado} — automatic extension applied, new deadline "
+                    f"{previsao_fmt}. {extensoes_restantes} automatic extension(s) left."
+                    + (f"\n\nView ticket: {link}" if link else "")
+                )
+                ok, err = enviar_email(email, assunto, corpo_html, corpo_texto, importance="normal")
+                if ok:
+                    logger.info(
+                        "Automatic extension confirmation e-mail sent to %s (ticket %s)",
+                        email,
+                        numero_chamado,
+                    )
+                else:
+                    logger.warning(
+                        "Failed to send automatic extension confirmation e-mail to %s "
+                        "(ticket %s): %s",
+                        email,
+                        numero_chamado,
+                        err,
+                    )
+
+            if uid:
+                criar_notificacao(
+                    usuario_id=uid,
+                    chamado_id=chamado_id,
+                    numero_chamado=numero_chamado,
+                    titulo=(
+                        f"Extensão automática aplicada — restam {extensoes_restantes} "
+                        f"de {extensoes_usadas + extensoes_restantes}"
+                    ),
+                    mensagem=categoria,
+                    tipo="previsao_extensao_automatica_confirmacao",
+                    categoria=categoria,
+                )
+                webpush_service.enviar_webpush_usuario(
+                    uid,
+                    titulo=assunto,
+                    corpo=categoria,
+                    url=link or "",
+                )
+
+
 # ── Helpers de disparo em thread (usados pelas rotas) ───────────────────────
 
 
@@ -935,5 +1097,42 @@ def disparar_notificacao_decisao_previsao_em_thread(
                 )
             except Exception as exc:
                 logger.warning("Notificação de decisão de previsão não enviada: %s", exc)
+
+    threading.Thread(target=_run, daemon=True).start()
+
+
+def disparar_notificacao_extensao_automatica_em_thread(
+    app,
+    *,
+    chamado_id: str,
+    numero_chamado: str,
+    categoria: str,
+    previsao_nova,
+    extensoes_usadas: int,
+    extensoes_restantes: int,
+    solicitante_id: str | None,
+    responsavel_id: str,
+    chamado_area: str,
+) -> None:
+    """Dispara notificar_extensao_automatica_previsao em background — usado
+    por api_colaboracao.api_solicitar_extensao_automatica_previsao."""
+    import threading
+
+    def _run():
+        with app.app_context():
+            try:
+                notificar_extensao_automatica_previsao(
+                    chamado_id=chamado_id,
+                    numero_chamado=numero_chamado,
+                    categoria=categoria,
+                    previsao_nova=previsao_nova,
+                    extensoes_usadas=extensoes_usadas,
+                    extensoes_restantes=extensoes_restantes,
+                    solicitante_id=solicitante_id,
+                    responsavel_id=responsavel_id,
+                    chamado_area=chamado_area,
+                )
+            except Exception as exc:
+                logger.warning("Notificação de extensão automática não enviada: %s", exc)
 
     threading.Thread(target=_run, daemon=True).start()

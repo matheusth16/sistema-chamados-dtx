@@ -225,6 +225,71 @@ def api_solicitar_previsao_atendimento(chamado_id: str):
         return erro_json(_t("internal_error_retry"), 500)
 
 
+@main.route("/api/chamado/<chamado_id>/previsao-atendimento/extensao-automatica", methods=["POST"])
+@login_required
+@requer_supervisor_area
+def api_solicitar_extensao_automatica_previsao(chamado_id: str):
+    """Extensão automática (self-service) do prazo — sem aprovação do gestor,
+    até LIMITE_EXTENSOES_AUTOMATICAS por chamado (ver
+    app/services/previsao_atendimento_service.py). Espelha
+    api_solicitar_previsao_atendimento, sem body — a data e o motivo são
+    calculados pelo próprio service.
+
+    Acesso: owner (responsavel_id == current_user.id) ou admin, e supervisor+.
+    """
+    try:
+        chamado = Chamado.get_by_id(chamado_id)
+        if not chamado:
+            return erro_json(_t("ticket_not_found"), 404)
+
+        if not usuario_pode_ver_chamado(current_user, chamado):
+            return erro_json(_t("access_denied_generic"), 403)
+
+        pode_mutar, _ = usuario_pode_mutar_chamado(current_user)
+        if not pode_mutar:
+            return erro_json(_t("access_denied_generic"), 403)
+
+        from app.services.permissoes_edicao_chamado import chamado_aceita_edicao_operacional
+
+        _pode_op, _ = chamado_aceita_edicao_operacional(current_user, chamado)
+        if not _pode_op:
+            return erro_json(_t("ticket_completed_no_operation"), 403)
+
+        from app.services.previsao_atendimento_service import solicitar_extensao_automatica
+
+        resultado = solicitar_extensao_automatica(chamado_id, current_user)
+        if not resultado["sucesso"]:
+            return jsonify(resultado), 400
+
+        from app.services.chamado_notificacao_service import (
+            disparar_notificacao_extensao_automatica_em_thread,
+        )
+
+        disparar_notificacao_extensao_automatica_em_thread(
+            current_app._get_current_object(),
+            chamado_id=chamado_id,
+            numero_chamado=chamado.numero_chamado or "N/A",
+            categoria=chamado.categoria or "",
+            previsao_nova=resultado["dados"]["previsao_nova"],
+            extensoes_usadas=resultado["dados"]["extensoes_usadas"],
+            extensoes_restantes=resultado["dados"]["extensoes_restantes"],
+            solicitante_id=resultado["dados"].get("solicitante_id"),
+            responsavel_id=current_user.id,
+            chamado_area=chamado.area or "",
+        )
+
+        return jsonify(resultado), 200
+
+    except ValueError as exc:
+        logger.debug("Validação extensao_automatica_previsao chamado=%s: %s", chamado_id, exc)
+        return erro_json(_t("invalid_request_data"), 400)
+    except Exception as exc:
+        logger.exception(
+            "Erro em api_solicitar_extensao_automatica_previsao chamado=%s: %s", chamado_id, exc
+        )
+        return erro_json(_t("internal_error_retry"), 500)
+
+
 @main.route(
     "/api/chamado/<chamado_id>/previsao-atendimento/<int:solicitacao_id>/decidir",
     methods=["POST"],

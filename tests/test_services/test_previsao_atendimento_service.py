@@ -458,6 +458,279 @@ class TestDecidirPrevisaoAtendimento:
         hist_instancia.save.assert_called_once()
 
 
+# ── solicitar_extensao_automatica (self-service, sem aprovação) ────────────
+
+
+class TestSolicitarExtensaoAutomatica:
+    def test_primeira_extensao_soma_tat_sobre_prazo_original(self):
+        """Também cobre o risco de timezone: se a implementação esquecer o
+        .replace(tzinfo=None) antes de gravar, os dígitos lidos de volta
+        vêm deslocados pelo offset de Config.SLA_TIMEZONE em vez de bater
+        exatamente com o esperado calculado de forma independente."""
+        from app.services.analytics import _sla_dias_por_categoria
+        from app.services.business_time import adicionar_dias_uteis
+        from app.services.previsao_atendimento_service import solicitar_extensao_automatica
+
+        chamado_id = _criar_chamado_real(categoria="Manutencao")
+        antes = Chamado.get_by_id(chamado_id)
+        dias_tat = _sla_dias_por_categoria(antes.categoria, antes.sla_dias)
+        baseline = adicionar_dias_uteis(antes.data_abertura, dias_tat)
+        esperado = adicionar_dias_uteis(baseline, dias_tat).replace(tzinfo=None)
+
+        resultado = solicitar_extensao_automatica(chamado_id, JULIA)
+
+        assert resultado["sucesso"] is True
+        atualizado = Chamado.get_by_id(chamado_id)
+        obtido = atualizado.previsao_atendimento.replace(tzinfo=None)
+        assert (obtido.year, obtido.month, obtido.day, obtido.hour, obtido.minute) == (
+            esperado.year,
+            esperado.month,
+            esperado.day,
+            esperado.hour,
+            esperado.minute,
+        )
+        assert atualizado.previsao_extensoes_automaticas_usadas == 1
+
+    def test_segunda_extensao_soma_sobre_prazo_ja_estendido(self):
+        from app.services.analytics import _sla_dias_por_categoria
+        from app.services.business_time import adicionar_dias_uteis
+        from app.services.previsao_atendimento_service import solicitar_extensao_automatica
+
+        chamado_id = _criar_chamado_real(categoria="Manutencao")
+        antes = Chamado.get_by_id(chamado_id)
+        dias_tat = _sla_dias_por_categoria(antes.categoria, antes.sla_dias)
+        baseline = adicionar_dias_uteis(antes.data_abertura, dias_tat)
+        esperado_apos_2 = adicionar_dias_uteis(
+            adicionar_dias_uteis(baseline, dias_tat), dias_tat
+        ).replace(tzinfo=None)
+
+        solicitar_extensao_automatica(chamado_id, JULIA)
+        resultado = solicitar_extensao_automatica(chamado_id, JULIA)
+
+        assert resultado["sucesso"] is True
+        atualizado = Chamado.get_by_id(chamado_id)
+        obtido = atualizado.previsao_atendimento.replace(tzinfo=None)
+        assert (obtido.year, obtido.month, obtido.day, obtido.hour, obtido.minute) == (
+            esperado_apos_2.year,
+            esperado_apos_2.month,
+            esperado_apos_2.day,
+            esperado_apos_2.hour,
+            esperado_apos_2.minute,
+        )
+        assert atualizado.previsao_extensoes_automaticas_usadas == 2
+
+    def test_respeita_sla_dias_customizado(self):
+        from app.services.analytics import _sla_dias_por_categoria
+        from app.services.business_time import adicionar_dias_uteis
+        from app.services.previsao_atendimento_service import solicitar_extensao_automatica
+
+        chamado = Chamado(
+            categoria="Manutencao",
+            tipo_solicitacao="Corretiva",
+            descricao="Descrição teste",
+            responsavel="Julia Silva",
+            responsavel_id="id_julia",
+            area="Engenharia",
+            status="Em Atendimento",
+            sla_dias=10,
+        )
+        chamado_id = chamado.salvar()
+        antes = Chamado.get_by_id(chamado_id)
+        dias_tat = _sla_dias_por_categoria(antes.categoria, antes.sla_dias)
+        assert dias_tat == 10
+        baseline = adicionar_dias_uteis(antes.data_abertura, dias_tat)
+        esperado = adicionar_dias_uteis(baseline, dias_tat).replace(tzinfo=None)
+
+        resultado = solicitar_extensao_automatica(chamado_id, JULIA)
+
+        assert resultado["sucesso"] is True
+        obtido = Chamado.get_by_id(chamado_id).previsao_atendimento.replace(tzinfo=None)
+        assert (obtido.year, obtido.month, obtido.day, obtido.hour) == (
+            esperado.year,
+            esperado.month,
+            esperado.day,
+            esperado.hour,
+        )
+
+    def test_contador_incrementa_a_cada_chamada(self):
+        from app.services.previsao_atendimento_service import solicitar_extensao_automatica
+
+        chamado_id = _criar_chamado_real(categoria="Manutencao")
+
+        r1 = solicitar_extensao_automatica(chamado_id, JULIA)
+        r2 = solicitar_extensao_automatica(chamado_id, JULIA)
+        r3 = solicitar_extensao_automatica(chamado_id, JULIA)
+
+        assert [r["dados"]["extensoes_usadas"] for r in (r1, r2, r3)] == [1, 2, 3]
+        assert [r["dados"]["extensoes_restantes"] for r in (r1, r2, r3)] == [2, 1, 0]
+
+    def test_bloqueia_na_quarta_tentativa_sem_travar(self):
+        from app.services.previsao_atendimento_service import solicitar_extensao_automatica
+
+        chamado_id = _criar_chamado_real(categoria="Manutencao")
+        for _ in range(3):
+            assert solicitar_extensao_automatica(chamado_id, JULIA)["sucesso"] is True
+
+        quarta = solicitar_extensao_automatica(chamado_id, JULIA)
+
+        assert quarta["sucesso"] is False
+        atualizado = Chamado.get_by_id(chamado_id)
+        assert atualizado.previsao_extensoes_automaticas_usadas == 3
+        assert atualizado.previsao_extensao_travada is False
+
+    def test_aog_bloqueia_incondicional(self):
+        from app.services.previsao_atendimento_service import solicitar_extensao_automatica
+
+        chamado_id = _criar_chamado_real(categoria="AOG")
+
+        resultado = solicitar_extensao_automatica(chamado_id, JULIA)
+
+        assert resultado["sucesso"] is False
+
+    def test_bloqueia_se_travado(self):
+        from app.services.previsao_atendimento_service import solicitar_extensao_automatica
+
+        chamado_id = _criar_chamado_real(categoria="Manutencao")
+        chamado = Chamado.get_by_id(chamado_id)
+        assert chamado.atualizar_campos(previsao_extensao_travada=True) is True
+
+        resultado = solicitar_extensao_automatica(chamado_id, JULIA)
+
+        assert resultado["sucesso"] is False
+        atualizado = Chamado.get_by_id(chamado_id)
+        assert atualizado.previsao_extensoes_automaticas_usadas == 0
+
+    def test_bloqueia_se_ha_pedido_manual_pendente(self):
+        from app.services.previsao_atendimento_service import (
+            solicitar_extensao_automatica,
+            solicitar_previsao_atendimento,
+        )
+
+        chamado_id = _criar_chamado_real(categoria="Manutencao")
+        pedido = solicitar_previsao_atendimento(chamado_id, _futuro(days=5), "motivo", JULIA)
+        assert pedido["sucesso"] is True
+
+        resultado = solicitar_extensao_automatica(chamado_id, JULIA)
+
+        assert resultado["sucesso"] is False
+
+    def test_nao_owner_retorna_erro(self):
+        from app.services.previsao_atendimento_service import solicitar_extensao_automatica
+
+        chamado_id = _criar_chamado_real(categoria="Manutencao")
+
+        resultado = solicitar_extensao_automatica(chamado_id, NAO_OWNER)
+
+        assert resultado["sucesso"] is False
+
+    def test_owner_solicitante_negado(self):
+        from app.services.previsao_atendimento_service import solicitar_extensao_automatica
+
+        chamado_id = _criar_chamado_real(categoria="Manutencao", responsavel_id=SOLICITANTE.id)
+
+        resultado = solicitar_extensao_automatica(chamado_id, SOLICITANTE)
+
+        assert resultado["sucesso"] is False
+
+    def test_admin_nao_owner_permitido(self):
+        from app.services.previsao_atendimento_service import solicitar_extensao_automatica
+
+        chamado_id = _criar_chamado_real(categoria="Manutencao")
+
+        resultado = solicitar_extensao_automatica(chamado_id, ADMIN)
+
+        assert resultado["sucesso"] is True
+
+    def test_chamado_nao_encontrado(self):
+        from app.services.previsao_atendimento_service import solicitar_extensao_automatica
+
+        resultado = solicitar_extensao_automatica(_ID_INEXISTENTE, JULIA)
+
+        assert resultado["sucesso"] is False
+
+    def test_grava_historico_com_ator_real(self):
+        from app.services.previsao_atendimento_service import solicitar_extensao_automatica
+
+        chamado_id = _criar_chamado_real(categoria="Manutencao")
+        hist_instancia = MagicMock()
+
+        with patch("app.services.previsao_atendimento_service.Historico") as mock_hist_cls:
+            mock_hist_cls.return_value = hist_instancia
+            solicitar_extensao_automatica(chamado_id, JULIA)
+
+        _, kwargs = mock_hist_cls.call_args
+        assert kwargs.get("acao") == "extensao_automatica_previsao"
+        assert kwargs.get("usuario_id") == JULIA.id
+        assert kwargs.get("usuario_nome") == JULIA.nome
+        hist_instancia.save.assert_called_once()
+
+
+# ── ratchet: decisão do gestor trava o self-service pra sempre ─────────────
+
+
+class TestRatchetExtensaoAutomatica:
+    def _pedir_e_decidir(self, chamado_id, acao="aprovar", **kwargs):
+        from app.services.previsao_atendimento_service import (
+            decidir_previsao_atendimento,
+            solicitar_previsao_atendimento,
+        )
+
+        pedido = solicitar_previsao_atendimento(chamado_id, _futuro(days=5), "motivo", JULIA)
+        assert pedido["sucesso"] is True
+        return decidir_previsao_atendimento(
+            pedido["dados"]["solicitacao_id"], acao, GESTOR_ENGENHARIA, **kwargs
+        )
+
+    def test_aprovacao_manual_trava_self_service(self):
+        chamado_id = _criar_chamado_real(area="Engenharia", categoria="Manutencao")
+
+        resultado = self._pedir_e_decidir(chamado_id, "aprovar")
+
+        assert resultado["sucesso"] is True
+        atualizado = Chamado.get_by_id(chamado_id)
+        assert atualizado.previsao_extensao_travada is True
+
+    def test_rejeicao_manual_trava_self_service(self):
+        chamado_id = _criar_chamado_real(area="Engenharia", categoria="Manutencao")
+
+        resultado = self._pedir_e_decidir(chamado_id, "rejeitar", motivo_rejeicao="sem tempo hábil")
+
+        assert resultado["sucesso"] is True
+        atualizado = Chamado.get_by_id(chamado_id)
+        assert atualizado.previsao_extensao_travada is True
+
+    def test_toctou_auto_rejeicao_nao_trava(self):
+        from app.services.previsao_atendimento_service import (
+            decidir_previsao_atendimento,
+            solicitar_previsao_atendimento,
+        )
+
+        chamado_id = _criar_chamado_real(area="Engenharia", categoria="Manutencao")
+        pedido = solicitar_previsao_atendimento(chamado_id, _futuro(days=5), "motivo", JULIA)
+        chamado = Chamado.get_by_id(chamado_id)
+        assert chamado.atualizar_campos(status="Concluído") is True
+
+        resultado = decidir_previsao_atendimento(
+            pedido["dados"]["solicitacao_id"], "aprovar", GESTOR_ENGENHARIA
+        )
+
+        assert resultado["sucesso"] is False
+        atualizado = Chamado.get_by_id(chamado_id)
+        assert atualizado.previsao_extensao_travada is False
+
+    def test_apos_travado_self_service_falha_mesmo_com_extensoes_disponiveis(self):
+        from app.services.previsao_atendimento_service import solicitar_extensao_automatica
+
+        chamado_id = _criar_chamado_real(area="Engenharia", categoria="Manutencao")
+        self._pedir_e_decidir(chamado_id, "aprovar")
+
+        resultado = solicitar_extensao_automatica(chamado_id, JULIA)
+
+        assert resultado["sucesso"] is False
+        atualizado = Chamado.get_by_id(chamado_id)
+        assert atualizado.previsao_extensoes_automaticas_usadas == 0
+
+
 # ── resolução do gestor decisor ─────────────────────────────────────────────
 
 
@@ -489,6 +762,74 @@ class TestResolverGestorDecisor:
             gestor = resolver_gestor_decisor("Area Orfa")
 
         assert gestor is None
+
+
+class TestResolverGestorDoSolicitante:
+    def test_resolve_por_area_unica_do_solicitante(self):
+        from app.services.previsao_atendimento_service import resolver_gestor_do_solicitante
+
+        solicitante = _usuario("id_sol2", "Solicitante", "solicitante", areas=["Engenharia"])
+        with patch("app.models_usuario.Usuario.get_all", return_value=[GESTOR_ENGENHARIA]):
+            gestor = resolver_gestor_do_solicitante(solicitante)
+
+        assert gestor.id == "id_gestor_eng"
+
+    def test_resolve_pela_primeira_area_com_gestor_quando_multiplas(self):
+        from app.services.previsao_atendimento_service import resolver_gestor_do_solicitante
+
+        solicitante = _usuario(
+            "id_sol3", "Solicitante", "solicitante", areas=["Outra Area", "Engenharia"]
+        )
+        with patch(
+            "app.models_usuario.Usuario.get_all",
+            return_value=[GESTOR_ENGENHARIA],
+        ):
+            gestor = resolver_gestor_do_solicitante(solicitante)
+
+        assert gestor.id == "id_gestor_eng"
+
+    def test_sem_areas_cai_no_fallback_superior(self):
+        from app.services.previsao_atendimento_service import resolver_gestor_do_solicitante
+
+        solicitante = _usuario("id_sol4", "Solicitante", "solicitante", areas=[])
+        gerente = _usuario(
+            "id_gerente2", "Gerente Producao", nivel_gestao="gerente_producao", areas=[]
+        )
+        gerente.email = "gerente2@dtx.aero"
+        with patch("app.models_usuario.Usuario.get_all", return_value=[gerente]):
+            gestor = resolver_gestor_do_solicitante(solicitante)
+
+        assert gestor.id == "id_gerente2"
+
+    def test_sem_ninguem_cadastrado_retorna_none(self):
+        from app.services.previsao_atendimento_service import resolver_gestor_do_solicitante
+
+        solicitante = _usuario("id_sol5", "Solicitante", "solicitante", areas=["Área Orfã"])
+        with patch("app.models_usuario.Usuario.get_all", return_value=[]):
+            gestor = resolver_gestor_do_solicitante(solicitante)
+
+        assert gestor is None
+
+    def test_nao_confunde_com_area_do_chamado(self):
+        """É literalmente o bug que essa função existe pra evitar: a área do
+        chamado (quem atende) é diferente da área do solicitante (quem
+        abriu) — resolve pela do solicitante, não pela do chamado."""
+        from app.services.previsao_atendimento_service import (
+            resolver_gestor_decisor,
+            resolver_gestor_do_solicitante,
+        )
+
+        solicitante = _usuario("id_sol6", "Solicitante", "solicitante", areas=["Outra Area"])
+        with patch(
+            "app.models_usuario.Usuario.get_all",
+            return_value=[GESTOR_ENGENHARIA, GESTOR_OUTRA_AREA],
+        ):
+            gestor_do_solicitante = resolver_gestor_do_solicitante(solicitante)
+            gestor_do_chamado = resolver_gestor_decisor("Engenharia")
+
+        assert gestor_do_solicitante.id == "id_gestor_outra"
+        assert gestor_do_chamado.id == "id_gestor_eng"
+        assert gestor_do_solicitante.id != gestor_do_chamado.id
 
 
 class TestUsuarioPodeDecidirPrevisaoAtendimento:

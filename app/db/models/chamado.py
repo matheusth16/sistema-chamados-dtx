@@ -109,6 +109,15 @@ class ChamadoRow(Base):
     reaberturas_solicitante_count: Mapped[int] = mapped_column(
         SmallInteger, nullable=False, default=0
     )
+    # Extensões automáticas (self-service, sem aprovação do gestor) da
+    # previsão de atendimento — ver app/services/previsao_atendimento_service.py.
+    # Ratchet de mão única: previsao_extensao_travada nunca volta a False
+    # depois que o gestor decide (aprova ou rejeita) qualquer pedido manual
+    # desse chamado — o self-service não é reconcedido.
+    previsao_extensoes_automaticas_usadas: Mapped[int] = mapped_column(
+        SmallInteger, nullable=False, default=0
+    )
+    previsao_extensao_travada: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     # Confirmação de leitura (versão simples): grava só a primeira vez que o
     # responsável ATUAL abre o detalhe do chamado — ver
     # app/services/visualizacao_chamado_service.py. NULL = ainda não visto.

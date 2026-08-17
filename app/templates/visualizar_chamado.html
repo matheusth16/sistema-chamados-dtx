@@ -110,6 +110,9 @@
                 case 'executar-definir-previsao-atendimento':
                     if (typeof executarDefinirPrevisaoAtendimento === 'function') executarDefinirPrevisaoAtendimento();
                     break;
+                case 'extensao-automatica-previsao':
+                    if (typeof executarExtensaoAutomaticaPrevisao === 'function') executarExtensaoAutomaticaPrevisao(el);
+                    break;
                 case 'decidir-previsao-aprovar':
                     if (typeof decidirPrevisaoAtendimento === 'function') decidirPrevisaoAtendimento(el.dataset.solicitacaoId, 'aprovar');
                     break;
@@ -670,7 +673,10 @@
                             {% endif %}
                             <!-- Previsão de atendimento (unifica antigo "Prazo do chamado (dias)" +
                                  "Adiar avisos de escalonamento" — só vale depois de aprovada pelo
-                                 gestor do setor, ver previsao_atendimento_service.py) -->
+                                 gestor do setor, ver previsao_atendimento_service.py). AOG nunca
+                                 tem prazo alterável — nem manual nem extensão automática — então a
+                                 seção inteira fica fora da tela pra essa categoria. -->
+                            {% if chamado.categoria != 'AOG' %}
                             <div style="padding-top:16px; border-top:1px solid var(--color-surface-border);">
                                 <label class="bento-field-label" style="margin-bottom:10px;">{{ t('deadline_and_alerts_title') if t else 'Prazo e avisos' }}</label>
 
@@ -700,8 +706,26 @@
                                     <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                                     {{ t('attendance_forecast_btn') if t else 'Solicitar nova previsão de atendimento' }}
                                 </button>
+
+                                <!-- Extensão automática (self-service, sem aprovação do gestor) —
+                                     ratchet de mão única: some pra sempre assim que
+                                     previsao_extensao_travada vira True (decisão do gestor já
+                                     aconteceu nesse chamado, ver previsao_atendimento_service.py). -->
+                                {% if not chamado.previsao_extensao_travada and chamado.previsao_extensoes_automaticas_usadas < limite_extensoes_automaticas %}
+                                <button type="button" id="btn-extensao-automatica-previsao" data-action="extensao-automatica-previsao" class="bento-btn-outline" style="width:100%; justify-content:center; margin-top:8px;">
+                                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                                    {{ t('attendance_forecast_auto_extend_btn') if t else 'Estender prazo automaticamente' }}
+                                </button>
+                                <p id="extensao-automatica-erro" class="hidden" style="font-size:11px; color:var(--color-bento-danger-deep); margin-top:6px; text-align:center;"></p>
+                                <p style="font-size:11px; color:var(--color-surface-muted); margin-top:6px; text-align:center;">
+                                    {{ t('attendance_forecast_extensions_remaining', restantes=(limite_extensoes_automaticas - chamado.previsao_extensoes_automaticas_usadas), total=limite_extensoes_automaticas) if t else ((limite_extensoes_automaticas - chamado.previsao_extensoes_automaticas_usadas) ~ ' de ' ~ limite_extensoes_automaticas ~ ' extensões automáticas restantes') }}
+                                </p>
+                                {% else %}
+                                <p style="font-size:11px; color:var(--color-surface-muted); margin-top:8px; text-align:center;">{{ t('attendance_forecast_extensions_exhausted') if t else 'Extensões automáticas esgotadas — peça aprovação ao gestor' }}</p>
+                                {% endif %}
                                 {% endif %}
                             </div>
+                            {% endif %}
 
                             <div style="padding-top:16px; margin-top:4px; border-top:1px solid var(--color-surface-border);">
                                 <button type="submit" id="btn-submit-status" class="bento-btn-primary" style="width:100%; justify-content:center;">
@@ -766,7 +790,7 @@
                                 </div>
                             </div>
                             {% endif %}
-                            {% if chamado.sla_dias or chamado.previsao_atendimento or previsao_pendente %}
+                            {% if chamado.categoria != 'AOG' and (chamado.sla_dias or chamado.previsao_atendimento or previsao_pendente) %}
                             <div>
                                 <label class="bento-field-label" style="margin-bottom:6px;">{{ t('deadline_and_alerts_title') if t else 'Prazo e avisos' }}</label>
                                 {% if chamado.sla_dias %}
@@ -1149,7 +1173,9 @@
     </div>
 </div>
 
-<!-- Modal: Previsão de Atendimento -->
+{% if chamado.categoria != 'AOG' %}
+<!-- Modal: Previsão de Atendimento — fora da tela pra AOG, que nunca tem
+     prazo alterável (mesmo bloqueio incondicional do service). -->
 <div id="modal-previsao-atendimento" class="hidden bento-modal-overlay flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="modal-previsao-atendimento-titulo">
     <div class="bento-modal-backdrop"></div>
     <div class="bento-modal-panel" style="position:relative; z-index:1;">
@@ -1183,6 +1209,7 @@
         </div>
     </div>
 </div>
+{% endif %}
 
 <script nonce="{{ csp_nonce }}">
 window.DTX_MSGS = window.DTX_MSGS || {};
@@ -1383,6 +1410,30 @@ Object.assign(window.DTX_MSGS, {
             else { mostrarErro('previsao-atendimento-erro', data.erro || DTX_MSGS.error_forecast_set); }
         })
         .catch(function() { mostrarErro('previsao-atendimento-erro', DTX_MSGS.error_connection); });
+    };
+
+    window.executarExtensaoAutomaticaPrevisao = function(botao) {
+        esconderErro('extensao-automatica-erro');
+        // Desabilita durante o fetch em voo — evita duplo-clique consumindo
+        // 2 das 3 extensões livres sem querer (não é proteção de dado, o
+        // lock no banco já garante isso; é só polish de UX).
+        if (botao) botao.disabled = true;
+        fetch('/api/chamado/' + CHAMADO_ID + '/previsao-atendimento/extensao-automatica', {
+            method: 'POST',
+            headers: { 'X-CSRFToken': CSRF_TOKEN }
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.sucesso) { window.location.reload(); }
+            else {
+                mostrarErro('extensao-automatica-erro', data.erro || DTX_MSGS.error_forecast_set);
+                if (botao) botao.disabled = false;
+            }
+        })
+        .catch(function() {
+            mostrarErro('extensao-automatica-erro', DTX_MSGS.error_connection);
+            if (botao) botao.disabled = false;
+        });
     };
 
     window.decidirPrevisaoAtendimento = function(solicitacaoId, acao) {

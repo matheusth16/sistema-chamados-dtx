@@ -814,6 +814,30 @@ def test_visualizar_chamado_nao_responsavel_nao_marca_visualizado(client_logado_
     assert recarregado.visualizado_pelo_responsavel_em is None
 
 
+def test_visualizar_chamado_aog_esconde_opcao_de_prazo(client_logado_admin, db_session):
+    """GET /chamado/<id> com categoria AOG não deve mostrar nenhuma opção de
+    prazo/previsão de atendimento na tela — AOG nunca pode ter o prazo
+    alterado (bloqueio incondicional já existe no service; a UI deixou de
+    oferecer a opção pra fechar a lacuna de UX que só rejeitava no backend)."""
+    from tests.factories import make_chamado
+
+    chamado = make_chamado(categoria="AOG", responsavel_id="id_admin")
+    with (
+        patch("app.routes.dashboard.usuario_pode_ver_chamado", return_value=True),
+        patch("app.routes.dashboard.get_static_cached", return_value=[]),
+        patch("app.routes.dashboard.filtrar_supervisores_por_area", return_value=[]),
+        patch("app.routes.dashboard.CategoriaSetor.get_all", return_value=[]),
+    ):
+        r = client_logado_admin.get(f"/chamado/{chamado.id}", follow_redirects=False)
+
+    assert r.status_code == 200
+    html = r.get_data(as_text=True)
+    # Checa os elementos de marcação (não a string do case do dispatcher JS,
+    # que sempre existe no bloco de script compartilhado da página).
+    assert 'id="btn-extensao-automatica-previsao"' not in html
+    assert 'id="modal-previsao-atendimento"' not in html
+
+
 def test_visualizar_chamado_com_participantes_sem_usuario_atual_retorna_200(
     client_logado_admin, db_session
 ):

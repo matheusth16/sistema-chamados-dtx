@@ -111,6 +111,18 @@ def test_to_dict_previsao_atendimento_customizada():
     assert d["motivo_previsao_atendimento"] == "Combinado com o gestor"
 
 
+def test_to_dict_previsao_extensao_automatica_padrao():
+    d = _chamado().to_dict()
+    assert d["previsao_extensoes_automaticas_usadas"] == 0
+    assert d["previsao_extensao_travada"] is False
+
+
+def test_to_dict_previsao_extensao_automatica_customizada():
+    d = _chamado(previsao_extensoes_automaticas_usadas=2, previsao_extensao_travada=True).to_dict()
+    assert d["previsao_extensoes_automaticas_usadas"] == 2
+    assert d["previsao_extensao_travada"] is True
+
+
 def test_to_dict_visualizado_pelo_responsavel_padrao_none():
     d = _chamado().to_dict()
     assert d["visualizado_pelo_responsavel_em"] is None
@@ -205,6 +217,33 @@ def test_from_dict_previsao_atendimento_customizada():
     )
     assert c.previsao_atendimento == previsao
     assert c.motivo_previsao_atendimento == "Combinado com o gestor"
+
+
+def test_from_dict_previsao_extensao_automatica_padrao():
+    from app.models import Chamado
+
+    c = Chamado.from_dict(
+        {"categoria": "TI", "tipo_solicitacao": "S", "descricao": "D", "responsavel": "R"}
+    )
+    assert c.previsao_extensoes_automaticas_usadas == 0
+    assert c.previsao_extensao_travada is False
+
+
+def test_from_dict_previsao_extensao_automatica_customizada():
+    from app.models import Chamado
+
+    c = Chamado.from_dict(
+        {
+            "categoria": "TI",
+            "tipo_solicitacao": "S",
+            "descricao": "D",
+            "responsavel": "R",
+            "previsao_extensoes_automaticas_usadas": 3,
+            "previsao_extensao_travada": True,
+        }
+    )
+    assert c.previsao_extensoes_automaticas_usadas == 3
+    assert c.previsao_extensao_travada is True
 
 
 def test_from_dict_visualizado_pelo_responsavel_padrao_none():
@@ -619,6 +658,29 @@ def test_atualizar_campos_cas_incrementa_contador_no_banco(app):
     recarregado = _chamado_get_by_id(c.id)
     assert recarregado.reaberturas_solicitante_count == 2
     assert recarregado.status == "Aberto"
+
+
+def test_salvar_e_recarregar_previsao_extensao_automatica_defaults(app):
+    c = _chamado(numero_chamado="CHM-EXT-1")
+    c.salvar()
+
+    recarregado = _chamado_get_by_id(c.id)
+    assert recarregado.previsao_extensoes_automaticas_usadas == 0
+    assert recarregado.previsao_extensao_travada is False
+
+
+def test_atualizar_campos_previsao_extensao_automatica(app):
+    c = _chamado(numero_chamado="CHM-EXT-2")
+    c.salvar()
+
+    resultado = c.atualizar_campos(
+        previsao_extensoes_automaticas_usadas=2, previsao_extensao_travada=True
+    )
+
+    assert resultado is True
+    recarregado = _chamado_get_by_id(c.id)
+    assert recarregado.previsao_extensoes_automaticas_usadas == 2
+    assert recarregado.previsao_extensao_travada is True
 
 
 def test_salvar_e_recarregar_visualizado_pelo_responsavel_default_none(app):

@@ -33,7 +33,8 @@ from app.db.models.chamado import ChamadoPrevisaoSolicitacaoRow, ChamadoRow
 from app.i18n import get_translation_session
 from app.models import Chamado
 from app.models_historico import Historico
-from app.services.analytics import _sla_dias_por_categoria
+from app.services.analytics import _prazo_efetivo, _sla_dias_por_categoria
+from app.services.business_time import adicionar_dias_uteis
 from config import Config
 
 logger = logging.getLogger(__name__)
@@ -41,10 +42,25 @@ logger = logging.getLogger(__name__)
 _SALT_TOKEN_DECISAO = "previsao-atendimento-decisao"  # nosec B105 - salt público do itsdangerous, não segredo (ver _serializer)
 _TOKEN_MAX_AGE_SEGUNDOS = 30 * 24 * 60 * 60  # 30 dias
 ACOES_VALIDAS = ("aprovar", "rejeitar")
+# Extensões automáticas (self-service) grátis por chamado antes de exigir
+# aprovação do gestor — ver solicitar_extensao_automatica.
+LIMITE_EXTENSOES_AUTOMATICAS = 3
 
 
 def _t(key, **kwargs):
     return get_translation_session(key, **kwargs)
+
+
+def _permite_solicitar_previsao(usuario, chamado) -> bool:
+    """Owner-ou-admin E perfil supervisor+ — reusado por solicitar_previsao_atendimento
+    e solicitar_extensao_automatica (mesma regra de quem pode mexer no prazo)."""
+    eh_supervisor_ou_acima = getattr(usuario, "perfil", None) in (
+        "supervisor",
+        "admin",
+        "admin_global",
+    )
+    eh_owner_ou_admin = chamado.responsavel_id == usuario.id or usuario.is_admin_or_above
+    return eh_supervisor_ou_acima and eh_owner_ou_admin
 
 
 # ── Token de aprovação por e-mail ────────────────────────────────────────────
@@ -78,14 +94,24 @@ def validar_token_decisao(token: str) -> dict | None:
 # ── Resolução do gestor decisor ──────────────────────────────────────────────
 
 
-def _localizar_gestor_setor(area: str):
+def _localizar_gestor_setor(areas: str | list[str]):
+    """Primeiro gestor_setor ativo cujo .areas bate com QUALQUER área da
+    lista informada. Aceita uma única área (string, comportamento original,
+    usado por resolver_gestor_decisor) ou uma lista (usado por
+    resolver_gestor_do_solicitante — quem abriu o chamado pode ter mais de
+    uma área cadastrada)."""
+    lista_areas = [areas] if isinstance(areas, str) else list(areas or [])
+    lista_areas = [a for a in lista_areas if a]
+    if not lista_areas:
+        return None
+
     from app.models_usuario import Usuario
 
     for usuario in Usuario.get_all():
         if (
             getattr(usuario, "nivel_gestao", None) == "gestor_setor"
             and getattr(usuario, "ativo", True)
-            and area in (getattr(usuario, "areas", None) or [])
+            and any(a in (getattr(usuario, "areas", None) or []) for a in lista_areas)
         ):
             return usuario
     return None
@@ -120,6 +146,16 @@ def resolver_gestor_decisor(area: str):
     (chamado.area, não a área de quem solicitou), com fallback em cascata.
     Retorna None se não houver ninguém cadastrado em nível nenhum."""
     return _localizar_gestor_setor(area or "") or _localizar_fallback_superior()
+
+
+def resolver_gestor_do_solicitante(usuario_solicitante):
+    """Usuario que deve ser avisado em nome de quem ABRIU o chamado: o
+    gestor_setor cujo .areas bate com o departamento do próprio solicitante
+    (usuario_solicitante.areas), não com a área que está atendendo o
+    chamado — usado só nas notificações de extensão automática. Mesmo
+    fallback em cascata de resolver_gestor_decisor."""
+    areas_solicitante = getattr(usuario_solicitante, "areas", None) or []
+    return _localizar_gestor_setor(areas_solicitante) or _localizar_fallback_superior()
 
 
 def usuario_pode_decidir_previsao_atendimento(usuario, chamado_area: str) -> bool:
@@ -225,13 +261,7 @@ def solicitar_previsao_atendimento(chamado_id: str, previsao, motivo: str, usuar
         )
         return {"sucesso": False, "erro": _t("attendance_forecast_not_allowed_aog")}
 
-    eh_supervisor_ou_acima = getattr(usuario, "perfil", None) in (
-        "supervisor",
-        "admin",
-        "admin_global",
-    )
-    eh_owner_ou_admin = chamado.responsavel_id == usuario.id or usuario.is_admin_or_above
-    if not (eh_supervisor_ou_acima and eh_owner_ou_admin):
+    if not _permite_solicitar_previsao(usuario, chamado):
         logger.warning(
             "solicitar_previsao_atendimento negado: usuário %s sem permissão no chamado %s",
             usuario.id,
@@ -322,6 +352,128 @@ def solicitar_previsao_atendimento(chamado_id: str, previsao, motivo: str, usuar
     }
 
 
+def solicitar_extensao_automatica(chamado_id: str, usuario) -> dict:
+    """Extensão automática (self-service) do prazo — sem aprovação do
+    gestor. Até LIMITE_EXTENSOES_AUTOMATICAS por chamado, cada uma somando
+    o TAT da categoria (respeitando sla_dias customizado, mesma regra de
+    _sla_dias_por_categoria) em cima do prazo efetivo ATUAL — que já pode
+    ter sido estendido antes, por uma extensão automática anterior ou por
+    uma previsão aprovada pelo gestor.
+
+    Ratchet de mão única: uma vez que decidir_previsao_atendimento trava o
+    chamado (previsao_extensao_travada=True), essa função nunca mais aplica
+    nada nele, mesmo que ainda "sobrem" extensões no contador — o self-service
+    não é reconcedido depois que o gestor precisa intervir.
+
+    Args:
+        chamado_id: ID do chamado.
+        usuario: quem pede — precisa ser owner-ou-admin, E supervisor+
+            (mesma regra de solicitar_previsao_atendimento).
+
+    Returns:
+        {"sucesso": True, "dados": {...}} ou {"sucesso": False, "erro": "..."}.
+    """
+    chamado = Chamado.get_by_id(chamado_id)
+    if chamado is None:
+        return {"sucesso": False, "erro": _t("ticket_not_found")}
+
+    # AOG é prioridade máxima, sempre — nunca pode ter o prazo alterado,
+    # nem pelo fluxo manual nem pela extensão automática.
+    if chamado.categoria == "AOG":
+        logger.warning(
+            "solicitar_extensao_automatica negado: chamado %s é AOG (bloqueio incondicional)",
+            chamado_id,
+        )
+        return {"sucesso": False, "erro": _t("attendance_forecast_not_allowed_aog")}
+
+    if not _permite_solicitar_previsao(usuario, chamado):
+        logger.warning(
+            "solicitar_extensao_automatica negado: usuário %s sem permissão no chamado %s",
+            usuario.id,
+            chamado_id,
+        )
+        return {"sucesso": False, "erro": _t("no_permission_set_attendance_forecast")}
+
+    # Enquanto há um pedido manual pendente, não deixa a extensão automática
+    # somar em cima de um prazo que está prestes a ser substituído pela
+    # decisão do gestor — evita os dois prazos se pisarem.
+    if obter_solicitacao_pendente(chamado.id) is not None:
+        return {
+            "sucesso": False,
+            "erro": _t("attendance_forecast_self_service_blocked_by_pending"),
+        }
+
+    with db_module.SessionLocal() as session, session.begin():
+        chamado_row = session.execute(
+            select(ChamadoRow).where(ChamadoRow.id == chamado.id).with_for_update()
+        ).scalar_one_or_none()
+        if chamado_row is None:
+            return {"sucesso": False, "erro": _t("ticket_not_found")}
+
+        if chamado_row.previsao_extensao_travada:
+            return {"sucesso": False, "erro": _t("attendance_forecast_self_service_locked")}
+
+        if chamado_row.previsao_extensoes_automaticas_usadas >= LIMITE_EXTENSOES_AUTOMATICAS:
+            return {
+                "sucesso": False,
+                "erro": _t("attendance_forecast_self_service_limit_reached"),
+            }
+
+        dias_tat = _sla_dias_por_categoria(chamado_row.categoria or "", chamado_row.sla_dias)
+        baseline = adicionar_dias_uteis(chamado_row.data_abertura, dias_tat)
+        prazo_atual = _prazo_efetivo(baseline, chamado_row.previsao_atendimento)
+        # prazo_atual sempre sai tz-aware (baseline vem de data_abertura, que
+        # é um instante real de verdade; _prazo_efetivo reanexa
+        # Config.SLA_TIMEZONE em cima dos dígitos de previsao_atendimento).
+        # .replace(tzinfo=None) é obrigatório antes de gravar — a convenção
+        # da coluna é dígitos naive = horário local, nunca um instante
+        # tz-aware de verdade (ver docstring de analytics._previsao_atendimento_instante).
+        nova_previsao = adicionar_dias_uteis(prazo_atual, dias_tat).replace(tzinfo=None)
+
+        extensoes_usadas = chamado_row.previsao_extensoes_automaticas_usadas + 1
+        motivo = f"Extensão automática {extensoes_usadas}/{LIMITE_EXTENSOES_AUTOMATICAS}"
+
+        chamado_row.previsao_atendimento = nova_previsao
+        chamado_row.motivo_previsao_atendimento = motivo
+        chamado_row.previsao_extensoes_automaticas_usadas = extensoes_usadas
+
+        solicitante_id = chamado_row.solicitante_id
+        solicitante_nome = chamado_row.solicitante_nome
+
+    Historico(
+        chamado_id=chamado_id,
+        usuario_id=usuario.id,
+        usuario_nome=usuario.nome,
+        acao="extensao_automatica_previsao",
+        campo_alterado="previsao_atendimento",
+        valor_anterior=str(prazo_atual),
+        valor_novo=str(nova_previsao),
+        detalhe=motivo,
+    ).save()
+
+    logger.info(
+        "Chamado %s: extensão automática %s/%s aplicada por %s — nova previsão %s",
+        chamado_id,
+        extensoes_usadas,
+        LIMITE_EXTENSOES_AUTOMATICAS,
+        usuario.id,
+        nova_previsao,
+    )
+
+    return {
+        "sucesso": True,
+        "dados": {
+            "previsao_nova": str(nova_previsao),
+            "extensoes_usadas": extensoes_usadas,
+            "extensoes_restantes": LIMITE_EXTENSOES_AUTOMATICAS - extensoes_usadas,
+            "solicitante_id": solicitante_id,
+            "solicitante_nome": solicitante_nome,
+            "responsavel_id": usuario.id,
+            "responsavel_nome": usuario.nome,
+        },
+    }
+
+
 def decidir_previsao_atendimento(
     solicitacao_id: int,
     acao: str,
@@ -401,6 +553,14 @@ def decidir_previsao_atendimento(
                 row.chamado_id,
                 chamado_row.status,
             )
+
+        # Ratchet de mão única: assim que o gestor decide (aprova OU rejeita)
+        # um pedido de verdade — não o auto-reject por TOCTOU, que não é
+        # decisão de mérito sobre nada — a extensão automática (self-service)
+        # fica desabilitada permanentemente pra esse chamado. Não volta a
+        # ganhar 3 de novo (ver solicitar_extensao_automatica).
+        if not encerrado_automaticamente:
+            chamado_row.previsao_extensao_travada = True
 
         row.status = "aprovada" if acao_efetiva == "aprovar" else "rejeitada"
         row.gestor_id = gestor.id

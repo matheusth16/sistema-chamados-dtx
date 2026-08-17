@@ -65,6 +65,10 @@ class Chamado:
         # Previsão de atendimento — suspende e-mails de escalonamento (Escada A/B) até a data
         previsao_atendimento=None,
         motivo_previsao_atendimento: str = None,
+        # Extensões automáticas (self-service) da previsão de atendimento —
+        # ver app/services/previsao_atendimento_service.py
+        previsao_extensoes_automaticas_usadas: int = 0,
+        previsao_extensao_travada: bool = False,
         # Confirmação de leitura (versão simples) — ver
         # app/services/visualizacao_chamado_service.py
         visualizado_pelo_responsavel_em=None,
@@ -131,6 +135,12 @@ class Chamado:
         # Previsão de atendimento — suspende e-mails de escalonamento (Escada A/B) até a data
         self.previsao_atendimento = previsao_atendimento
         self.motivo_previsao_atendimento = motivo_previsao_atendimento
+        self.previsao_extensoes_automaticas_usadas = (
+            previsao_extensoes_automaticas_usadas
+            if previsao_extensoes_automaticas_usadas is not None
+            else 0
+        )
+        self.previsao_extensao_travada = bool(previsao_extensao_travada)
         self.visualizado_pelo_responsavel_em = visualizado_pelo_responsavel_em
 
     def _converter_timestamp(self, ts):
@@ -242,6 +252,8 @@ class Chamado:
             # Previsão de atendimento
             "previsao_atendimento": self.previsao_atendimento,
             "motivo_previsao_atendimento": self.motivo_previsao_atendimento,
+            "previsao_extensoes_automaticas_usadas": self.previsao_extensoes_automaticas_usadas,
+            "previsao_extensao_travada": self.previsao_extensao_travada,
             "visualizado_pelo_responsavel_em": self.visualizado_pelo_responsavel_em,
         }
 
@@ -314,6 +326,10 @@ class Chamado:
             # Previsão de atendimento
             previsao_atendimento=data.get("previsao_atendimento"),
             motivo_previsao_atendimento=data.get("motivo_previsao_atendimento"),
+            previsao_extensoes_automaticas_usadas=data.get(
+                "previsao_extensoes_automaticas_usadas", 0
+            ),
+            previsao_extensao_travada=data.get("previsao_extensao_travada", False),
             visualizado_pelo_responsavel_em=data.get("visualizado_pelo_responsavel_em"),
         )
 
@@ -359,6 +375,8 @@ class Chamado:
             "lembrete_confirmacao_2_enviado": self.lembrete_confirmacao_2_enviado,
             "alerta_prazo_24h_enviado_em": self.alerta_prazo_24h_enviado_em,
             "reaberturas_solicitante_count": self.reaberturas_solicitante_count,
+            "previsao_extensoes_automaticas_usadas": self.previsao_extensoes_automaticas_usadas,
+            "previsao_extensao_travada": self.previsao_extensao_travada,
             "visualizado_pelo_responsavel_em": self.visualizado_pelo_responsavel_em,
         }
 
@@ -407,6 +425,8 @@ class Chamado:
             observadores=observadores or [],
             previsao_atendimento=row.previsao_atendimento,
             motivo_previsao_atendimento=row.motivo_previsao_atendimento,
+            previsao_extensoes_automaticas_usadas=row.previsao_extensoes_automaticas_usadas,
+            previsao_extensao_travada=row.previsao_extensao_travada,
             visualizado_pelo_responsavel_em=row.visualizado_pelo_responsavel_em,
         )
 
