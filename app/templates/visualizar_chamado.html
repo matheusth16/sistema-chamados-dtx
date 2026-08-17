@@ -733,6 +733,18 @@
                                 <div style="font-size:14px; font-weight:700;">
                                     {{ chamado.responsavel or '—' }}
                                 </div>
+                                {% if chamado.solicitante_id == current_user.id %}
+                                {% set _visto_em = chamado.visualizado_pelo_responsavel_formatada() %}
+                                <div style="margin-top:4px; font-size:11px; font-weight:600; display:flex; align-items:center; gap:4px; color:{{ 'var(--color-bento-success)' if _visto_em else 'var(--color-surface-muted)' }};">
+                                    {% if _visto_em %}
+                                    <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                                    <span>{{ t('viewed_by_assignee_at', date=_visto_em) if t else 'Visualizado em ' ~ _visto_em }}</span>
+                                    {% else %}
+                                    <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke-width="2"></circle></svg>
+                                    <span>{{ t('not_viewed_by_assignee_yet') if t else 'Ainda não visualizado pelo responsável' }}</span>
+                                    {% endif %}
+                                </div>
+                                {% endif %}
                             </div>
                             <!-- Participantes (Fase 4) — leitura -->
                             {% if chamado.participantes %}

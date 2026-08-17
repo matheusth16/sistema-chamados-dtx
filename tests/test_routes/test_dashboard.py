@@ -655,6 +655,51 @@ def test_visualizar_chamado_admin_com_permissao_retorna_200(client_logado_admin,
     assert r.status_code == 200
 
 
+def test_visualizar_chamado_responsavel_marca_visualizado_primeira_vez(
+    client_logado_admin, db_session
+):
+    """GET /chamado/<id> pelo responsável atual grava visualizado_pelo_responsavel_em
+    na primeira vez (confirmação de leitura, versão simples)."""
+    from app.models import Chamado
+    from tests.factories import make_chamado
+
+    chamado = make_chamado(responsavel_id="admin_1")
+    assert chamado.visualizado_pelo_responsavel_em is None
+
+    with (
+        patch("app.routes.dashboard.usuario_pode_ver_chamado", return_value=True),
+        patch("app.routes.dashboard.get_static_cached", return_value=[]),
+        patch("app.routes.dashboard.filtrar_supervisores_por_area", return_value=[]),
+        patch("app.routes.dashboard.CategoriaSetor.get_all", return_value=[]),
+    ):
+        r = client_logado_admin.get(f"/chamado/{chamado.id}", follow_redirects=False)
+
+    assert r.status_code == 200
+    recarregado = Chamado.get_by_id(chamado.id)
+    assert recarregado.visualizado_pelo_responsavel_em is not None
+
+
+def test_visualizar_chamado_nao_responsavel_nao_marca_visualizado(client_logado_admin, db_session):
+    """GET /chamado/<id> por quem não é o responsável atual não grava nada —
+    só o responsável dispara a confirmação de leitura."""
+    from app.models import Chamado
+    from tests.factories import make_chamado
+
+    chamado = make_chamado(responsavel_id="outro_supervisor")
+
+    with (
+        patch("app.routes.dashboard.usuario_pode_ver_chamado", return_value=True),
+        patch("app.routes.dashboard.get_static_cached", return_value=[]),
+        patch("app.routes.dashboard.filtrar_supervisores_por_area", return_value=[]),
+        patch("app.routes.dashboard.CategoriaSetor.get_all", return_value=[]),
+    ):
+        r = client_logado_admin.get(f"/chamado/{chamado.id}", follow_redirects=False)
+
+    assert r.status_code == 200
+    recarregado = Chamado.get_by_id(chamado.id)
+    assert recarregado.visualizado_pelo_responsavel_em is None
+
+
 def test_visualizar_chamado_com_participantes_sem_usuario_atual_retorna_200(
     client_logado_admin, db_session
 ):

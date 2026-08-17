@@ -109,6 +109,12 @@ class ChamadoRow(Base):
     reaberturas_solicitante_count: Mapped[int] = mapped_column(
         SmallInteger, nullable=False, default=0
     )
+    # Confirmação de leitura (versão simples): grava só a primeira vez que o
+    # responsável ATUAL abre o detalhe do chamado — ver
+    # app/services/visualizacao_chamado_service.py. NULL = ainda não visto.
+    visualizado_pelo_responsavel_em: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True)
+    )
 
 
 class ChamadoParticipanteRow(Base):

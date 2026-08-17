@@ -559,6 +559,16 @@
     "en": "Assigned to",
     "es": "Asignado a"
   },
+  "viewed_by_assignee_at": {
+    "pt_BR": "Visualizado em {date}",
+    "en": "Viewed on {date}",
+    "es": "Visto el {date}"
+  },
+  "not_viewed_by_assignee_yet": {
+    "pt_BR": "Ainda não visualizado pelo responsável",
+    "en": "Not yet viewed by the assignee",
+    "es": "Aún no visto por el responsable"
+  },
   "to": {
     "pt_BR": "a",
     "en": "to",

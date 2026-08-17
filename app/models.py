@@ -65,6 +65,9 @@ class Chamado:
         # Previsão de atendimento — suspende e-mails de escalonamento (Escada A/B) até a data
         previsao_atendimento=None,
         motivo_previsao_atendimento: str = None,
+        # Confirmação de leitura (versão simples) — ver
+        # app/services/visualizacao_chamado_service.py
+        visualizado_pelo_responsavel_em=None,
     ):
         self.id = id
         self.numero_chamado = numero_chamado
@@ -128,6 +131,7 @@ class Chamado:
         # Previsão de atendimento — suspende e-mails de escalonamento (Escada A/B) até a data
         self.previsao_atendimento = previsao_atendimento
         self.motivo_previsao_atendimento = motivo_previsao_atendimento
+        self.visualizado_pelo_responsavel_em = visualizado_pelo_responsavel_em
 
     def _converter_timestamp(self, ts):
         """Converte timestamp (datetime, ou qualquer objeto tipo-Timestamp com
@@ -182,6 +186,14 @@ class Chamado:
             return dt.strftime("%d/%m/%Y %H:%M")
         return "-"
 
+    def visualizado_pelo_responsavel_formatada(self):
+        """Retorna visualizado_pelo_responsavel_em formatada como string, ou
+        None se o responsável ainda não visualizou o chamado."""
+        dt = self._converter_timestamp(self.visualizado_pelo_responsavel_em)
+        if dt and isinstance(dt, datetime):
+            return dt.strftime("%d/%m/%Y %H:%M")
+        return None
+
     def to_dict(self):
         """Converte para dicionário (serialização para templates, notificações, exports)."""
         return {
@@ -230,6 +242,7 @@ class Chamado:
             # Previsão de atendimento
             "previsao_atendimento": self.previsao_atendimento,
             "motivo_previsao_atendimento": self.motivo_previsao_atendimento,
+            "visualizado_pelo_responsavel_em": self.visualizado_pelo_responsavel_em,
         }
 
     @classmethod
@@ -301,6 +314,7 @@ class Chamado:
             # Previsão de atendimento
             previsao_atendimento=data.get("previsao_atendimento"),
             motivo_previsao_atendimento=data.get("motivo_previsao_atendimento"),
+            visualizado_pelo_responsavel_em=data.get("visualizado_pelo_responsavel_em"),
         )
 
     def to_row_kwargs(self) -> dict:
@@ -345,6 +359,7 @@ class Chamado:
             "lembrete_confirmacao_2_enviado": self.lembrete_confirmacao_2_enviado,
             "alerta_prazo_24h_enviado_em": self.alerta_prazo_24h_enviado_em,
             "reaberturas_solicitante_count": self.reaberturas_solicitante_count,
+            "visualizado_pelo_responsavel_em": self.visualizado_pelo_responsavel_em,
         }
 
     @classmethod
@@ -392,6 +407,7 @@ class Chamado:
             observadores=observadores or [],
             previsao_atendimento=row.previsao_atendimento,
             motivo_previsao_atendimento=row.motivo_previsao_atendimento,
+            visualizado_pelo_responsavel_em=row.visualizado_pelo_responsavel_em,
         )
 
     @staticmethod

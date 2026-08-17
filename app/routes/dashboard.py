@@ -201,6 +201,13 @@ def visualizar_detalhe_chamado(chamado_id: str) -> Response:
                 return redirect(url_for("main.meus_chamados"))
             flash_t("only_view_history_your_area", "danger")
             return _redirect_dashboard()
+
+        from app.services.visualizacao_chamado_service import (
+            marcar_visualizado_pelo_responsavel,
+        )
+
+        marcar_visualizado_pelo_responsavel(chamado, current_user.id)
+
         voltar_url = (
             request.referrer
             if request.referrer and _same_origin(request.referrer)

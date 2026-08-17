@@ -111,6 +111,17 @@ def test_to_dict_previsao_atendimento_customizada():
     assert d["motivo_previsao_atendimento"] == "Combinado com o gestor"
 
 
+def test_to_dict_visualizado_pelo_responsavel_padrao_none():
+    d = _chamado().to_dict()
+    assert d["visualizado_pelo_responsavel_em"] is None
+
+
+def test_to_dict_visualizado_pelo_responsavel_customizado():
+    visto_em = datetime(2026, 8, 17, 14, 32, tzinfo=pytz.timezone("America/Sao_Paulo"))
+    d = _chamado(visualizado_pelo_responsavel_em=visto_em).to_dict()
+    assert d["visualizado_pelo_responsavel_em"] == visto_em
+
+
 # ── from_dict ─────────────────────────────────────────────────────────────────
 
 
@@ -194,6 +205,31 @@ def test_from_dict_previsao_atendimento_customizada():
     )
     assert c.previsao_atendimento == previsao
     assert c.motivo_previsao_atendimento == "Combinado com o gestor"
+
+
+def test_from_dict_visualizado_pelo_responsavel_padrao_none():
+    from app.models import Chamado
+
+    c = Chamado.from_dict(
+        {"categoria": "TI", "tipo_solicitacao": "S", "descricao": "D", "responsavel": "R"}
+    )
+    assert c.visualizado_pelo_responsavel_em is None
+
+
+def test_from_dict_visualizado_pelo_responsavel_customizado():
+    from app.models import Chamado
+
+    visto_em = datetime(2026, 8, 17, 14, 32, tzinfo=pytz.timezone("America/Sao_Paulo"))
+    c = Chamado.from_dict(
+        {
+            "categoria": "TI",
+            "tipo_solicitacao": "S",
+            "descricao": "D",
+            "responsavel": "R",
+            "visualizado_pelo_responsavel_em": visto_em,
+        }
+    )
+    assert c.visualizado_pelo_responsavel_em == visto_em
 
 
 def test_from_dict_preserva_id():
@@ -321,6 +357,20 @@ def test_previsao_atendimento_formatada_retorna_string_data():
     c = _chamado()
     c.previsao_atendimento = datetime(2024, 6, 15, 10, 30, tzinfo=pytz.utc)
     resultado = c.previsao_atendimento_formatada()
+    assert "/" in resultado
+    assert ":" in resultado
+
+
+def test_visualizado_pelo_responsavel_formatada_retorna_none_quando_nao_visto():
+    c = _chamado()
+    c.visualizado_pelo_responsavel_em = None
+    assert c.visualizado_pelo_responsavel_formatada() is None
+
+
+def test_visualizado_pelo_responsavel_formatada_retorna_string_data():
+    c = _chamado()
+    c.visualizado_pelo_responsavel_em = datetime(2026, 8, 17, 14, 32, tzinfo=pytz.utc)
+    resultado = c.visualizado_pelo_responsavel_formatada()
     assert "/" in resultado
     assert ":" in resultado
 
@@ -569,6 +619,26 @@ def test_atualizar_campos_cas_incrementa_contador_no_banco(app):
     recarregado = _chamado_get_by_id(c.id)
     assert recarregado.reaberturas_solicitante_count == 2
     assert recarregado.status == "Aberto"
+
+
+def test_salvar_e_recarregar_visualizado_pelo_responsavel_default_none(app):
+    c = _chamado(numero_chamado="CHM-VIS-1")
+    c.salvar()
+
+    recarregado = _chamado_get_by_id(c.id)
+    assert recarregado.visualizado_pelo_responsavel_em is None
+
+
+def test_atualizar_campos_visualizado_pelo_responsavel(app):
+    c = _chamado(numero_chamado="CHM-VIS-2")
+    c.salvar()
+
+    visto_em = datetime(2026, 8, 17, 14, 32, tzinfo=pytz.utc)
+    resultado = c.atualizar_campos(visualizado_pelo_responsavel_em=visto_em)
+
+    assert resultado is True
+    recarregado = _chamado_get_by_id(c.id)
+    assert recarregado.visualizado_pelo_responsavel_em is not None
 
 
 def test_deletar_remove_chamado(app):
