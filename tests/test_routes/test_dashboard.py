@@ -312,6 +312,59 @@ def test_historico_com_supervisor_permissao_retorna_200(client_logado_supervisor
     assert r.status_code == 200
 
 
+def test_historico_admin_global_com_permissao_retorna_200(client_logado_admin_global, db_session):
+    """GET /chamado/<id>/historico com admin_global retorna 200 — admin_global
+    herda tudo de admin, incluindo ver histórico de qualquer chamado."""
+    from tests.factories import make_chamado
+
+    chamado = make_chamado(area="Manutencao", solicitante_id="sol1")
+    with (
+        patch("app.routes.dashboard.usuario_pode_ver_chamado", return_value=True),
+        patch("app.routes.dashboard.Historico.get_by_chamado_id", return_value=[]),
+    ):
+        r = client_logado_admin_global.get(
+            f"/chamado/{chamado.id}/historico", follow_redirects=False
+        )
+    assert r.status_code == 200
+
+
+def test_historico_gestor_amplo_com_permissao_retorna_200(client, app, db_session):
+    """GET /chamado/<id>/historico com nivel_gestao company-wide (Gerente de
+    Produção/Assistente GM/GM) retorna 200, mesmo com perfil='solicitante' —
+    regra de negócio: esses 3 níveis devem ver histórico de qualquer chamado,
+    igual a admin. Antes desse fix, o gate da rota redirecionava QUALQUER
+    perfil='solicitante' antes de checar nivel_gestao, bloqueando esses gestores."""
+    from tests.factories import make_chamado
+
+    chamado = make_chamado(area="Manutencao", solicitante_id="sol1")
+    user = _mock_usuario_gestor_amplo()
+    with (
+        patch("app.routes.auth.Usuario.get_by_email", return_value=user),
+        patch("app.models_usuario.Usuario.get_by_id", return_value=user),
+        patch("app.routes.auth._dispositivo_confiavel", return_value=True),
+    ):
+        client.post("/login", data={"email": user.email, "senha": "ok"}, follow_redirects=False)
+        with (
+            patch("app.routes.dashboard.usuario_pode_ver_chamado", return_value=True),
+            patch("app.routes.dashboard.Historico.get_by_chamado_id", return_value=[]),
+        ):
+            r = client.get(f"/chamado/{chamado.id}/historico", follow_redirects=False)
+    assert r.status_code == 200
+
+
+def test_historico_solicitante_puro_redireciona_para_detalhe(client_logado_solicitante, db_session):
+    """GET /chamado/<id>/historico com solicitante sem nivel_gestao continua
+    redirecionando pra tela de detalhe (comportamento preservado — link de
+    e-mail antigo)."""
+    from tests.factories import make_chamado
+
+    chamado = make_chamado(solicitante_id="sol_1")
+    r = client_logado_solicitante.get(f"/chamado/{chamado.id}/historico", follow_redirects=False)
+    assert r.status_code == 302
+    assert f"/chamado/{chamado.id}" in (r.location or "")
+    assert "historico" not in (r.location or "")
+
+
 def test_historico_renderiza_todas_acoes_automaticas_sem_quebrar(
     client_logado_supervisor, db_session
 ):
@@ -653,6 +706,67 @@ def test_visualizar_chamado_admin_com_permissao_retorna_200(client_logado_admin,
     ):
         r = client_logado_admin.get(f"/chamado/{chamado.id}", follow_redirects=False)
     assert r.status_code == 200
+
+
+def test_visualizar_chamado_admin_global_ve_botao_historico(client_logado_admin_global, db_session):
+    """GET /chamado/<id> com admin_global mostra o botão "Ver Histórico" —
+    admin_global herda tudo de admin; o botão só checava perfil in
+    ['admin', 'supervisor'], deixando admin_global sem o botão mesmo tendo
+    acesso à rota /chamado/<id>/historico."""
+    from tests.factories import make_chamado
+
+    chamado = make_chamado()
+    with (
+        patch("app.routes.dashboard.usuario_pode_ver_chamado", return_value=True),
+        patch("app.routes.dashboard.get_static_cached", return_value=[]),
+        patch("app.routes.dashboard.filtrar_supervisores_por_area", return_value=[]),
+        patch("app.routes.dashboard.CategoriaSetor.get_all", return_value=[]),
+    ):
+        r = client_logado_admin_global.get(f"/chamado/{chamado.id}", follow_redirects=False)
+    assert r.status_code == 200
+    html = r.get_data(as_text=True)
+    assert f"/chamado/{chamado.id}/historico" in html
+
+
+def test_visualizar_chamado_gestor_amplo_ve_botao_historico(client, app, db_session):
+    """GET /chamado/<id> com nivel_gestao company-wide (Gerente de Produção/
+    Assistente GM/GM) mostra o botão "Ver Histórico", mesmo com perfil='solicitante'
+    — regra de negócio: esses 3 níveis devem ver histórico de qualquer chamado."""
+    from tests.factories import make_chamado
+
+    chamado = make_chamado()
+    user = _mock_usuario_gestor_amplo()
+    with (
+        patch("app.routes.auth.Usuario.get_by_email", return_value=user),
+        patch("app.models_usuario.Usuario.get_by_id", return_value=user),
+        patch("app.routes.auth._dispositivo_confiavel", return_value=True),
+    ):
+        client.post("/login", data={"email": user.email, "senha": "ok"}, follow_redirects=False)
+        with (
+            patch("app.routes.dashboard.usuario_pode_ver_chamado", return_value=True),
+            patch("app.routes.dashboard.get_static_cached", return_value=[]),
+            patch("app.routes.dashboard.filtrar_supervisores_por_area", return_value=[]),
+            patch("app.routes.dashboard.CategoriaSetor.get_all", return_value=[]),
+        ):
+            r = client.get(f"/chamado/{chamado.id}", follow_redirects=False)
+    assert r.status_code == 200
+    html = r.get_data(as_text=True)
+    assert f"/chamado/{chamado.id}/historico" in html
+
+
+def test_visualizar_chamado_solicitante_puro_nao_ve_botao_historico(
+    client_logado_solicitante, db_session
+):
+    """GET /chamado/<id> com solicitante sem nivel_gestao não mostra o botão
+    "Ver Histórico" (comportamento preservado)."""
+    from tests.factories import make_chamado
+
+    chamado = make_chamado(solicitante_id="sol_1")
+    with patch("app.routes.dashboard.CategoriaSetor.get_all", return_value=[]):
+        r = client_logado_solicitante.get(f"/chamado/{chamado.id}", follow_redirects=False)
+    assert r.status_code == 200
+    html = r.get_data(as_text=True)
+    assert f"/chamado/{chamado.id}/historico" not in html
 
 
 def test_visualizar_chamado_responsavel_marca_visualizado_primeira_vez(

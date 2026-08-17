@@ -347,13 +347,17 @@ def editar_chamado_pagina() -> Response:
 def visualizar_historico(chamado_id: str) -> Response:
     """Exibe histórico de alterações do chamado.
 
-    Solicitantes que chegam por link de e-mail antigo são redirecionados
-    para a página de detalhe do chamado (onde fica o bloco de confirmação).
+    Solicitantes "puros" (sem nivel_gestao) que chegam por link de e-mail
+    antigo são redirecionados para a página de detalhe do chamado (onde fica
+    o bloco de confirmação). Quem tem nivel_gestao (Gestor do Setor/Gerente
+    de Produção/Assistente GM/GM) passa direto mesmo com perfil='solicitante'
+    — achado 2026-08-17: o gate antigo redirecionava QUALQUER perfil
+    'solicitante' antes de checar nivel_gestao, bloqueando esses gestores.
     """
-    if current_user.perfil == "solicitante":
+    if current_user.perfil == "solicitante" and not current_user.is_gestor:
         return redirect(url_for("main.visualizar_detalhe_chamado", chamado_id=chamado_id))
 
-    if current_user.perfil not in ("supervisor", "admin", "admin_global"):
+    if not (current_user.is_supervisor_or_above or current_user.is_gestor):
         flash_t("access_denied_supervisors", "danger")
         return redirect(url_for("main.index"))
 
