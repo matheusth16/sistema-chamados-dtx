@@ -81,6 +81,12 @@
 }
 .bento-form input:focus, .bento-form select:focus, .bento-form textarea:focus{ outline:none; border-color:var(--color-dtx-500); background:#fff; }
 .bento-form input[type="checkbox"], .bento-form input[type="radio"]{ width:16px; background:none; border:none; padding:0; }
+/* .bento-form input (acima) tem especificidade (0,1,1), maior que .sr-only (0,1,0) —
+   sem este override, o <input type="file"> do dropzone de anexo (sr-only, deveria ficar
+   1x1px) herdava width:100%/padding:11px 14px e virava uma caixa ~700px+ absolutamente
+   posicionada, estourando a largura da página (barra de rolagem horizontal ao abrir
+   chamado). Achado 2026-08-17. */
+.bento-form input.sr-only{ position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border-width:0; }
 .bento-form input::placeholder, .bento-form textarea::placeholder{ color:var(--color-surface-muted); }
 .bento-form textarea{ resize:vertical; min-height:100px; }
 .bento-form select{ cursor:pointer; }
