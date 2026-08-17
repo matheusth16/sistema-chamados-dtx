@@ -517,9 +517,15 @@ DIAS_PERIODO_PERMITIDOS = (7, 30, 90)
 
 
 @main.route("/admin/relatorios")
-@requer_supervisor_area
+@login_required
+@requer_gestor_ou_admin
 def relatorios() -> Response:
-    """Dashboard de relatórios e análises. Use ?atualizar=1 para forçar dados frescos.
+    """Dashboard de relatórios e análises. Acessível a admins e a quem tem
+    nivel_gestao — supervisor "puro" (sem nivel_gestao) não vê essa página.
+    Gestor do Setor (nivel_gestao='gestor_setor') só vê o relatório da própria
+    área; demais níveis de gestão (gerente_producao/assistente_gm/gm) e admins
+    veem o relatório completo (todas as áreas).
+    Use ?atualizar=1 para forçar dados frescos.
     Query params: dias (7|30|90, padrão 30), pagina_sup, pagina_area, ordenar_sup,
     ordenar_area, ordem_sup, ordem_area (asc|desc), busca_sup, busca_area."""
     erro_relatorio = False
@@ -527,6 +533,11 @@ def relatorios() -> Response:
         dias = request.args.get("dias", 30, type=int)
         if dias not in DIAS_PERIODO_PERMITIDOS:
             dias = 30
+        areas_escopo = (
+            list(current_user.areas or [])
+            if getattr(current_user, "nivel_gestao", None) == "gestor_setor"
+            else None
+        )
         atualizar = request.args.get("atualizar") == "1"
         if atualizar:
             limite = getattr(Config, "RELATORIO_MAX_POR_USUARIO_POR_DIA", 0) or 0
@@ -539,7 +550,10 @@ def relatorios() -> Response:
                     return redirect(url_for("main.relatorios", dias=dias))
         try:
             relatorio = (
-                analisador.obter_relatorio_completo(usar_cache=not atualizar, dias=dias) or {}
+                analisador.obter_relatorio_completo(
+                    usar_cache=not atualizar, dias=dias, areas=areas_escopo
+                )
+                or {}
             )
         except Exception as e_analytics:
             logger.exception("Erro ao obter relatório completo (analytics): %s", e_analytics)

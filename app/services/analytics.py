@@ -26,8 +26,9 @@ from app.services.business_time import percentual_prazo_resolucao
 logger = logging.getLogger(__name__)
 
 # Cache em memória (fallback quando Redis não está configurado), por período
-# (dias) — cada seleção de período no seletor da UI tem sua própria entrada.
-_RELATORIO_CACHE: dict[int, dict[str, Any]] = {}
+# (dias) + escopo de área — cada seleção de período/área no seletor da UI tem
+# sua própria entrada (chave: "relatorio_completo_{dias}_{areas ou 'all'}").
+_RELATORIO_CACHE: dict[str, dict[str, Any]] = {}
 _RELATORIO_CACHE_TTL_SEC = 300  # 5 minutos
 # TTL para queries analíticas individuais — curto o suficiente para manter dados
 # razoavelmente frescos, longo o suficiente para não re-escanear 2000 docs por minuto.
@@ -955,17 +956,27 @@ class AnalisadorChamados:
 
     # ========== RELATÓRIOS DETALHADOS ==========
 
-    def obter_relatorio_completo(self, usar_cache: bool = True, dias: int = 30) -> dict[str, Any]:
+    def obter_relatorio_completo(
+        self, usar_cache: bool = True, dias: int = 30, areas: list[str] | None = None
+    ) -> dict[str, Any]:
         """Retorna um relatório completo consolidado.
 
         `dias` controla o período da Visão Geral (métricas gerais, gráficos e
         resumo de SLA) — as tabelas de supervisores/áreas continuam all-time,
         sem filtro de período.
 
+        `areas`: quando não-None, restringe TODO o relatório (visão geral,
+        supervisores e áreas) aos chamados dessas áreas — usado pelo Gestor do
+        Setor (nivel_gestao='gestor_setor'), que só pode ver a própria área.
+        Uma lista vazia é um escopo válido (usuário sem área associada) e não
+        cai para a visão company-wide — só `areas=None` (padrão) faz isso.
+
         Com usar_cache=True (padrão), reutiliza resultado por 5 minutos (Redis ou memória),
         evitando várias queries pesadas ao banco.
         """
-        cache_key = f"relatorio_completo_{dias}"
+        escopo_area = areas is not None
+        areas_norm = sorted({a for a in areas if a}) if areas else []
+        cache_key = f"relatorio_completo_{dias}_{'|'.join(areas_norm) if escopo_area else 'all'}"
         try:
             if usar_cache:
                 try:
@@ -979,7 +990,7 @@ class AnalisadorChamados:
                     logger.debug("Cache get ignorado: %s", e)
                 # Fallback: cache em memória local
                 now = time.time()
-                cache_mem = _RELATORIO_CACHE.get(dias)
+                cache_mem = _RELATORIO_CACHE.get(cache_key)
                 if cache_mem and (now < cache_mem.get("expires", 0)):
                     logger.debug("Relatório servido do cache em memória")
                     return cache_mem["data"]
@@ -987,6 +998,9 @@ class AnalisadorChamados:
             # Carrega todos os chamados UMA vez (com cache Redis/memória) e distribui
             # para todas as funções de métricas — elimina múltiplas queries a 'chamados'.
             chamados_cache = self._carregar_chamados_analytics()
+            if escopo_area:
+                areas_set = set(areas_norm)
+                chamados_cache = [c for c in chamados_cache if c.get("area") in areas_set]
 
             metricas_gerais = self.obter_metricas_gerais(
                 dias=dias, chamados_pre_carregados=chamados_cache
@@ -1000,6 +1014,12 @@ class AnalisadorChamados:
                 chamados_pre_carregados=chamados_cache
             )
             metricas_areas = self.obter_metricas_areas(chamados_pre_carregados=chamados_cache)
+            if escopo_area:
+                areas_set = set(areas_norm)
+                metricas_supervisores = [
+                    m for m in metricas_supervisores if m.get("area") in areas_set
+                ]
+                metricas_areas = [m for m in metricas_areas if m.get("area") in areas_set]
             insights = self.obter_insights(
                 metricas_supervisores=metricas_supervisores,
                 metricas_areas=metricas_areas,
@@ -1020,7 +1040,7 @@ class AnalisadorChamados:
                     cache_set(cache_key, relatorio, _RELATORIO_CACHE_TTL_SEC)
                 except Exception as e:
                     logger.debug("Cache set ignorado: %s", e)
-                _RELATORIO_CACHE[dias] = {
+                _RELATORIO_CACHE[cache_key] = {
                     "data": relatorio,
                     "expires": time.time() + _RELATORIO_CACHE_TTL_SEC,
                 }

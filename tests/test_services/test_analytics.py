@@ -1630,6 +1630,69 @@ def test_obter_relatorio_completo_exception_retorna_estrutura_vazia(app):
     assert r["metricas_supervisores"] == []
 
 
+def test_obter_relatorio_completo_com_areas_filtra_chamados_e_metricas(app):
+    """obter_relatorio_completo(areas=[...]) restringe chamados_pre_carregados às áreas
+    informadas e filtra fora as linhas de metricas_supervisores/metricas_areas de outras
+    áreas — usado pelo Gestor do Setor, que só pode ver dado da própria área."""
+    from app.services.analytics import AnalisadorChamados
+
+    chamados = [
+        {"area": "TI", "status": "Aberto"},
+        {"area": "RH", "status": "Aberto"},
+    ]
+    sup_ti = {"supervisor_nome": "Ana", "area": "TI", "total_chamados": 1}
+    sup_rh = {"supervisor_nome": "Bob", "area": "RH", "total_chamados": 1}
+    area_ti = {"area": "TI", "total_chamados": 1}
+    area_rh = {"area": "RH", "total_chamados": 1}
+
+    with (
+        app.app_context(),
+        patch.object(AnalisadorChamados, "_carregar_chamados_analytics", return_value=chamados),
+        patch.object(AnalisadorChamados, "obter_metricas_gerais", return_value={}) as mock_mg,
+        patch.object(AnalisadorChamados, "obter_metricas_periodo_anterior", return_value={}),
+        patch.object(
+            AnalisadorChamados, "obter_metricas_supervisores", return_value=[sup_ti, sup_rh]
+        ),
+        patch.object(AnalisadorChamados, "obter_metricas_areas", return_value=[area_ti, area_rh]),
+        patch.object(AnalisadorChamados, "obter_insights", return_value=[]),
+        patch("app.cache.cache_get", return_value=None),
+        patch("app.cache.cache_set"),
+    ):
+        a = AnalisadorChamados()
+        r = a.obter_relatorio_completo(usar_cache=True, areas=["TI"])
+
+    chamados_repassados = mock_mg.call_args.kwargs["chamados_pre_carregados"]
+    assert all(c["area"] == "TI" for c in chamados_repassados)
+    assert [m["area"] for m in r["metricas_supervisores"]] == ["TI"]
+    assert [m["area"] for m in r["metricas_areas"]] == ["TI"]
+
+
+def test_obter_relatorio_completo_com_areas_vazia_nao_vaza_dado_de_outra_area(app):
+    """obter_relatorio_completo(areas=[]) é um escopo válido (usuário sem área
+    associada) — não deve cair para a visão company-wide."""
+    from app.services.analytics import AnalisadorChamados
+
+    chamados = [{"area": "TI", "status": "Aberto"}]
+    sup_ti = {"supervisor_nome": "Ana", "area": "TI", "total_chamados": 1}
+
+    with (
+        app.app_context(),
+        patch.object(AnalisadorChamados, "_carregar_chamados_analytics", return_value=chamados),
+        patch.object(AnalisadorChamados, "obter_metricas_gerais", return_value={}) as mock_mg,
+        patch.object(AnalisadorChamados, "obter_metricas_periodo_anterior", return_value={}),
+        patch.object(AnalisadorChamados, "obter_metricas_supervisores", return_value=[sup_ti]),
+        patch.object(AnalisadorChamados, "obter_metricas_areas", return_value=[]),
+        patch.object(AnalisadorChamados, "obter_insights", return_value=[]),
+        patch("app.cache.cache_get", return_value=None),
+        patch("app.cache.cache_set"),
+    ):
+        a = AnalisadorChamados()
+        r = a.obter_relatorio_completo(usar_cache=True, areas=[])
+
+    assert mock_mg.call_args.kwargs["chamados_pre_carregados"] == []
+    assert r["metricas_supervisores"] == []
+
+
 # ── Fase 7 — obter_sla_para_exibicao: Em Atendimento + data_em_atendimento ────
 
 

@@ -14,7 +14,6 @@ Requer:
 import pytest
 from playwright.sync_api import Page
 
-from tests.e2e.conftest import DEFAULT_TIMEOUT
 from tests.e2e.pages.dashboard_page import DashboardPage
 
 
@@ -27,14 +26,14 @@ def test_supervisor_acessa_dashboard(logged_in_supervisor: Page, base_url: str) 
 
 
 @pytest.mark.e2e
-def test_supervisor_acessa_relatorios(logged_in_supervisor: Page, base_url: str) -> None:
-    """Supervisor deve conseguir acessar a página de relatórios."""
+def test_supervisor_puro_nao_acessa_relatorios(logged_in_supervisor: Page, base_url: str) -> None:
+    """Supervisor sem nivel_gestao não deve acessar /admin/relatorios — só quem tem
+    nivel_gestao (Gestor do Setor, GM, Assistente GM, Gerente de Produção) ou é admin."""
     page = logged_in_supervisor
     page.goto(f"{base_url}/admin/relatorios")
     page.wait_for_load_state("networkidle")
 
-    # Não deve redirecionar para login
-    assert "/login" not in page.url
+    assert "/admin/relatorios" not in page.url
 
 
 @pytest.mark.e2e
@@ -79,19 +78,3 @@ def test_supervisor_nao_acessa_admin_categorias(logged_in_supervisor: Page, base
     assert "/admin/categorias" not in page.url, (
         f"Supervisor não deveria acessar /admin/categorias. URL: {page.url}"
     )
-
-
-@pytest.mark.e2e
-def test_supervisor_relatorios_tem_conteudo(logged_in_supervisor: Page, base_url: str) -> None:
-    """Supervisor acessa /admin/relatorios e vê a página sem erro (status 200)."""
-    page = logged_in_supervisor
-    responses = []
-    page.on("response", lambda r: responses.append(r) if "/relatorios" in r.url else None)
-
-    page.goto(f"{base_url}/admin/relatorios")
-    page.wait_for_load_state("networkidle", timeout=DEFAULT_TIMEOUT)
-
-    assert "/login" not in page.url
-    # Verifica que há algum conteúdo renderizado (não página em branco)
-    body_text = page.locator("body").inner_text()
-    assert len(body_text.strip()) > 0, "Página de relatórios não deve estar em branco"

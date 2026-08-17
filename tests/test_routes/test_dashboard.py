@@ -201,8 +201,28 @@ def test_relatorios_dias_invalido_normaliza_para_30(client_logado_admin):
     assert mock_anal.obter_relatorio_completo.call_args.kwargs["dias"] == 30
 
 
-def test_supervisor_pode_ver_relatorios(client_logado_supervisor):
-    """GET /admin/relatorios com supervisor retorna 200."""
+def test_supervisor_puro_nao_pode_ver_relatorios(client_logado_supervisor):
+    """GET /admin/relatorios com supervisor sem nivel_gestao é bloqueado (302 ou 403).
+
+    Regra de negócio: nenhum supervisor "puro" vê essa página — só quem tem
+    nivel_gestao (Gestor do Setor, Assistente GM, GM, Gerente de Produção) ou é admin.
+    """
+    r = client_logado_supervisor.get("/admin/relatorios", follow_redirects=False)
+    assert r.status_code in (302, 403)
+    if r.status_code == 302:
+        assert "/admin/relatorios" not in (r.location or "")
+
+
+def test_solicitante_nao_pode_ver_relatorios(client_logado_solicitante):
+    """GET /admin/relatorios com solicitante é bloqueado (302 ou 403)."""
+    r = client_logado_solicitante.get("/admin/relatorios", follow_redirects=False)
+    assert r.status_code in (302, 403)
+
+
+def test_gestor_setor_ve_relatorios_escopado_para_sua_area(client_logado_gestor):
+    """GET /admin/relatorios com Gestor do Setor (supervisor + nivel_gestao='gestor_setor')
+    retorna 200 e repassa areas=current_user.areas ao analisador (visão restrita à própria área).
+    """
     with patch("app.routes.dashboard.analisador") as mock_anal:
         mock_anal.obter_relatorio_completo.return_value = {
             "data_geracao": None,
@@ -215,14 +235,61 @@ def test_supervisor_pode_ver_relatorios(client_logado_supervisor):
             patch("app.routes.dashboard.Usuario.get_all", return_value=[]),
             patch("app.routes.dashboard.CategoriaSetor.get_all", return_value=[]),
         ):
-            r = client_logado_supervisor.get("/admin/relatorios", follow_redirects=False)
+            r = client_logado_gestor.get("/admin/relatorios", follow_redirects=False)
     assert r.status_code == 200
+    assert mock_anal.obter_relatorio_completo.call_args.kwargs["areas"] == ["Geral"]
 
 
-def test_solicitante_nao_pode_ver_relatorios(client_logado_solicitante):
-    """GET /admin/relatorios com solicitante é bloqueado (302 ou 403)."""
-    r = client_logado_solicitante.get("/admin/relatorios", follow_redirects=False)
-    assert r.status_code in (302, 403)
+def _mock_usuario_gestor_amplo(uid="gm_1", nivel_gestao="gm"):
+    """MagicMock de usuário com nivel_gestao company-wide (gm/assistente_gm/gerente_producao) —
+    sem perfil operacional (não é supervisor nem admin), só o nível de gestão concede acesso."""
+    u = MagicMock()
+    u.id = uid
+    u.email = f"{uid}@dtx.aero"
+    u.nome = "Gestor Amplo Teste"
+    u.perfil = "solicitante"
+    u.area = "Geral"
+    u.areas = ["Geral"]
+    u.nivel_gestao = nivel_gestao
+    u.is_authenticated = True
+    u.get_id = lambda: str(uid)
+    u.must_change_password = False
+    u.mfa_enabled = True
+    u.is_admin_or_above = False
+    u.is_supervisor_or_above = False
+    u.is_gestor = True
+    u.is_gestor_only = True
+    u.onboarding_perfis_vistos = ["solicitante"]
+    u.onboarding_passo = 0
+    u.ativo = True
+    return u
+
+
+def test_gm_ve_relatorios_completo_sem_escopo_de_area(client, app):
+    """GET /admin/relatorios com nivel_gestao='gm' (sem perfil supervisor/admin)
+    retorna 200 e repassa areas=None ao analisador (visão company-wide)."""
+    user = _mock_usuario_gestor_amplo()
+    with (
+        patch("app.routes.auth.Usuario.get_by_email", return_value=user),
+        patch("app.models_usuario.Usuario.get_by_id", return_value=user),
+        patch("app.routes.auth._dispositivo_confiavel", return_value=True),
+    ):
+        client.post("/login", data={"email": user.email, "senha": "ok"}, follow_redirects=False)
+        with patch("app.routes.dashboard.analisador") as mock_anal:
+            mock_anal.obter_relatorio_completo.return_value = {
+                "data_geracao": None,
+                "metricas_gerais": {},
+                "metricas_supervisores": [],
+                "metricas_areas": [],
+                "insights": [],
+            }
+            with (
+                patch("app.routes.dashboard.Usuario.get_all", return_value=[]),
+                patch("app.routes.dashboard.CategoriaSetor.get_all", return_value=[]),
+            ):
+                r = client.get("/admin/relatorios", follow_redirects=False)
+    assert r.status_code == 200
+    assert mock_anal.obter_relatorio_completo.call_args.kwargs["areas"] is None
 
 
 def test_historico_sem_login_redireciona(client):

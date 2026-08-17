@@ -219,10 +219,40 @@ def test_navbar_supervisor_tem_gestao(client_logado_supervisor):
     assert 'href="/painel"' in html
 
 
-def test_navbar_supervisor_tem_relatorios(client_logado_supervisor):
-    """Navbar do supervisor deve conter link para /admin/relatorios."""
+def test_navbar_supervisor_puro_nao_tem_relatorios(client_logado_supervisor):
+    """Navbar do supervisor sem nivel_gestao NÃO deve conter link para /admin/relatorios —
+    só quem tem nivel_gestao (Gestor do Setor, GM, Assistente GM, Gerente de Produção)
+    ou é admin vê essa página."""
     with _mock_dashboard():
         r = client_logado_supervisor.get("/painel?lang=pt_BR", follow_redirects=False)
+    html = r.data.decode("utf-8", errors="replace")
+    assert "/admin/relatorios" not in html
+
+
+def test_navbar_gestor_setor_tem_relatorios(client_logado_gestor):
+    """Navbar do Gestor do Setor (supervisor + nivel_gestao='gestor_setor') deve
+    conter link para /admin/relatorios (visão restrita à própria área). A fixture
+    client_logado_gestor tem is_gestor_only=True, então /painel redireciona pra
+    /gestor/dashboard — é lá que o navbar do gestor renderiza."""
+    ctx_mock = {
+        "contadores": {
+            "total": 0,
+            "atrasados": 0,
+            "aberto_sem_resposta": 0,
+            "multi_setor_travado": 0,
+        },
+        "chamados": [],
+        "filtro_ativo": "todos",
+        "insights": {
+            "area_critica": None,
+            "tempo_medio_sem_resposta_min": None,
+            "saude_percentual": 100,
+        },
+        "grupos": [],
+    }
+    with patch("app.routes.dashboard.obter_contexto_gestor_dashboard", return_value=ctx_mock):
+        r = client_logado_gestor.get("/gestor/dashboard?lang=pt_BR", follow_redirects=False)
+    assert r.status_code == 200
     html = r.data.decode("utf-8", errors="replace")
     assert "/admin/relatorios" in html
 

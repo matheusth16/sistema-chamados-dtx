@@ -65,9 +65,8 @@ def test_capturar_screenshots_supervisor(logged_in_supervisor: Page, base_url: s
     # não navegar para /exportar-avancado, que é um download direto (sem HTML
     # para renderizar) e derruba o Page.goto do Playwright.
     _salvar(page, "supervisor", "06-exportar.png")
-
-    page.goto(f"{base_url}/admin/relatorios")
-    _salvar(page, "supervisor", "05-relatorios.png")
+    # /admin/relatorios não é mais acessível a supervisor "puro" (sem nivel_gestao) —
+    # ver test_fluxo_supervisor.py::test_supervisor_puro_nao_acessa_relatorios
 
 
 @pytest.mark.capture
