@@ -632,33 +632,34 @@ def notificar_resposta_supervisor_chamado(
 def _link_chamado(chamado_id: str) -> str:
     """Link "View ticket" usado em todos os e-mails deste módulo.
 
-    Achado ao implementar a aprovação de previsão de atendimento (2026-08-12):
-    o endpoint real da rota de detalhe é 'main.visualizar_detalhe_chamado'
-    (ver app/routes/dashboard.py), não 'main.visualizar_chamado' — o nome
-    errado fazia url_for levantar BuildError, silenciosamente engolido pelo
-    except abaixo, deixando TODOS os botões "View ticket" de TODAS as
-    notificações deste arquivo sempre vazios (href="").
+    Construído direto a partir de APP_BASE_URL (mesmo padrão de
+    notifications_core.py/status_service.py), não com url_for(_external=True)
+    dentro de um current_app.test_request_context() solto: sem SERVER_NAME
+    configurado em lugar nenhum do app, esse context assume host "localhost"
+    e ignora APP_BASE_URL por completo — todo e-mail deste módulo linkava pra
+    http://localhost/... mesmo em produção (achado 2026-08-17).
     """
     try:
-        from flask import current_app, url_for
+        from flask import current_app
 
-        with current_app.test_request_context():
-            return url_for("main.visualizar_detalhe_chamado", chamado_id=chamado_id, _external=True)
+        base = (current_app.config.get("APP_BASE_URL") or "").strip().rstrip("/")
+        return f"{base}/chamado/{chamado_id}" if base else ""
     except Exception:
         return ""
 
 
 def _link_decisao_previsao(solicitacao_id: int, acao: str) -> str:
     """Link assinado (token de uso único) pra decidir o pedido direto do e-mail —
-    ver previsao_atendimento_service.gerar_token_decisao/validar_token_decisao."""
+    ver previsao_atendimento_service.gerar_token_decisao/validar_token_decisao.
+    Construído a partir de APP_BASE_URL — ver _link_chamado acima pro porquê."""
     try:
-        from flask import current_app, url_for
+        from flask import current_app
 
         from app.services.previsao_atendimento_service import gerar_token_decisao
 
         token = gerar_token_decisao(solicitacao_id, acao)
-        with current_app.test_request_context():
-            return url_for("main.aprovacao_previsao", token=token, _external=True)
+        base = (current_app.config.get("APP_BASE_URL") or "").strip().rstrip("/")
+        return f"{base}/aprovacao-previsao/{token}" if base else ""
     except Exception:
         return ""
 

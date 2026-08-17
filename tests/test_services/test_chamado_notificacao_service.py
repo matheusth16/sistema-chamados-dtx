@@ -19,6 +19,53 @@ def _usuario_mock(uid, nome, email, perfil="supervisor"):
     return u
 
 
+class TestLinksDeEmailUsamAppBaseUrl:
+    """_link_chamado/_link_decisao_previsao geravam link "View ticket" com
+    url_for(_external=True) dentro de um current_app.test_request_context()
+    solto — sem SERVER_NAME configurado em lugar nenhum do app, o Flask
+    assume host "localhost", ignorando APP_BASE_URL por completo. Resultado:
+    todo e-mail deste módulo (novo chamado, observador incluído, mudança de
+    status, decisão/aprovação de previsão, extensão automática) linkava pra
+    http://localhost/... mesmo em produção. Correção: construir o link
+    diretamente a partir de current_app.config['APP_BASE_URL'], igual ao
+    padrão já usado em notifications_core.py/status_service.py."""
+
+    def test_link_chamado_usa_app_base_url_configurada(self, app):
+        from app.services.chamado_notificacao_service import _link_chamado
+
+        app.config["APP_BASE_URL"] = "http://10.20.0.199:8080"
+        with app.app_context():
+            link = _link_chamado("ch_1")
+
+        assert link == "http://10.20.0.199:8080/chamado/ch_1"
+        assert "localhost" not in link
+
+    def test_link_chamado_sem_app_base_url_retorna_vazio(self, app):
+        from app.services.chamado_notificacao_service import _link_chamado
+
+        app.config["APP_BASE_URL"] = ""
+        with app.app_context():
+            link = _link_chamado("ch_1")
+
+        assert link == ""
+
+    def test_link_decisao_previsao_usa_app_base_url_configurada(self, app):
+        from app.services.chamado_notificacao_service import _link_decisao_previsao
+
+        app.config["APP_BASE_URL"] = "http://10.20.0.199:8080"
+        with (
+            app.app_context(),
+            patch(
+                "app.services.previsao_atendimento_service.gerar_token_decisao",
+                return_value="tok123",
+            ),
+        ):
+            link = _link_decisao_previsao(1, "aprovar")
+
+        assert link == "http://10.20.0.199:8080/aprovacao-previsao/tok123"
+        assert "localhost" not in link
+
+
 class TestDestinatariosDoChamado:
     def test_retorna_responsavel_e_observadores(self):
         """Com responsável + 2 observadores → lista com 3 usuários."""
