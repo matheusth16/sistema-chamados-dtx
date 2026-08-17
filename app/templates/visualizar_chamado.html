@@ -412,6 +412,70 @@
                     </section>
                     {% endif %}
 
+                    {% if pode_editar %}
+                    <!-- window.enviarRespostaSupervisor num bloco próprio, gated só por
+                         pode_editar (não pode_escalonar): pode_escalonar exige
+                         chamado.responsavel_id == current_user.id, sempre False pra
+                         chamados de áreas de roteamento em grupo (Compras/Estoque)
+                         ainda não assumidos por ninguém — o botão "Enviar resposta"
+                         (acima, gated por pode_editar, baseado em área) ficava visível
+                         mas sem handler correspondente, clique não fazia nada, sem
+                         erro visível (bug real em produção, achado 2026-08-17). Mesmo
+                         padrão já usado pra decidirPrevisaoAtendimento (ver painel de
+                         decisão de previsão, gated só por pode_decidir_previsao). -->
+                    <script nonce="{{ csp_nonce }}">
+                    (function() {
+                        var CSRF_TOKEN = document.querySelector('meta[name="csrf-token"]') ? document.querySelector('meta[name="csrf-token"]').content : '';
+                        function mostrarErro(elId, msg) {
+                            var el = document.getElementById(elId);
+                            if (el) {
+                                el.textContent = msg;
+                                el.classList.remove('hidden');
+                                document.querySelectorAll('[aria-describedby~="' + elId + '"]').forEach(function(campo) {
+                                    campo.setAttribute('aria-invalid', 'true');
+                                });
+                            }
+                        }
+                        function esconderErro(elId) {
+                            var el = document.getElementById(elId);
+                            if (el) {
+                                el.classList.add('hidden');
+                                document.querySelectorAll('[aria-describedby~="' + elId + '"]').forEach(function(campo) {
+                                    campo.removeAttribute('aria-invalid');
+                                });
+                            }
+                        }
+                        window.enviarRespostaSupervisor = function(chamadoId) {
+                            esconderErro('sup-resposta-erro');
+                            esconderErro('sup-resposta-ok');
+                            var campoTexto = document.getElementById('sup-resposta-texto');
+                            var mensagem = (campoTexto && campoTexto.value || '').trim();
+                            if (mensagem.length < 2) {
+                                mostrarErro('sup-resposta-erro', {{ t('reply_message_required', min_chars=2) | tojson }});
+                                return;
+                            }
+                            fetch('/api/chamado/' + chamadoId + '/responder', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
+                                body: JSON.stringify({ mensagem: mensagem })
+                            })
+                            .then(function(r) { return r.json(); })
+                            .then(function(data) {
+                                if (data.sucesso) {
+                                    mostrarErro('sup-resposta-ok', {{ t('text_reply_sent_success') | tojson }});
+                                    if (campoTexto) campoTexto.value = '';
+                                } else {
+                                    mostrarErro('sup-resposta-erro', data.erro || {{ t('error_processing_request') | tojson }});
+                                }
+                            })
+                            .catch(function() {
+                                mostrarErro('sup-resposta-erro', {{ t('error_connection') | tojson }});
+                            });
+                        };
+                    })();
+                    </script>
+                    {% endif %}
+
                     <!-- Anexos -->
                     <div class="bento-panel">
                         <label class="bento-panel-label">
@@ -1268,37 +1332,9 @@ Object.assign(window.DTX_MSGS, {
         }
     }
 
-    // ── Responder ao solicitante (via inversa de enviarRespostaSolicitante,
-    //    definida num bloco condicional só do solicitante mais abaixo —
-    //    inacessível aqui pro supervisor). Botão só existe no DOM quando
-    //    pode_editar (ver painel "Responder ao Solicitante"). ──
-    window.enviarRespostaSupervisor = function(chamadoId) {
-        esconderErro('sup-resposta-erro');
-        esconderErro('sup-resposta-ok');
-        var campoTexto = document.getElementById('sup-resposta-texto');
-        var mensagem = (campoTexto && campoTexto.value || '').trim();
-        if (mensagem.length < 2) {
-            mostrarErro('sup-resposta-erro', {{ t('reply_message_required', min_chars=2) | tojson }});
-            return;
-        }
-        fetch('/api/chamado/' + chamadoId + '/responder', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
-            body: JSON.stringify({ mensagem: mensagem })
-        })
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-            if (data.sucesso) {
-                mostrarErro('sup-resposta-ok', {{ t('text_reply_sent_success') | tojson }});
-                if (campoTexto) campoTexto.value = '';
-            } else {
-                mostrarErro('sup-resposta-erro', data.erro || {{ t('error_processing_request') | tojson }});
-            }
-        })
-        .catch(function() {
-            mostrarErro('sup-resposta-erro', {{ t('error_connection') | tojson }});
-        });
-    };
+    // window.enviarRespostaSupervisor foi movida pra um bloco próprio gated
+    // por pode_editar (não pode_escalonar) — ver logo após o painel
+    // "Responder ao Solicitante". Não duplicar aqui de novo.
 
     window.carregarSupervisoresDestino = function(area) {
         var selSup = document.getElementById('transferir-supervisor-select');

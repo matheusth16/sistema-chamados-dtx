@@ -838,6 +838,39 @@ def test_visualizar_chamado_aog_esconde_opcao_de_prazo(client_logado_admin, db_s
     assert 'id="modal-previsao-atendimento"' not in html
 
 
+def test_visualizar_chamado_supervisor_area_sem_responsavel_ve_handler_de_resposta(
+    client_logado_supervisor, db_session
+):
+    """Bug real em produção (achado 2026-08-17): chamados de área com roteamento
+    em grupo (Compras/Estoque) ficam com responsavel_id None até alguém
+    assumir — o botão "Enviar resposta" é liberado por pode_editar (baseado
+    em área, funciona certo), mas window.enviarRespostaSupervisor estava
+    definida só dentro do bloco {% if pode_escalonar %}, que exige
+    responsavel_id == current_user.id. Resultado: botão visível, clique não
+    fazia nada, sem erro, sem requisição — confirmado via SSH em produção
+    (chamado real CHM-0002, área Compras, 3 supervisores reais, zero POST
+    /responder nos logs apesar de várias visitas à página).
+
+    client_logado_supervisor é "sup_1", área "Manutencao" — não é o
+    responsável (None) nem admin, então pode_escalonar é False aqui; mas a
+    área bate, então pode_editar é True e o botão deveria ter handler."""
+    from tests.factories import make_chamado
+
+    chamado = make_chamado(area="Manutencao", responsavel_id=None, status="Aberto")
+    with (
+        patch("app.routes.dashboard.usuario_pode_ver_chamado", return_value=True),
+        patch("app.routes.dashboard.get_static_cached", return_value=[]),
+        patch("app.routes.dashboard.filtrar_supervisores_por_area", return_value=[]),
+        patch("app.routes.dashboard.CategoriaSetor.get_all", return_value=[]),
+    ):
+        r = client_logado_supervisor.get(f"/chamado/{chamado.id}", follow_redirects=False)
+
+    assert r.status_code == 200
+    html = r.get_data(as_text=True)
+    assert 'data-action="enviar-resposta-supervisor"' in html
+    assert "window.enviarRespostaSupervisor" in html
+
+
 def test_visualizar_chamado_com_participantes_sem_usuario_atual_retorna_200(
     client_logado_admin, db_session
 ):
