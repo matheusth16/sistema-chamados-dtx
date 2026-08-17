@@ -39,9 +39,45 @@ logger = logging.getLogger(__name__)
 # lista fechada de propósito (sem toggle de admin), decisão explícita do usuário.
 AREAS_GRUPO = {"Compras", "Estoque"}
 
+# Observadora automática: solicitante da área "Produção" abrindo chamado pra
+# outro setor coloca julia.salgado@dtx.aero em cópia sem ação manual (decisão
+# de negócio do usuário, 2026-08-17). Ela é supervisora de "Planejamento de
+# Produção" — área distinta de "Produção" no catálogo, não confundir. Exclui
+# como destino tanto "Produção" (chamado pra ela mesma) quanto "Planejamento
+# de Produção" (área dela — ela já é responsável/supervisora desse chamado,
+# virar observadora também seria redundante e duplicaria notificação).
+# Busca por e-mail (não ID hardcoded) pra sobreviver a troca de conta; conta
+# ausente/inativa não bloqueia a criação do chamado.
+AREA_PRODUCAO = "Produção"
+AREAS_DESTINO_SEM_OBSERVADOR_AUTOMATICO_PRODUCAO = {AREA_PRODUCAO, "Planejamento de Produção"}
+EMAIL_OBSERVADOR_AUTOMATICO_PRODUCAO = "julia.salgado@dtx.aero"
+
 
 def _eh_area_grupo(area: str) -> bool:
     return area in AREAS_GRUPO
+
+
+def _incluir_observador_automatico_producao(
+    observadores_list: list, area_solicitante: str | None, area_chamado: str
+) -> list:
+    areas_solicitante = (area_solicitante or "").split(", ")
+    if (
+        AREA_PRODUCAO not in areas_solicitante
+        or area_chamado in AREAS_DESTINO_SEM_OBSERVADOR_AUTOMATICO_PRODUCAO
+    ):
+        return observadores_list
+    ids_existentes = {o.get("usuario_id") for o in observadores_list}
+    try:
+        usuario = Usuario.get_by_email(EMAIL_OBSERVADOR_AUTOMATICO_PRODUCAO)
+    except Exception as exc:
+        logger.warning("Observador automático Produção: busca de usuário falhou: %s", exc)
+        return observadores_list
+    if usuario is None or usuario.id in ids_existentes:
+        return observadores_list
+    return [
+        *observadores_list,
+        {"usuario_id": usuario.id, "nome": usuario.nome, "email": usuario.email},
+    ]
 
 
 def _t(key, **kwargs):
@@ -247,6 +283,10 @@ def criar_chamado(
 
     area_chamado = (
         setor_para_area(tipo) if tipo else (area_solicitante if area_solicitante else "Geral")
+    )
+
+    observadores_list = _incluir_observador_automatico_producao(
+        observadores_list, area_solicitante, area_chamado
     )
 
     # Fase 2 — Supervisor obrigatório quando área tem supervisores cadastrados.

@@ -38,7 +38,7 @@ from config import Config
 
 logger = logging.getLogger(__name__)
 
-_SALT_TOKEN_DECISAO = "previsao-atendimento-decisao"
+_SALT_TOKEN_DECISAO = "previsao-atendimento-decisao"  # nosec B105 - salt público do itsdangerous, não segredo (ver _serializer)
 _TOKEN_MAX_AGE_SEGUNDOS = 30 * 24 * 60 * 60  # 30 dias
 ACOES_VALIDAS = ("aprovar", "rejeitar")
 
