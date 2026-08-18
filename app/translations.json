@@ -1069,6 +1069,11 @@
     "en": "Attached by the requester",
     "es": "Adjuntado por el solicitante"
   },
+  "requester_attachments_title": {
+    "pt_BR": "Anexos do Solicitante",
+    "en": "Requester's Attachments",
+    "es": "Archivos Adjuntos del Solicitante"
+  },
   "attachment_from_you": {
     "pt_BR": "Anexado por você",
     "en": "Attached by you",

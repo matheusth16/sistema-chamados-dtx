@@ -2089,6 +2089,87 @@ def test_visualizar_chamado_admin_mostra_descricao_editavel(client_logado_admin,
     assert b'id="modal-descricao"' in r.data
 
 
+# ── Anexos do solicitante perto da Descrição (pedido do usuário, 2026-08-18) ──
+
+
+def test_visualizar_chamado_anexos_solicitante_aparecem_perto_da_descricao(
+    client_logado_supervisor, db_session
+):
+    """Anexo enviado na abertura do chamado (sempre do solicitante) aparece num
+    painel logo após a Descrição, antes da Conversa — supervisor não precisa
+    rolar até o painel de Anexos lá embaixo pra ver o que o solicitante mandou."""
+    from tests.factories import make_chamado
+
+    chamado = make_chamado(area="Manutencao", anexos=["local:relatorio_falha.pdf"])
+    with (
+        patch("app.routes.dashboard.usuario_pode_ver_chamado", return_value=True),
+        patch("app.routes.dashboard.get_static_cached", return_value=[]),
+        patch("app.routes.dashboard.CategoriaSetor.get_all", return_value=[]),
+        patch("app.routes.dashboard.filtrar_supervisores_por_area", return_value=[]),
+    ):
+        r = client_logado_supervisor.get(f"/chamado/{chamado.id}", follow_redirects=False)
+
+    assert r.status_code == 200
+    html = r.data.decode("utf-8")
+    idx_descricao = html.find('id="problem-description-title"')
+    idx_anexos_solicitante = html.find("Anexos do Solicitante")
+    idx_conversa = html.find('id="conversation-title"')
+    idx_arquivo = html.find("relatorio_falha.pdf")
+
+    assert idx_descricao != -1
+    assert idx_anexos_solicitante != -1
+    assert idx_conversa != -1
+    assert idx_descricao < idx_anexos_solicitante < idx_conversa
+    assert idx_descricao < idx_arquivo < idx_conversa
+
+
+def test_visualizar_chamado_novo_anexo_lista_so_anexos_do_responsavel(
+    client_logado_supervisor, db_session
+):
+    """O painel "Novo Anexo" (upload do responsável) lista só os anexos que o
+    próprio responsável adicionou depois — não repete o anexo do solicitante,
+    que já apareceu no painel perto da Descrição."""
+    from app.models_historico import Historico
+    from tests.factories import make_chamado
+
+    chamado = make_chamado(
+        area="Manutencao",
+        anexos=["local:relatorio_falha.pdf", "local:foto_reparo.jpg"],
+    )
+    evento = Historico(
+        chamado_id=chamado.id,
+        usuario_id="resp1",
+        usuario_nome="Responsável Teste",
+        acao="alteracao_dados",
+        campo_alterado="novo anexo",
+        valor_novo="local:foto_reparo.jpg",
+    )
+    assert evento.save()
+
+    with (
+        patch("app.routes.dashboard.usuario_pode_ver_chamado", return_value=True),
+        patch("app.routes.dashboard.get_static_cached", return_value=[]),
+        patch("app.routes.dashboard.CategoriaSetor.get_all", return_value=[]),
+        patch("app.routes.dashboard.filtrar_supervisores_por_area", return_value=[]),
+    ):
+        r = client_logado_supervisor.get(f"/chamado/{chamado.id}", follow_redirects=False)
+
+    assert r.status_code == 200
+    html = r.data.decode("utf-8")
+    # id="modal-input-anexo" é o input de upload do responsável — âncora única
+    # (o texto "Novo Anexo" também aparece antes, num comentário HTML no
+    # painel do solicitante).
+    idx_novo_anexo = html.find('id="modal-input-anexo"')
+    idx_foto = html.find("foto_reparo.jpg", idx_novo_anexo)
+    idx_relatorio_apos_novo_anexo = html.find("relatorio_falha.pdf", idx_novo_anexo)
+
+    assert idx_novo_anexo != -1
+    assert idx_foto != -1
+    assert idx_relatorio_apos_novo_anexo == -1, (
+        "anexo do solicitante não deveria aparecer de novo no painel do responsável"
+    )
+
+
 def test_navbar_admin_expoe_menu_de_perfil_com_relacao_programatica(client_logado_admin):
     """O acionador do perfil identifica e controla programaticamente seu painel."""
     with (
