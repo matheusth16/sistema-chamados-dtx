@@ -426,8 +426,12 @@
         }
 
         atualizarSóBadge();
-        var _POLL_MS = 300000; // 5 minutos (reduz reads Firestore em ~60%)
-        var _DEBOUNCE_MS = 60000; // ignora visibilitychange se polou há < 60s
+        // 30s (era 5 min — reduzia reads Firestore, motivo que não existe mais
+        // desde a migração pra Postgres, Marco 12). Só o contador (1 leitura
+        // agregada), não a lista completa — barato o bastante pra encurtar
+        // (pedido do usuário, 2026-08-18).
+        var _POLL_MS = 30000;
+        var _DEBOUNCE_MS = 15000; // ignora visibilitychange se polou há < 15s
         setInterval(function () {
           if (document.visibilityState === "visible") atualizarSóBadge();
         }, _POLL_MS);

@@ -40,3 +40,18 @@ def test_clique_no_sino_ainda_busca_lista_completa():
     assert "carregarNotificacoes();\n            abrirDropdown();" in src, (
         "Clique no sino não está mais chamando carregarNotificacoes() ao abrir o dropdown"
     )
+
+
+def test_poll_ms_encurtado_de_5_minutos():
+    """_POLL_MS herdava 5 min (300000) da era Firestore, pra poupar custo de
+    leitura — motivo que não existe mais desde a migração pra Postgres
+    (Marco 12). Encurtado a pedido do usuário (2026-08-18) pra dar sensação
+    de tempo real sem virar polling agressivo (é só 1 leitura agregada de
+    contagem, não a lista completa)."""
+    src = _base_html_source()
+    assert "var _POLL_MS = 300000" not in src, (
+        "_POLL_MS ainda em 5 minutos — motivo original (custo de leitura Firestore) não se aplica mais"
+    )
+    idx = src.index("var _POLL_MS =")
+    trecho = src[idx : idx + 40]
+    assert "= 30000" in trecho, f"_POLL_MS esperado em 30000 (30s), trecho encontrado: {trecho!r}"
