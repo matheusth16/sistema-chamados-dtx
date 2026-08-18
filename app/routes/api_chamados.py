@@ -379,6 +379,31 @@ def api_chamado_por_id(chamado_id: str):
         return erro_json(_t("internal_error_retry"), 500)
 
 
+@main.route("/api/chamado/<chamado_id>/mensagens-novas", methods=["GET"])
+@login_required
+@limiter.limit("30 per minute")
+def api_mensagens_novas_chamado(chamado_id: str):
+    """Polling da Conversa (solicitante ↔ responsável): mensagens gravadas
+    depois de ?apos_id=N, pra aparecer sem precisar recarregar a página
+    (pedido do usuário, 2026-08-18). Mesma checagem de acesso da tela de
+    detalhe — não expõe nada que o usuário já não veria lá."""
+    try:
+        chamado = Chamado.get_by_id(chamado_id)
+        if chamado is None:
+            return erro_json(_t("ticket_not_found"), 404)
+        if not usuario_pode_ver_chamado(current_user, chamado):
+            return erro_json(_t("no_permission_generic"), 403)
+
+        apos_id = request.args.get("apos_id", 0, type=int) or 0
+
+        from app.services.conversa_chamado_service import mensagens_novas
+
+        return sucesso_json(mensagens=mensagens_novas(chamado_id, apos_id))
+    except Exception as e:
+        logger.exception("Erro ao buscar mensagens novas do chamado %s: %s", chamado_id, e)
+        return erro_json(_t("internal_error_retry"), 500)
+
+
 def _aplicar_filtro_perfil(user):
     """Condições de escopo de chamados por perfil — evita IDOR por omissão de filtro.
 

@@ -436,7 +436,7 @@
                             {{ t('conversation_title') if t else 'Conversa' }}
                         </h2>
                         {% if mensagens_conversa %}
-                        <ol role="log" aria-live="polite" aria-relevant="additions" aria-labelledby="conversation-title" aria-label="{{ t('conversation_log_aria') }}" class="space-y-3" style="max-height:320px; overflow-y:auto; padding-right:2px;">
+                        <ol id="conversa-lista" role="log" aria-live="polite" aria-relevant="additions" aria-labelledby="conversation-title" aria-label="{{ t('conversation_log_aria') }}" class="space-y-3" style="max-height:320px; overflow-y:auto; padding-right:2px;">
                             {% for msg in mensagens_conversa %}
                             {% set eh_solicitante = msg.acao == 'resposta_solicitante' %}
                             <li style="display:flex; {% if not eh_solicitante %}justify-content:flex-end;{% endif %}">
@@ -451,7 +451,7 @@
                         </ol>
                         {% elif pode_editar or pode_anexo_tardio_solicitante %}
                         {% set _ce = t('conversation_empty') %}
-                        <p style="font-size:13px; color:var(--color-surface-muted); font-style:italic;">{{ _ce if _ce != 'conversation_empty' else 'Nenhuma mensagem ainda — inicie a conversa.' }}</p>
+                        <p id="conversa-vazio" style="font-size:13px; color:var(--color-surface-muted); font-style:italic;">{{ _ce if _ce != 'conversation_empty' else 'Nenhuma mensagem ainda — inicie a conversa.' }}</p>
                         {% endif %}
 
                         {% if pode_editar %}
@@ -484,6 +484,104 @@
                         </div>
                         {% endif %}
                     </section>
+                    <!-- Polling da Conversa: sem isso, mensagem nova (inclusive a que a
+                         própria pessoa acabou de enviar) só aparecia recarregando a
+                         página manualmente (pedido do usuário, 2026-08-18). Sem
+                         WebSocket/SSE de propósito — gunicorn roda com 1 worker/8
+                         threads, sem Nginx na frente (ver CLAUDE.md); conexões longas
+                         por aba aberta esgotariam threads rápido. Poll curto e leve
+                         (?apos_id=cursor) é o encaixe certo pro porte deste app. -->
+                    <script nonce="{{ csp_nonce }}">
+                    (function() {
+                        var CHAMADO_ID = {{ chamado.id | tojson }};
+                        var ultimoId = {{ (mensagens_conversa[-1].id if mensagens_conversa else 0) | tojson }};
+                        var pollEmVoo = false;
+
+                        function criarLi(msg) {
+                            var li = document.createElement('li');
+                            li.style.display = 'flex';
+                            if (!msg.eh_solicitante) li.style.justifyContent = 'flex-end';
+                            var article = document.createElement('article');
+                            article.style.maxWidth = '80%';
+                            article.style.borderRadius = '14px';
+                            article.style.padding = '10px 14px';
+                            article.style.background = msg.eh_solicitante ? 'var(--color-surface-canvas)' : 'var(--color-dtx-100)';
+                            var pMeta = document.createElement('p');
+                            pMeta.style.fontSize = '11px';
+                            pMeta.style.fontWeight = '700';
+                            pMeta.style.color = 'var(--color-surface-muted)';
+                            pMeta.style.marginBottom = '2px';
+                            pMeta.appendChild(document.createTextNode((msg.usuario_nome || '') + ' · '));
+                            var time = document.createElement('time');
+                            time.setAttribute('datetime', msg.data_iso || '');
+                            time.textContent = msg.data_formatada || '';
+                            pMeta.appendChild(time);
+                            var pTexto = document.createElement('p');
+                            pTexto.style.fontSize = '13px';
+                            pTexto.style.lineHeight = '1.5';
+                            pTexto.style.whiteSpace = 'pre-line';
+                            pTexto.style.overflowWrap = 'break-word';
+                            pTexto.style.wordBreak = 'break-word';
+                            pTexto.textContent = msg.texto || '';
+                            article.appendChild(pMeta);
+                            article.appendChild(pTexto);
+                            li.appendChild(article);
+                            return li;
+                        }
+
+                        function garantirLista() {
+                            var ol = document.getElementById('conversa-lista');
+                            if (ol) return ol;
+                            ol = document.createElement('ol');
+                            ol.id = 'conversa-lista';
+                            ol.setAttribute('role', 'log');
+                            ol.setAttribute('aria-live', 'polite');
+                            ol.setAttribute('aria-relevant', 'additions');
+                            ol.setAttribute('aria-labelledby', 'conversation-title');
+                            ol.setAttribute('aria-label', {{ t('conversation_log_aria') | tojson }});
+                            ol.className = 'space-y-3';
+                            ol.style.maxHeight = '320px';
+                            ol.style.overflowY = 'auto';
+                            ol.style.paddingRight = '2px';
+                            var vazio = document.getElementById('conversa-vazio');
+                            if (vazio && vazio.parentNode) {
+                                vazio.parentNode.replaceChild(ol, vazio);
+                            }
+                            return ol;
+                        }
+
+                        function poll() {
+                            if (pollEmVoo) return;
+                            pollEmVoo = true;
+                            fetch('/api/chamado/' + CHAMADO_ID + '/mensagens-novas?apos_id=' + ultimoId)
+                                .then(function(r) { return r.json(); })
+                                .then(function(data) {
+                                    if (data.sucesso && data.mensagens && data.mensagens.length) {
+                                        var ol = garantirLista();
+                                        data.mensagens.forEach(function(msg) {
+                                            ol.appendChild(criarLi(msg));
+                                            ultimoId = msg.id;
+                                        });
+                                        ol.scrollTop = ol.scrollHeight;
+                                    }
+                                    pollEmVoo = false;
+                                })
+                                .catch(function() { pollEmVoo = false; });
+                        }
+
+                        setInterval(function() {
+                            if (document.visibilityState === 'visible') poll();
+                        }, 5000);
+                        document.addEventListener('visibilitychange', function() {
+                            if (document.visibilityState === 'visible') poll();
+                        });
+                        // Chamado pelos handlers de envio (enviarRespostaSupervisor/
+                        // enviarRespostaSolicitante) logo após sucesso, pra quem
+                        // acabou de mandar a mensagem já ver ela na hora, sem
+                        // esperar o próximo tick do poll.
+                        window._conversaPollAgora = poll;
+                    })();
+                    </script>
                     {% endif %}
 
                     {% if pode_editar %}
@@ -538,6 +636,7 @@
                                 if (data.sucesso) {
                                     mostrarErro('sup-resposta-ok', {{ t('text_reply_sent_success') | tojson }});
                                     if (campoTexto) campoTexto.value = '';
+                                    if (window._conversaPollAgora) window._conversaPollAgora();
                                 } else {
                                     mostrarErro('sup-resposta-erro', data.erro || {{ t('error_processing_request') | tojson }});
                                 }
@@ -2044,6 +2143,7 @@ function cancelarChamadoAdmin() {
                 okEl.textContent = {{ t('text_reply_sent_success') | tojson }};
                 okEl.classList.remove('hidden');
                 document.getElementById('sol-resposta-texto').value = '';
+                if (window._conversaPollAgora) window._conversaPollAgora();
             } else {
                 erroEl.textContent = data.erro || {{ t('error_processing_request') | tojson }};
                 erroEl.classList.remove('hidden');
