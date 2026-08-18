@@ -694,6 +694,83 @@ def test_claim_atribui_owner_ao_em_atendimento():
     assert chamado_atualizado.data_em_atendimento is not None
 
 
+def test_claim_grava_entrada_propria_de_historico_para_responsavel():
+    """Claim (fila de grupo sem owner, Aberto→Em Atendimento) precisa gravar
+    uma entrada de histórico própria pra campo "responsável" — não só a
+    entrada genérica de mudança de status — senão o timeline não mostra
+    explicitamente quem assumiu o chamado (pedido do usuário, 2026-08-18)."""
+    chamado_id = _criar_chamado_real(status="Aberto")
+    with (
+        patch("app.services.status_service.Historico") as mock_historico,
+        patch("app.services.status_service._notificar_solicitante"),
+        patch("app.services.status_service.GamificationService"),
+        patch(
+            "app.services.status_service.calcular_supervisor_ids_com_acesso",
+            return_value=["id_julia"],
+        ),
+    ):
+        atualizar_status_chamado(
+            chamado_id=chamado_id,
+            novo_status="Em Atendimento",
+            usuario_id="id_julia",
+            usuario_nome="Júlia Ferreira",
+            data_chamado={
+                "status": "Aberto",
+                "responsavel_id": None,
+                "area": "Engenharia",
+                "participantes": [],
+                "solicitante_id": "sol1",
+                "numero_chamado": "CHM-001",
+                "categoria": "Manutenção",
+                "escalacao_nivel": 0,
+            },
+        )
+    chamadas_responsavel = [
+        c for c in mock_historico.call_args_list if c.kwargs.get("campo_alterado") == "responsável"
+    ]
+    assert len(chamadas_responsavel) == 1
+    kwargs = chamadas_responsavel[0].kwargs
+    assert kwargs["acao"] == "alteracao_dados"
+    assert kwargs["valor_anterior"] == "-"
+    assert kwargs["valor_novo"] == "Júlia Ferreira"
+    assert kwargs["usuario_id"] == "id_julia"
+
+
+def test_em_atendimento_sem_claim_nao_grava_entrada_de_responsavel():
+    """Chamado que já tinha owner (não é claim) — Aberto→Em Atendimento não
+    deve gerar a entrada extra de "responsável" no histórico."""
+    chamado_id = _criar_chamado_real(status="Aberto", responsavel_id="id_julia")
+    with (
+        patch("app.services.status_service.Historico") as mock_historico,
+        patch("app.services.status_service._notificar_solicitante"),
+        patch("app.services.status_service.GamificationService"),
+        patch(
+            "app.services.status_service.calcular_supervisor_ids_com_acesso",
+            return_value=["id_julia"],
+        ),
+    ):
+        atualizar_status_chamado(
+            chamado_id=chamado_id,
+            novo_status="Em Atendimento",
+            usuario_id="id_julia",
+            usuario_nome="Júlia Ferreira",
+            data_chamado={
+                "status": "Aberto",
+                "responsavel_id": "id_julia",
+                "area": "Engenharia",
+                "participantes": [],
+                "solicitante_id": "sol1",
+                "numero_chamado": "CHM-001",
+                "categoria": "Manutenção",
+                "escalacao_nivel": 0,
+            },
+        )
+    chamadas_responsavel = [
+        c for c in mock_historico.call_args_list if c.kwargs.get("campo_alterado") == "responsável"
+    ]
+    assert chamadas_responsavel == []
+
+
 def test_claim_nao_sobrescreve_owner_existente():
     """Aberto já com owner → Em Atendimento NÃO muda responsavel_id."""
     chamado_id = _criar_chamado_real(status="Aberto", responsavel_id="id_julia")

@@ -168,6 +168,7 @@ def atualizar_status_chamado(
             update_data["data_cancelamento"] = datetime.now(ZoneInfo(Config.SLA_TIMEZONE))
 
         # Fase 2 — Claim ao 1º Em Atendimento
+        houve_claim = False
         if novo_status == "Em Atendimento" and status_anterior == "Aberto":
             responsavel_atual = data_chamado.get("responsavel_id")
             if not responsavel_atual:
@@ -175,6 +176,7 @@ def atualizar_status_chamado(
                 update_data["responsavel_id"] = usuario_id
                 update_data["responsavel"] = usuario_nome
                 responsavel_atual = usuario_id
+                houve_claim = True
             update_data["data_em_atendimento"] = datetime.now(ZoneInfo(Config.SLA_TIMEZONE))
             # Recalcula IDs com acesso após claim
             area = data_chamado.get("area", "")
@@ -246,6 +248,23 @@ def atualizar_status_chamado(
                     valor_anterior="Concluído",
                     valor_novo="Aberto",
                     detalhe=motivo[:500],
+                ).save()
+            if houve_claim:
+                # Fila de grupo (Compras/Estoque) sem responsável ainda: quem
+                # clica em "Em Atendimento" assume o chamado. A entrada de
+                # status já registra quem agiu, mas sem isso o campo
+                # "responsável" mudando de vazio pro nome de quem assumiu não
+                # aparecia como uma alteração própria no histórico (achado a
+                # pedido do usuário, 2026-08-18) — mesmo padrão de campo
+                # "responsável" já usado na reatribuição manual via edição.
+                Historico(
+                    chamado_id=chamado_id,
+                    usuario_id=usuario_id,
+                    usuario_nome=usuario_nome,
+                    acao="alteracao_dados",
+                    campo_alterado="responsável",
+                    valor_anterior="-",
+                    valor_novo=usuario_nome,
                 ).save()
 
         # Envia notificação ao solicitante em background (não para Cancelado)
