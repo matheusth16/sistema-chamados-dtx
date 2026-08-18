@@ -150,6 +150,36 @@ class TestTransferirArea:
         matheus_user = _usuario("id_matheus", "Matheus", areas=["Planejamento"])
         assert usuario_pode_ver_chamado(matheus_user, chamado_atualizado) is True
 
+    def test_transferir_area_reseta_confirmacao_de_leitura(self):
+        """Transferir área muda o responsável — a marcação de "visualizado"
+        é por responsável ATUAL, não pode sobreviver à troca (achado a
+        pedido do usuário, 2026-08-18: sem isso o solicitante via
+        "visualizado" com o timestamp de quem já não é mais o responsável)."""
+        from datetime import UTC, datetime
+
+        from app.services.escalonamento_service import transferir_area
+
+        chamado_id = _criar_chamado_real(area="Engenharia", responsavel_id="id_julia")
+        Chamado.get_by_id(chamado_id).atualizar_campos(
+            visualizado_pelo_responsavel_em=datetime.now(UTC)
+        )
+        assert Chamado.get_by_id(chamado_id).visualizado_pelo_responsavel_em is not None
+        sup_dest = _sup_mock("id_matheus", "Matheus Costa", areas=["Planejamento"])
+
+        with (
+            patch("app.services.escalonamento_service.Usuario") as mock_usuario,
+            patch("app.services.escalonamento_service.Historico"),
+            patch(
+                "app.services.escalonamento_service.calcular_supervisor_ids_com_acesso",
+                return_value=["id_matheus"],
+            ),
+        ):
+            mock_usuario.get_supervisores_por_area.return_value = [sup_dest]
+            resultado = transferir_area(chamado_id, "Planejamento", "id_matheus", "motivo", JULIA)
+
+        assert resultado["sucesso"] is True
+        assert Chamado.get_by_id(chamado_id).visualizado_pelo_responsavel_em is None
+
     def test_anti_orfao_supervisor_id_obrigatorio(self):
         """supervisor_id=None deve levantar ValueError (invariante anti-órfão)."""
         from app.services.escalonamento_service import transferir_area
@@ -306,6 +336,35 @@ class TestEscalonarColega:
 
         assert resultado["sucesso"] is True
         assert Chamado.get_by_id(chamado_id).responsavel_id == "id_matheus"
+
+    def test_escalonar_colega_reseta_confirmacao_de_leitura(self):
+        """Escalonar pra colega troca o responsável — a marcação de
+        "visualizado" é por responsável ATUAL, não pode sobreviver à troca
+        (achado a pedido do usuário, 2026-08-18)."""
+        from datetime import UTC, datetime
+
+        from app.services.escalonamento_service import escalonar_colega
+
+        chamado_id = _criar_chamado_real(area="Engenharia", responsavel_id="id_julia")
+        Chamado.get_by_id(chamado_id).atualizar_campos(
+            visualizado_pelo_responsavel_em=datetime.now(UTC)
+        )
+        assert Chamado.get_by_id(chamado_id).visualizado_pelo_responsavel_em is not None
+        colega = _sup_mock("id_matheus", "Matheus Costa", areas=["Engenharia"])
+
+        with (
+            patch("app.services.escalonamento_service.Usuario") as mock_usuario,
+            patch("app.services.escalonamento_service.Historico"),
+            patch(
+                "app.services.escalonamento_service.calcular_supervisor_ids_com_acesso",
+                return_value=["id_matheus"],
+            ),
+        ):
+            mock_usuario.get_supervisores_por_area.return_value = [colega]
+            resultado = escalonar_colega(chamado_id, "id_matheus", "motivo", JULIA)
+
+        assert resultado["sucesso"] is True
+        assert Chamado.get_by_id(chamado_id).visualizado_pelo_responsavel_em is None
 
     def test_escalonar_colega_area_permanece(self):
         """Escalonamento de colega não altera a área do chamado."""

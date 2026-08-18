@@ -107,6 +107,9 @@ def transferir_area(
         chamado.responsavel_id = supervisor_id
         chamado.responsavel = sup_destino.nome
         chamado.motivo_ultima_escalacao = motivo[:500]
+        # Reseta confirmação de leitura — é por responsável ATUAL, não deve
+        # herdar o "visualizado" de quem transferiu (achado 2026-08-18).
+        chamado.visualizado_pelo_responsavel_em = None
         chamado.supervisor_ids_com_acesso = calcular_supervisor_ids_com_acesso(
             area, supervisor_id, chamado.participantes
         )
@@ -194,6 +197,9 @@ def escalonar_colega(
         chamado.responsavel_id = supervisor_id
         chamado.responsavel = colega.nome
         chamado.motivo_ultima_escalacao = motivo[:500]
+        # Reseta confirmação de leitura — é por responsável ATUAL, não deve
+        # herdar o "visualizado" de quem escalou (achado 2026-08-18).
+        chamado.visualizado_pelo_responsavel_em = None
         chamado.supervisor_ids_com_acesso = calcular_supervisor_ids_com_acesso(
             chamado.area, supervisor_id, chamado.participantes
         )

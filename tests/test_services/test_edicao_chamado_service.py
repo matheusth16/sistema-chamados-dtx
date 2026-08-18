@@ -589,6 +589,44 @@ def test_edicao_troca_responsavel_atualiza_supervisor_ids_com_acesso(app):
     mock_calc.assert_called_once()
 
 
+def test_edicao_troca_responsavel_reseta_confirmacao_de_leitura(app):
+    """Trocar responsável via edição manual reseta visualizado_pelo_responsavel_em
+    — a marcação é por responsável ATUAL, não pode sobreviver à troca (achado a
+    pedido do usuário, 2026-08-18)."""
+    from app.services.edicao_chamado_service import processar_edicao_chamado
+
+    u = _make_usuario()
+    novo_resp = MagicMock()
+    novo_resp.id = "resp2"
+    novo_resp.nome = "Novo Responsavel"
+    novo_resp.areas = ["Manutencao"]
+    novo_resp.area = "Manutencao"
+
+    with (
+        app.app_context(),
+        patch("app.services.edicao_chamado_service.Chamado") as mock_chamado_cls,
+        patch("app.services.edicao_chamado_service.Usuario") as mock_usuario_cls,
+    ):
+        mock_chamado = _make_chamado_mock()
+        mock_chamado_cls.get_by_id.return_value = mock_chamado
+        mock_usuario_cls.get_by_id.return_value = novo_resp
+        result = processar_edicao_chamado(
+            usuario_atual=u,
+            chamado_id="ch1",
+            novo_status="",
+            motivo_cancelamento="",
+            nova_descricao="",
+            novo_responsavel_id="resp2",
+            novo_sla_str="",
+            arquivos_novos=[],
+            setores_adicionais_lista=[],
+        )
+    assert result["sucesso"] is True
+    update_data = mock_chamado.atualizar_campos.call_args.kwargs
+    assert "visualizado_pelo_responsavel_em" in update_data
+    assert update_data["visualizado_pelo_responsavel_em"] is None
+
+
 # ── Setores adicionais ────────────────────────────────────────────────────────
 
 

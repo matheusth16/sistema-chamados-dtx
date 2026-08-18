@@ -135,6 +135,11 @@ def processar_edicao_chamado(
                     if getattr(novo_resp, "areas", None)
                     else novo_resp.area or data_chamado.get("area")
                 )
+                # Confirmação de leitura é por responsável ATUAL — reatribuir
+                # sem resetar deixava o solicitante vendo "visualizado" com o
+                # timestamp do responsável anterior, mesmo o novo ainda nunca
+                # tendo aberto o chamado (achado a pedido do usuário, 2026-08-18).
+                update_data["visualizado_pelo_responsavel_em"] = None
 
                 historico_pendente.append(
                     Historico(
