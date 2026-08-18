@@ -221,6 +221,65 @@ def obter_solicitacao_por_id(solicitacao_id: int) -> dict | None:
         return _row_to_dict(row) if row else None
 
 
+def _calcular_previsao_auto(chamado) -> datetime:
+    """Prazo que uma extensão automática aplicaria agora — TAT da categoria
+    (respeitando sla_dias customizado) em cima do prazo efetivo ATUAL.
+    Compartilhado entre calcular_sugestao_extensao_automatica (prévia
+    read-only) e solicitar_extensao_automatica (aplica de verdade)."""
+    dias_tat = _sla_dias_por_categoria(chamado.categoria or "", getattr(chamado, "sla_dias", None))
+    baseline = adicionar_dias_uteis(chamado.data_abertura, dias_tat)
+    prazo_atual = _prazo_efetivo(baseline, chamado.previsao_atendimento)
+    # .replace(tzinfo=None) obrigatório antes de comparar/gravar — ver
+    # docstring de analytics._previsao_atendimento_instante: a coluna guarda
+    # dígitos naive (horário local), nunca um instante tz-aware de verdade.
+    return adicionar_dias_uteis(prazo_atual, dias_tat).replace(tzinfo=None)
+
+
+def calcular_sugestao_extensao_automatica(chamado_id: str) -> dict:
+    """Prévia (read-only, sem lock) do que a extensão automática faria se
+    chamada agora — usada pra pré-preencher a data sugerida no modal único
+    de "Solicitar nova previsão de atendimento" e, no submit, pra decidir
+    se o pedido aplica na hora (self-service) ou vai pro gestor (ver
+    solicitar_previsao_atendimento). Mesma regra de elegibilidade de
+    solicitar_extensao_automatica, sem travar linha nem escrever nada.
+
+    Returns:
+        {"elegivel": bool, "previsao_sugerida": datetime | None,
+         "extensoes_usadas": int, "extensoes_restantes": int}
+    """
+    chamado = Chamado.get_by_id(chamado_id)
+    if chamado is None:
+        return {
+            "elegivel": False,
+            "previsao_sugerida": None,
+            "extensoes_usadas": 0,
+            "extensoes_restantes": 0,
+        }
+
+    usadas = chamado.previsao_extensoes_automaticas_usadas or 0
+    restantes = max(0, LIMITE_EXTENSOES_AUTOMATICAS - usadas)
+    elegivel = (
+        chamado.categoria != "AOG"
+        and not chamado.previsao_extensao_travada
+        and usadas < LIMITE_EXTENSOES_AUTOMATICAS
+        and obter_solicitacao_pendente(chamado.id) is None
+    )
+    if not elegivel:
+        return {
+            "elegivel": False,
+            "previsao_sugerida": None,
+            "extensoes_usadas": usadas,
+            "extensoes_restantes": restantes,
+        }
+
+    return {
+        "elegivel": True,
+        "previsao_sugerida": _calcular_previsao_auto(chamado),
+        "extensoes_usadas": usadas,
+        "extensoes_restantes": restantes,
+    }
+
+
 # ── Escrita ───────────────────────────────────────────────────────────────
 
 
@@ -268,6 +327,18 @@ def solicitar_previsao_atendimento(chamado_id: str, previsao, motivo: str, usuar
             chamado_id,
         )
         return {"sucesso": False, "erro": _t("no_permission_set_attendance_forecast")}
+
+    # Botão único "Solicitar nova previsão de atendimento": se a data enviada
+    # bate exatamente com a sugestão de extensão automática (o modal já vem
+    # com essa data pré-preenchida) e o chamado ainda está elegível, aplica
+    # na hora — sem passar pelo gestor. Qualquer outra data (ou chamado não
+    # elegível, ex.: travado/limite atingido) segue pro fluxo normal abaixo.
+    sugestao = calcular_sugestao_extensao_automatica(chamado.id)
+    if sugestao["elegivel"] and sugestao["previsao_sugerida"] == previsao:
+        resultado = solicitar_extensao_automatica(chamado_id, usuario, motivo=motivo)
+        if resultado.get("sucesso"):
+            resultado["tipo"] = "auto"
+        return resultado
 
     # previsao chega naive do <input type="datetime-local">, representando um
     # horário no fuso de negócio (Config.SLA_TIMEZONE) — mesma convenção usada
@@ -343,6 +414,7 @@ def solicitar_previsao_atendimento(chamado_id: str, previsao, motivo: str, usuar
 
     return {
         "sucesso": True,
+        "tipo": "manual",
         "dados": {
             "solicitacao_id": solicitacao_id,
             "previsao_solicitada": str(previsao),
@@ -352,7 +424,7 @@ def solicitar_previsao_atendimento(chamado_id: str, previsao, motivo: str, usuar
     }
 
 
-def solicitar_extensao_automatica(chamado_id: str, usuario) -> dict:
+def solicitar_extensao_automatica(chamado_id: str, usuario, motivo: str | None = None) -> dict:
     """Extensão automática (self-service) do prazo — sem aprovação do
     gestor. Até LIMITE_EXTENSOES_AUTOMATICAS por chamado, cada uma somando
     o TAT da categoria (respeitando sla_dias customizado, mesma regra de
@@ -369,6 +441,9 @@ def solicitar_extensao_automatica(chamado_id: str, usuario) -> dict:
         chamado_id: ID do chamado.
         usuario: quem pede — precisa ser owner-ou-admin, E supervisor+
             (mesma regra de solicitar_previsao_atendimento).
+        motivo: opcional — quando informado (ver solicitar_previsao_atendimento,
+            botão único "Solicitar nova previsão de atendimento"), sobrescreve
+            o texto padrão "Extensão automática N/3".
 
     Returns:
         {"sucesso": True, "dados": {...}} ou {"sucesso": False, "erro": "..."}.
@@ -419,22 +494,22 @@ def solicitar_extensao_automatica(chamado_id: str, usuario) -> dict:
                 "erro": _t("attendance_forecast_self_service_limit_reached"),
             }
 
-        dias_tat = _sla_dias_por_categoria(chamado_row.categoria or "", chamado_row.sla_dias)
-        baseline = adicionar_dias_uteis(chamado_row.data_abertura, dias_tat)
-        prazo_atual = _prazo_efetivo(baseline, chamado_row.previsao_atendimento)
-        # prazo_atual sempre sai tz-aware (baseline vem de data_abertura, que
-        # é um instante real de verdade; _prazo_efetivo reanexa
-        # Config.SLA_TIMEZONE em cima dos dígitos de previsao_atendimento).
-        # .replace(tzinfo=None) é obrigatório antes de gravar — a convenção
-        # da coluna é dígitos naive = horário local, nunca um instante
-        # tz-aware de verdade (ver docstring de analytics._previsao_atendimento_instante).
-        nova_previsao = adicionar_dias_uteis(prazo_atual, dias_tat).replace(tzinfo=None)
+        prazo_atual = _prazo_efetivo(
+            adicionar_dias_uteis(
+                chamado_row.data_abertura,
+                _sla_dias_por_categoria(chamado_row.categoria or "", chamado_row.sla_dias),
+            ),
+            chamado_row.previsao_atendimento,
+        )
+        nova_previsao = _calcular_previsao_auto(chamado_row)
 
         extensoes_usadas = chamado_row.previsao_extensoes_automaticas_usadas + 1
-        motivo = f"Extensão automática {extensoes_usadas}/{LIMITE_EXTENSOES_AUTOMATICAS}"
+        motivo_final = (motivo or "").strip()[:500] or (
+            f"Extensão automática {extensoes_usadas}/{LIMITE_EXTENSOES_AUTOMATICAS}"
+        )
 
         chamado_row.previsao_atendimento = nova_previsao
-        chamado_row.motivo_previsao_atendimento = motivo
+        chamado_row.motivo_previsao_atendimento = motivo_final
         chamado_row.previsao_extensoes_automaticas_usadas = extensoes_usadas
 
         solicitante_id = chamado_row.solicitante_id
@@ -448,7 +523,7 @@ def solicitar_extensao_automatica(chamado_id: str, usuario) -> dict:
         campo_alterado="previsao_atendimento",
         valor_anterior=str(prazo_atual),
         valor_novo=str(nova_previsao),
-        detalhe=motivo,
+        detalhe=motivo_final,
     ).save()
 
     logger.info(

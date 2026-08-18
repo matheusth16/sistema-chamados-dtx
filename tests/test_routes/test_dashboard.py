@@ -832,10 +832,73 @@ def test_visualizar_chamado_aog_esconde_opcao_de_prazo(client_logado_admin, db_s
 
     assert r.status_code == 200
     html = r.get_data(as_text=True)
-    # Checa os elementos de marcação (não a string do case do dispatcher JS,
-    # que sempre existe no bloco de script compartilhado da página).
-    assert 'id="btn-extensao-automatica-previsao"' not in html
     assert 'id="modal-previsao-atendimento"' not in html
+
+
+def test_visualizar_chamado_elegivel_pre_preenche_data_sugerida_no_modal(
+    client_logado_admin, db_session
+):
+    """Botão único "Solicitar nova previsão de atendimento": pra um chamado
+    elegível pro self-service, o campo de data do modal já vem preenchido
+    com a data que a extensão automática aplicaria — ver
+    calcular_sugestao_extensao_automatica. Aceitar essa data sem mudar
+    aplica na hora; qualquer outra data vai pro gestor (ver service)."""
+    from app.services.previsao_atendimento_service import (
+        calcular_sugestao_extensao_automatica,
+    )
+    from tests.factories import make_chamado
+
+    chamado = make_chamado(categoria="Manutencao", responsavel_id="admin_1")
+    sugestao = calcular_sugestao_extensao_automatica(chamado.id)
+    assert sugestao["elegivel"] is True
+    esperado = sugestao["previsao_sugerida"].strftime("%Y-%m-%dT%H:%M")
+
+    with (
+        patch("app.routes.dashboard.usuario_pode_ver_chamado", return_value=True),
+        patch("app.routes.dashboard.get_static_cached", return_value=[]),
+        patch("app.routes.dashboard.filtrar_supervisores_por_area", return_value=[]),
+        patch("app.routes.dashboard.CategoriaSetor.get_all", return_value=[]),
+    ):
+        r = client_logado_admin.get(f"/chamado/{chamado.id}", follow_redirects=False)
+
+    assert r.status_code == 200
+    html = r.get_data(as_text=True)
+    assert f'value="{esperado}"' in html
+
+
+def test_visualizar_chamado_modal_previsao_tem_min_igual_a_agora(client_logado_admin, db_session):
+    """O campo de data do modal "Solicitar nova previsão de atendimento"
+    tem min=agora — o navegador não deixa escolher hoje ou uma data
+    passada, complementando a rejeição que o service já faz
+    (solicitar_previsao_atendimento: previsao <= agora)."""
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    from config import Config
+    from tests.factories import make_chamado
+
+    chamado = make_chamado(categoria="Manutencao", responsavel_id="admin_1")
+
+    with (
+        patch("app.routes.dashboard.usuario_pode_ver_chamado", return_value=True),
+        patch("app.routes.dashboard.get_static_cached", return_value=[]),
+        patch("app.routes.dashboard.filtrar_supervisores_por_area", return_value=[]),
+        patch("app.routes.dashboard.CategoriaSetor.get_all", return_value=[]),
+    ):
+        antes = datetime.now(ZoneInfo(Config.SLA_TIMEZONE))
+        r = client_logado_admin.get(f"/chamado/{chamado.id}", follow_redirects=False)
+        depois = datetime.now(ZoneInfo(Config.SLA_TIMEZONE))
+
+    assert r.status_code == 200
+    html = r.get_data(as_text=True)
+    idx = html.find('id="previsao-atendimento-data"')
+    assert idx != -1
+    trecho = html[idx : idx + 400]
+    inicio_min = trecho.find('min="') + len('min="')
+    min_valor = trecho[inicio_min : inicio_min + 16]
+    # min tem que estar entre o instante logo antes e logo depois da
+    # requisição (dentro do mesmo minuto, já que strftime corta segundos).
+    assert antes.strftime("%Y-%m-%dT%H:%M") <= min_valor <= depois.strftime("%Y-%m-%dT%H:%M")
 
 
 def test_visualizar_chamado_supervisor_area_sem_responsavel_ve_handler_de_resposta(

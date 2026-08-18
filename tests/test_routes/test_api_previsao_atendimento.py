@@ -167,6 +167,96 @@ class TestSolicitarPrevisaoAtendimentoRota:
 
         assert resp.status_code == 200
 
+    def test_tipo_auto_dispara_notificacao_de_extensao_automatica(self, client_logado_supervisor):
+        """Botão único: quando o service resolve a data enviada como igual
+        à sugestão automática, retorna tipo="auto" — a rota deve disparar a
+        notificação de extensão automática, não a de solicitação pendente."""
+        chamado_mock = _mock_chamado_obj(area="Manutencao", responsavel_id="sup_1")
+
+        with (
+            patch("app.routes.api_colaboracao.Chamado") as mock_chamado_cls,
+            patch("app.routes.api_colaboracao.usuario_pode_ver_chamado", return_value=True),
+            patch(
+                "app.services.previsao_atendimento_service.solicitar_previsao_atendimento",
+                return_value={
+                    "sucesso": True,
+                    "tipo": "auto",
+                    "dados": {
+                        "previsao_nova": "2026-07-18 16:30:00",
+                        "extensoes_usadas": 1,
+                        "extensoes_restantes": 2,
+                        "solicitante_id": "sol_outro",
+                        "solicitante_nome": "Sol Outro",
+                        "responsavel_id": "sup_1",
+                        "responsavel_nome": "Sup 1",
+                    },
+                },
+            ),
+            patch(
+                "app.services.chamado_notificacao_service."
+                "disparar_notificacao_extensao_automatica_em_thread"
+            ) as mock_notif_auto,
+            patch(
+                "app.services.chamado_notificacao_service."
+                "disparar_notificacao_solicitacao_previsao_em_thread"
+            ) as mock_notif_manual,
+        ):
+            mock_chamado_cls.get_by_id.return_value = chamado_mock
+
+            resp = client_logado_supervisor.post(
+                "/api/chamado/id123/previsao-atendimento",
+                json={"previsao": "2026-07-18T16:30", "motivo": "motivo"},
+                content_type="application/json",
+            )
+
+        assert resp.status_code == 200
+        assert resp.get_json()["tipo"] == "auto"
+        mock_notif_auto.assert_called_once()
+        mock_notif_manual.assert_not_called()
+
+    def test_tipo_manual_dispara_notificacao_de_solicitacao(self, client_logado_supervisor):
+        """tipo="manual" (fluxo normal, pedido pendente) continua disparando
+        a notificação de solicitação pro gestor, não a de extensão automática."""
+        chamado_mock = _mock_chamado_obj(area="Manutencao", responsavel_id="sup_1")
+
+        with (
+            patch("app.routes.api_colaboracao.Chamado") as mock_chamado_cls,
+            patch("app.routes.api_colaboracao.usuario_pode_ver_chamado", return_value=True),
+            patch(
+                "app.services.previsao_atendimento_service.solicitar_previsao_atendimento",
+                return_value={
+                    "sucesso": True,
+                    "tipo": "manual",
+                    "dados": {
+                        "solicitacao_id": 1,
+                        "previsao_solicitada": "2026-07-15 16:00:00",
+                        "gestor_id": None,
+                        "gestor_nome": None,
+                    },
+                },
+            ),
+            patch(
+                "app.services.chamado_notificacao_service."
+                "disparar_notificacao_extensao_automatica_em_thread"
+            ) as mock_notif_auto,
+            patch(
+                "app.services.chamado_notificacao_service."
+                "disparar_notificacao_solicitacao_previsao_em_thread"
+            ) as mock_notif_manual,
+        ):
+            mock_chamado_cls.get_by_id.return_value = chamado_mock
+
+            resp = client_logado_supervisor.post(
+                "/api/chamado/id123/previsao-atendimento",
+                json={"previsao": "2026-07-15T16:00", "motivo": "motivo"},
+                content_type="application/json",
+            )
+
+        assert resp.status_code == 200
+        assert resp.get_json()["tipo"] == "manual"
+        mock_notif_manual.assert_called_once()
+        mock_notif_auto.assert_not_called()
+
 
 class TestDecidirPrevisaoAtendimentoRota:
     def test_aprovar_sucesso_retorna_200(self, client_logado_admin):
@@ -243,131 +333,5 @@ class TestDecidirPrevisaoAtendimentoRota:
             json={"acao": "aprovar"},
             content_type="application/json",
         )
-        assert resp.status_code == 401
-        assert resp.is_json
-
-
-class TestSolicitarExtensaoAutomaticaRota:
-    _URL = "/api/chamado/id123/previsao-atendimento/extensao-automatica"
-
-    def test_sucesso_retorna_200(self, client_logado_supervisor):
-        chamado_mock = _mock_chamado_obj(area="Manutencao", responsavel_id="sup_1")
-
-        with (
-            patch("app.routes.api_colaboracao.Chamado") as mock_chamado_cls,
-            patch("app.routes.api_colaboracao.usuario_pode_ver_chamado", return_value=True),
-            patch(
-                "app.services.previsao_atendimento_service.solicitar_extensao_automatica",
-                return_value={
-                    "sucesso": True,
-                    "dados": {
-                        "previsao_nova": "2026-07-18 16:30:00",
-                        "extensoes_usadas": 1,
-                        "extensoes_restantes": 2,
-                        "solicitante_id": "sol_outro",
-                        "solicitante_nome": "Sol Outro",
-                        "responsavel_id": "sup_1",
-                        "responsavel_nome": "Sup 1",
-                    },
-                },
-            ) as mock_service,
-            patch(
-                "app.services.chamado_notificacao_service."
-                "disparar_notificacao_extensao_automatica_em_thread"
-            ) as mock_notif,
-        ):
-            mock_chamado_cls.get_by_id.return_value = chamado_mock
-
-            resp = client_logado_supervisor.post(self._URL)
-
-        assert resp.status_code == 200
-        assert resp.get_json()["sucesso"] is True
-        mock_service.assert_called_once()
-        mock_notif.assert_called_once()
-
-    def test_erro_do_service_retorna_400(self, client_logado_supervisor):
-        chamado_mock = _mock_chamado_obj(area="Manutencao", responsavel_id="sup_1")
-
-        with (
-            patch("app.routes.api_colaboracao.Chamado") as mock_chamado_cls,
-            patch("app.routes.api_colaboracao.usuario_pode_ver_chamado", return_value=True),
-            patch(
-                "app.services.previsao_atendimento_service.solicitar_extensao_automatica",
-                return_value={"sucesso": False, "erro": "limite atingido"},
-            ),
-            patch(
-                "app.services.chamado_notificacao_service."
-                "disparar_notificacao_extensao_automatica_em_thread"
-            ) as mock_notif,
-        ):
-            mock_chamado_cls.get_by_id.return_value = chamado_mock
-
-            resp = client_logado_supervisor.post(self._URL)
-
-        assert resp.status_code == 400
-        assert resp.get_json()["sucesso"] is False
-        mock_notif.assert_not_called()
-
-    def test_chamado_nao_encontrado_retorna_404(self, client_logado_supervisor):
-        with patch("app.routes.api_colaboracao.Chamado") as mock_chamado_cls:
-            mock_chamado_cls.get_by_id.return_value = None
-            resp = client_logado_supervisor.post(
-                "/api/chamado/id_inexistente/previsao-atendimento/extensao-automatica"
-            )
-
-        assert resp.status_code == 404
-
-    def test_idor_sem_acesso_retorna_403(self, client_logado_supervisor):
-        chamado_mock = _mock_chamado_obj(area="TI", responsavel_id="outro_sup")
-
-        with (
-            patch("app.routes.api_colaboracao.Chamado") as mock_chamado_cls,
-            patch("app.routes.api_colaboracao.usuario_pode_ver_chamado", return_value=False),
-        ):
-            mock_chamado_cls.get_by_id.return_value = chamado_mock
-
-            resp = client_logado_supervisor.post(self._URL)
-
-        assert resp.status_code == 403
-
-    def test_solicitante_retorna_json_403(self, client_logado_solicitante):
-        resp = client_logado_solicitante.post(self._URL)
-        assert resp.status_code == 403
-        assert resp.is_json
-
-    def test_admin_nao_owner_permitido(self, client_logado_admin):
-        chamado_mock = _mock_chamado_obj(area="Manutencao", responsavel_id="sup_1")
-
-        with (
-            patch("app.routes.api_colaboracao.Chamado") as mock_chamado_cls,
-            patch("app.routes.api_colaboracao.usuario_pode_ver_chamado", return_value=True),
-            patch(
-                "app.services.previsao_atendimento_service.solicitar_extensao_automatica",
-                return_value={
-                    "sucesso": True,
-                    "dados": {
-                        "previsao_nova": "2026-07-18 16:30:00",
-                        "extensoes_usadas": 1,
-                        "extensoes_restantes": 2,
-                        "solicitante_id": "sol_outro",
-                        "solicitante_nome": "Sol Outro",
-                        "responsavel_id": "id_admin",
-                        "responsavel_nome": "Admin",
-                    },
-                },
-            ),
-            patch(
-                "app.services.chamado_notificacao_service."
-                "disparar_notificacao_extensao_automatica_em_thread"
-            ),
-        ):
-            mock_chamado_cls.get_by_id.return_value = chamado_mock
-
-            resp = client_logado_admin.post(self._URL)
-
-        assert resp.status_code == 200
-
-    def test_nao_autenticado_retorna_json_401(self, client):
-        resp = client.post(self._URL)
         assert resp.status_code == 401
         assert resp.is_json

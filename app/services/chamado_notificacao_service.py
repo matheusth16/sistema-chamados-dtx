@@ -1115,7 +1115,9 @@ def disparar_notificacao_extensao_automatica_em_thread(
     chamado_area: str,
 ) -> None:
     """Dispara notificar_extensao_automatica_previsao em background — usado
-    por api_colaboracao.api_solicitar_extensao_automatica_previsao."""
+    por api_colaboracao.api_solicitar_previsao_atendimento quando o service
+    resolve o pedido como tipo="auto" (botão único, data enviada bate com a
+    sugestão de extensão automática)."""
     import threading
 
     def _run():

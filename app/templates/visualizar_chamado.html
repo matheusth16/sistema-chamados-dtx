@@ -110,9 +110,6 @@
                 case 'executar-definir-previsao-atendimento':
                     if (typeof executarDefinirPrevisaoAtendimento === 'function') executarDefinirPrevisaoAtendimento();
                     break;
-                case 'extensao-automatica-previsao':
-                    if (typeof executarExtensaoAutomaticaPrevisao === 'function') executarExtensaoAutomaticaPrevisao(el);
-                    break;
                 case 'decidir-previsao-aprovar':
                     if (typeof decidirPrevisaoAtendimento === 'function') decidirPrevisaoAtendimento(el.dataset.solicitacaoId, 'aprovar');
                     break;
@@ -770,23 +767,6 @@
                                     <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                                     {{ t('attendance_forecast_btn') if t else 'Solicitar nova previsão de atendimento' }}
                                 </button>
-
-                                <!-- Extensão automática (self-service, sem aprovação do gestor) —
-                                     ratchet de mão única: some pra sempre assim que
-                                     previsao_extensao_travada vira True (decisão do gestor já
-                                     aconteceu nesse chamado, ver previsao_atendimento_service.py). -->
-                                {% if not chamado.previsao_extensao_travada and chamado.previsao_extensoes_automaticas_usadas < limite_extensoes_automaticas %}
-                                <button type="button" id="btn-extensao-automatica-previsao" data-action="extensao-automatica-previsao" class="bento-btn-outline" style="width:100%; justify-content:center; margin-top:8px;">
-                                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-                                    {{ t('attendance_forecast_auto_extend_btn') if t else 'Estender prazo automaticamente' }}
-                                </button>
-                                <p id="extensao-automatica-erro" class="hidden" style="font-size:11px; color:var(--color-bento-danger-deep); margin-top:6px; text-align:center;"></p>
-                                <p style="font-size:11px; color:var(--color-surface-muted); margin-top:6px; text-align:center;">
-                                    {{ t('attendance_forecast_extensions_remaining', restantes=(limite_extensoes_automaticas - chamado.previsao_extensoes_automaticas_usadas), total=limite_extensoes_automaticas) if t else ((limite_extensoes_automaticas - chamado.previsao_extensoes_automaticas_usadas) ~ ' de ' ~ limite_extensoes_automaticas ~ ' extensões automáticas restantes') }}
-                                </p>
-                                {% else %}
-                                <p style="font-size:11px; color:var(--color-surface-muted); margin-top:8px; text-align:center;">{{ t('attendance_forecast_extensions_exhausted') if t else 'Extensões automáticas esgotadas — peça aprovação ao gestor' }}</p>
-                                {% endif %}
                                 {% endif %}
                             </div>
                             {% endif %}
@@ -1252,8 +1232,16 @@
         <div class="space-y-4" style="padding:24px;">
             <div>
                 <label for="previsao-atendimento-data" class="bento-field-label" style="margin-bottom:6px;">{{ t('attendance_forecast_label') if t else 'Previsão de atendimento' }} <span style="color:var(--color-bento-danger);">*</span></label>
-                <input type="datetime-local" id="previsao-atendimento-data" aria-describedby="previsao-atendimento-erro" aria-invalid="false"
+                <input type="datetime-local" id="previsao-atendimento-data" aria-describedby="previsao-atendimento-erro previsao-atendimento-hint" aria-invalid="false"
+                    min="{{ previsao_min }}"
+                    {% if sugestao_extensao.elegivel %}value="{{ sugestao_extensao.previsao_sugerida.strftime('%Y-%m-%dT%H:%M') }}"{% endif %}
                     style="width:100%; background:var(--color-surface-canvas); border:1.5px solid transparent; border-radius:14px; padding:11px 14px; font-family:inherit; font-size:14px;">
+                <!-- Botão único: se a data ficar igual à sugestão de extensão
+                     automática (pré-preenchida acima), o pedido aplica na hora,
+                     sem aprovação do gestor — ver solicitar_previsao_atendimento.
+                     Texto atualizado dinamicamente pelo JS conforme o usuário
+                     mexe na data (ver atualizarDicaPrevisaoAtendimento abaixo). -->
+                <p id="previsao-atendimento-hint" style="font-size:11px; color:var(--color-surface-muted); margin-top:6px;"></p>
             </div>
             <div>
                 <label for="previsao-atendimento-motivo" class="bento-field-label" style="margin-bottom:6px;">{{ t('escalation_reason_label') if t else 'Motivo' }} <span style="color:var(--color-bento-danger);">*</span></label>
@@ -1302,7 +1290,8 @@ Object.assign(window.DTX_MSGS, {
     participant_all_done_success: {{ t('participant_all_done_success') | tojson }},
     participant_part_done_success: {{ t('participant_part_done_success') | tojson }},
     error_forecast_required: {{ t('field_attendance_forecast_required') | tojson }},
-    error_forecast_set: {{ t('error_forecast_set') | tojson }}
+    error_forecast_set: {{ t('error_forecast_set') | tojson }},
+    error_forecast_must_be_future: {{ t('attendance_forecast_must_be_future') | tojson }}
 });
 </script>
 <script nonce="{{ csp_nonce }}">
@@ -1311,6 +1300,17 @@ Object.assign(window.DTX_MSGS, {
     var AREA_ATUAL = {{ (chamado.area or '') | tojson }};
     var CURRENT_USER_ID = {{ current_user.id | tojson }};
     var CSRF_TOKEN = document.querySelector('meta[name="csrf-token"]') ? document.querySelector('meta[name="csrf-token"]').content : '';
+    // Botão único "Solicitar nova previsão de atendimento": PREVISAO_AUTO_SUGERIDA
+    // é a data que a extensão automática aplicaria agora (mesma que já vem
+    // pré-preenchida no campo, ver sugestao_extensao no dashboard.py) — null
+    // se o chamado não está elegível pro self-service (AOG, travado, limite
+    // atingido, ou já tem pedido pendente). Comparar o valor atual do campo
+    // contra essa constante é só pra decidir QUAL TEXTO mostrar — a decisão
+    // real de aplicar na hora ou mandar pro gestor é sempre do backend
+    // (solicitar_previsao_atendimento), nunca confiar só no JS.
+    var PREVISAO_AUTO_SUGERIDA = {{ (sugestao_extensao.previsao_sugerida.strftime('%Y-%m-%dT%H:%M') if sugestao_extensao.elegivel else None) | tojson }};
+    var PREVISAO_AUTO_RESTANTES = {{ sugestao_extensao.extensoes_restantes | tojson }};
+    var PREVISAO_AUTO_TOTAL = {{ (sugestao_extensao.extensoes_usadas + sugestao_extensao.extensoes_restantes) | tojson }};
 
     function mostrarErro(elId, msg) {
         var el = document.getElementById(elId);
@@ -1429,11 +1429,45 @@ Object.assign(window.DTX_MSGS, {
         .catch(function() { mostrarErro('escalonar-erro', DTX_MSGS.error_connection); });
     };
 
+    function atualizarDicaPrevisaoAtendimento() {
+        var input = document.getElementById('previsao-atendimento-data');
+        var hint = document.getElementById('previsao-atendimento-hint');
+        if (!input || !hint) return;
+        if (PREVISAO_AUTO_SUGERIDA && input.value === PREVISAO_AUTO_SUGERIDA) {
+            hint.textContent = {{ t('attendance_forecast_hint_auto') | tojson }}
+                .replace('{restantes}', PREVISAO_AUTO_RESTANTES)
+                .replace('{total}', PREVISAO_AUTO_TOTAL);
+            hint.style.color = 'var(--color-bento-success)';
+        } else if (PREVISAO_AUTO_SUGERIDA) {
+            hint.textContent = {{ t('attendance_forecast_hint_manual') | tojson }};
+            hint.style.color = 'var(--color-surface-muted)';
+        } else {
+            hint.textContent = {{ t('attendance_forecast_hint_sempre_gestor') | tojson }};
+            hint.style.color = 'var(--color-surface-muted)';
+        }
+    }
+    (function() {
+        var input = document.getElementById('previsao-atendimento-data');
+        if (input) {
+            input.addEventListener('input', atualizarDicaPrevisaoAtendimento);
+            atualizarDicaPrevisaoAtendimento();
+        }
+    })();
+
     window.executarDefinirPrevisaoAtendimento = function() {
         esconderErro('previsao-atendimento-erro');
-        var dataLocal = document.getElementById('previsao-atendimento-data').value;
+        var inputData = document.getElementById('previsao-atendimento-data');
+        var dataLocal = inputData.value;
         var motivo = (document.getElementById('previsao-atendimento-motivo').value || '').trim();
         if (!dataLocal) { mostrarErro('previsao-atendimento-erro', DTX_MSGS.error_forecast_required); return; }
+        // Mesmo limite que o service já rejeita (previsao <= agora) — bloqueado
+        // aqui também pra nunca deixar enviar uma data de hoje ou passada,
+        // não só depois que o servidor responde com erro. Comparação de string
+        // funciona porque o formato "YYYY-MM-DDTHH:MM" já ordena léxico = cronológico.
+        if (inputData.min && dataLocal <= inputData.min) {
+            mostrarErro('previsao-atendimento-erro', DTX_MSGS.error_forecast_must_be_future);
+            return;
+        }
         if (!motivo) { mostrarErro('previsao-atendimento-erro', DTX_MSGS.error_reason_required); return; }
         fetch('/api/chamado/' + CHAMADO_ID + '/previsao-atendimento', {
             method: 'POST',
@@ -1446,30 +1480,6 @@ Object.assign(window.DTX_MSGS, {
             else { mostrarErro('previsao-atendimento-erro', data.erro || DTX_MSGS.error_forecast_set); }
         })
         .catch(function() { mostrarErro('previsao-atendimento-erro', DTX_MSGS.error_connection); });
-    };
-
-    window.executarExtensaoAutomaticaPrevisao = function(botao) {
-        esconderErro('extensao-automatica-erro');
-        // Desabilita durante o fetch em voo — evita duplo-clique consumindo
-        // 2 das 3 extensões livres sem querer (não é proteção de dado, o
-        // lock no banco já garante isso; é só polish de UX).
-        if (botao) botao.disabled = true;
-        fetch('/api/chamado/' + CHAMADO_ID + '/previsao-atendimento/extensao-automatica', {
-            method: 'POST',
-            headers: { 'X-CSRFToken': CSRF_TOKEN }
-        })
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-            if (data.sucesso) { window.location.reload(); }
-            else {
-                mostrarErro('extensao-automatica-erro', data.erro || DTX_MSGS.error_forecast_set);
-                if (botao) botao.disabled = false;
-            }
-        })
-        .catch(function() {
-            mostrarErro('extensao-automatica-erro', DTX_MSGS.error_connection);
-            if (botao) botao.disabled = false;
-        });
     };
 
     window.decidirPrevisaoAtendimento = function(solicitacaoId, acao) {

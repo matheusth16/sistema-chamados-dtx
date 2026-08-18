@@ -5,6 +5,7 @@ import logging
 from datetime import datetime
 from typing import Any
 from urllib.parse import urlparse
+from zoneinfo import ZoneInfo
 
 from flask import (
     Response,
@@ -241,7 +242,7 @@ def visualizar_detalhe_chamado(chamado_id: str) -> Response:
         anexos_exibicao = montar_anexos_para_exibicao(chamado, historico)
 
         from app.services.previsao_atendimento_service import (
-            LIMITE_EXTENSOES_AUTOMATICAS,
+            calcular_sugestao_extensao_automatica,
             obter_solicitacao_pendente,
             usuario_pode_decidir_previsao_atendimento,
         )
@@ -250,6 +251,15 @@ def visualizar_detalhe_chamado(chamado_id: str) -> Response:
         pode_decidir_previsao = previsao_pendente is not None and (
             usuario_pode_decidir_previsao_atendimento(current_user, chamado.area or "")
         )
+        # Botão único "Solicitar nova previsão de atendimento": se elegível,
+        # o modal já vem com a data de extensão automática pré-preenchida —
+        # ver calcular_sugestao_extensao_automatica.
+        sugestao_extensao = calcular_sugestao_extensao_automatica(chamado.id)
+        # min do campo de data — trava no navegador o mesmo limite que o
+        # service já rejeita (previsao <= agora não é permitido, ver
+        # solicitar_previsao_atendimento): evita a pessoa escolher a data de
+        # hoje ou uma data passada só pra descobrir o erro depois de enviar.
+        previsao_min = datetime.now(ZoneInfo(Config.SLA_TIMEZONE)).strftime("%Y-%m-%dT%H:%M")
 
         # Conversa solicitante↔responsável: só as respostas em texto livre,
         # em ordem cronológica (historico vem mais recente primeiro).
@@ -275,7 +285,8 @@ def visualizar_detalhe_chamado(chamado_id: str) -> Response:
             previsao_pendente=previsao_pendente,
             pode_decidir_previsao=pode_decidir_previsao,
             mensagens_conversa=mensagens_conversa,
-            limite_extensoes_automaticas=LIMITE_EXTENSOES_AUTOMATICAS,
+            sugestao_extensao=sugestao_extensao,
+            previsao_min=previsao_min,
         )
     except Exception as e:
         logger.exception("Erro ao exibir chamado %s: %s", chamado_id, e)

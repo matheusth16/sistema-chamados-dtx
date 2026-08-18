@@ -5369,20 +5369,20 @@
     "en": "There's already a pending forecast request — decide it before using the automatic extension",
     "es": "Ya existe un pedido de previsión pendiente — decídalo antes de usar la extensión automática"
   },
-  "attendance_forecast_auto_extend_btn": {
-    "pt_BR": "Estender prazo automaticamente",
-    "en": "Extend deadline automatically",
-    "es": "Extender el plazo automáticamente"
+  "attendance_forecast_hint_auto": {
+    "pt_BR": "Mantendo essa data, o pedido é aplicado na hora — sem aprovação do gestor ({restantes} de {total} extensões automáticas restantes).",
+    "en": "Keeping this date, the request is applied right away — no manager approval needed ({restantes} of {total} automatic extensions remaining).",
+    "es": "Manteniendo esta fecha, el pedido se aplica al instante — sin aprobación del gestor ({restantes} de {total} extensiones automáticas restantes)."
   },
-  "attendance_forecast_extensions_remaining": {
-    "pt_BR": "{restantes} de {total} extensões automáticas restantes",
-    "en": "{restantes} of {total} automatic extensions remaining",
-    "es": "{restantes} de {total} extensiones automáticas restantes"
+  "attendance_forecast_hint_manual": {
+    "pt_BR": "Essa data é diferente da sugestão automática — o pedido vai passar pela aprovação do gestor do setor.",
+    "en": "This date is different from the automatic suggestion — the request will go through the sector manager's approval.",
+    "es": "Esta fecha es distinta de la sugerencia automática — el pedido pasará por la aprobación del gestor del sector."
   },
-  "attendance_forecast_extensions_exhausted": {
-    "pt_BR": "Extensões automáticas esgotadas — peça aprovação ao gestor",
-    "en": "Automatic extensions exhausted — request manager approval",
-    "es": "Extensiones automáticas agotadas — solicite aprobación del gestor"
+  "attendance_forecast_hint_sempre_gestor": {
+    "pt_BR": "Esse pedido vai passar pela aprovação do gestor do setor.",
+    "en": "This request will go through the sector manager's approval.",
+    "es": "Este pedido pasará por la aprobación del gestor del sector."
   },
   "attendance_forecast_request_not_found": {
     "pt_BR": "Pedido de previsão de atendimento não encontrado",

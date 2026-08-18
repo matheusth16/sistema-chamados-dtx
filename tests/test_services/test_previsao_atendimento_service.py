@@ -241,6 +241,78 @@ class TestSolicitarPrevisaoAtendimento:
 
         assert segundo["sucesso"] is False
 
+    def test_retorna_tipo_manual_no_fluxo_normal(self):
+        from app.services.previsao_atendimento_service import solicitar_previsao_atendimento
+
+        chamado_id = _criar_chamado_real(categoria="Manutencao")
+        resultado = solicitar_previsao_atendimento(chamado_id, _futuro(days=90), "motivo", JULIA)
+
+        assert resultado["sucesso"] is True
+        assert resultado["tipo"] == "manual"
+
+    def test_data_igual_a_sugestao_automatica_aplica_na_hora_sem_pedido_pendente(self):
+        """Botão único: se a data enviada bate exatamente com a sugestão
+        automática (prazo atual + TAT) e o chamado ainda tem extensões
+        disponíveis, o pedido aplica na hora — não cria linha 'pendente'."""
+        from app.services.analytics import _sla_dias_por_categoria
+        from app.services.business_time import adicionar_dias_uteis
+        from app.services.previsao_atendimento_service import solicitar_previsao_atendimento
+
+        chamado_id = _criar_chamado_real(categoria="Manutencao")
+        antes = Chamado.get_by_id(chamado_id)
+        dias_tat = _sla_dias_por_categoria(antes.categoria, antes.sla_dias)
+        baseline = adicionar_dias_uteis(antes.data_abertura, dias_tat)
+        previsao_sugerida = adicionar_dias_uteis(baseline, dias_tat).replace(tzinfo=None)
+
+        resultado = solicitar_previsao_atendimento(chamado_id, previsao_sugerida, "motivo", JULIA)
+
+        assert resultado["sucesso"] is True
+        assert resultado["tipo"] == "auto"
+        assert resultado["dados"]["extensoes_usadas"] == 1
+        atualizado = Chamado.get_by_id(chamado_id)
+        assert atualizado.previsao_extensoes_automaticas_usadas == 1
+        from app.services.previsao_atendimento_service import obter_solicitacao_pendente
+
+        assert obter_solicitacao_pendente(chamado_id) is None
+
+    def test_data_diferente_da_sugestao_cria_pedido_pendente_normal(self):
+        """Mudar a data (mesmo elegível pra self-service) sempre vai pro
+        gestor — só a data sugerida exata aplica na hora."""
+        from app.services.previsao_atendimento_service import solicitar_previsao_atendimento
+
+        chamado_id = _criar_chamado_real(categoria="Manutencao")
+
+        resultado = solicitar_previsao_atendimento(chamado_id, _futuro(days=30), "motivo", JULIA)
+
+        assert resultado["sucesso"] is True
+        assert resultado["tipo"] == "manual"
+        atualizado = Chamado.get_by_id(chamado_id)
+        assert atualizado.previsao_extensoes_automaticas_usadas == 0
+
+    def test_travado_mesmo_com_data_da_sugestao_cria_pedido_pendente(self):
+        """Chamado travado (ratchet já disparado) nunca aplica na hora, nem
+        se a data enviada coincidir com o que seria a sugestão — porque
+        calcular_sugestao_extensao_automatica já retorna elegivel=False
+        (previsao_sugerida=None) nesse caso, então a comparação nunca bate."""
+        from app.services.analytics import _sla_dias_por_categoria
+        from app.services.business_time import adicionar_dias_uteis
+        from app.services.previsao_atendimento_service import solicitar_previsao_atendimento
+
+        chamado_id = _criar_chamado_real(categoria="Manutencao")
+        chamado = Chamado.get_by_id(chamado_id)
+        assert chamado.atualizar_campos(previsao_extensao_travada=True) is True
+
+        dias_tat = _sla_dias_por_categoria(chamado.categoria, chamado.sla_dias)
+        baseline = adicionar_dias_uteis(chamado.data_abertura, dias_tat)
+        previsao_que_seria_sugerida = adicionar_dias_uteis(baseline, dias_tat).replace(tzinfo=None)
+
+        resultado = solicitar_previsao_atendimento(
+            chamado_id, previsao_que_seria_sugerida, "motivo", JULIA
+        )
+
+        assert resultado["sucesso"] is True
+        assert resultado["tipo"] == "manual"
+
 
 # ── decidir_previsao_atendimento ────────────────────────────────────────────
 
@@ -458,6 +530,104 @@ class TestDecidirPrevisaoAtendimento:
         hist_instancia.save.assert_called_once()
 
 
+# ── calcular_sugestao_extensao_automatica (prévia read-only) ───────────────
+
+
+class TestCalcularSugestaoExtensaoAutomatica:
+    def test_chamado_novo_elegivel_com_previsao_correta(self):
+        from app.services.analytics import _sla_dias_por_categoria
+        from app.services.business_time import adicionar_dias_uteis
+        from app.services.previsao_atendimento_service import (
+            calcular_sugestao_extensao_automatica,
+        )
+
+        chamado_id = _criar_chamado_real(categoria="Manutencao")
+        antes = Chamado.get_by_id(chamado_id)
+        dias_tat = _sla_dias_por_categoria(antes.categoria, antes.sla_dias)
+        baseline = adicionar_dias_uteis(antes.data_abertura, dias_tat)
+        esperado = adicionar_dias_uteis(baseline, dias_tat).replace(tzinfo=None)
+
+        sugestao = calcular_sugestao_extensao_automatica(chamado_id)
+
+        assert sugestao["elegivel"] is True
+        assert sugestao["extensoes_usadas"] == 0
+        assert sugestao["extensoes_restantes"] == 3
+        obtido = sugestao["previsao_sugerida"]
+        assert (obtido.year, obtido.month, obtido.day, obtido.hour, obtido.minute) == (
+            esperado.year,
+            esperado.month,
+            esperado.day,
+            esperado.hour,
+            esperado.minute,
+        )
+
+    def test_aog_nunca_elegivel(self):
+        from app.services.previsao_atendimento_service import (
+            calcular_sugestao_extensao_automatica,
+        )
+
+        chamado_id = _criar_chamado_real(categoria="AOG")
+
+        sugestao = calcular_sugestao_extensao_automatica(chamado_id)
+
+        assert sugestao["elegivel"] is False
+        assert sugestao["previsao_sugerida"] is None
+
+    def test_travado_nao_elegivel(self):
+        from app.services.previsao_atendimento_service import (
+            calcular_sugestao_extensao_automatica,
+        )
+
+        chamado_id = _criar_chamado_real(categoria="Manutencao")
+        chamado = Chamado.get_by_id(chamado_id)
+        assert chamado.atualizar_campos(previsao_extensao_travada=True) is True
+
+        sugestao = calcular_sugestao_extensao_automatica(chamado_id)
+
+        assert sugestao["elegivel"] is False
+        assert sugestao["previsao_sugerida"] is None
+
+    def test_limite_atingido_nao_elegivel(self):
+        from app.services.previsao_atendimento_service import (
+            calcular_sugestao_extensao_automatica,
+        )
+
+        chamado_id = _criar_chamado_real(categoria="Manutencao")
+        chamado = Chamado.get_by_id(chamado_id)
+        assert chamado.atualizar_campos(previsao_extensoes_automaticas_usadas=3) is True
+
+        sugestao = calcular_sugestao_extensao_automatica(chamado_id)
+
+        assert sugestao["elegivel"] is False
+        assert sugestao["extensoes_restantes"] == 0
+
+    def test_com_pedido_pendente_nao_elegivel(self):
+        from app.services.previsao_atendimento_service import (
+            calcular_sugestao_extensao_automatica,
+        )
+        from app.services.previsao_atendimento_service import (
+            solicitar_previsao_atendimento as solicitar,
+        )
+
+        chamado_id = _criar_chamado_real(categoria="Manutencao")
+        pedido = solicitar(chamado_id, _futuro(days=30), "motivo", JULIA)
+        assert pedido["sucesso"] is True
+
+        sugestao = calcular_sugestao_extensao_automatica(chamado_id)
+
+        assert sugestao["elegivel"] is False
+
+    def test_chamado_nao_encontrado_nao_elegivel(self):
+        from app.services.previsao_atendimento_service import (
+            calcular_sugestao_extensao_automatica,
+        )
+
+        sugestao = calcular_sugestao_extensao_automatica(_ID_INEXISTENTE)
+
+        assert sugestao["elegivel"] is False
+        assert sugestao["previsao_sugerida"] is None
+
+
 # ── solicitar_extensao_automatica (self-service, sem aprovação) ────────────
 
 
@@ -663,6 +833,34 @@ class TestSolicitarExtensaoAutomatica:
         assert kwargs.get("usuario_id") == JULIA.id
         assert kwargs.get("usuario_nome") == JULIA.nome
         hist_instancia.save.assert_called_once()
+
+    def test_motivo_customizado_sobrescreve_texto_padrao(self):
+        """solicitar_previsao_atendimento repassa o motivo do usuário pro
+        caminho automático em vez do texto genérico "Extensão automática
+        N/3" — usado quando a data enviada bate com a sugestão (botão
+        único, ver TestSolicitarPrevisaoAtendimento)."""
+        from app.services.previsao_atendimento_service import solicitar_extensao_automatica
+
+        chamado_id = _criar_chamado_real(categoria="Manutencao")
+
+        resultado = solicitar_extensao_automatica(
+            chamado_id, JULIA, motivo="Preciso de mais tempo pro fornecedor"
+        )
+
+        assert resultado["sucesso"] is True
+        atualizado = Chamado.get_by_id(chamado_id)
+        assert atualizado.motivo_previsao_atendimento == "Preciso de mais tempo pro fornecedor"
+
+    def test_sem_motivo_usa_texto_padrao(self):
+        from app.services.previsao_atendimento_service import solicitar_extensao_automatica
+
+        chamado_id = _criar_chamado_real(categoria="Manutencao")
+
+        resultado = solicitar_extensao_automatica(chamado_id, JULIA)
+
+        assert resultado["sucesso"] is True
+        atualizado = Chamado.get_by_id(chamado_id)
+        assert atualizado.motivo_previsao_atendimento == "Extensão automática 1/3"
 
 
 # ── ratchet: decisão do gestor trava o self-service pra sempre ─────────────
