@@ -100,6 +100,7 @@
 
 .bento-dropzone{ border:2px dashed #c7cddb; border-radius:16px; padding:28px 20px; text-align:center; cursor:pointer; transition:all .15s; background:#FAFBFD; }
 .bento-dropzone:hover{ background:var(--color-dtx-100); border-color:var(--color-dtx-500); }
+.bento-dropzone.dragover{ background:var(--color-dtx-100); border-color:var(--color-dtx-500); }
 .bento-dropzone .icon{ width:44px; height:44px; margin:0 auto 10px; border-radius:99px; background:#fff; color:#a3a9ba; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 8px rgba(20,30,60,.06); }
 .bento-dropzone .link{ color:var(--color-dtx-500); font-weight:700; text-decoration:underline; }
 .bento-dropzone small{ display:block; margin-top:6px; color:#a3a9ba; font-size:12px; }

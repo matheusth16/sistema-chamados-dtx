@@ -173,7 +173,7 @@
 
             <div>
                 <label class="bento-field-label">{{ t('attach_file') }}</label>
-                <label for="anexo_arquivo" class="bento-dropzone block">
+                <label for="anexo_arquivo" id="dropzone_anexo" class="bento-dropzone block">
                     <input id="anexo_arquivo" name="anexo" type="file" class="sr-only" accept="{{ accept_anexo }}" multiple>
                     <div class="icon">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
@@ -676,8 +676,7 @@
             }
         }
 
-        input.addEventListener('change', function () {
-            var novos = input.files;
+        function _processarArquivos(novos) {
             var existentes = {};
             for (var i = 0; i < dt.files.length; i++) existentes[_chave(dt.files[i])] = true;
             var arquivosGrandes = [];
@@ -695,6 +694,42 @@
                 blocoLink.classList.remove('hidden');
                 inputLink.focus();
             }
+        }
+
+        input.addEventListener('change', function () {
+            _processarArquivos(input.files);
+        });
+
+        // Arrastar e soltar: sem preventDefault nos eventos de drag, o Chrome
+        // trata o drop como navegação e abre o arquivo em nova aba.
+        var dropzone = document.getElementById('dropzone_anexo');
+        ['dragenter', 'dragover'].forEach(function (evt) {
+            dropzone.addEventListener(evt, function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                dropzone.classList.add('dragover');
+            });
+        });
+        ['dragleave', 'dragend'].forEach(function (evt) {
+            dropzone.addEventListener(evt, function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                dropzone.classList.remove('dragover');
+            });
+        });
+        dropzone.addEventListener('drop', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            dropzone.classList.remove('dragover');
+            if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) {
+                _processarArquivos(e.dataTransfer.files);
+            }
+        });
+
+        // Rede de segurança: se o usuário soltar o arquivo perto da dropzone
+        // mas fora dela, evita que o Chrome abra o arquivo em nova aba.
+        ['dragover', 'drop'].forEach(function (evt) {
+            window.addEventListener(evt, function (e) { e.preventDefault(); });
         });
 
         btnAddLink.addEventListener('click', function () {

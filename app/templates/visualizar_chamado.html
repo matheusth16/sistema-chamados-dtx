@@ -681,7 +681,7 @@
                         {% if pode_editar %}
                         <div class="bento-resp-box">
                             <label class="bento-field-label" style="margin-bottom:8px;">{% set _natt = t('new_attachment') %}{{ _natt if _natt != 'new_attachment' else 'Novo Anexo' }}</label>
-                            <label for="modal-input-anexo" class="bento-dropzone block" style="padding:16px;" data-upload-placeholder="{% set _cu = t('click_to_upload_file') %}{{ _cu if _cu != 'click_to_upload_file' else 'Clique para enviar um arquivo' }}">
+                            <label for="modal-input-anexo" id="dropzone-modal-anexo" class="bento-dropzone block" style="padding:16px;" data-upload-placeholder="{% set _cu = t('click_to_upload_file') %}{{ _cu if _cu != 'click_to_upload_file' else 'Clique para enviar um arquivo' }}">
                                 <input type="file" id="modal-input-anexo" form="form-status" name="anexos_novos" class="sr-only" accept="{{ accept_anexo }}" multiple>
                                 <div class="icon" style="margin:0 auto 6px;">
                                     <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -710,7 +710,7 @@
                             <textarea id="sol-anexo-motivo" rows="2" aria-describedby="sol-anexo-erro" aria-invalid="false"
                                 style="width:100%; box-sizing:border-box; background:var(--color-surface-canvas); border:1.5px solid transparent; border-radius:14px; padding:11px 14px; font-family:inherit; font-size:13px; resize:none; margin-bottom:8px;"
                                 placeholder="{{ t('late_attachment_motivo_placeholder') if t else 'Motivo (mínimo 10 caracteres)' }}"></textarea>
-                            <label for="sol-anexo-file" class="bento-dropzone block" style="padding:16px;" data-upload-placeholder="{% set _cu3 = t('click_to_upload_file') %}{{ _cu3 if _cu3 != 'click_to_upload_file' else 'Clique para enviar um arquivo' }}">
+                            <label for="sol-anexo-file" id="dropzone-sol-anexo" class="bento-dropzone block" style="padding:16px;" data-upload-placeholder="{% set _cu3 = t('click_to_upload_file') %}{{ _cu3 if _cu3 != 'click_to_upload_file' else 'Clique para enviar um arquivo' }}">
                                 <input type="file" id="sol-anexo-file" class="sr-only" accept="{{ accept_anexo }}">
                                 <div class="icon" style="margin:0 auto 6px;">
                                     <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1851,8 +1851,7 @@ Object.assign(window.DTX_MSGS, {
     }
 
     if(inputFile) {
-        inputFile.addEventListener('change', function(e) {
-            var files = e.target.files;
+        function _processarArquivosAnexoNovo(files) {
             if(files.length === 1) {
                 nomeArquivoEl.textContent = files[0].name;
                 nomeArquivoEl.style.color = 'var(--color-dtx-500)';
@@ -1900,7 +1899,47 @@ Object.assign(window.DTX_MSGS, {
                     previewAnexoNovo.appendChild(li);
                 });
             }
+        }
+
+        inputFile.addEventListener('change', function(e) {
+            _processarArquivosAnexoNovo(e.target.files);
         });
+
+        // Arrastar e soltar: sem preventDefault nos eventos de drag, o Chrome
+        // trata o drop como navegação e abre o arquivo em nova aba.
+        var dropzoneModalAnexo = document.getElementById('dropzone-modal-anexo');
+        if (dropzoneModalAnexo) {
+            ['dragenter', 'dragover'].forEach(function (evt) {
+                dropzoneModalAnexo.addEventListener(evt, function (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    dropzoneModalAnexo.classList.add('dragover');
+                });
+            });
+            ['dragleave', 'dragend'].forEach(function (evt) {
+                dropzoneModalAnexo.addEventListener(evt, function (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    dropzoneModalAnexo.classList.remove('dragover');
+                });
+            });
+            dropzoneModalAnexo.addEventListener('drop', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                dropzoneModalAnexo.classList.remove('dragover');
+                if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) {
+                    var dt = new DataTransfer();
+                    Array.prototype.forEach.call(e.dataTransfer.files, function (f) { dt.items.add(f); });
+                    inputFile.files = dt.files;
+                    _processarArquivosAnexoNovo(inputFile.files);
+                }
+            });
+            // Rede de segurança: se o usuário soltar o arquivo perto da dropzone
+            // mas fora dela, evita que o Chrome abra o arquivo em nova aba.
+            ['dragover', 'drop'].forEach(function (evt) {
+                window.addEventListener(evt, function (e) { e.preventDefault(); });
+            });
+        }
     }
 </script>
 {% endif %}
@@ -2240,8 +2279,7 @@ function cancelarChamadoAdmin() {
             return 'outro';
         }
 
-        inputFile.addEventListener('change', function (e) {
-            var arq = e.target.files && e.target.files[0];
+        function _processarArquivoSolAnexo(arq) {
             if (arq) {
                 nomeArquivoEl.textContent = arq.name;
                 nomeArquivoEl.style.color = 'var(--color-dtx-500)';
@@ -2282,7 +2320,42 @@ function cancelarChamadoAdmin() {
                     previewEl.appendChild(li);
                 }
             }
+        }
+
+        inputFile.addEventListener('change', function (e) {
+            _processarArquivoSolAnexo(e.target.files && e.target.files[0]);
         });
+
+        // Arrastar e soltar: sem preventDefault nos eventos de drag, o Chrome
+        // trata o drop como navegação e abre o arquivo em nova aba.
+        var dropzoneSolAnexo = document.getElementById('dropzone-sol-anexo');
+        if (dropzoneSolAnexo) {
+            ['dragenter', 'dragover'].forEach(function (evt) {
+                dropzoneSolAnexo.addEventListener(evt, function (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    dropzoneSolAnexo.classList.add('dragover');
+                });
+            });
+            ['dragleave', 'dragend'].forEach(function (evt) {
+                dropzoneSolAnexo.addEventListener(evt, function (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    dropzoneSolAnexo.classList.remove('dragover');
+                });
+            });
+            dropzoneSolAnexo.addEventListener('drop', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                dropzoneSolAnexo.classList.remove('dragover');
+                if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) {
+                    var dt = new DataTransfer();
+                    dt.items.add(e.dataTransfer.files[0]);
+                    inputFile.files = dt.files;
+                    _processarArquivoSolAnexo(inputFile.files[0]);
+                }
+            });
+        }
     })();
     {% endif %}
 })();
