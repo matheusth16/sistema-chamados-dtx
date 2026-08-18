@@ -1,12 +1,18 @@
-"""TDD: inclusão automática de observadora quando Produção abre chamado pra outro setor.
+"""TDD: inclusão automática de observadora quando Produção está envolvida no chamado.
 
-Regra de negócio (2026-08-17): sempre que um solicitante da área "Produção" abre
-um chamado pra qualquer outro setor, julia.salgado@dtx.aero (supervisora de
-"Planejamento de Produção", área distinta) entra automaticamente como
-observadora — aparece em `chamado.observadores` e recebe as notificações que
-qualquer observador já recebe (e-mail/in-app/Web Push, ver
-_notificar_observadores_inclusao). Chamados abertos pela própria Produção pra
-Produção não disparam a inclusão.
+Regra de negócio (2026-08-17, estendida em 2026-08-18): julia.salgado@dtx.aero
+(supervisora de "Planejamento de Produção", área distinta de "Produção") entra
+automaticamente como observadora — aparece em `chamado.observadores` e recebe
+as notificações que qualquer observador já recebe (e-mail/in-app/Web Push, ver
+_notificar_observadores_inclusao) — em dois sentidos:
+
+1. Solicitante da área "Produção" abre chamado pra qualquer outro setor.
+2. Solicitante de qualquer outro setor abre chamado com destino "Produção".
+
+Nenhum dos dois sentidos dispara quando a área envolvida do outro lado é
+"Produção" ou "Planejamento de Produção" (ela já tem visibilidade natural
+desses chamados — evita notificação duplicada e ela virar observadora do
+próprio chamado dela).
 """
 
 import json
@@ -199,3 +205,31 @@ class TestObservadorAutomaticoProducao:
         assert erro is None
         ids = {o["usuario_id"] for o in Chamado.get_by_id(chamado_id).observadores}
         assert "user_b4c6c498b86a4bb6a97f8a0ad5bf902c" in ids
+
+    def test_outro_setor_abre_para_producao_inclui_julia(self, app):
+        """Solicitante de TI abrindo chamado com destino Produção → Julia entra em cópia."""
+        form = _base_form("Produção")
+        with app.app_context():
+            chamado_id, erro, _ = _criar_chamado_patched(
+                form, area_solicitante="TI", get_by_email_return=_julia_mock()
+            )
+
+        assert erro is None
+        ids = {o["usuario_id"] for o in Chamado.get_by_id(chamado_id).observadores}
+        assert "user_b4c6c498b86a4bb6a97f8a0ad5bf902c" in ids
+
+    def test_planejamento_producao_abre_para_producao_nao_inclui_julia(self, app):
+        """Chamado originado no próprio time dela (Planejamento de Produção) com destino
+        Produção não dispara a inclusão — mesma lógica de exclusão usada no sentido
+        contrário (ela já tem visibilidade natural do chamado do próprio time)."""
+        form = _base_form("Produção")
+        with app.app_context():
+            chamado_id, erro, mock_get_by_email = _criar_chamado_patched(
+                form,
+                area_solicitante="Planejamento de Produção",
+                get_by_email_return=_julia_mock(),
+            )
+
+        assert erro is None
+        assert Chamado.get_by_id(chamado_id).observadores == []
+        mock_get_by_email.assert_not_called()

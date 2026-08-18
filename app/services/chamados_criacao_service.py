@@ -39,17 +39,19 @@ logger = logging.getLogger(__name__)
 # lista fechada de propósito (sem toggle de admin), decisão explícita do usuário.
 AREAS_GRUPO = {"Compras", "Estoque"}
 
-# Observadora automática: solicitante da área "Produção" abrindo chamado pra
-# outro setor coloca julia.salgado@dtx.aero em cópia sem ação manual (decisão
-# de negócio do usuário, 2026-08-17). Ela é supervisora de "Planejamento de
-# Produção" — área distinta de "Produção" no catálogo, não confundir. Exclui
-# como destino tanto "Produção" (chamado pra ela mesma) quanto "Planejamento
-# de Produção" (área dela — ela já é responsável/supervisora desse chamado,
-# virar observadora também seria redundante e duplicaria notificação).
-# Busca por e-mail (não ID hardcoded) pra sobreviver a troca de conta; conta
-# ausente/inativa não bloqueia a criação do chamado.
+# Observadora automática: julia.salgado@dtx.aero entra em cópia sem ação manual
+# sempre que "Produção" está de um lado do chamado e o outro lado é um setor
+# diferente (decisão de negócio do usuário, 2026-08-17; estendida em
+# 2026-08-18 pro sentido contrário). Ela é supervisora de "Planejamento de
+# Produção" — área distinta de "Produção" no catálogo, não confundir. Nenhum
+# dos dois sentidos dispara quando o outro lado é "Produção" ou "Planejamento
+# de Produção" (ela já tem visibilidade natural desses chamados — evitaria
+# notificação duplicada e ela virar observadora do próprio chamado dela/do
+# time dela). Busca por e-mail (não ID hardcoded) pra sobreviver a troca de
+# conta; conta ausente/inativa não bloqueia a criação do chamado.
 AREA_PRODUCAO = "Produção"
-AREAS_DESTINO_SEM_OBSERVADOR_AUTOMATICO_PRODUCAO = {AREA_PRODUCAO, "Planejamento de Produção"}
+AREA_PLANEJAMENTO_PRODUCAO = "Planejamento de Produção"
+AREAS_PRODUCAO_SEM_OBSERVADOR_AUTOMATICO = {AREA_PRODUCAO, AREA_PLANEJAMENTO_PRODUCAO}
 EMAIL_OBSERVADOR_AUTOMATICO_PRODUCAO = "julia.salgado@dtx.aero"
 
 
@@ -60,11 +62,16 @@ def _eh_area_grupo(area: str) -> bool:
 def _incluir_observador_automatico_producao(
     observadores_list: list, area_solicitante: str | None, area_chamado: str
 ) -> list:
-    areas_solicitante = (area_solicitante or "").split(", ")
-    if (
-        AREA_PRODUCAO not in areas_solicitante
-        or area_chamado in AREAS_DESTINO_SEM_OBSERVADOR_AUTOMATICO_PRODUCAO
-    ):
+    areas_solicitante = set((area_solicitante or "").split(", "))
+    producao_como_origem = (
+        AREA_PRODUCAO in areas_solicitante
+        and area_chamado not in AREAS_PRODUCAO_SEM_OBSERVADOR_AUTOMATICO
+    )
+    producao_como_destino = (
+        area_chamado == AREA_PRODUCAO
+        and not areas_solicitante & AREAS_PRODUCAO_SEM_OBSERVADOR_AUTOMATICO
+    )
+    if not (producao_como_origem or producao_como_destino):
         return observadores_list
     ids_existentes = {o.get("usuario_id") for o in observadores_list}
     try:
