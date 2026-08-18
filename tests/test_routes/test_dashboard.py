@@ -66,6 +66,85 @@ def test_admin_com_admin_retorna_200(client_logado_admin):
     assert r.status_code == 200
 
 
+def _mock_chamado_linha(**overrides):
+    """Chamado mínimo pra renderizar components/_ticket_row_dashboard.html."""
+    c = MagicMock()
+    c.id = 1
+    c.numero_chamado = "CHM-0001"
+    c.rl_codigo = None
+    c.categoria = "Não Aplicável"
+    c.gate = None
+    c.responsavel = "Fulano"
+    c.descricao = "Descrição de teste"
+    c.status = "Aberto"
+    c.sla_info = None
+    c.sla_dias = None
+    c.prioridade = 1
+    c.anexo = None
+    c.anexos = []
+    for k, v in overrides.items():
+        setattr(c, k, v)
+    return c
+
+
+def test_admin_chamado_com_anexo_mostra_icone_de_clipe(client_logado_admin):
+    """Linha da tabela de Gestão de Chamados mostra um ícone de clipe junto
+    do número do chamado quando ele tem anexo — indicador visual sem
+    precisar abrir o chamado pra saber."""
+    chamado = _mock_chamado_linha(anexos=["anexos/arquivo.pdf"])
+
+    with (
+        patch("app.routes.dashboard.obter_contexto_admin") as mock_ctx,
+        patch("app.routes.dashboard.get_static_cached", return_value=[]),
+    ):
+        mock_ctx.return_value = {
+            "chamados": [chamado],
+            "gates": [],
+            "responsaveis": [],
+            "sla_map": {},
+            "tem_proxima": False,
+            "tem_anterior": False,
+            "proximo_cursor": None,
+            "cursor_anterior": None,
+        }
+        r = client_logado_admin.get("/admin", follow_redirects=False)
+
+    assert r.status_code == 200
+    html = r.data.decode("utf-8")
+    idx = html.find("CHM-0001")
+    assert idx != -1
+    trecho = html[idx : idx + 400]
+    assert "<svg" in trecho
+    assert "Tem anexo" in trecho or "Has attachment" in trecho
+
+
+def test_admin_chamado_sem_anexo_nao_mostra_icone_de_clipe(client_logado_admin):
+    chamado = _mock_chamado_linha(numero_chamado="CHM-0002", anexos=[], anexo=None)
+
+    with (
+        patch("app.routes.dashboard.obter_contexto_admin") as mock_ctx,
+        patch("app.routes.dashboard.get_static_cached", return_value=[]),
+    ):
+        mock_ctx.return_value = {
+            "chamados": [chamado],
+            "gates": [],
+            "responsaveis": [],
+            "sla_map": {},
+            "tem_proxima": False,
+            "tem_anterior": False,
+            "proximo_cursor": None,
+            "cursor_anterior": None,
+        }
+        r = client_logado_admin.get("/admin", follow_redirects=False)
+
+    assert r.status_code == 200
+    html = r.data.decode("utf-8")
+    idx = html.find("CHM-0002")
+    assert idx != -1
+    trecho = html[idx : idx + 400]
+    assert "Tem anexo" not in trecho and "Has attachment" not in trecho
+
+
 def test_admin_navbar_tem_link_novo_chamado_e_meus_chamados(client_logado_admin):
     """Navbar (menu hambúrguer) do Admin deve ter link para abrir chamado e ver
     seus próprios chamados — o backend já permite (@requer_solicitante inclui

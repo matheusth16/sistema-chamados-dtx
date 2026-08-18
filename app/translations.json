@@ -519,6 +519,11 @@
     "en": "RL:",
     "es": "RL:"
   },
+  "has_attachment": {
+    "pt_BR": "Tem anexo",
+    "en": "Has attachment",
+    "es": "Tiene adjunto"
+  },
   "rl_code_label": {
     "pt_BR": "Código RL",
     "en": "RL Code",

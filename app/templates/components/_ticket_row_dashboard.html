@@ -10,7 +10,15 @@
         </label>
     </td>
     <td class="id-cell" data-cell="numero">
-        <div class="num">{{ chamado.numero_chamado }}</div>
+        <div class="num">
+            {{ chamado.numero_chamado }}
+            {% if chamado.anexos or (chamado.anexo and chamado.anexo != 'None') %}
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:inline-block; vertical-align:-1px; margin-left:3px; color:var(--color-surface-muted);" aria-hidden="true">
+                <title>{{ t('has_attachment') if t and t('has_attachment') != 'has_attachment' else 'Tem anexo' }}</title>
+                <path stroke-linecap="round" stroke-linejoin="round" d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01l-.01.01m5.699-9.941l-7.81 7.81a1.5 1.5 0 002.112 2.13" />
+            </svg>
+            {% endif %}
+        </div>
         {% if chamado.rl_codigo %}
         <span class="bento-chip-badge rl">{{ t('rl_short') }} {{ chamado.rl_codigo }}</span>
         {% endif %}
