@@ -239,6 +239,157 @@ def test_preparar_metricas_paginadas_clampeia_pagina_fora_do_intervalo():
     assert result["pagina"] == 1
 
 
+class TestVerificarAtualizacoesDashboard:
+    """Polling leve do dashboard (Gestão de Chamados): sinaliza se há
+    Historico novo (id > apos_id) visível no escopo do usuário — ver
+    app/routes/api_chamados.py::api_dashboard_tem_atualizacoes."""
+
+    def test_admin_ve_atualizacao_de_qualquer_area(self):
+        from app.models_historico import Historico
+        from app.services.dashboard_service import verificar_atualizacoes_dashboard
+        from tests.factories import make_chamado
+
+        user = MagicMock()
+        user.perfil = "admin"
+        user.areas = []
+
+        chamado = make_chamado(area="Manutencao")
+        h1 = Historico(chamado_id=chamado.id, usuario_id="u1", usuario_nome="U1", acao="criacao")
+        h1.save()
+        cursor_antes = h1.id
+
+        resultado = verificar_atualizacoes_dashboard(user, cursor_antes)
+
+        assert resultado["tem_atualizacoes"] is False
+
+        h2 = Historico(
+            chamado_id=chamado.id,
+            usuario_id="u1",
+            usuario_nome="U1",
+            acao="alteracao_status",
+        )
+        h2.save()
+
+        resultado2 = verificar_atualizacoes_dashboard(user, cursor_antes)
+        assert resultado2["tem_atualizacoes"] is True
+        assert resultado2["cursor_atual"] == h2.id
+
+    def test_supervisor_nao_ve_atualizacao_de_area_alheia(self):
+        from app.models_historico import Historico
+        from app.services.dashboard_service import verificar_atualizacoes_dashboard
+        from tests.factories import make_chamado
+
+        supervisor = MagicMock()
+        supervisor.perfil = "supervisor"
+        supervisor.id = "sup_fora"
+        supervisor.areas = ["TI"]
+
+        chamado_outra_area = make_chamado(
+            area="Manutencao", supervisor_ids_com_acesso=["outro_supervisor"]
+        )
+        cursor_inicial = 0
+        Historico(
+            chamado_id=chamado_outra_area.id,
+            usuario_id="u1",
+            usuario_nome="U1",
+            acao="criacao",
+        ).save()
+
+        resultado = verificar_atualizacoes_dashboard(supervisor, cursor_inicial)
+
+        assert resultado["tem_atualizacoes"] is False
+        assert resultado["cursor_atual"] == cursor_inicial
+
+    def test_supervisor_ve_atualizacao_da_propria_area(self):
+        from app.models_historico import Historico
+        from app.services.dashboard_service import verificar_atualizacoes_dashboard
+        from tests.factories import make_chamado
+
+        supervisor = MagicMock()
+        supervisor.perfil = "supervisor"
+        supervisor.id = "sup_dono"
+        supervisor.areas = ["Manutencao"]
+
+        chamado = make_chamado(area="Manutencao", supervisor_ids_com_acesso=["sup_dono"])
+        cursor_inicial = 0
+        h = Historico(chamado_id=chamado.id, usuario_id="u1", usuario_nome="U1", acao="criacao")
+        h.save()
+
+        resultado = verificar_atualizacoes_dashboard(supervisor, cursor_inicial)
+
+        assert resultado["tem_atualizacoes"] is True
+        assert resultado["cursor_atual"] == h.id
+
+    def test_solicitante_nao_ve_atualizacao_de_chamado_alheio(self):
+        """Escopo pro item 4 do plano de tempo real (Meus Chamados) — solicitante
+        só vê atualização dos próprios chamados, nunca de terceiros."""
+        from app.models_historico import Historico
+        from app.services.dashboard_service import verificar_atualizacoes_dashboard
+        from tests.factories import make_chamado
+
+        solicitante = MagicMock()
+        solicitante.perfil = "solicitante"
+        solicitante.id = "sol_1"
+
+        chamado_alheio = make_chamado(solicitante_id="sol_2")
+        Historico(
+            chamado_id=chamado_alheio.id, usuario_id="u1", usuario_nome="U1", acao="criacao"
+        ).save()
+
+        resultado = verificar_atualizacoes_dashboard(solicitante, 0)
+
+        assert resultado["tem_atualizacoes"] is False
+
+    def test_solicitante_ve_atualizacao_do_proprio_chamado(self):
+        from app.models_historico import Historico
+        from app.services.dashboard_service import verificar_atualizacoes_dashboard
+        from tests.factories import make_chamado
+
+        solicitante = MagicMock()
+        solicitante.perfil = "solicitante"
+        solicitante.id = "sol_1"
+
+        chamado = make_chamado(solicitante_id="sol_1")
+        h = Historico(chamado_id=chamado.id, usuario_id="u1", usuario_nome="U1", acao="criacao")
+        h.save()
+
+        resultado = verificar_atualizacoes_dashboard(solicitante, 0)
+
+        assert resultado["tem_atualizacoes"] is True
+        assert resultado["cursor_atual"] == h.id
+
+
+class TestObterCursorAtualizacoesDashboard:
+    def test_retorna_maior_id_historico_no_escopo(self):
+        from app.models_historico import Historico
+        from app.services.dashboard_service import obter_cursor_atualizacoes_dashboard
+        from tests.factories import make_chamado
+
+        user = MagicMock()
+        user.perfil = "admin"
+        user.areas = []
+
+        chamado = make_chamado()
+        h = Historico(chamado_id=chamado.id, usuario_id="u1", usuario_nome="U1", acao="criacao")
+        h.save()
+
+        cursor = obter_cursor_atualizacoes_dashboard(user)
+
+        assert cursor >= h.id
+
+    def test_sem_historico_no_escopo_retorna_zero(self):
+        from app.services.dashboard_service import obter_cursor_atualizacoes_dashboard
+
+        supervisor = MagicMock()
+        supervisor.perfil = "supervisor"
+        supervisor.id = "sup_isolado_xyz"
+        supervisor.areas = ["Área Sem Chamado Nenhum XYZ"]
+
+        cursor = obter_cursor_atualizacoes_dashboard(supervisor)
+
+        assert cursor == 0
+
+
 def test_obter_contexto_admin_projetos_no_topo_e_grupo_key_definido(db_session):
     """Chamados Projetos ficam no topo e recebem grupo_key iniciando com '0|'."""
     from app.services.dashboard_service import obter_contexto_admin

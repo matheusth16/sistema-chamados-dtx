@@ -4,7 +4,7 @@ app/services/conversa_chamado_service.py."""
 import pytest
 
 from app.models_historico import Historico
-from app.services.conversa_chamado_service import mensagens_novas
+from app.services.conversa_chamado_service import historico_fora_da_conversa, mensagens_novas
 from tests.factories import make_chamado
 
 pytestmark = pytest.mark.usefixtures("db_session")
@@ -95,3 +95,55 @@ class TestMensagensNovas:
         assert resultado[0]["usuario_nome"] == "Julia"
         assert resultado[0]["texto"] == "Olá"
         assert resultado[0]["data_iso"] != ""
+
+
+class TestHistoricoForaDaConversa:
+    """Sinal pro banner "chamado atualizado" na tela de detalhe (item 2 do
+    plano de tempo real — ver [[project_tempo_real_polling_planejado]]):
+    True quando algo mudou no chamado que NÃO é mensagem da Conversa (essa
+    já é tratada ao vivo pelo próprio polling de mensagens_novas)."""
+
+    def test_sem_historico_retorna_false(self):
+        chamado = make_chamado()
+        assert historico_fora_da_conversa(chamado.id) is False
+
+    def test_alteracao_status_retorna_true(self):
+        chamado = make_chamado()
+        Historico(
+            chamado_id=chamado.id,
+            usuario_id="u1",
+            usuario_nome="Fulano",
+            acao="alteracao_status",
+            campo_alterado="status",
+            valor_anterior="Aberto",
+            valor_novo="Em Atendimento",
+        ).save()
+
+        assert historico_fora_da_conversa(chamado.id) is True
+
+    def test_apenas_mensagens_de_conversa_retorna_false(self):
+        chamado = make_chamado()
+        _msg(chamado.id, "resposta_solicitante", texto="oi")
+        _msg(chamado.id, "resposta_responsavel", texto="olá")
+
+        assert historico_fora_da_conversa(chamado.id) is False
+
+    def test_respeita_apos_id(self):
+        chamado = make_chamado()
+        h1 = Historico(
+            chamado_id=chamado.id, usuario_id="u1", usuario_nome="Fulano", acao="criacao"
+        )
+        h1.save()
+
+        assert historico_fora_da_conversa(chamado.id, apos_id=h1.id) is False
+
+        h2 = Historico(
+            chamado_id=chamado.id,
+            usuario_id="u1",
+            usuario_nome="Fulano",
+            acao="alteracao_status",
+        )
+        h2.save()
+
+        assert historico_fora_da_conversa(chamado.id, apos_id=h1.id) is True
+        assert historico_fora_da_conversa(chamado.id, apos_id=h2.id) is False

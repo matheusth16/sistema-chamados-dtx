@@ -8,8 +8,12 @@ paginação por cursor, listas de responsáveis e gates.
 import logging
 from typing import Any
 
+from sqlalchemy import func, select
+
+from app import db as db_module
 from app.cache import get_static_cached
 from app.db.models.chamado import ChamadoRow
+from app.db.models.historico import HistoricoRow
 from app.models import Chamado
 from app.models_categorias import CategoriaGate
 from app.models_usuario import Usuario
@@ -20,6 +24,54 @@ from app.services.permissoes_edicao_chamado import filtrar_supervisores_por_area
 from app.utils import extrair_numero_chamado
 
 logger = logging.getLogger(__name__)
+
+
+def _condicoes_escopo_dashboard(user: Any) -> list:
+    """Condições de escopo por perfil, reaproveitadas em dois lugares: a
+    listagem principal do dashboard (obter_contexto_admin, só
+    supervisor/admin) e o cursor de atualizações em tempo real (polling,
+    ver verificar_atualizacoes_dashboard) — este último também usado por
+    Meus Chamados (solicitante). Admin/admin_global: lista vazia (sem
+    restrição)."""
+    condicoes = []
+    if user.perfil == "solicitante":
+        condicoes.append(ChamadoRow.solicitante_id == user.id)
+    elif user.perfil == "supervisor" and getattr(user, "areas", None):
+        condicoes.append(ChamadoRow.supervisor_ids_com_acesso.contains([user.id]))
+    return condicoes
+
+
+def obter_cursor_atualizacoes_dashboard(user: Any) -> int:
+    """Maior HistoricoRow.id visível no escopo do usuário — cursor inicial
+    pro polling de "novas atualizações" do dashboard (Gestão de Chamados).
+    0 quando não há nenhum histórico no escopo."""
+    condicoes = _condicoes_escopo_dashboard(user)
+    stmt = select(func.max(HistoricoRow.id))
+    if condicoes:
+        stmt = stmt.join(ChamadoRow, HistoricoRow.chamado_id == ChamadoRow.id).where(*condicoes)
+    with db_module.SessionLocal() as session:
+        return session.execute(stmt).scalar() or 0
+
+
+def verificar_atualizacoes_dashboard(user: Any, apos_id: int) -> dict:
+    """Sinal leve pro polling do dashboard: True se existe HistoricoRow.id >
+    apos_id visível no escopo do usuário — usado só pra mostrar um aviso de
+    "novas atualizações disponíveis" (o usuário decide recarregar ou não),
+    nunca pra recarregar a lista sozinho. Ver
+    app/routes/api_chamados.py::api_dashboard_tem_atualizacoes e o mesmo
+    padrão de polling já usado na Conversa do chamado
+    (app/services/conversa_chamado_service.py)."""
+    condicoes = _condicoes_escopo_dashboard(user)
+    stmt = select(HistoricoRow.id).where(HistoricoRow.id > apos_id)
+    if condicoes:
+        stmt = stmt.join(ChamadoRow, HistoricoRow.chamado_id == ChamadoRow.id).where(*condicoes)
+    stmt = stmt.order_by(HistoricoRow.id.desc()).limit(1)
+    with db_module.SessionLocal() as session:
+        novo_cursor = session.execute(stmt).scalar()
+    if novo_cursor is None:
+        return {"tem_atualizacoes": False, "cursor_atual": apos_id}
+    return {"tem_atualizacoes": True, "cursor_atual": novo_cursor}
+
 
 # ---------------------------------------------------------------------------
 # Helpers de relatórios: ordenação e paginação de métricas
@@ -149,9 +201,7 @@ def obter_contexto_admin(
         [{"id": u.id, "nome": u.nome, "area": u.area} for u in supervisores],
         key=lambda x: x["nome"].upper(),
     )
-    condicoes_base = []
-    if user.perfil == "supervisor" and getattr(user, "areas", None):
-        condicoes_base.append(ChamadoRow.supervisor_ids_com_acesso.contains([user.id]))
+    condicoes_base = _condicoes_escopo_dashboard(user)
 
     # Preset "meus chamados pendentes" — usado pelo botão "Open system" do
     # digest diário e do aviso prévio de escalonamento (ver
@@ -236,4 +286,5 @@ def obter_contexto_admin(
         "tem_proxima": resultado.get("tem_proxima", False),
         "cursor_anterior": resultado.get("cursor_anterior"),
         "tem_anterior": resultado.get("tem_anterior", False),
+        "cursor_inicial_atualizacoes": obter_cursor_atualizacoes_dashboard(user),
     }

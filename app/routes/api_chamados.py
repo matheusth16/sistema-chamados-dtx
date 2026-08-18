@@ -396,11 +396,40 @@ def api_mensagens_novas_chamado(chamado_id: str):
 
         apos_id = request.args.get("apos_id", 0, type=int) or 0
 
-        from app.services.conversa_chamado_service import mensagens_novas
+        from app.services.conversa_chamado_service import (
+            historico_fora_da_conversa,
+            mensagens_novas,
+        )
 
-        return sucesso_json(mensagens=mensagens_novas(chamado_id, apos_id))
+        return sucesso_json(
+            mensagens=mensagens_novas(chamado_id, apos_id),
+            tem_outras_atualizacoes=historico_fora_da_conversa(chamado_id, apos_id),
+        )
     except Exception as e:
         logger.exception("Erro ao buscar mensagens novas do chamado %s: %s", chamado_id, e)
+        return erro_json(_t("internal_error_retry"), 500)
+
+
+@main.route("/api/dashboard/tem-atualizacoes", methods=["GET"])
+@login_required
+@limiter.limit("30 per minute")
+def api_dashboard_tem_atualizacoes():
+    """Polling leve de "novas atualizações" pra Gestão de Chamados (admin/
+    supervisor) E Meus Chamados (solicitante): sinaliza se há mudanças
+    novas (qualquer Historico.id > ?apos_id) no escopo do usuário, pra
+    mostrar um aviso de "atualizar" sem recarregar a lista sozinho —
+    generaliza o mesmo padrão já usado na Conversa do chamado (ver
+    api_mensagens_novas_chamado acima), pedido do usuário 2026-08-18. Sem
+    checagem de perfil aqui: verificar_atualizacoes_dashboard já escopa a
+    query por perfil (dono/área/tudo), mesmo padrão de api_chamados_paginar."""
+    try:
+        apos_id = request.args.get("apos_id", 0, type=int) or 0
+
+        from app.services.dashboard_service import verificar_atualizacoes_dashboard
+
+        return sucesso_json(**verificar_atualizacoes_dashboard(current_user, apos_id))
+    except Exception as e:
+        logger.exception("Erro ao verificar atualizações do dashboard: %s", e)
         return erro_json(_t("internal_error_retry"), 500)
 
 

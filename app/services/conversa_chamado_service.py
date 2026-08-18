@@ -11,6 +11,16 @@ from app.models_historico import Historico
 ACOES_CONVERSA = ("resposta_solicitante", "resposta_responsavel")
 
 
+def historico_fora_da_conversa(chamado_id: str, apos_id: int = 0) -> bool:
+    """True se há Historico deste chamado gravado depois de apos_id que NÃO
+    é mensagem da Conversa (status, anexo, decisão de previsão, transferência/
+    escalonamento etc.) — sinaliza a tela de detalhe pra avisar "chamado
+    atualizado" sem duplicar o polling já existente das mensagens (item 2 do
+    plano de tempo real, generaliza o padrão de mensagens_novas acima)."""
+    historico = Historico.get_by_chamado_id(chamado_id)
+    return any(h.acao not in ACOES_CONVERSA and (h.id or 0) > apos_id for h in historico)
+
+
 def mensagens_novas(chamado_id: str, apos_id: int = 0) -> list[dict]:
     """Mensagens da conversa gravadas depois de `apos_id` (exclusivo), da mais
     antiga pra mais nova (ordem de exibição). Historico.id é o cursor — evita

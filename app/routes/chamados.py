@@ -139,12 +139,16 @@ def meus_chamados() -> Response:
             itens_por_pagina=itens_por_pagina,
         )
         chamados_em_copia = listar_chamados_como_observador(current_user.id)
+
+        from app.services.dashboard_service import obter_cursor_atualizacoes_dashboard
+
         return render_template(
             "meus_chamados.html",
             itens_por_pagina=itens_por_pagina,
             status_filtro=status_filtro,
             rl_codigo=rl_codigo,
             chamados_em_copia=chamados_em_copia,
+            cursor_inicial_atualizacoes=obter_cursor_atualizacoes_dashboard(current_user),
             **resultado,
         )
     except Exception as e:

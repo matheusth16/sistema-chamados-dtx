@@ -849,6 +849,31 @@
     "en": "Change status in bulk",
     "es": "Cambiar estado en lote"
   },
+  "dashboard_updates_available_title": {
+    "pt_BR": "Novas atualizações",
+    "en": "New updates",
+    "es": "Nuevas actualizaciones"
+  },
+  "dashboard_updates_available_body": {
+    "pt_BR": "Algum chamado desta lista foi alterado por outra pessoa. Atualize a página para ver as mudanças.",
+    "en": "A ticket in this list was changed by someone else. Refresh the page to see the changes.",
+    "es": "Un ticket de esta lista fue modificado por otra persona. Actualiza la página para ver los cambios."
+  },
+  "dashboard_updates_refresh_button": {
+    "pt_BR": "Atualizar",
+    "en": "Refresh",
+    "es": "Actualizar"
+  },
+  "ticket_updated_title": {
+    "pt_BR": "Chamado atualizado",
+    "en": "Ticket updated",
+    "es": "Ticket actualizado"
+  },
+  "ticket_updated_body": {
+    "pt_BR": "Alguém alterou o status, anexos ou outros dados deste chamado. Atualize a página para ver as mudanças.",
+    "en": "Someone changed the status, attachments, or other data on this ticket. Refresh the page to see the changes.",
+    "es": "Alguien cambió el estado, los adjuntos u otros datos de este ticket. Actualiza la página para ver los cambios."
+  },
   "area_sector": {
     "pt_BR": "Área/Setor",
     "en": "Area/Sector",

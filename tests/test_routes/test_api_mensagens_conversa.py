@@ -85,3 +85,26 @@ class TestMensagensNovasRota:
         r = client_logado_supervisor.get(f"/api/chamado/{chamado.id}/mensagens-novas")
         assert r.status_code == 200
         assert r.get_json()["mensagens"] == []
+
+    def test_resposta_inclui_tem_outras_atualizacoes_false_por_padrao(
+        self, client_logado_supervisor, db_session
+    ):
+        from tests.factories import make_chamado
+
+        chamado = make_chamado(area="Manutencao", responsavel_id=None)
+        r = client_logado_supervisor.get(f"/api/chamado/{chamado.id}/mensagens-novas")
+        assert r.status_code == 200
+        assert r.get_json()["tem_outras_atualizacoes"] is False
+
+    def test_alteracao_de_status_sinaliza_tem_outras_atualizacoes(
+        self, client_logado_supervisor, db_session
+    ):
+        from tests.factories import make_chamado
+
+        chamado = make_chamado(area="Manutencao", responsavel_id=None)
+        _msg(chamado.id, "alteracao_status")
+
+        r = client_logado_supervisor.get(f"/api/chamado/{chamado.id}/mensagens-novas")
+
+        assert r.status_code == 200
+        assert r.get_json()["tem_outras_atualizacoes"] is True

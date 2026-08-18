@@ -1,0 +1,48 @@
+{# Aviso de "novas atualizações" via polling leve (não recarrega sozinho) —
+   reaproveitado por dashboard.html (Gestão de Chamados) e meus_chamados.html
+   (solicitante), pedido do usuário 2026-08-18, generaliza o padrão da
+   Conversa do chamado. Ambas as páginas são 100% server-side em
+   paginação/filtros, então "atualizar" aqui é só um reload preservando a
+   querystring atual. Requer `cursor_inicial_atualizacoes` no contexto do
+   template que faz o include. #}
+<div id="dashboard-atualizacoes-banner" class="bento-action-box blue hidden" style="display:none;">
+    <p class="title">{{ t('dashboard_updates_available_title') }}</p>
+    <p>{{ t('dashboard_updates_available_body') }}</p>
+    <button type="button" id="dashboard-atualizacoes-refresh" class="bento-btn-block" style="background:var(--color-bento-info); color:#fff;">
+        {{ t('dashboard_updates_refresh_button') }}
+    </button>
+</div>
+<script nonce="{{ csp_nonce }}">
+(function() {
+    var cursor = {{ cursor_inicial_atualizacoes | default(0) | tojson }};
+    var banner = document.getElementById('dashboard-atualizacoes-banner');
+    var botaoAtualizar = document.getElementById('dashboard-atualizacoes-refresh');
+    var pollEmVoo = false;
+
+    if (botaoAtualizar) {
+        botaoAtualizar.addEventListener('click', function() { window.location.reload(); });
+    }
+
+    function poll() {
+        if (pollEmVoo || !banner) return;
+        pollEmVoo = true;
+        fetch('/api/dashboard/tem-atualizacoes?apos_id=' + cursor)
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.sucesso && data.tem_atualizacoes) {
+                    banner.style.display = '';
+                    banner.classList.remove('hidden');
+                }
+                pollEmVoo = false;
+            })
+            .catch(function() { pollEmVoo = false; });
+    }
+
+    setInterval(function() {
+        if (document.visibilityState === 'visible') poll();
+    }, 15000);
+    document.addEventListener('visibilitychange', function() {
+        if (document.visibilityState === 'visible') poll();
+    });
+})();
+</script>

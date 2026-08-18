@@ -75,6 +75,19 @@
             {{ t('back') if t else 'Voltar' }}
         </a>
     </div>
+
+    <!-- Aviso de "chamado atualizado" (item 2 do plano de tempo real):
+         reaproveita o polling da Conversa abaixo, só troca o que é exibido —
+         status/anexo/previsão/transferência não têm DOM próprio pra
+         atualizar ao vivo, então o gesto aqui é pedir reload. -->
+    <div id="chamado-atualizado-banner" class="bento-action-box blue hidden" style="display:none;">
+        <p class="title">{{ t('ticket_updated_title') }}</p>
+        <p>{{ t('ticket_updated_body') }}</p>
+        <button type="button" id="chamado-atualizado-refresh" class="bento-btn-block" style="background:var(--color-bento-info); color:#fff;">
+            {{ t('dashboard_updates_refresh_button') }}
+        </button>
+    </div>
+
     <script nonce="{{ csp_nonce }}">
         (function() {
             var btn = document.getElementById('btn-voltar-detalhes');
@@ -494,8 +507,13 @@
                     <script nonce="{{ csp_nonce }}">
                     (function() {
                         var CHAMADO_ID = {{ chamado.id | tojson }};
-                        var ultimoId = {{ (mensagens_conversa[-1].id if mensagens_conversa else 0) | tojson }};
+                        var ultimoId = {{ cursor_inicial_chamado | default(0) | tojson }};
                         var pollEmVoo = false;
+                        var bannerAtualizado = document.getElementById('chamado-atualizado-banner');
+                        var btnAtualizarChamado = document.getElementById('chamado-atualizado-refresh');
+                        if (btnAtualizarChamado) {
+                            btnAtualizarChamado.addEventListener('click', function() { window.location.reload(); });
+                        }
 
                         function criarLi(msg) {
                             var li = document.createElement('li');
@@ -563,6 +581,10 @@
                                             ultimoId = msg.id;
                                         });
                                         ol.scrollTop = ol.scrollHeight;
+                                    }
+                                    if (data.sucesso && data.tem_outras_atualizacoes && bannerAtualizado) {
+                                        bannerAtualizado.style.display = '';
+                                        bannerAtualizado.classList.remove('hidden');
                                     }
                                     pollEmVoo = false;
                                 })

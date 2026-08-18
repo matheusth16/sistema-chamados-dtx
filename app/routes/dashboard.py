@@ -268,10 +268,18 @@ def visualizar_detalhe_chamado(chamado_id: str) -> Response:
         ]
         mensagens_conversa.reverse()
 
+        # Cursor único do polling da tela de detalhe (Conversa + "chamado
+        # atualizado", ver api_mensagens_novas_chamado): maior Historico.id
+        # deste chamado no momento do render, não só o da última mensagem —
+        # senão uma mudança não-conversa já refletida na página (ex.: status)
+        # dispararia o aviso de "atualizado" na hora, à toa.
+        cursor_inicial_chamado = max((h.id or 0 for h in historico), default=0)
+
         return render_template(
             "visualizar_chamado.html",
             chamado=chamado,
             voltar_url=voltar_url,
+            cursor_inicial_chamado=cursor_inicial_chamado,
             pode_editar=flags["pode_editar"],
             pode_editar_descricao=flags["pode_editar_descricao"],
             nivel_congelamento=flags["nivel_congelamento"],
