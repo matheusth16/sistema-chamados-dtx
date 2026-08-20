@@ -229,9 +229,14 @@ def montar_flags_detalhe_chamado(usuario: Any, chamado: Any) -> dict:
     pode_editar_base = supervisor_pode_alterar_chamado(usuario, chamado.area, chamado)
     # Chamado Concluído (qualquer nível) bloqueia edição operacional no formulário
     pode_editar = pode_editar_base and nivel is None
-    # Descrição é texto do solicitante — só admin pode sobrescrever (ver
-    # edicao_chamado_service.py); supervisor nunca edita o que foi escrito.
-    pode_editar_descricao = pode_editar and usuario.is_admin_or_above
+    # Descrição é texto do solicitante — admin só pode sobrescrever no PRÓPRIO
+    # chamado (onde é o solicitante); em chamado alheio vira somente-leitura
+    # mesmo pra admin, igual a qualquer outro perfil — decisão de escopo
+    # 2026-08-20 (ver edicao_chamado_service.py pro gate espelhado na escrita).
+    # supervisor nunca edita o que o solicitante escreveu, em nenhum caso.
+    pode_editar_descricao = (
+        pode_editar and usuario.is_admin_or_above and chamado.solicitante_id == usuario.id
+    )
 
     eh_dono_do_chamado = chamado.solicitante_id == usuario.id and not getattr(
         usuario, "is_gestor_only", False

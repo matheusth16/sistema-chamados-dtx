@@ -2194,11 +2194,15 @@ def test_visualizar_chamado_supervisor_nao_mostra_descricao_editavel(
     assert b'id="modal-descricao"' not in r.data
 
 
-def test_visualizar_chamado_admin_mostra_descricao_editavel(client_logado_admin, db_session):
-    """Admin continua vendo a descrição como textarea editável (válvula de escape)."""
+def test_visualizar_chamado_admin_mostra_descricao_editavel_no_proprio_chamado(
+    client_logado_admin, db_session
+):
+    """Admin vê a descrição como textarea editável só no PRÓPRIO chamado (onde
+    é o solicitante) — decisão de escopo 2026-08-20. client_logado_admin tem
+    id 'admin_1' (ver tests/conftest.py)."""
     from tests.factories import make_chamado
 
-    chamado = make_chamado()
+    chamado = make_chamado(solicitante_id="admin_1")
     with (
         patch("app.routes.dashboard.usuario_pode_ver_chamado", return_value=True),
         patch("app.routes.dashboard.get_static_cached", return_value=[]),
@@ -2208,6 +2212,26 @@ def test_visualizar_chamado_admin_mostra_descricao_editavel(client_logado_admin,
         r = client_logado_admin.get(f"/chamado/{chamado.id}", follow_redirects=False)
     assert r.status_code == 200
     assert b'id="modal-descricao"' in r.data
+
+
+def test_visualizar_chamado_admin_ve_descricao_somente_leitura_em_chamado_alheio(
+    client_logado_admin, db_session
+):
+    """Admin visualizando chamado de outra pessoa vê a descrição somente-
+    leitura (mesma <div> traduzida de qualquer outro perfil) — a "válvula de
+    escape administrativa" só vale pro próprio chamado do admin."""
+    from tests.factories import make_chamado
+
+    chamado = make_chamado()  # solicitante_id default != "admin_1"
+    with (
+        patch("app.routes.dashboard.usuario_pode_ver_chamado", return_value=True),
+        patch("app.routes.dashboard.get_static_cached", return_value=[]),
+        patch("app.routes.dashboard.CategoriaSetor.get_all", return_value=[]),
+        patch("app.routes.dashboard.filtrar_supervisores_por_area", return_value=[]),
+    ):
+        r = client_logado_admin.get(f"/chamado/{chamado.id}", follow_redirects=False)
+    assert r.status_code == 200
+    assert b'id="modal-descricao"' not in r.data
 
 
 # ── Anexos do solicitante perto da Descrição (pedido do usuário, 2026-08-18) ──

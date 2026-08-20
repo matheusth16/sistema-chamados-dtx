@@ -462,6 +462,7 @@ def test_processar_edicao_nova_descricao_diferente_salva(app):
         patch("app.services.edicao_chamado_service.Chamado") as mock_chamado_cls,
     ):
         mock_chamado = _make_chamado_mock()
+        mock_chamado.solicitante_id = u.id
         mock_chamado_cls.get_by_id.return_value = mock_chamado
         result = processar_edicao_chamado(
             usuario_atual=u,
@@ -493,6 +494,7 @@ def test_processar_edicao_nova_descricao_com_caractere_especial_nao_fica_escapad
         patch("app.services.edicao_chamado_service.Chamado") as mock_chamado_cls,
     ):
         mock_chamado = _make_chamado_mock()
+        mock_chamado.solicitante_id = u.id
         mock_chamado_cls.get_by_id.return_value = mock_chamado
         processar_edicao_chamado(
             usuario_atual=u,
@@ -865,6 +867,7 @@ def test_processar_edicao_descricao_acima_de_3000_chars_e_truncada(app):
         patch("app.services.edicao_chamado_service.Chamado") as mock_chamado_cls,
     ):
         mock_chamado = _base_patches(mock_chamado_cls, data=_data_f25())
+        mock_chamado.solicitante_id = u.id
         result = processar_edicao_chamado(
             usuario_atual=u,
             chamado_id="ch_f25",
@@ -920,17 +923,20 @@ def test_supervisor_nao_pode_editar_descricao_do_solicitante(app):
     mock_chamado.atualizar_campos.assert_not_called()
 
 
-def test_admin_ainda_pode_editar_descricao_do_solicitante(app):
-    """Admin continua podendo editar a descrição (válvula de escape administrativa)."""
+def test_admin_pode_editar_descricao_do_proprio_chamado(app):
+    """Admin continua podendo editar a descrição — mas só do PRÓPRIO chamado
+    (onde é o solicitante). Decisão de escopo 2026-08-20: a "válvula de escape
+    administrativa" deixou de valer pra chamado alheio (ver teste abaixo)."""
     from app.services.edicao_chamado_service import processar_edicao_chamado
 
-    admin = _make_usuario(perfil="admin")
+    admin = _make_usuario(perfil="admin", uid="admin1")
 
     with (
         app.app_context(),
         patch("app.services.edicao_chamado_service.Chamado") as mock_chamado_cls,
     ):
-        mock_chamado = _base_patches(mock_chamado_cls)
+        mock_chamado = _base_patches(mock_chamado_cls, data=_default_data())
+        mock_chamado.solicitante_id = "admin1"
 
         result = processar_edicao_chamado(
             usuario_atual=admin,
@@ -947,6 +953,38 @@ def test_admin_ainda_pode_editar_descricao_do_solicitante(app):
     assert result["sucesso"] is True
     update_data = mock_chamado.atualizar_campos.call_args.kwargs
     assert update_data.get("descricao") == "Descrição corrigida pelo admin"
+
+
+def test_admin_nao_pode_editar_descricao_de_chamado_alheio(app):
+    """Admin tentando alterar a descrição de um chamado que NÃO é dele (não é
+    o solicitante) → 403, igual ao supervisor. A "válvula de escape
+    administrativa" só vale pro próprio chamado do admin."""
+    from app.services.edicao_chamado_service import processar_edicao_chamado
+
+    admin = _make_usuario(perfil="admin", uid="admin1")
+
+    with (
+        app.app_context(),
+        patch("app.services.edicao_chamado_service.Chamado") as mock_chamado_cls,
+    ):
+        mock_chamado = _base_patches(mock_chamado_cls, data=_default_data())
+        mock_chamado.solicitante_id = "outro_solicitante"
+
+        result = processar_edicao_chamado(
+            usuario_atual=admin,
+            chamado_id="ch1",
+            novo_status="",
+            motivo_cancelamento="",
+            nova_descricao="Descrição alterada por admin em chamado alheio",
+            novo_responsavel_id="",
+            novo_sla_str="",
+            arquivos_novos=[],
+            setores_adicionais_lista=[],
+        )
+
+    assert result["sucesso"] is False
+    assert result.get("codigo") == 403
+    mock_chamado.atualizar_campos.assert_not_called()
 
 
 def test_supervisor_pode_editar_outros_campos_sem_tocar_descricao(app):
@@ -994,6 +1032,7 @@ def test_processar_edicao_descricao_menor_que_3000_nao_e_alterada(app):
         patch("app.services.edicao_chamado_service.Chamado") as mock_chamado_cls,
     ):
         mock_chamado = _base_patches(mock_chamado_cls, data=_data_f25())
+        mock_chamado.solicitante_id = u.id
         result = processar_edicao_chamado(
             usuario_atual=u,
             chamado_id="ch_f25b",
@@ -1029,6 +1068,7 @@ def test_edicao_descricao_nao_altera_data_em_atendimento(app):
         patch("app.services.edicao_chamado_service.Chamado") as mock_chamado_cls,
     ):
         mock_chamado = _base_patches(mock_chamado_cls, data=_data_f25())
+        mock_chamado.solicitante_id = u.id
         result = processar_edicao_chamado(
             usuario_atual=u,
             chamado_id="ch_reg_1",

@@ -834,13 +834,27 @@ def test_montar_flags_supervisor_area_correta_pode_editar():
     assert flags["nivel_congelamento"] is None
 
 
-def test_montar_flags_admin_pode_editar_descricao():
+def test_montar_flags_admin_pode_editar_descricao_do_proprio_chamado():
+    """Admin só ganha a caixa editável de descrição no PRÓPRIO chamado (onde é
+    o solicitante) — decisão de escopo 2026-08-20: em chamado alheio, admin
+    vê a mesma <div> de leitura (traduzida) que qualquer outro perfil."""
     from app.services.permissoes_edicao_chamado import montar_flags_detalhe_chamado
 
-    usuario = _usuario_mock(perfil="admin", is_admin_or_above=True)
-    chamado = _chamado_mock()
+    usuario = _usuario_mock(perfil="admin", is_admin_or_above=True, id="id_sol")
+    chamado = _chamado_mock(solicitante_id="id_sol")
     flags = montar_flags_detalhe_chamado(usuario, chamado)
     assert flags["pode_editar_descricao"] is True
+
+
+def test_montar_flags_admin_nao_edita_descricao_de_chamado_alheio():
+    """Admin visualizando chamado de outra pessoa: descrição vira somente-
+    leitura, mesmo sendo admin — só o link 'ver original'/tradução aparece."""
+    from app.services.permissoes_edicao_chamado import montar_flags_detalhe_chamado
+
+    usuario = _usuario_mock(perfil="admin", is_admin_or_above=True, id="id_admin")
+    chamado = _chamado_mock(solicitante_id="id_sol")
+    flags = montar_flags_detalhe_chamado(usuario, chamado)
+    assert flags["pode_editar_descricao"] is False
 
 
 def test_montar_flags_chamado_concluido_bloqueia_edicao():

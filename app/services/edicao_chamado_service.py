@@ -159,10 +159,17 @@ def processar_edicao_chamado(
                 )
 
         # 3. Descrição — texto original do solicitante. Só admin/admin_global pode
-        # sobrescrever (válvula de escape administrativa); supervisor nunca altera
-        # o que o solicitante escreveu, só acompanha e escala.
+        # sobrescrever, e só no PRÓPRIO chamado (onde é o solicitante) — decisão
+        # de escopo 2026-08-20: em chamado alheio vira somente-leitura mesmo pra
+        # admin, igual a qualquer outro perfil (ver montar_flags_detalhe_chamado
+        # pro gate espelhado na exibição). Supervisor nunca altera o que o
+        # solicitante escreveu, em nenhum caso.
         if nova_descricao and nova_descricao.strip() != data_chamado.get("descricao", "").strip():
-            if not getattr(usuario_atual, "is_admin_or_above", False):
+            eh_admin_dono = (
+                getattr(usuario_atual, "is_admin_or_above", False)
+                and chamado_obj.solicitante_id == usuario_atual.id
+            )
+            if not eh_admin_dono:
                 return {
                     "sucesso": False,
                     "erro": _t("cannot_edit_solicitante_description"),
