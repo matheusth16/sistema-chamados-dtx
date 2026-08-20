@@ -8,7 +8,7 @@ cada supervisor e admin via Microsoft Graph API.
 
 import logging
 from collections import defaultdict
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from html import escape
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -23,7 +23,10 @@ from app.models import Chamado
 from app.models_historico import Historico
 from app.models_usuario import Usuario
 from app.services.analytics import _to_datetime, obter_sla_para_exibicao
-from app.services.gestor_escalonamento_service import construir_mapa_gestor_setor
+from app.services.gestor_escalonamento_service import (
+    construir_mapa_gestor_setor,
+    construir_mapa_niveis_superiores,
+)
 from app.services.notifications import (
     _base_url,
     _link_dashboard,
@@ -120,6 +123,55 @@ def buscar_chamados_abertos() -> list[dict[str, Any]]:
     return resultado
 
 
+def buscar_chamados_cancelados_semana() -> list[dict[str, Any]]:
+    """Retorna chamados com status Cancelado cuja data_cancelamento caiu nos
+    últimos 7 dias corridos.
+
+    Usado só no resumo dos níveis superiores de gestão (gerente_producao,
+    assistente_gm, gm) — visão executiva completa da semana, aberto E
+    cancelado. Supervisor, admin e gestor_setor continuam só com os chamados
+    abertos (fora de escopo do pedido).
+    """
+    resultado: list[dict[str, Any]] = []
+    corte = datetime.now(UTC) - timedelta(days=7)
+    try:
+        with db_module.SessionLocal() as session:
+            stmt = (
+                select(ChamadoRow)
+                .where(ChamadoRow.status == "Cancelado")
+                .where(ChamadoRow.data_cancelamento >= corte)
+                .limit(MAX_DOCS)
+            )
+            rows = session.execute(stmt).scalars().all()
+    except Exception as exc:
+        logger.exception("Erro ao buscar chamados cancelados da semana: %s", exc)
+        return resultado
+
+    for row in rows:
+        chamado = Chamado._from_row(row)
+        resultado.append(
+            {
+                "id": chamado.id,
+                "numero": chamado.numero_chamado or chamado.id,
+                "categoria": get_translated_category(chamado.categoria, "en")
+                if chamado.categoria
+                else "—",
+                "tipo": chamado.tipo_solicitacao or "—",
+                "area": chamado.area or "—",
+                "responsavel": chamado.responsavel or "—",
+                "responsavel_id": chamado.responsavel_id or "",
+                "solicitante": chamado.solicitante_nome or "—",
+                "status": chamado.status,
+                "data_abertura_fmt": _formatar_data(chamado.data_abertura),
+                "dias_aberto": _dias_aberto(chamado.data_abertura),
+                "sla_label": "",
+                "atrasado": False,
+                "sla_dias": chamado.sla_dias,
+            }
+        )
+    return resultado
+
+
 # ---------------------------------------------------------------------------
 # HTML helpers
 # ---------------------------------------------------------------------------
@@ -132,6 +184,7 @@ def _tabela_html(chamados: list[dict[str, Any]], link_base: str) -> str:
         "<th style='padding:8px 10px;text-align:left;font-size:12px;'>Ticket</th>"
         "<th style='padding:8px 10px;text-align:left;font-size:12px;'>Category</th>"
         "<th style='padding:8px 10px;text-align:left;font-size:12px;'>Type</th>"
+        "<th style='padding:8px 10px;text-align:left;font-size:12px;'>Assignee</th>"
         "<th style='padding:8px 10px;text-align:left;font-size:12px;'>Requester</th>"
         "<th style='padding:8px 10px;text-align:left;font-size:12px;'>Opened</th>"
         "<th style='padding:8px 10px;text-align:left;font-size:12px;'>Days</th>"
@@ -140,7 +193,7 @@ def _tabela_html(chamados: list[dict[str, Any]], link_base: str) -> str:
     )
     linhas = []
     for c in chamados:
-        if c["atrasado"]:
+        if c["atrasado"] or c.get("status") == "Cancelado":
             cor_sla = "#dc2626"
         elif c["sla_label"] == "Em risco":
             cor_sla = "#d97706"
@@ -162,6 +215,7 @@ def _tabela_html(chamados: list[dict[str, Any]], link_base: str) -> str:
             f'<td style="padding:6px 10px;border-bottom:1px solid #e5e7eb;font-size:12px;">{numero_html}</td>'
             f'<td style="padding:6px 10px;border-bottom:1px solid #e5e7eb;font-size:12px;">{escape(str(c["categoria"]))}</td>'
             f'<td style="padding:6px 10px;border-bottom:1px solid #e5e7eb;font-size:12px;">{escape(str(c["tipo"]))}</td>'
+            f'<td style="padding:6px 10px;border-bottom:1px solid #e5e7eb;font-size:12px;">{escape(str(c.get("responsavel") or "—"))}</td>'
             f'<td style="padding:6px 10px;border-bottom:1px solid #e5e7eb;font-size:12px;">{escape(str(c["solicitante"]))}</td>'
             f'<td style="padding:6px 10px;border-bottom:1px solid #e5e7eb;font-size:12px;">{escape(str(c["data_abertura_fmt"]))}</td>'
             f'<td style="padding:6px 10px;border-bottom:1px solid #e5e7eb;font-size:12px;">{c["dias_aberto"]}d</td>'
@@ -323,6 +377,7 @@ def enviar_relatorio_semanal() -> dict[str, Any]:
 
     _enviar_resumo_admins(chamados, grupos, supervisores_map, data_ref, link_dash, link_base)
     _enviar_resumo_gestores_area(chamados, data_ref, link_dash, link_base)
+    _enviar_resumo_niveis_superiores(chamados, data_ref, link_base)
 
     return {
         "enviados": enviados,
@@ -472,6 +527,156 @@ def _enviar_resumo_gestores_area(
         else:
             logger.warning(
                 "Falha ao enviar relatório de área para gestor_setor %s: %s", email_gestor, err
+            )
+
+
+NIVEL_LABEL_EN = {
+    "gerente_producao": "Production Manager",
+    "assistente_gm": "Assistant GM",
+    "gm": "GM",
+}
+
+
+def _cards_resumo_html(
+    total: int,
+    atrasados: int,
+    num_setores: int,
+    setor_critico: str | None,
+    cancelados: int = 0,
+) -> str:
+    """Tira estatística (cartões) usada no topo do resumo pros níveis
+    superiores: total aberto, total atrasado, nº de setores, setor com mais
+    chamados atrasados e cancelados na semana."""
+
+    def _card(valor: str, rotulo: str, bg: str, cor_valor: str) -> str:
+        return (
+            f'<td style="background:{bg};border-radius:8px;padding:14px 10px;text-align:center;">'
+            f'<div style="font-size:22px;font-weight:700;color:{cor_valor};line-height:1.2;">{valor}</div>'
+            f'<div style="font-size:11px;color:#6b7280;margin-top:2px;">{rotulo}</div>'
+            "</td>"
+        )
+
+    return (
+        '<table style="width:100%;border-collapse:separate;border-spacing:8px 0;margin:16px 0 8px;">'
+        "<tr>"
+        + _card(str(total), "Total open", "#f3f4f6", "#111827")
+        + _card(str(atrasados), "Overdue", "#fef2f2", "#dc2626")
+        + _card(str(cancelados), "Cancelled", "#fef2f2", "#dc2626")
+        + _card(str(num_setores), "Sectors", "#f3f4f6", "#111827")
+        + _card(
+            escape(setor_critico) if setor_critico else "—", "Most critical", "#fffbeb", "#d97706"
+        )
+        + "</tr></table>"
+    )
+
+
+def _enviar_resumo_niveis_superiores(
+    chamados: list[dict[str, Any]],
+    data_ref: str,
+    link_base: str,
+) -> None:
+    """Envia resumo consolidado de todas as áreas, quebrado por setor no mesmo
+    e-mail, para cada nivel_gestao company-wide (gerente_producao, assistente_gm,
+    gm). Reusa a mesma fonte de verdade de e-mails de gestor
+    (`gestor_escalonamento_service.construir_mapa_niveis_superiores`) já usada
+    pela escalação de SLA, em vez de duplicar essa lógica. Sem ninguém cadastrado
+    num nível, não envia nada pra esse nível.
+    """
+    mapa_niveis = construir_mapa_niveis_superiores()
+    if not mapa_niveis:
+        return
+
+    por_area: dict[str, list] = defaultdict(list)
+    for c in chamados:
+        por_area[c.get("area") or ""].append(c)
+
+    areas_ordenadas = sorted(
+        por_area.items(),
+        key=lambda item: get_translated_sector(item[0], "en") if item[0] else item[0],
+    )
+
+    secoes = ""
+    total_atrasados = 0
+    setor_critico = None
+    max_atrasados_setor = 0
+    for area, lista in areas_ordenadas:
+        area_en = get_translated_sector(area, "en") if area else "No sector"
+        atrasados_area = sum(1 for c in lista if c["atrasado"])
+        total_atrasados += atrasados_area
+        if atrasados_area > max_atrasados_setor:
+            max_atrasados_setor = atrasados_area
+            setor_critico = area_en
+        secoes += (
+            '<div style="background:#111827;color:white;padding:8px 12px;'
+            'border-radius:6px 6px 0 0;margin-top:24px;font-size:13px;">'
+            f"<strong>{escape(area_en)}</strong> — {len(lista)} open"
+            + (
+                f' &nbsp;·&nbsp; <span style="color:#fca5a5;">{atrasados_area} overdue</span>'
+                if atrasados_area
+                else ""
+            )
+            + "</div>"
+            + _tabela_html(lista, link_base)
+        )
+
+    cancelados = buscar_chamados_cancelados_semana()
+    secao_cancelados = ""
+    if cancelados:
+        secao_cancelados = (
+            '<div style="background:#dc2626;color:white;padding:8px 12px;'
+            'border-radius:6px 6px 0 0;margin-top:24px;font-size:13px;">'
+            f"<strong>Cancelled this week</strong> — {len(cancelados)}"
+            "</div>" + _tabela_html(cancelados, link_base)
+        )
+
+    cards = _cards_resumo_html(
+        len(chamados), total_atrasados, len(por_area), setor_critico, len(cancelados)
+    )
+
+    # /admin exige perfil supervisor/admin/admin_global (@requer_supervisor_area) —
+    # um gerente_producao/assistente_gm/gm "puro" não tem acesso lá. O painel
+    # gerencial (@requer_gestor_ou_admin) é a rota que eles realmente enxergam.
+    link_gestor_dashboard = f"{link_base}/gestor/dashboard" if link_base else ""
+    btn = (
+        f'<a href="{link_gestor_dashboard}" style="background:#2563eb;color:white;padding:10px 20px;'
+        f'text-decoration:none;border-radius:6px;display:inline-block;margin-top:20px;">Open dashboard</a>'
+        if link_gestor_dashboard
+        else ""
+    )
+
+    assunto = f"Weekly report — All sectors — {data_ref}"
+
+    for nivel, email_gestor in mapa_niveis.items():
+        usuario_gestor = Usuario.get_by_email(email_gestor)
+        nome = getattr(usuario_gestor, "nome", None) or email_gestor
+        label = NIVEL_LABEL_EN.get(nivel, "Manager")
+
+        html = (
+            '<div style="font-family:Arial,sans-serif;max-width:760px;">'
+            '<div style="border-left:4px solid #2563eb;padding-left:12px;">'
+            '<h2 style="color:#111827;margin:0;">Weekly Report — All Sectors</h2>'
+            f'<p style="color:#6b7280;margin:4px 0 0;font-size:13px;">{data_ref}</p>'
+            "</div>"
+            f'<p style="margin-top:16px;">Hello, <strong>{escape(nome)}</strong> ({label}).</p>'
+            f"{cards}"
+            f"{secoes}{secao_cancelados}{btn}"
+            '<p style="margin-top:24px;color:#9ca3af;font-size:11px;"><em>Andon</em></p>'
+            "</div>"
+        )
+
+        ok, err = enviar_email(email_gestor, assunto, html, importance="low")
+        if ok:
+            logger.info(
+                "Relatório semanal (todas as áreas) enviado para %s (%s)",
+                nivel,
+                email_gestor,
+            )
+        else:
+            logger.warning(
+                "Falha ao enviar relatório de todas as áreas para %s (%s): %s",
+                nivel,
+                email_gestor,
+                err,
             )
 
 

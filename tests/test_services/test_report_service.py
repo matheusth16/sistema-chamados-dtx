@@ -123,6 +123,53 @@ def test_alerta_24h_grava_historico():
     assert alertas[0].usuario_id == "sistema"
 
 
+# ── _tabela_html ─────────────────────────────────────────────────────────────
+
+
+def test_tabela_html_mostra_responsavel_do_chamado():
+    """Achado no preview manual (2026-08-20): a tabela mostrava o Requester
+    (solicitante) mas não quem estava responsável pelo chamado — em relatórios
+    que cruzam vários responsáveis (gestor de área, níveis superiores), sem essa
+    coluna não dá pra saber quem está tratando cada ticket."""
+    from app.services.report_service import _tabela_html
+
+    chamado = {
+        "id": "c1",
+        "numero": "CH-001",
+        "categoria": "Projects",
+        "tipo": "Manutenção",
+        "responsavel": "Heraldo Andrade",
+        "solicitante": "Bruna Eloy",
+        "status": "Aberto",
+        "data_abertura_fmt": "01/01/2026",
+        "dias_aberto": 5,
+        "sla_label": "Ok",
+        "atrasado": False,
+        "sla_dias": 3,
+    }
+
+    html = _tabela_html([chamado], "")
+
+    assert "Assignee" in html
+    assert "Heraldo Andrade" in html
+
+
+# ── _cards_resumo_html ───────────────────────────────────────────────────────
+
+
+def test_cards_resumo_html_mostra_cancelados():
+    """O card de resumo do topo (níveis superiores) deve trazer também a
+    contagem de cancelados da semana, ao lado de total/atrasados/setores."""
+    from app.services.report_service import _cards_resumo_html
+
+    html = _cards_resumo_html(
+        total=10, atrasados=3, num_setores=2, setor_critico="IT", cancelados=4
+    )
+
+    assert ">4<" in html
+    assert "Cancelled" in html
+
+
 # ── buscar_chamados_abertos ───────────────────────────────────────────────────
 
 
@@ -442,6 +489,317 @@ def test_enviar_relatorio_semanal_nao_envia_gestor_area_sem_mapeamento(app):
         patch("app.services.report_service.Usuario.get_by_ids", return_value={"sup1": supervisor}),
         patch("app.services.report_service.Usuario.get_all", return_value=[]),
         patch("app.services.report_service.construir_mapa_gestor_setor", return_value={}),
+        patch("app.services.report_service.enviar_email", return_value=(True, None)) as mock_send,
+    ):
+        enviar_relatorio_semanal()
+
+    destinos = [call[0][0] for call in mock_send.call_args_list]
+    assert destinos == ["sup@test.com"]
+
+
+def test_enviar_relatorio_semanal_envia_para_niveis_superiores(app):
+    """Gerente de Produção, Assistente de GM e GM (nivel_gestao company-wide)
+    devem receber um resumo consolidado de todas as áreas, quebrado por setor
+    no mesmo e-mail — diferente do gestor_setor, que só vê a própria área."""
+    from app.services.report_service import enviar_relatorio_semanal
+
+    chamados = [
+        {
+            "id": "c1",
+            "numero": "CH-001",
+            "categoria": "Projetos",
+            "tipo": "Manutenção",
+            "area": "Manutenção",
+            "responsavel": "Supervisor",
+            "responsavel_id": "sup1",
+            "solicitante": "Solicitante",
+            "status": "Aberto",
+            "data_abertura_fmt": "01/01/2026",
+            "dias_aberto": 5,
+            "sla_label": "Ok",
+            "atrasado": False,
+            "sla_dias": 3,
+            "alerta_prazo_24h_enviado_em": None,
+        },
+        {
+            "id": "c2",
+            "numero": "CH-002",
+            "categoria": "TI",
+            "tipo": "Suporte",
+            "area": "TI",
+            "responsavel": "Supervisor",
+            "responsavel_id": "sup1",
+            "solicitante": "Solicitante",
+            "status": "Aberto",
+            "data_abertura_fmt": "01/01/2026",
+            "dias_aberto": 2,
+            "sla_label": "Atrasado",
+            "atrasado": True,
+            "sla_dias": 3,
+            "alerta_prazo_24h_enviado_em": None,
+        },
+    ]
+    supervisor = _make_usuario("sup@test.com", "Supervisor", "supervisor")
+
+    with (
+        app.app_context(),
+        patch("app.services.report_service.buscar_chamados_abertos", return_value=chamados),
+        patch("app.services.report_service.Usuario.get_by_ids", return_value={"sup1": supervisor}),
+        patch("app.services.report_service.Usuario.get_all", return_value=[]),
+        patch("app.services.report_service.construir_mapa_gestor_setor", return_value={}),
+        patch(
+            "app.services.report_service.construir_mapa_niveis_superiores",
+            return_value={
+                "gerente_producao": "geprod@dtx.aero",
+                "gm": "gm@dtx.aero",
+            },
+        ),
+        patch("app.services.report_service.enviar_email", return_value=(True, None)) as mock_send,
+    ):
+        resultado = enviar_relatorio_semanal()
+
+    assert resultado["enviados"] == 1  # só conta supervisores; níveis superiores são à parte
+    destinos = [call[0][0] for call in mock_send.call_args_list]
+    assert "geprod@dtx.aero" in destinos
+    assert "gm@dtx.aero" in destinos
+
+    # e-mail dos níveis superiores deve trazer as duas áreas no mesmo corpo
+    for call in mock_send.call_args_list:
+        if call[0][0] in ("geprod@dtx.aero", "gm@dtx.aero"):
+            html_corpo = call[0][2]
+            assert "Manut" in html_corpo
+            assert "IT" in html_corpo or "TI" in html_corpo
+
+
+def test_niveis_superiores_email_tem_saudacao_e_resumo_estatistico(app):
+    """O e-mail dos níveis superiores deve saudar o destinatário pelo nome
+    (como o do supervisor já faz) e trazer um resumo estatístico no topo:
+    total aberto, total atrasado, nº de setores e o setor mais crítico."""
+    from app.services.report_service import enviar_relatorio_semanal
+
+    chamados = [
+        {
+            "id": "c1",
+            "numero": "CH-001",
+            "categoria": "Projetos",
+            "tipo": "Manutenção",
+            "area": "Manutenção",
+            "responsavel": "Supervisor",
+            "responsavel_id": "sup1",
+            "solicitante": "Solicitante",
+            "status": "Aberto",
+            "data_abertura_fmt": "01/01/2026",
+            "dias_aberto": 5,
+            "sla_label": "Ok",
+            "atrasado": False,
+            "sla_dias": 3,
+            "alerta_prazo_24h_enviado_em": None,
+        },
+        {
+            "id": "c2",
+            "numero": "CH-002",
+            "categoria": "TI",
+            "tipo": "Suporte",
+            "area": "TI",
+            "responsavel": "Supervisor",
+            "responsavel_id": "sup1",
+            "solicitante": "Solicitante",
+            "status": "Aberto",
+            "data_abertura_fmt": "01/01/2026",
+            "dias_aberto": 2,
+            "sla_label": "Atrasado",
+            "atrasado": True,
+            "sla_dias": 3,
+            "alerta_prazo_24h_enviado_em": None,
+        },
+    ]
+    supervisor = _make_usuario("sup@test.com", "Supervisor", "supervisor")
+    gm = _make_usuario("gm@dtx.aero", "Ana Torres", "supervisor")
+
+    with (
+        app.app_context(),
+        patch("app.services.report_service.buscar_chamados_abertos", return_value=chamados),
+        patch("app.services.report_service.Usuario.get_by_ids", return_value={"sup1": supervisor}),
+        patch("app.services.report_service.Usuario.get_all", return_value=[]),
+        patch("app.services.report_service.construir_mapa_gestor_setor", return_value={}),
+        patch(
+            "app.services.report_service.construir_mapa_niveis_superiores",
+            return_value={"gm": "gm@dtx.aero"},
+        ),
+        patch("app.services.report_service.Usuario.get_by_email", return_value=gm),
+        patch("app.services.report_service.enviar_email", return_value=(True, None)) as mock_send,
+    ):
+        enviar_relatorio_semanal()
+
+    chamada_gm = next(c for c in mock_send.call_args_list if c[0][0] == "gm@dtx.aero")
+    html_corpo = chamada_gm[0][2]
+    assert "Ana Torres" in html_corpo
+    assert "GM" in html_corpo
+    assert ">2<" in html_corpo  # total aberto
+    assert ">1<" in html_corpo  # total atrasado
+    assert ">2<" in html_corpo  # nº de setores (Manutenção + TI)
+
+
+def test_niveis_superiores_email_linka_para_gestor_dashboard_nao_admin(app):
+    """Achado: o botão do e-mail apontava pra /admin — rota que exige
+    perfil supervisor/admin/admin_global (@requer_supervisor_area). Um
+    gerente_producao/assistente_gm/gm "puro" (sem perfil operacional) não tem
+    acesso lá, só em /gestor/dashboard (@requer_gestor_ou_admin). O botão deve
+    apontar pra /gestor/dashboard nesse e-mail."""
+    from app.services.report_service import enviar_relatorio_semanal
+
+    chamados = [
+        {
+            "id": "c1",
+            "numero": "CH-001",
+            "categoria": "Projetos",
+            "tipo": "Manutenção",
+            "area": "Manutenção",
+            "responsavel": "Supervisor",
+            "responsavel_id": "sup1",
+            "solicitante": "Solicitante",
+            "status": "Aberto",
+            "data_abertura_fmt": "01/01/2026",
+            "dias_aberto": 5,
+            "sla_label": "Ok",
+            "atrasado": False,
+            "sla_dias": 3,
+            "alerta_prazo_24h_enviado_em": None,
+        }
+    ]
+    supervisor = _make_usuario("sup@test.com", "Supervisor", "supervisor")
+
+    with (
+        app.app_context(),
+        patch("app.services.report_service.buscar_chamados_abertos", return_value=chamados),
+        patch("app.services.report_service.Usuario.get_by_ids", return_value={"sup1": supervisor}),
+        patch("app.services.report_service.Usuario.get_all", return_value=[]),
+        patch("app.services.report_service.construir_mapa_gestor_setor", return_value={}),
+        patch(
+            "app.services.report_service.construir_mapa_niveis_superiores",
+            return_value={"gm": "gm@dtx.aero"},
+        ),
+        patch(
+            "app.services.report_service._base_url",
+            return_value="http://10.20.0.199:8080",
+        ),
+        patch("app.services.report_service.enviar_email", return_value=(True, None)) as mock_send,
+    ):
+        enviar_relatorio_semanal()
+
+    chamada_gm = next(c for c in mock_send.call_args_list if c[0][0] == "gm@dtx.aero")
+    html_corpo = chamada_gm[0][2]
+    assert "/gestor/dashboard" in html_corpo
+    assert "/admin" not in html_corpo
+
+
+def test_niveis_superiores_email_inclui_cancelados_da_semana(app):
+    """Chamados cancelados na semana devem aparecer no resumo dos níveis
+    superiores (visão executiva completa aberto+cancelado) — pedido do
+    usuário, 2026-08-20. Não deve vazar pro e-mail do supervisor, que continua
+    só com os chamados abertos dele."""
+    from app.services.report_service import enviar_relatorio_semanal
+
+    chamados = [
+        {
+            "id": "c1",
+            "numero": "CH-001",
+            "categoria": "Projetos",
+            "tipo": "Manutenção",
+            "area": "Manutenção",
+            "responsavel": "Supervisor",
+            "responsavel_id": "sup1",
+            "solicitante": "Solicitante",
+            "status": "Aberto",
+            "data_abertura_fmt": "01/01/2026",
+            "dias_aberto": 5,
+            "sla_label": "Ok",
+            "atrasado": False,
+            "sla_dias": 3,
+            "alerta_prazo_24h_enviado_em": None,
+        }
+    ]
+    cancelado = {
+        "id": "c9",
+        "numero": "CH-009",
+        "categoria": "TI",
+        "tipo": "Suporte",
+        "area": "TI",
+        "responsavel": "Supervisor",
+        "responsavel_id": "sup1",
+        "solicitante": "Solicitante",
+        "status": "Cancelado",
+        "data_abertura_fmt": "01/01/2026",
+        "dias_aberto": 3,
+        "sla_label": "",
+        "atrasado": False,
+        "sla_dias": None,
+    }
+    supervisor = _make_usuario("sup@test.com", "Supervisor", "supervisor")
+
+    with (
+        app.app_context(),
+        patch("app.services.report_service.buscar_chamados_abertos", return_value=chamados),
+        patch(
+            "app.services.report_service.buscar_chamados_cancelados_semana",
+            return_value=[cancelado],
+        ),
+        patch("app.services.report_service.Usuario.get_by_ids", return_value={"sup1": supervisor}),
+        patch("app.services.report_service.Usuario.get_all", return_value=[]),
+        patch("app.services.report_service.construir_mapa_gestor_setor", return_value={}),
+        patch(
+            "app.services.report_service.construir_mapa_niveis_superiores",
+            return_value={"gm": "gm@dtx.aero"},
+        ),
+        patch("app.services.report_service.enviar_email", return_value=(True, None)) as mock_send,
+    ):
+        enviar_relatorio_semanal()
+
+    chamada_gm = next(c for c in mock_send.call_args_list if c[0][0] == "gm@dtx.aero")
+    html_gm = chamada_gm[0][2]
+    assert "CH-009" in html_gm
+    # "Cancelled" tem que aparecer no cartão de resumo lá em cima, na seção
+    # com a tabela e no badge da linha — não só nos últimos dois.
+    assert html_gm.count("Cancelled") >= 3
+
+    chamada_sup = next(c for c in mock_send.call_args_list if c[0][0] == "sup@test.com")
+    html_sup = chamada_sup[0][2]
+    assert "CH-009" not in html_sup
+
+
+def test_enviar_relatorio_semanal_nao_envia_niveis_superiores_sem_mapeamento(app):
+    """Sem ninguém com nivel_gestao company-wide cadastrado, não deve tentar
+    enviar nem gerar erro."""
+    from app.services.report_service import enviar_relatorio_semanal
+
+    chamados = [
+        {
+            "id": "c1",
+            "numero": "CH-001",
+            "categoria": "Projetos",
+            "tipo": "Manutenção",
+            "area": "Manutenção",
+            "responsavel": "Supervisor",
+            "responsavel_id": "sup1",
+            "solicitante": "Solicitante",
+            "status": "Aberto",
+            "data_abertura_fmt": "01/01/2026",
+            "dias_aberto": 5,
+            "sla_label": "Ok",
+            "atrasado": False,
+            "sla_dias": 3,
+            "alerta_prazo_24h_enviado_em": None,
+        }
+    ]
+    supervisor = _make_usuario("sup@test.com", "Supervisor", "supervisor")
+
+    with (
+        app.app_context(),
+        patch("app.services.report_service.buscar_chamados_abertos", return_value=chamados),
+        patch("app.services.report_service.Usuario.get_by_ids", return_value={"sup1": supervisor}),
+        patch("app.services.report_service.Usuario.get_all", return_value=[]),
+        patch("app.services.report_service.construir_mapa_gestor_setor", return_value={}),
+        patch("app.services.report_service.construir_mapa_niveis_superiores", return_value={}),
         patch("app.services.report_service.enviar_email", return_value=(True, None)) as mock_send,
     ):
         enviar_relatorio_semanal()
