@@ -198,12 +198,20 @@ def obter_contexto_gestor_dashboard(
     atrasados = [c for c in todos if _is_atrasado(c, _agora)]
     abertos_sem_resp = [c for c in todos if _is_aberto_sem_resposta(c, _agora)]
     multi_travados = [c for c in todos if _is_multi_setor_travado(c)]
+    cancelados = [c for c in todos if getattr(c, "status", None) == "Cancelado"]
 
     ids_atrasados = {id(c) for c in atrasados}
     ids_sem_resp = {id(c) for c in abertos_sem_resp}
     ids_multi = {id(c) for c in multi_travados}
     ids_com_risco = ids_atrasados | ids_sem_resp | ids_multi
-    em_dia = [c for c in todos if id(c) not in ids_com_risco]
+    # Chamados finalizados (Concluído/Cancelado) nunca entram na raia "Em dia"
+    # — bug real achado 2026-08-20: só os 3 buckets de risco acima excluíam
+    # finalizados explicitamente, então um Cancelado que não caísse em nenhum
+    # deles vazava pra "Em dia" (que deveria significar "saudável, em
+    # andamento", não "cancelado"). insights/saude_percentual continuam
+    # olhando pra `todos` sem esse filtro — escopo intencionalmente separado.
+    ids_finalizados = {id(c) for c in todos if getattr(c, "status", None) in _STATUS_FINALIZADOS}
+    em_dia = [c for c in todos if id(c) not in ids_com_risco and id(c) not in ids_finalizados]
     for c in todos:
         _marcar_riscos(c, ids_atrasados, ids_sem_resp, ids_multi)
 
@@ -213,6 +221,7 @@ def obter_contexto_gestor_dashboard(
         "aberto_sem_resposta": len(abertos_sem_resp),
         "multi_setor_travado": len(multi_travados),
         "em_dia": len(em_dia),
+        "cancelados": len(cancelados),
     }
 
     filtro_norm = (filtro or "").strip().lower()
@@ -224,6 +233,8 @@ def obter_contexto_gestor_dashboard(
         lista = multi_travados
     elif filtro_norm == "em_dia":
         lista = em_dia
+    elif filtro_norm == "cancelados":
+        lista = cancelados
     else:
         lista = todos
 
@@ -257,6 +268,13 @@ def obter_contexto_gestor_dashboard(
             "cor": "ok",
             "total": len(em_dia),
             "chamados": em_dia[:_LIMITE_POR_RAIA],
+        },
+        {
+            "chave": "cancelados",
+            "titulo": "gestor_lane_cancelados",
+            "cor": "cancelado",
+            "total": len(cancelados),
+            "chamados": cancelados[:_LIMITE_POR_RAIA],
         },
     ]
 

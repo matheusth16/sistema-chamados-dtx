@@ -3809,6 +3809,11 @@
     "en": "On track",
     "es": "Al día"
   },
+  "gestor_lane_cancelados": {
+    "pt_BR": "Cancelados",
+    "en": "Cancelled",
+    "es": "Cancelados"
+  },
   "index_building_title": {
     "pt_BR": "Índice do banco em construção",
     "en": "Database index under construction",

@@ -622,7 +622,7 @@ def test_chamado_pode_acumular_multiplos_riscos():
 # ---------------------------------------------------------------------------
 
 
-def test_grupos_contem_as_quatro_raias_com_totais_corretos():
+def test_grupos_contem_as_cinco_raias_com_totais_corretos():
     atrasado = _make_chamado_atrasado()
     aberto_antigo = _make_chamado_aberto_antigo()
     multi = _make_chamado_multi_travado()
@@ -633,12 +633,13 @@ def test_grupos_contem_as_quatro_raias_com_totais_corretos():
         ctx = obter_contexto_gestor_dashboard(agora=_AGORA_FIXED)
 
     chaves = {g["chave"] for g in ctx["grupos"]}
-    assert chaves == {"atrasados", "aberto_sem_resposta", "multi_setor", "em_dia"}
+    assert chaves == {"atrasados", "aberto_sem_resposta", "multi_setor", "em_dia", "cancelados"}
     por_chave = {g["chave"]: g for g in ctx["grupos"]}
     assert por_chave["atrasados"]["total"] == 1
     assert por_chave["aberto_sem_resposta"]["total"] == 1
     assert por_chave["multi_setor"]["total"] == 1
     assert por_chave["em_dia"]["total"] == 0
+    assert por_chave["cancelados"]["total"] == 0
 
 
 def test_grupos_limita_chamados_por_raia():
@@ -665,7 +666,7 @@ def test_grupos_contem_raia_em_dia_com_chamado_sem_risco():
         ctx = obter_contexto_gestor_dashboard(agora=_AGORA_FIXED)
 
     chaves = {g["chave"] for g in ctx["grupos"]}
-    assert chaves == {"atrasados", "aberto_sem_resposta", "multi_setor", "em_dia"}
+    assert chaves == {"atrasados", "aberto_sem_resposta", "multi_setor", "em_dia", "cancelados"}
     por_chave = {g["chave"]: g for g in ctx["grupos"]}
     assert por_chave["em_dia"]["total"] == 1
     assert por_chave["em_dia"]["chamados"] == [saudavel]
@@ -682,6 +683,112 @@ def test_grupos_em_dia_filtra_chamados_com_risco():
 
     por_chave = {g["chave"]: g for g in ctx["grupos"]}
     assert por_chave["em_dia"]["total"] == 0
+
+
+def _make_chamado_cancelado():
+    c = MagicMock()
+    c.status = "Cancelado"
+    c.is_atrasado = False
+    c.data_abertura = datetime(2024, 6, 3, 9, 0)
+    c.participantes = []
+    return c
+
+
+def test_grupos_contem_raia_cancelados():
+    """Pedido do usuário 2026-08-20: painel gerencial precisa de uma raia
+    própria pra chamados cancelados, igual ao e-mail semanal."""
+    cancelado = _make_chamado_cancelado()
+    with patch(
+        "app.services.gestor_dashboard_service._carregar_todos_chamados",
+        return_value=[cancelado],
+    ):
+        ctx = obter_contexto_gestor_dashboard(agora=_AGORA_FIXED)
+
+    por_chave = {g["chave"]: g for g in ctx["grupos"]}
+    assert por_chave["cancelados"]["total"] == 1
+    assert por_chave["cancelados"]["chamados"] == [cancelado]
+    assert ctx["contadores"]["cancelados"] == 1
+
+
+def test_obter_contexto_filtro_cancelados_retorna_apenas_cancelados():
+    cancelado = _make_chamado_cancelado()
+    saudavel = _make_chamado_saudavel()
+    with patch(
+        "app.services.gestor_dashboard_service._carregar_todos_chamados",
+        return_value=[cancelado, saudavel],
+    ):
+        ctx = obter_contexto_gestor_dashboard(filtro="cancelados", agora=_AGORA_FIXED)
+
+    assert ctx["filtro_ativo"] == "cancelados"
+    assert ctx["chamados"] == [cancelado]
+
+
+def test_cancelado_nao_vaza_para_raia_em_dia():
+    """Bug real achado 2026-08-20: _carregar_todos_chamados() não filtra
+    status nenhum, e só as raias de risco (atrasado/sem_resposta/multi_setor)
+    excluíam explicitamente chamados finalizados — um Cancelado que não caísse
+    em nenhuma delas ia parar direto na raia 'Em dia', que deveria significar
+    'saudável, em andamento', não 'cancelado'."""
+    cancelado = _make_chamado_cancelado()
+    with patch(
+        "app.services.gestor_dashboard_service._carregar_todos_chamados",
+        return_value=[cancelado],
+    ):
+        ctx = obter_contexto_gestor_dashboard(agora=_AGORA_FIXED)
+
+    por_chave = {g["chave"]: g for g in ctx["grupos"]}
+    assert por_chave["em_dia"]["total"] == 0
+    assert cancelado not in por_chave["em_dia"]["chamados"]
+
+
+def test_concluido_nao_vaza_para_raia_em_dia():
+    """Mesmo bug, mas pra Concluído — também é status finalizado."""
+    c = MagicMock()
+    c.status = "Concluído"
+    c.is_atrasado = False
+    c.data_abertura = datetime(2024, 6, 3, 9, 0)
+    c.participantes = []
+    with patch(
+        "app.services.gestor_dashboard_service._carregar_todos_chamados",
+        return_value=[c],
+    ):
+        ctx = obter_contexto_gestor_dashboard(agora=_AGORA_FIXED)
+
+    por_chave = {g["chave"]: g for g in ctx["grupos"]}
+    assert por_chave["em_dia"]["total"] == 0
+
+
+def test_cancelado_recebe_riscos_vazio_para_o_template():
+    """chamado.riscos precisa existir mesmo pros cancelados (usado pelo macro
+    risk_card no template) — não deve estourar AttributeError."""
+    cancelado = _make_chamado_cancelado()
+    with patch(
+        "app.services.gestor_dashboard_service._carregar_todos_chamados",
+        return_value=[cancelado],
+    ):
+        ctx = obter_contexto_gestor_dashboard(agora=_AGORA_FIXED)
+
+    por_chave = {g["chave"]: g for g in ctx["grupos"]}
+    assert por_chave["cancelados"]["chamados"][0].riscos == []
+
+
+def test_saude_percentual_continua_contando_concluido_e_cancelado():
+    """A saúde operacional (insights.saude_percentual) NÃO muda de escopo com
+    esse fix — continua olhando pra `todos` (todo o carregado), só a raia
+    visual 'Em dia' passou a excluir finalizados. Regressão de guarda pro
+    comportamento já testado em test_insights_saude_percentual_reflete_proporcao_em_risco."""
+    atrasado = _make_chamado_atrasado()
+    ok1 = MagicMock(status="Concluído", is_atrasado=False, participantes=[])
+    ok2 = MagicMock(status="Concluído", is_atrasado=False, participantes=[])
+    ok3 = MagicMock(status="Concluído", is_atrasado=False, participantes=[])
+    with patch(
+        "app.services.gestor_dashboard_service._carregar_todos_chamados",
+        return_value=[atrasado, ok1, ok2, ok3],
+    ):
+        ctx = obter_contexto_gestor_dashboard(agora=_AGORA_FIXED)
+
+    assert ctx["insights"]["saude_percentual"] == 75
+    assert ctx["contadores"]["total"] == 4
 
 
 def test_obter_contexto_filtro_em_dia_retorna_apenas_saudaveis():

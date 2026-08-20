@@ -712,6 +712,7 @@ dialog.bento-modal textarea:focus{ outline:none; border-color:var(--color-dtx-50
 .bento-triage-lane.warn .bento-triage-lane-dot{ background:var(--color-bento-warning-icon); }
 .bento-triage-lane.purple .bento-triage-lane-dot{ background:#9333ea; }
 .bento-triage-lane.ok .bento-triage-lane-dot{ background:var(--color-bento-success-deep); }
+.bento-triage-lane.cancelado .bento-triage-lane-dot{ background:#9f1239; }
 .bento-triage-lane-count{ font-size:11px; font-weight:800; color:var(--color-surface-muted); background:var(--color-surface-canvas); padding:2px 9px; border-radius:99px; }
 .bento-triage-lane-more{ font-size:12px; font-weight:700; color:var(--color-dtx-500); text-decoration:none; white-space:nowrap; }
 .bento-triage-lane-more:hover{ text-decoration:underline; }
