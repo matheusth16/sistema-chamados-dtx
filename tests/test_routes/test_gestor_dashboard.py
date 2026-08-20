@@ -351,6 +351,63 @@ def test_gestor_setor_puro_ve_js_de_decisao_de_previsao_mesmo_sem_escalonar(
     assert "window.decidirPrevisaoAtendimento = function" in body
 
 
+def test_gestor_setor_ve_acoes_de_escalonamento_em_chamado_do_time(
+    client_logado_gestor, db_session, app
+):
+    """Ações de Escalonamento (decisão de escopo 2026-08-20): gestor_setor da
+    própria área ganha o painel de Escalation Actions (Transferir Área,
+    Transferir para Colega, Incluir Participantes) num chamado do time que
+    não é dele — antes ficava 100% read-only nessa tela. client_logado_gestor
+    é nivel_gestao='gestor_setor', áreas=['Geral']."""
+    from tests.factories import make_chamado
+
+    chamado = make_chamado(
+        area="Geral",
+        status="Em Atendimento",
+        solicitante_id="outro_solicitante",
+        responsavel_id="colega_supervisor",
+        responsavel="Colega",
+    )
+
+    with (
+        patch("app.routes.dashboard.usuario_pode_ver_chamado", return_value=True),
+        patch("app.routes.dashboard.get_static_cached", return_value=[]),
+        patch("app.routes.dashboard.CategoriaSetor.get_all", return_value=[]),
+    ):
+        resp = client_logado_gestor.get(f"/chamado/{chamado.id}")
+
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert 'data-target="modal-transferir-area"' in body
+    assert 'data-action="carregar-colegas-e-abrir-modal"' in body
+    assert 'data-target="modal-incluir-participantes"' in body
+
+
+def test_gestor_setor_fora_da_area_nao_ve_acoes_de_escalonamento(
+    client_logado_gestor, db_session, app
+):
+    """gestor_setor não tem nem leitura sobre chamado de área fora da sua —
+    a rota já bloqueia antes de chegar no template (usuario_pode_ver_chamado
+    real, sem patch aqui)."""
+    from tests.factories import make_chamado
+
+    chamado = make_chamado(
+        area="Outra Area",
+        status="Em Atendimento",
+        solicitante_id="outro_solicitante",
+        responsavel_id="colega_supervisor",
+        responsavel="Colega",
+    )
+
+    with (
+        patch("app.routes.dashboard.get_static_cached", return_value=[]),
+        patch("app.routes.dashboard.CategoriaSetor.get_all", return_value=[]),
+    ):
+        resp = client_logado_gestor.get(f"/chamado/{chamado.id}")
+
+    assert resp.status_code in (302, 403)
+
+
 def test_previsao_pendente_exibe_data_formatada_nao_iso_bruto(
     client_logado_gestor, db_session, app
 ):

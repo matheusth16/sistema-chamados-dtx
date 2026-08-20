@@ -26,13 +26,14 @@ _ID_INEXISTENTE = 999999999
 # ── helpers de mock ───────────────────────────────────────────────────────────
 
 
-def _usuario(uid, nome, perfil="supervisor", areas=None):
+def _usuario(uid, nome, perfil="supervisor", areas=None, nivel_gestao=None):
     u = MagicMock()
     u.id = uid
     u.nome = nome
     u.perfil = perfil
     u.areas = areas or []
     u.is_admin_or_above = perfil in ("admin", "admin_global")
+    u.nivel_gestao = nivel_gestao
     return u
 
 
@@ -40,6 +41,30 @@ JULIA = _usuario("id_julia", "Julia Silva", areas=["Engenharia"])
 MATHEUS_DEST = _usuario("id_matheus", "Matheus Costa", areas=["Planejamento"])
 ADMIN = _usuario("id_admin", "Admin User", "admin")
 NAO_OWNER = _usuario("id_nao_owner", "Outro Supervisor", areas=["Outra Area"])
+# Ações de Escalonamento — decisão de escopo 2026-08-20: gestor_setor pode agir
+# em chamado do time da própria área mesmo sem ser owner; gerente_producao
+# (company-wide) continua 100% read-only.
+GESTOR_SETOR_ENGENHARIA = _usuario(
+    "id_gestor_setor",
+    "Gestor Setor Engenharia",
+    perfil="solicitante",
+    areas=["Engenharia"],
+    nivel_gestao="gestor_setor",
+)
+GESTOR_SETOR_OUTRA_AREA = _usuario(
+    "id_gestor_setor_outra",
+    "Gestor Setor Outra Área",
+    perfil="solicitante",
+    areas=["Outra Area"],
+    nivel_gestao="gestor_setor",
+)
+GERENTE_PRODUCAO = _usuario(
+    "id_gerente_producao",
+    "Gerente Produção",
+    perfil="solicitante",
+    areas=[],
+    nivel_gestao="gerente_producao",
+)
 
 
 def _criar_chamado_real(
@@ -246,6 +271,54 @@ class TestTransferirArea:
 
         assert resultado["sucesso"] is False
         assert "permission" in resultado["erro"].lower() or "access" in resultado["erro"].lower()
+
+    def test_transferir_area_gestor_setor_da_area_pode_transferir_mesmo_sem_ser_owner(self):
+        """Ações de Escalonamento (2026-08-20): gestor_setor da própria área pode
+        transferir chamado do time mesmo sem ser owner."""
+        from app.services.escalonamento_service import transferir_area
+
+        chamado_id = _criar_chamado_real(area="Engenharia", responsavel_id="id_julia")
+        sup_dest = _sup_mock("id_matheus", "Matheus Costa", areas=["Planejamento"])
+
+        with (
+            patch("app.services.escalonamento_service.Usuario") as mock_usuario,
+            patch("app.services.escalonamento_service.Historico"),
+            patch(
+                "app.services.escalonamento_service.calcular_supervisor_ids_com_acesso",
+                return_value=["id_matheus"],
+            ),
+        ):
+            mock_usuario.get_supervisores_por_area.return_value = [sup_dest]
+            resultado = transferir_area(
+                chamado_id, "Planejamento", "id_matheus", "motivo", GESTOR_SETOR_ENGENHARIA
+            )
+
+        assert resultado["sucesso"] is True
+
+    def test_transferir_area_gestor_setor_fora_da_area_continua_bloqueado(self):
+        """gestor_setor de outra área não pode transferir chamado que não é do seu time."""
+        from app.services.escalonamento_service import transferir_area
+
+        chamado_id = _criar_chamado_real(area="Engenharia", responsavel_id="id_julia")
+
+        resultado = transferir_area(
+            chamado_id, "Planejamento", "id_matheus", "motivo", GESTOR_SETOR_OUTRA_AREA
+        )
+
+        assert resultado["sucesso"] is False
+
+    def test_transferir_area_gerente_producao_continua_bloqueado(self):
+        """gerente_producao (company-wide) continua 100% read-only — não entra
+        na exceção de gestor_setor."""
+        from app.services.escalonamento_service import transferir_area
+
+        chamado_id = _criar_chamado_real(area="Engenharia", responsavel_id="id_julia")
+
+        resultado = transferir_area(
+            chamado_id, "Planejamento", "id_matheus", "motivo", GERENTE_PRODUCAO
+        )
+
+        assert resultado["sucesso"] is False
 
     def test_transferir_area_motivo_vazio_lanca_erro(self):
         """Motivo vazio (após strip) deve levantar ValueError."""
@@ -475,6 +548,36 @@ class TestEscalonarColega:
         chamado_id = _criar_chamado_real(area="Engenharia", responsavel_id="id_julia")
 
         resultado = escalonar_colega(chamado_id, "id_matheus", "motivo", NAO_OWNER)
+
+        assert resultado["sucesso"] is False
+
+    def test_escalonar_colega_gestor_setor_da_area_pode_escalonar_mesmo_sem_ser_owner(self):
+        """Ações de Escalonamento (2026-08-20): gestor_setor da própria área pode
+        escalonar chamado do time mesmo sem ser owner."""
+        from app.services.escalonamento_service import escalonar_colega
+
+        chamado_id = _criar_chamado_real(area="Engenharia", responsavel_id="id_julia")
+        colega = _sup_mock("id_matheus", "Matheus Costa", areas=["Engenharia"])
+
+        with (
+            patch("app.services.escalonamento_service.Usuario") as mock_usuario,
+            patch("app.services.escalonamento_service.Historico"),
+            patch("app.services.escalonamento_service.calcular_supervisor_ids_com_acesso"),
+        ):
+            mock_usuario.get_supervisores_por_area.return_value = [colega]
+            resultado = escalonar_colega(
+                chamado_id, "id_matheus", "motivo", GESTOR_SETOR_ENGENHARIA
+            )
+
+        assert resultado["sucesso"] is True
+
+    def test_escalonar_colega_gerente_producao_continua_bloqueado(self):
+        """gerente_producao (company-wide) continua 100% read-only."""
+        from app.services.escalonamento_service import escalonar_colega
+
+        chamado_id = _criar_chamado_real(area="Engenharia", responsavel_id="id_julia")
+
+        resultado = escalonar_colega(chamado_id, "id_matheus", "motivo", GERENTE_PRODUCAO)
 
         assert resultado["sucesso"] is False
 
@@ -709,6 +812,49 @@ class TestIncluirParticipantes:
 
         assert resultado["sucesso"] is False
         assert "permission" in resultado["erro"].lower()
+
+    def test_incluir_participantes_gestor_setor_da_area_pode_incluir_mesmo_sem_ser_owner(self):
+        """Ações de Escalonamento (2026-08-20): gestor_setor da própria área pode
+        incluir participantes em chamado do time mesmo sem ser owner."""
+        from app.services.escalonamento_service import incluir_participantes
+
+        chamado_id = _criar_chamado_real(
+            area="Engenharia", responsavel_id="id_julia", participantes=[]
+        )
+        sup_pedro = _sup_mock("id_pedro", "Pedro Alves", areas=["Logistica"])
+
+        with (
+            patch("app.services.escalonamento_service.Usuario") as mock_usuario,
+            patch("app.services.escalonamento_service.Historico"),
+            patch(
+                "app.services.escalonamento_service.calcular_supervisor_ids_com_acesso",
+                return_value=["id_julia", "id_pedro"],
+            ),
+        ):
+            mock_usuario.get_supervisores_por_area.return_value = [sup_pedro]
+            resultado = incluir_participantes(
+                chamado_id,
+                [{"supervisor_id": "id_pedro", "area": "Logistica"}],
+                GESTOR_SETOR_ENGENHARIA,
+            )
+
+        assert resultado["sucesso"] is True
+
+    def test_incluir_participantes_gerente_producao_continua_bloqueado(self):
+        """gerente_producao (company-wide) continua 100% read-only."""
+        from app.services.escalonamento_service import incluir_participantes
+
+        chamado_id = _criar_chamado_real(
+            area="Engenharia", responsavel_id="id_julia", participantes=[]
+        )
+
+        resultado = incluir_participantes(
+            chamado_id,
+            [{"supervisor_id": "id_pedro", "area": "Logistica"}],
+            GERENTE_PRODUCAO,
+        )
+
+        assert resultado["sucesso"] is False
 
     def test_incluir_participantes_lista_vazia_retorna_erro(self):
         """Lista vazia de participantes retorna erro."""

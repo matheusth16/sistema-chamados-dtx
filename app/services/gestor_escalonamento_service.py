@@ -5,7 +5,7 @@ notifications.py (broadcast AOG imediato) — nunca duplicar essa lógica em mai
 de um lugar.
 
 O gestor de cada nível é sempre um usuário real do sistema (nivel_gestao no
-cadastro do usuário, o mesmo campo usado pelo Painel Gerencial), nunca e-mail
+cadastro do usuário, o mesmo campo usado pelo Painel do Time), nunca e-mail
 configurado à parte em variável de ambiente: cadastrar ou desligar alguém no
 Painel de Usuários já reflete aqui automaticamente, sem precisar mexer em
 código/config.

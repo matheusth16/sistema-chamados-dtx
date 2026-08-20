@@ -18,7 +18,10 @@ from app.i18n import get_translation_session
 from app.models import Chamado
 from app.models_historico import Historico
 from app.models_usuario import Usuario
-from app.services.permissions import calcular_supervisor_ids_com_acesso
+from app.services.permissions import (
+    calcular_supervisor_ids_com_acesso,
+    usuario_gestor_setor_pode_escalonar,
+)
 from config import Config
 
 logger = logging.getLogger(__name__)
@@ -82,7 +85,11 @@ def transferir_area(
     with Chamado.editar_com_lock(chamado_id) as chamado:
         if chamado is None:
             return {"sucesso": False, "erro": _t("ticket_not_found")}
-        if not (chamado.responsavel_id == usuario.id or usuario.is_admin_or_above):
+        if not (
+            chamado.responsavel_id == usuario.id
+            or usuario.is_admin_or_above
+            or usuario_gestor_setor_pode_escalonar(usuario, chamado)
+        ):
             logger.warning(
                 "transferir_area negado: usuário %s não é owner do chamado %s",
                 usuario.id,
@@ -168,7 +175,11 @@ def escalonar_colega(
     with Chamado.editar_com_lock(chamado_id) as chamado:
         if chamado is None:
             return {"sucesso": False, "erro": _t("ticket_not_found")}
-        if not (chamado.responsavel_id == usuario.id or usuario.is_admin_or_above):
+        if not (
+            chamado.responsavel_id == usuario.id
+            or usuario.is_admin_or_above
+            or usuario_gestor_setor_pode_escalonar(usuario, chamado)
+        ):
             logger.warning(
                 "escalonar_colega negado: usuário %s não é owner do chamado %s",
                 usuario.id,
@@ -268,7 +279,11 @@ def incluir_participantes(
     with Chamado.editar_com_lock(chamado_id) as chamado:
         if chamado is None:
             return {"sucesso": False, "erro": _t("ticket_not_found")}
-        if not (chamado.responsavel_id == usuario.id or usuario.is_admin_or_above):
+        if not (
+            chamado.responsavel_id == usuario.id
+            or usuario.is_admin_or_above
+            or usuario_gestor_setor_pode_escalonar(usuario, chamado)
+        ):
             logger.warning(
                 "incluir_participantes negado: usuário %s não é owner do chamado %s",
                 usuario.id,

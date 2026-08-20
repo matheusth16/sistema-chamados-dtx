@@ -275,11 +275,18 @@ def visualizar_detalhe_chamado(chamado_id: str) -> Response:
         # dispararia o aviso de "atualizado" na hora, à toa.
         cursor_inicial_chamado = max((h.id or 0 for h in historico), default=0)
 
+        from app.services.traducao_conteudo_service import montar_traducoes_chamado
+
+        # Lote único (descrição/motivo_* + todo o histórico) — 1 lookup de
+        # cache + no máximo 1 chamada HTTP ao LibreTranslate, nunca por campo.
+        traducoes = montar_traducoes_chamado(chamado, historico, session.get("language", "en"))
+
         return render_template(
             "visualizar_chamado.html",
             chamado=chamado,
             voltar_url=voltar_url,
             cursor_inicial_chamado=cursor_inicial_chamado,
+            traducoes=traducoes,
             pode_editar=flags["pode_editar"],
             pode_editar_descricao=flags["pode_editar_descricao"],
             nivel_congelamento=flags["nivel_congelamento"],
@@ -390,8 +397,18 @@ def visualizar_historico(chamado_id: str) -> Response:
         if not usuario_pode_ver_chamado(current_user, chamado):
             flash_t("only_view_history_your_area", "danger")
             return _redirect_dashboard()
-        historico = Historico.get_by_chamado_id(chamado_id)
-        return render_template("historico.html", chamado=chamado, historico=historico)
+        # Get_by_chamado_id vem mais recente primeiro; a tela de histórico
+        # mostra em ordem cronológica (mais antigo/criação no topo, mais
+        # recente embaixo) — pedido do usuário, 2026-08-20.
+        historico = list(reversed(Historico.get_by_chamado_id(chamado_id)))
+
+        from app.services.traducao_conteudo_service import montar_traducoes_chamado
+
+        traducoes = montar_traducoes_chamado(chamado, historico, session.get("language", "en"))
+
+        return render_template(
+            "historico.html", chamado=chamado, historico=historico, traducoes=traducoes
+        )
     except Exception as e:
         logger.exception("Erro ao buscar histórico de %s: %s", chamado_id, e)
         flash_t("error_loading_history", "danger")

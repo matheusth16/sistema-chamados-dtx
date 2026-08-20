@@ -306,6 +306,13 @@ class Config:
     # Cadastre em mymemory.translated.net e defina MYMEMORY_EMAIL nas variáveis de ambiente
     MYMEMORY_EMAIL = os.getenv("MYMEMORY_EMAIL", "").strip()
 
+    # LibreTranslate self-hosted (tradução de conteúdo dinâmico: descrição do
+    # chamado, histórico, conversa — ver app/services/traducao_conteudo_service.py).
+    # Desligado por padrão até o container ser subido e testado no servidor.
+    LIBRETRANSLATE_URL = os.getenv("LIBRETRANSLATE_URL", "").strip()
+    LIBRETRANSLATE_ENABLED = _to_bool(os.getenv("LIBRETRANSLATE_ENABLED"), default=False)
+    LIBRETRANSLATE_TIMEOUT_SECONDS = int(os.getenv("LIBRETRANSLATE_TIMEOUT_SECONDS", "15"))
+
     # Criptografia de PII em repouso (LGPD). Gere chave: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
     ENCRYPTION_KEY = os.getenv("ENCRYPTION_KEY", "").strip()
     ENCRYPT_PII_AT_REST = os.getenv("ENCRYPT_PII_AT_REST", "false").lower() in ("true", "1", "yes")

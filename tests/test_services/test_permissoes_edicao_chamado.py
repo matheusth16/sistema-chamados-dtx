@@ -433,10 +433,49 @@ def test_usuario_pode_mutar_chamado_mock_legado_sem_is_gestor_only():
 
 
 def test_usuario_pode_mutar_chamado_ignora_argumento_chamado():
-    """chamado=None é aceito (argumento reservado para versões futuras)."""
+    """chamado=None mantém o fail-closed original (gestor read-only bloqueado)."""
     gestor = MagicMock()
     gestor.is_gestor_only = True
     permitido, _ = usuario_pode_mutar_chamado(gestor, chamado=None)
+    assert permitido is False
+
+
+def test_usuario_pode_mutar_chamado_gestor_setor_area_propria_permitido():
+    """gestor_setor com a área do chamado entre as próprias pode mutar — exceção
+    de Ações de Escalonamento (decisão de escopo 2026-08-20)."""
+    gestor = MagicMock()
+    gestor.is_gestor_only = True
+    gestor.nivel_gestao = "gestor_setor"
+    gestor.areas = ["Manutencao"]
+    chamado = MagicMock()
+    chamado.area = "Manutencao"
+    permitido, erro = usuario_pode_mutar_chamado(gestor, chamado=chamado)
+    assert permitido is True
+    assert erro is None
+
+
+def test_usuario_pode_mutar_chamado_gestor_setor_area_diferente_bloqueado():
+    """gestor_setor fora da própria área continua bloqueado."""
+    gestor = MagicMock()
+    gestor.is_gestor_only = True
+    gestor.nivel_gestao = "gestor_setor"
+    gestor.areas = ["Manutencao"]
+    chamado = MagicMock()
+    chamado.area = "TI"
+    permitido, erro = usuario_pode_mutar_chamado(gestor, chamado=chamado)
+    assert permitido is False
+    assert erro is not None
+
+
+def test_usuario_pode_mutar_chamado_gerente_producao_continua_bloqueado():
+    """gerente_producao (company-wide) continua 100% read-only, mesmo passando chamado."""
+    gestor = MagicMock()
+    gestor.is_gestor_only = True
+    gestor.nivel_gestao = "gerente_producao"
+    gestor.areas = []
+    chamado = MagicMock()
+    chamado.area = "Producao"
+    permitido, erro = usuario_pode_mutar_chamado(gestor, chamado=chamado)
     assert permitido is False
 
 

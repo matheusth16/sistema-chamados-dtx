@@ -699,6 +699,15 @@ dialog.bento-modal textarea:focus{ outline:none; border-color:var(--color-dtx-50
 .bento-inline-notice.ok{ background:var(--color-status-done-bg); color:var(--color-bento-success); border:1px solid #a7f3d0; }
 .bento-inline-notice.warn{ background:var(--color-status-open-bg); color:var(--color-bento-warning); border:1px solid var(--color-bento-warning-bg); }
 
+/* Link "ver original" (traducao automatica de conteudo dinamico — LibreTranslate).
+   display:block isolado em :not(.hidden), mesmo motivo documentado acima pro
+   .bento-inline-notice: .hidden (Tailwind) precisa vencer sem empate de especificidade. */
+.bento-translate-toggle{ display:inline-flex; align-items:center; margin-left:6px; font-size:11px; font-weight:700; color:var(--color-dtx-500); background:none; border:none; padding:0; cursor:pointer; text-decoration:underline; text-underline-offset:2px; }
+.bento-translate-toggle:hover{ color:var(--color-dtx-600); }
+.bento-translate-toggle:focus-visible{ outline:2px solid var(--color-dtx-500); outline-offset:2px; }
+.bento-translate-original:not(.hidden){ display:block; }
+.bento-translate-original{ margin-top:6px; padding:8px 10px; background:var(--color-surface-canvas); border:1px dashed var(--color-surface-border); border-radius:10px; font-size:12px; color:var(--color-surface-muted); white-space:pre-wrap; word-break:break-word; }
+
 .bento-file-input-mini{ width:100%; font-size:11px; color:var(--color-text-muted); }
 .bento-file-input-mini::file-selector-button{ margin-right:8px; padding:5px 12px; border-radius:8px; border:none; font-size:11px; font-weight:700; background:var(--color-bento-info-bg-deep); color:var(--color-bento-info); cursor:pointer; }
 .bento-file-input-mini::file-selector-button:hover{ background:#bfdbfe; }

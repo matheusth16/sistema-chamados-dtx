@@ -6,13 +6,13 @@ import threading
 from flask import current_app, jsonify, request, session
 from flask_login import current_user, login_required
 
-from app.decoradores import requer_supervisor_area
+from app.decoradores import requer_supervisor_area, requer_supervisor_area_ou_gestor_setor
 from app.i18n import get_translation
 from app.models import Chamado
 from app.models_usuario import Usuario
 from app.routes import main
 from app.services.api_response import erro_json
-from app.services.permissions import usuario_pode_ver_chamado
+from app.services.permissions import usuario_gestor_setor_pode_escalonar, usuario_pode_ver_chamado
 from app.services.permissoes_edicao_chamado import usuario_pode_mutar_chamado
 
 logger = logging.getLogger(__name__)
@@ -72,12 +72,13 @@ def _notificar_escalonamento(
 
 @main.route("/api/chamado/<chamado_id>/transferir-area", methods=["POST"])
 @login_required
-@requer_supervisor_area
+@requer_supervisor_area_ou_gestor_setor
 def api_transferir_area(chamado_id: str):
     """Transfere o chamado para outra área com novo responsável obrigatório.
 
     Body JSON: {"area": str, "supervisor_id": str, "motivo": str}
-    Acesso: owner (responsavel_id == current_user.id) ou admin.
+    Acesso: owner (responsavel_id == current_user.id), admin, ou gestor_setor
+    da área do chamado (Ações de Escalonamento — decisão de escopo 2026-08-20).
     """
     try:
         dados = request.get_json(silent=True)
@@ -104,7 +105,7 @@ def api_transferir_area(chamado_id: str):
         if not usuario_pode_ver_chamado(current_user, chamado):
             return erro_json(_t("access_denied_generic"), 403)
 
-        pode_mutar, _ = usuario_pode_mutar_chamado(current_user)
+        pode_mutar, _ = usuario_pode_mutar_chamado(current_user, chamado)
         if not pode_mutar:
             return erro_json(_t("access_denied_generic"), 403)
 
@@ -114,7 +115,11 @@ def api_transferir_area(chamado_id: str):
         if not _pode_op:
             return erro_json(_t("ticket_completed_no_operation"), 403)
 
-        if not (chamado.responsavel_id == current_user.id or current_user.is_admin_or_above):
+        if not (
+            chamado.responsavel_id == current_user.id
+            or current_user.is_admin_or_above
+            or usuario_gestor_setor_pode_escalonar(current_user, chamado)
+        ):
             return erro_json(_t("only_owner_or_admin_transfer"), 403)
 
         from app.services.escalonamento_service import transferir_area
@@ -306,12 +311,13 @@ def api_decidir_previsao_atendimento(chamado_id: str, solicitacao_id: int):
 
 @main.route("/api/chamado/<chamado_id>/escalonar-colega", methods=["POST"])
 @login_required
-@requer_supervisor_area
+@requer_supervisor_area_ou_gestor_setor
 def api_escalonar_colega(chamado_id: str):
     """Escala o chamado para um colega da mesma área sem alterar a área.
 
     Body JSON: {"supervisor_id": str, "motivo": str}
-    Acesso: owner (responsavel_id == current_user.id) ou admin.
+    Acesso: owner (responsavel_id == current_user.id), admin, ou gestor_setor
+    da área do chamado (Ações de Escalonamento — decisão de escopo 2026-08-20).
     """
     try:
         dados = request.get_json(silent=True)
@@ -335,7 +341,7 @@ def api_escalonar_colega(chamado_id: str):
         if not usuario_pode_ver_chamado(current_user, chamado):
             return erro_json(_t("access_denied_generic"), 403)
 
-        pode_mutar, _ = usuario_pode_mutar_chamado(current_user)
+        pode_mutar, _ = usuario_pode_mutar_chamado(current_user, chamado)
         if not pode_mutar:
             return erro_json(_t("access_denied_generic"), 403)
 
@@ -345,7 +351,11 @@ def api_escalonar_colega(chamado_id: str):
         if not _pode_op:
             return erro_json(_t("ticket_completed_no_operation"), 403)
 
-        if not (chamado.responsavel_id == current_user.id or current_user.is_admin_or_above):
+        if not (
+            chamado.responsavel_id == current_user.id
+            or current_user.is_admin_or_above
+            or usuario_gestor_setor_pode_escalonar(current_user, chamado)
+        ):
             return erro_json(_t("only_owner_or_admin_escalate"), 403)
 
         from app.services.escalonamento_service import escalonar_colega
@@ -499,12 +509,13 @@ def _notificar_owner_todos_concluiram(
 
 @main.route("/api/chamado/<chamado_id>/incluir-participantes", methods=["POST"])
 @login_required
-@requer_supervisor_area
+@requer_supervisor_area_ou_gestor_setor
 def api_incluir_participantes(chamado_id: str):
     """Adiciona supervisores colaboradores em participantes[].
 
     Body JSON: {"participantes": [{"supervisor_id": str, "area": str}, ...]}
-    Acesso: owner (responsavel_id == current_user.id) ou admin.
+    Acesso: owner (responsavel_id == current_user.id), admin, ou gestor_setor
+    da área do chamado (Ações de Escalonamento — decisão de escopo 2026-08-20).
     """
     try:
         dados = request.get_json(silent=True)
@@ -524,7 +535,7 @@ def api_incluir_participantes(chamado_id: str):
         if not usuario_pode_ver_chamado(current_user, chamado):
             return erro_json(_t("access_denied_generic"), 403)
 
-        pode_mutar, _ = usuario_pode_mutar_chamado(current_user)
+        pode_mutar, _ = usuario_pode_mutar_chamado(current_user, chamado)
         if not pode_mutar:
             return erro_json(_t("access_denied_generic"), 403)
 
@@ -534,7 +545,11 @@ def api_incluir_participantes(chamado_id: str):
         if not _pode_op:
             return erro_json(_t("access_denied_generic"), 403)
 
-        if not (chamado.responsavel_id == current_user.id or current_user.is_admin_or_above):
+        if not (
+            chamado.responsavel_id == current_user.id
+            or current_user.is_admin_or_above
+            or usuario_gestor_setor_pode_escalonar(current_user, chamado)
+        ):
             return erro_json(_t("only_owner_or_admin_participants"), 403)
 
         from app.services.escalonamento_service import incluir_participantes

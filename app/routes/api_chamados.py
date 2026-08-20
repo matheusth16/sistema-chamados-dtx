@@ -402,7 +402,9 @@ def api_mensagens_novas_chamado(chamado_id: str):
         )
 
         return sucesso_json(
-            mensagens=mensagens_novas(chamado_id, apos_id),
+            mensagens=mensagens_novas(
+                chamado_id, apos_id, idioma_destino=session.get("language", "en")
+            ),
             tem_outras_atualizacoes=historico_fora_da_conversa(chamado_id, apos_id),
         )
     except Exception as e:

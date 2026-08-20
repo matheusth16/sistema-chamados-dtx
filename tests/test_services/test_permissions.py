@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 
 from app.services.permissions import (
     calcular_supervisor_ids_com_acesso,
+    usuario_gestor_setor_pode_escalonar,
     usuario_pode_operar_chamado,
     usuario_pode_ver_chamado,
     usuario_pode_ver_chamado_otimizado,
@@ -265,6 +266,41 @@ class TestUsuarioPodeOperarChamado:
         gestor_puro.is_gestor_only = True
         chamado = _chamado_mock(area="Manutencao", solicitante_id="gp_1")
         assert usuario_pode_operar_chamado(gestor_puro, chamado) is False
+
+
+class TestUsuarioGestorSetorPodeEscalonar:
+    """Ações de Escalonamento (transferir área/colega, incluir participantes) —
+    decisão de escopo 2026-08-20: gestor_setor ganha ação real (não só leitura
+    ampliada) sobre chamado do time que não é dele, restrita à própria área.
+    gerente_producao/assistente_gm/gm continuam 100% read-only."""
+
+    def test_gestor_setor_pode_escalonar_chamado_da_propria_area(self):
+        gestor = _usuario_mock(
+            "solicitante", areas=["Manutencao"], uid="gestor_1", nivel_gestao="gestor_setor"
+        )
+        chamado = _chamado_mock(area="Manutencao", responsavel_id="colega_supervisor")
+        assert usuario_gestor_setor_pode_escalonar(gestor, chamado) is True
+
+    def test_gestor_setor_nao_pode_escalonar_fora_da_propria_area(self):
+        gestor = _usuario_mock(
+            "solicitante", areas=["Manutencao"], uid="gestor_1", nivel_gestao="gestor_setor"
+        )
+        chamado = _chamado_mock(area="TI", responsavel_id="colega_supervisor")
+        assert usuario_gestor_setor_pode_escalonar(gestor, chamado) is False
+
+    def test_gerente_producao_nao_pode_escalonar_mesmo_com_leitura_ampliada(self):
+        """gerente_producao/assistente_gm/gm têm leitura ampliada (todas as áreas)
+        mas NÃO entram nesta exceção — continuam 100% read-only."""
+        gestor = _usuario_mock(
+            "solicitante", areas=[], uid="gestor_2", nivel_gestao="gerente_producao"
+        )
+        chamado = _chamado_mock(area="Producao", responsavel_id="colega_supervisor")
+        assert usuario_gestor_setor_pode_escalonar(gestor, chamado) is False
+
+    def test_supervisor_sem_nivel_gestao_nao_entra_nesta_excecao(self):
+        sup = _usuario_mock("supervisor", areas=["Manutencao"], uid="sup_1")
+        chamado = _chamado_mock(area="Manutencao", responsavel_id="colega_supervisor")
+        assert usuario_gestor_setor_pode_escalonar(sup, chamado) is False
 
 
 class TestUsuarioPodeVerChamadoOtimizado:

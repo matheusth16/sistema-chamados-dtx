@@ -103,6 +103,25 @@ Se ambas estiverem vazias, a inscrição/Web Push fica desabilitada.
 
 ---
 
+## LibreTranslate (tradução automática de conteúdo dinâmico dos chamados)
+
+Self-hosted via Docker (serviço `libretranslate` em `docker-compose.yml`/`docker-compose.prod.yml`)
+— traduz descrição, histórico e conversa pro idioma selecionado por quem está
+vendo, quando o idioma detectado do texto é diferente. Ver
+`app/services/traducao_conteudo_service.py`.
+
+| Variável                          | Descrição | Padrão | Exemplo |
+|------------------------------------|-----------|--------|---------|
+| `LIBRETRANSLATE_ENABLED`           | Liga/desliga a tradução automática. | `false` | `true` |
+| `LIBRETRANSLATE_URL`               | URL base do serviço LibreTranslate. Em produção/dev via compose, é o nome interno do serviço. | (vazio) | `http://libretranslate:5000` |
+| `LIBRETRANSLATE_TIMEOUT_SECONDS`   | Timeout (segundos) da chamada HTTP em lote. | `15` | `20` |
+
+Com `LIBRETRANSLATE_ENABLED=false` (ou `LIBRETRANSLATE_URL` vazio), o sistema
+sempre mostra o texto original — nunca quebra a página. Suba o container
+antes de habilitar: `docker compose -f docker-compose.prod.yml up -d libretranslate`.
+
+---
+
 ## Proteção de ambiente staging/HML — CWI 4.1
 
 > **Camada 2 (fallback app):** o controle primário é VPN / firewall de rede. Basic Auth é fallback para quando o controle de rede não está disponível. Ver [ADR-002](adr/002-protecao-ambientes-staging.md).

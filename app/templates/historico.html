@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from 'components/_status_badge.html' import status_badge with context %}
+{% from 'components/_traducao_toggle.html' import conteudo_traduzido with context %}
 
 {% block content %}
 <div class="space-y-4">
@@ -149,7 +150,7 @@
                                                     {{ t('history_resolution_confirmed') }}
                                                 {% endif %}
                                             </h3>
-                                            <span class="bento-timeline-badge">#{{ loop.revindex }}</span>
+                                            <span class="bento-timeline-badge">#{{ loop.index }}</span>
                                         </div>
                                         <p style="font-size:13px; color:var(--color-text-muted); display:flex; align-items:center; gap:6px;">
                                             <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -172,18 +173,18 @@
                                             <span style="font-size:13px; color:var(--color-text-muted); font-weight:600;">{{ evento.campo_alterado|translate_field_label }}:</span>
                                             <div class="flex items-center gap-2">
                                                 <span class="bento-diff-chip before">
-                                                    {% if evento.campo_alterado == 'status' %}{{ translate_status(evento.valor_anterior) }}{% else %}{{ evento.valor_anterior }}{% endif %}
+                                                    {% if evento.campo_alterado == 'status' %}{{ translate_status(evento.valor_anterior) }}{% else %}{{ conteudo_traduzido(evento.valor_anterior, traducoes, '', compact=True) }}{% endif %}
                                                 </span>
                                                 <svg width="16" height="16" style="color:var(--color-surface-muted);" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
                                                 </svg>
                                                 <span class="bento-diff-chip after">
-                                                    {% if evento.campo_alterado == 'status' %}{{ translate_status(evento.valor_novo) }}{% else %}{{ evento.valor_novo }}{% endif %}
+                                                    {% if evento.campo_alterado == 'status' %}{{ translate_status(evento.valor_novo) }}{% else %}{{ conteudo_traduzido(evento.valor_novo, traducoes, '', compact=True) }}{% endif %}
                                                 </span>
                                             </div>
                                         </div>
                                         {% if evento.acao in ('alteracao_status', 'reabertura') and evento.detalhe %}
-                                        <p style="font-size:13px; white-space:pre-wrap; word-break:break-word; margin-top:8px;">{{ evento.detalhe }}</p>
+                                        <p style="font-size:13px; white-space:pre-wrap; word-break:break-word; margin-top:8px;">{{ conteudo_traduzido(evento.detalhe, traducoes, 'orig-hist-detalhe-' ~ evento.id) }}</p>
                                         {% endif %}
                                     </div>
                                 {% elif evento.acao == 'edicao_descricao' %}
@@ -192,13 +193,13 @@
                                             {% if evento.valor_anterior %}
                                             <div>
                                                 <p style="font-size:11px; font-weight:800; text-transform:uppercase; color:var(--color-text-muted); margin-bottom:4px;">{{ t('history_previous_description') }}</p>
-                                                <div style="padding:10px 12px; background:var(--color-surface-base); border-radius:12px; border:1px solid var(--color-surface-border); font-size:13px; white-space:pre-wrap; word-break:break-word;">{{ evento.valor_anterior }}</div>
+                                                <div style="padding:10px 12px; background:var(--color-surface-base); border-radius:12px; border:1px solid var(--color-surface-border); font-size:13px; white-space:pre-wrap; word-break:break-word;">{{ conteudo_traduzido(evento.valor_anterior, traducoes, 'orig-hist-ant-' ~ evento.id) }}</div>
                                             </div>
                                             {% endif %}
                                             {% if evento.valor_novo %}
                                             <div>
                                                 <p style="font-size:11px; font-weight:800; text-transform:uppercase; color:var(--color-text-muted); margin-bottom:4px;">{{ t('history_new_description') }}</p>
-                                                <div style="padding:10px 12px; background:var(--color-status-done-bg); border-radius:12px; font-size:13px; white-space:pre-wrap; word-break:break-word;">{{ evento.valor_novo }}</div>
+                                                <div style="padding:10px 12px; background:var(--color-status-done-bg); border-radius:12px; font-size:13px; white-space:pre-wrap; word-break:break-word;">{{ conteudo_traduzido(evento.valor_novo, traducoes, 'orig-hist-novo-' ~ evento.id) }}</div>
                                             </div>
                                             {% endif %}
                                         </div>
@@ -221,13 +222,13 @@
                                                 {% if evento.valor_anterior %}
                                                 <div>
                                                     <p style="font-size:11px; font-weight:800; text-transform:uppercase; color:var(--color-text-muted); margin-bottom:4px;">{{ t('history_previous_description') }}</p>
-                                                    <div style="padding:10px 12px; background:var(--color-surface-base); border-radius:12px; border:1px solid var(--color-surface-border); font-size:13px; white-space:pre-wrap; word-break:break-word;">{{ evento.valor_anterior }}</div>
+                                                    <div style="padding:10px 12px; background:var(--color-surface-base); border-radius:12px; border:1px solid var(--color-surface-border); font-size:13px; white-space:pre-wrap; word-break:break-word;">{{ conteudo_traduzido(evento.valor_anterior, traducoes, 'orig-hist-ant-' ~ evento.id) }}</div>
                                                 </div>
                                                 {% endif %}
                                                 {% if evento.valor_novo %}
                                                 <div>
                                                     <p style="font-size:11px; font-weight:800; text-transform:uppercase; color:var(--color-text-muted); margin-bottom:4px;">{{ t('history_new_description') }}</p>
-                                                    <div style="padding:10px 12px; background:var(--color-status-done-bg); border-radius:12px; font-size:13px; white-space:pre-wrap; word-break:break-word;">{{ evento.valor_novo }}</div>
+                                                    <div style="padding:10px 12px; background:var(--color-status-done-bg); border-radius:12px; font-size:13px; white-space:pre-wrap; word-break:break-word;">{{ conteudo_traduzido(evento.valor_novo, traducoes, 'orig-hist-novo-' ~ evento.id) }}</div>
                                                 </div>
                                                 {% endif %}
                                             </div>
@@ -255,7 +256,7 @@
                                     </div>
                                 {% elif evento.acao in ('resposta_solicitante', 'resposta_responsavel') %}
                                     <div class="bento-timeline-detail resposta">
-                                        <p style="font-size:13px; white-space:pre-wrap; word-break:break-word;">{{ evento.valor_novo }}</p>
+                                        <p style="font-size:13px; white-space:pre-wrap; word-break:break-word;">{{ conteudo_traduzido(evento.valor_novo, traducoes, 'orig-hist-conversa-' ~ evento.id) }}</p>
                                     </div>
                                 {% elif evento.acao == 'anexo_tardio' %}
                                     <div class="bento-timeline-detail dados space-y-3">
@@ -264,7 +265,7 @@
                                             <span style="font-weight:600;">{{ evento.valor_novo.split('/')[-1] if evento.valor_novo else '' }}</span>
                                         </p>
                                         {% if evento.detalhe %}
-                                        <p style="font-size:13px; white-space:pre-wrap; word-break:break-word;">{{ evento.detalhe }}</p>
+                                        <p style="font-size:13px; white-space:pre-wrap; word-break:break-word;">{{ conteudo_traduzido(evento.detalhe, traducoes, 'orig-hist-detalhe-' ~ evento.id) }}</p>
                                         {% endif %}
                                         {% if evento.valor_novo and (evento.valor_novo.startswith('http') or evento.valor_novo.startswith('/')) %}
                                         <a href="{{ evento.valor_novo }}" target="_blank" rel="noopener noreferrer" class="bento-btn-ghost" style="display:inline-flex;">
@@ -276,7 +277,7 @@
                                 {% elif evento.acao in _acoes_previsao or evento.acao in _acoes_sistema or evento.acao in _acoes_colaboracao or evento.acao == 'confirmacao_resolucao' %}
                                     <div class="bento-timeline-detail">
                                         {% if evento.detalhe %}
-                                        <p style="font-size:13px; white-space:pre-wrap; word-break:break-word;">{{ evento.detalhe }}</p>
+                                        <p style="font-size:13px; white-space:pre-wrap; word-break:break-word;">{{ conteudo_traduzido(evento.detalhe, traducoes, 'orig-hist-detalhe-' ~ evento.id) }}</p>
                                         {% elif evento.valor_novo %}
                                         <p style="font-size:13px;">
                                             <span class="bento-diff-chip after small">{{ evento.valor_novo }}</span>

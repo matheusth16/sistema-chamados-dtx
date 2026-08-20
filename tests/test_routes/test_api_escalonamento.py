@@ -147,6 +147,55 @@ class TestTransferirAreaRota:
 
         assert resp.status_code == 403
 
+    def test_transferir_area_gestor_setor_da_area_sem_ser_owner_retorna_200(
+        self, client_logado_gestor
+    ):
+        """Ações de Escalonamento (2026-08-20): gestor_setor da própria área
+        pode transferir chamado do time mesmo sem ser owner (client_logado_gestor
+        é nivel_gestao='gestor_setor', áreas=['Geral'])."""
+        chamado_mock = _mock_chamado_obj(area="Geral", responsavel_id="outro_sup")
+
+        with (
+            patch("app.routes.api_colaboracao.Chamado") as mock_chamado_cls,
+            patch("app.routes.api_colaboracao.usuario_pode_ver_chamado", return_value=True),
+            patch(
+                "app.services.escalonamento_service.transferir_area",
+                return_value={
+                    "sucesso": True,
+                    "dados": {"area": "Planejamento", "responsavel_id": "id_dest"},
+                },
+            ),
+            patch("app.routes.api_colaboracao.threading"),
+        ):
+            mock_chamado_cls.get_by_id.return_value = chamado_mock
+
+            resp = client_logado_gestor.post(
+                "/api/chamado/id123/transferir-area",
+                json={"area": "Planejamento", "supervisor_id": "id_dest", "motivo": "motivo"},
+                content_type="application/json",
+            )
+
+        assert resp.status_code == 200
+        assert resp.get_json()["sucesso"] is True
+
+    def test_transferir_area_gestor_setor_fora_da_area_retorna_403(self, client_logado_gestor):
+        """gestor_setor fora da própria área continua bloqueado."""
+        chamado_mock = _mock_chamado_obj(area="Outra Area", responsavel_id="outro_sup")
+
+        with (
+            patch("app.routes.api_colaboracao.Chamado") as mock_chamado_cls,
+            patch("app.routes.api_colaboracao.usuario_pode_ver_chamado", return_value=True),
+        ):
+            mock_chamado_cls.get_by_id.return_value = chamado_mock
+
+            resp = client_logado_gestor.post(
+                "/api/chamado/id123/transferir-area",
+                json={"area": "Planejamento", "supervisor_id": "id_dest", "motivo": "motivo"},
+                content_type="application/json",
+            )
+
+        assert resp.status_code == 403
+
     def test_transferir_area_idor_sem_acesso_retorna_403(self, client_logado_supervisor):
         """Supervisor sem acesso ao chamado (usuario_pode_ver_chamado=False) → 403."""
         chamado_mock = _mock_chamado_obj(area="TI", responsavel_id="outro_sup")
@@ -388,6 +437,33 @@ class TestEscalonarColegaRota:
             )
 
         assert resp.status_code == 403
+
+    def test_escalonar_colega_gestor_setor_da_area_sem_ser_owner_retorna_200(
+        self, client_logado_gestor
+    ):
+        """Ações de Escalonamento (2026-08-20): gestor_setor da própria área
+        pode escalonar chamado do time mesmo sem ser owner."""
+        chamado_mock = _mock_chamado_obj(area="Geral", responsavel_id="outro_sup")
+
+        with (
+            patch("app.routes.api_colaboracao.Chamado") as mock_chamado_cls,
+            patch("app.routes.api_colaboracao.usuario_pode_ver_chamado", return_value=True),
+            patch(
+                "app.services.escalonamento_service.escalonar_colega",
+                return_value={"sucesso": True, "dados": {"responsavel_id": "id_colega"}},
+            ),
+            patch("app.routes.api_colaboracao.threading"),
+        ):
+            mock_chamado_cls.get_by_id.return_value = chamado_mock
+
+            resp = client_logado_gestor.post(
+                "/api/chamado/id123/escalonar-colega",
+                json={"supervisor_id": "id_colega", "motivo": "motivo"},
+                content_type="application/json",
+            )
+
+        assert resp.status_code == 200
+        assert resp.get_json()["sucesso"] is True
 
     def test_escalonar_colega_servico_retorna_erro_propaga_400(self, client_logado_supervisor):
         """Quando o serviço retorna sucesso=False (ex: destino inválido), a rota retorna 400."""

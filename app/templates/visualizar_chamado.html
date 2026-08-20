@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from 'components/_status_badge.html' import status_badge with context %}
+{% from 'components/_traducao_toggle.html' import conteudo_traduzido with context %}
 
 {% block content %}
 {% set participantes_pendentes = (chamado.participantes | rejectattr('status', 'equalto', 'concluido') | list) if chamado.participantes else [] %}
@@ -7,7 +8,12 @@
 {% set _participantes_atuais = (chamado.participantes | selectattr('supervisor_id', 'equalto', current_user.id) | list) if chamado.participantes else [] %}
 {% set participante_atual = _participantes_atuais[0] if _participantes_atuais else none %}
 {% set pode_concluir_parte = participante_atual is not none and participante_atual['status'] != 'concluido' %}
-{% set pode_escalonar = pode_editar and chamado.status in ('Aberto', 'Em Atendimento') and (chamado.responsavel_id == current_user.id or current_user.is_admin_or_above) %}
+{# gestor_setor ganha Ações de Escalonamento no chamado do time mesmo sem ser
+   dono, restrito à própria área — decisão de escopo 2026-08-20. Diferente do
+   painel de edição (pode_editar), que continua fechado pra gestor_setor
+   "puro" (is_gestor_only) — só as 3 ações de escalonamento abrem exceção. #}
+{% set _gestor_setor_pode_escalonar = current_user.nivel_gestao == 'gestor_setor' and chamado.area in (current_user.areas or []) %}
+{% set pode_escalonar = chamado.status in ('Aberto', 'Em Atendimento') and ((pode_editar and (chamado.responsavel_id == current_user.id or current_user.is_admin_or_above)) or _gestor_setor_pode_escalonar) %}
 
 {# anexo_item_li: um <li> de anexo (mesmo componente .bento-attach-list em
    ambos os painéis — Anexos do Solicitante, perto da Descrição, e Anexos do
@@ -408,7 +414,7 @@
                             <svg width="16" height="16" style="color:var(--color-surface-muted);" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"></path></svg>
                             {{ t('problem_description') if t else 'Descrição do Problema' }}
                         </h2>
-                        <div style="min-height:160px; max-height:220px; overflow-y:auto; background:var(--color-surface-canvas); padding:16px; border-radius:14px; font-size:13px; line-height:1.6; white-space:pre-line; overflow-wrap:break-word; word-break:break-word;">{{ chamado.descricao }}</div>
+                        <div style="min-height:160px; max-height:220px; overflow-y:auto; background:var(--color-surface-canvas); padding:16px; border-radius:14px; font-size:13px; line-height:1.6; white-space:pre-line; overflow-wrap:break-word; word-break:break-word;">{{ conteudo_traduzido(chamado.descricao, traducoes, 'orig-descricao') }}</div>
                         {% endif %}
                     </section>
 
@@ -457,7 +463,7 @@
                                     <p style="font-size:11px; font-weight:700; color:var(--color-surface-muted); margin-bottom:2px;">
                                         {{ msg.usuario_nome }} · <time datetime="{{ msg.data_acao.isoformat() if msg.data_acao else '' }}" aria-label="{{ t('message_sent_at') }} {{ msg.data_acao_formatada() }}">{{ msg.data_acao_formatada() }}</time>
                                     </p>
-                                    <p style="font-size:13px; line-height:1.5; white-space:pre-line; overflow-wrap:break-word; word-break:break-word;">{{ msg.valor_novo }}</p>
+                                    <p style="font-size:13px; line-height:1.5; white-space:pre-line; overflow-wrap:break-word; word-break:break-word;">{{ conteudo_traduzido(msg.valor_novo, traducoes, 'orig-msg-' ~ msg.id) }}</p>
                                 </article>
                             </li>
                             {% endfor %}
@@ -543,6 +549,26 @@
                             pTexto.textContent = msg.texto || '';
                             article.appendChild(pMeta);
                             article.appendChild(pTexto);
+                            // "Ver original" — mesmo padrão server-side (conteudo_traduzido,
+                            // components/_traducao_toggle.html): só aparece quando o texto
+                            // foi de fato traduzido (LibreTranslate).
+                            if (msg.texto_traduzido && msg.texto_original) {
+                                var toggleId = 'orig-msg-' + msg.id;
+                                var btnOriginal = document.createElement('button');
+                                btnOriginal.type = 'button';
+                                btnOriginal.className = 'bento-translate-toggle';
+                                btnOriginal.setAttribute('data-action', 'toggle-hidden');
+                                btnOriginal.setAttribute('data-target', toggleId);
+                                btnOriginal.setAttribute('aria-expanded', 'false');
+                                btnOriginal.setAttribute('aria-controls', toggleId);
+                                btnOriginal.textContent = (window.DTX_MSGS && window.DTX_MSGS.view_original_text) || 'Ver original';
+                                var divOriginal = document.createElement('div');
+                                divOriginal.id = toggleId;
+                                divOriginal.className = 'hidden bento-translate-original';
+                                divOriginal.textContent = msg.texto_original;
+                                article.appendChild(btnOriginal);
+                                article.appendChild(divOriginal);
+                            }
                             li.appendChild(article);
                             return li;
                         }
@@ -844,7 +870,7 @@
                                      textarea acima (editável) some pra chamado já cancelado. -->
                                 <div style="margin-top:14px;">
                                     <label class="bento-field-label" style="margin-bottom:8px;">{% set _cr3 = t('cancellation_reason') %}{{ _cr3 if _cr3 != 'cancellation_reason' else 'Motivo do cancelamento' }}</label>
-                                    <div style="font-size:13px; font-weight:600; background:#fff1f2; border:1px solid var(--color-bento-danger-bg); border-radius:14px; padding:14px;">{{ chamado.motivo_cancelamento }}</div>
+                                    <div style="font-size:13px; font-weight:600; background:#fff1f2; border:1px solid var(--color-bento-danger-bg); border-radius:14px; padding:14px;">{{ conteudo_traduzido(chamado.motivo_cancelamento, traducoes, 'orig-motivo-cancelamento-1') }}</div>
                                     {% if chamado.data_cancelamento_formatada() and chamado.data_cancelamento_formatada() != '-' %}
                                     <p style="font-size:11px; color:var(--color-surface-muted); font-weight:600; margin-top:8px;">{{ t('cancelled_on') if t else 'Cancelado em' }}: {{ chamado.data_cancelamento_formatada() }}</p>
                                     {% endif %}
@@ -905,7 +931,7 @@
                                 <div style="background:var(--color-surface-canvas); border-radius:14px; padding:10px 12px; margin-bottom:10px;">
                                     <p style="font-size:12px; font-weight:700;">{{ chamado.previsao_atendimento_formatada() }}</p>
                                     {% if chamado.motivo_previsao_atendimento %}
-                                    <p style="font-size:11px; color:var(--color-surface-muted); margin-top:2px;">{{ chamado.motivo_previsao_atendimento }}</p>
+                                    <p style="font-size:11px; color:var(--color-surface-muted); margin-top:2px;">{{ conteudo_traduzido(chamado.motivo_previsao_atendimento, traducoes, 'orig-motivo-previsao-1') }}</p>
                                     {% endif %}
                                 </div>
                                 {% else %}
@@ -940,7 +966,7 @@
                             {% if chamado.status == 'Cancelado' and chamado.motivo_cancelamento %}
                             <div>
                                 <label class="bento-field-label" style="margin-bottom:8px;">{% set _cr2 = t('cancellation_reason') %}{{ _cr2 if _cr2 != 'cancellation_reason' else 'Motivo do cancelamento' }}</label>
-                                <div style="font-size:13px; font-weight:600; background:#fff1f2; border:1px solid var(--color-bento-danger-bg); border-radius:14px; padding:14px;">{{ chamado.motivo_cancelamento }}</div>
+                                <div style="font-size:13px; font-weight:600; background:#fff1f2; border:1px solid var(--color-bento-danger-bg); border-radius:14px; padding:14px;">{{ conteudo_traduzido(chamado.motivo_cancelamento, traducoes, 'orig-motivo-cancelamento-2') }}</div>
                                 {% if chamado.data_cancelamento_formatada() and chamado.data_cancelamento_formatada() != '-' %}
                                 <p style="font-size:11px; color:var(--color-surface-muted); font-weight:600; margin-top:8px;">{{ t('cancelled_on') if t else 'Cancelado em' }}: {{ chamado.data_cancelamento_formatada() }}</p>
                                 {% endif %}
@@ -1003,7 +1029,7 @@
                                     <p style="font-size:11px; font-weight:700; color:var(--color-surface-muted); text-transform:uppercase; letter-spacing:.03em;">{{ t('deadline_and_alerts_title') if t else 'Previsão de atendimento' }}</p>
                                     <p style="font-size:12px; font-weight:700; margin-top:2px;">{{ chamado.previsao_atendimento_formatada() }}</p>
                                     {% if chamado.motivo_previsao_atendimento %}
-                                    <p style="font-size:11px; color:var(--color-surface-muted); margin-top:2px;">{{ chamado.motivo_previsao_atendimento }}</p>
+                                    <p style="font-size:11px; color:var(--color-surface-muted); margin-top:2px;">{{ conteudo_traduzido(chamado.motivo_previsao_atendimento, traducoes, 'orig-motivo-previsao-2') }}</p>
                                     {% endif %}
                                 </div>
                                 {% endif %}
@@ -1417,6 +1443,7 @@
 window.DTX_MSGS = window.DTX_MSGS || {};
 Object.assign(window.DTX_MSGS, {
     loading: {{ t('loading_generic') | tojson }},
+    view_original_text: {{ t('view_original_text') | tojson }},
     select_area_first: {{ t('escalation_select_area_first') | tojson }},
     select_responsible: {{ t('escalation_select_responsible') | tojson }},
     select_colleague: {{ t('escalation_select_colleague') | tojson }},

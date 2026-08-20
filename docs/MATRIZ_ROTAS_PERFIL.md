@@ -122,8 +122,8 @@
 
 | Rota | Método | Decorador | Perfis | Checks inline |
 |------|--------|-----------|--------|---------------|
-| `/api/chamado/<id>/transferir-area` | POST | `@requer_supervisor_area` | supervisor (owner), admin, admin_global | `usuario_pode_ver_chamado` (owner ou admin); `supervisor_id` destino obrigatório; `motivo` não vazio; invariante anti-órfão; serviço: `escalonamento_service.transferir_area` |
-| `/api/chamado/<id>/escalonar-colega` | POST | `@requer_supervisor_area` | supervisor (owner), admin, admin_global | `usuario_pode_ver_chamado`; `supervisor_id` destino obrigatório; `motivo` não vazio; destino ≠ atual; área inalterada; serviço: `escalonamento_service.escalonar_colega` |
+| `/api/chamado/<id>/transferir-area` | POST | `@requer_supervisor_area_ou_gestor_setor` | supervisor (owner), admin, admin_global, gestor_setor da área do chamado | `usuario_pode_ver_chamado` (owner, admin, ou `usuario_gestor_setor_pode_escalonar`); `supervisor_id` destino obrigatório; `motivo` não vazio; invariante anti-órfão; serviço: `escalonamento_service.transferir_area` |
+| `/api/chamado/<id>/escalonar-colega` | POST | `@requer_supervisor_area_ou_gestor_setor` | supervisor (owner), admin, admin_global, gestor_setor da área do chamado | `usuario_pode_ver_chamado`; `supervisor_id` destino obrigatório; `motivo` não vazio; destino ≠ atual; área inalterada; serviço: `escalonamento_service.escalonar_colega` |
 
 ## Rotas Fase 4 — Multi-setor com Participantes (implementado 2026-06-25)
 
@@ -131,7 +131,7 @@
 
 | Rota | Método | Decorador | Perfis | Checks inline |
 |------|--------|-----------|--------|---------------|
-| `/api/chamado/<id>/incluir-participantes` | POST | `@requer_supervisor_area` | supervisor (owner), admin, admin_global | `usuario_pode_ver_chamado`; `responsavel_id == current_user.id OR is_admin_or_above`; lista não vazia; cada `supervisor_id` pertence à `area`; owner não incluído como participante; sem duplicação |
+| `/api/chamado/<id>/incluir-participantes` | POST | `@requer_supervisor_area_ou_gestor_setor` | supervisor (owner), admin, admin_global, gestor_setor da área do chamado | `usuario_pode_ver_chamado`; `responsavel_id == current_user.id OR is_admin_or_above OR usuario_gestor_setor_pode_escalonar`; lista não vazia; cada `supervisor_id` pertence à `area`; owner não incluído como participante; sem duplicação |
 | `/api/chamado/<id>/concluir-minha-parte` | POST | `@login_required` | supervisor participante | `current_user.id in participantes[*].supervisor_id`; status participante `!= "concluido"` |
 
 ## Rotas Fase 5 — Perfil Gestor `[implementado 2026-06-25]`

@@ -103,17 +103,26 @@ def usuario_pode_mutar_chamado(usuario: Any, chamado=None) -> tuple[bool, str | 
     """Verifica se o usuário pode realizar qualquer mutação em chamados.
 
     Gestor read-only (is_gestor_only=True) nunca pode escrever, mesmo se for
-    owner ou participante. Admin sempre pode. Supervisor comum pode (verificações
-    de área ficam a cargo dos callers).
+    owner ou participante — EXCETO gestor_setor agindo via Ações de
+    Escalonamento num chamado da própria área (chamado informado + área bate),
+    decisão de escopo 2026-08-20 (ver usuario_gestor_setor_pode_escalonar).
+    Admin sempre pode. Supervisor comum pode (verificações de área ficam a
+    cargo dos callers).
 
     Args:
         usuario: current_user
-        chamado: ignorado nesta versão; mantido para compatibilidade futura
+        chamado: quando informado, habilita a exceção de gestor_setor acima —
+            sem ele, gestor read-only continua bloqueado (fail-closed)
 
     Returns:
         (permitido, mensagem_erro) — mensagem_erro é None quando permitido.
     """
     if getattr(usuario, "is_gestor_only", None) is True:
+        if chamado is not None:
+            from app.services.permissions import usuario_gestor_setor_pode_escalonar
+
+            if usuario_gestor_setor_pode_escalonar(usuario, chamado):
+                return True, None
         return False, "access_denied_gestor_readonly"
     return True, None
 

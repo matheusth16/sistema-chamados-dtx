@@ -152,6 +152,22 @@ def usuario_pode_operar_chamado(user: Usuario, chamado: Any) -> bool:
     return _usuario_pode_operar_chamado_base(user, chamado)
 
 
+def usuario_gestor_setor_pode_escalonar(user: Usuario, chamado: Any) -> bool:
+    """True se user é gestor_setor com a área do chamado entre as próprias.
+
+    Usado só pelas Ações de Escalonamento (transferir área/colega, incluir
+    participantes) — decisão de escopo 2026-08-20: diferente do gate de
+    escrita geral (usuario_pode_operar_chamado, que não herda a leitura
+    ampliada de gestor_setor), aqui o gestor_setor ganha ação real sobre
+    chamado do time que ele não é dono, restrita às próprias áreas.
+    gerente_producao/assistente_gm/gm continuam 100% read-only — não entram
+    aqui mesmo tendo leitura ampliada de todas as áreas.
+    """
+    return getattr(user, "nivel_gestao", None) == "gestor_setor" and getattr(
+        chamado, "area", None
+    ) in (getattr(user, "areas", None) or [])
+
+
 def _eh_observador(user_id: str, chamado) -> bool:
     """True se user_id aparece em chamado.observadores[*].usuario_id."""
     observadores = getattr(chamado, "observadores", None) or []

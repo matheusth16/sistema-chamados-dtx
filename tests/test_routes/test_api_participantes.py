@@ -132,6 +132,46 @@ class TestIncluirParticipantesRota:
 
         assert resp.status_code == 403
 
+    def test_incluir_gestor_setor_da_area_sem_ser_owner_retorna_200(self, client_logado_gestor):
+        """Ações de Escalonamento (2026-08-20): gestor_setor da própria área
+        pode incluir participantes em chamado do time mesmo sem ser owner."""
+        chamado_mock = _mock_chamado_obj(area="Geral", responsavel_id="outro_sup")
+
+        with (
+            patch("app.routes.api_colaboracao.Chamado") as mock_chamado_cls,
+            patch("app.routes.api_colaboracao.usuario_pode_ver_chamado", return_value=True),
+            patch(
+                "app.services.escalonamento_service.incluir_participantes",
+                return_value={
+                    "sucesso": True,
+                    "dados": {
+                        "participantes": [
+                            {
+                                "supervisor_id": "id_dest",
+                                "area": "Logistica",
+                                "status": "pendente",
+                                "concluido_em": None,
+                            }
+                        ],
+                        "adicionados": [
+                            {"supervisor_id": "id_dest", "area": "Logistica", "nome": "Dest"}
+                        ],
+                    },
+                },
+            ),
+            patch("app.routes.api_colaboracao.threading"),
+        ):
+            mock_chamado_cls.get_by_id.return_value = chamado_mock
+
+            resp = client_logado_gestor.post(
+                "/api/chamado/id123/incluir-participantes",
+                json={"participantes": [{"supervisor_id": "id_dest", "area": "Logistica"}]},
+                content_type="application/json",
+            )
+
+        assert resp.status_code == 200
+        assert resp.get_json()["sucesso"] is True
+
     def test_incluir_solicitante_bloqueado(self, client_logado_solicitante):
         """Solicitante não tem acesso à rota e recebe JSON 403."""
         resp = client_logado_solicitante.post(

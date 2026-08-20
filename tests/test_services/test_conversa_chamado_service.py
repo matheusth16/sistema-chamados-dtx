@@ -1,6 +1,8 @@
 """TDD: mensagens_novas (polling da Conversa solicitante ↔ responsável) —
 app/services/conversa_chamado_service.py."""
 
+from unittest.mock import patch
+
 import pytest
 
 from app.models_historico import Historico
@@ -89,12 +91,54 @@ class TestMensagensNovas:
             "usuario_nome",
             "eh_solicitante",
             "texto",
+            "texto_traduzido",
+            "texto_original",
             "data_iso",
             "data_formatada",
         }
         assert resultado[0]["usuario_nome"] == "Julia"
         assert resultado[0]["texto"] == "Olá"
         assert resultado[0]["data_iso"] != ""
+
+    def test_traduz_texto_conforme_idioma_destino(self, app):
+        """mensagens_novas repassa idioma_destino pro batch de tradução
+        (traducao_conteudo_service.traduzir_varios)."""
+        chamado = make_chamado()
+        _msg(chamado.id, "resposta_solicitante", texto="Prazo estendido")
+        app.config["LIBRETRANSLATE_ENABLED"] = True
+        app.config["LIBRETRANSLATE_URL"] = "http://libretranslate.local:5000"
+
+        with (
+            app.app_context(),
+            patch(
+                "app.services.conversa_chamado_service.traduzir_varios",
+                return_value={
+                    "Prazo estendido": {
+                        "texto": "Deadline extended",
+                        "traduzido": True,
+                        "original": "Prazo estendido",
+                    }
+                },
+            ) as mock_traduzir,
+        ):
+            resultado = mensagens_novas(chamado.id, idioma_destino="en")
+
+        mock_traduzir.assert_called_once_with(["Prazo estendido"], "en")
+        assert resultado[0]["texto"] == "Deadline extended"
+        assert resultado[0]["texto_traduzido"] is True
+        assert resultado[0]["texto_original"] == "Prazo estendido"
+
+    def test_sem_traducao_mantem_texto_original(self):
+        """Fora de contexto Flask (sem app.app_context) ou com a flag
+        desligada, texto_traduzido fica False e texto_original None."""
+        chamado = make_chamado()
+        _msg(chamado.id, "resposta_solicitante", texto="oi")
+
+        resultado = mensagens_novas(chamado.id)
+
+        assert resultado[0]["texto"] == "oi"
+        assert resultado[0]["texto_traduzido"] is False
+        assert resultado[0]["texto_original"] is None
 
 
 class TestHistoricoForaDaConversa:

@@ -1,0 +1,27 @@
+{#
+  _traducao_toggle.html
+  Renderiza um texto livre (descrição, histórico, conversa) já passado pelo
+  batch de tradução automática (traducao_conteudo_service, ver
+  app/routes/dashboard.py::visualizar_detalhe_chamado) — mostra o texto
+  traduzido e, só quando a tradução de fato aconteceu, um link "ver original"
+  que revela o texto no idioma original (mesmo padrão de toggle já usado nos
+  cards de ajuda da Ações de Escalonamento: data-action="toggle-hidden").
+
+  Uso: {% from 'components/_traducao_toggle.html' import conteudo_traduzido with context %}
+       {{ conteudo_traduzido(evento.detalhe, traducoes, 'orig-hist-detalhe-' ~ evento.id) }}
+
+  compact=True: só o texto traduzido, sem o link (usado em diff-chips
+  pequenos onde não cabe o toggle).
+#}
+{% macro conteudo_traduzido(texto_original, traducoes, toggle_id, compact=False) %}
+{%- set info = traducoes.get(texto_original) if traducoes and texto_original else none -%}
+{%- if info and info.traduzido -%}
+{{- info.texto -}}
+{%- if not compact %}
+<button type="button" class="bento-translate-toggle" data-action="toggle-hidden" data-target="{{ toggle_id }}" aria-expanded="false" aria-controls="{{ toggle_id }}">{{ t('view_original_text') if t else 'Ver original' }}</button>
+<div id="{{ toggle_id }}" class="hidden bento-translate-original">{{ info.original }}</div>
+{%- endif -%}
+{%- else -%}
+{{- texto_original -}}
+{%- endif -%}
+{% endmacro %}

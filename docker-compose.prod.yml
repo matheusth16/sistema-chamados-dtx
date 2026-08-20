@@ -93,3 +93,29 @@ services:
       - "127.0.0.1:8081:8080"
     command: --http-api-endpoints=update --cleanup sistema_chamados-web-1
     restart: unless-stopped
+
+  # LibreTranslate self-hosted — tradução automática de conteúdo dinâmico dos
+  # chamados (descrição, histórico, conversa; ver
+  # app/services/traducao_conteudo_service.py). Sem "depends_on" em "web" de
+  # propósito: LIBRETRANSLATE_ENABLED=false por padrão e o serviço falha
+  # aberto (mostra o texto original) se este container ficar indisponível —
+  # não faz sentido acoplar a disponibilidade do sistema de chamados a um
+  # sidecar novo/opcional. Suba com:
+  # docker compose -f docker-compose.prod.yml up -d libretranslate
+  libretranslate:
+    image: libretranslate/libretranslate:latest
+    environment:
+      - LT_LOAD_ONLY=en,pt,es
+      - LT_DISABLE_WEB_UI=true
+    volumes:
+      - libretranslate_models:/home/libretranslate/.local/share
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/languages')"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    restart: unless-stopped
+
+volumes:
+  libretranslate_models:

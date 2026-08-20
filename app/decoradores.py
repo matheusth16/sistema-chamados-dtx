@@ -142,6 +142,49 @@ def requer_supervisor_area(f):
     return funcao_decorada
 
 
+def requer_supervisor_area_ou_gestor_setor(f):
+    """Como requer_supervisor_area, mas também libera gestor_setor — mesmo
+    "puro" (sem perfil supervisor) — usado só nas rotas de Ações de
+    Escalonamento (transferir área/colega, incluir participantes), onde o
+    gestor_setor pode agir em chamado do time que não é dele, restrito à
+    própria área (decisão de escopo 2026-08-20). O escopo por área é
+    responsabilidade do corpo da rota/service (aqui só libera pelo perfil/
+    nivel_gestao, sem ainda ter o chamado em mãos).
+
+    gerente_producao/assistente_gm/gm (company-wide) NÃO entram aqui —
+    continuam 100% read-only.
+    """
+
+    @wraps(f)
+    def funcao_decorada(*args, **kwargs):
+        if not current_user.is_authenticated:
+            logger.warning("Acesso negado: usuário não autenticado tentou acessar %s", f.__name__)
+            if request.path.startswith("/api/"):
+                return _resposta_api_acesso_negado(401)
+            flash_t("login_required_msg", "danger")
+            return redirect(url_for("main.login"))
+
+        eh_gestor_setor = getattr(current_user, "nivel_gestao", None) == "gestor_setor"
+        if (
+            current_user.perfil not in ["supervisor", "admin", "admin_global"]
+            and not eh_gestor_setor
+        ):
+            logger.warning(
+                "Acesso negado: %s (%s) tentou acessar %s",
+                current_user.email,
+                current_user.perfil,
+                f.__name__,
+            )
+            if request.path.startswith("/api/"):
+                return _resposta_api_acesso_negado(403)
+            flash_t("access_denied_supervisors", "danger")
+            return redirect(url_for("main.index"))
+
+        return f(*args, **kwargs)
+
+    return funcao_decorada
+
+
 def requer_solicitante(f):
     """
     Decorador para rotas de criação e listagem de chamados.

@@ -787,6 +787,86 @@ def test_visualizar_chamado_admin_com_permissao_retorna_200(client_logado_admin,
     assert r.status_code == 200
 
 
+def test_visualizar_chamado_chama_montar_traducoes_uma_unica_vez(client_logado_admin, db_session):
+    """Tradução automática (LibreTranslate): visualizar_detalhe_chamado monta o
+    lote de tradução UMA vez antes do render_template — nunca dentro do loop
+    do histórico (evitaria N chamadas HTTP)."""
+    from tests.factories import make_chamado
+
+    chamado = make_chamado()
+    with (
+        patch("app.routes.dashboard.usuario_pode_ver_chamado", return_value=True),
+        patch("app.routes.dashboard.get_static_cached", return_value=[]),
+        patch("app.routes.dashboard.filtrar_supervisores_por_area", return_value=[]),
+        patch("app.routes.dashboard.CategoriaSetor.get_all", return_value=[]),
+        patch(
+            "app.services.traducao_conteudo_service.montar_traducoes_chamado", return_value={}
+        ) as mock_montar,
+    ):
+        r = client_logado_admin.get(f"/chamado/{chamado.id}", follow_redirects=False)
+
+    assert r.status_code == 200
+    mock_montar.assert_called_once()
+
+
+def test_visualizar_chamado_mostra_link_ver_original_quando_traduzido(
+    client_logado_supervisor, db_session
+):
+    """Quando o texto foi de fato traduzido, a página mostra o texto traduzido
+    + o link "ver original"; quando não houve tradução, nenhum dos dois
+    aparece."""
+    # client_logado_supervisor (não admin): pode_editar_descricao é exclusivo
+    # de admin (só admin pode sobrescrever o texto do solicitante) — supervisor
+    # sempre vê a <div> de leitura (onde entra conteudo_traduzido), nunca a
+    # textarea de edição (que usa chamado.descricao bruto de propósito).
+    from tests.factories import make_chamado
+
+    chamado = make_chamado(descricao="Descrição em português", area="Manutencao")
+    with (
+        patch("app.routes.dashboard.usuario_pode_ver_chamado", return_value=True),
+        patch("app.routes.dashboard.get_static_cached", return_value=[]),
+        patch("app.routes.dashboard.filtrar_supervisores_por_area", return_value=[]),
+        patch("app.routes.dashboard.CategoriaSetor.get_all", return_value=[]),
+        patch(
+            "app.services.traducao_conteudo_service.montar_traducoes_chamado",
+            return_value={
+                "Descrição em português": {
+                    "texto": "Description in English",
+                    "traduzido": True,
+                    "original": "Descrição em português",
+                }
+            },
+        ),
+    ):
+        r = client_logado_supervisor.get(f"/chamado/{chamado.id}", follow_redirects=False)
+
+    assert r.status_code == 200
+    html = r.get_data(as_text=True)
+    assert "Description in English" in html
+    assert 'class="bento-translate-toggle"' in html
+    assert "Descrição em português" in html  # dentro do <div> escondido de "ver original"
+
+
+def test_visualizar_chamado_sem_traducao_nao_mostra_link_ver_original(
+    client_logado_supervisor, db_session
+):
+    from tests.factories import make_chamado
+
+    chamado = make_chamado(descricao="Descrição em português", area="Manutencao")
+    with (
+        patch("app.routes.dashboard.usuario_pode_ver_chamado", return_value=True),
+        patch("app.routes.dashboard.get_static_cached", return_value=[]),
+        patch("app.routes.dashboard.filtrar_supervisores_por_area", return_value=[]),
+        patch("app.routes.dashboard.CategoriaSetor.get_all", return_value=[]),
+        patch("app.services.traducao_conteudo_service.montar_traducoes_chamado", return_value={}),
+    ):
+        r = client_logado_supervisor.get(f"/chamado/{chamado.id}", follow_redirects=False)
+
+    assert r.status_code == 200
+    html = r.get_data(as_text=True)
+    assert 'class="bento-translate-toggle"' not in html
+
+
 def test_visualizar_chamado_admin_global_ve_botao_historico(client_logado_admin_global, db_session):
     """GET /chamado/<id> com admin_global mostra o botão "Ver Histórico" —
     admin_global herda tudo de admin; o botão só checava perfil in
@@ -1673,6 +1753,47 @@ def test_historico_exception_redireciona(client_logado_supervisor, db_session):
     ):
         r = client_logado_supervisor.get(f"/chamado/{chamado.id}/historico", follow_redirects=False)
     assert r.status_code == 302
+
+
+def test_historico_mostra_criacao_no_topo_e_mais_recente_embaixo(
+    client_logado_supervisor, db_session
+):
+    """GET /chamado/<id>/historico em ordem cronológica: criação no topo, evento
+    mais recente embaixo — antes vinha invertido (mais recente no topo), pedido
+    do usuário (2026-08-20) pra ler de cima pra baixo."""
+    from app.models_historico import Historico
+    from tests.factories import make_chamado
+
+    chamado = make_chamado(area="Manutencao")
+    Historico(
+        chamado_id=chamado.id,
+        usuario_id="u1",
+        usuario_nome="Fulano",
+        acao="criacao",
+    ).save()
+    Historico(
+        chamado_id=chamado.id,
+        usuario_id="u1",
+        usuario_nome="Fulano",
+        acao="alteracao_status",
+        campo_alterado="status",
+        valor_anterior="Aberto",
+        valor_novo="Em Atendimento",
+    ).save()
+
+    with patch("app.routes.dashboard.usuario_pode_ver_chamado", return_value=True):
+        r = client_logado_supervisor.get(f"/chamado/{chamado.id}/historico")
+
+    assert r.status_code == 200
+    body = r.get_data(as_text=True)
+    # Marcadores de classe CSS (independentes de idioma) pra cada tipo de evento.
+    pos_criacao = body.index("bento-timeline-dot criacao")
+    pos_status = body.index("bento-timeline-dot status")
+    assert pos_criacao < pos_status, "criação deve aparecer antes (acima) do evento mais recente"
+
+    pos_badge_1 = body.index(">#1<")
+    pos_badge_2 = body.index(">#2<")
+    assert pos_badge_1 < pos_badge_2, "numeração deve contar #1 (mais antigo) até #N (mais recente)"
 
 
 def test_historico_traduz_status_para_ingles(client_logado_admin, db_session):
