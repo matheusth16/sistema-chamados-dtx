@@ -278,7 +278,8 @@ def visualizar_detalhe_chamado(chamado_id: str) -> Response:
         from app.services.traducao_conteudo_service import montar_traducoes_chamado
 
         # Lote único (descrição/motivo_* + todo o histórico) — 1 lookup de
-        # cache + no máximo 1 chamada HTTP ao LibreTranslate, nunca por campo.
+        # cache em lote; HTTP ao LibreTranslate 1 por texto que faltar no
+        # cache (nunca em array — ver traducao_conteudo_service.py).
         traducoes = montar_traducoes_chamado(chamado, historico, session.get("language", "en"))
 
         return render_template(

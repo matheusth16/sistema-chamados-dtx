@@ -13,13 +13,15 @@ import pytest
 pytestmark = pytest.mark.usefixtures("db_session")
 
 
-def _mock_urlopen(traducoes: list[str], detectados: list[str | None]):
+def _mock_urlopen(traduzido: str, detectado: str | None):
+    """Mock de UMA resposta de tradução de item único — LibreTranslate agora é
+    chamado individualmente por texto (nunca em lote com `q` como array; ver
+    nota em _traduzir_via_libretranslate sobre detecção de idioma quebrada em
+    lote com idiomas misturados, achado em produção 2026-08-20)."""
     payload = json.dumps(
         {
-            "translatedText": traducoes,
-            "detectedLanguage": [
-                {"language": d, "confidence": 90} if d else None for d in detectados
-            ],
+            "translatedText": traduzido,
+            "detectedLanguage": ({"language": detectado, "confidence": 90} if detectado else None),
         }
     ).encode()
     mock_resp = MagicMock()
@@ -75,7 +77,7 @@ class TestTraduzirConteudoCacheMiss:
             app_libretranslate.app_context(),
             patch(
                 "urllib.request.urlopen",
-                return_value=_mock_urlopen(["Deadline extended"], ["pt"]),
+                return_value=_mock_urlopen("Deadline extended", "pt"),
             ) as mock_urlopen,
         ):
             resultado = traduzir_conteudo("Prazo estendido", "en")
@@ -94,7 +96,7 @@ class TestTraduzirConteudoCacheMiss:
             app_libretranslate.app_context(),
             patch(
                 "urllib.request.urlopen",
-                return_value=_mock_urlopen(["Deadline extended"], ["pt"]),
+                return_value=_mock_urlopen("Deadline extended", "pt"),
             ),
         ):
             traduzir_conteudo("Prazo estendido", "en")
@@ -119,7 +121,7 @@ class TestTraduzirConteudoIdiomaJaBate:
             app_libretranslate.app_context(),
             patch(
                 "urllib.request.urlopen",
-                return_value=_mock_urlopen(["Already in English"], ["en"]),
+                return_value=_mock_urlopen("Already in English", "en"),
             ),
         ):
             resultado = traduzir_conteudo("Already in English", "en")
@@ -134,7 +136,7 @@ class TestTraduzirConteudoIdiomaJaBate:
             app_libretranslate.app_context(),
             patch(
                 "urllib.request.urlopen",
-                return_value=_mock_urlopen(["Already in English"], ["en"]),
+                return_value=_mock_urlopen("Already in English", "en"),
             ),
         ):
             traduzir_conteudo("Already in English", "en")
@@ -193,7 +195,7 @@ class TestTraduzirVariosLote:
             app_libretranslate.app_context(),
             patch(
                 "urllib.request.urlopen",
-                return_value=_mock_urlopen(["Cached hit translated"], ["pt"]),
+                return_value=_mock_urlopen("Cached hit translated", "pt"),
             ),
         ):
             traduzir_conteudo("Já em cache", "en")
@@ -202,7 +204,7 @@ class TestTraduzirVariosLote:
             app_libretranslate.app_context(),
             patch(
                 "urllib.request.urlopen",
-                return_value=_mock_urlopen(["Texto novo traduzido"], ["pt"]),
+                return_value=_mock_urlopen("Texto novo traduzido", "pt"),
             ) as mock_urlopen,
         ):
             resultado = traduzir_varios(["Já em cache", "Texto novo"], "en")
@@ -210,7 +212,7 @@ class TestTraduzirVariosLote:
         mock_urlopen.assert_called_once()
         request_enviado = mock_urlopen.call_args[0][0]
         corpo_enviado = json.loads(request_enviado.data.decode())
-        assert corpo_enviado["q"] == ["Texto novo"]
+        assert corpo_enviado["q"] == "Texto novo"
 
         assert resultado["Já em cache"]["texto"] == "Cached hit translated"
         assert resultado["Texto novo"]["texto"] == "Texto novo traduzido"
@@ -222,7 +224,7 @@ class TestTraduzirVariosLote:
             app_libretranslate.app_context(),
             patch(
                 "urllib.request.urlopen",
-                return_value=_mock_urlopen(["A", "B"], ["pt", "pt"]),
+                side_effect=[_mock_urlopen("A", "pt"), _mock_urlopen("B", "pt")],
             ),
         ):
             traduzir_varios(["Texto A", "Texto B"], "en")
@@ -236,6 +238,36 @@ class TestTraduzirVariosLote:
             resultado = traduzir_conteudo("Texto A", "en")
 
         assert resultado["texto"] == "A"
+
+    def test_lote_com_idiomas_misturados_detecta_cada_item_corretamente(self, app_libretranslate):
+        """Regressão (achado em produção, chamado real, 2026-08-20): um texto
+        já em inglês (ex.: descrição) e um texto em português (ex.: nota do
+        histórico) no MESMO lote não podem "contaminar" a detecção um do
+        outro. Antes (array batch com source=auto), o LibreTranslate detectava
+        o idioma do lote inteiro de uma vez e o item em português voltava sem
+        tradução nenhuma. Agora cada texto é uma chamada HTTP independente —
+        o teste simula exatamente isso: duas respostas diferentes, uma por
+        chamada, cada uma com seu próprio idioma detectado."""
+        from app.services.traducao_conteudo_service import traduzir_varios
+
+        with (
+            app_libretranslate.app_context(),
+            patch(
+                "urllib.request.urlopen",
+                side_effect=[
+                    _mock_urlopen("Already in English", "en"),
+                    _mock_urlopen("Missing ~26min to level 1", "pt"),
+                ],
+            ) as mock_urlopen,
+        ):
+            resultado = traduzir_varios(["Already in English", "Faltam ~26min pro nível 1"], "en")
+
+        assert mock_urlopen.call_count == 2
+        # Texto já em inglês: detectado == destino → não "traduzido" (mostra original)
+        assert resultado["Already in English"]["traduzido"] is False
+        # Texto em português: detectado != destino → traduzido de verdade
+        assert resultado["Faltam ~26min pro nível 1"]["traduzido"] is True
+        assert resultado["Faltam ~26min pro nível 1"]["texto"] == "Missing ~26min to level 1"
 
     def test_lote_vazio_retorna_dict_vazio(self, app_libretranslate):
         from app.services.traducao_conteudo_service import traduzir_varios

@@ -64,9 +64,12 @@ def traduzir_conteudo(texto: str, idioma_destino: str) -> dict[str, Any]:
 
 
 def traduzir_varios(textos: list[str], idioma_destino: str) -> dict[str, dict[str, Any]]:
-    """Traduz vários textos em lote: 1 lookup de cache no Postgres + no máximo
-    1 chamada HTTP ao LibreTranslate pros que faltarem no cache (evita N
-    chamadas de rede num loop de histórico com várias entradas).
+    """Traduz vários textos: 1 lookup de cache no Postgres em lote (todos os
+    textos de uma vez) + 1 chamada HTTP ao LibreTranslate POR TEXTO que
+    faltar no cache (nunca em lote com `q` como array — ver
+    _traduzir_via_libretranslate pro motivo: detecção de idioma quebrada em
+    lote com idiomas misturados). Resultado fica cacheado pra sempre, então
+    esse custo por item só é pago na primeira vez que cada texto aparece.
 
     Retorna {texto_original: {"texto": ..., "traduzido": bool, "original": ...}}.
     """
@@ -206,7 +209,9 @@ def montar_traducoes_chamado(chamado: Any, historico: list, idioma_destino: str)
     """Monta o dicionário de traduções pra tela de detalhe do chamado num
     lote ÚNICO (descrição/motivo_* do chamado + todo o histórico) — chamar
     UMA vez antes do render_template (app/routes/dashboard.py), nunca dentro
-    do loop do template, senão vira 1 chamada HTTP por entrada do histórico."""
+    do loop do template. O lookup de cache continua em lote (1 query); as
+    chamadas HTTP ao LibreTranslate são 1 por texto que faltar no cache (ver
+    _traduzir_via_libretranslate), mas o resultado fica cacheado pra sempre."""
     textos = [
         chamado.descricao,
         getattr(chamado, "motivo_cancelamento", None),
@@ -222,33 +227,47 @@ def montar_traducoes_chamado(chamado: Any, historico: list, idioma_destino: str)
 def _traduzir_via_libretranslate(
     textos: list[str], lt_target: str, url: str, timeout: int
 ) -> tuple[list[str] | None, list[str | None]]:
-    """Chama POST {url}/translate em lote (q como array). Retorna
-    (traduzidos, idiomas_detectados) ou (None, []) em qualquer falha."""
+    """Chama POST {url}/translate INDIVIDUALMENTE por texto — nunca em lote
+    com `q` como array.
+
+    Achado em produção (chamado real, 2026-08-20): quando `q` é um array com
+    `source=auto`, o LibreTranslate/Argos detecta o idioma da ORIGEM UMA VEZ
+    pro lote inteiro (não por item) — um lote com idiomas misturados (ex.:
+    descrição em inglês + histórico em português) faz TUDO ser tratado como
+    o idioma dominante, e os itens em português voltam sem tradução alguma,
+    silenciosamente (o par idioma-detectado==idioma-destino "bate" errado).
+    Chamar item a item custa mais requisições, mas cada uma já é rápida
+    (LibreTranslate local, mesma rede Docker) e o resultado fica cacheado no
+    Postgres pra sempre — só a primeira vez que um texto aparece paga esse
+    custo. Retorna (None, []) se qualquer chamada falhar — fail-open cobre o
+    lote inteiro, mesmo contrato de antes.
+    """
+    traduzidos: list[str] = []
+    detectados: list[str | None] = []
     try:
-        payload = json.dumps(
-            {"q": textos, "source": "auto", "target": lt_target, "format": "text"}
-        ).encode("utf-8")
-        req = urllib.request.Request(
-            url.rstrip("/") + "/translate",
-            data=payload,
-            headers={"Content-Type": "application/json"},
-            method="POST",
-        )
-        with urllib.request.urlopen(req, timeout=timeout) as resp:  # nosec B310
-            data = json.loads(resp.read().decode())
+        for texto in textos:
+            payload = json.dumps(
+                {"q": texto, "source": "auto", "target": lt_target, "format": "text"}
+            ).encode("utf-8")
+            req = urllib.request.Request(
+                url.rstrip("/") + "/translate",
+                data=payload,
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=timeout) as resp:  # nosec B310
+                data = json.loads(resp.read().decode())
 
-        traduzidos = data.get("translatedText")
-        if not isinstance(traduzidos, list) or len(traduzidos) != len(textos):
-            logger.warning("Resposta inesperada do LibreTranslate: %r", data)
-            return None, []
+            traduzido = data.get("translatedText")
+            if not isinstance(traduzido, str):
+                logger.warning("Resposta inesperada do LibreTranslate: %r", data)
+                return None, []
+            traduzidos.append(traduzido)
 
-        detectado_raw = data.get("detectedLanguage")
-        if isinstance(detectado_raw, list) and len(detectado_raw) == len(textos):
-            detectados = [
-                (d or {}).get("language") if isinstance(d, dict) else None for d in detectado_raw
-            ]
-        else:
-            detectados = [None] * len(textos)
+            detectado_raw = data.get("detectedLanguage")
+            detectados.append(
+                detectado_raw.get("language") if isinstance(detectado_raw, dict) else None
+            )
         return traduzidos, detectados
     except Exception as e:
         logger.warning("LibreTranslate indisponível: %s", e)
