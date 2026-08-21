@@ -2704,6 +2704,11 @@
     "en": "Only Admin Global can create or promote users to the Administrator role.",
     "es": "Solo el Admin Global puede crear o promover usuarios al perfil Administrador."
   },
+  "access_denied_manage_nivel_gestao": {
+    "pt_BR": "Apenas o Admin Global pode conceder ou alterar o nível de gestão de um usuário.",
+    "en": "Only Admin Global can grant or change a user's management level.",
+    "es": "Solo el Admin Global puede otorgar o cambiar el nivel de gestión de un usuario."
+  },
   "nav_admin_global": {
     "pt_BR": "Painel Global",
     "en": "Global Panel",

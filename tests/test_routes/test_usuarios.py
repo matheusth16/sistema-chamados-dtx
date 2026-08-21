@@ -306,6 +306,58 @@ def test_criar_usuario_supervisor_sem_area_redireciona(client_logado_admin):
     assert r.status_code == 302
 
 
+def test_criar_usuario_nivel_gestao_bloqueado_para_sub_admin(client_logado_admin):
+    """Sub-admin não pode conceder nivel_gestao (acesso company-wide a chamados) na
+    criação de usuário — regressão de escalada de privilégio (achado 2026-08-21):
+    nivel_gestao não tinha o mesmo gate de admin_global que o campo perfil já tem."""
+    with (
+        patch("app.routes.usuarios.Usuario.email_existe", return_value=False),
+        patch("app.routes.usuarios.Usuario") as mock_usuario_cls,
+    ):
+        r = client_logado_admin.post(
+            "/admin/usuarios",
+            data={
+                "acao": "criar",
+                "email": "novo@dtx.aero",
+                "nome": "Novo Usuario",
+                "perfil": "solicitante",
+                "nivel_gestao": "gm",
+            },
+            follow_redirects=False,
+        )
+    assert r.status_code == 302
+    mock_usuario_cls.assert_not_called()
+
+
+def test_criar_usuario_nivel_gestao_permitido_para_admin_global(client_logado_admin_global):
+    """admin_global pode conceder nivel_gestao na criação de usuário."""
+    with (
+        patch("app.routes.usuarios.Usuario") as mock_usuario_cls,
+        patch("app.routes.usuarios.cache_delete"),
+        patch("app.routes.usuarios.gerar_senha_aleatoria", return_value="SenhaTemp123!"),
+        patch("app.routes.usuarios.registrar_historico_usuario"),
+        patch("app.routes.usuarios.threading"),
+    ):
+        mock_usuario_cls.email_existe.return_value = False
+        mock_usuario_cls.invalidar_cache_supervisores_por_area = MagicMock()
+        mock_usuario_cls.return_value.save.return_value = True
+        r = client_logado_admin_global.post(
+            "/admin/usuarios",
+            data={
+                "acao": "criar",
+                "email": "novo2@dtx.aero",
+                "nome": "Novo Usuario Dois",
+                "perfil": "solicitante",
+                "nivel_gestao": "gm",
+            },
+            follow_redirects=False,
+        )
+    assert r.status_code == 302
+    mock_usuario_cls.assert_called_once()
+    _, kwargs = mock_usuario_cls.call_args
+    assert kwargs.get("nivel_gestao") == "gm"
+
+
 # ── Editar usuário ─────────────────────────────────────────────────────────────
 
 
@@ -1167,6 +1219,119 @@ def test_editar_usuario_post_admin_global_pode_promover_para_admin(client_logado
     assert r.status_code == 302
     assert "/admin/usuarios" in (r.location or "")
     fake.update.assert_called()
+
+
+def test_editar_usuario_post_nivel_gestao_bloqueado_para_sub_admin(client_logado_admin):
+    """Sub-admin não pode conceder nivel_gestao (acesso company-wide a chamados) via
+    edição de usuário — regressão de escalada de privilégio (achado 2026-08-21):
+    nivel_gestao não tinha o mesmo gate de admin_global que o campo perfil já tem, e
+    editar_usuario não bloqueava auto-edição, então um sub-admin comum conseguia se
+    autoconceder nivel_gestao='gm' e ganhar leitura de todos os chamados da empresa."""
+    fake = _usuario_fake(
+        uid="u_gestao", email="u_gestao@dtx.aero", nome="Alvo", perfil="solicitante"
+    )
+    fake.areas = ["Geral"]
+    fake.nivel_gestao = None
+    fake.update = MagicMock()
+    with (
+        patch(
+            "app.models_usuario.Usuario.get_by_id",
+            side_effect=_get_by_id_side_effect("u_gestao", fake),
+        ),
+        patch("app.routes.usuarios.Usuario.email_existe", return_value=False),
+    ):
+        r = client_logado_admin.post(
+            "/admin/usuarios/u_gestao/editar",
+            data={
+                "email": "u_gestao@dtx.aero",
+                "nome": "Alvo",
+                "perfil": "solicitante",
+                "areas": ["Geral"],
+                "nivel_gestao": "gm",
+            },
+            follow_redirects=False,
+        )
+    assert r.status_code == 302
+    fake.update.assert_not_called()
+
+
+def test_editar_usuario_post_nivel_gestao_permitido_para_admin_global(
+    client_logado_admin_global,
+):
+    """admin_global pode conceder nivel_gestao via edição de usuário."""
+    fake = _usuario_fake(uid="u_gestao2", email="u2@dtx.aero", nome="Alvo2", perfil="solicitante")
+    fake.areas = ["Geral"]
+    fake.nivel_gestao = None
+    fake.update = MagicMock()
+    ag_mock = _usuario_fake(
+        uid="ag_1", email="ag@test.com", nome="Admin Global", perfil="admin_global"
+    )
+
+    def _side(uid):
+        if uid == "u_gestao2":
+            return fake
+        return ag_mock
+
+    with (
+        patch("app.models_usuario.Usuario.get_by_id", side_effect=_side),
+        patch("app.routes.usuarios.Usuario.email_existe", return_value=False),
+        patch("app.routes.usuarios.cache_delete"),
+        patch("app.routes.usuarios.Usuario.invalidar_cache_supervisores_por_area"),
+    ):
+        r = client_logado_admin_global.post(
+            "/admin/usuarios/u_gestao2/editar",
+            data={
+                "email": "u2@dtx.aero",
+                "nome": "Alvo2",
+                "perfil": "solicitante",
+                "areas": ["Geral"],
+                "nivel_gestao": "gm",
+            },
+            follow_redirects=False,
+        )
+    assert r.status_code == 302
+    fake.update.assert_called_once()
+    _, kwargs = fake.update.call_args
+    assert kwargs.get("nivel_gestao") == "gm"
+
+
+def test_editar_usuario_post_nivel_gestao_inalterado_nao_bloqueia_sub_admin(
+    client_logado_admin,
+):
+    """Sub-admin editando outros campos de um usuário que JÁ tem nivel_gestao (e o
+    form resubmete o mesmo valor) não deve ser bloqueado — só a MUDANÇA de
+    nivel_gestao por quem não é admin_global é que precisa ser negada."""
+    fake = _usuario_fake(
+        uid="u_gestao3", email="u_gestao3@dtx.aero", nome="Nome Antigo", perfil="solicitante"
+    )
+    fake.areas = ["Geral"]
+    fake.nivel_gestao = "gestor_setor"
+    fake.update = MagicMock()
+    with (
+        patch(
+            "app.models_usuario.Usuario.get_by_id",
+            side_effect=_get_by_id_side_effect("u_gestao3", fake),
+        ),
+        patch("app.routes.usuarios.Usuario.email_existe", return_value=False),
+        patch("app.routes.usuarios.cache_delete"),
+        patch("app.routes.usuarios.Usuario.invalidar_cache_supervisores_por_area"),
+    ):
+        r = client_logado_admin.post(
+            "/admin/usuarios/u_gestao3/editar",
+            data={
+                "email": "u_gestao3@dtx.aero",
+                "nome": "Nome Novo",
+                "perfil": "solicitante",
+                "areas": ["Geral"],
+                "nivel_gestao": "gestor_setor",
+            },
+            follow_redirects=False,
+        )
+    assert r.status_code == 302
+    fake.update.assert_called_once()
+    _, kwargs = fake.update.call_args
+    assert "nivel_gestao" not in kwargs
+    assert kwargs.get("nome") == "Nome Novo"
 
 
 def test_editar_usuario_post_excecao_redireciona(client_logado_admin):

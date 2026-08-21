@@ -89,6 +89,11 @@ def gerenciar_usuarios() -> Response:
         # Sub-admins não podem criar outros admins — apenas admin_global pode
         if perfil == "admin" and current_user.perfil != "admin_global":
             erros.append("access_denied_create_admin")
+        # Sub-admins não podem conceder nivel_gestao (leitura company-wide de
+        # chamados) — apenas admin_global pode (achado 2026-08-21: campo não
+        # tinha o mesmo gate que perfil="admin" já tem).
+        if nivel_gestao and current_user.perfil != "admin_global":
+            erros.append("access_denied_manage_nivel_gestao")
         if erros:
             for e in erros:
                 flash_t(e, "danger")
@@ -189,6 +194,7 @@ def editar_usuario(usuario_id: str) -> Response:
         perfil_original = usuario.perfil
         perfil = request.form.get("perfil", usuario.perfil)
         areas = [a.strip() for a in request.form.getlist("areas") if a.strip()]
+        novo_nivel_gestao = request.form.get("nivel_gestao", "").strip() or None
         erros = []
         if email and email != usuario.email:
             if "@" not in email:
@@ -206,6 +212,16 @@ def editar_usuario(usuario_id: str) -> Response:
         # Sub-admins não podem promover para admin — apenas admin_global pode
         if perfil == "admin" and current_user.perfil != "admin_global":
             erros.append("access_denied_create_admin")
+        # Sub-admins não podem conceder/alterar nivel_gestao (leitura company-wide
+        # de chamados) — apenas admin_global pode (achado 2026-08-21: campo não
+        # tinha o mesmo gate que perfil="admin" já tem, e como esta rota não
+        # bloqueia auto-edição, um sub-admin conseguia se autoconceder o nível).
+        if (
+            novo_nivel_gestao != getattr(usuario, "nivel_gestao", None)
+            and novo_nivel_gestao
+            and current_user.perfil != "admin_global"
+        ):
+            erros.append("access_denied_manage_nivel_gestao")
         if erros:
             for e in erros:
                 flash_t(e, "danger")
@@ -224,7 +240,6 @@ def editar_usuario(usuario_id: str) -> Response:
         if novo_ativo != getattr(usuario, "ativo", True):
             update_data["ativo"] = novo_ativo
         # nivel_gestao: campo opcional select (vazio = None = sem gestão)
-        novo_nivel_gestao = request.form.get("nivel_gestao", "").strip() or None
         if novo_nivel_gestao != getattr(usuario, "nivel_gestao", None):
             update_data["nivel_gestao"] = novo_nivel_gestao
         perfil_mudou = "perfil" in update_data and perfil != perfil_original
