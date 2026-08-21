@@ -160,11 +160,24 @@ def _calcular_insights(
     }
 
 
-def _carregar_todos_chamados() -> list[Chamado]:
-    """Carrega chamados ativos do Postgres sem filtro de área."""
+# Corte de segurança pra não carregar a empresa inteira num dashboard read-only.
+# Quando `areas` é informado, o filtro roda no SQL ANTES deste LIMIT — filtrar
+# depois, em Python, deixava um chamado antigo da área do gestor_setor fora da
+# janela dos N mais recentes GLOBALMENTE assim que a empresa passasse desse
+# total, sumindo do painel de triagem sem que ninguém percebesse (achado ao
+# vivo, 2026-08-21).
+_LIMITE_CHAMADOS_DASHBOARD = 500
+
+
+def _carregar_todos_chamados(areas: list[str] | None = None) -> list[Chamado]:
+    """Carrega chamados do Postgres. Sem `areas`, sem filtro (visão company-wide).
+    Com `areas`, filtra por área NO SQL antes do LIMITE_CHAMADOS_DASHBOARD."""
     try:
         with db_module.SessionLocal() as session:
-            stmt = select(ChamadoRow).order_by(ChamadoRow.data_abertura.desc()).limit(500)
+            stmt = select(ChamadoRow).order_by(ChamadoRow.data_abertura.desc())
+            if areas:
+                stmt = stmt.where(ChamadoRow.area.in_(areas))
+            stmt = stmt.limit(_LIMITE_CHAMADOS_DASHBOARD)
             rows = session.execute(stmt).scalars().all()
             return [Chamado._from_row(row) for row in rows]
     except Exception:
@@ -189,11 +202,17 @@ def obter_contexto_gestor_dashboard(
         filtro ativo) e grupos (raias por categoria de risco, usadas na visão geral).
     """
     _agora = agora or datetime.now(ZoneInfo(Config.SLA_TIMEZONE))
-    todos = _carregar_todos_chamados()
-
+    areas_gestor = None
     if usuario is not None and getattr(usuario, "nivel_gestao", None) == "gestor_setor":
-        areas_gestor = set(getattr(usuario, "areas", None) or [])
-        todos = [c for c in todos if getattr(c, "area", None) in areas_gestor]
+        areas_gestor = list(getattr(usuario, "areas", None) or [])
+    todos = _carregar_todos_chamados(areas=areas_gestor)
+
+    if areas_gestor is not None:
+        # Filtro redundante ao que já roda no SQL acima — mantido como rede de
+        # segurança (ex.: _carregar_todos_chamados mockado em teste sem
+        # respeitar `areas`) e porque é barato numa lista já pequena.
+        areas_gestor_set = set(areas_gestor)
+        todos = [c for c in todos if getattr(c, "area", None) in areas_gestor_set]
 
     atrasados = [c for c in todos if _is_atrasado(c, _agora)]
     abertos_sem_resp = [c for c in todos if _is_aberto_sem_resposta(c, _agora)]

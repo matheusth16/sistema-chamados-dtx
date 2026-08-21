@@ -457,6 +457,32 @@ def test_carregar_todos_chamados_retorna_lista_de_chamados(db_session):
     assert result[0].status == "Aberto"
 
 
+def test_carregar_todos_chamados_com_areas_filtra_no_sql_antes_do_limite(db_session, monkeypatch):
+    """Regressão (achado ao vivo, 2026-08-21): o filtro de área do gestor_setor
+    rodava em Python só DEPOIS do corte de _LIMITE_CHAMADOS_DASHBOARD — se a
+    empresa tivesse mais chamados que o limite, um chamado antigo da área do
+    gestor podia "sair" da janela dos N mais recentes GLOBALMENTE e sumir do
+    painel de triagem, mesmo sendo o mais relevante pra área dele. Reduz o
+    limite pra 2 e cria 2 chamados recentes em outra área + 1 antigo na área do
+    gestor: se o filtro roda no SQL antes do LIMIT (correto), o antigo aparece;
+    se roda em Python depois (bug), ele já foi cortado e nunca chega no resultado."""
+    import app.services.gestor_dashboard_service as svc
+    from tests.factories import make_chamado
+
+    monkeypatch.setattr(svc, "_LIMITE_CHAMADOS_DASHBOARD", 2)
+
+    make_chamado(area="Manutencao", data_abertura=datetime(2020, 1, 1, 9, 0))
+    make_chamado(area="TI")
+    make_chamado(area="TI")
+
+    resultado = svc._carregar_todos_chamados(areas=["Manutencao"])
+
+    assert any(c.area == "Manutencao" for c in resultado), (
+        "chamado antigo da área do gestor sumiu — filtro de área não está "
+        "rodando no SQL antes do LIMIT"
+    )
+
+
 # ---------------------------------------------------------------------------
 # Insights de triagem (painel de risco)
 # ---------------------------------------------------------------------------
