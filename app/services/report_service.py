@@ -396,12 +396,19 @@ def _enviar_resumo_admins(
     link_dash: str,
     link_base: str,
 ) -> None:
-    """Envia resumo consolidado para cada admin diretamente."""
+    """Envia resumo consolidado para cada admin (e admin_global) diretamente.
+
+    admin_global herda tudo de admin em todo o resto do app (ver
+    Usuario.is_admin_or_above) — filtrar só perfil == "admin" aqui deixava os
+    admin_global sem nivel_gestao (não caem nos outros 2 grupos, que dependem
+    desse eixo ortogonal) sem receber o relatório semanal nenhum (achado ao
+    vivo em produção, 2026-08-21).
+    """
     try:
         admins = [
             u
             for u in Usuario.get_all()
-            if getattr(u, "perfil", "") == "admin" and getattr(u, "email", None)
+            if getattr(u, "perfil", "") in ("admin", "admin_global") and getattr(u, "email", None)
         ]
     except Exception as exc:
         logger.warning("Não foi possível obter admins: %s", exc)

@@ -359,6 +359,51 @@ def test_enviar_relatorio_semanal_envia_para_admin(app):
     assert "admin@test.com" in destinos
 
 
+def test_enviar_relatorio_semanal_envia_para_admin_global(app):
+    """Regressão (achado ao vivo, 2026-08-21): _enviar_resumo_admins filtrava
+    perfil == "admin" estritamente, excluindo admin_global -- os 2 admin_global
+    de produção (sem nivel_gestao) não recebiam o relatório semanal nenhum,
+    diferente do resto do app, que trata admin_global como "admin ou mais"
+    (ver Usuario.is_admin_or_above). admin_global também não cai nos outros 2
+    grupos (gestor_setor / níveis superiores), que dependem de nivel_gestao,
+    um eixo ortogonal a perfil."""
+    from app.services.report_service import enviar_relatorio_semanal
+
+    chamados = [
+        {
+            "id": "c3",
+            "numero": "CH-003",
+            "categoria": "TI",
+            "tipo": "Suporte",
+            "area": "TI",
+            "responsavel": "Supervisor",
+            "responsavel_id": "sup2",
+            "solicitante": "Req",
+            "status": "Em Atendimento",
+            "data_abertura_fmt": "01/01/2026",
+            "dias_aberto": 2,
+            "sla_label": "Atrasado",
+            "atrasado": True,
+            "sla_dias": 3,
+            "alerta_prazo_24h_enviado_em": None,
+        }
+    ]
+    supervisor = _make_usuario("sup2@test.com", "Sup2", "supervisor")
+    admin_global = _make_usuario("global@test.com", "Admin Global", "admin_global")
+
+    with (
+        app.app_context(),
+        patch("app.services.report_service.buscar_chamados_abertos", return_value=chamados),
+        patch("app.services.report_service.Usuario.get_by_ids", return_value={"sup2": supervisor}),
+        patch("app.services.report_service.Usuario.get_all", return_value=[admin_global]),
+        patch("app.services.report_service.enviar_email", return_value=(True, None)) as mock_send,
+    ):
+        enviar_relatorio_semanal()
+
+    destinos = [call[0][0] for call in mock_send.call_args_list]
+    assert "global@test.com" in destinos
+
+
 def test_relatorio_semanal_usa_get_by_ids_e_nao_get_by_id(app):
     """F-24: com 3+ responsáveis distintos, deve chamar get_by_ids 1× e get_by_id 0×."""
     from app.services.report_service import enviar_relatorio_semanal
