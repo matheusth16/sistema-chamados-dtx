@@ -1,4 +1,5 @@
 import logging
+import unicodedata
 from datetime import UTC, datetime
 
 from flask_login import UserMixin
@@ -30,6 +31,14 @@ PERFIS_VALIDOS = frozenset({"solicitante", "supervisor", "admin", "admin_global"
 
 # Teto de segurança para get_all() — evita ler a tabela inteira sem limite
 MAX_USUARIOS_GET_ALL = 2000
+
+
+def _sem_acentos(texto: str) -> str:
+    """Remove diacríticos (acentos, til, cedilha) via normalização NFKD —
+    usado por buscar_ativos() pra comparar nome/e-mail sem depender de quem
+    digitou (ou cadastrou) a grafia acentuada corretamente."""
+    nfkd = unicodedata.normalize("NFKD", texto)
+    return "".join(c for c in nfkd if not unicodedata.combining(c))
 
 
 class Usuario(UserMixin):
@@ -619,11 +628,19 @@ class Usuario(UserMixin):
 
     @classmethod
     def buscar_ativos(cls, q: str) -> list["Usuario"]:
-        """Busca usuários ativos cujo nome ou e-mail contém q (case-insensitive).
+        """Busca usuários ativos cujo nome ou e-mail contém q (case- e
+        acento-insensitive).
 
         Usa get_all() com filtragem em Python para compatibilidade com PII encryption.
+
+        Ignora acentos além de maiúsculas/minúsculas — achado ao vivo em
+        produção, 2026-08-21: buscar "Júlia" (grafia correta em português)
+        não encontrava "Julia Salgado" cadastrada sem acento no banco, porque
+        a comparação era só case-insensitive. Nomes/e-mails em produção
+        misturam livremente as duas grafias, então a busca precisa aceitar
+        qualquer combinação.
         """
-        q_low = (q or "").strip().lower()
+        q_low = _sem_acentos((q or "").strip().lower())
         if not q_low:
             return []
         try:
@@ -632,8 +649,8 @@ class Usuario(UserMixin):
             for u in todos:
                 if not getattr(u, "ativo", True):
                     continue
-                nome_low = (getattr(u, "nome", "") or "").lower()
-                email_low = (getattr(u, "email", "") or "").lower()
+                nome_low = _sem_acentos((getattr(u, "nome", "") or "").lower())
+                email_low = _sem_acentos((getattr(u, "email", "") or "").lower())
                 if q_low in nome_low or q_low in email_low:
                     resultado.append(u)
             return resultado

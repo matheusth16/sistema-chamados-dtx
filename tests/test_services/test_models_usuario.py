@@ -647,6 +647,31 @@ def test_buscar_ativos_ignora_usuario_inativo(app):
     assert resultado == []
 
 
+def test_buscar_ativos_ignora_acento_na_busca(app):
+    """Regressão (achado ao vivo, 2026-08-21): busca de observadores não
+    ignorava acento — "Júlia" (grafia correta em português) não encontrava
+    "Julia Salgado" cadastrada sem acento no banco. Confirmado em produção via
+    Usuario.buscar_ativos("Júlia") retornando [] enquanto "Julia" achava."""
+    with _pii_off():
+        Usuario(id="u1", email="julia@b.com", nome="Julia Salgado").save()
+
+        resultado = Usuario.buscar_ativos("Júlia")
+
+    assert len(resultado) == 1
+    assert resultado[0].nome == "Julia Salgado"
+
+
+def test_buscar_ativos_ignora_acento_no_nome_cadastrado(app):
+    """Caso inverso: nome cadastrado COM acento deve ser encontrado buscando
+    sem acento."""
+    with _pii_off():
+        Usuario(id="u1", email="joao@b.com", nome="João Ísis").save()
+
+        resultado = Usuario.buscar_ativos("joao isis")
+
+    assert len(resultado) == 1
+
+
 # ── Exceções de banco (SessionLocal indisponível) ─────────────────────────────
 
 
