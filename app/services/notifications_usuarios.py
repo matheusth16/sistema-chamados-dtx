@@ -6,6 +6,7 @@ from html import escape
 from app.i18n import get_translated_role, get_translated_sector_list
 from app.services.email_templates import build_cta_button, build_detail_table, build_email_shell
 from app.services.notifications_core import _base_url, _link_dashboard, _link_login, enviar_email
+from app.utils import mask_email_for_log
 
 logger = logging.getLogger(__name__)
 
@@ -71,9 +72,11 @@ def notificar_novo_usuario_cadastrado(
 
     ok, err = enviar_email(email_dest, assunto, corpo_html, corpo_texto, importance="normal")
     if ok:
-        logger.info("Registration e-mail sent to %s", email_dest)
+        logger.info("Registration e-mail sent to %s", mask_email_for_log(email_dest))
     else:
-        logger.warning("Failed to send registration e-mail to %s: %s", email_dest, err)
+        logger.warning(
+            "Failed to send registration e-mail to %s: %s", mask_email_for_log(email_dest), err
+        )
 
 
 def notificar_novo_usuario_sso(
@@ -111,9 +114,11 @@ def notificar_novo_usuario_sso(
 
     ok, err = enviar_email(email_dest, assunto, corpo_html, corpo_texto, importance="normal")
     if ok:
-        logger.info("SSO registration e-mail sent to %s", email_dest)
+        logger.info("SSO registration e-mail sent to %s", mask_email_for_log(email_dest))
     else:
-        logger.warning("Failed to send SSO registration e-mail to %s: %s", email_dest, err)
+        logger.warning(
+            "Failed to send SSO registration e-mail to %s: %s", mask_email_for_log(email_dest), err
+        )
 
 
 def notificar_admins_novo_usuario_sso(
@@ -160,9 +165,13 @@ def notificar_admins_novo_usuario_sso(
     for admin_email in admin_emails:
         ok, err = enviar_email(admin_email, assunto, corpo_html, corpo_texto, importance="normal")
         if ok:
-            logger.info("Admin SSO new-user e-mail sent to %s", admin_email)
+            logger.info("Admin SSO new-user e-mail sent to %s", mask_email_for_log(admin_email))
         else:
-            logger.warning("Failed to send admin SSO new-user e-mail to %s: %s", admin_email, err)
+            logger.warning(
+                "Failed to send admin SSO new-user e-mail to %s: %s",
+                mask_email_for_log(admin_email),
+                err,
+            )
 
 
 def notificar_mudanca_perfil(
@@ -202,9 +211,11 @@ def notificar_mudanca_perfil(
 
     ok, err = enviar_email(email_dest, assunto, corpo_html, corpo_texto, importance="normal")
     if ok:
-        logger.info("Role-change e-mail sent to %s", email_dest)
+        logger.info("Role-change e-mail sent to %s", mask_email_for_log(email_dest))
     else:
-        logger.warning("Failed to send role-change e-mail to %s: %s", email_dest, err)
+        logger.warning(
+            "Failed to send role-change e-mail to %s: %s", mask_email_for_log(email_dest), err
+        )
 
 
 def notificar_lembrete_mfa_pendente(usuario_email: str, usuario_nome: str = "") -> bool:
@@ -248,9 +259,13 @@ def notificar_lembrete_mfa_pendente(usuario_email: str, usuario_nome: str = "") 
 
     ok, err = enviar_email(email_dest, assunto, corpo_html, corpo_texto, importance="normal")
     if ok:
-        logger.info("MFA pending reminder e-mail sent to %s", email_dest)
+        logger.info("MFA pending reminder e-mail sent to %s", mask_email_for_log(email_dest))
     else:
-        logger.warning("Failed to send MFA pending reminder e-mail to %s: %s", email_dest, err)
+        logger.warning(
+            "Failed to send MFA pending reminder e-mail to %s: %s",
+            mask_email_for_log(email_dest),
+            err,
+        )
     return ok
 
 
@@ -310,11 +325,14 @@ def notificar_lembrete_mfa_pendente_com_senha(
 
     ok, err = enviar_email(email_dest, assunto, corpo_html, corpo_texto, importance="normal")
     if ok:
-        logger.info("MFA pending reminder (with new password) e-mail sent to %s", email_dest)
+        logger.info(
+            "MFA pending reminder (with new password) e-mail sent to %s",
+            mask_email_for_log(email_dest),
+        )
     else:
         logger.warning(
             "Failed to send MFA pending reminder (with new password) e-mail to %s: %s",
-            email_dest,
+            mask_email_for_log(email_dest),
             err,
         )
     return ok

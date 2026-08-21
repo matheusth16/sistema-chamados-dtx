@@ -21,6 +21,7 @@ from app.services.notifications_core import (
     enviar_email,
     resolver_importance,
 )
+from app.utils import mask_email_for_log
 
 logger = logging.getLogger(__name__)
 
@@ -104,9 +105,9 @@ def notificar_aprovador_novo_chamado(
 
     ok, err = enviar_email(email_dest, assunto, corpo_html, corpo_texto, importance=importance)
     if ok:
-        logger.info("New ticket notification sent to %s", email_dest)
+        logger.info("New ticket notification sent to %s", mask_email_for_log(email_dest))
     else:
-        logger.warning("Failed to notify approver %s: %s", email_dest, err)
+        logger.warning("Failed to notify approver %s: %s", mask_email_for_log(email_dest), err)
 
 
 # ---------------------------------------------------------------------------
@@ -185,9 +186,11 @@ def notificar_responsavel_prazo_24h(
         importance=resolver_importance("prazo_24h"),
     )
     if ok:
-        logger.info("24h alert sent to %s (ticket %s)", email_dest, numero_chamado)
+        logger.info(
+            "24h alert sent to %s (ticket %s)", mask_email_for_log(email_dest), numero_chamado
+        )
     else:
-        logger.warning("Failed to send 24h alert to %s: %s", email_dest, err)
+        logger.warning("Failed to send 24h alert to %s: %s", mask_email_for_log(email_dest), err)
 
 
 # ---------------------------------------------------------------------------
@@ -262,10 +265,14 @@ def notificar_responsavel_setor_adicional(
     ok, err = enviar_email(email_dest, assunto, corpo_html, corpo_texto, importance="normal")
     if ok:
         logger.info(
-            "Additional dept notification sent to %s (ticket %s)", email_dest, numero_chamado
+            "Additional dept notification sent to %s (ticket %s)",
+            mask_email_for_log(email_dest),
+            numero_chamado,
         )
     else:
-        logger.warning("Failed to notify additional dept %s: %s", email_dest, err)
+        logger.warning(
+            "Failed to notify additional dept %s: %s", mask_email_for_log(email_dest), err
+        )
 
 
 def notificar_setores_adicionais_chamado(
@@ -352,9 +359,13 @@ def notificar_setores_adicionais_chamado(
 
         ok, err = enviar_email(email.strip(), assunto, corpo_html, corpo_texto, importance="normal")
         if ok:
-            logger.info("Dept added notification sent to %s (ticket %s)", email, numero_chamado)
+            logger.info(
+                "Dept added notification sent to %s (ticket %s)",
+                mask_email_for_log(email),
+                numero_chamado,
+            )
         else:
-            logger.warning("Failed to notify dept added to %s: %s", email, err)
+            logger.warning("Failed to notify dept added to %s: %s", mask_email_for_log(email), err)
 
 
 # ---------------------------------------------------------------------------
@@ -419,9 +430,14 @@ def notificar_solicitante_status(
 
     ok, err = enviar_email(email, assunto, corpo_html, corpo_texto, importance="normal")
     if ok:
-        logger.info("Status e-mail (%s) sent to %s (ticket %s)", novo_status, email, numero_chamado)
+        logger.info(
+            "Status e-mail (%s) sent to %s (ticket %s)",
+            novo_status,
+            mask_email_for_log(email),
+            numero_chamado,
+        )
     else:
-        logger.warning("Failed to send status e-mail to %s: %s", email, err)
+        logger.warning("Failed to send status e-mail to %s: %s", mask_email_for_log(email), err)
 
 
 # ---------------------------------------------------------------------------
@@ -476,9 +492,13 @@ def notificar_solicitante_confirmacao_pendente(
 
     ok, err = enviar_email(email, assunto, corpo_html, corpo_texto, importance="normal")
     if ok:
-        logger.info("Confirmation request sent to %s (ticket %s)", email, numero_chamado)
+        logger.info(
+            "Confirmation request sent to %s (ticket %s)", mask_email_for_log(email), numero_chamado
+        )
     else:
-        logger.warning("Failed to send confirmation request to %s: %s", email, err)
+        logger.warning(
+            "Failed to send confirmation request to %s: %s", mask_email_for_log(email), err
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -549,7 +569,7 @@ def notificar_solicitante_lembrete_confirmacao(
         logger.info(
             "Confirmation reminder #%s sent to %s (ticket %s)",
             numero_lembrete,
-            email,
+            mask_email_for_log(email),
             numero_chamado,
         )
         return True
@@ -557,7 +577,7 @@ def notificar_solicitante_lembrete_confirmacao(
         logger.warning(
             "Failed to send confirmation reminder #%s to %s: %s",
             numero_lembrete,
-            email,
+            mask_email_for_log(email),
             err,
         )
         return False
@@ -633,9 +653,13 @@ def notificar_supervisor_chamado_reaberto(
         importance=resolver_importance("chamado_reaberto"),
     )
     if ok:
-        logger.info("Reopen notification sent to %s (ticket %s)", email, numero_chamado)
+        logger.info(
+            "Reopen notification sent to %s (ticket %s)", mask_email_for_log(email), numero_chamado
+        )
     else:
-        logger.warning("Failed to send reopen notification to %s: %s", email, err)
+        logger.warning(
+            "Failed to send reopen notification to %s: %s", mask_email_for_log(email), err
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -699,9 +723,15 @@ def notificar_responsavel_chamado_confirmado(
 
     ok, err = enviar_email(email, assunto, corpo_html, corpo_texto, importance="normal")
     if ok:
-        logger.info("Confirmation notification sent to %s (ticket %s)", email, numero_chamado)
+        logger.info(
+            "Confirmation notification sent to %s (ticket %s)",
+            mask_email_for_log(email),
+            numero_chamado,
+        )
     else:
-        logger.warning("Failed to send confirmation notification to %s: %s", email, err)
+        logger.warning(
+            "Failed to send confirmation notification to %s: %s", mask_email_for_log(email), err
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -769,9 +799,15 @@ def notificar_supervisor_transferencia_area(
         importance=resolver_importance("transferencia_area"),
     )
     if ok:
-        logger.info("Transfer notification sent to %s (ticket %s)", email_dest, numero_chamado)
+        logger.info(
+            "Transfer notification sent to %s (ticket %s)",
+            mask_email_for_log(email_dest),
+            numero_chamado,
+        )
     else:
-        logger.warning("Failed to send transfer notification to %s: %s", email_dest, err)
+        logger.warning(
+            "Failed to send transfer notification to %s: %s", mask_email_for_log(email_dest), err
+        )
 
 
 def notificar_supervisor_escalonamento_colega(
@@ -835,9 +871,15 @@ def notificar_supervisor_escalonamento_colega(
         importance=resolver_importance("escalonamento_colega"),
     )
     if ok:
-        logger.info("Escalation notification sent to %s (ticket %s)", email_dest, numero_chamado)
+        logger.info(
+            "Escalation notification sent to %s (ticket %s)",
+            mask_email_for_log(email_dest),
+            numero_chamado,
+        )
     else:
-        logger.warning("Failed to send escalation notification to %s: %s", email_dest, err)
+        logger.warning(
+            "Failed to send escalation notification to %s: %s", mask_email_for_log(email_dest), err
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -898,11 +940,15 @@ def notificar_participante_incluido(
     ok, err = enviar_email(email_dest, assunto, corpo_html, corpo_texto, importance="normal")
     if ok:
         logger.info(
-            "Participant inclusion notification sent to %s (ticket %s)", email_dest, numero_chamado
+            "Participant inclusion notification sent to %s (ticket %s)",
+            mask_email_for_log(email_dest),
+            numero_chamado,
         )
     else:
         logger.warning(
-            "Failed to send participant inclusion notification to %s: %s", email_dest, err
+            "Failed to send participant inclusion notification to %s: %s",
+            mask_email_for_log(email_dest),
+            err,
         )
 
 
@@ -964,7 +1010,11 @@ def notificar_owner_todos_participantes_concluiram(
     ok, err = enviar_email(email_dest, assunto, corpo_html, corpo_texto, importance="normal")
     if ok:
         logger.info(
-            "All-done owner notification sent to %s (ticket %s)", email_dest, numero_chamado
+            "All-done owner notification sent to %s (ticket %s)",
+            mask_email_for_log(email_dest),
+            numero_chamado,
         )
     else:
-        logger.warning("Failed to send all-done notification to %s: %s", email_dest, err)
+        logger.warning(
+            "Failed to send all-done notification to %s: %s", mask_email_for_log(email_dest), err
+        )

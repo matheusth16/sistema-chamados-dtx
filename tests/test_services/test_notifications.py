@@ -82,6 +82,36 @@ def test_notificar_novo_usuario_cadastrado_envia_direto(app):
     assert "123456" not in corpo_html
 
 
+def test_notificar_novo_usuario_cadastrado_mascara_email_no_log_em_producao(app, caplog):
+    """Regressão (achado 2026-08-21): notifications_usuarios.py logava e-mail
+    completo em texto puro, inconsistente com mask_email_for_log() já usado em
+    auth.py/mfa.py para o mesmo dado (PII)."""
+    import logging
+
+    from app.services.notifications import notificar_novo_usuario_cadastrado
+
+    with (
+        app.app_context(),
+        patch("app.services.notifications_usuarios.enviar_email") as mock_enviar,
+        caplog.at_level(logging.INFO, logger="app.services.notifications_usuarios"),
+    ):
+        app.config["APP_BASE_URL"] = "https://example.test"
+        app.config["ENV"] = "production"
+        mock_enviar.return_value = (True, None)
+        notificar_novo_usuario_cadastrado(
+            usuario_id="user_123",
+            usuario_email="vazamento@dtx.aero",
+            usuario_nome="Novo Usuario",
+            perfil="solicitante",
+            areas=["Manutencao"],
+            senha_inicial="SenhaTest99",
+        )
+
+    log_text = caplog.text
+    assert "vazamento@dtx.aero" not in log_text
+    assert "v***@dtx.aero" in log_text
+
+
 def test_notificar_novo_usuario_sso_envia_email_sem_senha(app):
     """notificar_novo_usuario_sso avisa o novo usuário sem mencionar senha."""
     from app.services.notifications import notificar_novo_usuario_sso
@@ -450,6 +480,41 @@ def test_notificar_aprovador_envia_direto_ao_responsavel(app):
     assert destinatario == "resp@dtx.aero"
     # categoria=Projetos → prefixo "Action required: "
     assert assunto == "Action required: New ticket assigned: 2026-103"
+
+
+def test_notificar_aprovador_mascara_email_no_log_em_producao(app, caplog):
+    """Regressão (achado 2026-08-21): notifications_chamados.py logava e-mail
+    completo em texto puro, inconsistente com mask_email_for_log() já usado em
+    auth.py/mfa.py para o mesmo dado (PII). Testa tanto o caminho de sucesso
+    quanto o de falha do envio."""
+    import logging
+
+    from app.services.notifications_chamados import notificar_aprovador_novo_chamado
+
+    responsavel = type("Resp", (), {"email": "vazamento@dtx.aero"})()
+
+    with (
+        app.app_context(),
+        patch("app.services.notifications_chamados.enviar_email") as mock_enviar,
+        caplog.at_level(logging.INFO, logger="app.services.notifications_chamados"),
+    ):
+        app.config["APP_BASE_URL"] = "https://example.test"
+        app.config["ENV"] = "production"
+        mock_enviar.return_value = (False, "SMTP indisponível")
+        notificar_aprovador_novo_chamado(
+            chamado_id="chamado_x",
+            numero_chamado="2026-103",
+            categoria="Projetos",
+            tipo_solicitacao="Manutencao",
+            descricao_resumo="Resumo",
+            area="Manutencao",
+            solicitante_nome="Solicitante",
+            responsavel_usuario=responsavel,
+        )
+
+    log_text = caplog.text
+    assert "vazamento@dtx.aero" not in log_text
+    assert "v***@dtx.aero" in log_text
 
 
 # ── notificar_solicitante_status (C1) ─────────────────────────────────────────
