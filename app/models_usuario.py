@@ -647,19 +647,30 @@ class Usuario(UserMixin):
 
         Usa o operador de contenção de array (ARRAY @> ARRAY[area]) — 1 query,
         aproveitando o índice GIN em areas[].
+
+        Nunca usa `with SessionLocal() as session:` aqui — SessionLocal é
+        scoped_session (thread-local); esse padrão chama session.close() ao
+        sair do bloco, e este método é chamado de dentro de outras seções que
+        já mantêm a mesma sessão compartilhada aberta (ex.: Chamado.editar_com_lock
+        em app/services/escalonamento_service.py). Fechar aqui quebrava a
+        transação externa com `InvalidRequestError: Can't operate on closed
+        transaction` — 500 sempre em transferir-area/escalonar-colega/
+        incluir-participantes (achado ao vivo em produção, 2026-08-21). A
+        sessão é limpa no fim da request por app.teardown_appcontext
+        (app/db/__init__.py), então não precisa (nem deve) ser fechada aqui.
         """
         try:
             usuarios = []
-            with db_module.SessionLocal() as session:
-                rows = (
-                    session.execute(select(UsuarioRow).where(UsuarioRow.areas.contains([area])))
-                    .scalars()
-                    .all()
-                )
-                for row in rows:
-                    usuario = cls._from_row(row)
-                    if usuario.perfil in ("supervisor", "admin"):
-                        usuarios.append(usuario)
+            session = db_module.SessionLocal()
+            rows = (
+                session.execute(select(UsuarioRow).where(UsuarioRow.areas.contains([area])))
+                .scalars()
+                .all()
+            )
+            for row in rows:
+                usuario = cls._from_row(row)
+                if usuario.perfil in ("supervisor", "admin"):
+                    usuarios.append(usuario)
             return usuarios
         except Exception as e:
             logger.exception("Erro ao buscar supervisores: %s", e)

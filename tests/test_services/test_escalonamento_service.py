@@ -380,6 +380,36 @@ class TestTransferirArea:
         assert resultado["sucesso"] is True
         assert Chamado.get_by_id(chamado_id).area == "Planejamento"
 
+    def test_transferir_area_com_usuario_real_nao_fecha_sessao_compartilhada(self):
+        """Regressão (achado ao vivo em produção, 2026-08-21): Usuario.get_supervisores_por_area
+        abre sua própria SessionLocal() de dentro do Chamado.editar_com_lock já aberto — como
+        SessionLocal é scoped_session (thread-local), sair do bloco interno fechava a sessão
+        compartilhada e o editar_com_lock quebrava com
+        `InvalidRequestError: Can't operate on closed transaction` ao sincronizar
+        participantes/observadores → 500 sempre. Este teste NÃO mocka Usuario — precisa
+        exercitar a query real (`Usuario.get_supervisores_por_area`) pra reproduzir."""
+        from app.models_usuario import Usuario
+        from app.services.escalonamento_service import transferir_area
+
+        chamado_id = _criar_chamado_real(area="Engenharia", responsavel_id="id_julia")
+        Usuario(
+            id="id_matheus_real",
+            email="matheus.real@dtx.aero",
+            nome="Matheus Costa",
+            perfil="supervisor",
+            areas=["Planejamento"],
+        ).save()
+
+        with patch("app.services.escalonamento_service.Historico"):
+            resultado = transferir_area(
+                chamado_id, "Planejamento", "id_matheus_real", "motivo real", JULIA
+            )
+
+        assert resultado["sucesso"] is True
+        atualizado = Chamado.get_by_id(chamado_id)
+        assert atualizado.area == "Planejamento"
+        assert atualizado.responsavel_id == "id_matheus_real"
+
 
 # ── Task 3.2: escalonar_colega ────────────────────────────────────────────────
 
@@ -587,6 +617,27 @@ class TestEscalonarColega:
 
         with pytest.raises(ValueError, match="supervisor_id"):
             escalonar_colega(_ID_INEXISTENTE, None, "motivo", JULIA)
+
+    def test_escalonar_colega_com_usuario_real_nao_fecha_sessao_compartilhada(self):
+        """Regressão (achado ao vivo em produção, 2026-08-21) — ver docstring
+        equivalente em TestTransferirArea. Este teste NÃO mocka Usuario."""
+        from app.models_usuario import Usuario
+        from app.services.escalonamento_service import escalonar_colega
+
+        chamado_id = _criar_chamado_real(area="Engenharia", responsavel_id="id_julia")
+        Usuario(
+            id="id_matheus_real",
+            email="matheus.real@dtx.aero",
+            nome="Matheus Costa",
+            perfil="supervisor",
+            areas=["Engenharia"],
+        ).save()
+
+        with patch("app.services.escalonamento_service.Historico"):
+            resultado = escalonar_colega(chamado_id, "id_matheus_real", "motivo real", JULIA)
+
+        assert resultado["sucesso"] is True
+        assert Chamado.get_by_id(chamado_id).responsavel_id == "id_matheus_real"
 
 
 # ── Task 4.2: incluir_participantes e concluir_minha_parte ───────────────────
@@ -959,6 +1010,32 @@ class TestIncluirParticipantes:
         args, kwargs = mock_hist_cls.call_args
         assert kwargs.get("acao") == "inclusao_participantes"
         hist_instancia.save.assert_called_once()
+
+    def test_incluir_participantes_com_usuario_real_nao_fecha_sessao_compartilhada(self):
+        """Regressão (achado ao vivo em produção, 2026-08-21) — ver docstring
+        equivalente em TestTransferirArea. Este teste NÃO mocka Usuario."""
+        from app.models_usuario import Usuario
+        from app.services.escalonamento_service import incluir_participantes
+
+        chamado_id = _criar_chamado_real(responsavel_id="id_julia", participantes=[])
+        Usuario(
+            id="id_pedro_real",
+            email="pedro.real@dtx.aero",
+            nome="Pedro Alves",
+            perfil="supervisor",
+            areas=["Logistica"],
+        ).save()
+
+        with patch("app.services.escalonamento_service.Historico"):
+            resultado = incluir_participantes(
+                chamado_id,
+                [{"supervisor_id": "id_pedro_real", "area": "Logistica"}],
+                JULIA,
+            )
+
+        assert resultado["sucesso"] is True
+        participantes = Chamado.get_by_id(chamado_id).participantes
+        assert any(p["supervisor_id"] == "id_pedro_real" for p in participantes)
 
 
 class TestConcluirMinhaParte:
