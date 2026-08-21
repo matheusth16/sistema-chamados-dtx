@@ -114,7 +114,8 @@ vendo, quando o idioma detectado do texto é diferente. Ver
 |------------------------------------|-----------|--------|---------|
 | `LIBRETRANSLATE_ENABLED`           | Liga/desliga a tradução automática. | `false` | `true` |
 | `LIBRETRANSLATE_URL`               | URL base do serviço LibreTranslate. Em produção/dev via compose, é o nome interno do serviço. | (vazio) | `http://libretranslate:5000` |
-| `LIBRETRANSLATE_TIMEOUT_SECONDS`   | Timeout (segundos) da chamada HTTP em lote. | `15` | `20` |
+| `LIBRETRANSLATE_TIMEOUT_SECONDS`   | Timeout (segundos) de CADA chamada HTTP individual (uma por texto). | `15` | `20` |
+| `LIBRETRANSLATE_BATCH_BUDGET_SECONDS` | Orçamento de tempo TOTAL pra tentativas de tradução de um mesmo lote — ao esgotar, para de chamar o serviço e trata o resto como não traduzido nesta passada (fail-open parcial). | `20` | `30` |
 
 Com `LIBRETRANSLATE_ENABLED=false` (ou `LIBRETRANSLATE_URL` vazio), o sistema
 sempre mostra o texto original — nunca quebra a página. Suba o container

@@ -278,6 +278,66 @@ class TestTraduzirVariosLote:
         assert resultado == {}
 
 
+class TestTraduzirVariosOrcamentoDeTempo:
+    """Regressão (achado ao vivo, 2026-08-21): desde que o LibreTranslate
+    passou a ser chamado individualmente por texto (commit 979bf27, corrige
+    detecção de idioma quebrada em lote misto), N textos ainda não cacheados
+    fazem N chamadas HTTP SEQUENCIAIS síncronas — até LIBRETRANSLATE_TIMEOUT_SECONDS
+    cada — na mesma thread da request, sem orçamento agregado. Com gunicorn
+    --workers 1 --threads 8 --timeout 120 (start.sh), poucos textos sem cache
+    já bastam pra travar a request inteira (e, em cascata, a thread) se o
+    LibreTranslate degradar. Um orçamento de tempo agregado bounda o pior
+    caso: ao esgotar, para de chamar o serviço e trata o resto como não
+    traduzido nesta passada (mesmo fail-open de sempre, agora parcial em vez
+    de bloquear indefinidamente)."""
+
+    def test_orcamento_esgotado_para_de_chamar_http_preservando_sucessos_anteriores(
+        self, app_libretranslate
+    ):
+        from app.services.traducao_conteudo_service import traduzir_varios
+
+        app_libretranslate.config["LIBRETRANSLATE_BATCH_BUDGET_SECONDS"] = 5
+
+        tempos = iter([0.0, 0.0, 6.0])
+        with (
+            app_libretranslate.app_context(),
+            patch(
+                "app.services.traducao_conteudo_service.time.monotonic",
+                side_effect=lambda: next(tempos),
+            ),
+            patch(
+                "urllib.request.urlopen",
+                return_value=_mock_urlopen("Traduzido", "pt"),
+            ) as mock_urlopen,
+        ):
+            resultado = traduzir_varios(["Texto um", "Texto dois", "Texto tres"], "en")
+
+        # Orçamento estourou antes do 2º texto — só 1 chamada HTTP acontece.
+        assert mock_urlopen.call_count == 1
+        assert resultado["Texto um"]["traduzido"] is True
+        assert resultado["Texto dois"]["traduzido"] is False
+        assert resultado["Texto tres"]["traduzido"] is False
+
+    def test_com_orcamento_folgado_tenta_todos_os_textos(self, app_libretranslate):
+        """Com orçamento suficiente pro tempo real gasto pelas chamadas
+        (mockadas, portanto instantâneas), o comportamento de sempre é
+        preservado — chama o LibreTranslate pra cada texto faltante."""
+        from app.services.traducao_conteudo_service import traduzir_varios
+
+        with (
+            app_libretranslate.app_context(),
+            patch(
+                "urllib.request.urlopen",
+                return_value=_mock_urlopen("Traduzido", "pt"),
+            ) as mock_urlopen,
+        ):
+            resultado = traduzir_varios(["Texto um", "Texto dois"], "en")
+
+        assert mock_urlopen.call_count == 2
+        assert resultado["Texto um"]["traduzido"] is True
+        assert resultado["Texto dois"]["traduzido"] is True
+
+
 def _historico_mock(
     acao="alteracao_status",
     campo_alterado=None,

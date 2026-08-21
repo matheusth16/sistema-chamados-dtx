@@ -312,6 +312,16 @@ class Config:
     LIBRETRANSLATE_URL = os.getenv("LIBRETRANSLATE_URL", "").strip()
     LIBRETRANSLATE_ENABLED = _to_bool(os.getenv("LIBRETRANSLATE_ENABLED"), default=False)
     LIBRETRANSLATE_TIMEOUT_SECONDS = int(os.getenv("LIBRETRANSLATE_TIMEOUT_SECONDS", "15"))
+    # Orçamento TOTAL (segundos) pra tentativas de tradução de um mesmo lote —
+    # sem isso, N textos ainda não cacheados faziam N chamadas HTTP sequenciais
+    # (até LIBRETRANSLATE_TIMEOUT_SECONDS cada) na mesma thread da request, com
+    # risco de bater no timeout do gunicorn (--timeout 120, 1 worker/8 threads)
+    # se o LibreTranslate degradar (achado ao vivo, 2026-08-21). Ao esgotar,
+    # para de chamar o serviço e trata o resto como não traduzido nesta
+    # passada (fail-open parcial).
+    LIBRETRANSLATE_BATCH_BUDGET_SECONDS = int(
+        os.getenv("LIBRETRANSLATE_BATCH_BUDGET_SECONDS", "20")
+    )
 
     # Criptografia de PII em repouso (LGPD). Gere chave: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
     ENCRYPTION_KEY = os.getenv("ENCRYPTION_KEY", "").strip()

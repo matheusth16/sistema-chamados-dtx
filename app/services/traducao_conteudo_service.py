@@ -19,6 +19,7 @@ original.
 import hashlib
 import json
 import logging
+import time
 import urllib.request
 from typing import Any
 
@@ -118,14 +119,14 @@ def traduzir_varios(textos: list[str], idioma_destino: str) -> dict[str, dict[st
         return resultado
 
     timeout = int(config.get("LIBRETRANSLATE_TIMEOUT_SECONDS", 15))
-    traduzidos, detectados = _traduzir_via_libretranslate(faltando, lt_target, url, timeout)
-    if traduzidos is None:
-        for texto in faltando:
-            resultado[texto] = _sem_traducao(texto)
-        return resultado
+    orcamento_raw = config.get("LIBRETRANSLATE_BATCH_BUDGET_SECONDS")
+    orcamento = int(orcamento_raw) if orcamento_raw not in (None, "") else None
+    traduzidos, detectados = _traduzir_via_libretranslate(
+        faltando, lt_target, url, timeout, orcamento
+    )
 
     novas_linhas = []
-    for texto, traduzido, detectado in zip(faltando, traduzidos, detectados, strict=True):
+    for texto, traduzido, detectado in zip(faltando, traduzidos, detectados, strict=False):
         if detectado and detectado == lt_target:
             resultado[texto] = _sem_traducao(texto)
             continue
@@ -138,6 +139,11 @@ def traduzir_varios(textos: list[str], idioma_destino: str) -> dict[str, dict[st
                 "texto_traduzido": traduzido,
             }
         )
+    # Textos além do que foi de fato tentado (orçamento esgotado ou uma
+    # chamada individual falhou/veio malformada) caem no fallback fail-open —
+    # mesmo contrato de sempre, só que parcial em vez de tudo-ou-nada.
+    for texto in faltando[len(traduzidos) :]:
+        resultado[texto] = _sem_traducao(texto)
 
     if novas_linhas:
         _persistir_cache(novas_linhas)
@@ -225,8 +231,12 @@ def montar_traducoes_chamado(chamado: Any, historico: list, idioma_destino: str)
 
 
 def _traduzir_via_libretranslate(
-    textos: list[str], lt_target: str, url: str, timeout: int
-) -> tuple[list[str] | None, list[str | None]]:
+    textos: list[str],
+    lt_target: str,
+    url: str,
+    timeout: int,
+    orcamento_segundos: int | None = None,
+) -> tuple[list[str], list[str | None]]:
     """Chama POST {url}/translate INDIVIDUALMENTE por texto — nunca em lote
     com `q` como array.
 
@@ -239,13 +249,35 @@ def _traduzir_via_libretranslate(
     Chamar item a item custa mais requisições, mas cada uma já é rápida
     (LibreTranslate local, mesma rede Docker) e o resultado fica cacheado no
     Postgres pra sempre — só a primeira vez que um texto aparece paga esse
-    custo. Retorna (None, []) se qualquer chamada falhar — fail-open cobre o
-    lote inteiro, mesmo contrato de antes.
+    custo.
+
+    `orcamento_segundos`, quando informado, limita o tempo TOTAL gasto tentando
+    chamadas — sem isso, um chamado com muitas entradas de histórico ainda não
+    cacheadas faz N chamadas sequenciais (até `timeout` segundos cada) na
+    MESMA thread da request; com gunicorn --workers 1 --threads 8 --timeout 120
+    (start.sh), poucos textos já bastam pra travar a request inteira se o
+    LibreTranslate degradar (achado ao vivo, 2026-08-21). Ao esgotar o
+    orçamento — ou se uma chamada individual falhar/vier malformada — para de
+    tentar e devolve só o que já traduziu com sucesso; quem chamou
+    (traduzir_varios) trata o restante como não traduzido nesta passada
+    (fail-open parcial, não mais tudo-ou-nada).
+
+    Retorna (traduzidos, detectados) — sempre do mesmo tamanho entre si, e
+    correspondendo a um PREFIXO de `textos` (pode ser mais curto que `textos`).
     """
     traduzidos: list[str] = []
     detectados: list[str | None] = []
-    try:
-        for texto in textos:
+    inicio = time.monotonic()
+    for texto in textos:
+        if orcamento_segundos is not None and (time.monotonic() - inicio) >= orcamento_segundos:
+            logger.warning(
+                "Orçamento de tradução (%ss) esgotado — %d/%d textos não tentados nesta passada",
+                orcamento_segundos,
+                len(textos) - len(traduzidos),
+                len(textos),
+            )
+            break
+        try:
             payload = json.dumps(
                 {"q": texto, "source": "auto", "target": lt_target, "format": "text"}
             ).encode("utf-8")
@@ -261,14 +293,14 @@ def _traduzir_via_libretranslate(
             traduzido = data.get("translatedText")
             if not isinstance(traduzido, str):
                 logger.warning("Resposta inesperada do LibreTranslate: %r", data)
-                return None, []
-            traduzidos.append(traduzido)
+                break
+        except Exception as e:
+            logger.warning("LibreTranslate indisponível: %s", e)
+            break
 
-            detectado_raw = data.get("detectedLanguage")
-            detectados.append(
-                detectado_raw.get("language") if isinstance(detectado_raw, dict) else None
-            )
-        return traduzidos, detectados
-    except Exception as e:
-        logger.warning("LibreTranslate indisponível: %s", e)
-        return None, []
+        traduzidos.append(traduzido)
+        detectado_raw = data.get("detectedLanguage")
+        detectados.append(
+            detectado_raw.get("language") if isinstance(detectado_raw, dict) else None
+        )
+    return traduzidos, detectados
