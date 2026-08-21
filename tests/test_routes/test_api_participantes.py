@@ -87,6 +87,47 @@ class TestIncluirParticipantesRota:
         assert data is not None
         assert data["sucesso"] is True
 
+    def test_incluir_sem_acesso_apos_dispara_flash_sucesso(self, client_logado_supervisor):
+        """Ver docstring equivalente em test_api_escalonamento.py::TestTransferirAreaRota."""
+        chamado_mock = _mock_chamado_obj(area="Manutencao", responsavel_id="sup_1")
+
+        with (
+            patch("app.routes.api_colaboracao.Chamado") as mock_chamado_cls,
+            patch("app.routes.api_colaboracao.usuario_pode_ver_chamado", return_value=True),
+            patch(
+                "app.services.escalonamento_service.incluir_participantes",
+                return_value={
+                    "sucesso": True,
+                    "dados": {
+                        "participantes": [
+                            {
+                                "supervisor_id": "id_dest",
+                                "area": "Logistica",
+                                "status": "pendente",
+                                "concluido_em": None,
+                            }
+                        ],
+                        "adicionados": [
+                            {"supervisor_id": "id_dest", "area": "Logistica", "nome": "Dest"}
+                        ],
+                        "ainda_tem_acesso": False,
+                    },
+                },
+            ),
+            patch("app.routes.api_colaboracao.threading"),
+            patch("app.routes.api_colaboracao.flash_t") as mock_flash,
+        ):
+            mock_chamado_cls.get_by_id.return_value = chamado_mock
+
+            resp = client_logado_supervisor.post(
+                "/api/chamado/id123/incluir-participantes",
+                json={"participantes": [{"supervisor_id": "id_dest", "area": "Logistica"}]},
+                content_type="application/json",
+            )
+
+        assert resp.status_code == 200
+        mock_flash.assert_called_once_with("acao_escalonamento_sucesso_sem_acesso", "success")
+
     def test_incluir_lista_vazia_retorna_400(self, client_logado_supervisor):
         """Lista de participantes vazia → 400."""
         chamado_mock = _mock_chamado_obj(area="Manutencao", responsavel_id="sup_1")

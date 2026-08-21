@@ -80,6 +80,82 @@ class TestTransferirAreaRota:
         assert data is not None
         assert data["sucesso"] is True
 
+    def test_transferir_area_sem_acesso_apos_dispara_flash_sucesso(self, client_logado_supervisor):
+        """Achado ao vivo em produção, 2026-08-21: quando quem transferiu perde
+        a visibilidade do chamado, a rota enfileira um flash de sucesso pro
+        front-end redirecionar em vez de recarregar a mesma tela (que bateria
+        num "acesso negado" logo após um sucesso)."""
+        chamado_mock = _mock_chamado_obj(area="Manutencao", responsavel_id="sup_1")
+
+        with (
+            patch("app.routes.api_colaboracao.Chamado") as mock_chamado_cls,
+            patch("app.routes.api_colaboracao.usuario_pode_ver_chamado", return_value=True),
+            patch(
+                "app.services.escalonamento_service.transferir_area",
+                return_value={
+                    "sucesso": True,
+                    "dados": {
+                        "area": "Planejamento",
+                        "responsavel_id": "id_dest",
+                        "ainda_tem_acesso": False,
+                    },
+                },
+            ),
+            patch("app.routes.api_colaboracao.threading"),
+            patch("app.routes.api_colaboracao.flash_t") as mock_flash,
+        ):
+            mock_chamado_cls.get_by_id.return_value = chamado_mock
+
+            resp = client_logado_supervisor.post(
+                "/api/chamado/id123/transferir-area",
+                json={
+                    "area": "Planejamento",
+                    "supervisor_id": "id_dest",
+                    "motivo": "Precisa de PPCP",
+                },
+                content_type="application/json",
+            )
+
+        assert resp.status_code == 200
+        mock_flash.assert_called_once_with("acao_escalonamento_sucesso_sem_acesso", "success")
+
+    def test_transferir_area_com_acesso_nao_dispara_flash(self, client_logado_admin):
+        """Quando quem transferiu continua com acesso (ex.: admin), nenhum
+        flash extra é enfileirado — a tela só recarrega no lugar."""
+        chamado_mock = _mock_chamado_obj(area="Manutencao", responsavel_id="sup_1")
+
+        with (
+            patch("app.routes.api_colaboracao.Chamado") as mock_chamado_cls,
+            patch("app.routes.api_colaboracao.usuario_pode_ver_chamado", return_value=True),
+            patch(
+                "app.services.escalonamento_service.transferir_area",
+                return_value={
+                    "sucesso": True,
+                    "dados": {
+                        "area": "Planejamento",
+                        "responsavel_id": "id_dest",
+                        "ainda_tem_acesso": True,
+                    },
+                },
+            ),
+            patch("app.routes.api_colaboracao.threading"),
+            patch("app.routes.api_colaboracao.flash_t") as mock_flash,
+        ):
+            mock_chamado_cls.get_by_id.return_value = chamado_mock
+
+            resp = client_logado_admin.post(
+                "/api/chamado/id123/transferir-area",
+                json={
+                    "area": "Planejamento",
+                    "supervisor_id": "id_dest",
+                    "motivo": "Precisa de PPCP",
+                },
+                content_type="application/json",
+            )
+
+        assert resp.status_code == 200
+        mock_flash.assert_not_called()
+
     def test_transferir_area_sem_motivo_retorna_400(self, client_logado_supervisor):
         """motivo vazio → 400."""
         chamado_mock = _mock_chamado_obj(area="Manutencao", responsavel_id="sup_1")
@@ -354,6 +430,34 @@ class TestEscalonarColegaRota:
         assert resp.status_code == 200
         data = resp.get_json()
         assert data["sucesso"] is True
+
+    def test_escalonar_colega_sem_acesso_apos_dispara_flash_sucesso(self, client_logado_supervisor):
+        """Ver docstring equivalente em TestTransferirAreaRota."""
+        chamado_mock = _mock_chamado_obj(area="Manutencao", responsavel_id="sup_1")
+
+        with (
+            patch("app.routes.api_colaboracao.Chamado") as mock_chamado_cls,
+            patch("app.routes.api_colaboracao.usuario_pode_ver_chamado", return_value=True),
+            patch(
+                "app.services.escalonamento_service.escalonar_colega",
+                return_value={
+                    "sucesso": True,
+                    "dados": {"responsavel_id": "id_colega", "ainda_tem_acesso": False},
+                },
+            ),
+            patch("app.routes.api_colaboracao.threading"),
+            patch("app.routes.api_colaboracao.flash_t") as mock_flash,
+        ):
+            mock_chamado_cls.get_by_id.return_value = chamado_mock
+
+            resp = client_logado_supervisor.post(
+                "/api/chamado/id123/escalonar-colega",
+                json={"supervisor_id": "id_colega", "motivo": "Matheus tem especialidade X"},
+                content_type="application/json",
+            )
+
+        assert resp.status_code == 200
+        mock_flash.assert_called_once_with("acao_escalonamento_sucesso_sem_acesso", "success")
 
     def test_escalonar_colega_sem_motivo_retorna_400(self, client_logado_supervisor):
         """motivo vazio → 400."""

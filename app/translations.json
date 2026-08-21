@@ -2709,6 +2709,11 @@
     "en": "Only Admin Global can grant or change a user's management level.",
     "es": "Solo el Admin Global puede otorgar o cambiar el nivel de gestión de un usuario."
   },
+  "acao_escalonamento_sucesso_sem_acesso": {
+    "pt_BR": "Ação realizada com sucesso. Você não tem mais acesso a este chamado, então foi redirecionado.",
+    "en": "Action completed successfully. You no longer have access to this ticket, so you were redirected.",
+    "es": "Acción realizada con éxito. Ya no tienes acceso a este ticket, por eso fuiste redirigido."
+  },
   "nav_admin_global": {
     "pt_BR": "Painel Global",
     "en": "Global Panel",

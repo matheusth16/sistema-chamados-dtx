@@ -1477,6 +1477,10 @@ Object.assign(window.DTX_MSGS, {
     var AREA_ATUAL = {{ (chamado.area or '') | tojson }};
     var CURRENT_USER_ID = {{ current_user.id | tojson }};
     var CSRF_TOKEN = document.querySelector('meta[name="csrf-token"]') ? document.querySelector('meta[name="csrf-token"]').content : '';
+    // Destino do redirecionamento quando uma Ação de Escalonamento tira o
+    // acesso de quem a executou (ver executarTransferirArea/EscalonarColega/
+    // IncluirParticipantes) — mesmo alvo do botão "Voltar" da página.
+    var VOLTAR_URL_APOS_ESCALONAMENTO = {{ voltar_url | tojson }};
     // Botão único "Solicitar nova previsão de atendimento": PREVISAO_AUTO_SUGERIDA
     // é a data que a extensão automática aplicaria agora (mesma que já vem
     // pré-preenchida no campo, ver sugestao_extensao no dashboard.py) — null
@@ -1506,6 +1510,23 @@ Object.assign(window.DTX_MSGS, {
             document.querySelectorAll('[aria-describedby~="' + elId + '"]').forEach(function(campo) {
                 campo.removeAttribute('aria-invalid');
             });
+        }
+    }
+
+    // Chamada após sucesso das Ações de Escalonamento (Transferir Área,
+    // Transferir para Colega, Incluir Participantes). Recarregar a mesma
+    // página às cegas quebrava a experiência quando a própria ação tirava o
+    // acesso de quem a executou (ex.: supervisor comum que transfere/escala
+    // deixa de ser responsável e não é participante) — a tela recarregava
+    // direto num "acesso negado" logo após um sucesso (achado ao vivo,
+    // 2026-08-21). O backend informa em data.dados.ainda_tem_acesso; quando
+    // false, o flash de sucesso já foi enfileirado no servidor (ver
+    // api_colaboracao.py) e só aparece na página de destino após a navegação.
+    function _aposAcaoEscalonamento(data) {
+        if (data.dados && data.dados.ainda_tem_acesso === false) {
+            window.location.href = VOLTAR_URL_APOS_ESCALONAMENTO;
+        } else {
+            window.location.reload();
         }
     }
 
@@ -1581,7 +1602,7 @@ Object.assign(window.DTX_MSGS, {
         })
         .then(function(r) { return r.json(); })
         .then(function(data) {
-            if (data.sucesso) { window.location.reload(); }
+            if (data.sucesso) { _aposAcaoEscalonamento(data); }
             else { mostrarErro('transferir-erro', data.erro || DTX_MSGS.error_transfer); }
         })
         .catch(function() { mostrarErro('transferir-erro', DTX_MSGS.error_connection); });
@@ -1600,7 +1621,7 @@ Object.assign(window.DTX_MSGS, {
         })
         .then(function(r) { return r.json(); })
         .then(function(data) {
-            if (data.sucesso) { window.location.reload(); }
+            if (data.sucesso) { _aposAcaoEscalonamento(data); }
             else { mostrarErro('escalonar-erro', data.erro || DTX_MSGS.error_escalate); }
         })
         .catch(function() { mostrarErro('escalonar-erro', DTX_MSGS.error_connection); });
@@ -1771,7 +1792,7 @@ Object.assign(window.DTX_MSGS, {
         })
         .then(function(r) { return r.json(); })
         .then(function(data) {
-            if (data.sucesso) { window.location.reload(); }
+            if (data.sucesso) { _aposAcaoEscalonamento(data); }
             else { mostrarErro('incluir-erro', data.erro || DTX_MSGS.error_include_participants); }
         })
         .catch(function() { mostrarErro('incluir-erro', DTX_MSGS.error_connection); });

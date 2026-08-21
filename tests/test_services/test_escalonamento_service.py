@@ -34,6 +34,10 @@ def _usuario(uid, nome, perfil="supervisor", areas=None, nivel_gestao=None):
     u.areas = areas or []
     u.is_admin_or_above = perfil in ("admin", "admin_global")
     u.nivel_gestao = nivel_gestao
+    # Espelha app.models_usuario.Usuario.is_gestor — sem isso, o mock não
+    # reproduz usuario_pode_ver_chamado() pra usuários com nivel_gestao
+    # (achado ao escrever teste de ainda_tem_acesso pra gestor_setor, 2026-08-21).
+    u.is_gestor = nivel_gestao is not None
     return u
 
 
@@ -410,6 +414,55 @@ class TestTransferirArea:
         assert atualizado.area == "Planejamento"
         assert atualizado.responsavel_id == "id_matheus_real"
 
+    def test_transferir_area_retorna_ainda_tem_acesso_false_para_ex_owner(self):
+        """Achado ao vivo em produção, 2026-08-21: depois de transferir, o
+        supervisor que fez a transferência (não-admin, não-participante) perde
+        a visibilidade do chamado (supervisor_ids_com_acesso passa a listar só
+        o novo responsável). O front-end recarregava a mesma página às cegas
+        (window.location.reload()) e o usuário caía direto num "acesso negado"
+        logo após um sucesso — confuso, mesmo não sendo um bug de dado. O
+        service agora informa isso no retorno pra o front-end decidir entre
+        recarregar no lugar ou redirecionar com mensagem de sucesso."""
+        from app.services.escalonamento_service import transferir_area
+
+        chamado_id = _criar_chamado_real(area="Engenharia", responsavel_id="id_julia")
+        sup_dest = _sup_mock("id_matheus", "Matheus Costa", areas=["Planejamento"])
+
+        with (
+            patch("app.services.escalonamento_service.Usuario") as mock_usuario,
+            patch("app.services.escalonamento_service.Historico"),
+            patch(
+                "app.services.escalonamento_service.calcular_supervisor_ids_com_acesso",
+                return_value=["id_matheus"],
+            ),
+        ):
+            mock_usuario.get_supervisores_por_area.return_value = [sup_dest]
+            resultado = transferir_area(chamado_id, "Planejamento", "id_matheus", "motivo", JULIA)
+
+        assert resultado["sucesso"] is True
+        assert resultado["dados"]["ainda_tem_acesso"] is False
+
+    def test_transferir_area_retorna_ainda_tem_acesso_true_para_admin(self):
+        """Admin continua vendo qualquer chamado depois de transferir."""
+        from app.services.escalonamento_service import transferir_area
+
+        chamado_id = _criar_chamado_real(area="Engenharia", responsavel_id="id_julia")
+        sup_dest = _sup_mock("id_matheus", "Matheus Costa", areas=["Planejamento"])
+
+        with (
+            patch("app.services.escalonamento_service.Usuario") as mock_usuario,
+            patch("app.services.escalonamento_service.Historico"),
+            patch(
+                "app.services.escalonamento_service.calcular_supervisor_ids_com_acesso",
+                return_value=["id_matheus"],
+            ),
+        ):
+            mock_usuario.get_supervisores_por_area.return_value = [sup_dest]
+            resultado = transferir_area(chamado_id, "Planejamento", "id_matheus", "motivo", ADMIN)
+
+        assert resultado["sucesso"] is True
+        assert resultado["dados"]["ainda_tem_acesso"] is True
+
 
 # ── Task 3.2: escalonar_colega ────────────────────────────────────────────────
 
@@ -618,6 +671,53 @@ class TestEscalonarColega:
         with pytest.raises(ValueError, match="supervisor_id"):
             escalonar_colega(_ID_INEXISTENTE, None, "motivo", JULIA)
 
+    def test_escalonar_colega_retorna_ainda_tem_acesso_false_para_ex_owner(self):
+        """Mesmo achado do transferir_area (2026-08-21): supervisor comum que
+        escala pra colega perde a visibilidade do chamado — o front-end usa
+        esse retorno pra decidir entre recarregar no lugar ou redirecionar."""
+        from app.services.escalonamento_service import escalonar_colega
+
+        chamado_id = _criar_chamado_real(area="Engenharia", responsavel_id="id_julia")
+        colega = _sup_mock("id_matheus", "Matheus Costa", areas=["Engenharia"])
+
+        with (
+            patch("app.services.escalonamento_service.Usuario") as mock_usuario,
+            patch("app.services.escalonamento_service.Historico"),
+            patch(
+                "app.services.escalonamento_service.calcular_supervisor_ids_com_acesso",
+                return_value=["id_matheus"],
+            ),
+        ):
+            mock_usuario.get_supervisores_por_area.return_value = [colega]
+            resultado = escalonar_colega(chamado_id, "id_matheus", "motivo", JULIA)
+
+        assert resultado["sucesso"] is True
+        assert resultado["dados"]["ainda_tem_acesso"] is False
+
+    def test_escalonar_colega_retorna_ainda_tem_acesso_true_para_gestor_setor(self):
+        """gestor_setor tem leitura ampliada da própria área — continua vendo
+        o chamado mesmo depois de escalar pra outro colega."""
+        from app.services.escalonamento_service import escalonar_colega
+
+        chamado_id = _criar_chamado_real(area="Engenharia", responsavel_id="id_julia")
+        colega = _sup_mock("id_matheus", "Matheus Costa", areas=["Engenharia"])
+
+        with (
+            patch("app.services.escalonamento_service.Usuario") as mock_usuario,
+            patch("app.services.escalonamento_service.Historico"),
+            patch(
+                "app.services.escalonamento_service.calcular_supervisor_ids_com_acesso",
+                return_value=["id_matheus"],
+            ),
+        ):
+            mock_usuario.get_supervisores_por_area.return_value = [colega]
+            resultado = escalonar_colega(
+                chamado_id, "id_matheus", "motivo", GESTOR_SETOR_ENGENHARIA
+            )
+
+        assert resultado["sucesso"] is True
+        assert resultado["dados"]["ainda_tem_acesso"] is True
+
     def test_escalonar_colega_com_usuario_real_nao_fecha_sessao_compartilhada(self):
         """Regressão (achado ao vivo em produção, 2026-08-21) — ver docstring
         equivalente em TestTransferirArea. Este teste NÃO mocka Usuario."""
@@ -757,6 +857,32 @@ class TestIncluirParticipantes:
         assert resultado["sucesso"] is True
         participantes = Chamado.get_by_id(chamado_id).participantes
         assert any(p["supervisor_id"] == "id_pedro" for p in participantes)
+
+    def test_incluir_participantes_retorna_ainda_tem_acesso_true_para_owner(self):
+        """Diferente de transferir_area/escalonar_colega, incluir_participantes
+        não troca o responsável — o owner continua vendo o chamado."""
+        from app.services.escalonamento_service import incluir_participantes
+
+        chamado_id = _criar_chamado_real(responsavel_id="id_julia", participantes=[])
+        sup_pedro = _sup_mock("id_pedro", "Pedro Alves", areas=["Logistica"])
+
+        with (
+            patch("app.services.escalonamento_service.Usuario") as mock_usuario,
+            patch("app.services.escalonamento_service.Historico"),
+            patch(
+                "app.services.escalonamento_service.calcular_supervisor_ids_com_acesso",
+                return_value=["id_julia", "id_pedro"],
+            ),
+        ):
+            mock_usuario.get_supervisores_por_area.return_value = [sup_pedro]
+            resultado = incluir_participantes(
+                chamado_id,
+                [{"supervisor_id": "id_pedro", "area": "Logistica"}],
+                JULIA,
+            )
+
+        assert resultado["sucesso"] is True
+        assert resultado["dados"]["ainda_tem_acesso"] is True
 
     def test_incluir_participantes_status_pendente(self):
         """Participante incluído recebe status='pendente'."""

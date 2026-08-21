@@ -21,6 +21,7 @@ from app.models_usuario import Usuario
 from app.services.permissions import (
     calcular_supervisor_ids_com_acesso,
     usuario_gestor_setor_pode_escalonar,
+    usuario_pode_ver_chamado,
 )
 from config import Config
 
@@ -141,7 +142,20 @@ def transferir_area(
         area,
         usuario.id,
     )
-    return {"sucesso": True, "dados": {"area": area, "responsavel_id": supervisor_id}}
+    # Quem transferiu pode ter perdido a visibilidade do chamado (deixou de
+    # ser o responsável e não é participante) — o front-end usa isso pra
+    # decidir entre recarregar a mesma tela ou redirecionar com mensagem de
+    # sucesso, em vez de recarregar às cegas num "acesso negado" logo após um
+    # sucesso (achado ao vivo, 2026-08-21).
+    ainda_tem_acesso = usuario_pode_ver_chamado(usuario, chamado)
+    return {
+        "sucesso": True,
+        "dados": {
+            "area": area,
+            "responsavel_id": supervisor_id,
+            "ainda_tem_acesso": ainda_tem_acesso,
+        },
+    }
 
 
 def escalonar_colega(
@@ -235,7 +249,12 @@ def escalonar_colega(
         supervisor_id,
         usuario.id,
     )
-    return {"sucesso": True, "dados": {"responsavel_id": supervisor_id}}
+    # Ver nota equivalente em transferir_area (achado ao vivo, 2026-08-21).
+    ainda_tem_acesso = usuario_pode_ver_chamado(usuario, chamado)
+    return {
+        "sucesso": True,
+        "dados": {"responsavel_id": supervisor_id, "ainda_tem_acesso": ainda_tem_acesso},
+    }
 
 
 # ── Fase 4: incluir_participantes ─────────────────────────────────────────────
@@ -368,11 +387,17 @@ def incluir_participantes(
         len(adicionados),
         usuario.id,
     )
+    # Ver nota equivalente em transferir_area (achado ao vivo, 2026-08-21) —
+    # incluir_participantes não troca o responsável, então normalmente
+    # continua True, mas mantemos a checagem por consistência com as outras
+    # Ações de Escalonamento.
+    ainda_tem_acesso = usuario_pode_ver_chamado(usuario, chamado)
     return {
         "sucesso": True,
         "dados": {
             "participantes": participantes_atuais,
             "adicionados": adicionados,
+            "ainda_tem_acesso": ainda_tem_acesso,
         },
     }
 

@@ -7,7 +7,7 @@ from flask import current_app, jsonify, request, session
 from flask_login import current_user, login_required
 
 from app.decoradores import requer_supervisor_area, requer_supervisor_area_ou_gestor_setor
-from app.i18n import get_translation
+from app.i18n import flash_t, get_translation
 from app.models import Chamado
 from app.models_usuario import Usuario
 from app.routes import main
@@ -137,6 +137,9 @@ def api_transferir_area(chamado_id: str):
             "transferencia_area",
             supervisor_id,
         )
+
+        if resultado["dados"].get("ainda_tem_acesso") is False:
+            flash_t("acao_escalonamento_sucesso_sem_acesso", "success")
 
         return jsonify(resultado), 200
 
@@ -374,6 +377,9 @@ def api_escalonar_colega(chamado_id: str):
             supervisor_id,
         )
 
+        if resultado["dados"].get("ainda_tem_acesso") is False:
+            flash_t("acao_escalonamento_sucesso_sem_acesso", "success")
+
         return jsonify(resultado), 200
 
     except ValueError as exc:
@@ -566,6 +572,9 @@ def api_incluir_participantes(chamado_id: str):
                 dados_chamado,
                 adicionados,
             )
+
+        if resultado["dados"].get("ainda_tem_acesso") is False:
+            flash_t("acao_escalonamento_sucesso_sem_acesso", "success")
 
         return jsonify(resultado), 200
 
