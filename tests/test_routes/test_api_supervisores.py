@@ -79,11 +79,15 @@ def test_supervisores_lista_sem_login_retorna_json_401(client):
     assert r.is_json
 
 
-def test_supervisores_lista_exclui_usuarios_com_nivel_gestao(client_logado_supervisor):
+def test_supervisores_lista_inclui_gestor_setor_mas_exclui_niveis_company_wide(
+    client_logado_supervisor,
+):
     """
-    Gestores (nivel_gestao preenchido — gestor_setor, gerente_producao,
-    assistente_gm, gm) não devem aparecer como responsável sugerido no
-    formulário de abertura, mesmo tendo perfil supervisor/admin na área.
+    gestor_setor (escopo por área, Nível 3) aparece por padrão como responsável
+    sugerido no formulário de abertura — pode virar dono de verdade do chamado
+    (ver usuario_pode_operar_chamado). gerente_producao/assistente_gm/gm
+    (company-wide, sem vínculo de área) continuam de fora: são só contato de
+    escalonamento (decisão original de ca68b05), não atendimento direto.
     """
     sup_comum = _sup_mock("sup_2", "Supervisor Comum", "comum@test.com")
     gestor_setor = _sup_mock(
@@ -101,8 +105,10 @@ def test_supervisores_lista_exclui_usuarios_com_nivel_gestao(client_logado_super
 
     assert r.status_code == 200
     data = r.get_json()
-    ids_retornados = [s["id"] for s in data["supervisores"]]
-    assert ids_retornados == ["sup_2"]
+    por_id = {s["id"]: s for s in data["supervisores"]}
+    assert set(por_id) == {"sup_2", "sup_3"}
+    assert por_id["sup_2"]["gestor"] is False
+    assert por_id["sup_3"]["gestor"] is True
 
 
 def test_supervisores_lista_incluir_gestor_traz_gestores_marcados(client_logado_supervisor):
@@ -172,6 +178,27 @@ def test_solicitante_pode_consultar_qualquer_area_para_abrir_chamado(client_loga
     assert propria.status_code == 200
     assert outra.status_code == 200
     assert mock_buscar.call_count == 2
+
+
+def test_solicitante_ve_gestor_setor_de_area_que_nao_e_sua_ao_abrir_chamado(
+    client_logado_solicitante,
+):
+    """gestor_setor aparece pro solicitante mesmo numa área que não é a dele —
+    sem incluir_gestor=1, a checagem anti-enumeração (restrita à própria área)
+    não se aplica, igual já valia pra supervisor comum."""
+    gestor_setor = _sup_mock(
+        "sup_3", "Gestor Setor", "gsetor@test.com", nivel_gestao="gestor_setor"
+    )
+
+    with patch(
+        "app.routes.api_chamados.Usuario.get_supervisores_por_area",
+        return_value=[gestor_setor],
+    ):
+        r = client_logado_solicitante.get("/api/supervisores/lista?area=Financeiro")
+
+    assert r.status_code == 200
+    data = r.get_json()
+    assert [s["id"] for s in data["supervisores"]] == ["sup_3"]
 
 
 def test_solicitante_com_incluir_gestor_ainda_bloqueado_fora_da_propria_area(

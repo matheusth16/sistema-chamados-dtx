@@ -622,6 +622,77 @@ def test_get_supervisores_por_area_sem_resultado_retorna_vazio(app):
     assert Usuario.get_supervisores_por_area("Area Sem Ninguem") == []
 
 
+def test_get_supervisores_por_area_inclui_gestor_setor_puro(app):
+    """Nível 3: gestor_setor sem perfil supervisor/admin também entra na lista de
+    responsáveis elegíveis da própria área — pode ser escolhido na abertura do chamado."""
+    with _pii_off():
+        Usuario(
+            id="gestor1",
+            email="g1@b.com",
+            nome="Gestor1",
+            perfil="solicitante",
+            areas=["TI"],
+            nivel_gestao="gestor_setor",
+        ).save()
+
+        resultado = Usuario.get_supervisores_por_area("TI")
+
+    ids = {u.id for u in resultado}
+    assert ids == {"gestor1"}
+
+
+def test_get_supervisores_por_area_nao_duplica_supervisor_que_e_gestor_setor(app):
+    """Quem acumula perfil=supervisor + nivel_gestao=gestor_setor não pode aparecer 2x."""
+    with _pii_off():
+        Usuario(
+            id="dual1",
+            email="d1@b.com",
+            nome="Dual1",
+            perfil="supervisor",
+            areas=["TI"],
+            nivel_gestao="gestor_setor",
+        ).save()
+
+        resultado = Usuario.get_supervisores_por_area("TI")
+
+    ids = [u.id for u in resultado]
+    assert ids.count("dual1") == 1
+
+
+def test_get_supervisores_por_area_gestor_setor_de_outra_area_nao_aparece(app):
+    with _pii_off():
+        Usuario(
+            id="gestor2",
+            email="g2@b.com",
+            nome="Gestor2",
+            perfil="solicitante",
+            areas=["RH"],
+            nivel_gestao="gestor_setor",
+        ).save()
+
+        resultado = Usuario.get_supervisores_por_area("TI")
+
+    assert resultado == []
+
+
+def test_get_supervisores_por_area_nivel_gestao_company_wide_nao_aparece(app):
+    """gerente_producao/assistente_gm/gm são company-wide (sem escopo de área) — não
+    fazem sentido no dropdown de responsável por área, só gestor_setor entra."""
+    with _pii_off():
+        Usuario(
+            id="ger1",
+            email="ger1@b.com",
+            nome="Gerente1",
+            perfil="solicitante",
+            areas=["TI"],
+            nivel_gestao="gerente_producao",
+        ).save()
+
+        resultado = Usuario.get_supervisores_por_area("TI")
+
+    assert resultado == []
+
+
 # ── buscar_ativos ─────────────────────────────────────────────────────────────
 
 

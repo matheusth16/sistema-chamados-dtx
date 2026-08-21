@@ -114,6 +114,11 @@ def _resolver_responsavel(
 
     Setores de grupo (ver _eh_area_grupo) ignoram qualquer responsavel_id/
     responsavel_nome vindo do form — nunca têm dono único.
+
+    Além de supervisor/admin, aceita gestor_setor (Nível 3) mesmo sem perfil
+    operacional — ver Usuario.get_supervisores_por_area, que já restringe a
+    lista de candidatos à área certa; usuario_pode_operar_chamado tem exceção
+    simétrica pra esse gestor poder agir no chamado do qual é responsável.
     """
     tipo = form.get("tipo")
     categoria = form.get("categoria")
@@ -134,7 +139,10 @@ def _resolver_responsavel(
     # Bloqueia self-assignment: solicitante não pode ser o próprio responsável
     if responsavel_id_form and responsavel_nome_form and responsavel_id_form != solicitante_id:
         usuario_escolhido = Usuario.get_by_id(responsavel_id_form)
-        if usuario_escolhido and usuario_escolhido.perfil in ("supervisor", "admin"):
+        if usuario_escolhido and (
+            usuario_escolhido.perfil in ("supervisor", "admin")
+            or getattr(usuario_escolhido, "nivel_gestao", None) == "gestor_setor"
+        ):
             return (
                 responsavel_nome_form,
                 responsavel_id_form,

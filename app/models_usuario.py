@@ -660,7 +660,14 @@ class Usuario(UserMixin):
 
     @classmethod
     def get_supervisores_por_area(cls, area: str):
-        """Retorna supervisores e admins de uma área específica.
+        """Retorna supervisores, admins e gestores de setor de uma área específica.
+
+        Além de perfil supervisor/admin, inclui quem tem nivel_gestao=gestor_setor
+        na área — mesmo sem perfil operacional (Nível 3, ver [[project_nivel3_gerente_setor]]).
+        gerente_producao/assistente_gm/gm ficam de fora: são company-wide (sem
+        escopo de área), não fazem sentido como candidato a responsável de uma
+        área específica. Quem acumula perfil=supervisor + nivel_gestao=gestor_setor
+        entra só uma vez (checagem por perfil já cobre, dedupe evita duplicata).
 
         Usa o operador de contenção de array (ARRAY @> ARRAY[area]) — 1 query,
         aproveitando o índice GIN em areas[].
@@ -686,7 +693,10 @@ class Usuario(UserMixin):
             )
             for row in rows:
                 usuario = cls._from_row(row)
-                if usuario.perfil in ("supervisor", "admin"):
+                if (
+                    usuario.perfil in ("supervisor", "admin")
+                    or usuario.nivel_gestao == "gestor_setor"
+                ):
                     usuarios.append(usuario)
             return usuarios
         except Exception as e:

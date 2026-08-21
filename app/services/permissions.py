@@ -144,11 +144,17 @@ def usuario_pode_operar_chamado(user: Usuario, chamado: Any) -> bool:
     Diferente de usuario_pode_ver_chamado, NÃO herda a leitura ampliada que
     gestor_setor ganha sobre chamado de colega da própria área — enxergar não vira
     edição automática (Nível 3, ver [[project_nivel3_gerente_setor]]).
+
+    Exceção: um gestor 100% read-only (is_gestor_only) que foi escolhido como
+    responsável no ato da abertura do chamado (get_supervisores_por_area passou a
+    listar gestor_setor como candidato) pode operar esse chamado específico — senão
+    ficaria travado com um dono que estruturalmente não consegue agir nele. Não
+    amplia pra chamado de colega: só quando responsavel_id é o próprio gestor.
     """
     if user.is_admin_or_above:
         return True
     if getattr(user, "is_gestor_only", None) is True:
-        return False
+        return getattr(chamado, "responsavel_id", None) == getattr(user, "id", None)
     return _usuario_pode_operar_chamado_base(user, chamado)
 
 

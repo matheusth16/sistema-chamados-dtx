@@ -655,9 +655,13 @@ def api_confirmar_resolucao(chamado_id: str):
 def api_lista_supervisores():
     """Lista simples de supervisores por área para o formulário (rápida, sem contar carga)."""
     area = request.args.get("area", "").strip() or "Geral"
-    # incluir_gestor: opt-in usado só por "Transferir para Colega" — as demais
-    # chamadas (Transferir Área, Incluir Supervisores) continuam excluindo
-    # gestores da lista de responsável sugerido (ver ca68b05).
+    # incluir_gestor: opt-in usado só por "Transferir para Colega" — traz também
+    # gerente_producao/assistente_gm/gm (company-wide, sem escopo de área), que
+    # são só contato de escalonamento (decisão original de ca68b05). gestor_setor
+    # (escopo por área, Nível 3) não depende desse opt-in — aparece sempre, igual
+    # a um supervisor comum, porque pode ser escolhido como responsável de
+    # verdade na abertura do chamado (ver Usuario.get_supervisores_por_area /
+    # usuario_pode_operar_chamado).
     incluir_gestor = request.args.get("incluir_gestor") == "1"
     try:
         area_resolvida = setor_para_area(area) or area
@@ -694,7 +698,8 @@ def api_lista_supervisores():
                 "gestor": bool(getattr(u, "nivel_gestao", None)),
             }
             for u in supervisores
-            if u.id != current_user.id and (incluir_gestor or not getattr(u, "nivel_gestao", None))
+            if u.id != current_user.id
+            and (incluir_gestor or getattr(u, "nivel_gestao", None) in (None, "gestor_setor"))
         ]
         return sucesso_json(area=area_resolvida, supervisores=dados)
     except Exception as e:

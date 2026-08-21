@@ -1034,6 +1034,62 @@ def test_criacao_grava_supervisor_ids_com_acesso(app):
     assert "id_julia" in Chamado.get_by_id(chamado_id).supervisor_ids_com_acesso
 
 
+def test_criacao_aceita_gestor_setor_como_responsavel(app):
+    """Nível 3: gestor_setor (mesmo com perfil solicitante, sem ser supervisor/admin)
+    pode ser escolhido como responsável — get_supervisores_por_area passa a incluir
+    gestor_setor da área, e _resolver_responsavel precisa aceitá-lo.
+
+    atribuidor.atribuir é forçado a falhar (sucesso=False) pra isolar o caminho de
+    escolha manual: se _resolver_responsavel não aceitar o gestor_setor, o fallback
+    de atribuição automática deixaria o chamado com responsavel_id=solicitante_id
+    (aguardando atribuição manual) em vez de "id_gestor" — só a aceitação explícita
+    do gestor_setor produz o resultado esperado."""
+    gestor_mock = MagicMock()
+    gestor_mock.id = "id_gestor"
+    gestor_mock.nome = "Gestor Setor"
+    gestor_mock.perfil = "solicitante"
+    gestor_mock.nivel_gestao = "gestor_setor"
+
+    with (
+        patch(
+            "app.services.chamados_criacao_service.Usuario.get_supervisores_por_area",
+            return_value=[gestor_mock],
+        ),
+        patch(
+            "app.services.chamados_criacao_service.Usuario.get_by_id",
+            return_value=gestor_mock,
+        ),
+        patch(
+            "app.services.chamados_criacao_service.gerar_numero_chamado", return_value="2026-300"
+        ),
+        patch(
+            "app.services.chamados_criacao_service.calcular_supervisor_ids_com_acesso",
+            return_value=["id_gestor"],
+        ),
+        patch("app.services.chamados_criacao_service.atribuidor") as mock_atr,
+        patch("app.services.chamados_criacao_service.Historico"),
+        patch("app.services.chamados_criacao_service.threading.Thread"),
+        app.app_context(),
+    ):
+        mock_atr.atribuir.return_value = {
+            "sucesso": False,
+            "supervisor": None,
+            "motivo": "sem supervisor disponível",
+        }
+        chamado_id, numero, erro, aviso = criar_chamado(
+            form=_form_base(responsavel_id="id_gestor", responsavel_nome="Gestor Setor"),
+            files=_files_empty(),
+            solicitante_id="sol1",
+            solicitante_nome="Solicitante",
+            area_solicitante="Manutencao",
+        )
+
+    assert erro is None
+    assert aviso is None
+    assert chamado_id is not None
+    assert Chamado.get_by_id(chamado_id).responsavel_id == "id_gestor"
+
+
 # ---------------------------------------------------------------------------
 # Setores de distribuição em grupo (sem dono único na criação) — Compras e
 # Estoque (ex-Armazém, renomeado no catálogo) hoje; ver AREAS_GRUPO em

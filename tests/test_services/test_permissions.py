@@ -267,6 +267,27 @@ class TestUsuarioPodeOperarChamado:
         chamado = _chamado_mock(area="Manutencao", solicitante_id="gp_1")
         assert usuario_pode_operar_chamado(gestor_puro, chamado) is False
 
+    def test_gestor_puro_pode_operar_chamado_onde_e_o_responsavel(self):
+        """Exceção: gestor_setor escolhido como responsável na abertura do chamado
+        passa a poder operar esse chamado específico, mesmo sendo is_gestor_only —
+        senão o chamado ficaria travado com um dono que não consegue agir."""
+        gestor_puro = _usuario_mock(
+            "solicitante", areas=["Manutencao"], uid="gestor_1", nivel_gestao="gestor_setor"
+        )
+        gestor_puro.is_gestor_only = True
+        chamado = _chamado_mock(area="Manutencao", responsavel_id="gestor_1")
+        assert usuario_pode_operar_chamado(gestor_puro, chamado) is True
+
+    def test_gestor_puro_nao_pode_operar_chamado_de_colega_mesmo_na_propria_area(self):
+        """A exceção é só pro chamado do qual ele é o responsável — chamado de colega
+        na mesma área continua bloqueado (leitura ampliada não vira escrita)."""
+        gestor_puro = _usuario_mock(
+            "solicitante", areas=["Manutencao"], uid="gestor_1", nivel_gestao="gestor_setor"
+        )
+        gestor_puro.is_gestor_only = True
+        chamado = _chamado_mock(area="Manutencao", responsavel_id="colega_supervisor")
+        assert usuario_pode_operar_chamado(gestor_puro, chamado) is False
+
 
 class TestUsuarioGestorSetorPodeEscalonar:
     """Ações de Escalonamento (transferir área/colega, incluir participantes) —
